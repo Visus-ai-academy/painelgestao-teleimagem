@@ -1,0 +1,4 @@
+paciente,cliente_id,medico,data_exame,modalidade,especialidade,categoria,prioridade,status,valor_bruto
+João Silva,cliente-001,Dr. Antonio Carlos,2024-01-15,MR,NE,Normal,Urgente,Realizado,450.00
+Maria Santos,cliente-002,Dra. Ana Paula,2024-01-16,CT,CA,Normal,Rotina,Realizado,320.00
+Pedro Oliveira,cliente-001,Dr. Carlos Lima,2024-01-17,US,OB,Especial,Urgente,Realizado,280.00

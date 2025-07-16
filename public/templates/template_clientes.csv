@@ -1,0 +1,4 @@
+nome,email,telefone,endereco,cnpj,ativo
+Hospital São Lucas,contato@saolucas.com.br,(11) 3456-7890,"Rua das Flores, 123 - São Paulo/SP",12.345.678/0001-90,true
+Clínica Central,admin@clinicacentral.com.br,(11) 2345-6789,"Av. Paulista, 456 - São Paulo/SP",98.765.432/0001-10,true
+Centro Médico Norte,info@centronorte.com.br,(11) 4567-8901,"Rua Norte, 789 - São Paulo/SP",11.222.333/0001-44,true

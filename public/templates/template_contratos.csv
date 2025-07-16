@@ -1,0 +1,4 @@
+cliente_id,modalidade,especialidade,categoria,prioridade,valor,desconto,acrescimo,data_vigencia_inicio,data_vigencia_fim,ativo
+cliente-001,MR,NE,Normal,Urgente,450.00,0,50.00,2024-01-01,2024-12-31,true
+cliente-001,CT,CA,Normal,Rotina,320.00,10.00,0,2024-01-01,2024-12-31,true
+cliente-002,US,OB,Especial,Urgente,280.00,0,30.00,2024-01-01,2024-12-31,true
