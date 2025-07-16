@@ -31,7 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useUserPermissions, UserRole } from "@/hooks/useUserPermissions";
+import { useUserPermissions, useHasMenuPermission, UserRole } from "@/hooks/useUserPermissions";
 
 interface MenuItem {
   title: string;
@@ -136,27 +136,39 @@ export function AppSidebar() {
     return location.pathname.startsWith(url);
   };
 
-  // Filtrar itens do menu baseado nas permissões do usuário
-  const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
-    if (permissions.loading) return [];
+  // Verificar permissão para cada menu
+  const getMenuPermission = (url: string) => {
+    const menuKey = url === '/' ? 'dashboard' : url.substring(1).replace(/\//g, '-');
     
-    return items.filter(item => {
-      // Verificar se o usuário tem permissão para o item principal
-      const hasMainPermission = item.requiredRoles.some(role => permissions.roles.includes(role));
-      if (!hasMainPermission) return false;
-
-      // Filtrar subitens se existirem
-      if (item.subItems) {
-        item.subItems = item.subItems.filter(subItem => 
-          subItem.requiredRoles.some(role => permissions.roles.includes(role))
-        );
-      }
-
-      return true;
-    });
+    if (permissions.loading) return false;
+    
+    // Se é admin, tem acesso a tudo
+    if (permissions.isAdmin) return true;
+    
+    // Verificar se há permissão customizada para este menu
+    if (menuKey in permissions.menuPermissions) {
+      return permissions.menuPermissions[menuKey];
+    }
+    
+    // Permissões padrão baseadas em roles (fallback)
+    const defaultPermissions: Record<string, UserRole[]> = {
+      'dashboard': ['admin', 'manager', 'user'],
+      'operacional': ['admin', 'manager'],
+      'financeiro': ['admin', 'manager'],
+      'people': ['admin', 'manager'],
+      'contratos': ['admin', 'manager'],
+      'configuracao': ['admin'],
+      'volumetria': ['admin', 'manager', 'user'],
+    };
+    
+    const allowedRoles = defaultPermissions[menuKey] || [];
+    return permissions.roles.some(role => allowedRoles.includes(role));
   };
 
-  const filteredMenuItems = filterMenuItems(menuItems);
+  // Filtrar itens do menu baseado nas permissões do usuário
+  const filteredMenuItems = menuItems.filter(item => {
+    return getMenuPermission(item.url);
+  });
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>

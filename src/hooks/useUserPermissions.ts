@@ -129,9 +129,25 @@ export const useHasMenuPermission = (menuKey: string) => {
     // Se é admin, tem acesso a tudo
     if (permissions.isAdmin) return true;
     
-    // Verificar se há permissão customizada para este menu
+    // Verificar se é um sub-menu (contém hífen além do menu principal)
+    const menuParts = menuKey.split('-');
+    let mainMenuKey = menuKey;
+    
+    // Se for um sub-menu, extrair o menu principal
+    if (menuParts.length > 1) {
+      // Para sub-menus como 'operacional-producao', o menu principal é 'operacional'
+      // Para 'configuracao-faturamento', o menu principal é 'configuracao'
+      mainMenuKey = menuParts[0];
+    }
+    
+    // Verificar se há permissão customizada para este menu específico
     if (menuKey in permissions.menuPermissions) {
       return permissions.menuPermissions[menuKey];
+    }
+    
+    // Se for um sub-menu, verificar se tem acesso ao menu principal
+    if (menuParts.length > 1 && mainMenuKey in permissions.menuPermissions) {
+      return permissions.menuPermissions[mainMenuKey];
     }
     
     // Permissões padrão baseadas em roles (fallback)
@@ -158,7 +174,14 @@ export const useHasMenuPermission = (menuKey: string) => {
       'usuarios': ['admin'],
     };
     
-    const allowedRoles = defaultPermissions[menuKey] || [];
+    // Verificar permissão do menu específico
+    let allowedRoles = defaultPermissions[menuKey] || [];
+    
+    // Se for um sub-menu e não tiver permissão específica, verificar o menu principal
+    if (allowedRoles.length === 0 && menuParts.length > 1) {
+      allowedRoles = defaultPermissions[mainMenuKey] || [];
+    }
+    
     return permissions.roles.some(role => allowedRoles.includes(role));
   };
 
