@@ -46,6 +46,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile } from "@/lib/supabase";
 import { CalculoFaturamento } from "@/types/faturamento";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const clientes = [
   { id: "todos", nome: "Todos" },
@@ -146,29 +147,85 @@ export default function GerarFaturamento() {
     }
   };
 
-  const handleGerarFaturaCompleta = async () => {
-    if (!calculoAtual) {
+  const handleGerarRelatorio = async () => {
+    if (!clienteSelecionado || !faturamentoPeriodo) {
       toast({
-        title: "Dados Incompletos",
-        description: "Selecione um período/cliente.",
-        variant: "destructive"
+        title: "Erro",
+        description: "Selecione um cliente e período",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      const processo = await gerarFaturaCompleta(calculoAtual, "", "");
-      
-      toast({
-        title: "Processo Iniciado",
-        description: "Geração de PDF e envio de email iniciados!",
+      // Calcular datas do período
+      const ano = parseInt(faturamentoPeriodo.substring(0, 4));
+      const mes = parseInt(faturamentoPeriodo.substring(5, 7));
+      const dataInicio = new Date(ano, mes - 1, 1).toISOString().split('T')[0];
+      const dataFim = new Date(ano, mes, 0).toISOString().split('T')[0];
+
+      const response = await supabase.functions.invoke('gerar-relatorio-faturamento', {
+        body: {
+          cliente_id: clienteSelecionado,
+          periodo: faturamentoPeriodo,
+          data_inicio: dataInicio,
+          data_fim: dataFim
+        }
       });
-      
-    } catch (error) {
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      const { relatorio } = response.data;
+      setCalculoAtual(relatorio);
+
       toast({
-        title: "Erro ao Iniciar Processo",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive"
+        title: "Sucesso",
+        description: `Relatório gerado com ${relatorio.resumo.total_laudos} exames`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao gerar relatório:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao gerar relatório",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEnviarEmail = async () => {
+    if (!calculoAtual || !clienteSelecionado) {
+      toast({
+        title: "Erro", 
+        description: "Você precisa gerar o relatório primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await supabase.functions.invoke('enviar-relatorio-email', {
+        body: {
+          cliente_id: clienteSelecionado,
+          relatorio: calculoAtual
+        }
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `Email enviado com sucesso`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao enviar email:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao enviar email",
+        variant: "destructive",
       });
     }
   };
@@ -345,14 +402,26 @@ export default function GerarFaturamento() {
               </Button>
             </div>
             
-            <Button 
-              onClick={handleGerarFaturaCompleta}
-              className="w-full"
-              disabled={!calculoAtual || loading}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {loading ? "Iniciando..." : "Gerar e Enviar Cliente"}
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={handleGerarRelatorio}
+                className="w-full"
+                disabled={!clienteSelecionado || !faturamentoPeriodo || loading}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {loading ? "Gerando..." : "Gerar Relatório"}
+              </Button>
+              
+              <Button 
+                onClick={handleEnviarEmail}
+                variant="outline"
+                className="w-full"
+                disabled={!calculoAtual || loading}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {loading ? "Enviando..." : "Enviar por Email"}
+              </Button>
+            </div>
               <p className="text-xs text-muted-foreground text-center">
                 Gera PDF e envia automaticamente por email
               </p>
