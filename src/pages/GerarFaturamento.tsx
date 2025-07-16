@@ -105,13 +105,14 @@ export default function GerarFaturamento() {
             throw new Error(`Erro ao gerar relatório: ${responseRelatorio.error.message}`);
           }
 
-          // Marcar relatório como gerado
+          // Marcar relatório como gerado E atualizar contador em tempo real
           setResultados(prev => prev.map(r => 
             r.clienteId === cliente.id 
               ? { ...r, relatorioGerado: true, dataProcessamento: new Date().toLocaleString('pt-BR') }
               : r
           ));
           relatoriosCount++;
+          setRelatoriosGerados(relatoriosCount); // ✅ Atualizar em tempo real
 
           // Enviar email
           const responseEmail = await supabase.functions.invoke('enviar-relatorio-email', {
@@ -125,13 +126,14 @@ export default function GerarFaturamento() {
             throw new Error(`Erro ao enviar email: ${responseEmail.error.message}`);
           }
 
-          // Marcar email como enviado
+          // Marcar email como enviado E atualizar contador em tempo real
           setResultados(prev => prev.map(r => 
             r.clienteId === cliente.id 
               ? { ...r, emailEnviado: true }
               : r
           ));
           emailsCount++;
+          setEmailsEnviados(emailsCount); // ✅ Atualizar em tempo real
 
         } catch (error: any) {
           console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
@@ -144,10 +146,6 @@ export default function GerarFaturamento() {
           ));
         }
       }
-
-      // Atualizar contadores totais
-      setRelatoriosGerados(relatoriosCount);
-      setEmailsEnviados(emailsCount);
 
       toast({
         title: "Processamento Concluído",
@@ -167,15 +165,24 @@ export default function GerarFaturamento() {
   };
 
   const limparResultados = () => {
+    // ✅ Reset completo de todos os estados
     setResultados(clientes.map(cliente => ({
       clienteId: cliente.id,
       clienteNome: cliente.nome,
       relatorioGerado: false,
       emailEnviado: false,
       emailDestino: cliente.email,
+      erro: undefined, // ✅ Limpar erros também
+      dataProcessamento: undefined // ✅ Limpar data de processamento
     })));
     setRelatoriosGerados(0);
     setEmailsEnviados(0);
+    
+    // ✅ Toast de confirmação
+    toast({
+      title: "Status Limpo",
+      description: "Todos os status foram resetados",
+    });
   };
 
   return (
