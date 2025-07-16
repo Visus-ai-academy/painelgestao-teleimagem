@@ -8,9 +8,10 @@ interface FilterBarProps {
   onPeriodChange?: (period: string) => void;
   onModalityChange?: (modality: string) => void;
   onSpecialtyChange?: (specialty: string) => void;
+  extraFilters?: React.ReactNode;
 }
 
-export function FilterBar({ onPeriodChange, onModalityChange, onSpecialtyChange }: FilterBarProps) {
+export function FilterBar({ onPeriodChange, onModalityChange, onSpecialtyChange, extraFilters }: FilterBarProps) {
   return (
     <Card className="p-4 mb-6">
       <div className="flex flex-wrap gap-4 items-center">
@@ -60,6 +61,8 @@ export function FilterBar({ onPeriodChange, onModalityChange, onSpecialtyChange 
           <Calendar className="h-4 w-4 mr-2" />
           Data personalizada
         </Button>
+
+        {extraFilters}
       </div>
     </Card>
   );

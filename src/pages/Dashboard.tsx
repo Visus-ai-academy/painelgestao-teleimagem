@@ -64,7 +64,7 @@ export default function Dashboard() {
             iconColor="text-green-600"
           />
         </div>
-        <div onClick={() => navigate("/people")} className="cursor-pointer">
+        <Card onClick={() => navigate("/people/medicos-ativos")} className="cursor-pointer hover:shadow-lg transition-shadow">
           <MetricCard
             title="Médicos Ativos"
             value="156"
@@ -73,7 +73,7 @@ export default function Dashboard() {
             icon={Users}
             iconColor="text-purple-600"
           />
-        </div>
+        </Card>
         <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
           <MetricCard
             title="Taxa de Qualidade"

@@ -14,6 +14,9 @@ import Escala from "./pages/Escala";
 import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
 import People from "./pages/People";
+import MedicosAtivos from "./pages/MedicosAtivos";
+import Desenvolvimento from "./pages/Desenvolvimento";
+import TreinamentoEquipe from "./pages/TreinamentoEquipe";
 import ContratosClientes from "./pages/ContratosClientes";
 import ContratosFornecedores from "./pages/ContratosFornecedores";
 import NotFound from "./pages/NotFound";
@@ -37,6 +40,9 @@ const App = () => (
             <Route path="/financeiro/*" element={<Financeiro />} />
             <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
             <Route path="/people/*" element={<People />} />
+            <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
+            <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />
+            <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
             <Route path="/contratos/clientes" element={<ContratosClientes />} />
             <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />
             <Route path="*" element={<NotFound />} />

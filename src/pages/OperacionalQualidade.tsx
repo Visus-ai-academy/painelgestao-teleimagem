@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ const teamData = [
 ];
 
 export default function OperacionalQualidade() {
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState("mensal");
   const [viewMode, setViewMode] = useState<"modalidade" | "medico">("modalidade");
   const [selectedTeam, setSelectedTeam] = useState<string>("todas");
@@ -339,7 +341,10 @@ export default function OperacionalQualidade() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button className="h-auto flex-col items-start p-4">
+            <Button 
+              className="h-auto flex-col items-start p-4"
+              onClick={() => navigate("/operacional/qualidade/treinamento-equipe")}
+            >
               <Users className="h-6 w-6 mb-2" />
               <span className="font-semibold">Treinamento Equipe</span>
               <span className="text-sm opacity-90">Capacitação técnica</span>
