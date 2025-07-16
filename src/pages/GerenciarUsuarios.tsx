@@ -28,7 +28,8 @@ import {
   Search,
   Crown,
   UserCheck,
-  MoreHorizontal
+  MoreHorizontal,
+  Settings
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { MenuPermissionsDialog } from "@/components/MenuPermissionsDialog";
 
 interface User {
   id: string;
@@ -58,6 +60,11 @@ export default function GerenciarUsuarios() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [menuPermissionsDialog, setMenuPermissionsDialog] = useState<{
+    isOpen: boolean;
+    userId: string;
+    userEmail: string;
+  }>({ isOpen: false, userId: '', userEmail: '' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -340,6 +347,16 @@ export default function GerenciarUsuarios() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
+                            onClick={() => setMenuPermissionsDialog({
+                              isOpen: true,
+                              userId: user.id,
+                              userEmail: user.email
+                            })}
+                          >
+                            <Settings className="mr-2 h-4 w-4" />
+                            Gerenciar Menus
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => updateUserRole(user.id, 'admin')}
                             disabled={user.roles.includes('admin')}
                           >
@@ -370,6 +387,13 @@ export default function GerenciarUsuarios() {
           </Table>
         </CardContent>
       </Card>
+
+      <MenuPermissionsDialog
+        isOpen={menuPermissionsDialog.isOpen}
+        onClose={() => setMenuPermissionsDialog({ isOpen: false, userId: '', userEmail: '' })}
+        userId={menuPermissionsDialog.userId}
+        userEmail={menuPermissionsDialog.userEmail}
+      />
     </div>
   );
 }

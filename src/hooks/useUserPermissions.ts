@@ -8,7 +8,13 @@ interface UserPermissions {
   isManager: boolean;
   isUser: boolean;
   roles: UserRole[];
+  menuPermissions: Record<string, boolean>;
   loading: boolean;
+}
+
+interface MenuPermission {
+  menu_key: string;
+  granted: boolean;
 }
 
 export const useUserPermissions = (): UserPermissions => {
@@ -17,6 +23,7 @@ export const useUserPermissions = (): UserPermissions => {
     isManager: false,
     isUser: false,
     roles: [],
+    menuPermissions: {},
     loading: true,
   });
 
@@ -31,29 +38,48 @@ export const useUserPermissions = (): UserPermissions => {
             isManager: false,
             isUser: false,
             roles: [],
+            menuPermissions: {},
             loading: false,
           });
           return;
         }
 
-        const { data: userRoles, error } = await supabase
+        // Buscar roles do usuário
+        const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id);
 
-        if (error) {
-          console.error('Erro ao buscar roles:', error);
+        if (rolesError) {
+          console.error('Erro ao buscar roles:', rolesError);
           setPermissions(prev => ({ ...prev, loading: false }));
           return;
         }
 
         const roles = userRoles?.map(r => r.role as UserRole) || ['user'];
+
+        // Buscar permissões customizadas de menu
+        const { data: menuPermissionsData, error: menuError } = await supabase
+          .from('user_menu_permissions')
+          .select('menu_key, granted')
+          .eq('user_id', user.id);
+
+        if (menuError && menuError.code !== 'PGRST116') { // Ignorar erro de nenhum resultado
+          console.error('Erro ao buscar permissões de menu:', menuError);
+        }
+
+        // Converter para objeto menu_key -> boolean
+        const menuPermissions: Record<string, boolean> = {};
+        menuPermissionsData?.forEach((perm: MenuPermission) => {
+          menuPermissions[perm.menu_key] = perm.granted;
+        });
         
         setPermissions({
           isAdmin: roles.includes('admin'),
           isManager: roles.includes('manager'),
           isUser: roles.includes('user'),
           roles,
+          menuPermissions,
           loading: false,
         });
       } catch (error) {
@@ -90,5 +116,54 @@ export const useHasPermission = (requiredRoles: UserRole | UserRole[]) => {
     hasPermission: hasPermission(),
     loading: permissions.loading,
     userRoles: permissions.roles,
+  };
+};
+
+// Hook para verificar permissão de menu específico
+export const useHasMenuPermission = (menuKey: string) => {
+  const permissions = useUserPermissions();
+  
+  const hasMenuPermission = () => {
+    if (permissions.loading) return false;
+    
+    // Se é admin, tem acesso a tudo
+    if (permissions.isAdmin) return true;
+    
+    // Verificar se há permissão customizada para este menu
+    if (menuKey in permissions.menuPermissions) {
+      return permissions.menuPermissions[menuKey];
+    }
+    
+    // Permissões padrão baseadas em roles (fallback)
+    const defaultPermissions: Record<string, UserRole[]> = {
+      'dashboard': ['admin', 'manager', 'user'],
+      'operacional': ['admin', 'manager'],
+      'operacional-producao': ['admin', 'manager'],
+      'operacional-qualidade': ['admin', 'manager'],
+      'financeiro': ['admin', 'manager'],
+      'gerar-faturamento': ['admin', 'manager'],
+      'configuracao-faturamento': ['admin'],
+      'regua-cobranca': ['admin', 'manager'],
+      'contratos-clientes': ['admin', 'manager'],
+      'contratos-fornecedores': ['admin'],
+      'volumetria': ['admin', 'manager'],
+      'medicos-ativos': ['admin', 'manager'],
+      'escala': ['admin', 'manager'],
+      'colaboradores': ['admin', 'manager'],
+      'treinamento-equipe': ['admin', 'manager'],
+      'plano-carreira': ['admin', 'manager'],
+      'bonificacao': ['admin', 'manager'],
+      'desenvolvimento': ['admin'],
+      'configuracao': ['admin'],
+      'usuarios': ['admin'],
+    };
+    
+    const allowedRoles = defaultPermissions[menuKey] || [];
+    return permissions.roles.some(role => allowedRoles.includes(role));
+  };
+
+  return {
+    hasMenuPermission: hasMenuPermission(),
+    loading: permissions.loading,
   };
 };
