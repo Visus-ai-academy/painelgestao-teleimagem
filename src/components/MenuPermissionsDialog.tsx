@@ -41,6 +41,7 @@ const menuOptions: MenuOption[] = [
   { key: 'operacional-producao', label: 'Produção', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
   { key: 'operacional-qualidade', label: 'Qualidade', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
   { key: 'escala', label: 'Escala', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
   
   // Sub-menus do Financeiro
   { key: 'gerar-faturamento', label: 'Gerar Faturamento', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
@@ -60,9 +61,6 @@ const menuOptions: MenuOption[] = [
   // Sub-menus da Configuração
   { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
   { key: 'configuracao-faturamento', label: 'Configuração Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
-  
-  // Outros menus independentes
-  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'] },
 ];
 
 export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
