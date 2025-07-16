@@ -1,7 +1,8 @@
-
 import { useState } from "react";
 import { FilterBar } from "@/components/FilterBar";
 import { MetricCard } from "@/components/MetricCard";
+import { Speedometer } from "@/components/Speedometer";
+import { StatusIndicator } from "@/components/StatusIndicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, TrendingUp, Activity, Users } from "lucide-react";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
@@ -69,6 +70,75 @@ export default function Volumetria() {
           icon={TrendingUp}
         />
       </div>
+
+      {/* Velocímetros de Volume */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Indicadores de Volume</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Speedometer
+              value={87}
+              max={100}
+              label="Meta Mensal"
+              unit="%"
+            />
+            <Speedometer
+              value={156}
+              max={180}
+              label="Exames/Dia"
+              unit=""
+              colorThresholds={{
+                low: { threshold: 40, color: "#ef4444" },
+                medium: { threshold: 70, color: "#f59e0b" },
+                high: { threshold: 100, color: "#10b981" }
+              }}
+            />
+            <Speedometer
+              value={92}
+              max={100}
+              label="Capacidade Utilizada"
+              unit="%"
+            />
+            <Speedometer
+              value={15.2}
+              max={20}
+              label="Taxa de Crescimento"
+              unit="%"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sinaleiros de Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status de Volume</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatusIndicator
+              status="good"
+              label="Volume Urgência"
+              value="Normal"
+              description="Dentro da capacidade planejada"
+            />
+            <StatusIndicator
+              status="warning"
+              label="Volume Eletivo"
+              value="Alto"
+              description="85% da capacidade máxima"
+            />
+            <StatusIndicator
+              status="good"
+              label="Distribuição Semanal"
+              value="Balanceada"
+              description="Volume equilibrado entre os dias"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Volume Diário */}

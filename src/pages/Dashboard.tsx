@@ -1,4 +1,3 @@
-
 import { 
   Activity, 
   DollarSign, 
@@ -10,6 +9,8 @@ import {
   Award
 } from "lucide-react";
 import { MetricCard } from "@/components/MetricCard";
+import { Speedometer } from "@/components/Speedometer";
+import { StatusIndicator } from "@/components/StatusIndicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
@@ -73,6 +74,70 @@ export default function Dashboard() {
           iconColor="text-orange-600"
         />
       </div>
+
+      {/* Velocímetros de Performance */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Indicadores de Performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Speedometer
+              value={95}
+              max={100}
+              label="Meta de Produção"
+              unit="%"
+            />
+            <Speedometer
+              value={98}
+              max={100}
+              label="Qualidade"
+              unit="%"
+            />
+            <Speedometer
+              value={92}
+              max={100}
+              label="Eficiência"
+              unit="%"
+            />
+            <Speedometer
+              value={96}
+              max={100}
+              label="SLA"
+              unit="%"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sinaleiros de Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status Operacional</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatusIndicator
+              status="good"
+              label="Sistema"
+              value="Online"
+              description="Todos os serviços funcionando normalmente"
+            />
+            <StatusIndicator
+              status="warning"
+              label="Capacidade"
+              value="85%"
+              description="Próximo do limite de capacidade"
+            />
+            <StatusIndicator
+              status="good"
+              label="Fila de Exames"
+              value="12 min"
+              description="Tempo médio de espera"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

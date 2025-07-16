@@ -1,6 +1,7 @@
-
 import { FilterBar } from "@/components/FilterBar";
 import { MetricCard } from "@/components/MetricCard";
+import { Speedometer } from "@/components/Speedometer";
+import { StatusIndicator } from "@/components/StatusIndicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, CreditCard, PiggyBank } from "lucide-react";
 import { Line, LineChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
@@ -65,6 +66,76 @@ export default function Financeiro() {
           icon={PiggyBank}
         />
       </div>
+
+      {/* Velocímetros Financeiros */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Indicadores Financeiros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Speedometer
+              value={32.7}
+              max={40}
+              label="Margem Líquida"
+              unit="%"
+            />
+            <Speedometer
+              value={84.6}
+              max={100}
+              label="Taxa de Recebimento"
+              unit="%"
+            />
+            <Speedometer
+              value={68}
+              max={100}
+              label="Eficiência de Custos"
+              unit="%"
+            />
+            <Speedometer
+              value={92}
+              max={100}
+              label="Meta Faturamento"
+              unit="%"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sinaleiros Financeiros */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status Financeiro</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatusIndicator
+              status="good"
+              label="Fluxo de Caixa"
+              value="Positivo"
+              description="R$ 1.8M disponível"
+            />
+            <StatusIndicator
+              status="good"
+              label="Inadimplência"
+              value="2.3%"
+              description="Dentro do limite aceitável"
+            />
+            <StatusIndicator
+              status="warning"
+              label="Contas a Pagar"
+              value="15 dias"
+              description="Prazo médio de pagamento"
+            />
+            <StatusIndicator
+              status="good"
+              label="ROI"
+              value="18.5%"
+              description="Retorno sobre investimento"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gráficos Financeiros */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
