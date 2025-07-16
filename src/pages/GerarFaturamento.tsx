@@ -355,6 +355,16 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6 mt-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
+            <ol className="list-decimal list-inside space-y-1 text-blue-800">
+              <li><strong>Primeiro:</strong> Upload de Clientes (cria os IDs na base)</li>
+              <li><strong>Segundo:</strong> Upload de Exames (vincula aos clientes)</li>
+              <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
+              <li><strong>Último:</strong> Escalas e Financeiro (opcionais)</li>
+            </ol>
+          </div>
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <FileUpload
               title="Upload de Clientes"

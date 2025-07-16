@@ -1,1 +1,22 @@
 project_id = "atbvikgxdcohnznkmaus"
+
+[functions.processar-exames]
+verify_jwt = false
+
+[functions.processar-clientes]
+verify_jwt = false
+
+[functions.processar-contratos]
+verify_jwt = false
+
+[functions.processar-escalas]
+verify_jwt = false
+
+[functions.processar-financeiro]
+verify_jwt = false
+
+[functions.gerar-relatorio-faturamento]
+verify_jwt = false
+
+[functions.enviar-relatorio-email]
+verify_jwt = false
