@@ -195,92 +195,78 @@ export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
               sobrescreverão as permissões padrão baseadas no role.
             </div>
 
-            <div className="space-y-6">
-              {/* Menus Principais */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 text-primary">Menus Principais</h3>
-                <div className="grid gap-3">
-                  {menuOptions
-                    .filter(menu => !menu.isSubMenu)
-                    .map((menu) => (
-                      <div
-                        key={menu.key}
-                        className="flex items-center space-x-3 p-3 border rounded-md bg-card"
-                      >
-                        <Checkbox
-                          id={menu.key}
-                          checked={permissions[menu.key] || false}
-                          onCheckedChange={(checked) =>
-                            handlePermissionChange(menu.key, !!checked)
-                          }
-                        />
-                        <div className="flex-1">
-                          <label
-                            htmlFor={menu.key}
-                            className="text-sm font-medium cursor-pointer"
-                          >
-                            {menu.label}
-                          </label>
-                          <div className="text-xs text-muted-foreground">
-                            Padrão para: {menu.defaultRoles.join(', ')}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground mb-3">
+                Acesso aos sub-menus é concedido automaticamente quando o usuário tem acesso ao menu principal correspondente.
               </div>
-
-              {/* Sub-menus */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 text-primary">Sub-menus</h3>
-                <div className="text-sm text-muted-foreground mb-3">
-                  Acesso aos sub-menus é concedido automaticamente quando o usuário tem acesso ao menu principal correspondente.
-                </div>
-                
-                {/* Agrupar sub-menus por menu pai */}
-                {[...new Set(menuOptions.filter(menu => menu.isSubMenu).map(menu => menu.parentMenu))].map(parentMenu => {
-                  const parentMenuData = menuOptions.find(menu => menu.key === parentMenu);
-                  const subMenus = menuOptions.filter(menu => menu.parentMenu === parentMenu);
-                  
-                  return (
-                    <div key={parentMenu} className="mb-4">
-                      <h4 className="text-md font-medium mb-2 text-foreground capitalize">
-                        {parentMenuData?.label}
-                      </h4>
-                      <div className="grid gap-2 ml-4">
-                        {subMenus.map((menu) => (
-                          <div
-                            key={menu.key}
-                            className="flex items-center space-x-3 p-2 border rounded-md bg-muted/30"
-                          >
-                            <Checkbox
-                              id={menu.key}
-                              checked={permissions[menu.key] || false}
-                              onCheckedChange={(checked) =>
-                                handlePermissionChange(menu.key, !!checked)
-                              }
-                              disabled={permissions[parentMenu!] === true}
-                            />
-                            <div className="flex-1">
-                              <label
-                                htmlFor={menu.key}
-                                className="text-sm cursor-pointer"
-                              >
-                                {menu.label}
-                              </label>
-                              <div className="text-xs text-muted-foreground">
-                                Padrão para: {menu.defaultRoles.join(', ')}
-                                {permissions[parentMenu!] === true && (
-                                  <span className="ml-2 text-green-600">• Habilitado pelo menu principal</span>
-                                )}
-                              </div>
+              
+              <div className="space-y-4">
+                {menuOptions
+                  .filter(menu => !menu.isSubMenu)
+                  .map((mainMenu) => {
+                    const subMenus = menuOptions.filter(menu => menu.parentMenu === mainMenu.key);
+                    
+                    return (
+                      <div key={mainMenu.key} className="space-y-2">
+                        {/* Menu Principal */}
+                        <div className="flex items-center space-x-3 p-3 border rounded-md bg-card">
+                          <Checkbox
+                            id={mainMenu.key}
+                            checked={permissions[mainMenu.key] || false}
+                            onCheckedChange={(checked) =>
+                              handlePermissionChange(mainMenu.key, !!checked)
+                            }
+                          />
+                          <div className="flex-1">
+                            <label
+                              htmlFor={mainMenu.key}
+                              className="text-sm font-medium cursor-pointer"
+                            >
+                              {mainMenu.label}
+                            </label>
+                            <div className="text-xs text-muted-foreground">
+                              Padrão para: {mainMenu.defaultRoles.join(', ')}
                             </div>
                           </div>
-                        ))}
+                        </div>
+
+                        {/* Sub-menus */}
+                        {subMenus.length > 0 && (
+                          <div className="ml-6 space-y-2">
+                            {subMenus.map((subMenu) => (
+                              <div
+                                key={subMenu.key}
+                                className="flex items-center space-x-3 p-2 border rounded-md bg-muted/30"
+                              >
+                                <Checkbox
+                                  id={subMenu.key}
+                                  checked={permissions[subMenu.key] || false}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(subMenu.key, !!checked)
+                                  }
+                                  disabled={permissions[mainMenu.key] === true}
+                                />
+                                <div className="flex-1">
+                                  <label
+                                    htmlFor={subMenu.key}
+                                    className="text-sm cursor-pointer"
+                                  >
+                                    {subMenu.label}
+                                  </label>
+                                  <div className="text-xs text-muted-foreground">
+                                    Padrão para: {subMenu.defaultRoles.join(', ')}
+                                    {permissions[mainMenu.key] === true && (
+                                      <span className="ml-2 text-green-600">• Habilitado pelo menu principal</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           </div>
