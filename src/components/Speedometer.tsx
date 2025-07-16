@@ -39,7 +39,7 @@ export function Speedometer({
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-32 h-16">
+      <div className="relative w-36 h-20 mb-2">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -48,8 +48,8 @@ export function Speedometer({
               cy="100%"
               startAngle={180}
               endAngle={0}
-              innerRadius={40}
-              outerRadius={60}
+              innerRadius={45}
+              outerRadius={65}
               dataKey="value"
             >
               {data.map((entry, index) => (
@@ -58,14 +58,16 @@ export function Speedometer({
             </Pie>
           </PieChart>
         </ResponsiveContainer>
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-2">
-          <span className="text-2xl font-bold" style={{ color: getColor() }}>
-            {value}{unit}
-          </span>
-          <span className="text-xs text-gray-500">de {max}{unit}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
+          <div className="text-center">
+            <span className="text-xl font-bold block" style={{ color: getColor() }}>
+              {value}{unit}
+            </span>
+            <span className="text-xs text-gray-500 block">de {max}{unit}</span>
+          </div>
         </div>
       </div>
-      <span className="text-sm font-medium text-center mt-2">{label}</span>
+      <span className="text-sm font-medium text-center">{label}</span>
     </div>
   );
 }

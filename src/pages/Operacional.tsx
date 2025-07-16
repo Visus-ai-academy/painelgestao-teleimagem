@@ -3,7 +3,9 @@ import { FilterBar } from "@/components/FilterBar";
 import { MetricCard } from "@/components/MetricCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, Users, Clock, Award, TrendingUp, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Target, Users, Clock, Award, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
@@ -12,19 +14,33 @@ const teamPerformance = [
     team: "Equipe A", 
     production: { meta: 100, realizado: 95 },
     quality: { meta: 98, realizado: 97 },
-    efficiency: { meta: 90, realizado: 88 }
+    efficiency: { meta: 90, realizado: 88 },
+    members: [
+      { name: "Dr. João Silva", especialidade: "NE", modalidade: "MR", status: "Ativo", experiencia: "5 anos" },
+      { name: "Dra. Ana Costa", especialidade: "CA", modalidade: "CT", status: "Ativo", experiencia: "8 anos" },
+      { name: "Dr. Carlos Lima", especialidade: "ME", modalidade: "DO", status: "Férias", experiencia: "3 anos" }
+    ]
   },
   { 
     team: "Equipe B", 
     production: { meta: 100, realizado: 102 },
     quality: { meta: 98, realizado: 99 },
-    efficiency: { meta: 90, realizado: 92 }
+    efficiency: { meta: 90, realizado: 92 },
+    members: [
+      { name: "Dra. Maria Santos", especialidade: "MI", modalidade: "MG", status: "Ativo", experiencia: "12 anos" },
+      { name: "Dr. Pedro Oliveira", especialidade: "MA", modalidade: "RX", status: "Ativo", experiencia: "7 anos" },
+      { name: "Dra. Sofia Mendes", especialidade: "CA", modalidade: "CT", status: "Licença", experiencia: "4 anos" }
+    ]
   },
   { 
     team: "Equipe C", 
     production: { meta: 100, realizado: 87 },
     quality: { meta: 98, realizado: 95 },
-    efficiency: { meta: 90, realizado: 85 }
+    efficiency: { meta: 90, realizado: 85 },
+    members: [
+      { name: "Dr. Bruno Alves", especialidade: "NE", modalidade: "MR", status: "Ativo", experiencia: "6 anos" },
+      { name: "Dra. Lucia Rocha", especialidade: "ME", modalidade: "DO", status: "Ativo", experiencia: "9 anos" }
+    ]
   }
 ];
 
@@ -89,9 +105,45 @@ export default function Operacional() {
                 <div key={team.team} className="border rounded-lg p-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-semibold">{team.team}</h3>
-                    <Badge variant="outline">
-                      {team.production.realizado >= team.production.meta ? "No alvo" : "Abaixo"}
-                    </Badge>
+                    <div className="flex gap-2">
+                      <Badge variant="outline">
+                        {team.production.realizado >= team.production.meta ? "No alvo" : "Abaixo"}
+                      </Badge>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-3 w-3 mr-1" />
+                            Ver Equipe
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Integrantes da {team.team}</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {team.members.map((member, index) => (
+                              <div key={index} className="p-4 border rounded-lg">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h4 className="font-semibold">{member.name}</h4>
+                                    <p className="text-sm text-gray-600">
+                                      Especialidade: {member.especialidade} | Modalidade: {member.modalidade}
+                                    </p>
+                                    <p className="text-sm text-gray-600">Experiência: {member.experiencia}</p>
+                                  </div>
+                                  <Badge 
+                                    variant={member.status === "Ativo" ? "default" : 
+                                            member.status === "Férias" ? "secondary" : "destructive"}
+                                  >
+                                    {member.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                   
                   <div className="space-y-3">

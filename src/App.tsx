@@ -8,6 +8,8 @@ import { Layout } from "@/components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Volumetria from "./pages/Volumetria";
 import Operacional from "./pages/Operacional";
+import OperacionalProducao from "./pages/OperacionalProducao";
+import OperacionalQualidade from "./pages/OperacionalQualidade";
 import Escala from "./pages/Escala";
 import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
@@ -29,6 +31,8 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/volumetria/*" element={<Volumetria />} />
             <Route path="/operacional/*" element={<Operacional />} />
+            <Route path="/operacional/producao" element={<OperacionalProducao />} />
+            <Route path="/operacional/qualidade" element={<OperacionalQualidade />} />
             <Route path="/operacional/escala" element={<Escala />} />
             <Route path="/financeiro/*" element={<Financeiro />} />
             <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
