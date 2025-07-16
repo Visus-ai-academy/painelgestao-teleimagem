@@ -49,6 +49,8 @@ interface ContratoCliente {
   servicos: ServicoContratado[];
   valorTotal: number;
   diasParaVencer: number;
+  indiceReajuste: "IPCA" | "IGP-M" | "INPC" | "CDI";
+  percentualUltimos12Meses?: number;
 }
 
 interface ServicoContratado {
@@ -71,7 +73,8 @@ const contratosData: ContratoCliente[] = [
       { modalidade: "CT", especialidade: "CA", categoria: "Contrastado", prioridade: "Rotina", valor: 380.00 },
     ],
     valorTotal: 830.00,
-    diasParaVencer: 120
+    diasParaVencer: 120,
+    indiceReajuste: "IPCA"
   },
   {
     id: "2",
@@ -84,7 +87,9 @@ const contratosData: ContratoCliente[] = [
       { modalidade: "MG", especialidade: "MI", categoria: "Score", prioridade: "Rotina", valor: 180.00 },
     ],
     valorTotal: 400.00,
-    diasParaVencer: 45
+    diasParaVencer: 45,
+    indiceReajuste: "IGP-M",
+    percentualUltimos12Meses: 5.45
   },
   {
     id: "3",
@@ -96,7 +101,8 @@ const contratosData: ContratoCliente[] = [
       { modalidade: "RX", especialidade: "MA", categoria: "Prostata", prioridade: "Plantão", valor: 120.00 },
     ],
     valorTotal: 120.00,
-    diasParaVencer: -30
+    diasParaVencer: -30,
+    indiceReajuste: "INPC"
   },
 ];
 
@@ -275,8 +281,8 @@ export default function ContratosClientes() {
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vigência</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Serviços</TableHead>
-                <TableHead>Valor Total</TableHead>
+                <TableHead>Serviços Contratados</TableHead>
+                <TableHead>Índice Reajuste</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -290,15 +296,33 @@ export default function ContratosClientes() {
                   </TableCell>
                   <TableCell>{getStatusBadge(contrato.status, contrato.diasParaVencer)}</TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="space-y-1">
                       {contrato.servicos.map((servico, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {servico.modalidade}/{servico.especialidade}
-                        </Badge>
+                        <div key={index} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {servico.modalidade}/{servico.especialidade}
+                            </Badge>
+                            <span className="text-gray-600">{servico.categoria}</span>
+                            <span className="text-gray-500">({servico.prioridade})</span>
+                          </div>
+                          <span className="font-medium text-green-600">
+                            R$ {servico.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell>R$ {contrato.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div className="font-medium">{contrato.indiceReajuste}</div>
+                      {contrato.percentualUltimos12Meses && contrato.diasParaVencer <= 60 && (
+                        <div className="text-xs text-orange-600 font-medium">
+                          {contrato.percentualUltimos12Meses}% (12m)
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button 
