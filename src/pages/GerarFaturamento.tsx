@@ -165,20 +165,23 @@ export default function GerarFaturamento() {
   };
 
   const limparResultados = () => {
-    // ✅ Reset completo de todos os estados
-    setResultados(clientes.map(cliente => ({
+    // ✅ Reset completo de todos os estados e forçar re-render
+    const novosResultados = clientes.map(cliente => ({
       clienteId: cliente.id,
       clienteNome: cliente.nome,
       relatorioGerado: false,
       emailEnviado: false,
       emailDestino: cliente.email,
-      erro: undefined, // ✅ Limpar erros também
-      dataProcessamento: undefined // ✅ Limpar data de processamento
-    })));
+      erro: undefined,
+      dataProcessamento: undefined
+    }));
+    
+    setResultados(novosResultados);
     setRelatoriosGerados(0);
     setEmailsEnviados(0);
     
-    // ✅ Toast de confirmação
+    console.log("Estado limpo:", novosResultados); // Debug
+    
     toast({
       title: "Status Limpo",
       description: "Todos os status foram resetados",
