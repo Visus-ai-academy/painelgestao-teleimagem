@@ -66,8 +66,17 @@ const specialtyQuality = [
   { specialty: "MA - Mastologia", quality: 98.9, trend: "+0.6%" }
 ];
 
+const doctorQuality = [
+  { name: "Dr. João Silva", specialty: "NE", exams: 145, approved: 143, quality: 98.6, trend: "+0.2%" },
+  { name: "Dra. Maria Santos", specialty: "CA", exams: 128, approved: 125, quality: 97.7, trend: "+0.1%" },
+  { name: "Dr. Carlos Lima", specialty: "ME", exams: 118, approved: 116, quality: 98.3, trend: "-0.1%" },
+  { name: "Dra. Ana Costa", specialty: "MI", exams: 102, approved: 99, quality: 97.1, trend: "+0.3%" },
+  { name: "Dr. Pedro Oliveira", specialty: "MA", exams: 89, approved: 88, quality: 98.9, trend: "+0.4%" }
+];
+
 export default function OperacionalQualidade() {
   const [selectedPeriod, setSelectedPeriod] = useState("mensal");
+  const [viewMode, setViewMode] = useState<"modalidade" | "medico">("modalidade");
   
   const totalExams = qualityMetrics.reduce((sum, metric) => sum + metric.total, 0);
   const totalApproved = qualityMetrics.reduce((sum, metric) => sum + metric.approved, 0);
@@ -124,45 +133,107 @@ export default function OperacionalQualidade() {
         />
       </div>
 
-      {/* Qualidade por Modalidade */}
+      {/* Qualidade por Modalidade ou Médico */}
       <Card>
         <CardHeader>
-          <CardTitle>Qualidade por Modalidade</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>
+              {viewMode === "modalidade" ? "Qualidade por Modalidade" : "Qualidade por Médico"}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant={viewMode === "modalidade" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setViewMode("modalidade")}
+              >
+                Por Modalidade
+              </Button>
+              <Button 
+                variant={viewMode === "medico" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setViewMode("medico")}
+              >
+                Por Médico
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {qualityMetrics.map((metric, index) => (
-              <div key={index} className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <h3 className="font-semibold">{metric.examType}</h3>
-                    <p className="text-sm text-gray-600">Categoria: {metric.category}</p>
+            {viewMode === "modalidade" ? (
+              qualityMetrics.map((metric, index) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-semibold">{metric.examType}</h3>
+                      <p className="text-sm text-gray-600">Categoria: {metric.category}</p>
+                    </div>
+                    {getQualityBadge(metric.quality)}
                   </div>
-                  {getQualityBadge(metric.quality)}
+                  
+                  <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Total</p>
+                      <p className="font-semibold">{metric.total}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Aprovados</p>
+                      <p className="font-semibold text-green-600">{metric.approved}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Rejeitados</p>
+                      <p className="font-semibold text-red-600">{metric.rejected}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Qualidade</p>
+                      <p className="font-semibold">{metric.quality}%</p>
+                    </div>
+                  </div>
+                  
+                  <Progress value={metric.quality} className="h-2" />
                 </div>
-                
-                <div className="grid grid-cols-4 gap-4 mb-3">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Total</p>
-                    <p className="font-semibold">{metric.total}</p>
+              ))
+            ) : (
+              doctorQuality.map((doctor, index) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-semibold">{doctor.name}</h3>
+                      <p className="text-sm text-gray-600">Especialidade: {doctor.specialty}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getQualityBadge(doctor.quality)}
+                      <span className={`text-sm font-medium ${
+                        doctor.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {doctor.trend}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Aprovados</p>
-                    <p className="font-semibold text-green-600">{metric.approved}</p>
+                  
+                  <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Exames</p>
+                      <p className="font-semibold">{doctor.exams}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Aprovados</p>
+                      <p className="font-semibold text-green-600">{doctor.approved}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Rejeitados</p>
+                      <p className="font-semibold text-red-600">{doctor.exams - doctor.approved}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Qualidade</p>
+                      <p className="font-semibold">{doctor.quality}%</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Rejeitados</p>
-                    <p className="font-semibold text-red-600">{metric.rejected}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Qualidade</p>
-                    <p className="font-semibold">{metric.quality}%</p>
-                  </div>
+                  
+                  <Progress value={doctor.quality} className="h-2" />
                 </div>
-                
-                <Progress value={metric.quality} className="h-2" />
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

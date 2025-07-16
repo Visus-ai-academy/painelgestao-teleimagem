@@ -77,8 +77,17 @@ const specialtyProduction = [
   { specialty: "MA - Mastologia", production: 89, target: 85, efficiency: 104.7 }
 ];
 
+const doctorProduction = [
+  { name: "Dr. João Silva", specialty: "NE", modalidade: "MR", meta: 45, realizado: 48, performance: 106.7, categoria: "Angio" },
+  { name: "Dra. Maria Santos", specialty: "CA", modalidade: "CT", meta: 42, realizado: 40, performance: 95.2, categoria: "Contrastado" },
+  { name: "Dr. Carlos Lima", specialty: "ME", modalidade: "DO", meta: 35, realizado: 38, performance: 108.6, categoria: "Score" },
+  { name: "Dra. Ana Costa", specialty: "MI", modalidade: "MG", meta: 30, realizado: 32, performance: 106.7, categoria: "Mastoide" },
+  { name: "Dr. Pedro Oliveira", specialty: "MA", modalidade: "RX", meta: 50, realizado: 52, performance: 104.0, categoria: "OIT" }
+];
+
 export default function OperacionalProducao() {
   const [selectedPeriod, setSelectedPeriod] = useState("semanal");
+  const [viewMode, setViewMode] = useState<"modalidade" | "medico">("modalidade");
   
   const totalMeta = modalityProduction.reduce((sum, item) => sum + item.meta, 0);
   const totalRealizado = modalityProduction.reduce((sum, item) => sum + item.realizado, 0);
@@ -157,49 +166,108 @@ export default function OperacionalProducao() {
         </CardContent>
       </Card>
 
-      {/* Produção por Modalidade */}
+      {/* Produção por Modalidade ou Médico */}
       <Card>
         <CardHeader>
-          <CardTitle>Performance por Modalidade</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>
+              {viewMode === "modalidade" ? "Performance por Modalidade" : "Performance por Médico"}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant={viewMode === "modalidade" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setViewMode("modalidade")}
+              >
+                Por Modalidade
+              </Button>
+              <Button 
+                variant={viewMode === "medico" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setViewMode("medico")}
+              >
+                Por Médico
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {modalityProduction.map((item, index) => (
-              <div key={index} className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <h3 className="font-semibold">{item.modalidade}</h3>
-                    <p className="text-sm text-gray-600">
-                      Categoria: {item.categoria} | Prioridade: {item.prioridade}
-                    </p>
+            {viewMode === "modalidade" ? (
+              modalityProduction.map((item, index) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-semibold">{item.modalidade}</h3>
+                      <p className="text-sm text-gray-600">
+                        Categoria: {item.categoria} | Prioridade: {item.prioridade}
+                      </p>
+                    </div>
+                    {getPerformanceBadge(item.performance)}
                   </div>
-                  {getPerformanceBadge(item.performance)}
+                  
+                  <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Meta</p>
+                      <p className="font-semibold">{item.meta}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Realizado</p>
+                      <p className="font-semibold text-blue-600">{item.realizado}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Diferença</p>
+                      <p className={`font-semibold ${item.realizado >= item.meta ? 'text-green-600' : 'text-red-600'}`}>
+                        {item.realizado - item.meta > 0 ? '+' : ''}{item.realizado - item.meta}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Performance</p>
+                      <p className="font-semibold">{item.performance}%</p>
+                    </div>
+                  </div>
+                  
+                  <Progress value={Math.min(item.performance, 100)} className="h-2" />
                 </div>
-                
-                <div className="grid grid-cols-4 gap-4 mb-3">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Meta</p>
-                    <p className="font-semibold">{item.meta}</p>
+              ))
+            ) : (
+              doctorProduction.map((doctor, index) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-semibold">{doctor.name}</h3>
+                      <p className="text-sm text-gray-600">
+                        {doctor.specialty} | {doctor.modalidade} | Categoria: {doctor.categoria}
+                      </p>
+                    </div>
+                    {getPerformanceBadge(doctor.performance)}
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Realizado</p>
-                    <p className="font-semibold text-blue-600">{item.realizado}</p>
+                  
+                  <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Meta</p>
+                      <p className="font-semibold">{doctor.meta}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Realizado</p>
+                      <p className="font-semibold text-blue-600">{doctor.realizado}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Diferença</p>
+                      <p className={`font-semibold ${doctor.realizado >= doctor.meta ? 'text-green-600' : 'text-red-600'}`}>
+                        {doctor.realizado - doctor.meta > 0 ? '+' : ''}{doctor.realizado - doctor.meta}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Performance</p>
+                      <p className="font-semibold">{doctor.performance}%</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Diferença</p>
-                    <p className={`font-semibold ${item.realizado >= item.meta ? 'text-green-600' : 'text-red-600'}`}>
-                      {item.realizado - item.meta > 0 ? '+' : ''}{item.realizado - item.meta}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Performance</p>
-                    <p className="font-semibold">{item.performance}%</p>
-                  </div>
+                  
+                  <Progress value={Math.min(doctor.performance, 100)} className="h-2" />
                 </div>
-                
-                <Progress value={Math.min(item.performance, 100)} className="h-2" />
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

@@ -36,6 +36,8 @@ import {
   UserX,
   AlertTriangle,
   Filter,
+  Users,
+  Eye
 } from "lucide-react";
 import { FilterBar } from "@/components/FilterBar";
 
@@ -112,6 +114,46 @@ const escalasData: EscalaData[] = [
     especialidade: "MA",
     categoria: "Prostata",
     prioridade: "Plantão"
+  }
+];
+
+// Dados das equipes com médicos
+const equipesData = [
+  {
+    nome: "Equipe A - Manhã",
+    turno: "Manhã",
+    medicos: [
+      { name: "Dr. João Silva", especialidade: "NE", modalidade: "MR", status: "Ativo", experiencia: "5 anos" },
+      { name: "Dra. Ana Costa", especialidade: "CA", modalidade: "CT", status: "Ativo", experiencia: "8 anos" },
+      { name: "Dr. Carlos Lima", especialidade: "ME", modalidade: "DO", status: "Férias", experiencia: "3 anos" }
+    ]
+  },
+  {
+    nome: "Equipe B - Tarde",
+    turno: "Tarde", 
+    medicos: [
+      { name: "Dra. Maria Santos", especialidade: "MI", modalidade: "MG", status: "Ativo", experiencia: "12 anos" },
+      { name: "Dr. Pedro Oliveira", especialidade: "MA", modalidade: "RX", status: "Ativo", experiencia: "7 anos" },
+      { name: "Dra. Sofia Mendes", especialidade: "CA", modalidade: "CT", status: "Licença", experiencia: "4 anos" }
+    ]
+  },
+  {
+    nome: "Equipe C - Noite",
+    turno: "Noite",
+    medicos: [
+      { name: "Dr. Bruno Alves", especialidade: "NE", modalidade: "MR", status: "Ativo", experiencia: "6 anos" },
+      { name: "Dra. Lucia Rocha", especialidade: "ME", modalidade: "DO", status: "Ativo", experiencia: "9 anos" },
+      { name: "Dr. Ricardo Santos", especialidade: "CA", modalidade: "CT", status: "Ativo", experiencia: "11 anos" }
+    ]
+  },
+  {
+    nome: "Equipe Plantão",
+    turno: "24h",
+    medicos: [
+      { name: "Dr. Fernando Costa", especialidade: "MI", modalidade: "MG", status: "Ativo", experiencia: "15 anos" },
+      { name: "Dra. Carla Oliveira", especialidade: "MA", modalidade: "RX", status: "Ativo", experiencia: "10 anos" },
+      { name: "Dr. Marcelo Silva", especialidade: "NE", modalidade: "MR", status: "Ativo", experiencia: "8 anos" }
+    ]
   }
 ];
 
@@ -390,6 +432,61 @@ export default function Escala() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Demonstrativo de Médicos por Equipe */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Demonstrativo de Médicos por Equipe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {equipesData.map((equipe, equipeIndex) => (
+              <div key={equipeIndex} className="border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">{equipe.nome}</h3>
+                    <p className="text-sm text-gray-600">Turno: {equipe.turno}</p>
+                  </div>
+                  <Badge variant="outline">
+                    {equipe.medicos.length} médicos
+                  </Badge>
+                </div>
+                
+                <div className="space-y-3">
+                  {equipe.medicos.map((medico, medicoIndex) => (
+                    <div key={medicoIndex} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium">{medico.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {medico.especialidade} | {medico.modalidade} | {medico.experiencia}
+                        </p>
+                      </div>
+                      <Badge 
+                        variant={medico.status === "Ativo" ? "default" : 
+                                medico.status === "Férias" ? "secondary" : "destructive"}
+                      >
+                        {medico.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-4 pt-3 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span>Médicos Ativos:</span>
+                    <span className="font-medium">
+                      {equipe.medicos.filter(m => m.status === "Ativo").length} / {equipe.medicos.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
