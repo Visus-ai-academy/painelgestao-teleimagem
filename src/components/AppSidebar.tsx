@@ -1,4 +1,3 @@
-
 import { 
   BarChart3, 
   Settings, 
@@ -32,70 +31,96 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { useUserPermissions, UserRole } from "@/hooks/useUserPermissions";
 
-const menuItems = [
-  { title: "Dashboard", url: "/", icon: Home },
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: any;
+  requiredRoles: UserRole[];
+  subItems?: SubMenuItem[];
+}
+
+interface SubMenuItem {
+  title: string;
+  url: string;
+  requiredRoles: UserRole[];
+}
+
+const menuItems: MenuItem[] = [
+  { 
+    title: "Dashboard", 
+    url: "/", 
+    icon: Home,
+    requiredRoles: ['user', 'manager', 'admin']
+  },
   { 
     title: "Volumetria", 
     url: "/volumetria", 
     icon: BarChart3,
+    requiredRoles: ['user', 'manager', 'admin'],
     subItems: [
-      { title: "Volume Diário", url: "/volumetria/diario" },
-      { title: "Volume Mensal", url: "/volumetria/mensal" },
-      { title: "Volume Anual", url: "/volumetria/anual" },
-      { title: "Por Modalidade", url: "/volumetria/modalidade" },
+      { title: "Volume Diário", url: "/volumetria/diario", requiredRoles: ['user', 'manager', 'admin'] },
+      { title: "Volume Mensal", url: "/volumetria/mensal", requiredRoles: ['user', 'manager', 'admin'] },
+      { title: "Volume Anual", url: "/volumetria/anual", requiredRoles: ['user', 'manager', 'admin'] },
+      { title: "Por Modalidade", url: "/volumetria/modalidade", requiredRoles: ['user', 'manager', 'admin'] },
     ]
   },
   { 
     title: "Operacional", 
     url: "/operacional", 
     icon: Activity,
+    requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Produção", url: "/operacional/producao" },
-      { title: "Qualidade", url: "/operacional/qualidade" },
-      { title: "Escala", url: "/operacional/escala" },
+      { title: "Produção", url: "/operacional/producao", requiredRoles: ['manager', 'admin'] },
+      { title: "Qualidade", url: "/operacional/qualidade", requiredRoles: ['manager', 'admin'] },
+      { title: "Escala", url: "/operacional/escala", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 
     title: "Financeiro", 
     url: "/financeiro", 
     icon: DollarSign,
+    requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Faturamento", url: "/financeiro/faturamento" },
-      { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento" },
-      { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca" },
-      { title: "Pagamentos Médicos", url: "/financeiro/pagamentos" },
-      { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa" },
-      { title: "DRE", url: "/financeiro/dre" },
+      { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
+      { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento", requiredRoles: ['manager', 'admin'] },
+      { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca", requiredRoles: ['manager', 'admin'] },
+      { title: "Pagamentos Médicos", url: "/financeiro/pagamentos", requiredRoles: ['admin'] },
+      { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa", requiredRoles: ['admin'] },
+      { title: "DRE", url: "/financeiro/dre", requiredRoles: ['admin'] },
     ]
   },
   { 
     title: "People", 
     url: "/people", 
     icon: Users2,
+    requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Colaboradores", url: "/people/colaboradores" },
-      { title: "Plano de Carreira", url: "/people/carreira" },
-      { title: "Desenvolvimento", url: "/people/desenvolvimento" },
-      { title: "Bonificação", url: "/people/bonificacao" },
+      { title: "Colaboradores", url: "/people/colaboradores", requiredRoles: ['manager', 'admin'] },
+      { title: "Plano de Carreira", url: "/people/carreira", requiredRoles: ['admin'] },
+      { title: "Desenvolvimento", url: "/people/desenvolvimento", requiredRoles: ['admin'] },
+      { title: "Bonificação", url: "/people/bonificacao", requiredRoles: ['admin'] },
     ]
   },
   { 
     title: "Contratos", 
     url: "/contratos", 
     icon: FileText,
+    requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Contratos Clientes", url: "/contratos/clientes" },
-      { title: "Contratos Fornecedores", url: "/contratos/fornecedores" },
+      { title: "Contratos Clientes", url: "/contratos/clientes", requiredRoles: ['manager', 'admin'] },
+      { title: "Contratos Fornecedores", url: "/contratos/fornecedores", requiredRoles: ['admin'] },
     ]
   },
   { 
     title: "Configuração", 
     url: "/configuracao", 
     icon: Settings,
+    requiredRoles: ['admin'],
     subItems: [
-      { title: "Configuração de Faturamento", url: "/configuracao/faturamento" },
-      { title: "Gerenciar Usuários", url: "/configuracao/usuarios" },
+      { title: "Configuração de Faturamento", url: "/configuracao/faturamento", requiredRoles: ['admin'] },
+      { title: "Gerenciar Usuários", url: "/configuracao/usuarios", requiredRoles: ['admin'] },
     ]
   },
 ];
@@ -104,11 +129,34 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const collapsed = state === "collapsed";
+  const permissions = useUserPermissions();
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
     return location.pathname.startsWith(url);
   };
+
+  // Filtrar itens do menu baseado nas permissões do usuário
+  const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+    if (permissions.loading) return [];
+    
+    return items.filter(item => {
+      // Verificar se o usuário tem permissão para o item principal
+      const hasMainPermission = item.requiredRoles.some(role => permissions.roles.includes(role));
+      if (!hasMainPermission) return false;
+
+      // Filtrar subitens se existirem
+      if (item.subItems) {
+        item.subItems = item.subItems.filter(subItem => 
+          subItem.requiredRoles.some(role => permissions.roles.includes(role))
+        );
+      }
+
+      return true;
+    });
+  };
+
+  const filteredMenuItems = filterMenuItems(menuItems);
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
@@ -127,64 +175,66 @@ export function AppSidebar() {
           </div>
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => {
-                if (item.subItems && !collapsed) {
-                  return (
-                    <Collapsible key={item.title} defaultOpen={isActiveRoute(item.url)}>
-                      <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuButton className="w-full">
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
-                            <ChevronDown className="ml-auto h-4 w-4" />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {item.subItems.map((subItem) => (
-                              <SidebarMenuSubItem key={subItem.title}>
-                                <SidebarMenuSubButton asChild>
-                                  <NavLink 
-                                    to={subItem.url}
-                                    className={({ isActive }) =>
-                                      isActive ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50"
-                                    }
-                                  >
-                                    {subItem.title}
-                                  </NavLink>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </SidebarMenuItem>
-                    </Collapsible>
-                  );
-                }
-
+        <div className="space-y-2 flex-1">
+          {permissions.loading ? (
+            <div className="p-4 text-center text-muted-foreground">
+              Carregando menu...
+            </div>
+          ) : (
+            filteredMenuItems.map((item) => {
+              if (item.subItems && !collapsed) {
                 return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink 
-                        to={item.url}
-                        className={({ isActive }) =>
-                          isActive ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50"
-                        }
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <div key={item.title} className="px-3 py-2">
+                    <Collapsible defaultOpen={isActiveRoute(item.url)}>
+                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </div>
+                        <ChevronDown className="h-4 w-4" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-1 space-y-1">
+                        {item.subItems?.map((subItem) => (
+                          <NavLink
+                            key={subItem.title}
+                            to={subItem.url}
+                            className={({ isActive }) =>
+                              `block py-2 px-4 ml-6 text-sm rounded-md transition-colors ${
+                                isActive
+                                  ? "bg-blue-50 text-blue-700 font-medium"
+                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              }`
+                            }
+                          >
+                            {subItem.title}
+                          </NavLink>
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
                 );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              }
+
+              return (
+                <div key={item.title} className="px-3 py-1">
+                  <NavLink
+                    to={item.url}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 p-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-blue-50 text-blue-700 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`
+                    }
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {!collapsed && <span>{item.title}</span>}
+                  </NavLink>
+                </div>
+              );
+            })
+          )}
+        </div>
       </SidebarContent>
     </Sidebar>
   );

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RoleProtectedRoute } from "./components/RoleProtectedRoute";
 import { Layout } from "@/components/Layout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -48,23 +49,79 @@ const App = () => (
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/volumetria/*" element={<Volumetria />} />
                     <Route path="/operacional/*" element={<Operacional />} />
-                    <Route path="/operacional/producao" element={<OperacionalProducao />} />
-                    <Route path="/operacional/qualidade" element={<OperacionalQualidade />} />
-                    <Route path="/operacional/escala" element={<Escala />} />
-                    <Route path="/financeiro/*" element={<Financeiro />} />
-                    <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
-                    <Route path="/financeiro/regua-cobranca" element={<ReguaCobranca />} />
+                    <Route path="/operacional/producao" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <OperacionalProducao />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/operacional/qualidade" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <OperacionalQualidade />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/operacional/escala" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <Escala />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/financeiro/*" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <Financeiro />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/financeiro/gerar-faturamento" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <GerarFaturamento />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/financeiro/regua-cobranca" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <ReguaCobranca />
+                      </RoleProtectedRoute>
+                    } />
                     <Route path="/people/*" element={<People />} />
                     <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
-                    <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />
-                    <Route path="/people/carreira" element={<PlanoCarreira />} />
-                    <Route path="/people/bonificacao" element={<Bonificacao />} />
-                    <Route path="/people/colaboradores" element={<Colaboradores />} />
+                    <Route path="/people/desenvolvimento" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <Desenvolvimento />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/people/carreira" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <PlanoCarreira />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/people/bonificacao" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <Bonificacao />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/people/colaboradores" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <Colaboradores />
+                      </RoleProtectedRoute>
+                    } />
                     <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
-                    <Route path="/contratos/clientes" element={<ContratosClientes />} />
-                    <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />
-                    <Route path="/configuracao/faturamento" element={<ConfiguracaoFaturamento />} />
-                    <Route path="/configuracao/usuarios" element={<GerenciarUsuarios />} />
+                    <Route path="/contratos/clientes" element={
+                      <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                        <ContratosClientes />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/contratos/fornecedores" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <ContratosFornecedores />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/configuracao/faturamento" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <ConfiguracaoFaturamento />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/configuracao/usuarios" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <GerenciarUsuarios />
+                      </RoleProtectedRoute>
+                    } />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>
