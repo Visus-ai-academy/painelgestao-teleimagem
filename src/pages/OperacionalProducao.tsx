@@ -77,6 +77,13 @@ const specialtyProduction = [
   { specialty: "MA - Mastologia", production: 89, target: 85, efficiency: 104.7 }
 ];
 
+const teamData = [
+  { name: "Equipe A", members: ["Dr. João Silva", "Dra. Ana Costa", "Dr. Carlos Lima"] },
+  { name: "Equipe B", members: ["Dra. Maria Santos", "Dr. Pedro Oliveira", "Dra. Sofia Mendes"] },
+  { name: "Equipe C", members: ["Dr. Bruno Alves", "Dra. Lucia Rocha", "Dr. Ricardo Santos"] },
+  { name: "Equipe Plantão", members: ["Dr. Fernando Costa", "Dra. Carla Oliveira", "Dr. Marcelo Silva"] }
+];
+
 const doctorProduction = [
   { name: "Dr. João Silva", specialty: "NE", modalidade: "MR", meta: 45, realizado: 48, performance: 106.7, categoria: "Angio" },
   { name: "Dra. Maria Santos", specialty: "CA", modalidade: "CT", meta: 42, realizado: 40, performance: 95.2, categoria: "Contrastado" },
@@ -88,6 +95,7 @@ const doctorProduction = [
 export default function OperacionalProducao() {
   const [selectedPeriod, setSelectedPeriod] = useState("semanal");
   const [viewMode, setViewMode] = useState<"modalidade" | "medico">("modalidade");
+  const [selectedTeam, setSelectedTeam] = useState<string>("todas");
   
   const totalMeta = modalityProduction.reduce((sum, item) => sum + item.meta, 0);
   const totalRealizado = modalityProduction.reduce((sum, item) => sum + item.realizado, 0);
@@ -100,6 +108,13 @@ export default function OperacionalProducao() {
     return <Badge className="bg-red-100 text-red-800">Abaixo</Badge>;
   };
 
+  const filteredDoctorProduction = selectedTeam === "todas" 
+    ? doctorProduction 
+    : doctorProduction.filter(doctor => {
+        const team = teamData.find(t => t.members.includes(doctor.name));
+        return team?.name === selectedTeam;
+      });
+
   return (
     <div className="space-y-6">
       <div>
@@ -107,9 +122,21 @@ export default function OperacionalProducao() {
         <p className="text-gray-600 mt-1">Monitoramento da produção por modalidade e especialidade</p>
       </div>
 
-      <FilterBar 
-        onPeriodChange={setSelectedPeriod}
-      />
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <FilterBar onPeriodChange={setSelectedPeriod} />
+        <div className="flex gap-4">
+          <select 
+            value={selectedTeam} 
+            onChange={(e) => setSelectedTeam(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="todas">Todas as Equipes</option>
+            {teamData.map((team) => (
+              <option key={team.name} value={team.name}>{team.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Métricas de Produção */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -231,7 +258,7 @@ export default function OperacionalProducao() {
                 </div>
               ))
             ) : (
-              doctorProduction.map((doctor, index) => (
+              filteredDoctorProduction.map((doctor, index) => (
                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex justify-between items-center mb-3">
                     <div>

@@ -74,9 +74,17 @@ const doctorQuality = [
   { name: "Dr. Pedro Oliveira", specialty: "MA", exams: 89, approved: 88, quality: 98.9, trend: "+0.4%" }
 ];
 
+const teamData = [
+  { name: "Equipe A", members: ["Dr. João Silva", "Dra. Ana Costa", "Dr. Carlos Lima"] },
+  { name: "Equipe B", members: ["Dra. Maria Santos", "Dr. Pedro Oliveira", "Dra. Sofia Mendes"] },
+  { name: "Equipe C", members: ["Dr. Bruno Alves", "Dra. Lucia Rocha", "Dr. Ricardo Santos"] },
+  { name: "Equipe Plantão", members: ["Dr. Fernando Costa", "Dra. Carla Oliveira", "Dr. Marcelo Silva"] }
+];
+
 export default function OperacionalQualidade() {
   const [selectedPeriod, setSelectedPeriod] = useState("mensal");
   const [viewMode, setViewMode] = useState<"modalidade" | "medico">("modalidade");
+  const [selectedTeam, setSelectedTeam] = useState<string>("todas");
   
   const totalExams = qualityMetrics.reduce((sum, metric) => sum + metric.total, 0);
   const totalApproved = qualityMetrics.reduce((sum, metric) => sum + metric.approved, 0);
@@ -90,6 +98,13 @@ export default function OperacionalQualidade() {
     return <Badge className="bg-red-100 text-red-800">Baixa</Badge>;
   };
 
+  const filteredDoctorQuality = selectedTeam === "todas" 
+    ? doctorQuality 
+    : doctorQuality.filter(doctor => {
+        const team = teamData.find(t => t.members.includes(doctor.name));
+        return team?.name === selectedTeam;
+      });
+
   return (
     <div className="space-y-6">
       <div>
@@ -97,9 +112,21 @@ export default function OperacionalQualidade() {
         <p className="text-gray-600 mt-1">Monitoramento da qualidade dos exames e especialidades</p>
       </div>
 
-      <FilterBar 
-        onPeriodChange={setSelectedPeriod}
-      />
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <FilterBar onPeriodChange={setSelectedPeriod} />
+        <div className="flex gap-4">
+          <select 
+            value={selectedTeam} 
+            onChange={(e) => setSelectedTeam(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="todas">Todas as Equipes</option>
+            {teamData.map((team) => (
+              <option key={team.name} value={team.name}>{team.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Métricas de Qualidade */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -194,7 +221,7 @@ export default function OperacionalQualidade() {
                 </div>
               ))
             ) : (
-              doctorQuality.map((doctor, index) => (
+              filteredDoctorQuality.map((doctor, index) => (
                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex justify-between items-center mb-3">
                     <div>

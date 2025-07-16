@@ -1,11 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FilterBar } from "@/components/FilterBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { 
   Select, 
   SelectContent, 
@@ -21,38 +22,118 @@ import {
   DollarSign,
   Users,
   Calculator,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle,
+  Lock
 } from "lucide-react";
+import { useFaturamento } from "@/hooks/useFaturamento";
+import { CalculoFaturamento } from "@/types/faturamento";
+import { useToast } from "@/hooks/use-toast";
+
+const clientes = [
+  { id: "1", nome: "Hospital São Lucas" },
+  { id: "2", nome: "Clínica Vida Plena" },
+  { id: "3", nome: "Centro Médico Norte" },
+];
 
 export default function GerarFaturamento() {
   const [faturamentoPeriodo, setFaturamentoPeriodo] = useState("");
   const [clienteSelecionado, setClienteSelecionado] = useState("");
-  const [valorTotal, setValorTotal] = useState(0);
+  const [dataVencimento, setDataVencimento] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  const [calculoAtual, setCalculoAtual] = useState<CalculoFaturamento | null>(null);
+  
+  const { 
+    periodos, 
+    processarFaturamento, 
+    gerarFatura, 
+    podeSerFaturado,
+    loading 
+  } = useFaturamento();
+  
+  const { toast } = useToast();
 
-  const clientes = [
-    { id: "1", nome: "Hospital São Lucas", valorPendente: 125000 },
-    { id: "2", nome: "Clínica Central", valorPendente: 85000 },
-    { id: "3", nome: "Medical Center", valorPendente: 95000 },
-    { id: "4", nome: "Hospital Regional", valorPendente: 156000 },
-  ];
+  // Processar faturamento quando cliente e período forem selecionados
+  useEffect(() => {
+    if (clienteSelecionado && faturamentoPeriodo) {
+      handleProcessarFaturamento();
+    }
+  }, [clienteSelecionado, faturamentoPeriodo]);
 
-  const examsPendentes = [
-    { id: "1", paciente: "João Silva", exame: "Ressonância Magnética", valor: 850, data: "2024-01-15" },
-    { id: "2", paciente: "Maria Santos", exame: "Tomografia", valor: 650, data: "2024-01-15" },
-    { id: "3", paciente: "Pedro Costa", exame: "Ultrassom", valor: 280, data: "2024-01-16" },
-    { id: "4", paciente: "Ana Oliveira", exame: "Raio-X", valor: 120, data: "2024-01-16" },
-  ];
+  const handleProcessarFaturamento = async () => {
+    if (!clienteSelecionado || !faturamentoPeriodo) return;
 
-  const handleGerarFaturamento = () => {
-    // Lógica para gerar faturamento
-    console.log("Gerando faturamento...");
+    // Verificar se período pode ser faturado
+    if (!podeSerFaturado(faturamentoPeriodo)) {
+      toast({
+        title: "Período Bloqueado",
+        description: "Este período já foi faturado e está bloqueado para novo faturamento.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const calculo = await processarFaturamento(clienteSelecionado, faturamentoPeriodo);
+      setCalculoAtual(calculo);
+      
+      if (calculo.resumo.totalExames === 0) {
+        toast({
+          title: "Nenhum Exame Encontrado",
+          description: "Não foram encontrados exames para faturar neste período.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao Processar",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    }
   };
+
+  const handleGerarFaturamento = async () => {
+    if (!calculoAtual || !dataVencimento) {
+      toast({
+        title: "Dados Incompletos",
+        description: "Selecione um período/cliente e defina a data de vencimento.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const fatura = await gerarFatura(calculoAtual, dataVencimento, observacoes);
+      
+      toast({
+        title: "Fatura Gerada",
+        description: `Fatura ${fatura.numero} gerada com sucesso!`,
+      });
+
+      // Limpar formulário
+      setFaturamentoPeriodo("");
+      setClienteSelecionado("");
+      setDataVencimento("");
+      setObservacoes("");
+      setCalculoAtual(null);
+      
+    } catch (error) {
+      toast({
+        title: "Erro ao Gerar Fatura",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const clienteNome = clientes.find(c => c.id === clienteSelecionado)?.nome || "";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Gerar Faturamento</h1>
-        <p className="text-gray-600 mt-1">Geração e emissão de faturas para clientes</p>
+        <p className="text-gray-600 mt-1">Geração e emissão de faturas baseadas nos contratos dos clientes</p>
       </div>
 
       <FilterBar />
@@ -112,7 +193,7 @@ export default function GerarFaturamento() {
         </Card>
       </div>
 
-      {/* Formulário de Geração */}
+      {/* Configuração e Processamento */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -129,9 +210,19 @@ export default function GerarFaturamento() {
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="janeiro-2024">Janeiro 2024</SelectItem>
-                  <SelectItem value="fevereiro-2024">Fevereiro 2024</SelectItem>
-                  <SelectItem value="marco-2024">Março 2024</SelectItem>
+                  {periodos.map((periodo) => (
+                    <SelectItem 
+                      key={periodo.id} 
+                      value={periodo.periodo}
+                      disabled={periodo.bloqueado}
+                    >
+                      <div className="flex items-center gap-2">
+                        {periodo.bloqueado && <Lock className="h-3 w-3" />}
+                        {periodo.periodo} 
+                        {periodo.bloqueado && <Badge variant="secondary" className="text-xs">Faturado</Badge>}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -145,7 +236,7 @@ export default function GerarFaturamento() {
                 <SelectContent>
                   {clientes.map((cliente) => (
                     <SelectItem key={cliente.id} value={cliente.id}>
-                      {cliente.nome} - R$ {cliente.valorPendente.toLocaleString()}
+                      {cliente.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -154,7 +245,12 @@ export default function GerarFaturamento() {
 
             <div className="space-y-2">
               <Label htmlFor="vencimento">Data de Vencimento</Label>
-              <Input type="date" id="vencimento" />
+              <Input 
+                type="date" 
+                id="vencimento" 
+                value={dataVencimento}
+                onChange={(e) => setDataVencimento(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -162,24 +258,44 @@ export default function GerarFaturamento() {
               <Input 
                 id="observacoes" 
                 placeholder="Observações adicionais para a fatura"
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
               />
             </div>
 
-            <Separator />
-
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold">Valor Total:</span>
-              <span className="text-2xl font-bold text-green-600">
-                R$ {valorTotal.toLocaleString()}
-              </span>
-            </div>
+            {calculoAtual && (
+              <>
+                <Separator />
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Exames Encontrados:</span>
+                    <span className="font-medium">{calculoAtual.resumo.totalExames}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>R$ {calculoAtual.resumo.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-semibold">
+                    <span>Valor Total:</span>
+                    <span className="text-green-600">
+                      R$ {calculoAtual.resumo.valorFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex gap-2">
-              <Button onClick={handleGerarFaturamento} className="flex-1">
+              <Button 
+                onClick={handleGerarFaturamento} 
+                className="flex-1"
+                disabled={!calculoAtual || !dataVencimento || loading}
+              >
                 <FileText className="h-4 w-4 mr-2" />
-                Gerar Fatura
+                {loading ? "Processando..." : "Gerar Fatura"}
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" disabled={!calculoAtual}>
                 <Download className="h-4 w-4 mr-2" />
                 Preview
               </Button>
@@ -187,33 +303,49 @@ export default function GerarFaturamento() {
           </CardContent>
         </Card>
 
-        {/* Lista de Exames Pendentes */}
+        {/* Detalhamento dos Exames */}
         <Card>
           <CardHeader>
-            <CardTitle>Exames Pendentes de Faturamento</CardTitle>
+            <CardTitle>
+              {calculoAtual ? `Exames - ${clienteNome} (${faturamentoPeriodo})` : "Detalhamento dos Exames"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {examsPendentes.map((exame) => (
-                <div key={exame.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{exame.paciente}</p>
-                    <p className="text-sm text-gray-600">{exame.exame}</p>
-                    <p className="text-xs text-gray-500">{exame.data}</p>
+            {calculoAtual ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {calculoAtual.items.map((item) => {
+                  const exame = calculoAtual.exames.find(e => e.id === item.exameId);
+                  return (
+                    <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{exame?.paciente}</p>
+                        <p className="text-sm text-gray-600">
+                          {item.modalidade} - {item.especialidade} ({item.categoria})
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {exame?.dataExame} | {item.prioridade}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">R$ {item.valorFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {calculoAtual.items.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                    <p>Nenhum exame encontrado para este período</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold">R$ {exame.valor}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Separator className="my-4" />
-            
-            <div className="flex justify-between font-semibold">
-              <span>Total Selecionado:</span>
-              <span>R$ 1.900</span>
-            </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="h-8 w-8 mx-auto mb-2" />
+                <p>Selecione um cliente e período para ver os exames</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -230,6 +362,7 @@ export default function GerarFaturamento() {
                 <tr className="border-b">
                   <th className="text-left p-3">Número</th>
                   <th className="text-left p-3">Cliente</th>
+                  <th className="text-left p-3">Período</th>
                   <th className="text-left p-3">Data Emissão</th>
                   <th className="text-left p-3">Vencimento</th>
                   <th className="text-right p-3">Valor</th>
@@ -241,13 +374,14 @@ export default function GerarFaturamento() {
                 <tr className="border-b">
                   <td className="p-3">#2024001</td>
                   <td className="p-3">Hospital São Lucas</td>
+                  <td className="p-3">2023-12</td>
                   <td className="p-3">15/01/2024</td>
                   <td className="p-3">15/02/2024</td>
                   <td className="p-3 text-right">R$ 125.000</td>
                   <td className="p-3">
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                    <Badge className="bg-green-100 text-green-800">
                       Pago
-                    </span>
+                    </Badge>
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2">
@@ -264,14 +398,15 @@ export default function GerarFaturamento() {
                 </tr>
                 <tr className="border-b">
                   <td className="p-3">#2024002</td>
-                  <td className="p-3">Clínica Central</td>
+                  <td className="p-3">Clínica Vida Plena</td>
+                  <td className="p-3">2023-12</td>
                   <td className="p-3">16/01/2024</td>
                   <td className="p-3">16/02/2024</td>
                   <td className="p-3 text-right">R$ 85.000</td>
                   <td className="p-3">
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                    <Badge className="bg-yellow-100 text-yellow-800">
                       Pendente
-                    </span>
+                    </Badge>
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2">
