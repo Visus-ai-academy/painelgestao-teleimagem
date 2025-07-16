@@ -4,9 +4,11 @@ import { FilterBar } from "@/components/FilterBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Select, 
   SelectContent, 
@@ -32,9 +34,16 @@ import {
   RefreshCw,
   Trash2,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Upload,
+  Database,
+  FileSpreadsheet,
+  Settings,
+  CloudUpload
 } from "lucide-react";
 import { useFaturamento } from "@/hooks/useFaturamento";
+import { FileUpload } from "@/components/FileUpload";
+import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile } from "@/lib/supabase";
 import { CalculoFaturamento } from "@/types/faturamento";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,6 +59,7 @@ export default function GerarFaturamento() {
   const [dataVencimento, setDataVencimento] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [calculoAtual, setCalculoAtual] = useState<CalculoFaturamento | null>(null);
+  const [activeTab, setActiveTab] = useState("faturamento");
   
   const { 
     periodos, 
@@ -169,6 +179,28 @@ export default function GerarFaturamento() {
         <h1 className="text-3xl font-bold text-gray-900">Gerar Faturamento</h1>
         <p className="text-gray-600 mt-1">Geração e emissão de faturas baseadas nos contratos dos clientes</p>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="faturamento" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Faturamento
+          </TabsTrigger>
+          <TabsTrigger value="uploads" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Upload de Dados
+          </TabsTrigger>
+          <TabsTrigger value="database" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Base de Dados
+          </TabsTrigger>
+          <TabsTrigger value="configuracao" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configuração
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="faturamento" className="space-y-6 mt-6">
 
       <FilterBar />
 
@@ -612,7 +644,7 @@ export default function GerarFaturamento() {
         </Card>
       </div>
 
-      {/* Histórico de Faturas Geradas */}
+      {/* Histórico de Faturas */}
       <Card>
         <CardHeader>
           <CardTitle>Histórico de Faturas Recentes</CardTitle>
@@ -688,6 +720,280 @@ export default function GerarFaturamento() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="uploads" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <FileUpload
+              title="Upload de Exames Realizados"
+              description="Arraste e solte arquivos CSV/Excel aqui ou clique para selecionar"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={50}
+              expectedFormat={["ID do Exame, Paciente, Cliente, Médico, Data", "Modalidade, Especialidade, Status"]}
+              onUpload={processExamesFile}
+              icon={<FileSpreadsheet className="h-5 w-5" />}
+            />
+
+            <FileUpload
+              title="Upload de Contratos/Regras"
+              description="Upload de tabela de preços e contratos"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={10}
+              expectedFormat={["Cliente ID, Modalidade, Especialidade", "Valor, Desconto, Vigência"]}
+              onUpload={processContratosFile}
+              icon={<Users className="h-5 w-5" />}
+            />
+
+            <FileUpload
+              title="Upload de Escalas Médicas"
+              description="Escalas e horários dos médicos"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={10}
+              expectedFormat={["Médico, Data, Turno, Modalidade", "Status, Tipo de Escala"]}
+              onUpload={processEscalasFile}
+              icon={<Calendar className="h-5 w-5" />}
+            />
+
+            <FileUpload
+              title="Upload de Dados Financeiros"
+              description="Dados de pagamentos e faturamento"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={25}
+              expectedFormat={["Fatura ID, Valor, Data Pagamento", "Status, Observações"]}
+              onUpload={processFinanceiroFile}
+              icon={<DollarSign className="h-5 w-5" />}
+            />
+          </div>
+
+          {/* Status dos Uploads */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Histórico de Uploads</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="font-medium">exames_janeiro_2024.xlsx</p>
+                      <p className="text-sm text-muted-foreground">Upload em 15/01/2024 às 14:30</p>
+                    </div>
+                  </div>
+                  <Badge variant="default">Processado</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium">contratos_2024.csv</p>
+                      <p className="text-sm text-muted-foreground">Upload em 10/01/2024 às 09:15</p>
+                    </div>
+                  </div>
+                  <Badge variant="default">Processado</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-purple-600" />
+                    <div>
+                      <p className="font-medium">escalas_janeiro.xlsx</p>
+                      <p className="text-sm text-muted-foreground">Upload em 05/01/2024 às 16:45</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Processando...</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Status das Tabelas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">exames_realizados</p>
+                      <p className="text-sm text-muted-foreground">15.430 registros</p>
+                    </div>
+                    <Badge variant="default">Ativo</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">contratos_clientes</p>
+                      <p className="text-sm text-muted-foreground">1.245 regras</p>
+                    </div>
+                    <Badge variant="default">Ativo</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">escalas_medicas</p>
+                      <p className="text-sm text-muted-foreground">3.890 turnos</p>
+                    </div>
+                    <Badge variant="default">Ativo</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">faturas_geradas</p>
+                      <p className="text-sm text-muted-foreground">287 faturas</p>
+                    </div>
+                    <Badge variant="default">Ativo</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Sincronização de Dados</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Última sincronização:</span>
+                  <span className="text-sm font-medium">Hoje às 14:30</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Próxima sincronização:</span>
+                  <span className="text-sm font-medium">Hoje às 18:00</span>
+                </div>
+                <Separator />
+                <Button className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sincronizar Agora
+                </Button>
+                <Button variant="outline" className="w-full">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar Backup
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Queries e Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Analytics da Base de Dados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 border rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">15.4K</div>
+                  <div className="text-sm text-muted-foreground">Exames Total</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">1.2K</div>
+                  <div className="text-sm text-muted-foreground">Regras Ativas</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">3.9K</div>
+                  <div className="text-sm text-muted-foreground">Escalas</div>
+                </div>
+                <div className="text-center p-4 border rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">287</div>
+                  <div className="text-sm text-muted-foreground">Faturas</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="configuracao" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuração Supabase</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Status da Conexão:</Label>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">Conectado</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Edge Functions:</Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>gerar-fatura</span>
+                      <Badge variant="default">Ativo</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>processar-upload</span>
+                      <Badge variant="default">Ativo</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>enviar-email</span>
+                      <Badge variant="default">Ativo</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <Button className="w-full">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Abrir Painel Supabase
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuração de Email</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-server">Servidor SMTP</Label>
+                  <Input id="smtp-server" value="smtp.gmail.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-port">Porta</Label>
+                  <Input id="smtp-port" value="587" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email-from">Email Remetente</Label>
+                  <Input id="email-from" value="faturamento@suaempresa.com" />
+                </div>
+                <Button variant="outline" className="w-full">
+                  <Send className="h-4 w-4 mr-2" />
+                  Testar Configuração
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Templates de Email */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Templates de Email</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-template">Template de Fatura</Label>
+                  <Textarea 
+                    id="email-template"
+                    rows={6}
+                    value="Prezado(a) {CLIENTE_NOME},\n\nSegue em anexo a fatura referente ao período {PERIODO}.\n\nValor Total: {VALOR_TOTAL}\nData de Vencimento: {DATA_VENCIMENTO}\n\nAtenciosamente,\nEquipe de Faturamento"
+                  />
+                </div>
+                <Button>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Salvar Template
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
     </div>
   );
 }
