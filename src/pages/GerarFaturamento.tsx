@@ -31,9 +31,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
 const clientes = [
-  { id: "1", nome: "Hospital São Lucas", email: "contato@saolucas.com.br" },
-  { id: "2", nome: "Clínica Vida Plena", email: "admin@vidaplena.com.br" },
-  { id: "3", nome: "Centro Médico Norte", email: "faturamento@centronorte.com.br" },
+  { id: "550e8400-e29b-41d4-a716-446655440001", nome: "Hospital São Lucas", email: "contato@saolucas.com.br" },
+  { id: "550e8400-e29b-41d4-a716-446655440002", nome: "Clínica Vida Plena", email: "admin@vidaplena.com.br" },
+  { id: "550e8400-e29b-41d4-a716-446655440003", nome: "Centro Médico Norte", email: "faturamento@centronorte.com.br" },
 ];
 
 // Período atual (julho/2025)
