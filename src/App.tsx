@@ -4,7 +4,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "@/components/Layout";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Volumetria from "./pages/Volumetria";
 import Operacional from "./pages/Operacional";
@@ -32,28 +35,37 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Layout>
+        <AuthProvider>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/volumetria/*" element={<Volumetria />} />
-            <Route path="/operacional/*" element={<Operacional />} />
-            <Route path="/operacional/producao" element={<OperacionalProducao />} />
-            <Route path="/operacional/qualidade" element={<OperacionalQualidade />} />
-            <Route path="/operacional/escala" element={<Escala />} />
-            <Route path="/financeiro/*" element={<Financeiro />} />
-            <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
-            <Route path="/people/*" element={<People />} />
-            <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
-            <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />
-            <Route path="/people/carreira" element={<PlanoCarreira />} />
-            <Route path="/people/bonificacao" element={<Bonificacao />} />
-            <Route path="/people/colaboradores" element={<Colaboradores />} />
-            <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
-            <Route path="/contratos/clientes" element={<ContratosClientes />} />
-            <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/volumetria/*" element={<Volumetria />} />
+                    <Route path="/operacional/*" element={<Operacional />} />
+                    <Route path="/operacional/producao" element={<OperacionalProducao />} />
+                    <Route path="/operacional/qualidade" element={<OperacionalQualidade />} />
+                    <Route path="/operacional/escala" element={<Escala />} />
+                    <Route path="/financeiro/*" element={<Financeiro />} />
+                    <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
+                    <Route path="/people/*" element={<People />} />
+                    <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
+                    <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />
+                    <Route path="/people/carreira" element={<PlanoCarreira />} />
+                    <Route path="/people/bonificacao" element={<Bonificacao />} />
+                    <Route path="/people/colaboradores" element={<Colaboradores />} />
+                    <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
+                    <Route path="/contratos/clientes" element={<ContratosClientes />} />
+                    <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            } />
           </Routes>
-        </Layout>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
