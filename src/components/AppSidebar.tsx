@@ -95,6 +95,7 @@ const menuItems = [
     icon: Settings,
     subItems: [
       { title: "Configuração de Faturamento", url: "/configuracao/faturamento" },
+      { title: "Gerenciar Usuários", url: "/configuracao/usuarios" },
     ]
   },
 ];
