@@ -111,22 +111,22 @@ export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
   };
 
   const handlePermissionChange = (menuKey: string, granted: boolean) => {
-    setPermissions(prev => ({
-      ...prev,
-      [menuKey]: granted,
-    }));
-    
-    // Se estiver concedendo acesso a um menu principal, automaticamente conceder aos sub-menus
-    if (granted) {
+    setPermissions(prev => {
+      const updatedPermissions = {
+        ...prev,
+        [menuKey]: granted,
+      };
+      
+      // Se estiver alterando um menu principal, automaticamente alterar todos os sub-menus
       const subMenus = menuOptions.filter(menu => menu.parentMenu === menuKey);
       if (subMenus.length > 0) {
-        const updatedPermissions = { ...permissions, [menuKey]: granted };
         subMenus.forEach(subMenu => {
-          updatedPermissions[subMenu.key] = true;
+          updatedPermissions[subMenu.key] = granted;
         });
-        setPermissions(prev => ({ ...prev, ...updatedPermissions }));
       }
-    }
+      
+      return updatedPermissions;
+    });
   };
 
   const savePermissions = async () => {
