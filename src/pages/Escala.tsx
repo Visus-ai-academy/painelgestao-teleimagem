@@ -50,8 +50,6 @@ interface EscalaData {
   modalidade: "MR" | "CT" | "DO" | "MG" | "RX";
   status: "Presente" | "Ausente" | "Pendente";
   especialidade: "CA" | "NE" | "ME" | "MI" | "MA";
-  categoria: "Angio" | "Contrastado" | "Mastoide" | "OIT" | "Pescoço" | "Prostata" | "Score";
-  prioridade: "Plantão" | "Rotina" | "Urgente";
 }
 
 const escalasData: EscalaData[] = [
@@ -63,9 +61,7 @@ const escalasData: EscalaData[] = [
     tipoEscala: "Plantão",
     modalidade: "MR",
     status: "Presente",
-    especialidade: "NE",
-    categoria: "Angio",
-    prioridade: "Plantão"
+    especialidade: "NE"
   },
   {
     id: "2",
@@ -75,9 +71,7 @@ const escalasData: EscalaData[] = [
     tipoEscala: "Turno",
     modalidade: "CT",
     status: "Presente",
-    especialidade: "CA",
-    categoria: "Contrastado",
-    prioridade: "Rotina"
+    especialidade: "CA"
   },
   {
     id: "3",
@@ -87,9 +81,7 @@ const escalasData: EscalaData[] = [
     tipoEscala: "Plantão",
     modalidade: "DO",
     status: "Ausente",
-    especialidade: "ME",
-    categoria: "Mastoide",
-    prioridade: "Urgente"
+    especialidade: "ME"
   },
   {
     id: "4",
@@ -99,9 +91,7 @@ const escalasData: EscalaData[] = [
     tipoEscala: "Turno",
     modalidade: "MG",
     status: "Pendente",
-    especialidade: "MI",
-    categoria: "Score",
-    prioridade: "Rotina"
+    especialidade: "MI"
   },
   {
     id: "5",
@@ -111,9 +101,7 @@ const escalasData: EscalaData[] = [
     tipoEscala: "Plantão",
     modalidade: "RX",
     status: "Presente",
-    especialidade: "MA",
-    categoria: "Prostata",
-    prioridade: "Plantão"
+    especialidade: "MA"
   }
 ];
 
@@ -411,8 +399,6 @@ export default function Escala() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Modalidade</TableHead>
                 <TableHead>Especialidade</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -425,8 +411,6 @@ export default function Escala() {
                   <TableCell>{getTipoBadge(escala.tipoEscala)}</TableCell>
                   <TableCell>{escala.modalidade}</TableCell>
                   <TableCell>{escala.especialidade}</TableCell>
-                  <TableCell>{escala.categoria}</TableCell>
-                  <TableCell>{escala.prioridade}</TableCell>
                   <TableCell>{getStatusBadge(escala.status)}</TableCell>
                 </TableRow>
               ))}
