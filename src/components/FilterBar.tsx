@@ -35,9 +35,11 @@ export function FilterBar({ onPeriodChange, onModalityChange, onSpecialtyChange 
             <SelectValue placeholder="Modalidade" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="urgencia">Urgência</SelectItem>
-            <SelectItem value="eletivo">Eletivo</SelectItem>
-            <SelectItem value="preventivo">Preventivo</SelectItem>
+            <SelectItem value="MR">MR</SelectItem>
+            <SelectItem value="CT">CT</SelectItem>
+            <SelectItem value="DO">DO</SelectItem>
+            <SelectItem value="MG">MG</SelectItem>
+            <SelectItem value="RX">RX</SelectItem>
           </SelectContent>
         </Select>
 
@@ -46,10 +48,11 @@ export function FilterBar({ onPeriodChange, onModalityChange, onSpecialtyChange 
             <SelectValue placeholder="Especialidade" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="cardiologia">Cardiologia</SelectItem>
-            <SelectItem value="radiologia">Radiologia</SelectItem>
-            <SelectItem value="neurologia">Neurologia</SelectItem>
-            <SelectItem value="ortopedia">Ortopedia</SelectItem>
+            <SelectItem value="CA">CA</SelectItem>
+            <SelectItem value="NE">NE</SelectItem>
+            <SelectItem value="ME">ME</SelectItem>
+            <SelectItem value="MI">MI</SelectItem>
+            <SelectItem value="MA">MA</SelectItem>
           </SelectContent>
         </Select>
 

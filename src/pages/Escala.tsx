@@ -45,9 +45,11 @@ interface EscalaData {
   data: string;
   turno: "Manhã" | "Tarde" | "Noite";
   tipoEscala: "Plantão" | "Turno";
-  modalidade: string;
+  modalidade: "MR" | "CT" | "DO" | "MG" | "RX";
   status: "Presente" | "Ausente" | "Pendente";
-  especialidade: string;
+  especialidade: "CA" | "NE" | "ME" | "MI" | "MA";
+  categoria: "Angio" | "Contrastado" | "Mastoide" | "OIT" | "Pescoço" | "Prostata" | "Score";
+  prioridade: "Plantão" | "Rotina" | "Urgente";
 }
 
 const escalasData: EscalaData[] = [
@@ -57,9 +59,11 @@ const escalasData: EscalaData[] = [
     data: "2024-01-15",
     turno: "Manhã",
     tipoEscala: "Plantão",
-    modalidade: "Radiologia",
+    modalidade: "MR",
     status: "Presente",
-    especialidade: "Radiologista"
+    especialidade: "NE",
+    categoria: "Angio",
+    prioridade: "Plantão"
   },
   {
     id: "2",
@@ -67,9 +71,11 @@ const escalasData: EscalaData[] = [
     data: "2024-01-15",
     turno: "Tarde",
     tipoEscala: "Turno",
-    modalidade: "Ultrassom",
+    modalidade: "CT",
     status: "Presente",
-    especialidade: "Ultrassonografista"
+    especialidade: "CA",
+    categoria: "Contrastado",
+    prioridade: "Rotina"
   },
   {
     id: "3",
@@ -77,9 +83,11 @@ const escalasData: EscalaData[] = [
     data: "2024-01-15",
     turno: "Noite",
     tipoEscala: "Plantão",
-    modalidade: "Tomografia",
+    modalidade: "DO",
     status: "Ausente",
-    especialidade: "Radiologista"
+    especialidade: "ME",
+    categoria: "Mastoide",
+    prioridade: "Urgente"
   },
   {
     id: "4",
@@ -87,9 +95,11 @@ const escalasData: EscalaData[] = [
     data: "2024-01-16",
     turno: "Manhã",
     tipoEscala: "Turno",
-    modalidade: "Ressonância",
+    modalidade: "MG",
     status: "Pendente",
-    especialidade: "Radiologista"
+    especialidade: "MI",
+    categoria: "Score",
+    prioridade: "Rotina"
   },
   {
     id: "5",
@@ -97,9 +107,11 @@ const escalasData: EscalaData[] = [
     data: "2024-01-16",
     turno: "Tarde",
     tipoEscala: "Plantão",
-    modalidade: "Mamografia",
+    modalidade: "RX",
     status: "Presente",
-    especialidade: "Mastologista"
+    especialidade: "MA",
+    categoria: "Prostata",
+    prioridade: "Plantão"
   }
 ];
 
@@ -357,6 +369,8 @@ export default function Escala() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Modalidade</TableHead>
                 <TableHead>Especialidade</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Prioridade</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -369,6 +383,8 @@ export default function Escala() {
                   <TableCell>{getTipoBadge(escala.tipoEscala)}</TableCell>
                   <TableCell>{escala.modalidade}</TableCell>
                   <TableCell>{escala.especialidade}</TableCell>
+                  <TableCell>{escala.categoria}</TableCell>
+                  <TableCell>{escala.prioridade}</TableCell>
                   <TableCell>{getStatusBadge(escala.status)}</TableCell>
                 </TableRow>
               ))}

@@ -9,7 +9,8 @@ import {
   Activity,
   Target,
   Award,
-  ChevronDown
+  ChevronDown,
+  FileText
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -75,6 +76,15 @@ const menuItems = [
       { title: "Plano de Carreira", url: "/people/carreira" },
       { title: "Desenvolvimento", url: "/people/desenvolvimento" },
       { title: "Bonificação", url: "/people/bonificacao" },
+    ]
+  },
+  { 
+    title: "Contratos", 
+    url: "/contratos", 
+    icon: FileText,
+    subItems: [
+      { title: "Contratos Clientes", url: "/contratos/clientes" },
+      { title: "Contratos Fornecedores", url: "/contratos/fornecedores" },
     ]
   },
 ];
