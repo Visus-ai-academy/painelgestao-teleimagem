@@ -16,6 +16,9 @@ import GerarFaturamento from "./pages/GerarFaturamento";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
 import Desenvolvimento from "./pages/Desenvolvimento";
+import PlanoCarreira from "./pages/PlanoCarreira";
+import Bonificacao from "./pages/Bonificacao";
+import Colaboradores from "./pages/Colaboradores";
 import TreinamentoEquipe from "./pages/TreinamentoEquipe";
 import ContratosClientes from "./pages/ContratosClientes";
 import ContratosFornecedores from "./pages/ContratosFornecedores";
@@ -42,6 +45,9 @@ const App = () => (
             <Route path="/people/*" element={<People />} />
             <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
             <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />
+            <Route path="/people/carreira" element={<PlanoCarreira />} />
+            <Route path="/people/bonificacao" element={<Bonificacao />} />
+            <Route path="/people/colaboradores" element={<Colaboradores />} />
             <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
             <Route path="/contratos/clientes" element={<ContratosClientes />} />
             <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />

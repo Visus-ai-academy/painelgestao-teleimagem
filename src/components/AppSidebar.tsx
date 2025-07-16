@@ -73,6 +73,7 @@ const menuItems = [
     url: "/people", 
     icon: Users2,
     subItems: [
+      { title: "Colaboradores", url: "/people/colaboradores" },
       { title: "Plano de Carreira", url: "/people/carreira" },
       { title: "Desenvolvimento", url: "/people/desenvolvimento" },
       { title: "Bonificação", url: "/people/bonificacao" },
