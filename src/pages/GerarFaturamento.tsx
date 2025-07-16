@@ -48,16 +48,18 @@ import { CalculoFaturamento } from "@/types/faturamento";
 import { useToast } from "@/hooks/use-toast";
 
 const clientes = [
+  { id: "todos", nome: "Todos" },
   { id: "1", nome: "Hospital São Lucas" },
   { id: "2", nome: "Clínica Vida Plena" },
   { id: "3", nome: "Centro Médico Norte" },
 ];
 
 export default function GerarFaturamento() {
-  const [faturamentoPeriodo, setFaturamentoPeriodo] = useState("");
+  // Período atual automático (julho/2025)
+  const currentDate = new Date();
+  const currentMonth = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const [faturamentoPeriodo, setFaturamentoPeriodo] = useState(currentMonth);
   const [clienteSelecionado, setClienteSelecionado] = useState("");
-  const [dataVencimento, setDataVencimento] = useState("");
-  const [observacoes, setObservacoes] = useState("");
   const [calculoAtual, setCalculoAtual] = useState<CalculoFaturamento | null>(null);
   const [activeTab, setActiveTab] = useState("faturamento");
   
@@ -118,17 +120,17 @@ export default function GerarFaturamento() {
   };
 
   const handleGerarFaturamento = async () => {
-    if (!calculoAtual || !dataVencimento) {
+    if (!calculoAtual) {
       toast({
         title: "Dados Incompletos",
-        description: "Selecione um período/cliente e defina a data de vencimento.",
+        description: "Selecione um período/cliente.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      const fatura = await gerarFatura(calculoAtual, dataVencimento, observacoes);
+      const fatura = await gerarFatura(calculoAtual, "", "");
       
       toast({
         title: "Fatura Calculada",
@@ -145,17 +147,17 @@ export default function GerarFaturamento() {
   };
 
   const handleGerarFaturaCompleta = async () => {
-    if (!calculoAtual || !dataVencimento) {
+    if (!calculoAtual) {
       toast({
         title: "Dados Incompletos",
-        description: "Selecione um período/cliente e defina a data de vencimento.",
+        description: "Selecione um período/cliente.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      const processo = await gerarFaturaCompleta(calculoAtual, dataVencimento, observacoes);
+      const processo = await gerarFaturaCompleta(calculoAtual, "", "");
       
       toast({
         title: "Processo Iniciado",
@@ -181,7 +183,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="faturamento" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Faturamento
@@ -194,15 +196,9 @@ export default function GerarFaturamento() {
             <Database className="h-4 w-4" />
             Base de Dados
           </TabsTrigger>
-          <TabsTrigger value="configuracao" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configuração
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="faturamento" className="space-y-6 mt-6">
-
-      <FilterBar />
 
       {/* Resumo Executivo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -286,26 +282,10 @@ export default function GerarFaturamento() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="periodo">Período de Faturamento</Label>
-              <Select value={faturamentoPeriodo} onValueChange={setFaturamentoPeriodo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o período" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodos.map((periodo) => (
-                    <SelectItem 
-                      key={periodo.id} 
-                      value={periodo.periodo}
-                      disabled={periodo.bloqueado}
-                    >
-                      <div className="flex items-center gap-2">
-                        {periodo.bloqueado && <Lock className="h-3 w-3" />}
-                        {periodo.periodo} 
-                        {periodo.bloqueado && <Badge variant="secondary" className="text-xs">Faturado</Badge>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="p-3 bg-muted rounded-md">
+                <span className="font-medium">{faturamentoPeriodo}</span>
+                <p className="text-sm text-muted-foreground">Período atual</p>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -324,25 +304,6 @@ export default function GerarFaturamento() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="vencimento">Data de Vencimento</Label>
-              <Input 
-                type="date" 
-                id="vencimento" 
-                value={dataVencimento}
-                onChange={(e) => setDataVencimento(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Input 
-                id="observacoes" 
-                placeholder="Observações adicionais para a fatura"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-              />
-            </div>
 
             {calculoAtual && (
               <>
@@ -370,28 +331,28 @@ export default function GerarFaturamento() {
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Button 
-                  onClick={handleGerarFaturamento} 
-                  variant="outline"
-                  className="flex-1"
-                  disabled={!calculoAtual || !dataVencimento || loading}
-                >
-                  <Calculator className="h-4 w-4 mr-2" />
-                  {loading ? "Calculando..." : "Calcular Fatura"}
-                </Button>
-                <Button variant="outline" disabled={!calculoAtual}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Preview
-                </Button>
-              </div>
-              
-              <Button 
-                onClick={handleGerarFaturaCompleta}
-                className="w-full"
-                disabled={!calculoAtual || !dataVencimento || loading}
+                onClick={handleGerarFaturamento} 
+                variant="outline"
+                className="flex-1"
+                disabled={!calculoAtual || loading}
               >
-                <Play className="h-4 w-4 mr-2" />
-                {loading ? "Iniciando..." : "Gerar Fatura Completa"}
+                <Calculator className="h-4 w-4 mr-2" />
+                {loading ? "Calculando..." : "Calcular Fatura"}
               </Button>
+              <Button variant="outline" disabled={!calculoAtual}>
+                <Download className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
+            </div>
+            
+            <Button 
+              onClick={handleGerarFaturaCompleta}
+              className="w-full"
+              disabled={!calculoAtual || loading}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {loading ? "Iniciando..." : "Gerar e Enviar Cliente"}
+            </Button>
               <p className="text-xs text-muted-foreground text-center">
                 Gera PDF e envia automaticamente por email
               </p>

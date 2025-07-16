@@ -17,6 +17,7 @@ import Escala from "./pages/Escala";
 import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
 import ReguaCobranca from "./pages/ReguaCobranca";
+import ConfiguracaoFaturamento from "./pages/ConfiguracaoFaturamento";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
 import Desenvolvimento from "./pages/Desenvolvimento";
@@ -61,6 +62,7 @@ const App = () => (
                     <Route path="/operacional/qualidade/treinamento-equipe" element={<TreinamentoEquipe />} />
                     <Route path="/contratos/clientes" element={<ContratosClientes />} />
                     <Route path="/contratos/fornecedores" element={<ContratosFornecedores />} />
+                    <Route path="/configuracao/faturamento" element={<ConfiguracaoFaturamento />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>

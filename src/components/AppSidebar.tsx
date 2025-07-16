@@ -89,6 +89,14 @@ const menuItems = [
       { title: "Contratos Fornecedores", url: "/contratos/fornecedores" },
     ]
   },
+  { 
+    title: "Configuração", 
+    url: "/configuracao", 
+    icon: Settings,
+    subItems: [
+      { title: "Configuração de Faturamento", url: "/configuracao/faturamento" },
+    ]
+  },
 ];
 
 export function AppSidebar() {
