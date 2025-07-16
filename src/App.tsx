@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Volumetria from "./pages/Volumetria";
 import Operacional from "./pages/Operacional";
 import Financeiro from "./pages/Financeiro";
+import GerarFaturamento from "./pages/GerarFaturamento";
 import People from "./pages/People";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/volumetria/*" element={<Volumetria />} />
             <Route path="/operacional/*" element={<Operacional />} />
             <Route path="/financeiro/*" element={<Financeiro />} />
+            <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
             <Route path="/people/*" element={<People />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -61,6 +61,7 @@ const menuItems = [
     icon: DollarSign,
     subItems: [
       { title: "Faturamento", url: "/financeiro/faturamento" },
+      { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento" },
       { title: "Pagamentos Médicos", url: "/financeiro/pagamentos" },
       { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa" },
       { title: "DRE", url: "/financeiro/dre" },
@@ -79,8 +80,9 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { collapsed } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
+  const collapsed = state === "collapsed";
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
