@@ -16,6 +16,7 @@ import OperacionalQualidade from "./pages/OperacionalQualidade";
 import Escala from "./pages/Escala";
 import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
+import ReguaCobranca from "./pages/ReguaCobranca";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
 import Desenvolvimento from "./pages/Desenvolvimento";
@@ -50,6 +51,7 @@ const App = () => (
                     <Route path="/operacional/escala" element={<Escala />} />
                     <Route path="/financeiro/*" element={<Financeiro />} />
                     <Route path="/financeiro/gerar-faturamento" element={<GerarFaturamento />} />
+                    <Route path="/financeiro/regua-cobranca" element={<ReguaCobranca />} />
                     <Route path="/people/*" element={<People />} />
                     <Route path="/people/medicos-ativos" element={<MedicosAtivos />} />
                     <Route path="/people/desenvolvimento" element={<Desenvolvimento />} />

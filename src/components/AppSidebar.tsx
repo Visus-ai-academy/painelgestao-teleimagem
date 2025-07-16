@@ -63,6 +63,7 @@ const menuItems = [
     subItems: [
       { title: "Faturamento", url: "/financeiro/faturamento" },
       { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento" },
+      { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca" },
       { title: "Pagamentos Médicos", url: "/financeiro/pagamentos" },
       { title: "Fluxo de Caixa", url: "/financeiro/fluxo-caixa" },
       { title: "DRE", url: "/financeiro/dre" },

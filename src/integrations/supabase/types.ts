@@ -115,6 +115,60 @@ export type Database = {
           },
         ]
       }
+      emails_cobranca: {
+        Row: {
+          assunto: string
+          cliente_email: string
+          corpo: string
+          created_at: string
+          enviado_em: string | null
+          erro_mensagem: string | null
+          fatura_id: string
+          id: string
+          regua_id: string
+          status: string | null
+        }
+        Insert: {
+          assunto: string
+          cliente_email: string
+          corpo: string
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          fatura_id: string
+          id?: string
+          regua_id: string
+          status?: string | null
+        }
+        Update: {
+          assunto?: string
+          cliente_email?: string
+          corpo?: string
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          fatura_id?: string
+          id?: string
+          regua_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_cobranca_fatura_id_fkey"
+            columns: ["fatura_id"]
+            isOneToOne: false
+            referencedRelation: "omie_faturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_cobranca_regua_id_fkey"
+            columns: ["regua_id"]
+            isOneToOne: false
+            referencedRelation: "regua_cobranca"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exames_realizados: {
         Row: {
           categoria: string | null
@@ -293,6 +347,54 @@ export type Database = {
           },
         ]
       }
+      omie_faturas: {
+        Row: {
+          cliente_email: string | null
+          cliente_nome: string
+          created_at: string
+          data_emissao: string
+          data_pagamento: string | null
+          data_vencimento: string
+          id: string
+          numero_fatura: string
+          omie_id: string
+          status: string | null
+          sync_date: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          cliente_email?: string | null
+          cliente_nome: string
+          created_at?: string
+          data_emissao: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          id?: string
+          numero_fatura: string
+          omie_id: string
+          status?: string | null
+          sync_date?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          cliente_email?: string | null
+          cliente_nome?: string
+          created_at?: string
+          data_emissao?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          id?: string
+          numero_fatura?: string
+          omie_id?: string
+          status?: string | null
+          sync_date?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -322,6 +424,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      regua_cobranca: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          dias_envio: number | null
+          emails_enviados: number | null
+          fatura_id: string
+          id: string
+          max_emails: number | null
+          proximo_envio: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          dias_envio?: number | null
+          emails_enviados?: number | null
+          fatura_id: string
+          id?: string
+          max_emails?: number | null
+          proximo_envio?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          dias_envio?: number | null
+          emails_enviados?: number | null
+          fatura_id?: string
+          id?: string
+          max_emails?: number | null
+          proximo_envio?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regua_cobranca_fatura_id_fkey"
+            columns: ["fatura_id"]
+            isOneToOne: false
+            referencedRelation: "omie_faturas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       upload_logs: {
         Row: {
