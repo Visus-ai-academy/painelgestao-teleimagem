@@ -13,6 +13,7 @@ import { Speedometer } from "@/components/Speedometer";
 import { StatusIndicator } from "@/components/StatusIndicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { useNavigate } from "react-router-dom";
 
 const volumeData = [
   { name: "Jan", exames: 1200, consultas: 800 },
@@ -31,6 +32,8 @@ const performanceData = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
@@ -41,38 +44,46 @@ export default function Dashboard() {
 
       {/* Métricas Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total de Exames"
-          value="8.450"
-          change="+12% vs mês anterior"
-          changeType="positive"
-          icon={Activity}
-          iconColor="text-blue-600"
-        />
-        <MetricCard
-          title="Faturamento"
-          value="R$ 2.4M"
-          change="+8% vs mês anterior"
-          changeType="positive"
-          icon={DollarSign}
-          iconColor="text-green-600"
-        />
-        <MetricCard
-          title="Médicos Ativos"
-          value="156"
-          change="+3 novos médicos"
-          changeType="positive"
-          icon={Users}
-          iconColor="text-purple-600"
-        />
-        <MetricCard
-          title="Taxa de Qualidade"
-          value="97.8%"
-          change="+0.5% vs mês anterior"
-          changeType="positive"
-          icon={Award}
-          iconColor="text-orange-600"
-        />
+        <div onClick={() => navigate("/volumetria")} className="cursor-pointer">
+          <MetricCard
+            title="Total de Exames"
+            value="8.450"
+            change="+12% vs mês anterior"
+            changeType="positive"
+            icon={Activity}
+            iconColor="text-blue-600"
+          />
+        </div>
+        <div onClick={() => navigate("/financeiro")} className="cursor-pointer">
+          <MetricCard
+            title="Faturamento"
+            value="R$ 2.4M"
+            change="+8% vs mês anterior"
+            changeType="positive"
+            icon={DollarSign}
+            iconColor="text-green-600"
+          />
+        </div>
+        <div onClick={() => navigate("/people")} className="cursor-pointer">
+          <MetricCard
+            title="Médicos Ativos"
+            value="156"
+            change="+3 novos médicos"
+            changeType="positive"
+            icon={Users}
+            iconColor="text-purple-600"
+          />
+        </div>
+        <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
+          <MetricCard
+            title="Taxa de Qualidade"
+            value="97.8%"
+            change="+0.5% vs mês anterior"
+            changeType="positive"
+            icon={Award}
+            iconColor="text-orange-600"
+          />
+        </div>
       </div>
 
       {/* Velocímetros de Performance */}
@@ -82,30 +93,38 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Speedometer
-              value={95}
-              max={100}
-              label="Meta de Produção"
-              unit="%"
-            />
-            <Speedometer
-              value={98}
-              max={100}
-              label="Qualidade"
-              unit="%"
-            />
-            <Speedometer
-              value={92}
-              max={100}
-              label="Eficiência"
-              unit="%"
-            />
-            <Speedometer
-              value={96}
-              max={100}
-              label="SLA"
-              unit="%"
-            />
+            <div onClick={() => navigate("/operacional/producao")} className="cursor-pointer">
+              <Speedometer
+                value={95}
+                max={100}
+                label="Meta de Produção"
+                unit="%"
+              />
+            </div>
+            <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
+              <Speedometer
+                value={98}
+                max={100}
+                label="Qualidade"
+                unit="%"
+              />
+            </div>
+            <div onClick={() => navigate("/operacional")} className="cursor-pointer">
+              <Speedometer
+                value={92}
+                max={100}
+                label="Eficiência"
+                unit="%"
+              />
+            </div>
+            <div onClick={() => navigate("/operacional")} className="cursor-pointer">
+              <Speedometer
+                value={96}
+                max={100}
+                label="SLA"
+                unit="%"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -141,7 +160,7 @@ export default function Dashboard() {
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card onClick={() => navigate("/volumetria")} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -163,7 +182,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card onClick={() => navigate("/operacional")} className="cursor-pointer hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-green-600" />

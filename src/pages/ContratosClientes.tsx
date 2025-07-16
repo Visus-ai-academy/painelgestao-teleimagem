@@ -132,8 +132,12 @@ export default function ContratosClientes() {
   const valorTotalAtivos = contratosAtivos.reduce((sum, c) => sum + c.valorTotal, 0);
 
   const handleGerarContrato = (contratoId: string) => {
-    console.log("Gerando contrato para:", contratoId);
-    // Aqui seria implementada a lógica de geração de contrato
+    const contrato = contratos.find(c => c.id === contratoId);
+    if (contrato) {
+      // Implementar lógica para gerar novo contrato ou aditivo
+      console.log("Gerando contrato/aditivo para:", contrato.cliente);
+      // Aqui seria implementada a navegação para formulário de contrato/aditivo
+    }
   };
 
   return (
@@ -329,9 +333,10 @@ export default function ContratosClientes() {
                         variant="outline" 
                         size="sm"
                         onClick={() => handleGerarContrato(contrato.id)}
+                        title="Gerar novo contrato ou aditivo de serviço"
                       >
-                        <Download className="h-3 w-3 mr-1" />
-                        Gerar
+                        <Plus className="h-3 w-3 mr-1" />
+                        Gerar Contrato
                       </Button>
                       <Button variant="outline" size="sm">
                         Editar
