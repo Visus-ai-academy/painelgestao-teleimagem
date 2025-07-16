@@ -60,7 +60,7 @@ const menuOptions: MenuOption[] = [
   
   // Sub-menus da Configuração
   { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
-  { key: 'configuracao-faturamento', label: 'Configuração Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'configuracao-faturamento', label: 'Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
 ];
 
 export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
