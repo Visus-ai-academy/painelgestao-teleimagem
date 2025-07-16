@@ -23,29 +23,46 @@ interface MenuOption {
   key: string;
   label: string;
   defaultRoles: string[];
+  isSubMenu?: boolean;
+  parentMenu?: string;
 }
 
 const menuOptions: MenuOption[] = [
+  // Menus Principais
   { key: 'dashboard', label: 'Dashboard', defaultRoles: ['admin', 'manager', 'user'] },
   { key: 'volumetria', label: 'Volumetria', defaultRoles: ['admin', 'manager', 'user'] },
   { key: 'operacional', label: 'Operacional', defaultRoles: ['admin', 'manager'] },
-  { key: 'operacional-producao', label: 'Operacional - Produção', defaultRoles: ['admin', 'manager'] },
-  { key: 'operacional-qualidade', label: 'Operacional - Qualidade', defaultRoles: ['admin', 'manager'] },
-  { key: 'escala', label: 'Escala', defaultRoles: ['admin', 'manager'] },
   { key: 'financeiro', label: 'Financeiro', defaultRoles: ['admin', 'manager'] },
-  { key: 'gerar-faturamento', label: 'Gerar Faturamento', defaultRoles: ['admin', 'manager'] },
-  { key: 'regua-cobranca', label: 'Régua de Cobrança', defaultRoles: ['admin', 'manager'] },
-  { key: 'contratos-clientes', label: 'Contratos Clientes', defaultRoles: ['admin', 'manager'] },
-  { key: 'contratos-fornecedores', label: 'Contratos Fornecedores', defaultRoles: ['admin'] },
-  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'] },
-  { key: 'colaboradores', label: 'Colaboradores', defaultRoles: ['admin', 'manager'] },
-  { key: 'plano-carreira', label: 'Plano de Carreira', defaultRoles: ['admin'] },
-  { key: 'desenvolvimento', label: 'Desenvolvimento', defaultRoles: ['admin'] },
-  { key: 'bonificacao', label: 'Bonificação', defaultRoles: ['admin', 'manager'] },
-  { key: 'treinamento-equipe', label: 'Treinamento Equipe', defaultRoles: ['admin', 'manager'] },
+  { key: 'people', label: 'People', defaultRoles: ['admin', 'manager'] },
+  { key: 'contratos', label: 'Contratos', defaultRoles: ['admin', 'manager'] },
   { key: 'configuracao', label: 'Configuração', defaultRoles: ['admin'] },
-  { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'] },
-  { key: 'configuracao-faturamento', label: 'Configuração Faturamento', defaultRoles: ['admin'] },
+  
+  // Sub-menus do Operacional
+  { key: 'operacional-producao', label: 'Produção', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'operacional-qualidade', label: 'Qualidade', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  { key: 'escala', label: 'Escala', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'operacional' },
+  
+  // Sub-menus do Financeiro
+  { key: 'gerar-faturamento', label: 'Gerar Faturamento', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
+  { key: 'regua-cobranca', label: 'Régua de Cobrança', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'financeiro' },
+  
+  // Sub-menus do People
+  { key: 'colaboradores', label: 'Colaboradores', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'plano-carreira', label: 'Plano de Carreira', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'desenvolvimento', label: 'Desenvolvimento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'bonificacao', label: 'Bonificação', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
+  { key: 'treinamento-equipe', label: 'Treinamento Equipe', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'people' },
+  
+  // Sub-menus dos Contratos
+  { key: 'contratos-clientes', label: 'Contratos Clientes', defaultRoles: ['admin', 'manager'], isSubMenu: true, parentMenu: 'contratos' },
+  { key: 'contratos-fornecedores', label: 'Contratos Fornecedores', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'contratos' },
+  
+  // Sub-menus da Configuração
+  { key: 'usuarios', label: 'Gerenciar Usuários', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  { key: 'configuracao-faturamento', label: 'Configuração Faturamento', defaultRoles: ['admin'], isSubMenu: true, parentMenu: 'configuracao' },
+  
+  // Outros menus independentes
+  { key: 'medicos-ativos', label: 'Médicos Ativos', defaultRoles: ['admin', 'manager'] },
 ];
 
 export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
@@ -100,6 +117,18 @@ export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
       ...prev,
       [menuKey]: granted,
     }));
+    
+    // Se estiver concedendo acesso a um menu principal, automaticamente conceder aos sub-menus
+    if (granted) {
+      const subMenus = menuOptions.filter(menu => menu.parentMenu === menuKey);
+      if (subMenus.length > 0) {
+        const updatedPermissions = { ...permissions, [menuKey]: granted };
+        subMenus.forEach(subMenu => {
+          updatedPermissions[subMenu.key] = true;
+        });
+        setPermissions(prev => ({ ...prev, ...updatedPermissions }));
+      }
+    }
   };
 
   const savePermissions = async () => {
@@ -168,32 +197,93 @@ export const MenuPermissionsDialog: React.FC<MenuPermissionsDialogProps> = ({
               sobrescreverão as permissões padrão baseadas no role.
             </div>
 
-            <div className="grid gap-3">
-              {menuOptions.map((menu) => (
-                <div
-                  key={menu.key}
-                  className="flex items-center space-x-3 p-3 border rounded-md"
-                >
-                  <Checkbox
-                    id={menu.key}
-                    checked={permissions[menu.key] || false}
-                    onCheckedChange={(checked) =>
-                      handlePermissionChange(menu.key, !!checked)
-                    }
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor={menu.key}
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      {menu.label}
-                    </label>
-                    <div className="text-xs text-muted-foreground">
-                      Padrão para: {menu.defaultRoles.join(', ')}
-                    </div>
-                  </div>
+            <div className="space-y-6">
+              {/* Menus Principais */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 text-primary">Menus Principais</h3>
+                <div className="grid gap-3">
+                  {menuOptions
+                    .filter(menu => !menu.isSubMenu)
+                    .map((menu) => (
+                      <div
+                        key={menu.key}
+                        className="flex items-center space-x-3 p-3 border rounded-md bg-card"
+                      >
+                        <Checkbox
+                          id={menu.key}
+                          checked={permissions[menu.key] || false}
+                          onCheckedChange={(checked) =>
+                            handlePermissionChange(menu.key, !!checked)
+                          }
+                        />
+                        <div className="flex-1">
+                          <label
+                            htmlFor={menu.key}
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {menu.label}
+                          </label>
+                          <div className="text-xs text-muted-foreground">
+                            Padrão para: {menu.defaultRoles.join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Sub-menus */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 text-primary">Sub-menus</h3>
+                <div className="text-sm text-muted-foreground mb-3">
+                  Acesso aos sub-menus é concedido automaticamente quando o usuário tem acesso ao menu principal correspondente.
+                </div>
+                
+                {/* Agrupar sub-menus por menu pai */}
+                {[...new Set(menuOptions.filter(menu => menu.isSubMenu).map(menu => menu.parentMenu))].map(parentMenu => {
+                  const parentMenuData = menuOptions.find(menu => menu.key === parentMenu);
+                  const subMenus = menuOptions.filter(menu => menu.parentMenu === parentMenu);
+                  
+                  return (
+                    <div key={parentMenu} className="mb-4">
+                      <h4 className="text-md font-medium mb-2 text-foreground capitalize">
+                        {parentMenuData?.label}
+                      </h4>
+                      <div className="grid gap-2 ml-4">
+                        {subMenus.map((menu) => (
+                          <div
+                            key={menu.key}
+                            className="flex items-center space-x-3 p-2 border rounded-md bg-muted/30"
+                          >
+                            <Checkbox
+                              id={menu.key}
+                              checked={permissions[menu.key] || false}
+                              onCheckedChange={(checked) =>
+                                handlePermissionChange(menu.key, !!checked)
+                              }
+                              disabled={permissions[parentMenu!] === true}
+                            />
+                            <div className="flex-1">
+                              <label
+                                htmlFor={menu.key}
+                                className="text-sm cursor-pointer"
+                              >
+                                {menu.label}
+                              </label>
+                              <div className="text-xs text-muted-foreground">
+                                Padrão para: {menu.defaultRoles.join(', ')}
+                                {permissions[parentMenu!] === true && (
+                                  <span className="ml-2 text-green-600">• Habilitado pelo menu principal</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
