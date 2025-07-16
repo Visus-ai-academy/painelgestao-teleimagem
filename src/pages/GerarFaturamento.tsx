@@ -28,7 +28,11 @@ import {
   Play,
   Clock,
   Mail,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Trash2,
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import { useFaturamento } from "@/hooks/useFaturamento";
 import { CalculoFaturamento } from "@/types/faturamento";
@@ -55,6 +59,9 @@ export default function GerarFaturamento() {
     podeSerFaturado,
     processos,
     logs,
+    limparProcessos,
+    cancelarProcesso,
+    reenviarEmail,
     loading 
   } = useFaturamento();
   
@@ -165,8 +172,8 @@ export default function GerarFaturamento() {
 
       <FilterBar />
 
-      {/* Resumo de Pendências */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Resumo Executivo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pendente</CardTitle>
@@ -215,6 +222,21 @@ export default function GerarFaturamento() {
             <div className="text-2xl font-bold">87</div>
             <p className="text-xs text-muted-foreground">
               Este mês
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Processos Ativos</CardTitle>
+            <Play className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {processos.filter(p => p.statusRelatorio === "gerando" || p.statusEmail === "enviando").length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Em andamento agora
             </p>
           </CardContent>
         </Card>
@@ -396,9 +418,22 @@ export default function GerarFaturamento() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Status dos Processos
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Status dos Processos
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={limparProcessos}
+                  disabled={processos.length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Limpar
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -462,15 +497,45 @@ export default function GerarFaturamento() {
                     </div>
                     
                     {processo.arquivoPdf && (
-                      <p className="text-xs text-muted-foreground">
-                        📄 {processo.arquivoPdf}
-                      </p>
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <p className="text-xs text-muted-foreground">
+                          📄 {processo.arquivoPdf}
+                        </p>
+                        <Button variant="outline" size="sm">
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </Button>
+                      </div>
                     )}
                     
                     {processo.emailDestinatario && processo.statusEmail !== "pendente" && (
-                      <p className="text-xs text-muted-foreground">
-                        📧 {processo.emailDestinatario}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          📧 {processo.emailDestinatario}
+                        </p>
+                        <div className="flex gap-1">
+                          {processo.statusEmail === "erro" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => reenviarEmail(processo.id)}
+                            >
+                              <RefreshCw className="h-3 w-3 mr-1" />
+                              Reenviar
+                            </Button>
+                          )}
+                          {(processo.statusRelatorio === "gerando" || processo.statusEmail === "enviando") && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => cancelarProcesso(processo.id)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Cancelar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))
@@ -481,9 +546,14 @@ export default function GerarFaturamento() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Log de Operações
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Log de Operações
+              </div>
+              <Badge variant="outline">
+                {logs.length} registros
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -494,7 +564,7 @@ export default function GerarFaturamento() {
                   <p>Nenhuma operação registrada</p>
                 </div>
               ) : (
-                logs.map((log) => (
+                logs.slice(0, 20).map((log) => (
                   <div key={log.id} className="flex items-start gap-3 p-2 text-sm border-l-2 border-l-primary">
                     <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2"></div>
                     <div className="flex-1">
@@ -505,13 +575,37 @@ export default function GerarFaturamento() {
                         </span>
                       </div>
                       {log.detalhes && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {JSON.stringify(log.detalhes)}
-                        </p>
+                        <div className="text-xs text-muted-foreground mt-1 p-2 bg-muted rounded">
+                          <details>
+                            <summary className="cursor-pointer">Detalhes</summary>
+                            <pre className="mt-1 text-xs">
+                              {JSON.stringify(log.detalhes, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
                       )}
+                      <div className="flex items-center gap-1 mt-1">
+                        <Badge 
+                          variant={
+                            log.tipo === "erro" ? "destructive" :
+                            log.tipo === "email" ? "secondary" : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {log.tipo}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 ))
+              )}
+              {logs.length > 20 && (
+                <div className="text-center py-2 border-t">
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver todos ({logs.length})
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>

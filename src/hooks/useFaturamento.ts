@@ -418,6 +418,78 @@ export const useFaturamento = () => {
     return processo;
   }, []);
 
+  // Limpar histórico de processos
+  const limparProcessos = useCallback(() => {
+    setProcessos([]);
+    setLogs([]);
+  }, []);
+
+  // Cancelar processo em andamento
+  const cancelarProcesso = useCallback((processoId: string) => {
+    setProcessos(prev => prev.map(p => 
+      p.id === processoId 
+        ? { 
+            ...p, 
+            statusRelatorio: p.statusRelatorio === "gerando" ? "erro" : p.statusRelatorio,
+            statusEmail: p.statusEmail === "enviando" ? "erro" : p.statusEmail,
+            erro: "Processo cancelado pelo usuário"
+          }
+        : p
+    ));
+
+    const logCancelamento: LogOperacao = {
+      id: `log_${Date.now()}`,
+      processoId,
+      timestamp: new Date().toISOString(),
+      tipo: "erro",
+      mensagem: "Processo cancelado pelo usuário",
+    };
+    setLogs(prev => [logCancelamento, ...prev]);
+  }, []);
+
+  // Reenviar email
+  const reenviarEmail = useCallback(async (processoId: string) => {
+    const processo = processos.find(p => p.id === processoId);
+    if (!processo || processo.statusRelatorio !== "gerado") return;
+
+    setProcessos(prev => prev.map(p => 
+      p.id === processoId 
+        ? { ...p, statusEmail: "enviando" }
+        : p
+    ));
+
+    const logReenvio: LogOperacao = {
+      id: `log_${Date.now()}`,
+      processoId,
+      timestamp: new Date().toISOString(),
+      tipo: "email",
+      mensagem: "Reenviando email...",
+    };
+    setLogs(prev => [logReenvio, ...prev]);
+
+    // Simular reenvio
+    setTimeout(() => {
+      setProcessos(prev => prev.map(p => 
+        p.id === processoId 
+          ? { 
+              ...p, 
+              statusEmail: "enviado",
+              dataFimEmail: new Date().toISOString()
+            }
+          : p
+      ));
+
+      const logSucesso: LogOperacao = {
+        id: `log_${Date.now() + 1}`,
+        processoId,
+        timestamp: new Date().toISOString(),
+        tipo: "email",
+        mensagem: "Email reenviado com sucesso!",
+      };
+      setLogs(prev => [logSucesso, ...prev]);
+    }, 2000);
+  }, [processos]);
+
   return {
     exames,
     regras,
@@ -431,6 +503,9 @@ export const useFaturamento = () => {
     processarFaturamento,
     gerarFatura,
     gerarFaturaCompleta,
+    limparProcessos,
+    cancelarProcesso,
+    reenviarEmail,
     podeSerFaturado
   };
 };
