@@ -24,14 +24,14 @@ serve(async (req) => {
 
     const { fileName } = await req.json()
 
-    console.log('Processando arquivo de exames:', fileName)
+    console.log('Processando arquivo de clientes:', fileName)
 
     // 1. Log do início do processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
         filename: fileName,
-        file_type: 'exames',
+        file_type: 'clientes',
         status: 'processing'
       })
       .select()
@@ -41,56 +41,59 @@ serve(async (req) => {
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
 
-    // 2. Baixar arquivo do storage (simulado)
-    console.log('Baixando arquivo do storage...')
+    // 2. Processar dados dos clientes (simulado por enquanto)
+    console.log('Processando dados dos clientes...')
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // 3. Processar CSV/Excel (simulado)
-    console.log('Analisando formato do arquivo...')
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    // Simular dados processados
-    const examosMock = [
+    // Dados simulados de clientes com UUIDs específicos
+    const clientesMock = [
       {
-        paciente: "João Silva",
-        cliente_id: "550e8400-e29b-41d4-a716-446655440001",
-        medico: "Dr. Antonio",
-        data_exame: "2025-07-15",
-        modalidade: "MR",
-        especialidade: "NE",
-        status: "Realizado",
-        valor_bruto: 450.00
+        id: "550e8400-e29b-41d4-a716-446655440001",
+        nome: "Hospital São Lucas",
+        email: "contato@saolucas.com.br",
+        telefone: "(11) 3456-7890",
+        endereco: "Rua das Flores, 123 - São Paulo/SP",
+        cnpj: "12.345.678/0001-90",
+        ativo: true
       },
       {
-        paciente: "Maria Santos",
-        cliente_id: "550e8400-e29b-41d4-a716-446655440002", 
-        medico: "Dra. Ana",
-        data_exame: "2025-07-16",
-        modalidade: "CT",
-        especialidade: "CA",
-        status: "Realizado",
-        valor_bruto: 320.00
+        id: "550e8400-e29b-41d4-a716-446655440002",
+        nome: "Clínica Vida Plena",
+        email: "admin@vidaplena.com.br",
+        telefone: "(11) 2345-6789",
+        endereco: "Av. Paulista, 456 - São Paulo/SP",
+        cnpj: "98.765.432/0001-10",
+        ativo: true
+      },
+      {
+        id: "550e8400-e29b-41d4-a716-446655440003",
+        nome: "Centro Médico Norte",
+        email: "faturamento@centronorte.com.br",
+        telefone: "(11) 4567-8901",
+        endereco: "Rua Norte, 789 - São Paulo/SP",
+        cnpj: "11.222.333/0001-44",
+        ativo: true
       }
     ]
 
-    console.log('Inserindo exames no banco...')
+    console.log('Inserindo clientes no banco...')
 
-    // 4. Inserir dados no banco
-    const { data: examesInseridos, error: examesError } = await supabaseClient
-      .from('exames_realizados')
-      .insert(examosMock)
+    // 3. Inserir/Atualizar clientes (upsert)
+    const { data: clientesInseridos, error: clientesError } = await supabaseClient
+      .from('clientes')
+      .upsert(clientesMock, { onConflict: 'id' })
       .select()
 
-    if (examesError) {
-      throw new Error(`Erro ao inserir exames: ${examesError.message}`)
+    if (clientesError) {
+      throw new Error(`Erro ao inserir clientes: ${clientesError.message}`)
     }
 
-    // 5. Atualizar log com sucesso
+    // 4. Atualizar log com sucesso
     const { error: updateLogError } = await supabaseClient
       .from('upload_logs')
       .update({
         status: 'success',
-        records_processed: examosMock.length
+        records_processed: clientesMock.length
       })
       .eq('id', logEntry.id)
 
@@ -98,14 +101,14 @@ serve(async (req) => {
       console.error('Erro ao atualizar log:', updateLogError.message)
     }
 
-    console.log(`Processamento concluído! ${examosMock.length} exames inseridos.`)
+    console.log(`Processamento concluído! ${clientesMock.length} clientes inseridos.`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: examosMock.length,
+        registros_processados: clientesMock.length,
         registros_erro: 0,
-        mensagem: 'Arquivo processado com sucesso'
+        mensagem: 'Clientes processados com sucesso'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

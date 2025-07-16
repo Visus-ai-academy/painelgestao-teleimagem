@@ -22,7 +22,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
-import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile } from "@/lib/supabase";
+import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
@@ -357,11 +357,21 @@ export default function GerarFaturamento() {
         <TabsContent value="uploads" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <FileUpload
+              title="Upload de Clientes"
+              description="Lista de clientes com emails para envio dos relatórios"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={10}
+              expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
+              onUpload={processClientesFile}
+              icon={<Users className="h-5 w-5" />}
+            />
+
+            <FileUpload
               title="Upload de Exames Realizados"
               description="Arraste e solte arquivos CSV/Excel aqui ou clique para selecionar"
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={50}
-              expectedFormat={["ID do Exame, Paciente, Cliente, Médico, Data", "Modalidade, Especialidade, Status"]}
+              expectedFormat={["paciente, cliente_id, medico, data_exame", "modalidade, especialidade, valor_bruto"]}
               onUpload={processExamesFile}
               icon={<FileSpreadsheet className="h-5 w-5" />}
             />

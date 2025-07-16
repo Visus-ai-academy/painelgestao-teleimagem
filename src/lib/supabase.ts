@@ -125,6 +125,26 @@ export async function processContratosFile(file: File) {
   }
 }
 
+export async function processClientesFile(file: File) {
+  try {
+    const fileName = `clientes_${Date.now()}_${file.name}`
+    await uploadFile(file, 'uploads', fileName)
+
+    const { data, error } = await supabase.functions.invoke('processar-clientes', {
+      body: { fileName }
+    })
+
+    if (error) {
+      throw new Error(`Erro ao processar clientes: ${error.message}`)
+    }
+
+    return data
+  } catch (error) {
+    console.error('Erro no processamento:', error)
+    throw error
+  }
+}
+
 export async function processEscalasFile(file: File) {
   try {
     const fileName = `escalas_${Date.now()}_${file.name}`
