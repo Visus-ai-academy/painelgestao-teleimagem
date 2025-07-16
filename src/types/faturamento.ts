@@ -87,3 +87,31 @@ export interface CalculoFaturamento {
     valorFinal: number;
   };
 }
+
+// Novos tipos para sistema de status
+export type StatusRelatorio = "pendente" | "gerando" | "gerado" | "erro";
+export type StatusEmail = "pendente" | "enviando" | "enviado" | "erro";
+
+export interface ProcessoFaturamento {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  periodo: string;
+  statusRelatorio: StatusRelatorio;
+  statusEmail: StatusEmail;
+  arquivoPdf?: string;
+  emailDestinatario?: string;
+  dataInicio: string;
+  dataFimRelatorio?: string;
+  dataFimEmail?: string;
+  erro?: string;
+}
+
+export interface LogOperacao {
+  id: string;
+  processoId: string;
+  timestamp: string;
+  tipo: "relatorio" | "email" | "erro";
+  mensagem: string;
+  detalhes?: any;
+}

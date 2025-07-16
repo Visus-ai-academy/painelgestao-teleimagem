@@ -5,7 +5,11 @@ import {
   PeriodoFaturamento, 
   CalculoFaturamento,
   FaturamentoItem,
-  Fatura
+  Fatura,
+  ProcessoFaturamento,
+  LogOperacao,
+  StatusRelatorio,
+  StatusEmail
 } from '@/types/faturamento';
 
 // Mock data - em produção viria da API/banco de dados
@@ -113,6 +117,8 @@ export const useFaturamento = () => {
   const [regras] = useState<RegraContrato[]>(mockRegrasContrato);
   const [periodos] = useState<PeriodoFaturamento[]>(mockPeriodos);
   const [loading, setLoading] = useState(false);
+  const [processos, setProcessos] = useState<ProcessoFaturamento[]>([]);
+  const [logs, setLogs] = useState<LogOperacao[]>([]);
 
   // Buscar exames por período
   const getExamesPorPeriodo = useCallback((periodo: string) => {
@@ -290,16 +296,141 @@ export const useFaturamento = () => {
     return !periodoInfo?.bloqueado;
   }, [periodos]);
 
+  // Gerar fatura completa (com PDF e envio de email) - rotina Python
+  const gerarFaturaCompleta = useCallback(async (
+    calculo: CalculoFaturamento,
+    dataVencimento: string,
+    observacoes?: string
+  ): Promise<ProcessoFaturamento> => {
+    const clienteMap: { [key: string]: string } = {
+      "1": "Hospital São Lucas",
+      "2": "Clínica Vida Plena", 
+      "3": "Centro Médico Norte"
+    };
+
+    const processo: ProcessoFaturamento = {
+      id: `proc_${Date.now()}`,
+      clienteId: calculo.clienteId,
+      clienteNome: clienteMap[calculo.clienteId] || "Cliente Desconhecido",
+      periodo: calculo.periodo,
+      statusRelatorio: "pendente",
+      statusEmail: "pendente",
+      emailDestinatario: `financeiro@${clienteMap[calculo.clienteId]?.toLowerCase().replace(/ /g, '')}.com.br`,
+      dataInicio: new Date().toISOString()
+    };
+
+    setProcessos(prev => [processo, ...prev]);
+
+    // Log inicial
+    const logInicial: LogOperacao = {
+      id: `log_${Date.now()}`,
+      processoId: processo.id,
+      timestamp: new Date().toISOString(),
+      tipo: "relatorio",
+      mensagem: "Iniciando geração de relatório PDF...",
+      detalhes: { cliente: processo.clienteNome, periodo: processo.periodo }
+    };
+    setLogs(prev => [logInicial, ...prev]);
+
+    // Simular processo de geração de PDF
+    setTimeout(() => {
+      setProcessos(prev => prev.map(p => 
+        p.id === processo.id 
+          ? { ...p, statusRelatorio: "gerando" }
+          : p
+      ));
+      
+      const logGerando: LogOperacao = {
+        id: `log_${Date.now() + 1}`,
+        processoId: processo.id,
+        timestamp: new Date().toISOString(),
+        tipo: "relatorio",
+        mensagem: "Processando dados e gerando PDF...",
+      };
+      setLogs(prev => [logGerando, ...prev]);
+    }, 1000);
+
+    // Simular conclusão do PDF
+    setTimeout(() => {
+      setProcessos(prev => prev.map(p => 
+        p.id === processo.id 
+          ? { 
+              ...p, 
+              statusRelatorio: "gerado",
+              dataFimRelatorio: new Date().toISOString(),
+              arquivoPdf: `fatura_${processo.clienteNome.replace(/ /g, '_')}_${processo.periodo}.pdf`
+            }
+          : p
+      ));
+
+      const logPdfGerado: LogOperacao = {
+        id: `log_${Date.now() + 2}`,
+        processoId: processo.id,
+        timestamp: new Date().toISOString(),
+        tipo: "relatorio",
+        mensagem: "PDF gerado com sucesso!",
+        detalhes: { arquivo: `fatura_${processo.clienteNome.replace(/ /g, '_')}_${processo.periodo}.pdf` }
+      };
+      setLogs(prev => [logPdfGerado, ...prev]);
+
+      // Iniciar envio de email
+      setTimeout(() => {
+        setProcessos(prev => prev.map(p => 
+          p.id === processo.id 
+            ? { ...p, statusEmail: "enviando" }
+            : p
+        ));
+
+        const logEmail: LogOperacao = {
+          id: `log_${Date.now() + 3}`,
+          processoId: processo.id,
+          timestamp: new Date().toISOString(),
+          tipo: "email",
+          mensagem: `Enviando fatura por email para ${processo.emailDestinatario}...`,
+        };
+        setLogs(prev => [logEmail, ...prev]);
+      }, 1000);
+
+      // Concluir envio de email
+      setTimeout(() => {
+        setProcessos(prev => prev.map(p => 
+          p.id === processo.id 
+            ? { 
+                ...p, 
+                statusEmail: "enviado",
+                dataFimEmail: new Date().toISOString()
+              }
+            : p
+        ));
+
+        const logEmailEnviado: LogOperacao = {
+          id: `log_${Date.now() + 4}`,
+          processoId: processo.id,
+          timestamp: new Date().toISOString(),
+          tipo: "email",
+          mensagem: "Email enviado com sucesso!",
+          detalhes: { destinatario: processo.emailDestinatario }
+        };
+        setLogs(prev => [logEmailEnviado, ...prev]);
+      }, 2500);
+    }, 3000);
+
+    return processo;
+  }, []);
+
   return {
     exames,
     regras,
     periodos,
     loading,
+    processos,
+    logs,
     getExamesPorPeriodo,
     getRegrasCliente,
     calcularValorExame,
     processarFaturamento,
     gerarFatura,
+    gerarFaturaCompleta,
     podeSerFaturado
   };
 };

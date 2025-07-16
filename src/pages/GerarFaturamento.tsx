@@ -24,7 +24,11 @@ import {
   Calculator,
   CheckCircle,
   AlertTriangle,
-  Lock
+  Lock,
+  Play,
+  Clock,
+  Mail,
+  AlertCircle
 } from "lucide-react";
 import { useFaturamento } from "@/hooks/useFaturamento";
 import { CalculoFaturamento } from "@/types/faturamento";
@@ -47,7 +51,10 @@ export default function GerarFaturamento() {
     periodos, 
     processarFaturamento, 
     gerarFatura, 
+    gerarFaturaCompleta,
     podeSerFaturado,
+    processos,
+    logs,
     loading 
   } = useFaturamento();
   
@@ -107,20 +114,40 @@ export default function GerarFaturamento() {
       const fatura = await gerarFatura(calculoAtual, dataVencimento, observacoes);
       
       toast({
-        title: "Fatura Gerada",
-        description: `Fatura ${fatura.numero} gerada com sucesso!`,
+        title: "Fatura Calculada",
+        description: `Fatura ${fatura.numero} calculada internamente!`,
       });
-
-      // Limpar formulário
-      setFaturamentoPeriodo("");
-      setClienteSelecionado("");
-      setDataVencimento("");
-      setObservacoes("");
-      setCalculoAtual(null);
       
     } catch (error) {
       toast({
-        title: "Erro ao Gerar Fatura",
+        title: "Erro ao Calcular Fatura",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleGerarFaturaCompleta = async () => {
+    if (!calculoAtual || !dataVencimento) {
+      toast({
+        title: "Dados Incompletos",
+        description: "Selecione um período/cliente e defina a data de vencimento.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const processo = await gerarFaturaCompleta(calculoAtual, dataVencimento, observacoes);
+      
+      toast({
+        title: "Processo Iniciado",
+        description: "Geração de PDF e envio de email iniciados!",
+      });
+      
+    } catch (error) {
+      toast({
+        title: "Erro ao Iniciar Processo",
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive"
       });
@@ -286,19 +313,34 @@ export default function GerarFaturamento() {
               </>
             )}
 
-            <div className="flex gap-2">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleGerarFaturamento} 
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!calculoAtual || !dataVencimento || loading}
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  {loading ? "Calculando..." : "Calcular Fatura"}
+                </Button>
+                <Button variant="outline" disabled={!calculoAtual}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
+              </div>
+              
               <Button 
-                onClick={handleGerarFaturamento} 
-                className="flex-1"
+                onClick={handleGerarFaturaCompleta}
+                className="w-full"
                 disabled={!calculoAtual || !dataVencimento || loading}
               >
-                <FileText className="h-4 w-4 mr-2" />
-                {loading ? "Processando..." : "Gerar Fatura"}
+                <Play className="h-4 w-4 mr-2" />
+                {loading ? "Iniciando..." : "Gerar Fatura Completa"}
               </Button>
-              <Button variant="outline" disabled={!calculoAtual}>
-                <Download className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Gera PDF e envia automaticamente por email
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -346,6 +388,132 @@ export default function GerarFaturamento() {
                 <p>Selecione um cliente e período para ver os exames</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status dos Processos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Status dos Processos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {processos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>Nenhum processo em andamento</p>
+                </div>
+              ) : (
+                processos.map((processo) => (
+                  <div key={processo.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{processo.clienteNome}</p>
+                        <p className="text-sm text-muted-foreground">Período: {processo.periodo}</p>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        {new Date(processo.dataInicio).toLocaleString('pt-BR')}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span className="text-sm">Relatório PDF</span>
+                        </div>
+                        <Badge 
+                          variant={
+                            processo.statusRelatorio === "gerado" ? "default" :
+                            processo.statusRelatorio === "gerando" ? "secondary" :
+                            processo.statusRelatorio === "erro" ? "destructive" : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {processo.statusRelatorio === "pendente" ? "Pendente" :
+                           processo.statusRelatorio === "gerando" ? "Gerando..." :
+                           processo.statusRelatorio === "gerado" ? "Gerado" : "Erro"}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          <span className="text-sm">Email</span>
+                        </div>
+                        <Badge 
+                          variant={
+                            processo.statusEmail === "enviado" ? "default" :
+                            processo.statusEmail === "enviando" ? "secondary" :
+                            processo.statusEmail === "erro" ? "destructive" : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {processo.statusEmail === "pendente" ? "Pendente" :
+                           processo.statusEmail === "enviando" ? "Enviando..." :
+                           processo.statusEmail === "enviado" ? "Enviado" : "Erro"}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {processo.arquivoPdf && (
+                      <p className="text-xs text-muted-foreground">
+                        📄 {processo.arquivoPdf}
+                      </p>
+                    )}
+                    
+                    {processo.emailDestinatario && processo.statusEmail !== "pendente" && (
+                      <p className="text-xs text-muted-foreground">
+                        📧 {processo.emailDestinatario}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Log de Operações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {logs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2" />
+                  <p>Nenhuma operação registrada</p>
+                </div>
+              ) : (
+                logs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 p-2 text-sm border-l-2 border-l-primary">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2"></div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{log.mensagem}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log.timestamp).toLocaleTimeString('pt-BR')}
+                        </span>
+                      </div>
+                      {log.detalhes && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {JSON.stringify(log.detalhes)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
