@@ -68,17 +68,28 @@ export default function GerarFaturamento() {
   // Carregar clientes da base de dados (inicialização)
   const carregarClientes = async () => {
     try {
+      console.log('Iniciando carregamento de clientes...');
+      
       const { data, error } = await supabase
         .from('clientes')
-        .select('id, nome, email')
-        .eq('ativo', true)
-        .not('email', 'is', null);
+        .select('id, nome, email, ativo')
+        .eq('ativo', true);
 
-      if (error) throw error;
+      console.log('Resultado da consulta:', { data, error });
 
-      const clientesComEmail = data?.filter(cliente => cliente.email && cliente.email.trim() !== '') || [];
+      if (error) {
+        console.error('Erro na consulta:', error);
+        throw error;
+      }
+
+      // Filtrar clientes com email válido
+      const clientesComEmail = data?.filter(cliente => 
+        cliente.email && 
+        cliente.email.trim() !== '' && 
+        cliente.email.includes('@')
+      ) || [];
       
-      console.log('Clientes carregados da base:', clientesComEmail);
+      console.log('Clientes filtrados com email:', clientesComEmail);
       
       setClientesCarregados(clientesComEmail);
       
