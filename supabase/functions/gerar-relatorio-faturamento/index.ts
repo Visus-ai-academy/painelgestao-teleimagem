@@ -262,10 +262,10 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
     doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${relatorio.periodo}`, margin, y);
     
-    y += 5;
+    y += 6;
     doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
     
-    y += 10;
+    y += 12; // Mais espaço antes da linha
     doc.line(margin, y, pageWidth - margin, y);
 
     // Dados do Cliente
@@ -286,7 +286,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
     doc.text(`Email: ${relatorio.cliente.email}`, margin, y);
 
     // Linha separadora
-    y += 10;
+    y += 12;
     doc.line(margin, y, pageWidth - margin, y);
 
     // Resumo Financeiro
@@ -295,7 +295,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
     doc.setFont('helvetica', 'bold');
     doc.text('RESUMO FINANCEIRO', margin, y);
 
-    y += 10;
+    y += 12;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
 
@@ -325,18 +325,28 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       y += 6;
     });
 
-    // Detalhamento dos Exames
+    // Detalhamento dos Exames - sempre incluir, mesmo na primeira página se houver espaço
+    y += 15;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    
     if (relatorio.exames.length > 0) {
-      doc.addPage('landscape'); // Garantir que a nova página seja paisagem
-      y = 30;
-
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
       doc.text(`DETALHAMENTO DOS EXAMES (${relatorio.exames.length} laudos)`, margin, y);
 
-      y += 15;
+      y += 12;
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
+      
+      // Verificar se há espaço na página atual, senão criar nova página
+      if (y > 140) { // Se não há espaço suficiente na primeira página
+        doc.addPage('landscape');
+        y = 30;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`DETALHAMENTO DOS EXAMES (${relatorio.exames.length} laudos)`, margin, y);
+        y += 12;
+        doc.setFontSize(7);
+      }
       
       // Cabeçalho da tabela - layout paisagem com mais espaço
       doc.text('Data Exame', margin, y);
@@ -396,7 +406,8 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
         y += 5;
       });
     } else {
-      y += 15;
+      doc.text('DETALHAMENTO DOS EXAMES (0 laudos)', margin, y);
+      y += 12;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'italic');
       doc.text('Nenhum exame encontrado para o período especificado.', margin, y);
