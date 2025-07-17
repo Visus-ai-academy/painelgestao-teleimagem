@@ -56,9 +56,11 @@ export default function GerarFaturamento() {
   
   const { toast } = useToast();
 
-  // Inicializar resultados na primeira carga
+  // Inicializar resultados apenas na primeira carga (não após limpar)
+  const [foiInicializado, setFoiInicializado] = useState(false);
+  
   useEffect(() => {
-    if (resultados.length === 0) {
+    if (!foiInicializado && resultados.length === 0) {
       setResultados(clientes.map(cliente => ({
         clienteId: cliente.id,
         clienteNome: cliente.nome,
@@ -66,8 +68,9 @@ export default function GerarFaturamento() {
         emailEnviado: false,
         emailDestino: cliente.email,
       })));
+      setFoiInicializado(true);
     }
-  }, []);
+  }, [foiInicializado]);
 
   const handleProcessarTodosClientes = async () => {
     setProcessandoTodos(true);
@@ -165,26 +168,16 @@ export default function GerarFaturamento() {
   };
 
   const limparResultados = () => {
-    // ✅ Reset completo de todos os estados e forçar re-render
-    const novosResultados = clientes.map(cliente => ({
-      clienteId: cliente.id,
-      clienteNome: cliente.nome,
-      relatorioGerado: false,
-      emailEnviado: false,
-      emailDestino: cliente.email,
-      erro: undefined,
-      dataProcessamento: undefined
-    }));
-    
-    setResultados(novosResultados);
+    // ✅ Limpar completamente a lista (deixar vazia)
+    setResultados([]);
     setRelatoriosGerados(0);
     setEmailsEnviados(0);
     
-    console.log("Estado limpo:", novosResultados); // Debug
+    console.log("Lista limpa completamente"); // Debug
     
     toast({
-      title: "Status Limpo",
-      description: "Todos os status foram resetados",
+      title: "Lista Limpa",
+      description: "A lista de clientes foi limpa completamente",
     });
   };
 
