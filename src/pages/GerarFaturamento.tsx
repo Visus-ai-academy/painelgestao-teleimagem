@@ -696,14 +696,32 @@ export default function GerarFaturamento() {
                   </tbody>
                 </table>
               </div>
+              {/* Debug: Mostrar info do estado atual */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-3 bg-gray-50 border rounded text-xs">
+                  <strong>Debug:</strong> Total clientes: {resultados.length}, 
+                  Com erro: {resultados.filter(r => r.erro).length},
+                  Relatórios: {resultados.filter(r => r.relatorioGerado).length},
+                  Emails: {resultados.filter(r => r.emailEnviado).length}
+                </div>
+              )}
               
               {/* Mostrar erros se houver */}
-              {resultados.some(r => r.erro) && (
+              {resultados.length > 0 && resultados.some(r => r.erro) && (
                 <div className="mt-4 space-y-2">
-                  <h4 className="font-semibold text-red-600">Erros Encontrados:</h4>
+                  <h4 className="font-semibold text-red-600 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Erros Encontrados ({resultados.filter(r => r.erro).length}):
+                  </h4>
                   {resultados.filter(r => r.erro).map(resultado => (
                     <div key={resultado.clienteId} className="text-sm p-3 bg-red-50 border border-red-200 rounded">
-                      <span className="font-medium">{resultado.clienteNome}:</span> {resultado.erro}
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium text-red-800">{resultado.clienteNome}:</span>
+                          <p className="text-red-700 mt-1">{resultado.erro}</p>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
