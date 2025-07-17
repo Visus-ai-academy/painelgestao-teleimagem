@@ -20,6 +20,7 @@ import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
 import ReguaCobranca from "./pages/ReguaCobranca";
 import ConfiguracaoFaturamento from "./pages/ConfiguracaoFaturamento";
+import ConfiguracaoLogomarca from "./pages/ConfiguracaoLogomarca";
 import GerenciarUsuarios from "./pages/GerenciarUsuarios";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
@@ -133,6 +134,11 @@ const App = () => {
                     <Route path="/configuracao/usuarios" element={
                       <RoleProtectedRoute requiredRoles={['admin']}>
                         <GerenciarUsuarios />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/configuracao/logomarca" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <ConfiguracaoLogomarca />
                       </RoleProtectedRoute>
                     } />
                     <Route path="*" element={<NotFound />} />
