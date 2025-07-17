@@ -60,7 +60,7 @@ export default function GerarFaturamento() {
   
   const { toast } = useToast();
 
-  // Carregar clientes da base de dados
+  // Carregar clientes da base de dados (inicialização)
   const carregarClientes = async () => {
     try {
       const { data, error } = await supabase
@@ -77,10 +77,8 @@ export default function GerarFaturamento() {
       
       setClientesCarregados(clientesComEmail);
       
-      // ✅ SEMPRE limpar resultados primeiro, depois povoar APENAS com clientes reais
-      setResultados([]);
-      
-      if (clientesComEmail.length > 0) {
+      // Inicializar resultados APENAS se estiver vazio
+      if (resultados.length === 0 && clientesComEmail.length > 0) {
         setResultados(clientesComEmail.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
@@ -89,15 +87,12 @@ export default function GerarFaturamento() {
           emailDestino: cliente.email,
         })));
         console.log('Lista populada com clientes reais:', clientesComEmail.length);
-      } else {
-        console.log('Nenhum cliente real encontrado - lista vazia');
       }
       
       return clientesComEmail;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       setClientesCarregados([]);
-      setResultados([]);
       
       toast({
         title: "Erro ao carregar clientes",
@@ -109,13 +104,73 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Carregar clientes na inicialização E forçar recarregamento a cada 5 segundos
+  // Recarregar clientes sem resetar resultados
+  const recarregarClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nome, email')
+        .eq('ativo', true)
+        .not('email', 'is', null);
+
+      if (error) throw error;
+
+      const clientesComEmail = data?.filter(cliente => cliente.email && cliente.email.trim() !== '') || [];
+      setClientesCarregados(clientesComEmail);
+      
+      toast({
+        title: "Clientes atualizados",
+        description: `${clientesComEmail.length} clientes carregados da base`,
+      });
+      
+      return clientesComEmail;
+    } catch (error) {
+      console.error('Erro ao recarregar clientes:', error);
+      toast({
+        title: "Erro ao recarregar",
+        description: "Não foi possível atualizar a lista de clientes",
+        variant: "destructive",
+      });
+      return [];
+    }
+  };
+
+  const criarClientesTeste = async () => {
+    try {
+      const clientesTeste = [
+        { nome: 'IMAX', email: 'adm@medforlife.com.br' },
+        { nome: 'MRI', email: 'administracao@teleimagem.com.br' },
+        { nome: 'PARANAVAI', email: 'financeiro@dustestudio.com.br' }
+      ];
+
+      const { error } = await supabase
+        .from('clientes')
+        .insert(clientesTeste.map(cliente => ({
+          nome: cliente.nome,
+          email: cliente.email,
+          ativo: true
+        })));
+
+      if (error) throw error;
+
+      toast({
+        title: "Clientes criados",
+        description: `${clientesTeste.length} clientes de teste criados com sucesso`,
+      });
+
+      await carregarClientes();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar clientes",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Carregar clientes apenas na inicialização
   useEffect(() => {
     carregarClientes();
-    
-    // Recarregar periodicamente para garantir dados atualizados
-    const interval = setInterval(carregarClientes, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleProcessarTodosClientes = async () => {
@@ -342,7 +397,7 @@ export default function GerarFaturamento() {
                   
                   <Button 
                     variant="outline"
-                    onClick={carregarClientes}
+                    onClick={recarregarClientes}
                     disabled={processandoTodos}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -357,6 +412,17 @@ export default function GerarFaturamento() {
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Limpar
                   </Button>
+                  
+                  {clientesCarregados.length === 0 && (
+                    <Button 
+                      variant="outline"
+                      onClick={criarClientesTeste}
+                      disabled={processandoTodos}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Criar Clientes Teste
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
