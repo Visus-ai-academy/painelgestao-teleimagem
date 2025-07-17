@@ -40,6 +40,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Buscar exames do período
+    console.log(`Buscando exames para cliente ${cliente_id} entre ${data_inicio} e ${data_fim}`);
+    
     const { data: exames, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
@@ -49,15 +51,47 @@ const handler = async (req: Request): Promise<Response> => {
       .order('data_exame', { ascending: true });
 
     if (examesError) {
+      console.error('Erro ao buscar exames:', examesError);
       throw new Error(`Erro ao buscar exames: ${examesError.message}`);
     }
 
+    console.log(`Exames encontrados: ${exames?.length || 0}`);
+
     if (!exames || exames.length === 0) {
+      console.log('Nenhum exame encontrado, gerando relatório vazio');
+      // Retornar relatório vazio ao invés de erro 404
+      const relatorio = {
+        cliente: {
+          nome: cliente.nome,
+          cnpj: cliente.cnpj,
+          email: cliente.email
+        },
+        periodo: periodo,
+        resumo: {
+          total_laudos: 0,
+          valor_bruto: 0,
+          franquia: 0,
+          ajuste: 0,
+          valor_total: 0,
+          irrf: 0,
+          csll: 0,
+          pis: 0,
+          cofins: 0,
+          impostos: 0,
+          valor_a_pagar: 0
+        },
+        exames: []
+      };
+
       return new Response(
-        JSON.stringify({ error: 'Nenhum exame encontrado para o período especificado' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        JSON.stringify({ 
+          success: true, 
+          relatorio,
+          message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
