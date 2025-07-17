@@ -74,43 +74,37 @@ export default function GerarFaturamento() {
 
       const clientesComEmail = data?.filter(cliente => cliente.email && cliente.email.trim() !== '') || [];
       
-      // Se não há clientes na base, usar os hardcoded como fallback
-      const clientesFinais = clientesComEmail.length > 0 ? clientesComEmail : clientes;
+      console.log('Clientes carregados da base:', clientesComEmail);
       
-      setClientesCarregados(clientesFinais);
+      setClientesCarregados(clientesComEmail);
       
-      // Inicializar resultados se ainda não foram inicializados
-      if (resultados.length === 0) {
-        setResultados(clientesFinais.map(cliente => ({
+      // Inicializar resultados apenas se há clientes reais
+      if (clientesComEmail.length > 0 && resultados.length === 0) {
+        setResultados(clientesComEmail.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
           relatorioGerado: false,
           emailEnviado: false,
           emailDestino: cliente.email,
         })));
+      } else if (clientesComEmail.length === 0) {
+        // Limpar resultados se não há clientes na base
+        setResultados([]);
       }
       
-      return clientesFinais;
+      return clientesComEmail;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      setClientesCarregados([]);
+      setResultados([]);
+      
       toast({
-        title: "Aviso",
-        description: "Usando lista de clientes padrão. Faça upload dos clientes para usar dados reais.",
-        variant: "default",
+        title: "Erro ao carregar clientes",
+        description: "Não foi possível carregar os clientes da base de dados. Faça upload dos clientes primeiro.",
+        variant: "destructive",
       });
       
-      // Fallback para clientes hardcoded
-      setClientesCarregados(clientes);
-      if (resultados.length === 0) {
-        setResultados(clientes.map(cliente => ({
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-          relatorioGerado: false,
-          emailEnviado: false,
-          emailDestino: cliente.email,
-        })));
-      }
-      return clientes;
+      return [];
     }
   };
 
@@ -127,6 +121,19 @@ export default function GerarFaturamento() {
     try {
       // Garantir que temos clientes carregados
       const clientesParaProcessar = clientesCarregados.length > 0 ? clientesCarregados : await carregarClientes();
+      
+      // ✅ VALIDAÇÃO CRÍTICA: Impedir processamento se não há clientes reais
+      if (clientesParaProcessar.length === 0) {
+        toast({
+          title: "Nenhum Cliente Encontrado",
+          description: "Faça upload dos clientes antes de gerar relatórios. Vá para a aba 'Upload de Dados'.",
+          variant: "destructive",
+        });
+        setProcessandoTodos(false);
+        return;
+      }
+      
+      console.log('Processando clientes:', clientesParaProcessar.map(c => c.nome));
       
       // Se a lista de resultados estiver vazia, inicializar com os clientes carregados
       if (resultados.length === 0) {
@@ -267,6 +274,21 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="faturamento" className="space-y-6 mt-6">
+          {/* ⚠️ Alerta se não há clientes carregados */}
+          {clientesCarregados.length === 0 && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3 text-orange-800">
+                  <AlertTriangle className="h-5 w-5" />
+                  <div>
+                    <h3 className="font-semibold">Nenhum Cliente Encontrado</h3>
+                    <p className="text-sm">Faça upload da lista de clientes primeiro na aba "Upload de Dados".</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Botão Principal no Topo */}
           <Card>
             <CardContent className="pt-6">
@@ -274,12 +296,17 @@ export default function GerarFaturamento() {
                 <div>
                   <h2 className="text-xl font-semibold">Processar Faturamento - {PERIODO_ATUAL}</h2>
                   <p className="text-muted-foreground">Gera relatórios e envia por email para todos os clientes</p>
+                  {clientesCarregados.length > 0 && (
+                    <p className="text-sm text-blue-600 mt-2">
+                      ✅ {clientesCarregados.length} clientes carregados na base de dados
+                    </p>
+                  )}
                 </div>
                 
                 <div className="flex justify-center gap-4">
                   <Button 
                     onClick={handleProcessarTodosClientes}
-                    disabled={processandoTodos}
+                    disabled={processandoTodos || clientesCarregados.length === 0}
                     size="lg"
                     className="min-w-[200px]"
                   >
@@ -437,7 +464,11 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-              onUpload={processClientesFile}
+              onUpload={async (file) => {
+                await processClientesFile(file);
+                // Recarregar clientes após upload bem-sucedido
+                await carregarClientes();
+              }}
               icon={<Users className="h-5 w-5" />}
             />
 
