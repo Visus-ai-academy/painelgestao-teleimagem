@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -903,6 +903,34 @@ export default function GerarFaturamento() {
               onUpload={processFinanceiroFile}
               icon={<DollarSign className="h-5 w-5" />}
             />
+            {/* Template Download Section */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Template de Faturamento
+                </CardTitle>
+                <CardDescription>
+                  Baixe o template CSV com a estrutura correta para o upload de dados de faturamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <h4 className="font-medium mb-2">Estrutura do Template (11 colunas):</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Paciente → Cliente → Médico → Data → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → [Reservado] → Valor
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" className="w-full">
+                    <a href="/templates/template_faturamento.csv" download="template_faturamento.csv">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Baixar Template CSV
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             <FileUpload
               title="Upload de Faturamento"
