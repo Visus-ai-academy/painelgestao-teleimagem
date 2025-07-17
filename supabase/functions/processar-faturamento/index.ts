@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import * as XLSX from 'https://cdn.skypack.dev/xlsx'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +30,39 @@ serve(async (req) => {
 
     console.log('Processando arquivo de faturamento:', fileName)
 
+    // Retrieve the uploaded file from storage
+    const { data: fileData, error: fileError } = await supabaseClient.storage
+      .from('uploads')
+      .download(fileName)
+
+    if (fileError) {
+      console.error('Erro ao baixar arquivo:', fileError)
+      throw fileError
+    }
+
+    // Convert file to buffer
+    const arrayBuffer = await fileData.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer, { type: 'buffer' })
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+    // Validate file structure
+    if (data.length < 2) {
+      throw new Error('Arquivo vazio ou sem dados')
+    }
+
+    // Extract faturamento data
+    const faturamentoData = data.slice(1).map(row => ({
+      nome: row[1], // Coluna B (nome)
+      quantidade: row[9] || 0, // Coluna J (quantidade)
+      valor_bruto: row[10] || 0, // Coluna K (valor bruto)
+      data_emissao: new Date().toISOString().split('T')[0],
+      numero_fatura: `FAT-${row[1].substring(0, 3).toUpperCase()}-2025-07`,
+      periodo: "2025-07"
+    })).filter(item => item.nome && (item.quantidade > 0 || item.valor_bruto > 0))
+
+    console.log('Dados extraídos:', faturamentoData)
+
     // Log do início do processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
@@ -43,36 +77,6 @@ serve(async (req) => {
     if (logError) {
       console.error('Erro ao criar log:', logError)
     }
-
-    // Dados de faturamento reais baseados na coluna B (nome) e colunas J (quantidade) e K (valor_bruto)
-    const faturamentoData = [
-      {
-        nome: "AKCPALMAS", 
-        quantidade: 25, 
-        valor_bruto: 12500.00,
-        data_emissao: "2025-07-15",
-        numero_fatura: "FAT-AKC-2025-07",
-        periodo: "2025-07"
-      },
-      {
-        nome: "BIOCARDIOS", 
-        quantidade: 32, 
-        valor_bruto: 18600.00,
-        data_emissao: "2025-07-15",
-        numero_fatura: "FAT-BIO-2025-07",
-        periodo: "2025-07"
-      },
-      {
-        nome: "VILARICA", 
-        quantidade: 18, 
-        valor_bruto: 8200.00,
-        data_emissao: "2025-07-15",
-        numero_fatura: "FAT-VIL-2025-07",
-        periodo: "2025-07"
-      }
-    ]
-
-    console.log('Inserindo dados de faturamento no banco...')
 
     // Inserir dados no banco
     const { data: faturamentoInserido, error: faturamentoError } = await supabaseClient

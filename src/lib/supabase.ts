@@ -206,19 +206,27 @@ export async function processFinanceiroFile(file: File) {
 export async function processFaturamentoFile(file: File) {
   try {
     const fileName = `faturamento_${Date.now()}_${file.name}`
+    
+    console.log(`Iniciando upload de arquivo de faturamento: ${fileName}`);
+    
     await uploadFile(file, 'uploads', fileName)
+
+    console.log(`Upload concluído. Chamando edge function processar-faturamento com filename: ${fileName}`);
 
     const { data, error } = await supabase.functions.invoke('processar-faturamento', {
       body: { fileName }
     })
 
+    console.log('Resposta da edge function:', { data, error });
+
     if (error) {
+      console.error('Erro detalhado:', JSON.stringify(error, null, 2));
       throw new Error(`Erro ao processar faturamento: ${error.message}`)
     }
 
     return data
   } catch (error) {
-    console.error('Erro no processamento:', error)
+    console.error('Erro no processamento completo:', error)
     throw error
   }
 }
