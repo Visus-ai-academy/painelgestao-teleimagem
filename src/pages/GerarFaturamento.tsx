@@ -44,6 +44,11 @@ export default function GerarFaturamento() {
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  const [clientesCarregados, setClientesCarregados] = useState<Array<{
+    id: string;
+    nome: string;
+    email: string;
+  }>>([]);
   const [resultados, setResultados] = useState<Array<{
     clienteId: string;
     clienteNome: string;
@@ -56,21 +61,63 @@ export default function GerarFaturamento() {
   
   const { toast } = useToast();
 
-  // Inicializar resultados apenas na primeira carga (não após limpar)
-  const [foiInicializado, setFoiInicializado] = useState(false);
-  
-  useEffect(() => {
-    if (!foiInicializado && resultados.length === 0) {
-      setResultados(clientes.map(cliente => ({
-        clienteId: cliente.id,
-        clienteNome: cliente.nome,
-        relatorioGerado: false,
-        emailEnviado: false,
-        emailDestino: cliente.email,
-      })));
-      setFoiInicializado(true);
+  // Carregar clientes da base de dados
+  const carregarClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nome, email')
+        .eq('ativo', true)
+        .not('email', 'is', null);
+
+      if (error) throw error;
+
+      const clientesComEmail = data?.filter(cliente => cliente.email && cliente.email.trim() !== '') || [];
+      
+      // Se não há clientes na base, usar os hardcoded como fallback
+      const clientesFinais = clientesComEmail.length > 0 ? clientesComEmail : clientes;
+      
+      setClientesCarregados(clientesFinais);
+      
+      // Inicializar resultados se ainda não foram inicializados
+      if (resultados.length === 0) {
+        setResultados(clientesFinais.map(cliente => ({
+          clienteId: cliente.id,
+          clienteNome: cliente.nome,
+          relatorioGerado: false,
+          emailEnviado: false,
+          emailDestino: cliente.email,
+        })));
+      }
+      
+      return clientesFinais;
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      toast({
+        title: "Aviso",
+        description: "Usando lista de clientes padrão. Faça upload dos clientes para usar dados reais.",
+        variant: "default",
+      });
+      
+      // Fallback para clientes hardcoded
+      setClientesCarregados(clientes);
+      if (resultados.length === 0) {
+        setResultados(clientes.map(cliente => ({
+          clienteId: cliente.id,
+          clienteNome: cliente.nome,
+          relatorioGerado: false,
+          emailEnviado: false,
+          emailDestino: cliente.email,
+        })));
+      }
+      return clientes;
     }
-  }, [foiInicializado]);
+  };
+
+  // Carregar clientes na inicialização
+  useEffect(() => {
+    carregarClientes();
+  }, []);
 
   const handleProcessarTodosClientes = async () => {
     setProcessandoTodos(true);
@@ -78,8 +125,23 @@ export default function GerarFaturamento() {
     let emailsCount = 0;
 
     try {
+      // Garantir que temos clientes carregados
+      const clientesParaProcessar = clientesCarregados.length > 0 ? clientesCarregados : await carregarClientes();
+      
+      // Se a lista de resultados estiver vazia, inicializar com os clientes carregados
+      if (resultados.length === 0) {
+        const novosResultados = clientesParaProcessar.map(cliente => ({
+          clienteId: cliente.id,
+          clienteNome: cliente.nome,
+          relatorioGerado: false,
+          emailEnviado: false,
+          emailDestino: cliente.email,
+        }));
+        setResultados(novosResultados);
+      }
+
       // Processar cada cliente
-      for (const cliente of clientes) {
+      for (const cliente of clientesParaProcessar) {
         try {
           // Atualizar estado para mostrar progresso
           setResultados(prev => prev.map(r => 
@@ -257,7 +319,7 @@ export default function GerarFaturamento() {
               <CardContent>
                 <div className="text-2xl font-bold">{relatoriosGerados}</div>
                 <p className="text-xs text-muted-foreground">
-                  de {clientes.length} clientes
+                  de {clientesCarregados.length || clientes.length} clientes
                 </p>
               </CardContent>
             </Card>
