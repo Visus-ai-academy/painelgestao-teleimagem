@@ -309,16 +309,19 @@ export default function GerarFaturamento() {
   };
 
   const limparResultados = () => {
-    // ✅ Limpar completamente a lista (deixar vazia)
+    // ✅ Limpar completamente a lista e contadores
     setResultados([]);
     setRelatoriosGerados(0);
     setEmailsEnviados(0);
+    
+    // ✅ Recarregar clientes para evitar duplicação
+    carregarClientes();
     
     console.log("Lista limpa completamente"); // Debug
     
     toast({
       title: "Lista Limpa",
-      description: "A lista de clientes foi limpa completamente",
+      description: "A lista de clientes foi limpa e recarregada",
     });
   };
 
