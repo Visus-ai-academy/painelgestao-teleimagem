@@ -85,19 +85,28 @@ export async function uploadFile(file: File, bucket: string, path: string) {
 // Funções para processar arquivos CSV/Excel
 export async function processExamesFile(file: File) {
   try {
+    console.log('Iniciando processamento de exames para arquivo:', file.name)
+    
     // Fazer upload do arquivo
     const fileName = `exames_${Date.now()}_${file.name}`
+    console.log('Fazendo upload do arquivo:', fileName)
+    
     await uploadFile(file, 'uploads', fileName)
+    console.log('Upload concluído, chamando edge function...')
 
     // Chamar Edge Function para processar
     const { data, error } = await supabase.functions.invoke('processar-exames', {
       body: { fileName }
     })
 
+    console.log('Resposta da edge function:', { data, error })
+
     if (error) {
+      console.error('Erro da edge function:', error)
       throw new Error(`Erro ao processar arquivo: ${error.message}`)
     }
 
+    console.log('Processamento concluído com sucesso')
     return data
   } catch (error) {
     console.error('Erro no processamento:', error)
