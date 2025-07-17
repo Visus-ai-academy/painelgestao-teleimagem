@@ -82,8 +82,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Enviar email
     const emailResponse = await resend.emails.send({
-      from: 'Teleimagem <onboarding@resend.dev>',
-      reply_to: 'i.a.academybrasil@gmail.com',
+      from: 'Teleimagem <financeiro@teleimagem.com.br>',
+      reply_to: 'financeiro@teleimagem.com.br',
       to: [cliente.email],
       subject: assunto,
       html: html,
