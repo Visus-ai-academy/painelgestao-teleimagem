@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,71 +6,28 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('=== EDGE FUNCTION INICIADA ===')
+  console.log('Method:', req.method)
+  console.log('URL:', req.url)
+  
   if (req.method === 'OPTIONS') {
+    console.log('Retornando OPTIONS')
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('=== PROCESSAR EXAMES INICIADO ===')
+    console.log('Processando requisição...')
     
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
-
     const requestBody = await req.json()
-    const { fileName } = requestBody
+    console.log('Body recebido:', requestBody)
 
-    console.log('Processando arquivo de exames:', fileName)
-
-    // Inserir dados de exemplo sem processamento de arquivo complexo
-    const examosMock = [
-      {
-        paciente: "João Silva",
-        medico: "Dr. Antonio",
-        data_exame: "2025-07-15",
-        modalidade: "MR",
-        especialidade: "NE",
-        status: "realizado",
-        valor_bruto: 450.00
-      },
-      {
-        paciente: "Maria Santos", 
-        medico: "Dra. Ana",
-        data_exame: "2025-07-16",
-        modalidade: "CT",
-        especialidade: "CA",
-        status: "realizado",
-        valor_bruto: 320.00
-      }
-    ]
-
-    console.log('Inserindo exames no banco...')
-
-    // Inserir dados no banco
-    const { data: examesInseridos, error: examesError } = await supabaseClient
-      .from('exames_realizados')
-      .insert(examosMock)
-      .select()
-
-    if (examesError) {
-      console.error('Erro ao inserir exames:', examesError)
-      throw new Error(`Erro ao inserir exames: ${examesError.message}`)
-    }
-
-    console.log(`Processamento concluído! ${examosMock.length} exames inseridos.`)
+    console.log('Retornando sucesso...')
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: examosMock.length,
-        registros_erro: 0,
-        mensagem: 'Arquivo processado com sucesso'
+        message: 'Função executada com sucesso',
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,13 +36,15 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('=== ERRO NO PROCESSAMENTO ===')
+    console.error('=== ERRO ===')
     console.error('Error:', error)
+    console.error('Error message:', error?.message)
+    console.error('Error stack:', error?.stack)
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error?.message || 'Erro interno do servidor'
+        error: error?.message || 'Erro desconhecido'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
