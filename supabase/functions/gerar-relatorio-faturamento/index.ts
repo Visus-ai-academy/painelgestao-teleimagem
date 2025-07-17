@@ -58,6 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`Total de faturas encontradas para ${cliente.nome}: ${faturas?.length || 0}`);
+    console.log('Dados das faturas encontradas:', faturas);
     
     // Buscar exames do cliente no período
     const { data: examesCliente, error: examesError } = await supabase
@@ -201,7 +202,7 @@ const handler = async (req: Request): Promise<Response> => {
       }))
     };
 
-    console.log(`Relatório gerado com ${examesCliente?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
+    console.log(`Relatório gerado com ${faturas?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
     // Gerar relatório em PDF
     const pdfContent = await gerarPDFRelatorio(relatorio);
