@@ -22,6 +22,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
+import { Speedometer } from "@/components/Speedometer";
 import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -369,6 +370,52 @@ export default function GerarFaturamento() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Gráficos Velocímetro */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Progresso do Faturamento</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
+                <Speedometer
+                  value={clientesCarregados.length}
+                  max={Math.max(clientesCarregados.length, 1)}
+                  label="Clientes Cadastrados"
+                  unit=""
+                  colorThresholds={{
+                    low: { threshold: 30, color: "#3b82f6" },
+                    medium: { threshold: 70, color: "#3b82f6" },
+                    high: { threshold: 100, color: "#3b82f6" }
+                  }}
+                />
+                
+                <Speedometer
+                  value={relatoriosGerados}
+                  max={Math.max(clientesCarregados.length, 1)}
+                  label="Relatórios Gerados"
+                  unit=""
+                  colorThresholds={{
+                    low: { threshold: 40, color: "#f59e0b" },
+                    medium: { threshold: 80, color: "#10b981" },
+                    high: { threshold: 100, color: "#10b981" }
+                  }}
+                />
+                
+                <Speedometer
+                  value={emailsEnviados}
+                  max={Math.max(clientesCarregados.length, 1)}
+                  label="E-mails Enviados"
+                  unit=""
+                  colorThresholds={{
+                    low: { threshold: 40, color: "#ef4444" },
+                    medium: { threshold: 80, color: "#f59e0b" },
+                    high: { threshold: 100, color: "#10b981" }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Lista de Clientes */}
           <Card>
