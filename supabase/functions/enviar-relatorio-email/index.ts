@@ -27,7 +27,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // Verificar se o Resend está configurado
     if (!resend || !resendApiKey) {
-      console.error('RESEND_API_KEY não configurado');
+      console.error('RESEND_API_KEY não configurado ou inválido');
+      console.log('RESEND_API_KEY está definido:', !!resendApiKey);
       throw new Error('Serviço de email não configurado. Configure a chave RESEND_API_KEY.');
     }
 
@@ -93,7 +94,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Verificar se houve erro na resposta
     if (emailResponse.error) {
-      throw new Error(`Erro do Resend: ${emailResponse.error.message}`);
+      console.error('Erro detalhado do Resend:', emailResponse.error);
+      throw new Error(`Erro do Resend: ${emailResponse.error.message || JSON.stringify(emailResponse.error)}`);
     }
 
     // Log do envio
