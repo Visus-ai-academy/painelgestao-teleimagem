@@ -175,6 +175,11 @@ export default function GerarFaturamento() {
 
   const handleProcessarTodosClientes = async () => {
     setProcessandoTodos(true);
+    
+    // ✅ Resetar contadores no início
+    setRelatoriosGerados(0);
+    setEmailsEnviados(0);
+    
     let relatoriosCount = 0;
     let emailsCount = 0;
 
@@ -195,17 +200,15 @@ export default function GerarFaturamento() {
       
       console.log('Processando clientes:', clientesParaProcessar.map(c => c.nome));
       
-      // Se a lista de resultados estiver vazia, inicializar com os clientes carregados
-      if (resultados.length === 0) {
-        const novosResultados = clientesParaProcessar.map(cliente => ({
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-          relatorioGerado: false,
-          emailEnviado: false,
-          emailDestino: cliente.email,
-        }));
-        setResultados(novosResultados);
-      }
+      // ✅ Inicializar resultados sempre com clientes carregados
+      const novosResultados = clientesParaProcessar.map(cliente => ({
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        relatorioGerado: false,
+        emailEnviado: false,
+        emailDestino: cliente.email,
+      }));
+      setResultados(novosResultados);
 
       // Processar cada cliente
       for (const cliente of clientesParaProcessar) {
