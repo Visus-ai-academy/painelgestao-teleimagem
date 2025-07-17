@@ -123,12 +123,18 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro no processamento:', error)
+    console.error('=== ERRO NO PROCESSAMENTO ===')
+    console.error('Tipo do erro:', typeof error)
+    console.error('Error name:', error?.name)
+    console.error('Error message:', error?.message)
+    console.error('Error stack:', error?.stack)
+    console.error('Error completo:', error)
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro interno do servidor'
+        error: error?.message || 'Erro interno do servidor',
+        details: error?.stack || 'Sem detalhes do stack'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
