@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import * as XLSX from 'https://deno.land/x/sheetjs@v0.18.3/xlsx.mjs'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,59 +42,72 @@ serve(async (req) => {
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
 
-    // 2. Processar dados dos clientes (simulado por enquanto)
-    console.log('Processando dados dos clientes...')
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 2. Baixar arquivo do storage
+    console.log('Baixando arquivo do storage...')
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(fileName)
 
-    // Dados simulados de clientes com UUIDs específicos
-    const clientesMock = [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440001",
-        nome: "Hospital São Lucas",
-        email: "contato@saolucas.com.br",
-        telefone: "(11) 3456-7890",
-        endereco: "Rua das Flores, 123 - São Paulo/SP",
-        cnpj: "12.345.678/0001-90",
-        ativo: true
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440002",
-        nome: "Clínica Vida Plena",
-        email: "admin@vidaplena.com.br",
-        telefone: "(11) 2345-6789",
-        endereco: "Av. Paulista, 456 - São Paulo/SP",
-        cnpj: "98.765.432/0001-10",
-        ativo: true
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440003",
-        nome: "Centro Médico Norte",
-        email: "faturamento@centronorte.com.br",
-        telefone: "(11) 4567-8901",
-        endereco: "Rua Norte, 789 - São Paulo/SP",
-        cnpj: "11.222.333/0001-44",
-        ativo: true
-      }
-    ]
+    if (downloadError) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`)
+    }
 
-    console.log('Inserindo clientes no banco...')
+    // 3. Converter arquivo para buffer
+    const buffer = await fileData.arrayBuffer()
+    
+    // 4. Processar arquivo Excel/CSV
+    console.log('Analisando formato do arquivo...')
+    const workbook = XLSX.read(buffer)
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
-    // 3. Inserir/Atualizar clientes (upsert)
+    console.log('Dados encontrados:', jsonData.length, 'registros')
+
+    // 5. Mapear dados para estrutura do banco
+    const clientes = jsonData.map((row: any) => ({
+      id: crypto.randomUUID(), // Gerar UUID único
+      nome: row.nome || row.Nome || row.NOME || '',
+      email: row.email || row.Email || row.EMAIL || '',
+      telefone: row.telefone || row.Telefone || row.TELEFONE || null,
+      endereco: row.endereco || row.Endereco || row.ENDERECO || null,
+      cnpj: row.cnpj || row.CNPJ || null,
+      ativo: true
+    }))
+
+    // 6. Filtrar apenas clientes com nome válido
+    const clientesValidos = clientes.filter(cliente => 
+      cliente.nome && cliente.nome.trim() !== ''
+    )
+
+    console.log('Inserindo clientes no banco...', clientesValidos.length, 'registros')
+
+    // 7. ⚠️ IMPORTANTE: Limpar dados antigos primeiro (substitui arquivo anterior)
+    const { error: deleteError } = await supabaseClient
+      .from('clientes')
+      .delete()
+      .neq('id', 'never-match') // Deleta todos os registros
+
+    if (deleteError) {
+      console.warn('Aviso ao limpar dados antigos:', deleteError.message)
+    }
+
+    // 8. Inserir novos clientes
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
       .from('clientes')
-      .upsert(clientesMock, { onConflict: 'id' })
+      .insert(clientesValidos)
       .select()
 
     if (clientesError) {
       throw new Error(`Erro ao inserir clientes: ${clientesError.message}`)
     }
 
-    // 4. Atualizar log com sucesso
+    // 9. Atualizar log com sucesso
     const { error: updateLogError } = await supabaseClient
       .from('upload_logs')
       .update({
-        status: 'success',
-        records_processed: clientesMock.length
+        status: 'completed',
+        records_processed: clientesValidos.length
       })
       .eq('id', logEntry.id)
 
@@ -101,14 +115,14 @@ serve(async (req) => {
       console.error('Erro ao atualizar log:', updateLogError.message)
     }
 
-    console.log(`Processamento concluído! ${clientesMock.length} clientes inseridos.`)
+    console.log(`Processamento concluído! ${clientesValidos.length} clientes inseridos.`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: clientesMock.length,
-        registros_erro: 0,
-        mensagem: 'Clientes processados com sucesso'
+        registros_processados: clientesValidos.length,
+        registros_erro: jsonData.length - clientesValidos.length,
+        mensagem: `${clientesValidos.length} clientes processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
