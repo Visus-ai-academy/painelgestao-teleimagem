@@ -169,6 +169,65 @@ export type Database = {
           },
         ]
       }
+      escalas_medicas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: string
+          data_ausencia: string | null
+          especialidade: string
+          id: string
+          medico_id: string
+          modalidade: string
+          motivo_ausencia: string | null
+          observacoes: string | null
+          status: string
+          tipo_escala: string
+          turno: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data: string
+          data_ausencia?: string | null
+          especialidade: string
+          id?: string
+          medico_id: string
+          modalidade: string
+          motivo_ausencia?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo_escala: string
+          turno: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          data_ausencia?: string | null
+          especialidade?: string
+          id?: string
+          medico_id?: string
+          modalidade?: string
+          motivo_ausencia?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo_escala?: string
+          turno?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalas_medicas_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exames_realizados: {
         Row: {
           categoria: string | null
@@ -346,6 +405,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      medicos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          crm: string
+          email: string | null
+          especialidade: string
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          crm: string
+          email?: string | null
+          especialidade: string
+          id?: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          crm?: string
+          email?: string | null
+          especialidade?: string
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       omie_faturas: {
         Row: {
