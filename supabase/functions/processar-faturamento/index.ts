@@ -58,36 +58,54 @@ serve(async (req) => {
     
      // Extract faturamento data with all columns shown in the image
      // paciente, medico, data_exame, modalidade, especialidade, categoria, prioridade, nome exame, quantidade, valor_bruto
-     const faturamentoData = data.slice(1).map(row => {
+     const faturamentoData = []
+     
+     for (let i = 1; i < data.length; i++) {
+       const row = data[i]
+       
        // Check if row has the necessary data before processing
-       if (!row || !row[1]) { // Nome (CLIENTE) ainda é obrigatório
-         console.log('Linha inválida ignorada:', row)
-         return null
+       if (!row || !row[1] || row.length < 2) { // Nome (CLIENTE) ainda é obrigatório
+         console.log(`Linha ${i} inválida ignorada:`, row)
+         continue
        }
        
-       return {
-         nome: row[1], // Coluna B (nome do cliente)
+       // Log cada linha processada para debug
+       console.log(`Processando linha ${i}:`, {
+         paciente: row[0],
+         cliente: row[1], 
+         medico: row[2],
+         quantidade: row[9],
+         valor: row[10]
+       })
+       
+       const faturamentoItem = {
+         nome: String(row[1]).trim(), // Coluna B (nome do cliente)
          
          // Colunas detalhadas para relatório
-         paciente: row[0] || 'NÃO INFORMADO', // Coluna A (paciente)
-         medico: row[2] || 'NÃO INFORMADO', // Coluna C (medico)
+         paciente: row[0] ? String(row[0]).trim() : 'NÃO INFORMADO', // Coluna A (paciente)
+         medico: row[2] ? String(row[2]).trim() : 'NÃO INFORMADO', // Coluna C (medico)
          data_exame: row[3] ? new Date(row[3]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // Coluna D (data)
-         modalidade: row[4] || 'NÃO INFORMADO', // Coluna E (modalidade)
-         especialidade: row[5] || 'NÃO INFORMADO', // Coluna F (especialidade)
-         categoria: row[6] || 'NORMAL', // Coluna G (categoria)
-         prioridade: row[7] || 'NORMAL', // Coluna H (prioridade)
-         nome_exame: row[8] || 'EXAME NÃO ESPECIFICADO', // Coluna I (nome exame)
+         modalidade: row[4] ? String(row[4]).trim() : 'NÃO INFORMADO', // Coluna E (modalidade)
+         especialidade: row[5] ? String(row[5]).trim() : 'NÃO INFORMADO', // Coluna F (especialidade)
+         categoria: row[6] ? String(row[6]).trim() : 'NORMAL', // Coluna G (categoria)
+         prioridade: row[7] ? String(row[7]).trim() : 'NORMAL', // Coluna H (prioridade)
+         nome_exame: row[8] ? String(row[8]).trim() : 'EXAME NÃO ESPECIFICADO', // Coluna I (nome exame)
          
-         // Colunas essenciais para faturamento
-         quantidade: row[9] || 1, // Coluna J (quantidade)
-         valor_bruto: row[10] || 0, // Coluna K (valor_bruto)
+         // Colunas essenciais para faturamento - garantir que são números
+         quantidade: row[9] ? parseInt(row[9]) || 1 : 1, // Coluna J (quantidade)
+         valor_bruto: row[10] ? parseFloat(row[10]) || 0 : 0, // Coluna K (valor_bruto)
          
          // Campos auxiliares
          data_emissao: new Date().toISOString().split('T')[0],
-         numero_fatura: `FAT-${String(row[1]).substring(0, 3).toUpperCase()}-2025-07`,
+         numero_fatura: `FAT-${String(row[1]).substring(0, 3).toUpperCase()}-${i}-2025-07`,
          periodo: "2025-07"
        }
-     }).filter(item => item && item.nome && (item.quantidade > 0 || item.valor_bruto > 0))
+       
+       // Só adiciona se tem dados válidos
+       if (faturamentoItem.nome && (faturamentoItem.quantidade > 0 || faturamentoItem.valor_bruto > 0)) {
+         faturamentoData.push(faturamentoItem)
+       }
+     }
 
     console.log('Dados extraídos:', faturamentoData)
     console.log(`Total de registros extraídos: ${faturamentoData.length}`)
