@@ -127,15 +127,42 @@ serve(async (req) => {
       console.error('Erro ao criar log:', logError)
     }
 
-    // Inserir dados no banco
-    const { data: faturamentoInserido, error: faturamentoError } = await supabaseClient
-      .from('faturamento')
-      .insert(faturamentoData)
-      .select()
+    // Inserir dados no banco em lotes para evitar timeout
+    const batchSize = 50
+    let processedCount = 0
+    const errors: string[] = []
 
-    if (faturamentoError) {
-      console.error('Erro ao inserir dados de faturamento:', faturamentoError)
-      throw new Error(`Erro ao inserir dados de faturamento: ${faturamentoError.message}`)
+    console.log(`Iniciando inserção em lotes de ${batchSize} registros`)
+
+    for (let i = 0; i < faturamentoData.length; i += batchSize) {
+      const batch = faturamentoData.slice(i, i + batchSize)
+      
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('faturamento')
+          .insert(batch)
+
+        if (insertError) {
+          console.error(`Erro ao inserir lote ${Math.floor(i/batchSize) + 1}:`, insertError)
+          errors.push(`Lote ${Math.floor(i/batchSize) + 1}: ${insertError.message}`)
+        } else {
+          processedCount += batch.length
+          console.log(`✅ Lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(faturamentoData.length/batchSize)} processado: ${batch.length} registros`)
+        }
+      } catch (error: any) {
+        console.error(`Erro no processamento do lote ${Math.floor(i/batchSize) + 1}:`, error)
+        errors.push(`Lote ${Math.floor(i/batchSize) + 1}: ${error.message}`)
+      }
+      
+      // Pequena pausa para evitar timeout
+      if (i % (batchSize * 3) === 0 && i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Erros durante o processamento:', errors)
+      throw new Error(`Erros durante inserção: ${errors.join('; ')}`)
     }
 
     // Atualizar log com sucesso
@@ -153,14 +180,14 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Processamento concluído! ${faturamentoData.length} registros de faturamento inseridos.`)
+    console.log(`Processamento concluído! ${processedCount} registros de faturamento inseridos.`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: faturamentoData.length,
-        registros_erro: 0,
-        mensagem: `${faturamentoData.length} registros de faturamento processados com sucesso`
+        registros_processados: processedCount,
+        registros_erro: errors.length,
+        mensagem: `${processedCount} registros de faturamento processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
