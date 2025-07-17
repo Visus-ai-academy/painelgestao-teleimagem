@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import jsPDF from "https://esm.sh/jspdf@2.5.1";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +13,7 @@ interface FaturamentoRequest {
   periodo: string;
   data_inicio: string;
   data_fim: string;
+  formato?: 'pdf' | 'excel' | 'ambos';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { cliente_id, periodo, data_inicio, data_fim }: FaturamentoRequest = await req.json();
+    const { cliente_id, periodo, data_inicio, data_fim, formato = 'ambos' }: FaturamentoRequest = await req.json();
 
     console.log(`Gerando relatório para cliente ${cliente_id}, período ${periodo}`);
 
@@ -83,54 +86,56 @@ const handler = async (req: Request): Promise<Response> => {
         exames: []
       };
 
-      // Gerar PDF do relatório vazio
-      const pdfContent = await gerarPDFRelatorio(relatorio);
+      // Gerar relatórios nos formatos solicitados
+      const arquivos: any[] = [];
       
-      // Determinar extensão baseada no conteúdo
-      const contentStart = new TextDecoder().decode(pdfContent.slice(0, 30));
-      const isText = contentStart.includes('RELATÓRIO DE VOLUMETRIA');
-      const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.${isText ? 'txt' : 'pdf'}`;
-      
-      // Salvar PDF no storage
-      const contentType = nomeArquivo.endsWith('.pdf') ? 'application/pdf' : 'text/plain';
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('relatorios-faturamento')
-        .upload(nomeArquivo, pdfContent, {
-          contentType: contentType,
-          cacheControl: '3600'
-        });
-
-      if (uploadError) {
-        console.error('Erro ao salvar PDF vazio:', uploadError);
-        // Se falhar, retornar com link temporário
-        const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+      if (formato === 'pdf' || formato === 'ambos') {
+        const pdfContent = await gerarPDFRelatorio(relatorio);
+        const nomeArquivoPDF = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
         
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            relatorio,
-            linkRelatorio,
-            nomeArquivo,
-            message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        const { data: uploadDataPDF, error: uploadErrorPDF } = await supabase.storage
+          .from('relatorios-faturamento')
+          .upload(nomeArquivoPDF, pdfContent, {
+            contentType: 'application/pdf',
+            cacheControl: '3600'
+          });
+          
+        if (!uploadErrorPDF) {
+          const { data: { publicUrl: pdfUrl } } = supabase.storage
+            .from('relatorios-faturamento')
+            .getPublicUrl(nomeArquivoPDF);
+          arquivos.push({ tipo: 'pdf', url: pdfUrl, nome: nomeArquivoPDF });
+        }
       }
-
-      // Gerar URL público do PDF
-      const { data: { publicUrl } } = supabase.storage
-        .from('relatorios-faturamento')
-        .getPublicUrl(nomeArquivo);
+      
+      if (formato === 'excel' || formato === 'ambos') {
+        const excelContent = await gerarExcelRelatorio(relatorio);
+        const nomeArquivoExcel = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.xlsx`;
+        
+        const { data: uploadDataExcel, error: uploadErrorExcel } = await supabase.storage
+          .from('relatorios-faturamento')
+          .upload(nomeArquivoExcel, excelContent, {
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            cacheControl: '3600'
+          });
+          
+        if (!uploadErrorExcel) {
+          const { data: { publicUrl: excelUrl } } = supabase.storage
+            .from('relatorios-faturamento')
+            .getPublicUrl(nomeArquivoExcel);
+          arquivos.push({ tipo: 'excel', url: excelUrl, nome: nomeArquivoExcel });
+        }
+      }
+      
+      if (arquivos.length === 0) {
+        throw new Error('Erro ao gerar relatórios');
+      }
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           relatorio,
-          linkRelatorio: publicUrl,
-          nomeArquivo,
+          arquivos,
           message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
         }),
         {
@@ -190,41 +195,60 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Relatório gerado com ${exames.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
-    // Gerar PDF do relatório
-    const pdfContent = await gerarPDFRelatorio(relatorio);
+    // Gerar relatórios nos formatos solicitados
+    const arquivos: any[] = [];
     
-    // Determinar extensão baseada no conteúdo
-    const contentStart = new TextDecoder().decode(pdfContent.slice(0, 30));
-    const isText = contentStart.includes('RELATÓRIO DE VOLUMETRIA');
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.${isText ? 'txt' : 'pdf'}`;
-    
-    // Salvar PDF no storage
-    const contentType = nomeArquivo.endsWith('.pdf') ? 'application/pdf' : 'text/plain';
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('relatorios-faturamento')
-      .upload(nomeArquivo, pdfContent, {
-        contentType: contentType,
-        cacheControl: '3600'
-      });
-
-    if (uploadError) {
-      console.error('Erro ao salvar PDF:', uploadError);
-      throw new Error(`Erro ao salvar relatório: ${uploadError.message}`);
+    if (formato === 'pdf' || formato === 'ambos') {
+      const pdfContent = await gerarPDFRelatorio(relatorio);
+      const nomeArquivoPDF = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+      
+      const { data: uploadDataPDF, error: uploadErrorPDF } = await supabase.storage
+        .from('relatorios-faturamento')
+        .upload(nomeArquivoPDF, pdfContent, {
+          contentType: 'application/pdf',
+          cacheControl: '3600'
+        });
+        
+      if (uploadErrorPDF) {
+        console.error('Erro ao salvar PDF:', uploadErrorPDF);
+        throw new Error(`Erro ao salvar relatório PDF: ${uploadErrorPDF.message}`);
+      }
+      
+      const { data: { publicUrl: pdfUrl } } = supabase.storage
+        .from('relatorios-faturamento')
+        .getPublicUrl(nomeArquivoPDF);
+      arquivos.push({ tipo: 'pdf', url: pdfUrl, nome: nomeArquivoPDF });
+      console.log('PDF salvo com sucesso:', pdfUrl);
     }
-
-    // Gerar URL público do PDF
-    const { data: { publicUrl } } = supabase.storage
-      .from('relatorios-faturamento')
-      .getPublicUrl(nomeArquivo);
-
-    console.log('PDF salvo com sucesso:', publicUrl);
+    
+    if (formato === 'excel' || formato === 'ambos') {
+      const excelContent = await gerarExcelRelatorio(relatorio);
+      const nomeArquivoExcel = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.xlsx`;
+      
+      const { data: uploadDataExcel, error: uploadErrorExcel } = await supabase.storage
+        .from('relatorios-faturamento')
+        .upload(nomeArquivoExcel, excelContent, {
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          cacheControl: '3600'
+        });
+        
+      if (uploadErrorExcel) {
+        console.error('Erro ao salvar Excel:', uploadErrorExcel);
+        throw new Error(`Erro ao salvar relatório Excel: ${uploadErrorExcel.message}`);
+      }
+      
+      const { data: { publicUrl: excelUrl } } = supabase.storage
+        .from('relatorios-faturamento')
+        .getPublicUrl(nomeArquivoExcel);
+      arquivos.push({ tipo: 'excel', url: excelUrl, nome: nomeArquivoExcel });
+      console.log('Excel salvo com sucesso:', excelUrl);
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         relatorio,
-        linkRelatorio: publicUrl,
-        nomeArquivo,
+        arquivos,
         message: `Relatório gerado com sucesso para ${cliente.nome}` 
       }),
       {
@@ -248,76 +272,59 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-// Função para gerar PDF do relatório usando PDFKit
+// Função para gerar PDF do relatório usando jsPDF
 async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
   try {
-    // Importar PDFKit que funciona no Deno
-    const PDFDocument = (await import('https://esm.sh/pdfkit@0.13.0')).default;
+    const doc = new jsPDF();
     
-    // Criar novo documento PDF
-    const doc = new PDFDocument({
-      size: 'A4',
-      margin: 50,
-      info: {
-        Title: `Relatório de Faturamento - ${relatorio.cliente.nome}`,
-        Author: 'Sistema de Faturamento',
-        Subject: `Relatório período ${relatorio.periodo}`,
-        Creator: 'Sistema Teleimagem'
-      }
-    });
-
-    // Buffer para armazenar o PDF
-    const chunks: Uint8Array[] = [];
-    
-    // Configurar stream para capturar dados
-    doc.on('data', (chunk: any) => {
-      chunks.push(new Uint8Array(chunk));
-    });
+    // Configurações
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    let y = 30;
 
     // Cabeçalho
-    doc.fontSize(20)
-       .font('Helvetica-Bold')
-       .text('Relatório de Volumetria - Faturamento', 50, 50)
-       .fontSize(14)
-       .font('Helvetica')
-       .text(`Período: ${relatorio.periodo}`, 50, 80);
-
-    // Linha separadora
-    doc.moveTo(50, 100)
-       .lineTo(550, 100)
-       .stroke();
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RELATÓRIO DE VOLUMETRIA - FATURAMENTO', margin, y);
+    
+    y += 10;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Período: ${relatorio.periodo}`, margin, y);
+    
+    y += 15;
+    doc.line(margin, y, pageWidth - margin, y);
 
     // Dados do Cliente
-    let y = 120;
-    doc.fontSize(16)
-       .font('Helvetica-Bold')
-       .text('Dados do Cliente', 50, y);
-
-    y += 25;
-    doc.fontSize(12)
-       .font('Helvetica')
-       .text(`Nome: ${relatorio.cliente.nome}`, 50, y);
-
     y += 15;
-    doc.text(`CNPJ: ${relatorio.cliente.cnpj || 'Não informado'}`, 50, y);
-
-    y += 15;
-    doc.text(`Email: ${relatorio.cliente.email}`, 50, y);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DADOS DO CLIENTE', margin, y);
+    
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nome: ${relatorio.cliente.nome}`, margin, y);
+    
+    y += 6;
+    doc.text(`CNPJ: ${relatorio.cliente.cnpj || 'Não informado'}`, margin, y);
+    
+    y += 6;
+    doc.text(`Email: ${relatorio.cliente.email}`, margin, y);
 
     // Linha separadora
-    y += 25;
-    doc.moveTo(50, y)
-       .lineTo(550, y)
-       .stroke();
+    y += 10;
+    doc.line(margin, y, pageWidth - margin, y);
 
     // Resumo Financeiro
-    y += 20;
-    doc.fontSize(16)
-       .font('Helvetica-Bold')
-       .text('Resumo Financeiro', 50, y);
+    y += 15;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESUMO FINANCEIRO', margin, y);
 
-    y += 25;
-    doc.fontSize(12).font('Helvetica');
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
 
     const financialData = [
       ['Total de Laudos:', relatorio.resumo.total_laudos.toString()],
@@ -335,153 +342,154 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
 
     financialData.forEach(([label, value], index) => {
       if (index === 4 || index === 10) { // Valor Total e Valor a Pagar
-        doc.font('Helvetica-Bold');
+        doc.setFont('helvetica', 'bold');
       } else {
-        doc.font('Helvetica');
+        doc.setFont('helvetica', 'normal');
       }
       
-      doc.text(label, 50, y);
-      doc.text(value, 350, y);
-      y += 15;
+      doc.text(label, margin, y);
+      doc.text(value, margin + 80, y);
+      y += 6;
     });
 
-    // Nova página para exames se necessário
+    // Detalhamento dos Exames
     if (relatorio.exames.length > 0) {
       doc.addPage();
-      y = 50;
+      y = 30;
 
-      doc.fontSize(16)
-         .font('Helvetica-Bold')
-         .text('Detalhamento dos Exames', 50, y);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DETALHAMENTO DOS EXAMES', margin, y);
 
-      y += 30;
-
-      // Cabeçalho da tabela
-      doc.fontSize(10)
-         .font('Helvetica-Bold')
-         .text('Data', 50, y)
-         .text('Paciente', 100, y)
-         .text('Médico', 200, y)
-         .text('Modalidade', 300, y)
-         .text('Especialidade', 400, y)
-         .text('Valor', 500, y);
-
-      // Linha do cabeçalho
       y += 15;
-      doc.moveTo(50, y)
-         .lineTo(550, y)
-         .stroke();
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      
+      // Cabeçalho da tabela
+      doc.text('Data', margin, y);
+      doc.text('Paciente', margin + 25, y);
+      doc.text('Médico', margin + 70, y);
+      doc.text('Modalidade', margin + 110, y);
+      doc.text('Especialidade', margin + 140, y);
+      doc.text('Valor', margin + 170, y);
 
-      y += 10;
-      doc.font('Helvetica');
+      y += 8;
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
 
-      // Dados dos exames (máximo 25 por página)
-      relatorio.exames.slice(0, 25).forEach((exame: any, index: number) => {
-        if (y > 750) { // Nova página se necessário
+      doc.setFont('helvetica', 'normal');
+
+      // Dados dos exames
+      relatorio.exames.forEach((exame: any, index: number) => {
+        if (y > 280) { // Nova página se necessário
           doc.addPage();
-          y = 50;
+          y = 30;
         }
 
         const dataFormatada = new Date(exame.data_estudo).toLocaleDateString('pt-BR');
-        const pacienteAbrev = exame.paciente.length > 20 ? exame.paciente.substring(0, 17) + '...' : exame.paciente;
-        const medicoAbrev = exame.medico.length > 20 ? exame.medico.substring(0, 17) + '...' : exame.medico;
-        const modalidadeAbrev = exame.modalidade.length > 15 ? exame.modalidade.substring(0, 12) + '...' : exame.modalidade;
-        const especialidadeAbrev = exame.especialidade.length > 15 ? exame.especialidade.substring(0, 12) + '...' : exame.especialidade;
+        const pacienteAbrev = exame.paciente.length > 18 ? exame.paciente.substring(0, 15) + '...' : exame.paciente;
+        const medicoAbrev = exame.medico.length > 18 ? exame.medico.substring(0, 15) + '...' : exame.medico;
+        const modalidadeAbrev = exame.modalidade.length > 12 ? exame.modalidade.substring(0, 9) + '...' : exame.modalidade;
+        const especialidadeAbrev = exame.especialidade.length > 12 ? exame.especialidade.substring(0, 9) + '...' : exame.especialidade;
 
-        doc.text(dataFormatada, 50, y)
-           .text(pacienteAbrev, 100, y)
-           .text(medicoAbrev, 200, y)
-           .text(modalidadeAbrev, 300, y)
-           .text(especialidadeAbrev, 400, y)
-           .text(`R$ ${exame.valor.toFixed(2).replace('.', ',')}`, 500, y);
+        doc.text(dataFormatada, margin, y);
+        doc.text(pacienteAbrev, margin + 25, y);
+        doc.text(medicoAbrev, margin + 70, y);
+        doc.text(modalidadeAbrev, margin + 110, y);
+        doc.text(especialidadeAbrev, margin + 140, y);
+        doc.text(`R$ ${exame.valor.toFixed(2).replace('.', ',')}`, margin + 170, y);
 
-        y += 12;
+        y += 5;
       });
-
-      if (relatorio.exames.length > 25) {
-        y += 10;
-        doc.fontSize(10)
-           .font('Helvetica-Oblique')
-           .text(`... e mais ${relatorio.exames.length - 25} exames`, 50, y);
-      }
     } else {
-      y += 30;
-      doc.fontSize(12)
-         .font('Helvetica-Oblique')
-         .text('Nenhum exame encontrado para o período especificado.', 50, y);
+      y += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'italic');
+      doc.text('Nenhum exame encontrado para o período especificado.', margin, y);
     }
 
     // Rodapé
-    doc.fontSize(8)
-       .font('Helvetica')
-       .text(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}`, 50, 750);
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`, margin, 285);
+    }
 
-    // Finalizar documento
-    doc.end();
-
-    // Esperar todos os chunks serem coletados
-    return new Promise((resolve) => {
-      doc.on('end', () => {
-        // Combinar todos os chunks em um único Uint8Array
-        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        
-        for (const chunk of chunks) {
-          result.set(chunk, offset);
-          offset += chunk.length;
-        }
-        
-        resolve(result);
-      });
-    });
+    // Converter para Uint8Array
+    const pdfArrayBuffer = doc.output('arraybuffer');
+    return new Uint8Array(pdfArrayBuffer);
 
   } catch (error) {
-    console.error('Erro ao gerar PDF com PDFKit:', error);
-    
-    // Fallback simples: gerar um arquivo de texto estruturado
-    const textContent = `
-RELATÓRIO DE VOLUMETRIA - FATURAMENTO
-Período: ${relatorio.periodo}
-
-========================================
-DADOS DO CLIENTE
-========================================
-Nome: ${relatorio.cliente.nome}
-CNPJ: ${relatorio.cliente.cnpj || 'Não informado'}
-Email: ${relatorio.cliente.email}
-
-========================================
-RESUMO FINANCEIRO
-========================================
-Total de Laudos: ${relatorio.resumo.total_laudos}
-Valor Bruto: R$ ${relatorio.resumo.valor_bruto.toFixed(2).replace('.', ',')}
-Franquia: R$ ${relatorio.resumo.franquia.toFixed(2).replace('.', ',')}
-Ajuste: R$ ${relatorio.resumo.ajuste.toFixed(2).replace('.', ',')}
-Valor Total: R$ ${relatorio.resumo.valor_total.toFixed(2).replace('.', ',')}
-IRRF (1,5%): R$ ${relatorio.resumo.irrf.toFixed(2).replace('.', ',')}
-CSLL (1%): R$ ${relatorio.resumo.csll.toFixed(2).replace('.', ',')}
-PIS (0,65%): R$ ${relatorio.resumo.pis.toFixed(2).replace('.', ',')}
-COFINS (3%): R$ ${relatorio.resumo.cofins.toFixed(2).replace('.', ',')}
-Total Impostos: R$ ${relatorio.resumo.impostos.toFixed(2).replace('.', ',')}
-VALOR A PAGAR: R$ ${relatorio.resumo.valor_a_pagar.toFixed(2).replace('.', ',')}
-
-========================================
-DETALHAMENTO DOS EXAMES
-========================================
-${relatorio.exames.length > 0 ? 
-  relatorio.exames.map((exame: any) => 
-    `Data: ${new Date(exame.data_estudo).toLocaleDateString('pt-BR')} | Paciente: ${exame.paciente} | Médico: ${exame.medico} | Modalidade: ${exame.modalidade} | Especialidade: ${exame.especialidade} | Valor: R$ ${exame.valor.toFixed(2).replace('.', ',')}`
-  ).join('\n') : 
-  'Nenhum exame encontrado para o período especificado.'
+    console.error('Erro ao gerar PDF:', error);
+    throw error;
+  }
 }
 
-========================================
-Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}
-    `;
+// Função para gerar Excel do relatório
+async function gerarExcelRelatorio(relatorio: any): Promise<Uint8Array> {
+  try {
+    const workbook = XLSX.utils.book_new();
     
-    const encoder = new TextEncoder();
-    return encoder.encode(textContent);
+    // Aba 1: Resumo
+    const resumoData = [
+      ['RELATÓRIO DE VOLUMETRIA - FATURAMENTO'],
+      [`Período: ${relatorio.periodo}`],
+      [''],
+      ['DADOS DO CLIENTE'],
+      ['Nome', relatorio.cliente.nome],
+      ['CNPJ', relatorio.cliente.cnpj || 'Não informado'],
+      ['Email', relatorio.cliente.email],
+      [''],
+      ['RESUMO FINANCEIRO'],
+      ['Item', 'Valor'],
+      ['Total de Laudos', relatorio.resumo.total_laudos],
+      ['Valor Bruto', relatorio.resumo.valor_bruto],
+      ['Franquia', relatorio.resumo.franquia],
+      ['Ajuste', relatorio.resumo.ajuste],
+      ['Valor Total', relatorio.resumo.valor_total],
+      ['IRRF (1,5%)', relatorio.resumo.irrf],
+      ['CSLL (1%)', relatorio.resumo.csll],
+      ['PIS (0,65%)', relatorio.resumo.pis],
+      ['COFINS (3%)', relatorio.resumo.cofins],
+      ['Total Impostos', relatorio.resumo.impostos],
+      ['VALOR A PAGAR', relatorio.resumo.valor_a_pagar]
+    ];
+    
+    const resumoWS = XLSX.utils.aoa_to_sheet(resumoData);
+    XLSX.utils.book_append_sheet(workbook, resumoWS, 'Resumo');
+
+    // Aba 2: Detalhamento dos Exames
+    if (relatorio.exames.length > 0) {
+      const examesData = [
+        ['Data do Exame', 'Paciente', 'Médico', 'Modalidade', 'Especialidade', 'Categoria', 'Prioridade', 'Valor']
+      ];
+      
+      relatorio.exames.forEach((exame: any) => {
+        examesData.push([
+          new Date(exame.data_estudo).toLocaleDateString('pt-BR'),
+          exame.paciente,
+          exame.medico,
+          exame.modalidade,
+          exame.especialidade,
+          exame.categoria || '',
+          exame.prioridade || '',
+          exame.valor
+        ]);
+      });
+      
+      const examesWS = XLSX.utils.aoa_to_sheet(examesData);
+      XLSX.utils.book_append_sheet(workbook, examesWS, 'Exames');
+    }
+
+    // Converter para Uint8Array
+    const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    return new Uint8Array(excelBuffer);
+
+  } catch (error) {
+    console.error('Erro ao gerar Excel:', error);
+    throw error;
   }
 }
 

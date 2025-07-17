@@ -54,6 +54,7 @@ export default function GerarFaturamento() {
     emailEnviado: boolean;
     emailDestino: string;
     linkRelatorio?: string;
+    arquivos?: Array<{ tipo: string; url: string; nome: string }>;
     erro?: string;
     dataProcessamento?: string;
     relatorioData?: any;
@@ -239,7 +240,8 @@ export default function GerarFaturamento() {
               cliente_id: cliente.id,
               periodo: PERIODO_ATUAL,
               data_inicio: dataInicio,
-              data_fim: dataFim
+              data_fim: dataFim,
+              formato: 'ambos' // Gera PDF e Excel
             }
           });
 
@@ -248,7 +250,7 @@ export default function GerarFaturamento() {
           }
 
           // Marcar relatório como gerado
-          const linkRelatorio = responseRelatorio.data?.linkRelatorio || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
+          const linkRelatorio = responseRelatorio.data?.arquivos?.[0]?.url || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
           const dataProcessamento = new Date().toLocaleString('pt-BR');
           
           setResultados(prev => prev.map(r => 
@@ -258,6 +260,7 @@ export default function GerarFaturamento() {
                   relatorioGerado: true, 
                   dataProcessamento: dataProcessamento,
                   linkRelatorio: linkRelatorio,
+                  arquivos: responseRelatorio.data?.arquivos || [],
                   detalhesRelatorio: {
                     total_laudos: responseRelatorio.data?.relatorio?.resumo?.total_laudos || 0,
                     valor_total: responseRelatorio.data?.relatorio?.resumo?.valor_total || 0
@@ -726,21 +729,36 @@ export default function GerarFaturamento() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3">
-                          {resultado.linkRelatorio ? (
-                            <a 
-                              href={resultado.linkRelatorio} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              Ver Relatório
-                            </a>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">-</span>
-                          )}
-                        </td>
+                         <td className="p-3">
+                           {resultado.arquivos && resultado.arquivos.length > 0 ? (
+                             <div className="flex flex-col space-y-1">
+                               {resultado.arquivos.map((arquivo, index) => (
+                                 <a
+                                   key={index}
+                                   href={arquivo.url}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                                 >
+                                   <ExternalLink className="h-3 w-3" />
+                                   {arquivo.tipo.toUpperCase()}
+                                 </a>
+                               ))}
+                             </div>
+                           ) : resultado.linkRelatorio ? (
+                             <a 
+                               href={resultado.linkRelatorio} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                             >
+                               <ExternalLink className="h-3 w-3" />
+                               Ver Relatório
+                             </a>
+                           ) : (
+                             <span className="text-sm text-muted-foreground">-</span>
+                           )}
+                         </td>
                         <td className="p-3 text-sm text-muted-foreground">
                           {resultado.dataProcessamento || "-"}
                         </td>
