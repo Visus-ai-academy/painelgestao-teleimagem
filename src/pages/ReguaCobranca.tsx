@@ -79,15 +79,15 @@ export default function ReguaCobranca() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      // Carregar faturas do Omie
+      // Carregar faturas da nova tabela faturamento
       const { data: faturasData, error: faturasError } = await supabase
-        .from('omie_faturas')
+        .from('faturamento')
         .select('*')
-        .order('data_vencimento', { ascending: false });
+        .order('data_emissao', { ascending: false });
 
       if (faturasError) throw faturasError;
 
-      setFaturas((faturasData || []) as OmieFatura[]);
+      setFaturas((faturasData || []) as any[]);
 
       // Carregar emails de cobrança
       const { data: emailsData, error: emailsError } = await supabase
@@ -101,7 +101,7 @@ export default function ReguaCobranca() {
       setEmails(emailsData || []);
 
       // Calcular métricas
-      calcularMetricas((faturasData || []) as OmieFatura[], emailsData || []);
+      calcularMetricas((faturasData || []) as any[], emailsData || []);
 
     } catch (error: any) {
       toast({

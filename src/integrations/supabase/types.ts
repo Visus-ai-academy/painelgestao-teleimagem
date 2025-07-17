@@ -157,7 +157,7 @@ export type Database = {
             foreignKeyName: "emails_cobranca_fatura_id_fkey"
             columns: ["fatura_id"]
             isOneToOne: false
-            referencedRelation: "omie_faturas"
+            referencedRelation: "faturamento"
             referencedColumns: ["id"]
           },
           {
@@ -335,6 +335,48 @@ export type Database = {
           },
         ]
       }
+      faturamento: {
+        Row: {
+          created_at: string
+          data_emissao: string
+          email: string | null
+          id: string
+          nome: string
+          numero_fatura: string
+          periodo: string
+          quantidade: number
+          status: string | null
+          updated_at: string
+          valor_bruto: number
+        }
+        Insert: {
+          created_at?: string
+          data_emissao: string
+          email?: string | null
+          id?: string
+          nome: string
+          numero_fatura: string
+          periodo: string
+          quantidade?: number
+          status?: string | null
+          updated_at?: string
+          valor_bruto?: number
+        }
+        Update: {
+          created_at?: string
+          data_emissao?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          numero_fatura?: string
+          periodo?: string
+          quantidade?: number
+          status?: string | null
+          updated_at?: string
+          valor_bruto?: number
+        }
+        Relationships: []
+      }
       faturas_geradas: {
         Row: {
           acrescimo: number | null
@@ -445,60 +487,6 @@ export type Database = {
         }
         Relationships: []
       }
-      omie_faturas: {
-        Row: {
-          cliente_email: string | null
-          cliente_nome: string
-          created_at: string
-          data_emissao: string
-          data_pagamento: string | null
-          data_vencimento: string
-          id: string
-          numero_fatura: string
-          omie_id: string
-          quantidade: number | null
-          status: string | null
-          sync_date: string | null
-          updated_at: string
-          valor: number
-          valor_bruto: number | null
-        }
-        Insert: {
-          cliente_email?: string | null
-          cliente_nome: string
-          created_at?: string
-          data_emissao: string
-          data_pagamento?: string | null
-          data_vencimento: string
-          id?: string
-          numero_fatura: string
-          omie_id: string
-          quantidade?: number | null
-          status?: string | null
-          sync_date?: string | null
-          updated_at?: string
-          valor: number
-          valor_bruto?: number | null
-        }
-        Update: {
-          cliente_email?: string | null
-          cliente_nome?: string
-          created_at?: string
-          data_emissao?: string
-          data_pagamento?: string | null
-          data_vencimento?: string
-          id?: string
-          numero_fatura?: string
-          omie_id?: string
-          quantidade?: number | null
-          status?: string | null
-          sync_date?: string | null
-          updated_at?: string
-          valor?: number
-          valor_bruto?: number | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -568,7 +556,7 @@ export type Database = {
             foreignKeyName: "regua_cobranca_fatura_id_fkey"
             columns: ["fatura_id"]
             isOneToOne: false
-            referencedRelation: "omie_faturas"
+            referencedRelation: "faturamento"
             referencedColumns: ["id"]
           },
         ]
