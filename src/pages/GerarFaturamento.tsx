@@ -19,11 +19,12 @@ import {
   FileSpreadsheet,
   Settings,
   Download,
-  ExternalLink
+  ExternalLink,
+  FileBarChart2
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { Speedometer } from "@/components/Speedometer";
-import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile } from "@/lib/supabase";
+import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
@@ -902,6 +903,16 @@ export default function GerarFaturamento() {
               expectedFormat={["Fatura ID, Valor, Data Pagamento", "Status, Observações"]}
               onUpload={processFinanceiroFile}
               icon={<DollarSign className="h-5 w-5" />}
+            />
+
+            <FileUpload
+              title="Upload de Faturamento"
+              description="Upload de arquivo de faturamento com colunas de Nome (B), Quantidade (J) e Valor Bruto (K)"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={25}
+              expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
+              onUpload={processFaturamentoFile}
+              icon={<FileBarChart2 className="h-5 w-5" />}
             />
           </div>
         </TabsContent>

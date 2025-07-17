@@ -202,3 +202,23 @@ export async function processFinanceiroFile(file: File) {
     throw error
   }
 }
+
+export async function processFaturamentoFile(file: File) {
+  try {
+    const fileName = `faturamento_${Date.now()}_${file.name}`
+    await uploadFile(file, 'uploads', fileName)
+
+    const { data, error } = await supabase.functions.invoke('processar-faturamento', {
+      body: { fileName }
+    })
+
+    if (error) {
+      throw new Error(`Erro ao processar faturamento: ${error.message}`)
+    }
+
+    return data
+  } catch (error) {
+    console.error('Erro no processamento:', error)
+    throw error
+  }
+}
