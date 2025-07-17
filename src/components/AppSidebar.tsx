@@ -173,15 +173,15 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
-        <div className="p-6 border-b">
+        <div className="p-6 border-b bg-gradient-subtle">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-white" />
+            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center shadow-3d animate-bounce-in">
+              <TrendingUp className="h-5 w-5 text-primary-foreground" />
             </div>
             {!collapsed && (
               <div>
-                <h2 className="font-bold text-lg text-gray-800">MedSystem</h2>
-                <p className="text-sm text-gray-500">Dashboard</p>
+                <h2 className="font-bold text-lg text-foreground">MedSystem</h2>
+                <p className="text-sm text-muted-foreground">Dashboard</p>
               </div>
             )}
           </div>
@@ -198,12 +198,12 @@ export function AppSidebar() {
                 return (
                   <div key={item.title} className="px-3 py-2">
                     <Collapsible defaultOpen={isActiveRoute(item.url)}>
-                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">
+                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-left text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md btn-3d transition-all duration-300 ease-smooth">
                         <div className="flex items-center gap-2">
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </div>
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="h-4 w-4 transition-transform duration-300" />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-1 space-y-1">
                         {item.subItems?.map((subItem) => (
@@ -211,10 +211,10 @@ export function AppSidebar() {
                             key={subItem.title}
                             to={subItem.url}
                             className={({ isActive }) =>
-                              `block py-2 px-4 ml-6 text-sm rounded-md transition-colors ${
+                              `block py-2 px-4 ml-6 text-sm rounded-md transition-all duration-300 ease-smooth btn-3d ${
                                 isActive
-                                  ? "bg-blue-50 text-blue-700 font-medium"
-                                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                  ? "bg-gradient-primary text-primary-foreground font-medium shadow-3d-hover scale-105"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:scale-105"
                               }`
                             }
                           >
@@ -232,10 +232,10 @@ export function AppSidebar() {
                   <NavLink
                     to={item.url}
                     className={({ isActive }) =>
-                      `flex items-center gap-2 p-2 text-sm rounded-md transition-colors ${
+                      `flex items-center gap-2 p-2 text-sm rounded-md transition-all duration-300 ease-smooth btn-3d ${
                         isActive
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          ? "bg-gradient-primary text-primary-foreground font-medium shadow-3d-hover scale-105"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:scale-105"
                       }`
                     }
                   >

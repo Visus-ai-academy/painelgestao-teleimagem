@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { useMouseLight } from "@/hooks/useMouseLight";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RoleProtectedRoute } from "./components/RoleProtectedRoute";
 import { Layout } from "@/components/Layout";
@@ -33,12 +34,24 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+const App = () => {
+  const { mousePosition, isVisible } = useMouseLight();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {/* Mouse Light Effect */}
+        <div
+          className="mouse-light"
+          style={{
+            left: mousePosition.x,
+            top: mousePosition.y,
+            opacity: isVisible ? 1 : 0,
+          }}
+        />
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -132,6 +145,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
