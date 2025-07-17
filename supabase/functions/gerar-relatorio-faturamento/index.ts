@@ -142,20 +142,17 @@ const handler = async (req: Request): Promise<Response> => {
     let total_laudos = 0;
     let valor_bruto = 0;
     
-    if (examesCliente && examesCliente.length > 0) {
-      // Usar exames para calcular (prioridade)
-      total_laudos = examesCliente.length;
-      valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
-      console.log(`Calculado de exames - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
-    } else if (faturas && faturas.length > 0) {
-      // Se não há exames mas tem faturas, usar as faturas como fallback
+    // Usar SEMPRE os dados da tabela faturamento como fonte principal
+    if (faturas && faturas.length > 0) {
+      // Usar dados de faturamento para calcular totais (oficial)
       total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
       valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
-      console.log(`Calculado de faturas - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
+      console.log(`Usando dados oficiais de faturamento - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
     } else {
-      console.log("Nenhuma fatura ou exame encontrado - gerando relatório vazio");
-      total_laudos = 0;
-      valor_bruto = 0;
+      // Fallback apenas se não houver dados na tabela faturamento
+      console.log("Nenhum dado de faturamento encontrado - usando dados de exames como fallback");
+      total_laudos = examesCliente?.length || 0;
+      valor_bruto = examesCliente?.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0) || 0;
     }
     
     const franquia = 0;
@@ -189,8 +186,8 @@ const handler = async (req: Request): Promise<Response> => {
         cofins,
         valor_a_pagar
       },
-      // Sempre usar exames detalhados quando disponíveis, caso contrário usar dados da tabela faturamento
-      exames: examesCliente && examesCliente.length > 0
+      // Se tem dados da tabela faturamento mas não tem detalhes, criar um único item consolidado
+      exames: (examesCliente && examesCliente.length > 0) 
         ? examesCliente.map(exame => ({
             data_exame: exame.data_exame,
             nome_exame: exame.modalidade + ' - ' + exame.especialidade,
@@ -203,20 +200,18 @@ const handler = async (req: Request): Promise<Response> => {
             quantidade: 1,
             valor: exame.valor_bruto || 0
           }))
-        : faturas && faturas.length > 0 
-          ? faturas.map(fatura => ({
-              data_exame: fatura.data_emissao,
-              nome_exame: `Fatura ${fatura.numero_fatura}`,
-              paciente: 'Resumo do Período',
-              medico: 'Consolidado',
-              modalidade: 'Faturamento',
-              especialidade: 'Consolidado',
-              categoria: 'Período',
-              prioridade: 'Normal',
-              quantidade: fatura.quantidade,
-              valor: fatura.valor_bruto
-            }))
-          : []
+        : faturas.map(fatura => ({
+            data_exame: fatura.data_emissao,
+            nome_exame: `CONSOLIDADO - FATURA ${fatura.numero_fatura}`,
+            paciente: 'DIVERSOS',
+            medico: 'DIVERSOS',
+            modalidade: 'DIVERSOS',
+            especialidade: 'DIVERSOS',
+            categoria: 'DIVERSOS',
+            prioridade: 'NORMAL',
+            quantidade: fatura.quantidade,
+            valor: fatura.valor_bruto
+          }))
     };
 
     console.log(`Relatório gerado com ${examesCliente?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
