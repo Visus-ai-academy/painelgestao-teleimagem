@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import * as XLSX from 'https://deno.land/x/sheetjs@v0.18.3/xlsx.mjs'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +15,6 @@ serve(async (req) => {
   try {
     console.log('=== PROCESSAR EXAMES INICIADO ===')
     console.log('Method:', req.method)
-    console.log('Headers:', Object.fromEntries(req.headers.entries()))
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -50,56 +50,69 @@ serve(async (req) => {
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
 
-    // 2. Baixar arquivo do storage (simulado)
+    // 2. Baixar arquivo do storage
     console.log('Baixando arquivo do storage...')
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(fileName)
 
-    // 3. Processar CSV/Excel (simulado)
+    if (downloadError) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`)
+    }
+
+    // 3. Converter arquivo para buffer
+    const buffer = await fileData.arrayBuffer()
+    
+    // 4. Processar arquivo Excel/CSV
     console.log('Analisando formato do arquivo...')
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    const workbook = XLSX.read(buffer)
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
-    // Simular dados processados
-    const examosMock = [
-      {
-        paciente: "João Silva",
-        cliente_id: "550e8400-e29b-41d4-a716-446655440001",
-        medico: "Dr. Antonio",
-        data_exame: "2025-07-15",
-        modalidade: "MR",
-        especialidade: "NE",
-        status: "Realizado",
-        valor_bruto: 450.00
-      },
-      {
-        paciente: "Maria Santos",
-        cliente_id: "550e8400-e29b-41d4-a716-446655440002", 
-        medico: "Dra. Ana",
-        data_exame: "2025-07-16",
-        modalidade: "CT",
-        especialidade: "CA",
-        status: "Realizado",
-        valor_bruto: 320.00
-      }
-    ]
+    console.log('Dados encontrados:', jsonData.length, 'registros')
 
-    console.log('Inserindo exames no banco...')
+    // 5. Mapear dados para estrutura do banco
+    const exames = jsonData.map((row: any) => ({
+      id: crypto.randomUUID(),
+      paciente: row.paciente || row.Paciente || row.PACIENTE || '',
+      medico: row.medico || row.Medico || row.MEDICO || '',
+      data_exame: row.data_exame || row.Data_Exame || row.DATA_EXAME || new Date().toISOString().split('T')[0],
+      modalidade: row.modalidade || row.Modalidade || row.MODALIDADE || '',
+      especialidade: row.especialidade || row.Especialidade || row.ESPECIALIDADE || '',
+      categoria: row.categoria || row.Categoria || row.CATEGORIA || null,
+      prioridade: row.prioridade || row.Prioridade || row.PRIORIDADE || null,
+      status: 'realizado',
+      valor_bruto: parseFloat(row.valor_bruto || row.Valor_Bruto || row.VALOR_BRUTO || 0) || null,
+      cliente_id: null // Será necessário mapear com os clientes existentes
+    }))
 
-    // 4. Inserir dados no banco
+    // 6. Filtrar apenas exames com campos obrigatórios válidos
+    const examesValidos = exames.filter(exame => 
+      exame.paciente && exame.paciente.trim() !== '' &&
+      exame.medico && exame.medico.trim() !== '' &&
+      exame.modalidade && exame.modalidade.trim() !== '' &&
+      exame.especialidade && exame.especialidade.trim() !== ''
+    )
+
+    console.log('Inserindo exames no banco...', examesValidos.length, 'registros')
+
+    // 7. Inserir dados no banco
     const { data: examesInseridos, error: examesError } = await supabaseClient
       .from('exames_realizados')
-      .insert(examosMock)
+      .insert(examesValidos)
       .select()
 
     if (examesError) {
       throw new Error(`Erro ao inserir exames: ${examesError.message}`)
     }
 
-    // 5. Atualizar log com sucesso
+    // 8. Atualizar log com sucesso
     const { error: updateLogError } = await supabaseClient
       .from('upload_logs')
       .update({
-        status: 'success',
-        records_processed: examosMock.length
+        status: 'completed',
+        records_processed: examesValidos.length
       })
       .eq('id', logEntry.id)
 
@@ -107,14 +120,14 @@ serve(async (req) => {
       console.error('Erro ao atualizar log:', updateLogError.message)
     }
 
-    console.log(`Processamento concluído! ${examosMock.length} exames inseridos.`)
+    console.log(`Processamento concluído! ${examesValidos.length} exames inseridos.`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: examosMock.length,
-        registros_erro: 0,
-        mensagem: 'Arquivo processado com sucesso'
+        registros_processados: examesValidos.length,
+        registros_erro: jsonData.length - examesValidos.length,
+        mensagem: `${examesValidos.length} exames processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
