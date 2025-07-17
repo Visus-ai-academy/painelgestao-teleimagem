@@ -8,15 +8,21 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('=== INICIANDO PROCESSAR-CLIENTES ===')
+  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request')
     return new Response('ok', { headers: corsHeaders })
   }
 
-  let logEntry = null;
-  let supabaseClient = null;
-  
   try {
-    supabaseClient = createClient(
+    console.log('Método da requisição:', req.method)
+    console.log('Headers:', Object.fromEntries(req.headers.entries()))
+
+    // Create Supabase client
+    console.log('Criando cliente Supabase...')
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -25,13 +31,22 @@ serve(async (req) => {
         },
       }
     )
+    console.log('Cliente Supabase criado com sucesso')
 
-    const { fileName } = await req.json()
+    // Parse request body
+    console.log('Fazendo parse do body...')
+    const requestBody = await req.json()
+    console.log('Body recebido:', requestBody)
+    
+    const { fileName } = requestBody
+    if (!fileName) {
+      throw new Error('Nome do arquivo não fornecido')
+    }
+    console.log('Nome do arquivo:', fileName)
 
-    console.log('Processando arquivo de clientes:', fileName)
-
-    // 1. Log do início do processamento
-    const { data: logData, error: logError } = await supabaseClient
+    // Create upload log
+    console.log('Criando log de upload...')
+    const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
         filename: fileName,
@@ -45,89 +60,89 @@ serve(async (req) => {
       console.error('Erro ao criar log:', logError)
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
+    console.log('Log criado:', logEntry.id)
 
-    logEntry = logData
-    console.log('Log criado com sucesso:', logEntry.id)
-
-    // 2. Baixar arquivo do storage
+    // Download file from storage
     console.log('Baixando arquivo do storage...')
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(fileName)
 
     if (downloadError) {
+      console.error('Erro ao baixar arquivo:', downloadError)
       throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`)
     }
+    console.log('Arquivo baixado com sucesso, tamanho:', fileData.size)
 
-    // 3. Converter arquivo para buffer
+    // Convert to buffer and process
+    console.log('Convertendo para buffer...')
     const buffer = await fileData.arrayBuffer()
+    console.log('Buffer criado, tamanho:', buffer.byteLength)
     
-    // 4. Processar arquivo Excel/CSV
-    console.log('Analisando formato do arquivo...')
+    // Parse Excel/CSV file
+    console.log('Processando arquivo Excel/CSV...')
     const workbook = XLSX.read(buffer)
     const sheetName = workbook.SheetNames[0]
+    console.log('Nome da planilha:', sheetName)
+    
     const worksheet = workbook.Sheets[sheetName]
     const jsonData = XLSX.utils.sheet_to_json(worksheet)
-
-    console.log('Dados encontrados:', jsonData.length, 'registros')
+    console.log('Dados convertidos para JSON:', jsonData.length, 'registros')
     
-    // Log das primeiras linhas para debug
     if (jsonData.length > 0) {
-      console.log('Primeira linha do arquivo:', JSON.stringify(jsonData[0]))
-      console.log('Colunas disponíveis:', Object.keys(jsonData[0]))
+      console.log('Primeira linha exemplo:', JSON.stringify(jsonData[0]))
     }
 
-    // 5. Mapear dados para estrutura do banco com busca flexível de colunas
+    // Map data to database structure
+    console.log('Mapeando dados para estrutura do banco...')
     const clientes = jsonData.map((row: any) => {
-      // Buscar nome em várias possibilidades
-      const nome = row.nome || row.Nome || row.NOME || row.cliente || row.Cliente || row.CLIENTE ||
-                   row.razao_social || row['Razão Social'] || row['RAZÃO SOCIAL'] || 
-                   row.empresa || row.Empresa || row.EMPRESA || '';
-      
-      // Buscar email
-      const email = row.email || row.Email || row.EMAIL || row['E-mail'] || row['e-mail'] || '';
-      
-      console.log('Processando linha:', { nome, email, originalRow: row });
+      const nome = row.nome || row.Nome || row.NOME || row.cliente || row.Cliente || '';
+      const email = row.email || row.Email || row.EMAIL || '';
       
       return {
-        id: crypto.randomUUID(),
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row.telefone || row.Telefone || row.TELEFONE || row.fone || row.Fone || null,
-        endereco: row.endereco || row.Endereco || row.ENDERECO || row.endereco_completo || null,
-        cnpj: row.cnpj || row.CNPJ || row.documento || row.Documento || null,
+        telefone: row.telefone || row.Telefone || null,
+        endereco: row.endereco || row.Endereco || null,
+        cnpj: row.cnpj || row.CNPJ || null,
         ativo: true
       };
     })
 
-    // 6. Filtrar apenas clientes com nome válido
+    // Filter valid clients
     const clientesValidos = clientes.filter(cliente => 
       cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
     )
+    console.log('Clientes válidos filtrados:', clientesValidos.length)
 
-    console.log('Inserindo clientes no banco...', clientesValidos.length, 'registros')
-
-    // 7. ⚠️ IMPORTANTE: Limpar dados antigos primeiro (substitui arquivo anterior)
+    // Clear existing clients
+    console.log('Limpando clientes existentes...')
     const { error: deleteError } = await supabaseClient
       .from('clientes')
       .delete()
-      .neq('id', 'never-match') // Deleta todos os registros
+      .neq('id', 'never-match')
 
     if (deleteError) {
-      console.warn('Aviso ao limpar dados antigos:', deleteError.message)
+      console.warn('Aviso ao limpar dados:', deleteError.message)
+    } else {
+      console.log('Clientes existentes removidos')
     }
 
-    // 8. Inserir novos clientes
+    // Insert new clients
+    console.log('Inserindo novos clientes...')
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
       .from('clientes')
       .insert(clientesValidos)
       .select()
 
     if (clientesError) {
+      console.error('Erro ao inserir clientes:', clientesError)
       throw new Error(`Erro ao inserir clientes: ${clientesError.message}`)
     }
+    console.log('Clientes inseridos com sucesso:', clientesInseridos?.length)
 
-    // 9. Atualizar log com sucesso
+    // Update log
+    console.log('Atualizando log...')
     const { error: updateLogError } = await supabaseClient
       .from('upload_logs')
       .update({
@@ -137,16 +152,14 @@ serve(async (req) => {
       .eq('id', logEntry.id)
 
     if (updateLogError) {
-      console.error('Erro ao atualizar log:', updateLogError.message)
+      console.error('Erro ao atualizar log:', updateLogError)
     }
 
-    console.log(`Processamento concluído! ${clientesValidos.length} clientes inseridos.`)
-
+    console.log('=== PROCESSAMENTO CONCLUÍDO COM SUCESSO ===')
     return new Response(
       JSON.stringify({
         success: true,
         registros_processados: clientesValidos.length,
-        registros_erro: jsonData.length - clientesValidos.length,
         mensagem: `${clientesValidos.length} clientes processados com sucesso`
       }),
       {
@@ -156,29 +169,14 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro detalhado no processamento:', error)
-    console.error('Stack trace:', error.stack)
-
-    // Tentar atualizar log com erro
-    try {
-      if (logEntry && logEntry.id) {
-        await supabaseClient
-          .from('upload_logs')
-          .update({
-            status: 'error',
-            error_message: error.message || 'Erro interno do servidor'
-          })
-          .eq('id', logEntry.id)
-      }
-    } catch (logUpdateError) {
-      console.error('Erro ao atualizar log com erro:', logUpdateError)
-    }
+    console.error('=== ERRO NO PROCESSAMENTO ===')
+    console.error('Erro:', error.message)
+    console.error('Stack:', error.stack)
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro interno do servidor',
-        details: error.stack || 'Sem detalhes adicionais'
+        error: error.message || 'Erro interno do servidor'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
