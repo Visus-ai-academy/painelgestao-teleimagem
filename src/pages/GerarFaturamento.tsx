@@ -386,9 +386,9 @@ export default function GerarFaturamento() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
                 <Speedometer
                   value={clientesCarregados.length}
-                  max={Math.max(clientesCarregados.length, 5)}
+                  max={clientesCarregados.length}
                   label="Clientes Cadastrados"
-                  unit={clientesCarregados.length === 0 ? " (vazio)" : ""}
+                  unit=""
                   colorThresholds={{
                     low: { threshold: 30, color: "#3b82f6" },
                     medium: { threshold: 70, color: "#3b82f6" },
@@ -398,9 +398,9 @@ export default function GerarFaturamento() {
                 
                 <Speedometer
                   value={relatoriosGerados}
-                  max={clientesCarregados.length > 0 ? clientesCarregados.length : 1}
+                  max={clientesCarregados.length}
                   label="Relatórios Gerados"
-                  unit={clientesCarregados.length === 0 ? " (aguardando)" : ""}
+                  unit=""
                   colorThresholds={{
                     low: { threshold: 40, color: "#f59e0b" },
                     medium: { threshold: 80, color: "#10b981" },
@@ -410,9 +410,9 @@ export default function GerarFaturamento() {
                 
                 <Speedometer
                   value={emailsEnviados}
-                  max={clientesCarregados.length > 0 ? clientesCarregados.length : 1}
+                  max={clientesCarregados.length}
                   label="E-mails Enviados"
-                  unit={clientesCarregados.length === 0 ? " (aguardando)" : ""}
+                  unit=""
                   colorThresholds={{
                     low: { threshold: 40, color: "#ef4444" },
                     medium: { threshold: 80, color: "#f59e0b" },
