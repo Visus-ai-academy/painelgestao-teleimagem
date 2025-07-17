@@ -385,33 +385,48 @@ export default function GerarFaturamento() {
       // Primeira etapa: gerar todos os relatórios
       await handleGerarTodosRelatorios();
       
-      // Aguardar um momento para UI atualizar e obter dados atualizados
+      // Aguardar um momento para UI atualizar
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Segunda etapa: obter clientes com relatórios gerados diretamente
-      const clientesParaEmail = resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
-      
-      console.log('Clientes disponíveis para email após geração:', clientesParaEmail.map(c => c.clienteNome));
-      
-      if (clientesParaEmail.length > 0) {
-        await handleEnviarEmailsInterno(clientesParaEmail);
-      } else {
-        // Verificar se todos têm relatórios mas com erro
-        const todosComRelatorio = resultados.filter(r => r.relatorioGerado);
-        if (todosComRelatorio.length > 0) {
-          toast({
-            title: "Relatórios Gerados, mas Emails Não Enviados",
-            description: "Todos os relatórios foram gerados, mas houve erros no envio de emails. Verifique a lista de erros.",
-            variant: "destructive",
+      // Segunda etapa: usar um callback para obter o estado atualizado
+      setResultados(resultadosAtuais => {
+        const clientesParaEmail = resultadosAtuais.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+        
+        console.log('Estado completo dos resultados:', resultadosAtuais.map(r => ({
+          nome: r.clienteNome,
+          relatorioGerado: r.relatorioGerado,
+          emailEnviado: r.emailEnviado,
+          erro: r.erro,
+          temDadosRelatorio: !!r.relatorioData
+        })));
+        
+        console.log('Clientes disponíveis para email após geração:', clientesParaEmail.map(c => c.clienteNome));
+        
+        // Executar envio de emails de forma assíncrona
+        if (clientesParaEmail.length > 0) {
+          handleEnviarEmailsInterno(clientesParaEmail).catch(error => {
+            console.error('Erro no envio de emails:', error);
           });
         } else {
-          toast({
-            title: "Nenhum Relatório Válido",
-            description: "Não foi possível gerar relatórios válidos para envio de emails.",
-            variant: "destructive",
-          });
+          // Verificar se todos têm relatórios mas com erro
+          const todosComRelatorio = resultadosAtuais.filter(r => r.relatorioGerado);
+          if (todosComRelatorio.length > 0) {
+            toast({
+              title: "Relatórios Gerados, mas Emails Não Enviados", 
+              description: "Todos os relatórios foram gerados, mas houve problemas para identificar clientes válidos para envio. Tente usar o botão 'Enviar Emails' separadamente.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Nenhum Relatório Válido",
+              description: "Não foi possível gerar relatórios válidos para envio de emails.",
+              variant: "destructive",
+            });
+          }
         }
-      }
+        
+        return resultadosAtuais; // Retornar o estado sem alterações
+      });
       
     } catch (error: any) {
       console.error("Erro no processamento automático:", error);
