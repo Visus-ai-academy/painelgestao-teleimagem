@@ -41,62 +41,37 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar todos os exames do período primeiro
-    console.log(`Buscando exames entre ${data_inicio} e ${data_fim} para cliente: ${cliente.nome}`);
+    // Buscar dados de faturamento (tabela omie_faturas) do cliente específico
+    console.log(`Buscando faturas entre ${data_inicio} e ${data_fim} para cliente: ${cliente.nome}`);
     
-    const { data: todosExames, error: examesError } = await supabase
+    const { data: faturas, error: faturasError } = await supabase
+      .from('omie_faturas')
+      .select('*')
+      .eq('cliente_nome', cliente.nome)
+      .gte('data_emissao', data_inicio)
+      .lte('data_emissao', data_fim)
+      .order('data_emissao', { ascending: true });
+
+    if (faturasError) {
+      console.error('Erro ao buscar faturas:', faturasError);
+      throw new Error(`Erro ao buscar faturas: ${faturasError.message}`);
+    }
+
+    console.log(`Total de faturas encontradas para ${cliente.nome}: ${faturas?.length || 0}`);
+    
+    // Buscar exames relacionados ao cliente baseado no nome
+    const { data: examesCliente, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
       .gte('data_exame', data_inicio)
       .lte('data_exame', data_fim)
+      .ilike('paciente', `%${cliente.nome}%`)
       .order('data_exame', { ascending: true });
 
     if (examesError) {
       console.error('Erro ao buscar exames:', examesError);
       throw new Error(`Erro ao buscar exames: ${examesError.message}`);
     }
-
-    // Buscar todos os clientes ativos
-    const { data: clientesAtivos, error: clientesError } = await supabase
-      .from('clientes')
-      .select('id, nome')
-      .eq('ativo', true);
-
-    if (clientesError) {
-      console.error('Erro ao buscar clientes:', clientesError);
-      throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
-    }
-
-    console.log(`Total de exames encontrados: ${todosExames?.length || 0}`);
-    console.log(`Total de clientes ativos: ${clientesAtivos?.length || 0}`);
-    
-    // Determinar quantos exames pertencem a este cliente
-    // Se AKCPALMAS deve ter 35 exames com valor R$ 7.701,95, vamos implementar essa lógica
-    let examesCliente = [];
-    let valorEsperado = 0;
-    let quantidadeEsperada = 0;
-    
-    if (cliente.nome === 'AKCPALMAS') {
-      quantidadeEsperada = 35;
-      valorEsperado = 7701.95;
-    } else if (cliente.nome === 'BIOCARDIOS') {
-      // Definir valores específicos para outros clientes conforme necessário
-      quantidadeEsperada = Math.floor((todosExames?.length || 0) / (clientesAtivos?.length || 1));
-      valorEsperado = quantidadeEsperada * 450; // valor médio estimado
-    } else if (cliente.nome === 'VILARICA') {
-      quantidadeEsperada = Math.floor((todosExames?.length || 0) / (clientesAtivos?.length || 1));
-      valorEsperado = quantidadeEsperada * 450;
-    } else {
-      // Para outros clientes, distribuir igualmente
-      quantidadeEsperada = Math.floor((todosExames?.length || 0) / (clientesAtivos?.length || 1));
-      valorEsperado = quantidadeEsperada * 450;
-    }
-    
-    // Selecionar os exames para este cliente (primeiros N exames para simplificar)
-    examesCliente = (todosExames || []).slice(0, quantidadeEsperada).map(exame => ({
-      ...exame,
-      valor_bruto: valorEsperado / quantidadeEsperada // Ajustar valor unitário
-    }));
     
     console.log(`Exames do cliente encontrados: ${examesCliente?.length || 0}`);
 
@@ -160,9 +135,18 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular totais baseado nos exames do cliente
+    // Calcular totais baseado nos dados das faturas e exames
     const total_laudos = examesCliente.length;
-    const valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
+    
+    // Se há faturas do Omie, usar esses valores como referência
+    let valor_bruto = 0;
+    if (faturas && faturas.length > 0) {
+      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor || 0), 0);
+    } else {
+      // Caso não haja faturas, calcular baseado nos exames
+      valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
+    }
+    
     const franquia = 0;
     const ajuste = 0;
     const valor_total = valor_bruto + franquia + ajuste;
