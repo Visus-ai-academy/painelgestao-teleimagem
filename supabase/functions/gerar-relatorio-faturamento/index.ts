@@ -7,12 +7,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface FaturamentoRequest {
+interface RelatorioRequest {
   cliente_id: string;
-  periodo: string;
-  data_inicio: string;
-  data_fim: string;
-  formato?: 'pdf';
+  periodo: string; // formato: "2025-07"
+}
+
+interface ExameDetalhado {
+  data_estudo: string;
+  paciente: string;
+  nome_exame: string;
+  laudado_por: string;
+  prioridade: string;
+  modalidade: string;
+  especialidade: string;
+  categoria: string;
+  laudos: number;
+  valor: number;
+}
+
+interface ResumoFinanceiro {
+  total_laudos: number;
+  franquia: number;
+  ajuste: number;
+  valor_bruto: number;
+  valor_total: number;
+  irrf: number;
+  csll: number;
+  pis: number;
+  cofins: number;
+  impostos: number;
+  valor_a_pagar: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -26,11 +50,17 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { cliente_id, periodo, data_inicio, data_fim, formato = 'pdf' }: FaturamentoRequest = await req.json();
+    const { cliente_id, periodo }: RelatorioRequest = await req.json();
+    console.log(`🔥 INICIANDO GERAÇÃO DE RELATÓRIO - Cliente: ${cliente_id}, Período: ${periodo}`);
 
-    console.log(`Gerando relatório para cliente ${cliente_id}, período ${periodo}`);
+    // Extrair ano e mês do período (formato: "2025-07")
+    const [ano, mes] = periodo.split('-');
+    const data_inicio = `${ano}-${mes}-01`;
+    const data_fim = `${ano}-${mes}-31`;
+    
+    console.log(`📅 Período: ${data_inicio} até ${data_fim}`);
 
-    // Buscar dados do cliente
+    // 1. BUSCAR DADOS DO CLIENTE
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
       .select('*')
@@ -38,13 +68,14 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (clienteError || !cliente) {
+      console.error('❌ Cliente não encontrado:', clienteError);
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar dados de faturamento (tabela faturamento) do cliente específico
-    console.log(`Buscando faturas entre ${data_inicio} e ${data_fim} para cliente: ${cliente.nome}`);
-    
-    const { data: faturas, error: faturasError } = await supabase
+    console.log(`👤 Cliente encontrado: ${cliente.nome}`);
+
+    // 2. BUSCAR DADOS DE FATURAMENTO PRIMEIRO (PRIORIDADE)
+    const { data: dadosFaturamento, error: faturamentoError } = await supabase
       .from('faturamento')
       .select('*')
       .eq('nome', cliente.nome)
@@ -52,16 +83,15 @@ const handler = async (req: Request): Promise<Response> => {
       .lte('data_emissao', data_fim)
       .order('data_emissao', { ascending: true });
 
-    if (faturasError) {
-      console.error('Erro ao buscar faturas:', faturasError);
-      throw new Error(`Erro ao buscar faturas: ${faturasError.message}`);
+    if (faturamentoError) {
+      console.error('❌ Erro ao buscar faturamento:', faturamentoError);
+      throw new Error(`Erro ao buscar dados de faturamento: ${faturamentoError.message}`);
     }
 
-    console.log(`Total de faturas encontradas para ${cliente.nome}: ${faturas?.length || 0}`);
-    console.log('Dados das faturas encontradas:', faturas);
-    
-    // Buscar exames do cliente no período
-    const { data: examesCliente, error: examesError } = await supabase
+    console.log(`💰 Dados de faturamento encontrados: ${dadosFaturamento?.length || 0} registros`);
+
+    // 3. BUSCAR EXAMES COMO FALLBACK
+    const { data: examesRealizados, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
       .eq('cliente_id', cliente_id)
@@ -70,182 +100,131 @@ const handler = async (req: Request): Promise<Response> => {
       .order('data_exame', { ascending: true });
 
     if (examesError) {
-      console.error('Erro ao buscar exames:', examesError);
+      console.error('❌ Erro ao buscar exames:', examesError);
       throw new Error(`Erro ao buscar exames: ${examesError.message}`);
     }
-    
-    console.log(`Exames do cliente encontrados: ${examesCliente?.length || 0}`);
 
-    // Verificar se existem faturas ou exames para o cliente
-    const temDados = (faturas && faturas.length > 0) || (examesCliente && examesCliente.length > 0);
-    
-    if (!temDados) {
-      console.log('Nenhum exame ou fatura encontrado, gerando relatório vazio');
-      // Retornar relatório vazio ao invés de erro 404
-      const relatorio = {
-        cliente: {
-          nome: cliente.nome,
-          cnpj: cliente.cnpj,
-          email: cliente.email
-        },
-        periodo: periodo,
-        resumo: {
-          total_laudos: 0,
-          valor_bruto: 0,
-          franquia: 0,
-          ajuste: 0,
-          valor_total: 0,
-          irrf: 0,
-          csll: 0,
-          pis: 0,
-          cofins: 0,
-          valor_a_pagar: 0
-        },
-        exames: []
-      };
+    console.log(`🩺 Exames encontrados: ${examesRealizados?.length || 0} registros`);
 
-      // Gerar relatório em PDF
-      const pdfContent = await gerarPDFRelatorio(relatorio);
-      const nomeArquivoPDF = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    // 4. DECIDIR FONTE DE DADOS (FATURAMENTO TEM PRIORIDADE)
+    let examesDetalhados: ExameDetalhado[] = [];
+    let fonteDados = 'vazio';
+
+    if (dadosFaturamento && dadosFaturamento.length > 0) {
+      // USAR DADOS DE FATURAMENTO
+      fonteDados = 'faturamento';
+      console.log('📊 Usando dados da tabela FATURAMENTO');
       
-      const { data: uploadDataPDF, error: uploadErrorPDF } = await supabase.storage
-        .from('relatorios-faturamento')
-        .upload(nomeArquivoPDF, pdfContent, {
-          contentType: 'application/pdf',
-          cacheControl: '3600'
-        });
-        
-      if (uploadErrorPDF) {
-        throw new Error(`Erro ao salvar relatório PDF: ${uploadErrorPDF.message}`);
-      }
+      examesDetalhados = dadosFaturamento.map(item => ({
+        data_estudo: item.data_exame || item.data_emissao || data_inicio,
+        paciente: item.paciente || 'NÃO INFORMADO', 
+        nome_exame: item.nome_exame || `${item.modalidade || ''} ${item.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
+        laudado_por: item.medico || 'NÃO INFORMADO',
+        prioridade: item.prioridade || 'NORMAL',
+        modalidade: item.modalidade || 'NÃO INFORMADO',
+        especialidade: item.especialidade || 'NÃO INFORMADO', 
+        categoria: item.categoria || 'NORMAL',
+        laudos: item.quantidade || 1,
+        valor: item.valor_bruto || 0
+      }));
       
-      const { data: { publicUrl: pdfUrl } } = supabase.storage
-        .from('relatorios-faturamento')
-        .getPublicUrl(nomeArquivoPDF);
+    } else if (examesRealizados && examesRealizados.length > 0) {
+      // USAR DADOS DE EXAMES COMO FALLBACK
+      fonteDados = 'exames';
+      console.log('📋 Usando dados da tabela EXAMES_REALIZADOS como fallback');
       
-      const arquivos = [{ tipo: 'pdf', url: pdfUrl, nome: nomeArquivoPDF }];
-      
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          relatorio,
-          arquivos,
-          message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+      examesDetalhados = examesRealizados.map(exame => ({
+        data_estudo: exame.data_exame,
+        paciente: exame.paciente || 'NÃO INFORMADO',
+        nome_exame: `${exame.modalidade || ''} ${exame.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
+        laudado_por: exame.medico || 'NÃO INFORMADO',
+        prioridade: exame.prioridade || 'NORMAL',
+        modalidade: exame.modalidade || 'NÃO INFORMADO',
+        especialidade: exame.especialidade || 'NÃO INFORMADO',
+        categoria: exame.categoria || 'NORMAL', 
+        laudos: 1, // Cada exame é 1 laudo
+        valor: exame.valor_bruto || 0.00
+      }));
     }
 
-    // Priorizar exames para o cálculo dos totais (valores mais detalhados)
-    let total_laudos = 0;
-    let valor_bruto = 0;
-    
-    // Usar SEMPRE os dados da tabela faturamento como fonte principal
-    if (faturas && faturas.length > 0) {
-      // Usar dados de faturamento para calcular totais (oficial)
-      total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
-      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
-      console.log(`Usando dados oficiais de faturamento - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
-    } else {
-      // Fallback apenas se não houver dados na tabela faturamento
-      console.log("Nenhum dado de faturamento encontrado - usando dados de exames como fallback");
-      total_laudos = examesCliente?.length || 0;
-      valor_bruto = examesCliente?.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0) || 0;
-    }
-    
-    const franquia = 0;
-    const ajuste = 0;
+    console.log(`📈 Fonte de dados: ${fonteDados}`);
+    console.log(`📝 Total de exames processados: ${examesDetalhados.length}`);
+
+    // 5. CALCULAR RESUMO FINANCEIRO (IGUAL AO SCRIPT PYTHON)
+    const total_laudos = examesDetalhados.reduce((sum, exame) => sum + exame.laudos, 0);
+    const valor_bruto = examesDetalhados.reduce((sum, exame) => sum + exame.valor, 0);
+    const franquia = 0.0;
+    const ajuste = 0.0;
     const valor_total = valor_bruto + franquia + ajuste;
     
-    // Impostos calculados sobre o valor bruto (conforme solicitado)
-    const irrf = valor_bruto * 0.015;
-    const csll = valor_bruto * 0.01;
-    const pis = valor_bruto * 0.0065;
-    const cofins = valor_bruto * 0.03;
-    const valor_a_pagar = valor_bruto - (irrf + csll + pis + cofins);
+    // Impostos exatamente como no Python
+    const irrf = valor_total * 0.015;
+    const csll = valor_total * 0.01;
+    const pis = valor_total * 0.0065;
+    const cofins = valor_total * 0.03;
+    const impostos = irrf + csll + pis + cofins;
+    const valor_a_pagar = valor_total - impostos;
 
-    // Gerar dados do relatório
-    const relatorio = {
-      cliente: {
-        nome: cliente.nome,
-        cnpj: cliente.cnpj,
-        email: cliente.email
-      },
-      periodo: periodo,
-      resumo: {
-        total_laudos,
-        valor_bruto,
-        franquia,
-        ajuste,
-        valor_total,
-        irrf,
-        csll,
-        pis,
-        cofins,
-        valor_a_pagar
-      },
-      // CORREÇÃO: Usar dados detalhados dependendo da fonte
-      exames: (faturas && faturas.length > 0) 
-        ? faturas.map(fatura => ({
-            data_exame: fatura.data_exame || fatura.data_emissao,
-            nome_exame: fatura.nome_exame || `${fatura.modalidade || ''} ${fatura.especialidade || ''}`.trim() || 'EXAME',
-            paciente: fatura.paciente || 'NÃO INFORMADO',
-            medico: fatura.medico || 'NÃO INFORMADO',
-            modalidade: fatura.modalidade || 'NÃO INFORMADO',
-            especialidade: fatura.especialidade || 'NÃO INFORMADO',
-            categoria: fatura.categoria || 'NORMAL',
-            prioridade: fatura.prioridade || 'NORMAL',
-            quantidade: fatura.quantidade || 1,
-            valor: fatura.valor_bruto || 0
-          }))
-        : (examesCliente || []).map(exame => ({
-            data_exame: exame.data_exame,
-            nome_exame: `${exame.modalidade || ''} ${exame.especialidade || ''}`.trim() || 'EXAME',
-            paciente: exame.paciente || 'NÃO INFORMADO',
-            medico: exame.medico || 'NÃO INFORMADO',
-            modalidade: exame.modalidade || 'NÃO INFORMADO',
-            especialidade: exame.especialidade || 'NÃO INFORMADO',
-            categoria: exame.categoria || 'NORMAL',
-            prioridade: exame.prioridade || 'NORMAL',
-            quantidade: 1, // Cada linha de exame representa 1 exame
-            valor: exame.valor_bruto || 0
-          }))
+    const resumo: ResumoFinanceiro = {
+      total_laudos,
+      franquia,
+      ajuste,
+      valor_bruto,
+      valor_total,
+      irrf,
+      csll,
+      pis,
+      cofins,
+      impostos,
+      valor_a_pagar
     };
 
-    console.log(`Relatório gerado com ${faturas?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
+    console.log(`💵 Resumo calculado:`, resumo);
 
-    // Gerar relatório em PDF
-    const pdfContent = await gerarPDFRelatorio(relatorio);
-    const nomeArquivoPDF = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    // 6. GERAR PDF (LAYOUT BASEADO NO SCRIPT PYTHON)
+    const pdfContent = await gerarPDFCompleto({
+      cliente,
+      periodo,
+      resumo,
+      exames: examesDetalhados
+    });
+
+    // 7. SALVAR PDF NO STORAGE
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
     
-    const { data: uploadDataPDF, error: uploadErrorPDF } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('relatorios-faturamento')
-      .upload(nomeArquivoPDF, pdfContent, {
+      .upload(nomeArquivo, pdfContent, {
         contentType: 'application/pdf',
         cacheControl: '3600'
       });
       
-    if (uploadErrorPDF) {
-      console.error('Erro ao salvar PDF:', uploadErrorPDF);
-      throw new Error(`Erro ao salvar relatório PDF: ${uploadErrorPDF.message}`);
+    if (uploadError) {
+      console.error('❌ Erro ao salvar PDF:', uploadError);
+      throw new Error(`Erro ao salvar PDF: ${uploadError.message}`);
     }
-    
-    const { data: { publicUrl: pdfUrl } } = supabase.storage
-      .from('relatorios-faturamento')
-      .getPublicUrl(nomeArquivoPDF);
-    
-    const arquivos = [{ tipo: 'pdf', url: pdfUrl, nome: nomeArquivoPDF }];
-    console.log('PDF salvo com sucesso:', pdfUrl);
 
+    const { data: { publicUrl } } = supabase.storage
+      .from('relatorios-faturamento')
+      .getPublicUrl(nomeArquivo);
+
+    console.log(`✅ PDF salvo com sucesso: ${publicUrl}`);
+
+    // 8. RESPOSTA FINAL
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        relatorio,
-        arquivos,
-        message: `Relatório gerado com sucesso para ${cliente.nome}` 
+        success: true,
+        cliente: cliente.nome,
+        periodo,
+        resumo,
+        total_exames: examesDetalhados.length,
+        fonte_dados: fonteDados,
+        arquivos: [{
+          tipo: 'pdf',
+          url: publicUrl,
+          nome: nomeArquivo
+        }],
+        message: `Relatório gerado com sucesso - ${total_laudos} laudos, valor total: R$ ${valor_total.toFixed(2)}`
       }),
       {
         status: 200,
@@ -254,9 +233,10 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
   } catch (error: any) {
-    console.error('Erro ao gerar relatório:', error);
+    console.error('❌ ERRO GERAL:', error);
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: 'Erro interno do servidor',
         details: error.message 
       }),
@@ -268,200 +248,159 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-// Função para gerar PDF do relatório usando jsPDF
-async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
-  try {
-    const doc = new jsPDF('landscape'); // Formato paisagem
-    
-    // Configurações
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 20;
-    let y = 20;
+// FUNÇÃO PARA GERAR PDF COMPLETO (BASEADA NO SCRIPT PYTHON)
+async function gerarPDFCompleto(dados: {
+  cliente: any;
+  periodo: string;
+  resumo: ResumoFinanceiro;
+  exames: ExameDetalhado[];
+}): Promise<Uint8Array> {
+  
+  const { cliente, periodo, resumo, exames } = dados;
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+  
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  const margin = 15;
+  let y = 20;
 
-    // Logomarca Teleimagem (texto temporário - seria melhor com imagem real)
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 102, 204); // Azul corporativo
-    doc.text('TELEIMAGEM', margin, y);
+  // CABEÇALHO - LOGOMARCA E TÍTULO
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 102, 204);
+  doc.text('TELEIMAGEM', pageWidth - 60, 15);
+  
+  doc.setFontSize(12);
+  doc.setTextColor(100, 100, 100);
+  doc.setFont('helvetica', 'normal');  
+  doc.text('Diagnóstico por Imagem', pageWidth - 60, 22);
+
+  // TÍTULO PRINCIPAL
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DEMONSTRATIVO DE FATURAMENTO', margin, y);
+  
+  y += 10;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Cliente: ${cliente.nome}`, margin, y);
+  
+  y += 6;
+  const [ano, mes] = periodo.split('-');
+  const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const mesNome = nomesMeses[parseInt(mes)] || mes;
+  doc.text(`Mês de Faturamento: ${mesNome}/${ano}`, margin, y);
+
+  y += 10;
+  doc.line(margin, y, pageWidth - margin, y);
+  
+  // RESUMO FINANCEIRO (TABELA)
+  y += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.text('RESUMO FINANCEIRO', margin, y);
+  
+  y += 8;
+  const larguraLabel = 65;
+  const larguraValor = 40;
+  
+  // Função para adicionar linha na tabela
+  const adicionarLinha = (label: string, valor: string | number, isBold = false) => {
+    if (isBold) doc.setFont('helvetica', 'bold');
+    else doc.setFont('helvetica', 'normal');
     
-    y += 8;
-    doc.setFontSize(12);
-    doc.setTextColor(100, 100, 100); // Cinza
-    doc.setFont('helvetica', 'normal');
-    doc.text('Diagnóstico por Imagem', margin, y);
+    doc.rect(margin, y, larguraLabel, 6);
+    doc.rect(margin + larguraLabel, y, larguraValor, 6);
     
-    y += 15;
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0); // Preto
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE VOLUMETRIA - FATURAMENTO', margin, y);
+    doc.text(label, margin + 2, y + 4);
     
-    y += 10;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Período: ${relatorio.periodo}`, margin, y);
+    const valorFormatado = typeof valor === 'number' 
+      ? valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : valor;
     
+    doc.text(valorFormatado, margin + larguraLabel + larguraValor - 2, y + 4, { align: 'right' });
     y += 6;
-    doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
+  };
+
+  // Linhas do resumo (exatamente como no Python)
+  adicionarLinha('Total de laudos:', resumo.total_laudos.toLocaleString('pt-BR'));
+  adicionarLinha('Valor total faturado:', `R$ ${resumo.valor_total.toFixed(2)}`);
+  adicionarLinha('Franquia:', `R$ ${resumo.franquia.toFixed(2)}`);
+  adicionarLinha('Desconto / Acréscimo:', `R$ ${resumo.ajuste.toFixed(2)}`);
+  adicionarLinha('IRRF (1,5%):', `R$ ${resumo.irrf.toFixed(2)}`);
+  adicionarLinha('CSLL (1,0%):', `R$ ${resumo.csll.toFixed(2)}`);
+  adicionarLinha('PIS (0,65%):', `R$ ${resumo.pis.toFixed(2)}`);
+  adicionarLinha('Cofins (3,0%):', `R$ ${resumo.cofins.toFixed(2)}`);
+  adicionarLinha('Valor a pagar:', `R$ ${resumo.valor_a_pagar.toFixed(2)}`, true);
+
+  // DETALHAMENTO DOS EXAMES
+  y += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('DETALHAMENTO DOS EXAMES', margin, y);
+  
+  y += 8;
+  
+  // Cabeçalho da tabela de exames (como no Python)
+  const titulos = [
+    'Data Estudo', 'Paciente', 'Nome Exame', 'Laudado por',
+    'Prior', 'Mod', 'Especialidade', 'Categoria', 'Laudos', 'Valor'
+  ];
+  const larguras = [20, 50, 38, 40, 10, 10, 35, 18, 12, 22]; // Larguras exatas do Python
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  
+  let x = margin;
+  for (let i = 0; i < titulos.length; i++) {
+    doc.rect(x, y, larguras[i], 7);
+    doc.text(titulos[i], x + larguras[i]/2, y + 4.5, { align: 'center' });
+    x += larguras[i];
+  }
+  y += 7;
+
+  // Dados dos exames
+  doc.setFont('helvetica', 'normal');
+  for (const exame of exames) {
+    // Verificar se cabe na página
+    if (y > pageHeight - 30) {
+      doc.addPage();
+      y = 20;
+    }
     
-    y += 12; // Mais espaço antes da linha
-    doc.line(margin, y, pageWidth - margin, y);
-
-    // Dados do Cliente
-    y += 15;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DADOS DO CLIENTE', margin, y);
-    
-    y += 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Nome: ${relatorio.cliente.nome}`, margin, y);
-    
-    y += 6;
-    doc.text(`CNPJ: ${relatorio.cliente.cnpj || 'Não informado'}`, margin, y);
-    
-    y += 6;
-    doc.text(`Email: ${relatorio.cliente.email}`, margin, y);
-
-    // Linha separadora
-    y += 12;
-    doc.line(margin, y, pageWidth - margin, y);
-
-    // Resumo Financeiro
-    y += 15;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RESUMO FINANCEIRO', margin, y);
-
-    y += 12;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-
-    const financialData = [
-      ['Total de Laudos:', relatorio.resumo.total_laudos.toString()],
-      ['Valor Bruto:', `R$ ${relatorio.resumo.valor_bruto.toFixed(2).replace('.', ',')}`],
-      ['Franquia:', `R$ ${relatorio.resumo.franquia.toFixed(2).replace('.', ',')}`],
-      ['Ajuste:', `R$ ${relatorio.resumo.ajuste.toFixed(2).replace('.', ',')}`],
-      ['Valor Total:', `R$ ${relatorio.resumo.valor_total.toFixed(2).replace('.', ',')}`],
-      ['IRRF (1,5%):', `R$ ${relatorio.resumo.irrf.toFixed(2).replace('.', ',')}`],
-      ['CSLL (1%):', `R$ ${relatorio.resumo.csll.toFixed(2).replace('.', ',')}`],
-      ['PIS (0,65%):', `R$ ${relatorio.resumo.pis.toFixed(2).replace('.', ',')}`],
-      ['COFINS (3%):', `R$ ${relatorio.resumo.cofins.toFixed(2).replace('.', ',')}`],
-      ['VALOR A PAGAR:', `R$ ${relatorio.resumo.valor_a_pagar.toFixed(2).replace('.', ',')}`]
+    const dados = [
+      new Date(exame.data_estudo).toLocaleDateString('pt-BR'),
+      exame.paciente,
+      exame.nome_exame,
+      exame.laudado_por,
+      exame.prioridade,
+      exame.modalidade,
+      exame.especialidade,
+      exame.categoria,
+      exame.laudos.toString(),
+      `R$ ${exame.valor.toFixed(2)}`
     ];
-
-    financialData.forEach(([label, value], index) => {
-      if (index === 4 || index === 9) { // Valor Total (índice 4) e Valor a Pagar (índice 9)
-        doc.setFont('helvetica', 'bold');
-      } else {
-        doc.setFont('helvetica', 'normal');
+    
+    x = margin;
+    for (let i = 0; i < dados.length; i++) {
+      doc.rect(x, y, larguras[i], 6);
+      
+      // Truncar texto se muito longo
+      let texto = dados[i];
+      if (texto.length > 20 && [1, 2, 3, 6].includes(i)) { // Campos longos
+        texto = texto.substring(0, 17) + '...';
       }
       
-      doc.text(label, margin, y);
-      doc.text(value, margin + 80, y);
-      y += 6;
-    });
-
-    // Detalhamento dos Exames - SEMPRE na página 2
-    doc.addPage('landscape'); // Forçar nova página
-    y = 30;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    
-    if (relatorio.exames.length > 0) {
-      doc.text(`DETALHAMENTO DOS EXAMES (${relatorio.exames.length} laudos)`, margin, y);
-
-      y += 12;
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      
-      // Cabeçalho da tabela - layout paisagem com mais espaço
-      doc.text('Data Exame', margin, y);
-      doc.text('Nome do Exame', margin + 25, y);
-      doc.text('Paciente', margin + 80, y);
-      doc.text('Médico', margin + 120, y);
-      doc.text('Categoria', margin + 160, y);
-      doc.text('Prioridade', margin + 190, y);
-      doc.text('Qtd', margin + 220, y);
-      doc.text('Valor', margin + 235, y);
-
-      y += 8;
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 5;
-
-      doc.setFont('helvetica', 'normal');
-
-      // Dados dos exames
-      relatorio.exames.forEach((exame: any, index: number) => {
-        if (y > 180) { // Ajustado para formato paisagem
-          doc.addPage('landscape');
-          y = 30;
-          
-          // Repetir cabeçalho na nova página
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Data Exame', margin, y);
-          doc.text('Nome do Exame', margin + 25, y);
-          doc.text('Paciente', margin + 80, y);
-          doc.text('Médico', margin + 120, y);
-          doc.text('Categoria', margin + 160, y);
-          doc.text('Prioridade', margin + 190, y);
-          doc.text('Qtd', margin + 220, y);
-          doc.text('Valor', margin + 235, y);
-          y += 8;
-          doc.line(margin, y, pageWidth - margin, y);
-          y += 5;
-          doc.setFont('helvetica', 'normal');
-        }
-
-        const dataFormatada = new Date(exame.data_exame).toLocaleDateString('pt-BR');
-        const nomeExameAbrev = exame.nome_exame.length > 25 ? exame.nome_exame.substring(0, 22) + '...' : exame.nome_exame;
-        const pacienteAbrev = exame.paciente.length > 18 ? exame.paciente.substring(0, 15) + '...' : exame.paciente;
-        const medicoAbrev = exame.medico.length > 18 ? exame.medico.substring(0, 15) + '...' : exame.medico;
-        const categoriaAbrev = exame.categoria.length > 12 ? exame.categoria.substring(0, 9) + '...' : exame.categoria;
-        const prioridadeAbrev = exame.prioridade.length > 10 ? exame.prioridade.substring(0, 7) + '...' : exame.prioridade;
-
-        doc.text(dataFormatada, margin, y);
-        doc.text(nomeExameAbrev, margin + 25, y);
-        doc.text(pacienteAbrev, margin + 80, y);
-        doc.text(medicoAbrev, margin + 120, y);
-        doc.text(categoriaAbrev, margin + 160, y);
-        doc.text(prioridadeAbrev, margin + 190, y);
-        doc.text(exame.quantidade.toString(), margin + 220, y);
-        doc.text(`R$ ${exame.valor.toFixed(2).replace('.', ',')}`, margin + 235, y);
-
-        y += 5;
-      });
-    } else {
-      doc.text('DETALHAMENTO DOS EXAMES (0 laudos)', margin, y);
-      y += 12;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'italic');
-      doc.text('Nenhum exame encontrado para o período especificado.', margin, y);
+      doc.text(texto, x + 2, y + 4);
+      x += larguras[i];
     }
-
-    // Rodapé - alinhado à direita para não sobrepor tabelas
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      const rodapeTexto = `Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`;
-      const textWidth = doc.getTextWidth(rodapeTexto);
-      doc.text(rodapeTexto, pageWidth - margin - textWidth, pageHeight - 15);
-    }
-
-    // Converter para Uint8Array
-    const pdfArrayBuffer = doc.output('arraybuffer');
-    return new Uint8Array(pdfArrayBuffer);
-
-  } catch (error) {
-    console.error('Erro ao gerar PDF:', error);
-    throw error;
+    y += 6;
   }
-}
 
+  // Converter para Uint8Array
+  const pdfArrayBuffer = doc.output('arraybuffer');
+  return new Uint8Array(pdfArrayBuffer);
+}
 
 serve(handler);

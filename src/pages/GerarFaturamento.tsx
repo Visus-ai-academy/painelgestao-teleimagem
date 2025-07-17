@@ -229,20 +229,11 @@ export default function GerarFaturamento() {
       // Gerar relatório para cada cliente
       for (const cliente of clientesParaProcessar) {
         try {
-          // Calcular datas do período
-          const ano = parseInt(PERIODO_ATUAL.substring(0, 4));
-          const mes = parseInt(PERIODO_ATUAL.substring(5, 7));
-          const dataInicio = new Date(ano, mes - 1, 1).toISOString().split('T')[0];
-          const dataFim = new Date(ano, mes, 0).toISOString().split('T')[0];
-
-          // Gerar relatório
+          // Gerar relatório com nova estrutura simplificada
           const responseRelatorio = await supabase.functions.invoke('gerar-relatorio-faturamento', {
             body: {
               cliente_id: cliente.id,
-              periodo: PERIODO_ATUAL,
-              data_inicio: dataInicio,
-              data_fim: dataFim,
-              formato: 'pdf'
+              periodo: PERIODO_ATUAL // formato: "2025-07"
             }
           });
 
@@ -250,7 +241,13 @@ export default function GerarFaturamento() {
             throw new Error(`Erro ao gerar relatório: ${responseRelatorio.error.message}`);
           }
 
-          // Marcar relatório como gerado
+          if (!responseRelatorio.data?.success) {
+            throw new Error(responseRelatorio.data?.details || 'Erro desconhecido na geração do relatório');
+          }
+
+          console.log(`✅ Relatório gerado para ${cliente.nome}:`, responseRelatorio.data);
+
+          // Marcar relatório como gerado com novos dados
           const linkRelatorio = responseRelatorio.data?.arquivos?.[0]?.url || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
           const dataProcessamento = new Date().toLocaleString('pt-BR');
           
@@ -263,12 +260,14 @@ export default function GerarFaturamento() {
                   linkRelatorio: linkRelatorio,
                   arquivos: responseRelatorio.data?.arquivos || [],
                   detalhesRelatorio: {
-                    total_laudos: responseRelatorio.data?.relatorio?.resumo?.total_laudos || 0,
-                    valor_total: responseRelatorio.data?.relatorio?.resumo?.valor_total || 0
+                    total_laudos: responseRelatorio.data?.resumo?.total_laudos || 0,
+                    valor_total: responseRelatorio.data?.resumo?.valor_total || 0,
+                    fonte_dados: responseRelatorio.data?.fonte_dados || 'desconhecida',
+                    total_exames: responseRelatorio.data?.total_exames || 0
                   },
-                  relatorioData: responseRelatorio.data.relatorio // Salvar dados do relatório para envio posterior
+                  relatorioData: responseRelatorio.data // Dados completos para envio posterior
                 }
-              : r
+                : r
           ));
           relatoriosCount++;
           setRelatoriosGerados(relatoriosCount);
