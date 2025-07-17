@@ -56,6 +56,11 @@ export default function GerarFaturamento() {
     linkRelatorio?: string;
     erro?: string;
     dataProcessamento?: string;
+    relatorioData?: any;
+    detalhesRelatorio?: {
+      total_laudos: number;
+      valor_total: number;
+    };
   }>>([]);
   
   const { toast } = useToast();
@@ -173,21 +178,17 @@ export default function GerarFaturamento() {
     carregarClientes();
   }, []);
 
-  const handleProcessarTodosClientes = async () => {
+  // Primeira etapa: Gerar todos os relatórios
+  const handleGerarTodosRelatorios = async () => {
     setProcessandoTodos(true);
-    
-    // ✅ Resetar contadores no início
     setRelatoriosGerados(0);
-    setEmailsEnviados(0);
     
     let relatoriosCount = 0;
-    let emailsCount = 0;
 
     try {
       // Garantir que temos clientes carregados
       const clientesParaProcessar = clientesCarregados.length > 0 ? clientesCarregados : await carregarClientes();
       
-      // ✅ VALIDAÇÃO CRÍTICA: Impedir processamento se não há clientes reais
       if (clientesParaProcessar.length === 0) {
         toast({
           title: "Nenhum Cliente Encontrado",
@@ -198,9 +199,9 @@ export default function GerarFaturamento() {
         return;
       }
       
-      console.log('Processando clientes:', clientesParaProcessar.map(c => c.nome));
+      console.log('Gerando relatórios para clientes:', clientesParaProcessar.map(c => c.nome));
       
-      // ✅ Inicializar resultados sempre com clientes carregados
+      // Inicializar resultados
       const novosResultados = clientesParaProcessar.map(cliente => ({
         clienteId: cliente.id,
         clienteNome: cliente.nome,
@@ -210,16 +211,9 @@ export default function GerarFaturamento() {
       }));
       setResultados(novosResultados);
 
-      // Processar cada cliente
+      // Gerar relatório para cada cliente
       for (const cliente of clientesParaProcessar) {
         try {
-          // Atualizar estado para mostrar progresso
-          setResultados(prev => prev.map(r => 
-            r.clienteId === cliente.id 
-              ? { ...r, erro: undefined }
-              : r
-          ));
-
           // Calcular datas do período
           const ano = parseInt(PERIODO_ATUAL.substring(0, 4));
           const mes = parseInt(PERIODO_ATUAL.substring(5, 7));
@@ -240,7 +234,7 @@ export default function GerarFaturamento() {
             throw new Error(`Erro ao gerar relatório: ${responseRelatorio.error.message}`);
           }
 
-          // Marcar relatório como gerado E atualizar contador em tempo real
+          // Marcar relatório como gerado
           const linkRelatorio = responseRelatorio.data?.linkRelatorio || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
           const dataProcessamento = new Date().toLocaleString('pt-BR');
           
@@ -254,38 +248,17 @@ export default function GerarFaturamento() {
                   detalhesRelatorio: {
                     total_laudos: responseRelatorio.data?.relatorio?.resumo?.total_laudos || 0,
                     valor_total: responseRelatorio.data?.relatorio?.resumo?.valor_total || 0
-                  }
+                  },
+                  relatorioData: responseRelatorio.data.relatorio // Salvar dados do relatório para envio posterior
                 }
               : r
           ));
           relatoriosCount++;
-          setRelatoriosGerados(relatoriosCount); // ✅ Atualizar em tempo real
-
-          // Enviar email
-          const responseEmail = await supabase.functions.invoke('enviar-relatorio-email', {
-            body: {
-              cliente_id: cliente.id,
-              relatorio: responseRelatorio.data.relatorio
-            }
-          });
-
-          if (responseEmail.error) {
-            throw new Error(`Erro ao enviar email: ${responseEmail.error.message}`);
-          }
-
-          // Marcar email como enviado E atualizar contador em tempo real
-          setResultados(prev => prev.map(r => 
-            r.clienteId === cliente.id 
-              ? { ...r, emailEnviado: true }
-              : r
-          ));
-          emailsCount++;
-          setEmailsEnviados(emailsCount); // ✅ Atualizar em tempo real
+          setRelatoriosGerados(relatoriosCount);
 
         } catch (error: any) {
-          console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
+          console.error(`Erro ao gerar relatório para ${cliente.nome}:`, error);
           
-          // Marcar erro para este cliente
           setResultados(prev => prev.map(r => 
             r.clienteId === cliente.id 
               ? { ...r, erro: error.message }
@@ -295,20 +268,113 @@ export default function GerarFaturamento() {
       }
 
       toast({
-        title: "Processamento Concluído",
-        description: `${relatoriosCount} relatórios gerados, ${emailsCount} emails enviados`,
+        title: "Relatórios Gerados",
+        description: `${relatoriosCount} relatórios gerados com sucesso. Agora você pode enviar os emails.`,
       });
 
     } catch (error: any) {
       console.error("Erro geral:", error);
       toast({
         title: "Erro",
-        description: error.message || "Erro durante o processamento",
+        description: error.message || "Erro durante a geração de relatórios",
         variant: "destructive",
       });
     } finally {
       setProcessandoTodos(false);
     }
+  };
+
+  // Segunda etapa: Enviar emails um por vez
+  const handleEnviarEmails = async () => {
+    setProcessandoTodos(true);
+    setEmailsEnviados(0);
+    
+    let emailsCount = 0;
+
+    try {
+      // Filtrar apenas clientes com relatórios gerados
+      const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+      
+      if (clientesComRelatorio.length === 0) {
+        toast({
+          title: "Nenhum Relatório Disponível",
+          description: "Gere os relatórios primeiro antes de enviar os emails.",
+          variant: "destructive",
+        });
+        setProcessandoTodos(false);
+        return;
+      }
+
+      console.log('Enviando emails para:', clientesComRelatorio.map(c => c.clienteNome));
+
+      // Enviar email para cada cliente, um por vez
+      for (const cliente of clientesComRelatorio) {
+        try {
+          // Adicionar delay entre envios para evitar rate limiting
+          if (emailsCount > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo de delay
+          }
+
+          const responseEmail = await supabase.functions.invoke('enviar-relatorio-email', {
+            body: {
+              cliente_id: cliente.clienteId,
+              relatorio: cliente.relatorioData
+            }
+          });
+
+          if (responseEmail.error) {
+            throw new Error(`Erro ao enviar email: ${responseEmail.error.message}`);
+          }
+
+          // Marcar email como enviado
+          setResultados(prev => prev.map(r => 
+            r.clienteId === cliente.clienteId 
+              ? { ...r, emailEnviado: true }
+              : r
+          ));
+          emailsCount++;
+          setEmailsEnviados(emailsCount);
+
+          toast({
+            title: "Email Enviado",
+            description: `Email enviado para ${cliente.clienteNome}`,
+          });
+
+        } catch (error: any) {
+          console.error(`Erro ao enviar email para ${cliente.clienteNome}:`, error);
+          
+          setResultados(prev => prev.map(r => 
+            r.clienteId === cliente.clienteId 
+              ? { ...r, erro: `Erro no email: ${error.message}` }
+              : r
+          ));
+        }
+      }
+
+      toast({
+        title: "Envio Concluído",
+        description: `${emailsCount} emails enviados com sucesso`,
+      });
+
+    } catch (error: any) {
+      console.error("Erro geral:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro durante o envio de emails",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessandoTodos(false);
+    }
+  };
+
+  // Função combinada para conveniência (opcional)
+  const handleProcessarTodosClientes = async () => {
+    await handleGerarTodosRelatorios();
+    // Aguardar um momento antes de iniciar o envio de emails
+    setTimeout(async () => {
+      await handleEnviarEmails();
+    }, 2000);
   };
 
   const limparResultados = () => {
@@ -381,12 +447,52 @@ export default function GerarFaturamento() {
                   )}
                 </div>
                 
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <Button 
+                    onClick={handleGerarTodosRelatorios}
+                    disabled={processandoTodos || clientesCarregados.length === 0}
+                    size="lg"
+                    className="min-w-[180px]"
+                  >
+                    {processandoTodos ? (
+                      <>
+                        <Clock className="h-5 w-5 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5 mr-2" />
+                        Gerar Relatórios
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleEnviarEmails}
+                    disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length === 0}
+                    size="lg"
+                    className="min-w-[180px]"
+                    variant="secondary"
+                  >
+                    {processandoTodos ? (
+                      <>
+                        <Clock className="h-5 w-5 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-5 w-5 mr-2" />
+                        Enviar Emails
+                      </>
+                    )}
+                  </Button>
+                  
                   <Button 
                     onClick={handleProcessarTodosClientes}
                     disabled={processandoTodos || clientesCarregados.length === 0}
                     size="lg"
                     className="min-w-[200px]"
+                    variant="outline"
                   >
                     {processandoTodos ? (
                       <>
@@ -396,7 +502,7 @@ export default function GerarFaturamento() {
                     ) : (
                       <>
                         <Send className="h-5 w-5 mr-2" />
-                        Gerar e Enviar Tudo
+                        Fazer Tudo (Automático)
                       </>
                     )}
                   </Button>
