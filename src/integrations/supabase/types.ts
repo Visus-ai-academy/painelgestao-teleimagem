@@ -456,10 +456,12 @@ export type Database = {
           id: string
           numero_fatura: string
           omie_id: string
+          quantidade: number | null
           status: string | null
           sync_date: string | null
           updated_at: string
           valor: number
+          valor_bruto: number | null
         }
         Insert: {
           cliente_email?: string | null
@@ -471,10 +473,12 @@ export type Database = {
           id?: string
           numero_fatura: string
           omie_id: string
+          quantidade?: number | null
           status?: string | null
           sync_date?: string | null
           updated_at?: string
           valor: number
+          valor_bruto?: number | null
         }
         Update: {
           cliente_email?: string | null
@@ -486,10 +490,12 @@ export type Database = {
           id?: string
           numero_fatura?: string
           omie_id?: string
+          quantidade?: number | null
           status?: string | null
           sync_date?: string | null
           updated_at?: string
           valor?: number
+          valor_bruto?: number | null
         }
         Relationships: []
       }

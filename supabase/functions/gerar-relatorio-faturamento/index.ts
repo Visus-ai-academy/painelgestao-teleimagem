@@ -41,16 +41,13 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar faturas geradas do cliente específico no período
+    // Buscar dados de faturamento (tabela omie_faturas) do cliente específico
     console.log(`Buscando faturas entre ${data_inicio} e ${data_fim} para cliente: ${cliente.nome}`);
     
     const { data: faturas, error: faturasError } = await supabase
-      .from('faturas_geradas')
-      .select(`
-        *,
-        fatura_itens (*)
-      `)
-      .eq('cliente_id', cliente_id)
+      .from('omie_faturas')
+      .select('*')
+      .eq('cliente_nome', cliente.nome)
       .gte('data_emissao', data_inicio)
       .lte('data_emissao', data_fim)
       .order('data_emissao', { ascending: true });
@@ -138,15 +135,17 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular totais baseado nos dados das faturas e exames
-    const total_laudos = examesCliente.length;
-    
-    // Usar dados das faturas geradas como referência principal
+    // Calcular totais baseado nos dados das faturas (omie_faturas)
+    let total_laudos = 0;
     let valor_bruto = 0;
+    
     if (faturas && faturas.length > 0) {
-      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_total || 0), 0);
+      // Somar quantidade (coluna J) e valor_bruto (coluna K) da tabela omie_faturas
+      total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
+      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
     } else {
-      // Caso não haja faturas, calcular baseado nos exames
+      // Caso não haja faturas, usar dados dos exames como fallback
+      total_laudos = examesCliente.length;
       valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
     }
     
