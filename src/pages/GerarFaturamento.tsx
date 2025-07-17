@@ -368,7 +368,7 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função combinada que aguarda cada etapa adequadamente
+  // Função combinada que executa as duas etapas sequencialmente
   const handleProcessarTodosClientes = async () => {
     try {
       // Primeira etapa: gerar todos os relatórios
@@ -377,17 +377,10 @@ export default function GerarFaturamento() {
       // Aguardar um momento para UI atualizar
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Segunda etapa: enviar emails (só se houver relatórios gerados)
-      const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
-      if (clientesComRelatorio.length > 0) {
-        await handleEnviarEmails();
-      } else {
-        toast({
-          title: "Nenhum Email para Enviar",
-          description: "Não há relatórios válidos para envio de emails.",
-          variant: "destructive",
-        });
-      }
+      // Segunda etapa: enviar emails 
+      // (handleEnviarEmails fará sua própria verificação de relatórios)
+      await handleEnviarEmails();
+      
     } catch (error: any) {
       console.error("Erro no processamento automático:", error);
       toast({
