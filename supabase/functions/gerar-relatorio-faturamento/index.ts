@@ -189,18 +189,32 @@ const handler = async (req: Request): Promise<Response> => {
         cofins,
         valor_a_pagar
       },
-      exames: examesCliente.map(exame => ({
-        data_exame: exame.data_exame,
-        nome_exame: exame.modalidade + ' - ' + exame.especialidade,
-        paciente: exame.paciente,
-        medico: exame.medico,
-        modalidade: exame.modalidade,
-        especialidade: exame.especialidade,
-        categoria: exame.categoria || '',
-        prioridade: exame.prioridade || '',
-        quantidade: 1,
-        valor: exame.valor_bruto || 0
-      }))
+      // Usar dados da tabela faturamento para detalhamento quando disponível
+      exames: faturas && faturas.length > 0 
+        ? faturas.map(fatura => ({
+            data_exame: fatura.data_emissao,
+            nome_exame: `Fatura ${fatura.numero_fatura}`,
+            paciente: 'Resumo do Período',
+            medico: 'Consolidado',
+            modalidade: 'Faturamento',
+            especialidade: 'Consolidado',
+            categoria: 'Período',
+            prioridade: 'Normal',
+            quantidade: fatura.quantidade,
+            valor: fatura.valor_bruto
+          }))
+        : examesCliente.map(exame => ({
+            data_exame: exame.data_exame,
+            nome_exame: exame.modalidade + ' - ' + exame.especialidade,
+            paciente: exame.paciente,
+            medico: exame.medico,
+            modalidade: exame.modalidade,
+            especialidade: exame.especialidade,
+            categoria: exame.categoria || '',
+            prioridade: exame.prioridade || '',
+            quantidade: 1,
+            valor: exame.valor_bruto || 0
+          }))
     };
 
     console.log(`Relatório gerado com ${examesCliente.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
