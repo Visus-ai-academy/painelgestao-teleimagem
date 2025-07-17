@@ -919,7 +919,7 @@ export default function GerarFaturamento() {
                   <div className="p-4 bg-muted rounded-lg">
                     <h4 className="font-medium mb-2">Estrutura do Template (11 colunas):</h4>
                     <p className="text-sm text-muted-foreground">
-                      Paciente → Cliente → Médico → Data → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → [Reservado] → Valor
+                      Paciente → Cliente → Médico → Data → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → Quantidade → Valor
                     </p>
                   </div>
                   <Button asChild variant="outline" className="w-full">

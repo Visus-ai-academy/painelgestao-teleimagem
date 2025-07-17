@@ -92,10 +92,10 @@ serve(async (req) => {
          categoria: row[6] ? String(row[6]).trim() : 'NORMAL', // Coluna G (categoria)
          prioridade: row[7] ? String(row[7]).trim() : 'NORMAL', // Coluna H (prioridade)
          nome_exame: row[8] ? String(row[8]).trim() : 'EXAME NÃO ESPECIFICADO', // Coluna I (nome exame)
-         
-         // Colunas essenciais para faturamento - CADA LINHA É 1 EXAME
-         quantidade: 1, // SEMPRE 1 porque cada linha representa 1 exame individual
-         valor_bruto: row[10] ? parseFloat(row[10]) || 0 : 0, // Coluna K (valor_bruto)
+          
+          // Colunas essenciais para faturamento
+          quantidade: row[9] ? parseInt(row[9]) || 1 : 1, // Coluna J (quantidade)
+          valor_bruto: row[10] ? parseFloat(row[10]) || 0 : 0, // Coluna K (valor_bruto)
          
          // Campos auxiliares
          data_emissao: new Date().toISOString().split('T')[0],
