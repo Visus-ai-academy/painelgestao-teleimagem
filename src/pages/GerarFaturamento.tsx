@@ -241,7 +241,7 @@ export default function GerarFaturamento() {
               periodo: PERIODO_ATUAL,
               data_inicio: dataInicio,
               data_fim: dataFim,
-              formato: 'ambos' // Gera PDF e Excel
+              formato: 'pdf'
             }
           });
 
