@@ -187,19 +187,32 @@ const handler = async (req: Request): Promise<Response> => {
         cofins,
         valor_a_pagar
       },
-      // Usar os dados detalhados da tabela faturamento
-      exames: faturas.map(fatura => ({
-        data_exame: fatura.data_exame || fatura.data_emissao,
-        nome_exame: fatura.nome_exame || `${fatura.modalidade || ''} ${fatura.especialidade || ''}`.trim() || 'EXAME',
-        paciente: fatura.paciente || 'NÃO INFORMADO',
-        medico: fatura.medico || 'NÃO INFORMADO',
-        modalidade: fatura.modalidade || 'NÃO INFORMADO',
-        especialidade: fatura.especialidade || 'NÃO INFORMADO',
-        categoria: fatura.categoria || 'NORMAL',
-        prioridade: fatura.prioridade || 'NORMAL',
-        quantidade: fatura.quantidade || 1,
-        valor: fatura.valor_bruto || 0
-      }))
+      // CORREÇÃO: Usar dados detalhados dependendo da fonte
+      exames: (faturas && faturas.length > 0) 
+        ? faturas.map(fatura => ({
+            data_exame: fatura.data_exame || fatura.data_emissao,
+            nome_exame: fatura.nome_exame || `${fatura.modalidade || ''} ${fatura.especialidade || ''}`.trim() || 'EXAME',
+            paciente: fatura.paciente || 'NÃO INFORMADO',
+            medico: fatura.medico || 'NÃO INFORMADO',
+            modalidade: fatura.modalidade || 'NÃO INFORMADO',
+            especialidade: fatura.especialidade || 'NÃO INFORMADO',
+            categoria: fatura.categoria || 'NORMAL',
+            prioridade: fatura.prioridade || 'NORMAL',
+            quantidade: fatura.quantidade || 1,
+            valor: fatura.valor_bruto || 0
+          }))
+        : (examesCliente || []).map(exame => ({
+            data_exame: exame.data_exame,
+            nome_exame: `${exame.modalidade || ''} ${exame.especialidade || ''}`.trim() || 'EXAME',
+            paciente: exame.paciente || 'NÃO INFORMADO',
+            medico: exame.medico || 'NÃO INFORMADO',
+            modalidade: exame.modalidade || 'NÃO INFORMADO',
+            especialidade: exame.especialidade || 'NÃO INFORMADO',
+            categoria: exame.categoria || 'NORMAL',
+            prioridade: exame.prioridade || 'NORMAL',
+            quantidade: 1, // Cada linha de exame representa 1 exame
+            valor: exame.valor_bruto || 0
+          }))
     };
 
     console.log(`Relatório gerado com ${faturas?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
