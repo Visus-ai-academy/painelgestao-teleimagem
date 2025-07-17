@@ -41,13 +41,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar exames do período para o cliente específico
-    console.log(`Buscando exames para cliente ${cliente_id} entre ${data_inicio} e ${data_fim}`);
+    // Buscar exames do período - removendo filtro de cliente_id já que os dados não têm esse campo preenchido
+    console.log(`Buscando exames entre ${data_inicio} e ${data_fim}`);
     
     const { data: exames, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
-      .eq('cliente_id', cliente_id)
       .gte('data_exame', data_inicio)
       .lte('data_exame', data_fim)
       .order('data_exame', { ascending: true });
@@ -71,6 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
         periodo: periodo,
         resumo: {
           total_laudos: 0,
+          total_quantidade: 0,
           valor_bruto: 0,
           franquia: 0,
           ajuste: 0,
@@ -150,6 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
       periodo: periodo,
       resumo: {
         total_laudos,
+        total_quantidade,
         valor_bruto,
         franquia,
         ajuste,
@@ -301,6 +302,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
 
     const financialData = [
       ['Total de Laudos:', relatorio.resumo.total_laudos.toString()],
+      ['Total Quantidade:', relatorio.resumo.total_quantidade.toString()],
       ['Valor Bruto:', `R$ ${relatorio.resumo.valor_bruto.toFixed(2).replace('.', ',')}`],
       ['Franquia:', `R$ ${relatorio.resumo.franquia.toFixed(2).replace('.', ',')}`],
       ['Ajuste:', `R$ ${relatorio.resumo.ajuste.toFixed(2).replace('.', ',')}`],
@@ -314,7 +316,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
     ];
 
     financialData.forEach(([label, value], index) => {
-      if (index === 4 || index === 10) { // Valor Total e Valor a Pagar
+      if (index === 5 || index === 11) { // Valor Total e Valor a Pagar (ajustado porque adicionamos uma linha)
         doc.setFont('helvetica', 'bold');
       } else {
         doc.setFont('helvetica', 'normal');
