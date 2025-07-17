@@ -83,6 +83,18 @@ serve(async (req) => {
 
     console.log('Clientes válidos:', clientesValidos.length)
 
+    // Remove duplicates based on nome + email combination
+    const clientesUnicos = clientesValidos.reduce((acc: any[], cliente: any) => {
+      const key = `${cliente.nome}_${cliente.email || 'sem_email'}`
+      const exists = acc.some(c => `${c.nome}_${c.email || 'sem_email'}` === key)
+      if (!exists) {
+        acc.push(cliente)
+      }
+      return acc
+    }, [])
+
+    console.log('Clientes únicos após remoção de duplicatas:', clientesUnicos.length)
+
     // Clear existing clients
     await supabaseClient
       .from('clientes')
@@ -92,7 +104,7 @@ serve(async (req) => {
     // Insert new clients
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
       .from('clientes')
-      .insert(clientesValidos)
+      .insert(clientesUnicos)
       .select()
 
     if (clientesError) {
@@ -104,17 +116,18 @@ serve(async (req) => {
       .from('upload_logs')
       .update({
         status: 'completed',
-        records_processed: clientesValidos.length
+        records_processed: clientesUnicos.length
       })
       .eq('id', logEntry.id)
 
-    console.log('Processamento concluído:', clientesValidos.length, 'clientes')
+    console.log('Processamento concluído:', clientesUnicos.length, 'clientes')
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: clientesValidos.length,
-        mensagem: `${clientesValidos.length} clientes processados com sucesso`
+        registros_processados: clientesUnicos.length,
+        registros_duplicados: clientesValidos.length - clientesUnicos.length,
+        mensagem: `${clientesUnicos.length} clientes processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -124,6 +137,17 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Erro no processamento:', error.message)
+
+    // Update log with error
+    if (logEntry) {
+      await supabaseClient
+        .from('upload_logs')
+        .update({
+          status: 'error',
+          error_message: error.message
+        })
+        .eq('id', logEntry.id)
+    }
 
     return new Response(
       JSON.stringify({
