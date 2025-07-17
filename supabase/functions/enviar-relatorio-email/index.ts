@@ -5,7 +5,8 @@ import React from 'npm:react@18.3.1';
 import { renderAsync } from 'npm:@react-email/components@0.0.22';
 import { RelatorioFaturamentoEmail } from './_templates/relatorio-faturamento.tsx';
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const resendApiKey = Deno.env.get("RESEND_API_KEY");
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +25,12 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Verificar se o Resend está configurado
+    if (!resend || !resendApiKey) {
+      console.error('RESEND_API_KEY não configurado');
+      throw new Error('Serviço de email não configurado. Configure a chave RESEND_API_KEY.');
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

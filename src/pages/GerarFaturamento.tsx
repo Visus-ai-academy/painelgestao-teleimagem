@@ -183,15 +183,20 @@ export default function GerarFaturamento() {
           }
 
           // Marcar relatório como gerado E atualizar contador em tempo real
-          const linkRelatorio = responseRelatorio.data?.link || responseRelatorio.data?.relatorio?.link || null;
+          const linkRelatorio = responseRelatorio.data?.link || null;
+          const dataProcessamento = new Date().toLocaleString('pt-BR');
           
           setResultados(prev => prev.map(r => 
             r.clienteId === cliente.id 
               ? { 
                   ...r, 
                   relatorioGerado: true, 
-                  dataProcessamento: new Date().toLocaleString('pt-BR'),
-                  linkRelatorio: linkRelatorio
+                  dataProcessamento: dataProcessamento,
+                  linkRelatorio: linkRelatorio,
+                  detalhesRelatorio: {
+                    total_laudos: responseRelatorio.data?.relatorio?.resumo?.total_laudos || 0,
+                    valor_total: responseRelatorio.data?.relatorio?.resumo?.valor_total || 0
+                  }
                 }
               : r
           ));
