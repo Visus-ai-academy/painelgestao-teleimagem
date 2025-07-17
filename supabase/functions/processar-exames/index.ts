@@ -12,6 +12,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== PROCESSAR EXAMES INICIADO ===')
+    console.log('Method:', req.method)
+    console.log('Headers:', Object.fromEntries(req.headers.entries()))
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -22,7 +26,12 @@ serve(async (req) => {
       }
     )
 
-    const { fileName } = await req.json()
+    console.log('Cliente Supabase criado')
+    
+    const requestBody = await req.json()
+    console.log('Body recebido:', requestBody)
+    
+    const { fileName } = requestBody
 
     console.log('Processando arquivo de exames:', fileName)
 
