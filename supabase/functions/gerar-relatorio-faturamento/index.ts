@@ -106,13 +106,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`🩺 Exames encontrados: ${examesRealizados?.length || 0} registros`);
 
-    // 4. DECIDIR FONTE DE DADOS (FATURAMENTO TEM PRIORIDADE)
+    // 4. USAR DADOS DE FATURAMENTO (PRIORIDADE)
     let examesDetalhados: ExameDetalhado[] = [];
-    let fonteDados = 'vazio';
+    let fonteDados = 'faturamento';
 
     if (dadosFaturamento && dadosFaturamento.length > 0) {
-      // USAR DADOS DE FATURAMENTO
-      fonteDados = 'faturamento';
       console.log('📊 Usando dados da tabela FATURAMENTO');
       
       examesDetalhados = dadosFaturamento.map(item => ({
@@ -127,24 +125,9 @@ const handler = async (req: Request): Promise<Response> => {
         laudos: item.quantidade || 1,
         valor: item.valor_bruto || 0
       }));
-      
-    } else if (examesRealizados && examesRealizados.length > 0) {
-      // USAR DADOS DE EXAMES COMO FALLBACK
-      fonteDados = 'exames';
-      console.log('📋 Usando dados da tabela EXAMES_REALIZADOS como fallback');
-      
-      examesDetalhados = examesRealizados.map(exame => ({
-        data_estudo: exame.data_exame,
-        paciente: exame.paciente || 'NÃO INFORMADO',
-        nome_exame: `${exame.modalidade || ''} ${exame.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
-        laudado_por: exame.medico || 'NÃO INFORMADO',
-        prioridade: exame.prioridade || 'NORMAL',
-        modalidade: exame.modalidade || 'NÃO INFORMADO',
-        especialidade: exame.especialidade || 'NÃO INFORMADO',
-        categoria: exame.categoria || 'NORMAL', 
-        laudos: 1, // Cada exame é 1 laudo
-        valor: exame.valor_bruto || 0.00
-      }));
+    } else {
+      console.log('❌ Nenhum dado de faturamento encontrado para o período');
+      throw new Error('Nenhum dado de faturamento encontrado para o período especificado');
     }
 
     console.log(`📈 Fonte de dados: ${fonteDados}`);
