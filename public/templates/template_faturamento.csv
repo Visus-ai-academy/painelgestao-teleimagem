@@ -1,6 +1,6 @@
-Paciente,Cliente,Medico,Data_Exame,Modalidade,Especialidade,Categoria,Prioridade,Nome_Exame,Reservado,Valor_Bruto
-João Silva Santos,AKCPALMAS,Dr. Roberto Carvalho,2025-07-15,TC,Radiologia,NORMAL,URGENTE,TC de Abdome Total,,"250,00"
-Maria Oliveira Lima,AKCPALMAS,Dr. Ana Souza,2025-07-15,RM,Radiologia,NORMAL,NORMAL,RM de Crânio,,"380,00"
-Carlos Eduardo Costa,BIOCARDIOS,Dr. Pedro Alves,2025-07-16,US,Cardiologia,NORMAL,URGENTE,Ecocardiograma,,"150,00"
-Ana Paula Rocha,BIOCARDIOS,Dr. Lucia Fernandes,2025-07-16,RX,Radiologia,NORMAL,NORMAL,Raio-X de Tórax,,"80,00"
-José Antônio Pereira,VILARICA,Dr. Marcos Silva,2025-07-17,TC,Neurologia,NORMAL,NORMAL,TC de Crânio,,"320,00"
+Paciente;Cliente;Medico;Data_Exame;Modalidade;Especialidade;Categoria;Prioridade;Nome_Exame;Reservado;Valor_Bruto
+João Silva Santos;AKCPALMAS;Dr. Roberto Carvalho;2025-07-15;TC;Radiologia;NORMAL;URGENTE;TC de Abdome Total;;250.00
+Maria Oliveira Lima;AKCPALMAS;Dr. Ana Souza;2025-07-15;RM;Radiologia;NORMAL;NORMAL;RM de Crânio;;380.00
+Carlos Eduardo Costa;BIOCARDIOS;Dr. Pedro Alves;2025-07-16;US;Cardiologia;NORMAL;URGENTE;Ecocardiograma;;150.00
+Ana Paula Rocha;BIOCARDIOS;Dr. Lucia Fernandes;2025-07-16;RX;Radiologia;NORMAL;NORMAL;Raio-X de Tórax;;80.00
+José Antônio Pereira;VILARICA;Dr. Marcos Silva;2025-07-17;TC;Neurologia;NORMAL;NORMAL;TC de Crânio;;320.00
