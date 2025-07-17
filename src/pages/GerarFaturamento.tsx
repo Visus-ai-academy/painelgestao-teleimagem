@@ -913,14 +913,19 @@ export default function GerarFaturamento() {
               expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
               onUpload={async (file) => {
                 try {
-                  console.log('Iniciando upload de faturamento com função correta:', file.name);
+                  console.log('🔥 UPLOAD DE FATURAMENTO INICIADO - ARQUIVO:', file.name);
+                  console.log('🔥 TAMANHO DO ARQUIVO:', file.size, 'bytes');
+                  console.log('🔥 TIPO DO ARQUIVO:', file.type);
+                  
                   await processFaturamentoFile(file);
+                  
+                  console.log('🔥 UPLOAD DE FATURAMENTO CONCLUÍDO COM SUCESSO');
                   toast({
                     title: "Upload de Faturamento Concluído",
                     description: "Dados de faturamento carregados com sucesso!",
                   });
                 } catch (error: any) {
-                  console.error('Erro no upload de faturamento:', error);
+                  console.error('🔥 ERRO NO UPLOAD DE FATURAMENTO:', error);
                   toast({
                     title: "Erro no Upload de Faturamento",
                     description: error.message,
