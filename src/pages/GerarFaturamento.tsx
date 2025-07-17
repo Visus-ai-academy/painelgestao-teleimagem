@@ -82,8 +82,8 @@ export default function GerarFaturamento() {
       
       setClientesCarregados(clientesComEmail);
       
-      // Inicializar resultados APENAS se estiver vazio
-      if (resultados.length === 0 && clientesComEmail.length > 0) {
+      // Sempre inicializar resultados quando há clientes
+      if (clientesComEmail.length > 0) {
         setResultados(clientesComEmail.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
@@ -92,6 +92,8 @@ export default function GerarFaturamento() {
           emailDestino: cliente.email,
         })));
         console.log('Lista populada com clientes reais:', clientesComEmail.length);
+      } else {
+        setResultados([]);
       }
       
       return clientesComEmail;
@@ -810,9 +812,25 @@ export default function GerarFaturamento() {
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
               onUpload={async (file) => {
-                await processClientesFile(file);
-                // Recarregar clientes após upload bem-sucedido
-                await carregarClientes();
+                try {
+                  await processClientesFile(file);
+                  // Limpar resultados antigos e recarregar clientes
+                  setResultados([]);
+                  setRelatoriosGerados(0);
+                  setEmailsEnviados(0);
+                  await carregarClientes();
+                  
+                  toast({
+                    title: "Upload Concluído",
+                    description: "Clientes carregados com sucesso! Agora você pode gerar relatórios.",
+                  });
+                } catch (error: any) {
+                  toast({
+                    title: "Erro no Upload",
+                    description: error.message,
+                    variant: "destructive",
+                  });
+                }
               }}
               icon={<Users className="h-5 w-5" />}
             />
