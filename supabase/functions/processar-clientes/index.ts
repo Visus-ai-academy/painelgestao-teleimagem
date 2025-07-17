@@ -63,21 +63,39 @@ serve(async (req) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
     console.log('Dados encontrados:', jsonData.length, 'registros')
+    
+    // Log das primeiras linhas para debug
+    if (jsonData.length > 0) {
+      console.log('Primeira linha do arquivo:', JSON.stringify(jsonData[0]))
+      console.log('Colunas disponíveis:', Object.keys(jsonData[0]))
+    }
 
-    // 5. Mapear dados para estrutura do banco
-    const clientes = jsonData.map((row: any) => ({
-      id: crypto.randomUUID(), // Gerar UUID único
-      nome: row.nome || row.Nome || row.NOME || '',
-      email: row.email || row.Email || row.EMAIL || '',
-      telefone: row.telefone || row.Telefone || row.TELEFONE || null,
-      endereco: row.endereco || row.Endereco || row.ENDERECO || null,
-      cnpj: row.cnpj || row.CNPJ || null,
-      ativo: true
-    }))
+    // 5. Mapear dados para estrutura do banco com busca flexível de colunas
+    const clientes = jsonData.map((row: any) => {
+      // Buscar nome em várias possibilidades
+      const nome = row.nome || row.Nome || row.NOME || row.cliente || row.Cliente || row.CLIENTE ||
+                   row.razao_social || row['Razão Social'] || row['RAZÃO SOCIAL'] || 
+                   row.empresa || row.Empresa || row.EMPRESA || '';
+      
+      // Buscar email
+      const email = row.email || row.Email || row.EMAIL || row['E-mail'] || row['e-mail'] || '';
+      
+      console.log('Processando linha:', { nome, email, originalRow: row });
+      
+      return {
+        id: crypto.randomUUID(),
+        nome: String(nome).trim(),
+        email: String(email).trim(),
+        telefone: row.telefone || row.Telefone || row.TELEFONE || row.fone || row.Fone || null,
+        endereco: row.endereco || row.Endereco || row.ENDERECO || row.endereco_completo || null,
+        cnpj: row.cnpj || row.CNPJ || row.documento || row.Documento || null,
+        ativo: true
+      };
+    })
 
     // 6. Filtrar apenas clientes com nome válido
     const clientesValidos = clientes.filter(cliente => 
-      cliente.nome && cliente.nome.trim() !== ''
+      cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
     )
 
     console.log('Inserindo clientes no banco...', clientesValidos.length, 'registros')
