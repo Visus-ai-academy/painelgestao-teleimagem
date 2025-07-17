@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import * as XLSX from 'https://cdn.skypack.dev/xlsx'
+import { read, utils } from "https://deno.land/x/sheetjs/xlsx.mjs"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,9 +42,9 @@ serve(async (req) => {
 
     // Convert file to buffer
     const arrayBuffer = await fileData.arrayBuffer()
-    const workbook = XLSX.read(arrayBuffer, { type: 'buffer' })
+    const workbook = read(arrayBuffer, { type: 'array' })
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+    const data = utils.sheet_to_json(worksheet, { header: 1 })
 
     // Validate file structure
     if (data.length < 2) {
