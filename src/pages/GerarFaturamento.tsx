@@ -183,7 +183,7 @@ export default function GerarFaturamento() {
           }
 
           // Marcar relatório como gerado E atualizar contador em tempo real
-          const linkRelatorio = responseRelatorio.data?.link || null;
+          const linkRelatorio = responseRelatorio.data?.linkRelatorio || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
           const dataProcessamento = new Date().toLocaleString('pt-BR');
           
           setResultados(prev => prev.map(r => 

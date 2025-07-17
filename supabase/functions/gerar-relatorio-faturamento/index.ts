@@ -83,10 +83,15 @@ const handler = async (req: Request): Promise<Response> => {
         exames: []
       };
 
+      const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.json`;
+      const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+
       return new Response(
         JSON.stringify({ 
           success: true, 
           relatorio,
+          linkRelatorio,
+          nomeArquivo,
           message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
         }),
         {
@@ -146,10 +151,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Relatório gerado com ${exames.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
+    // Gerar nome único para o relatório
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.json`;
+    const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         relatorio,
+        linkRelatorio,
+        nomeArquivo,
         message: `Relatório gerado com sucesso para ${cliente.nome}` 
       }),
       {
