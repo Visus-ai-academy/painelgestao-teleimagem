@@ -77,8 +77,10 @@ export default function GerarFaturamento() {
       
       setClientesCarregados(clientesComEmail);
       
-      // Inicializar resultados apenas se há clientes reais
-      if (clientesComEmail.length > 0 && resultados.length === 0) {
+      // ✅ SEMPRE limpar resultados primeiro, depois povoar APENAS com clientes reais
+      setResultados([]);
+      
+      if (clientesComEmail.length > 0) {
         setResultados(clientesComEmail.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
@@ -86,9 +88,9 @@ export default function GerarFaturamento() {
           emailEnviado: false,
           emailDestino: cliente.email,
         })));
-      } else if (clientesComEmail.length === 0) {
-        // Limpar resultados se não há clientes na base
-        setResultados([]);
+        console.log('Lista populada com clientes reais:', clientesComEmail.length);
+      } else {
+        console.log('Nenhum cliente real encontrado - lista vazia');
       }
       
       return clientesComEmail;
