@@ -368,13 +368,34 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função combinada para conveniência (opcional)
+  // Função combinada que aguarda cada etapa adequadamente
   const handleProcessarTodosClientes = async () => {
-    await handleGerarTodosRelatorios();
-    // Aguardar um momento antes de iniciar o envio de emails
-    setTimeout(async () => {
-      await handleEnviarEmails();
-    }, 2000);
+    try {
+      // Primeira etapa: gerar todos os relatórios
+      await handleGerarTodosRelatorios();
+      
+      // Aguardar um momento para UI atualizar
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Segunda etapa: enviar emails (só se houver relatórios gerados)
+      const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+      if (clientesComRelatorio.length > 0) {
+        await handleEnviarEmails();
+      } else {
+        toast({
+          title: "Nenhum Email para Enviar",
+          description: "Não há relatórios válidos para envio de emails.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Erro no processamento automático:", error);
+      toast({
+        title: "Erro no Processamento",
+        description: error.message || "Erro durante o processamento automático",
+        variant: "destructive",
+      });
+    }
   };
 
   const limparResultados = () => {
