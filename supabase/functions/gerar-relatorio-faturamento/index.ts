@@ -41,12 +41,13 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar exames do período (sem filtro de cliente_id para pegar todos os exames)
-    console.log(`Buscando exames entre ${data_inicio} e ${data_fim}`);
+    // Buscar exames do período para o cliente específico
+    console.log(`Buscando exames para cliente ${cliente_id} entre ${data_inicio} e ${data_fim}`);
     
     const { data: exames, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
+      .eq('cliente_id', cliente_id)
       .gte('data_exame', data_inicio)
       .lte('data_exame', data_fim)
       .order('data_exame', { ascending: true });
@@ -125,6 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Calcular totais
     const total_laudos = exames.length;
+    const total_quantidade = exames.reduce((sum, exame) => sum + 1, 0); // Cada exame conta como 1 na quantidade
     const valor_bruto = exames.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
     const franquia = 0;
     const ajuste = 0;
@@ -160,13 +162,15 @@ const handler = async (req: Request): Promise<Response> => {
         valor_a_pagar
       },
       exames: exames.map(exame => ({
-        data_estudo: exame.data_exame,
+        data_exame: exame.data_exame,
+        nome_exame: exame.modalidade + ' - ' + exame.especialidade,
         paciente: exame.paciente,
         medico: exame.medico,
         modalidade: exame.modalidade,
         especialidade: exame.especialidade,
         categoria: exame.categoria || '',
         prioridade: exame.prioridade || '',
+        quantidade: 1,
         valor: exame.valor_bruto || 0
       }))
     };
@@ -227,10 +231,11 @@ const handler = async (req: Request): Promise<Response> => {
 // Função para gerar PDF do relatório usando jsPDF
 async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
   try {
-    const doc = new jsPDF();
+    const doc = new jsPDF('landscape'); // Formato paisagem
     
     // Configurações
     const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
     const margin = 20;
     let y = 20;
 
@@ -322,7 +327,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
 
     // Detalhamento dos Exames
     if (relatorio.exames.length > 0) {
-      doc.addPage();
+      doc.addPage('landscape'); // Garantir que a nova página seja paisagem
       y = 30;
 
       doc.setFontSize(14);
@@ -330,16 +335,18 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       doc.text(`DETALHAMENTO DOS EXAMES (${relatorio.exames.length} laudos)`, margin, y);
 
       y += 15;
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       
-      // Cabeçalho da tabela
-      doc.text('Data', margin, y);
-      doc.text('Paciente', margin + 25, y);
-      doc.text('Médico', margin + 70, y);
-      doc.text('Modalidade', margin + 110, y);
-      doc.text('Especialidade', margin + 140, y);
-      doc.text('Valor', margin + 170, y);
+      // Cabeçalho da tabela - layout paisagem com mais espaço
+      doc.text('Data Exame', margin, y);
+      doc.text('Nome do Exame', margin + 25, y);
+      doc.text('Paciente', margin + 80, y);
+      doc.text('Médico', margin + 120, y);
+      doc.text('Categoria', margin + 160, y);
+      doc.text('Prioridade', margin + 190, y);
+      doc.text('Qtd', margin + 220, y);
+      doc.text('Valor', margin + 235, y);
 
       y += 8;
       doc.line(margin, y, pageWidth - margin, y);
@@ -349,37 +356,42 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
 
       // Dados dos exames
       relatorio.exames.forEach((exame: any, index: number) => {
-        if (y > 280) { // Nova página se necessário
-          doc.addPage();
+        if (y > 180) { // Ajustado para formato paisagem
+          doc.addPage('landscape');
           y = 30;
           
           // Repetir cabeçalho na nova página
-          doc.setFontSize(8);
+          doc.setFontSize(7);
           doc.setFont('helvetica', 'bold');
-          doc.text('Data', margin, y);
-          doc.text('Paciente', margin + 25, y);
-          doc.text('Médico', margin + 70, y);
-          doc.text('Modalidade', margin + 110, y);
-          doc.text('Especialidade', margin + 140, y);
-          doc.text('Valor', margin + 170, y);
+          doc.text('Data Exame', margin, y);
+          doc.text('Nome do Exame', margin + 25, y);
+          doc.text('Paciente', margin + 80, y);
+          doc.text('Médico', margin + 120, y);
+          doc.text('Categoria', margin + 160, y);
+          doc.text('Prioridade', margin + 190, y);
+          doc.text('Qtd', margin + 220, y);
+          doc.text('Valor', margin + 235, y);
           y += 8;
           doc.line(margin, y, pageWidth - margin, y);
           y += 5;
           doc.setFont('helvetica', 'normal');
         }
 
-        const dataFormatada = new Date(exame.data_estudo).toLocaleDateString('pt-BR');
+        const dataFormatada = new Date(exame.data_exame).toLocaleDateString('pt-BR');
+        const nomeExameAbrev = exame.nome_exame.length > 25 ? exame.nome_exame.substring(0, 22) + '...' : exame.nome_exame;
         const pacienteAbrev = exame.paciente.length > 18 ? exame.paciente.substring(0, 15) + '...' : exame.paciente;
         const medicoAbrev = exame.medico.length > 18 ? exame.medico.substring(0, 15) + '...' : exame.medico;
-        const modalidadeAbrev = exame.modalidade.length > 12 ? exame.modalidade.substring(0, 9) + '...' : exame.modalidade;
-        const especialidadeAbrev = exame.especialidade.length > 12 ? exame.especialidade.substring(0, 9) + '...' : exame.especialidade;
+        const categoriaAbrev = exame.categoria.length > 12 ? exame.categoria.substring(0, 9) + '...' : exame.categoria;
+        const prioridadeAbrev = exame.prioridade.length > 10 ? exame.prioridade.substring(0, 7) + '...' : exame.prioridade;
 
         doc.text(dataFormatada, margin, y);
-        doc.text(pacienteAbrev, margin + 25, y);
-        doc.text(medicoAbrev, margin + 70, y);
-        doc.text(modalidadeAbrev, margin + 110, y);
-        doc.text(especialidadeAbrev, margin + 140, y);
-        doc.text(`R$ ${exame.valor.toFixed(2).replace('.', ',')}`, margin + 170, y);
+        doc.text(nomeExameAbrev, margin + 25, y);
+        doc.text(pacienteAbrev, margin + 80, y);
+        doc.text(medicoAbrev, margin + 120, y);
+        doc.text(categoriaAbrev, margin + 160, y);
+        doc.text(prioridadeAbrev, margin + 190, y);
+        doc.text(exame.quantidade.toString(), margin + 220, y);
+        doc.text(`R$ ${exame.valor.toFixed(2).replace('.', ',')}`, margin + 235, y);
 
         y += 5;
       });
@@ -396,7 +408,7 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`, margin, 285);
+      doc.text(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`, margin, pageHeight - 15);
     }
 
     // Converter para Uint8Array
