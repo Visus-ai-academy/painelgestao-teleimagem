@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import teleimagemlLogo from "@/assets/teleimagem-logo.jpg";
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -24,7 +25,17 @@ export function Header() {
     <header className="h-16 border-b bg-white px-6 flex items-center justify-between">
       <div className="flex items-center gap-4">
         <SidebarTrigger />
-        <h1 className="text-xl font-semibold text-gray-800">Teleimagem A.I.</h1>
+        <div className="flex items-center gap-3">
+          <img 
+            src={teleimagemlLogo} 
+            alt="Teleimagem Logo" 
+            className="h-8 w-auto object-contain"
+          />
+          <div className="flex flex-col">
+            <h1 className="text-lg font-semibold text-gray-800 leading-tight">Teleimagem</h1>
+            <p className="text-sm text-gray-600 leading-tight">Painel de Gestão</p>
+          </div>
+        </div>
       </div>
       
       <div className="flex items-center gap-4">

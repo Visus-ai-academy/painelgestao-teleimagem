@@ -41,13 +41,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar exames do período
-    console.log(`Buscando exames para cliente ${cliente_id} entre ${data_inicio} e ${data_fim}`);
+    // Buscar exames do período (sem filtro de cliente_id para pegar todos os exames)
+    console.log(`Buscando exames entre ${data_inicio} e ${data_fim}`);
     
     const { data: exames, error: examesError } = await supabase
       .from('exames_realizados')
       .select('*')
-      .eq('cliente_id', cliente_id)
       .gte('data_exame', data_inicio)
       .lte('data_exame', data_fim)
       .order('data_exame', { ascending: true });
@@ -235,13 +234,22 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
     const margin = 20;
     let y = 20;
 
-    // Logomarca (texto simulado - substituir por imagem real se disponível)
-    doc.setFontSize(20);
+    // Logomarca Teleimagem (texto temporário - seria melhor com imagem real)
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('EMPRESA LOGO', margin, y);
+    doc.setTextColor(0, 102, 204); // Azul corporativo
+    doc.text('TELEIMAGEM', margin, y);
+    
+    y += 8;
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100); // Cinza
+    doc.setFont('helvetica', 'normal');
+    doc.text('Diagnóstico por Imagem', margin, y);
     
     y += 15;
     doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0); // Preto
+    doc.setFont('helvetica', 'bold');
     doc.text('RELATÓRIO DE VOLUMETRIA - FATURAMENTO', margin, y);
     
     y += 10;
