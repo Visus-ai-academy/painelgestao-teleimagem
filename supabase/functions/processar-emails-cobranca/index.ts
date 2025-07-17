@@ -122,7 +122,7 @@ Teleimagem A.I.
         // Enviar email via Resend
         if (resend) {
           const emailResponse = await resend.emails.send({
-            from: 'Cobrança <cobranca@teleimagem.ai>',
+            from: 'Teleimagem <onboarding@resend.dev>',
             to: [fatura.cliente_email],
             subject: assunto,
             text: corpoEmail

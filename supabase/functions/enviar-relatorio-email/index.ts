@@ -81,7 +81,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Enviar email
     const emailResponse = await resend.emails.send({
-      from: 'financeiro@teleimagem.com.br',
+      from: 'Teleimagem <onboarding@resend.dev>',
       to: [cliente.email],
       subject: assunto,
       html: html,
