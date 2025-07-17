@@ -244,97 +244,153 @@ const handler = async (req: Request): Promise<Response> => {
 
 // Função para gerar PDF do relatório
 async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
-  // Criar HTML do relatório
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Relatório de Faturamento - ${relatorio.cliente.nome}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .cliente-info { background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-        .resumo { background: #e3f2fd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-        .exames { margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .valor { text-align: right; }
-        .total { font-weight: bold; background-color: #fff3cd; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Relatório de Volumetria - Faturamento</h1>
-        <h2>Período: ${relatorio.periodo}</h2>
-      </div>
+  // Importar biblioteca para gerar PDF
+  const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
+  
+  const doc = new jsPDF();
+  
+  // Configurar fonte
+  doc.setFont('helvetica');
+  
+  // Cabeçalho
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('Relatório de Volumetria - Faturamento', 20, 30);
+  
+  doc.setFontSize(14);
+  doc.text(`Período: ${relatorio.periodo}`, 20, 40);
+  
+  // Linha separadora
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, 45, 190, 45);
+  
+  // Dados do Cliente
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Dados do Cliente', 20, 60);
+  
+  doc.setFontSize(12);
+  doc.text(`Nome: ${relatorio.cliente.nome}`, 20, 70);
+  doc.text(`CNPJ: ${relatorio.cliente.cnpj || 'Não informado'}`, 20, 80);
+  doc.text(`Email: ${relatorio.cliente.email}`, 20, 90);
+  
+  // Linha separadora
+  doc.line(20, 95, 190, 95);
+  
+  // Resumo Financeiro
+  doc.setFontSize(16);
+  doc.text('Resumo Financeiro', 20, 110);
+  
+  doc.setFontSize(12);
+  let y = 120;
+  
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL' 
+    }).format(value);
+  
+  // Dados financeiros
+  const financialData = [
+    ['Total de Laudos:', relatorio.resumo.total_laudos.toString()],
+    ['Valor Bruto:', formatCurrency(relatorio.resumo.valor_bruto)],
+    ['Franquia:', formatCurrency(relatorio.resumo.franquia)],
+    ['Ajuste:', formatCurrency(relatorio.resumo.ajuste)],
+    ['Valor Total:', formatCurrency(relatorio.resumo.valor_total)],
+    ['IRRF (1,5%):', formatCurrency(relatorio.resumo.irrf)],
+    ['CSLL (1%):', formatCurrency(relatorio.resumo.csll)],
+    ['PIS (0,65%):', formatCurrency(relatorio.resumo.pis)],
+    ['COFINS (3%):', formatCurrency(relatorio.resumo.cofins)],
+    ['Total Impostos:', formatCurrency(relatorio.resumo.impostos)],
+    ['Valor a Pagar:', formatCurrency(relatorio.resumo.valor_a_pagar)]
+  ];
+  
+  financialData.forEach(([label, value]) => {
+    doc.text(label, 20, y);
+    doc.text(value, 120, y);
+    y += 10;
+  });
+  
+  // Nova página se necessário
+  if (relatorio.exames.length > 0) {
+    doc.addPage();
+    
+    // Título da tabela de exames
+    doc.setFontSize(16);
+    doc.text('Detalhamento dos Exames', 20, 30);
+    
+    // Cabeçalho da tabela
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    y = 45;
+    
+    doc.text('Data', 20, y);
+    doc.text('Paciente', 45, y);
+    doc.text('Médico', 85, y);
+    doc.text('Modalidade', 120, y);
+    doc.text('Especialidade', 150, y);
+    doc.text('Valor', 180, y);
+    
+    // Linha do cabeçalho
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, y + 2, 190, y + 2);
+    
+    y += 10;
+    doc.setTextColor(0, 0, 0);
+    
+    // Dados dos exames (limitado a 20 por página)
+    relatorio.exames.slice(0, 20).forEach((exame: any) => {
+      const dataFormatada = new Date(exame.data_estudo).toLocaleDateString('pt-BR');
+      const pacienteAbrev = exame.paciente.length > 15 ? exame.paciente.substring(0, 15) + '...' : exame.paciente;
+      const medicoAbrev = exame.medico.length > 15 ? exame.medico.substring(0, 15) + '...' : exame.medico;
+      const modalidadeAbrev = exame.modalidade.length > 12 ? exame.modalidade.substring(0, 12) + '...' : exame.modalidade;
+      const especialidadeAbrev = exame.especialidade.length > 12 ? exame.especialidade.substring(0, 12) + '...' : exame.especialidade;
       
-      <div class="cliente-info">
-        <h3>Dados do Cliente</h3>
-        <p><strong>Nome:</strong> ${relatorio.cliente.nome}</p>
-        <p><strong>CNPJ:</strong> ${relatorio.cliente.cnpj || 'Não informado'}</p>
-        <p><strong>Email:</strong> ${relatorio.cliente.email}</p>
-      </div>
+      doc.text(dataFormatada, 20, y);
+      doc.text(pacienteAbrev, 45, y);
+      doc.text(medicoAbrev, 85, y);
+      doc.text(modalidadeAbrev, 120, y);
+      doc.text(especialidadeAbrev, 150, y);
+      doc.text(formatCurrency(exame.valor), 175, y);
       
-      <div class="resumo">
-        <h3>Resumo Financeiro</h3>
-        <table>
-          <tr><td><strong>Total de Laudos:</strong></td><td class="valor">${relatorio.resumo.total_laudos}</td></tr>
-          <tr><td><strong>Valor Bruto:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_bruto.toFixed(2)}</td></tr>
-          <tr><td><strong>Franquia:</strong></td><td class="valor">R$ ${relatorio.resumo.franquia.toFixed(2)}</td></tr>
-          <tr><td><strong>Ajuste:</strong></td><td class="valor">R$ ${relatorio.resumo.ajuste.toFixed(2)}</td></tr>
-          <tr class="total"><td><strong>Valor Total:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_total.toFixed(2)}</td></tr>
-          <tr><td>IRRF (1,5%):</td><td class="valor">R$ ${relatorio.resumo.irrf.toFixed(2)}</td></tr>
-          <tr><td>CSLL (1%):</td><td class="valor">R$ ${relatorio.resumo.csll.toFixed(2)}</td></tr>
-          <tr><td>PIS (0,65%):</td><td class="valor">R$ ${relatorio.resumo.pis.toFixed(2)}</td></tr>
-          <tr><td>COFINS (3%):</td><td class="valor">R$ ${relatorio.resumo.cofins.toFixed(2)}</td></tr>
-          <tr><td><strong>Total Impostos:</strong></td><td class="valor">R$ ${relatorio.resumo.impostos.toFixed(2)}</td></tr>
-          <tr class="total"><td><strong>Valor a Pagar:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_a_pagar.toFixed(2)}</td></tr>
-        </table>
-      </div>
+      y += 8;
       
-      <div class="exames">
-        <h3>Detalhamento dos Exames</h3>
-        ${relatorio.exames.length > 0 ? `
-        <table>
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Paciente</th>
-              <th>Médico</th>
-              <th>Modalidade</th>
-              <th>Especialidade</th>
-              <th>Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${relatorio.exames.map((exame: any) => `
-              <tr>
-                <td>${new Date(exame.data_estudo).toLocaleDateString('pt-BR')}</td>
-                <td>${exame.paciente}</td>
-                <td>${exame.medico}</td>
-                <td>${exame.modalidade}</td>
-                <td>${exame.especialidade}</td>
-                <td class="valor">R$ ${exame.valor.toFixed(2)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        ` : '<p>Nenhum exame encontrado para o período especificado.</p>'}
-      </div>
-      
-      <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #666;">
-        <p>Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}</p>
-      </div>
-    </body>
-    </html>
-  `;
-
-  // Simular geração de PDF (em produção usaria uma biblioteca como puppeteer ou jsPDF)
-  // Por enquanto, retornar o HTML como bytes
-  const encoder = new TextEncoder();
-  return encoder.encode(html);
+      // Nova página se necessário
+      if (y > 280) {
+        doc.addPage();
+        y = 30;
+      }
+    });
+    
+    if (relatorio.exames.length > 20) {
+      y += 10;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`... e mais ${relatorio.exames.length - 20} exames`, 20, y);
+    }
+  } else {
+    // Sem exames
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Nenhum exame encontrado para o período especificado.', 20, y + 20);
+  }
+  
+  // Rodapé
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i} de ${totalPages}`,
+      20,
+      285
+    );
+  }
+  
+  // Retornar como Uint8Array
+  const pdfOutput = doc.output('arraybuffer');
+  return new Uint8Array(pdfOutput);
 }
 
 serve(handler);
