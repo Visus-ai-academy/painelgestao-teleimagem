@@ -52,6 +52,7 @@ export default function GerarFaturamento() {
     relatorioGerado: boolean;
     emailEnviado: boolean;
     emailDestino: string;
+    linkRelatorio?: string;
     erro?: string;
     dataProcessamento?: string;
   }>>([]);
@@ -175,9 +176,16 @@ export default function GerarFaturamento() {
           }
 
           // Marcar relatório como gerado E atualizar contador em tempo real
+          const linkRelatorio = responseRelatorio.data?.link || responseRelatorio.data?.relatorio?.link || null;
+          
           setResultados(prev => prev.map(r => 
             r.clienteId === cliente.id 
-              ? { ...r, relatorioGerado: true, dataProcessamento: new Date().toLocaleString('pt-BR') }
+              ? { 
+                  ...r, 
+                  relatorioGerado: true, 
+                  dataProcessamento: new Date().toLocaleString('pt-BR'),
+                  linkRelatorio: linkRelatorio
+                }
               : r
           ));
           relatoriosCount++;
@@ -373,8 +381,9 @@ export default function GerarFaturamento() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left p-3">Cliente</th>
-                      <th className="text-center p-3">Relatório Gerado</th>
+                      <th className="text-center p-3">Relatório</th>
                       <th className="text-left p-3">E-mail Enviado Para</th>
+                      <th className="text-left p-3">Link do Relatório</th>
                       <th className="text-left p-3">Data/Hora</th>
                       <th className="text-left p-3">Status</th>
                     </tr>
@@ -397,6 +406,21 @@ export default function GerarFaturamento() {
                               <CheckCircle className="h-4 w-4 text-green-600" />
                             )}
                           </div>
+                        </td>
+                        <td className="p-3">
+                          {resultado.linkRelatorio ? (
+                            <a 
+                              href={resultado.linkRelatorio} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Ver Relatório
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="p-3 text-sm text-muted-foreground">
                           {resultado.dataProcessamento || "-"}
