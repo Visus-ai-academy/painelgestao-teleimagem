@@ -75,8 +75,11 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log(`Exames do cliente encontrados: ${examesCliente?.length || 0}`);
 
-    if (!examesCliente || examesCliente.length === 0) {
-      console.log('Nenhum exame encontrado, gerando relatório vazio');
+    // Verificar se existem faturas ou exames para o cliente
+    const temDados = (faturas && faturas.length > 0) || (examesCliente && examesCliente.length > 0);
+    
+    if (!temDados) {
+      console.log('Nenhum exame ou fatura encontrado, gerando relatório vazio');
       // Retornar relatório vazio ao invés de erro 404
       const relatorio = {
         cliente: {
@@ -144,8 +147,13 @@ const handler = async (req: Request): Promise<Response> => {
       total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
       valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
       console.log(`Calculado de faturas - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
+    } else if (examesCliente && examesCliente.length > 0) {
+      // Caso não haja faturas mas tenha exames, usar os exames para calcular
+      total_laudos = examesCliente.length;
+      valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
+      console.log(`Calculado de exames - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
     } else {
-      console.log("Nenhuma fatura encontrada na tabela faturamento - gerando relatório vazio");
+      console.log("Nenhuma fatura ou exame encontrado - gerando relatório vazio");
       total_laudos = 0;
       valor_bruto = 0;
     }
