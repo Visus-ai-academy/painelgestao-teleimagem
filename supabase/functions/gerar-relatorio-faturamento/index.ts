@@ -186,32 +186,19 @@ const handler = async (req: Request): Promise<Response> => {
         cofins,
         valor_a_pagar
       },
-      // Se tem dados da tabela faturamento mas não tem detalhes, criar um único item consolidado
-      exames: (examesCliente && examesCliente.length > 0) 
-        ? examesCliente.map(exame => ({
-            data_exame: exame.data_exame,
-            nome_exame: exame.modalidade + ' - ' + exame.especialidade,
-            paciente: exame.paciente,
-            medico: exame.medico,
-            modalidade: exame.modalidade,
-            especialidade: exame.especialidade,
-            categoria: exame.categoria || '',
-            prioridade: exame.prioridade || '',
-            quantidade: 1,
-            valor: exame.valor_bruto || 0
-          }))
-        : faturas.map(fatura => ({
-            data_exame: fatura.data_emissao,
-            nome_exame: `CONSOLIDADO - FATURA ${fatura.numero_fatura}`,
-            paciente: 'DIVERSOS',
-            medico: 'DIVERSOS',
-            modalidade: 'DIVERSOS',
-            especialidade: 'DIVERSOS',
-            categoria: 'DIVERSOS',
-            prioridade: 'NORMAL',
-            quantidade: fatura.quantidade,
-            valor: fatura.valor_bruto
-          }))
+      // Usar os dados detalhados da tabela faturamento
+      exames: faturas.map(fatura => ({
+        data_exame: fatura.data_exame || fatura.data_emissao,
+        nome_exame: fatura.nome_exame || `${fatura.modalidade || ''} ${fatura.especialidade || ''}`.trim() || 'EXAME',
+        paciente: fatura.paciente || 'NÃO INFORMADO',
+        medico: fatura.medico || 'NÃO INFORMADO',
+        modalidade: fatura.modalidade || 'NÃO INFORMADO',
+        especialidade: fatura.especialidade || 'NÃO INFORMADO',
+        categoria: fatura.categoria || 'NORMAL',
+        prioridade: fatura.prioridade || 'NORMAL',
+        quantidade: fatura.quantidade || 1,
+        valor: fatura.valor_bruto || 0
+      }))
     };
 
     console.log(`Relatório gerado com ${examesCliente?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);

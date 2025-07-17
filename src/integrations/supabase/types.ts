@@ -337,39 +337,63 @@ export type Database = {
       }
       faturamento: {
         Row: {
+          categoria: string | null
           created_at: string
           data_emissao: string
+          data_exame: string | null
           email: string | null
+          especialidade: string | null
           id: string
+          medico: string | null
+          modalidade: string | null
           nome: string
+          nome_exame: string | null
           numero_fatura: string
+          paciente: string | null
           periodo: string
+          prioridade: string | null
           quantidade: number
           status: string | null
           updated_at: string
           valor_bruto: number
         }
         Insert: {
+          categoria?: string | null
           created_at?: string
           data_emissao: string
+          data_exame?: string | null
           email?: string | null
+          especialidade?: string | null
           id?: string
+          medico?: string | null
+          modalidade?: string | null
           nome: string
+          nome_exame?: string | null
           numero_fatura: string
+          paciente?: string | null
           periodo: string
+          prioridade?: string | null
           quantidade?: number
           status?: string | null
           updated_at?: string
           valor_bruto?: number
         }
         Update: {
+          categoria?: string | null
           created_at?: string
           data_emissao?: string
+          data_exame?: string | null
           email?: string | null
+          especialidade?: string | null
           id?: string
+          medico?: string | null
+          modalidade?: string | null
           nome?: string
+          nome_exame?: string | null
           numero_fatura?: string
+          paciente?: string | null
           periodo?: string
+          prioridade?: string | null
           quantidade?: number
           status?: string | null
           updated_at?: string
