@@ -88,7 +88,12 @@ const handler = async (req: Request): Promise<Response> => {
       attachments: attachments.length > 0 ? attachments : undefined
     });
 
-    console.log('Email enviado com sucesso:', emailResponse);
+    console.log('Resposta do Resend:', emailResponse);
+
+    // Verificar se houve erro na resposta
+    if (emailResponse.error) {
+      throw new Error(`Erro do Resend: ${emailResponse.error.message}`);
+    }
 
     // Log do envio
     await supabase
