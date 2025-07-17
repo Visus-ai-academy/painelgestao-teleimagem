@@ -337,6 +337,15 @@ export default function GerarFaturamento() {
                   
                   <Button 
                     variant="outline"
+                    onClick={carregarClientes}
+                    disabled={processandoTodos}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recarregar Clientes
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
                     onClick={limparResultados}
                     disabled={processandoTodos}
                   >
