@@ -109,9 +109,13 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Carregar clientes na inicialização
+  // Carregar clientes na inicialização E forçar recarregamento a cada 5 segundos
   useEffect(() => {
     carregarClientes();
+    
+    // Recarregar periodicamente para garantir dados atualizados
+    const interval = setInterval(carregarClientes, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleProcessarTodosClientes = async () => {
