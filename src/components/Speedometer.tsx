@@ -63,7 +63,7 @@ export function Speedometer({
             <span className="text-xl font-bold block" style={{ color: getColor() }}>
               {value}{unit}
             </span>
-            <span className="text-xs text-gray-500 block">de {max}{unit}</span>
+            <span className="text-xs text-gray-500 block">de {max}</span>
           </div>
         </div>
       </div>

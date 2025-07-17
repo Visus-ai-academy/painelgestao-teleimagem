@@ -386,7 +386,7 @@ export default function GerarFaturamento() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
                 <Speedometer
                   value={clientesCarregados.length}
-                  max={Math.max(clientesCarregados.length, 5)} // Mínimo 5 para visualização
+                  max={Math.max(clientesCarregados.length, 5)}
                   label="Clientes Cadastrados"
                   unit={clientesCarregados.length === 0 ? " (vazio)" : ""}
                   colorThresholds={{
