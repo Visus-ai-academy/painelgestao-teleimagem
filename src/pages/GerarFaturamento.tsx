@@ -351,12 +351,7 @@ export default function GerarFaturamento() {
               <CardContent>
                 <div className="text-2xl font-bold">{relatoriosGerados}</div>
                 <p className="text-xs text-muted-foreground">
-                  {relatoriosGerados === 0 
-                    ? `0 de ${clientesCarregados.length} clientes`
-                    : relatoriosGerados === 1 
-                      ? "1 relatório gerado" 
-                      : `${relatoriosGerados} relatórios gerados`
-                  }
+                  relatórios gerados
                 </p>
               </CardContent>
             </Card>
