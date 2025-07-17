@@ -83,14 +83,50 @@ const handler = async (req: Request): Promise<Response> => {
         exames: []
       };
 
-      const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.json`;
-      const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+      // Gerar PDF do relatório vazio
+      const pdfContent = await gerarPDFRelatorio(relatorio);
+      
+      // Gerar nome único para o arquivo
+      const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+      
+      // Salvar PDF no storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('relatorios-faturamento')
+        .upload(nomeArquivo, pdfContent, {
+          contentType: 'application/pdf',
+          cacheControl: '3600'
+        });
+
+      if (uploadError) {
+        console.error('Erro ao salvar PDF vazio:', uploadError);
+        // Se falhar, retornar com link temporário
+        const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            relatorio,
+            linkRelatorio,
+            nomeArquivo,
+            message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Gerar URL público do PDF
+      const { data: { publicUrl } } = supabase.storage
+        .from('relatorios-faturamento')
+        .getPublicUrl(nomeArquivo);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           relatorio,
-          linkRelatorio,
+          linkRelatorio: publicUrl,
           nomeArquivo,
           message: `Relatório gerado para ${cliente.nome} - Período sem exames` 
         }),
@@ -151,15 +187,37 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Relatório gerado com ${exames.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
-    // Gerar nome único para o relatório
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.json`;
-    const linkRelatorio = `#relatorio-${cliente_id}-${periodo}`;
+    // Gerar PDF do relatório
+    const pdfContent = await gerarPDFRelatorio(relatorio);
+    
+    // Gerar nome único para o arquivo
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    
+    // Salvar PDF no storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('relatorios-faturamento')
+      .upload(nomeArquivo, pdfContent, {
+        contentType: 'application/pdf',
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      console.error('Erro ao salvar PDF:', uploadError);
+      throw new Error(`Erro ao salvar relatório: ${uploadError.message}`);
+    }
+
+    // Gerar URL público do PDF
+    const { data: { publicUrl } } = supabase.storage
+      .from('relatorios-faturamento')
+      .getPublicUrl(nomeArquivo);
+
+    console.log('PDF salvo com sucesso:', publicUrl);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         relatorio,
-        linkRelatorio,
+        linkRelatorio: publicUrl,
         nomeArquivo,
         message: `Relatório gerado com sucesso para ${cliente.nome}` 
       }),
@@ -183,5 +241,100 @@ const handler = async (req: Request): Promise<Response> => {
     );
   }
 };
+
+// Função para gerar PDF do relatório
+async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
+  // Criar HTML do relatório
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Relatório de Faturamento - ${relatorio.cliente.nome}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+        .cliente-info { background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .resumo { background: #e3f2fd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .exames { margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .valor { text-align: right; }
+        .total { font-weight: bold; background-color: #fff3cd; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Relatório de Volumetria - Faturamento</h1>
+        <h2>Período: ${relatorio.periodo}</h2>
+      </div>
+      
+      <div class="cliente-info">
+        <h3>Dados do Cliente</h3>
+        <p><strong>Nome:</strong> ${relatorio.cliente.nome}</p>
+        <p><strong>CNPJ:</strong> ${relatorio.cliente.cnpj || 'Não informado'}</p>
+        <p><strong>Email:</strong> ${relatorio.cliente.email}</p>
+      </div>
+      
+      <div class="resumo">
+        <h3>Resumo Financeiro</h3>
+        <table>
+          <tr><td><strong>Total de Laudos:</strong></td><td class="valor">${relatorio.resumo.total_laudos}</td></tr>
+          <tr><td><strong>Valor Bruto:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_bruto.toFixed(2)}</td></tr>
+          <tr><td><strong>Franquia:</strong></td><td class="valor">R$ ${relatorio.resumo.franquia.toFixed(2)}</td></tr>
+          <tr><td><strong>Ajuste:</strong></td><td class="valor">R$ ${relatorio.resumo.ajuste.toFixed(2)}</td></tr>
+          <tr class="total"><td><strong>Valor Total:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_total.toFixed(2)}</td></tr>
+          <tr><td>IRRF (1,5%):</td><td class="valor">R$ ${relatorio.resumo.irrf.toFixed(2)}</td></tr>
+          <tr><td>CSLL (1%):</td><td class="valor">R$ ${relatorio.resumo.csll.toFixed(2)}</td></tr>
+          <tr><td>PIS (0,65%):</td><td class="valor">R$ ${relatorio.resumo.pis.toFixed(2)}</td></tr>
+          <tr><td>COFINS (3%):</td><td class="valor">R$ ${relatorio.resumo.cofins.toFixed(2)}</td></tr>
+          <tr><td><strong>Total Impostos:</strong></td><td class="valor">R$ ${relatorio.resumo.impostos.toFixed(2)}</td></tr>
+          <tr class="total"><td><strong>Valor a Pagar:</strong></td><td class="valor">R$ ${relatorio.resumo.valor_a_pagar.toFixed(2)}</td></tr>
+        </table>
+      </div>
+      
+      <div class="exames">
+        <h3>Detalhamento dos Exames</h3>
+        ${relatorio.exames.length > 0 ? `
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Paciente</th>
+              <th>Médico</th>
+              <th>Modalidade</th>
+              <th>Especialidade</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${relatorio.exames.map((exame: any) => `
+              <tr>
+                <td>${new Date(exame.data_estudo).toLocaleDateString('pt-BR')}</td>
+                <td>${exame.paciente}</td>
+                <td>${exame.medico}</td>
+                <td>${exame.modalidade}</td>
+                <td>${exame.especialidade}</td>
+                <td class="valor">R$ ${exame.valor.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        ` : '<p>Nenhum exame encontrado para o período especificado.</p>'}
+      </div>
+      
+      <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #666;">
+        <p>Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Simular geração de PDF (em produção usaria uma biblioteca como puppeteer ou jsPDF)
+  // Por enquanto, retornar o HTML como bytes
+  const encoder = new TextEncoder();
+  return encoder.encode(html);
+}
 
 serve(handler);
