@@ -386,7 +386,7 @@ export default function GerarFaturamento() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
                 <Speedometer
                   value={clientesCarregados.length}
-                  max={Math.max(clientesCarregados.length, 1)}
+                  max={clientesCarregados.length || 10} // Máximo dinâmico ou padrão 10
                   label="Clientes Cadastrados"
                   unit=""
                   colorThresholds={{
@@ -398,7 +398,7 @@ export default function GerarFaturamento() {
                 
                 <Speedometer
                   value={relatoriosGerados}
-                  max={Math.max(clientesCarregados.length, 1)}
+                  max={clientesCarregados.length || 10} // Usa total de clientes ou padrão 10
                   label="Relatórios Gerados"
                   unit=""
                   colorThresholds={{
@@ -410,7 +410,7 @@ export default function GerarFaturamento() {
                 
                 <Speedometer
                   value={emailsEnviados}
-                  max={Math.max(clientesCarregados.length, 1)}
+                  max={clientesCarregados.length || 10} // Usa total de clientes ou padrão 10
                   label="E-mails Enviados"
                   unit=""
                   colorThresholds={{
