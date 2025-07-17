@@ -911,7 +911,23 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={25}
               expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
-              onUpload={processFaturamentoFile}
+              onUpload={async (file) => {
+                try {
+                  console.log('Iniciando upload de faturamento com função correta:', file.name);
+                  await processFaturamentoFile(file);
+                  toast({
+                    title: "Upload de Faturamento Concluído",
+                    description: "Dados de faturamento carregados com sucesso!",
+                  });
+                } catch (error: any) {
+                  console.error('Erro no upload de faturamento:', error);
+                  toast({
+                    title: "Erro no Upload de Faturamento",
+                    description: error.message,
+                    variant: "destructive",
+                  });
+                }
+              }}
               icon={<FileBarChart2 className="h-5 w-5" />}
             />
           </div>
