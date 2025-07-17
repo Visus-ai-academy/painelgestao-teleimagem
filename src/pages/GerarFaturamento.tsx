@@ -906,7 +906,7 @@ export default function GerarFaturamento() {
 
             <FileUpload
               title="Upload de Faturamento"
-              description="Upload de arquivo de faturamento com colunas de Nome (B), Quantidade (J) e Valor Bruto (K)"
+              description="Upload de arquivo de faturamento seguindo o template com as colunas: Paciente, Cliente, Médico, Data, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, [Reservado], Valor. Baixar template CSV: /templates/template_faturamento.csv"
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={25}
               expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
