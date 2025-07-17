@@ -12,8 +12,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let logEntry = null;
+  let supabaseClient = null;
+  
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -28,7 +31,7 @@ serve(async (req) => {
     console.log('Processando arquivo de clientes:', fileName)
 
     // 1. Log do início do processamento
-    const { data: logEntry, error: logError } = await supabaseClient
+    const { data: logData, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
         filename: fileName,
@@ -39,8 +42,12 @@ serve(async (req) => {
       .single()
 
     if (logError) {
+      console.error('Erro ao criar log:', logError)
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
+
+    logEntry = logData
+    console.log('Log criado com sucesso:', logEntry.id)
 
     // 2. Baixar arquivo do storage
     console.log('Baixando arquivo do storage...')
@@ -149,12 +156,29 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro no processamento:', error)
+    console.error('Erro detalhado no processamento:', error)
+    console.error('Stack trace:', error.stack)
+
+    // Tentar atualizar log com erro
+    try {
+      if (logEntry && logEntry.id) {
+        await supabaseClient
+          .from('upload_logs')
+          .update({
+            status: 'error',
+            error_message: error.message || 'Erro interno do servidor'
+          })
+          .eq('id', logEntry.id)
+      }
+    } catch (logUpdateError) {
+      console.error('Erro ao atualizar log com erro:', logUpdateError)
+    }
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro interno do servidor'
+        error: error.message || 'Erro interno do servidor',
+        details: error.stack || 'Sem detalhes adicionais'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

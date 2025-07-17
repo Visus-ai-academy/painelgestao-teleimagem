@@ -136,20 +136,29 @@ export async function processContratosFile(file: File) {
 
 export async function processClientesFile(file: File) {
   try {
+    console.log('Iniciando processamento de clientes para arquivo:', file.name)
+    
     const fileName = `clientes_${Date.now()}_${file.name}`
+    console.log('Fazendo upload do arquivo:', fileName)
+    
     await uploadFile(file, 'uploads', fileName)
+    console.log('Upload concluído, chamando edge function...')
 
     const { data, error } = await supabase.functions.invoke('processar-clientes', {
       body: { fileName }
     })
 
+    console.log('Resposta da edge function processar-clientes:', { data, error })
+
     if (error) {
+      console.error('Erro da edge function processar-clientes:', error)
       throw new Error(`Erro ao processar clientes: ${error.message}`)
     }
 
+    console.log('Processamento de clientes concluído com sucesso')
     return data
   } catch (error) {
-    console.error('Erro no processamento:', error)
+    console.error('Erro no processamento de clientes:', error)
     throw error
   }
 }
