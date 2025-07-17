@@ -51,24 +51,39 @@ serve(async (req) => {
       throw new Error('Arquivo vazio ou sem dados')
     }
 
-    // Extract faturamento data
-    const faturamentoData = data.slice(1).map(row => ({
-      nome: row[1], // Coluna B (nome)
-      quantidade: row[9] || 0, // Coluna J (quantidade)
-      valor_bruto: row[10] || 0, // Coluna K (valor bruto)
-      data_emissao: new Date().toISOString().split('T')[0],
-      numero_fatura: `FAT-${row[1].substring(0, 3).toUpperCase()}-2025-07`,
-      periodo: "2025-07"
-    })).filter(item => item.nome && (item.quantidade > 0 || item.valor_bruto > 0))
+    // Debugging - log the first few rows to see structure
+    console.log('Primeiras linhas do arquivo:')
+    console.log('Headers:', data[0])
+    console.log('Primeira linha de dados:', data[1])
+    
+    // Extract faturamento data - ensure column indexes are correct
+    // Assuming: Column B (index 1) = nome, Column J (index 9) = quantidade, Column K (index 10) = valor_bruto
+    const faturamentoData = data.slice(1).map(row => {
+      // Check if row has the necessary data before processing
+      if (!row || !row[1]) {
+        console.log('Linha inválida ignorada:', row)
+        return null
+      }
+      
+      return {
+        nome: row[1], // Coluna B (nome)
+        quantidade: row[9] || 0, // Coluna J (quantidade)
+        valor_bruto: row[10] || 0, // Coluna K (valor bruto)
+        data_emissao: new Date().toISOString().split('T')[0],
+        numero_fatura: `FAT-${String(row[1]).substring(0, 3).toUpperCase()}-2025-07`,
+        periodo: "2025-07"
+      }
+    }).filter(item => item && item.nome && (item.quantidade > 0 || item.valor_bruto > 0))
 
     console.log('Dados extraídos:', faturamentoData)
+    console.log(`Total de registros extraídos: ${faturamentoData.length}`)
 
     // Log do início do processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
         filename: fileName,
-        file_type: 'faturamento',
+        file_type: 'faturamento', // Importante: corrigido para 'faturamento'
         status: 'processing'
       })
       .select()

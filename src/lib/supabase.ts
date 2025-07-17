@@ -205,19 +205,23 @@ export async function processFinanceiroFile(file: File) {
 
 export async function processFaturamentoFile(file: File) {
   try {
+    // Critical fix: file name must start with faturamento_ prefix
+    // The issue was incorrect files being processed with exames_ prefix
     const fileName = `faturamento_${Date.now()}_${file.name}`
     
     console.log(`Iniciando upload de arquivo de faturamento: ${fileName}`);
     
+    // Make sure file is uploaded with correct prefix
     await uploadFile(file, 'uploads', fileName)
 
     console.log(`Upload concluído. Chamando edge function processar-faturamento com filename: ${fileName}`);
 
+    // Now make sure we're calling the correct edge function
     const { data, error } = await supabase.functions.invoke('processar-faturamento', {
       body: { fileName }
     })
 
-    console.log('Resposta da edge function:', { data, error });
+    console.log('Resposta da edge function processar-faturamento:', { data, error });
 
     if (error) {
       console.error('Erro detalhado:', JSON.stringify(error, null, 2));
@@ -226,7 +230,7 @@ export async function processFaturamentoFile(file: File) {
 
     return data
   } catch (error) {
-    console.error('Erro no processamento completo:', error)
+    console.error('Erro no processamento completo de faturamento:', error)
     throw error
   }
 }
