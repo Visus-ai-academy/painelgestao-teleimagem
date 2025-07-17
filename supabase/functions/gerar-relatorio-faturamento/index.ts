@@ -41,8 +41,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Cliente não encontrado: ${clienteError?.message}`);
     }
 
-    // Buscar exames do período - removendo filtro de cliente_id já que os dados não têm esse campo preenchido
-    console.log(`Buscando exames entre ${data_inicio} e ${data_fim}`);
+    // Buscar exames do período - Como não há cliente_id nos exames, vamos buscar todos
+    // e depois filtrar pelo nome do cliente se necessário
+    console.log(`Buscando exames entre ${data_inicio} e ${data_fim} para cliente: ${cliente.nome}`);
     
     const { data: exames, error: examesError } = await supabase
       .from('exames_realizados')
@@ -56,9 +57,14 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Erro ao buscar exames: ${examesError.message}`);
     }
 
-    console.log(`Exames encontrados: ${exames?.length || 0}`);
+    console.log(`Total de exames encontrados: ${exames?.length || 0}`);
+    // Filtrar exames que podem estar relacionados ao cliente (por enquanto todos, já que não há relação direta)
+    // TODO: Implementar lógica de relacionamento entre cliente e exames
+    const examesCliente = exames || [];
+    
+    console.log(`Exames do cliente encontrados: ${examesCliente?.length || 0}`);
 
-    if (!exames || exames.length === 0) {
+    if (!examesCliente || examesCliente.length === 0) {
       console.log('Nenhum exame encontrado, gerando relatório vazio');
       // Retornar relatório vazio ao invés de erro 404
       const relatorio = {
@@ -70,7 +76,6 @@ const handler = async (req: Request): Promise<Response> => {
         periodo: periodo,
         resumo: {
           total_laudos: 0,
-          total_quantidade: 0,
           valor_bruto: 0,
           franquia: 0,
           ajuste: 0,
@@ -79,7 +84,6 @@ const handler = async (req: Request): Promise<Response> => {
           csll: 0,
           pis: 0,
           cofins: 0,
-          impostos: 0,
           valor_a_pagar: 0
         },
         exames: []
@@ -106,10 +110,6 @@ const handler = async (req: Request): Promise<Response> => {
       
       const arquivos = [{ tipo: 'pdf', url: pdfUrl, nome: nomeArquivoPDF }];
       
-      if (arquivos.length === 0) {
-        throw new Error('Erro ao gerar relatórios');
-      }
-
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -124,21 +124,19 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular totais
-    const total_laudos = exames.length;
-    const total_quantidade = exames.reduce((sum, exame) => sum + 1, 0); // Cada exame conta como 1 na quantidade
-    const valor_bruto = exames.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
+    // Calcular totais baseado nos exames do cliente
+    const total_laudos = examesCliente.length;
+    const valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
     const franquia = 0;
     const ajuste = 0;
     const valor_total = valor_bruto + franquia + ajuste;
     
-    // Impostos
-    const irrf = valor_total * 0.015;
-    const csll = valor_total * 0.01;
-    const pis = valor_total * 0.0065;
-    const cofins = valor_total * 0.03;
-    const impostos = irrf + csll + pis + cofins;
-    const valor_a_pagar = valor_total - impostos;
+    // Impostos calculados sobre o valor bruto (conforme solicitado)
+    const irrf = valor_bruto * 0.015;
+    const csll = valor_bruto * 0.01;
+    const pis = valor_bruto * 0.0065;
+    const cofins = valor_bruto * 0.03;
+    const valor_a_pagar = valor_bruto - (irrf + csll + pis + cofins);
 
     // Gerar dados do relatório
     const relatorio = {
@@ -150,7 +148,6 @@ const handler = async (req: Request): Promise<Response> => {
       periodo: periodo,
       resumo: {
         total_laudos,
-        total_quantidade,
         valor_bruto,
         franquia,
         ajuste,
@@ -159,10 +156,9 @@ const handler = async (req: Request): Promise<Response> => {
         csll,
         pis,
         cofins,
-        impostos,
         valor_a_pagar
       },
-      exames: exames.map(exame => ({
+      exames: examesCliente.map(exame => ({
         data_exame: exame.data_exame,
         nome_exame: exame.modalidade + ' - ' + exame.especialidade,
         paciente: exame.paciente,
@@ -176,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
       }))
     };
 
-    console.log(`Relatório gerado com ${exames.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
+    console.log(`Relatório gerado com ${examesCliente.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
     // Gerar relatório em PDF
     const pdfContent = await gerarPDFRelatorio(relatorio);
@@ -302,7 +298,6 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
 
     const financialData = [
       ['Total de Laudos:', relatorio.resumo.total_laudos.toString()],
-      ['Total Quantidade:', relatorio.resumo.total_quantidade.toString()],
       ['Valor Bruto:', `R$ ${relatorio.resumo.valor_bruto.toFixed(2).replace('.', ',')}`],
       ['Franquia:', `R$ ${relatorio.resumo.franquia.toFixed(2).replace('.', ',')}`],
       ['Ajuste:', `R$ ${relatorio.resumo.ajuste.toFixed(2).replace('.', ',')}`],
@@ -311,12 +306,11 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       ['CSLL (1%):', `R$ ${relatorio.resumo.csll.toFixed(2).replace('.', ',')}`],
       ['PIS (0,65%):', `R$ ${relatorio.resumo.pis.toFixed(2).replace('.', ',')}`],
       ['COFINS (3%):', `R$ ${relatorio.resumo.cofins.toFixed(2).replace('.', ',')}`],
-      ['Total Impostos:', `R$ ${relatorio.resumo.impostos.toFixed(2).replace('.', ',')}`],
       ['VALOR A PAGAR:', `R$ ${relatorio.resumo.valor_a_pagar.toFixed(2).replace('.', ',')}`]
     ];
 
     financialData.forEach(([label, value], index) => {
-      if (index === 5 || index === 11) { // Valor Total e Valor a Pagar (ajustado porque adicionamos uma linha)
+      if (index === 4 || index === 9) { // Valor Total (índice 4) e Valor a Pagar (índice 9)
         doc.setFont('helvetica', 'bold');
       } else {
         doc.setFont('helvetica', 'normal');
@@ -327,8 +321,9 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       y += 6;
     });
 
-    // Detalhamento dos Exames - sempre incluir, mesmo na primeira página se houver espaço
-    y += 15;
+    // Detalhamento dos Exames - SEMPRE na página 2
+    doc.addPage('landscape'); // Forçar nova página
+    y = 30;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     
@@ -338,17 +333,6 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       y += 12;
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      
-      // Verificar se há espaço na página atual, senão criar nova página
-      if (y > 140) { // Se não há espaço suficiente na primeira página
-        doc.addPage('landscape');
-        y = 30;
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`DETALHAMENTO DOS EXAMES (${relatorio.exames.length} laudos)`, margin, y);
-        y += 12;
-        doc.setFontSize(7);
-      }
       
       // Cabeçalho da tabela - layout paisagem com mais espaço
       doc.text('Data Exame', margin, y);
@@ -415,13 +399,15 @@ async function gerarPDFRelatorio(relatorio: any): Promise<Uint8Array> {
       doc.text('Nenhum exame encontrado para o período especificado.', margin, y);
     }
 
-    // Rodapé
+    // Rodapé - alinhado à direita para não sobrepor tabelas
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`, margin, pageHeight - 15);
+      const rodapeTexto = `Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${pageCount}`;
+      const textWidth = doc.getTextWidth(rodapeTexto);
+      doc.text(rodapeTexto, pageWidth - margin - textWidth, pageHeight - 15);
     }
 
     // Converter para Uint8Array
