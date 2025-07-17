@@ -138,20 +138,20 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular totais baseado nos dados das faturas (tabela faturamento)
+    // Priorizar exames para o cálculo dos totais (valores mais detalhados)
     let total_laudos = 0;
     let valor_bruto = 0;
     
-    if (faturas && faturas.length > 0) {
-      // Somar quantidade (coluna J) e valor_bruto (coluna K) da tabela faturamento
-      total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
-      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
-      console.log(`Calculado de faturas - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
-    } else if (examesCliente && examesCliente.length > 0) {
-      // Caso não haja faturas mas tenha exames, usar os exames para calcular
+    if (examesCliente && examesCliente.length > 0) {
+      // Usar exames para calcular (prioridade)
       total_laudos = examesCliente.length;
       valor_bruto = examesCliente.reduce((sum, exame) => sum + (exame.valor_bruto || 0), 0);
       console.log(`Calculado de exames - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
+    } else if (faturas && faturas.length > 0) {
+      // Se não há exames mas tem faturas, usar as faturas como fallback
+      total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
+      valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
+      console.log(`Calculado de faturas - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
     } else {
       console.log("Nenhuma fatura ou exame encontrado - gerando relatório vazio");
       total_laudos = 0;
@@ -189,21 +189,9 @@ const handler = async (req: Request): Promise<Response> => {
         cofins,
         valor_a_pagar
       },
-      // Usar dados da tabela faturamento para detalhamento quando disponível
-      exames: faturas && faturas.length > 0 
-        ? faturas.map(fatura => ({
-            data_exame: fatura.data_emissao,
-            nome_exame: `Fatura ${fatura.numero_fatura}`,
-            paciente: 'Resumo do Período',
-            medico: 'Consolidado',
-            modalidade: 'Faturamento',
-            especialidade: 'Consolidado',
-            categoria: 'Período',
-            prioridade: 'Normal',
-            quantidade: fatura.quantidade,
-            valor: fatura.valor_bruto
-          }))
-        : examesCliente.map(exame => ({
+      // Sempre usar exames detalhados quando disponíveis, caso contrário usar dados da tabela faturamento
+      exames: examesCliente && examesCliente.length > 0
+        ? examesCliente.map(exame => ({
             data_exame: exame.data_exame,
             nome_exame: exame.modalidade + ' - ' + exame.especialidade,
             paciente: exame.paciente,
@@ -215,9 +203,23 @@ const handler = async (req: Request): Promise<Response> => {
             quantidade: 1,
             valor: exame.valor_bruto || 0
           }))
+        : faturas && faturas.length > 0 
+          ? faturas.map(fatura => ({
+              data_exame: fatura.data_emissao,
+              nome_exame: `Fatura ${fatura.numero_fatura}`,
+              paciente: 'Resumo do Período',
+              medico: 'Consolidado',
+              modalidade: 'Faturamento',
+              especialidade: 'Consolidado',
+              categoria: 'Período',
+              prioridade: 'Normal',
+              quantidade: fatura.quantidade,
+              valor: fatura.valor_bruto
+            }))
+          : []
     };
 
-    console.log(`Relatório gerado com ${examesCliente.length} exames, valor total: R$ ${valor_total.toFixed(2)}`);
+    console.log(`Relatório gerado com ${examesCliente?.length || 0} exames, valor total: R$ ${valor_total.toFixed(2)}`);
 
     // Gerar relatório em PDF
     const pdfContent = await gerarPDFRelatorio(relatorio);
