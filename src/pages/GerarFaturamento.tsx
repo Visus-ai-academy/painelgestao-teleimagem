@@ -30,11 +30,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
-const clientes = [
-  { id: "550e8400-e29b-41d4-a716-446655440001", nome: "Hospital São Lucas", email: "contato@saolucas.com.br" },
-  { id: "550e8400-e29b-41d4-a716-446655440002", nome: "Clínica Vida Plena", email: "admin@vidaplena.com.br" },
-  { id: "550e8400-e29b-41d4-a716-446655440003", nome: "Centro Médico Norte", email: "faturamento@centronorte.com.br" },
-];
+// ❌ REMOVIDO: Lista de clientes fictícios
+// Agora usa APENAS clientes reais carregados via upload
 
 // Período atual (julho/2025)
 const PERIODO_ATUAL = "2025-07";
@@ -346,7 +343,7 @@ export default function GerarFaturamento() {
               <CardContent>
                 <div className="text-2xl font-bold">{relatoriosGerados}</div>
                 <p className="text-xs text-muted-foreground">
-                  de {clientesCarregados.length || clientes.length} clientes
+                  de {clientesCarregados.length} clientes
                 </p>
               </CardContent>
             </Card>
