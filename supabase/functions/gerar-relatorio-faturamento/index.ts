@@ -143,8 +143,9 @@ const handler = async (req: Request): Promise<Response> => {
       // Somar quantidade (coluna J) e valor_bruto (coluna K) da tabela faturamento
       total_laudos = faturas.reduce((sum, fatura) => sum + (fatura.quantidade || 0), 0);
       valor_bruto = faturas.reduce((sum, fatura) => sum + (fatura.valor_bruto || 0), 0);
+      console.log(`Calculado de faturas - Total laudos: ${total_laudos}, Valor bruto: ${valor_bruto}`);
     } else {
-      console.log("Nenhuma fatura encontrada na tabela faturamento");
+      console.log("Nenhuma fatura encontrada na tabela faturamento - gerando relatório vazio");
       total_laudos = 0;
       valor_bruto = 0;
     }
