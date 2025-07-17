@@ -127,7 +127,21 @@ const handler = async (req: Request): Promise<Response> => {
       }));
     } else {
       console.log('❌ Nenhum dado de faturamento encontrado para o período');
-      throw new Error('Nenhum dado de faturamento encontrado para o período especificado');
+      console.log(`Cliente: ${cliente.nome}, Período: ${periodo}`);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Nenhum dado de faturamento encontrado',
+          details: `Não foram encontrados dados de faturamento para ${cliente.nome} no período ${periodo}. Verifique se o arquivo de faturamento foi processado corretamente.`,
+          cliente: cliente.nome,
+          periodo
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     console.log(`📈 Fonte de dados: ${fonteDados}`);
