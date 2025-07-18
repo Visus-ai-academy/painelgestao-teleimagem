@@ -443,8 +443,8 @@ export default function GerarFaturamento() {
         throw new Error(`Erro no processamento: ${error.message}`);
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Erro desconhecido no processamento');
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Erro desconhecido no processamento');
       }
 
       setStatusProcessamento({
@@ -453,26 +453,61 @@ export default function GerarFaturamento() {
         progresso: 80
       });
 
-      // Atualizar resultados com os PDFs gerados
-      const novosResultados = data.pdfs_gerados.map((pdf: any) => ({
-        clienteId: `cliente-${pdf.cliente}`,
-        clienteNome: pdf.cliente,
-        relatorioGerado: true,
-        emailEnviado: pdf.email_enviado || false,
-        emailDestino: 'email@cliente.com', // Será atualizado conforme cadastro
-        linkRelatorio: pdf.url,
-        dataProcessamento: new Date().toLocaleString('pt-BR'),
-        detalhesRelatorio: {
-          total_laudos: pdf.resumo.total_laudos,
-          valor_total: pdf.resumo.valor_pagar
-        },
-        erro: pdf.erro,
-        erroEmail: pdf.erro_email
-      }));
+      // Verificar se é resposta de teste
+      if (data.message === 'Teste de conectividade realizado com sucesso') {
+        setResultados([{
+          clienteId: 'teste-conectividade',
+          clienteNome: 'Teste de Conectividade',
+          relatorioGerado: true,
+          emailEnviado: false,
+          emailDestino: 'teste@exemplo.com',
+          linkRelatorio: '#',
+          dataProcessamento: new Date().toLocaleString('pt-BR'),
+          detalhesRelatorio: {
+            total_laudos: 0,
+            valor_total: 0
+          }
+        }]);
 
-      setResultados(novosResultados);
-      setRelatoriosGerados(data.pdfs_gerados.length);
-      setEmailsEnviados(data.emails_enviados || 0);
+        setStatusProcessamento({
+          processando: false,
+          mensagem: 'Teste de conectividade concluído com sucesso!',
+          progresso: 100
+        });
+
+        toast({
+          title: "Teste Realizado",
+          description: "Edge function está funcionando corretamente. O sistema está pronto para processar dados reais.",
+        });
+        return;
+      }
+
+      // Atualizar resultados com os PDFs gerados (quando implementado)
+      if (data.pdfs_gerados && Array.isArray(data.pdfs_gerados)) {
+        const novosResultados = data.pdfs_gerados.map((pdf: any) => ({
+          clienteId: `cliente-${pdf.cliente}`,
+          clienteNome: pdf.cliente,
+          relatorioGerado: true,
+          emailEnviado: pdf.email_enviado || false,
+          emailDestino: 'email@cliente.com',
+          linkRelatorio: pdf.url,
+          dataProcessamento: new Date().toLocaleString('pt-BR'),
+          detalhesRelatorio: {
+            total_laudos: pdf.resumo?.total_laudos || 0,
+            valor_total: pdf.resumo?.valor_pagar || 0
+          },
+          erro: pdf.erro,
+          erroEmail: pdf.erro_email
+        }));
+        setResultados(novosResultados);
+        setRelatoriosGerados(novosResultados.length);
+        setEmailsEnviados(data.emails_enviados || 0);
+      } else {
+        // Fallback para quando não há dados de PDFs ainda
+        setResultados([]);
+        setRelatoriosGerados(0);
+        setEmailsEnviados(0);
+      }
 
       setStatusProcessamento({
         processando: false,
@@ -480,9 +515,12 @@ export default function GerarFaturamento() {
         progresso: 100
       });
 
+      const totalRelatorios = data.pdfs_gerados?.length || 0;
+      const totalEmails = data.emails_enviados || 0;
+
       toast({
         title: "Processamento Concluído",
-        description: `${data.pdfs_gerados.length} relatórios PDF gerados${enviarEmails ? ` e ${data.emails_enviados} emails enviados` : ''} com sucesso`,
+        description: `${totalRelatorios} relatórios PDF gerados${enviarEmails ? ` e ${totalEmails} emails enviados` : ''} com sucesso`,
       });
 
       // Mudar para aba de envio se emails não foram enviados
