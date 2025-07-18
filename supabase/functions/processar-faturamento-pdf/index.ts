@@ -26,9 +26,9 @@ serve(async (req) => {
 
     // Buscar dados do faturamento processado
     const { data: faturamentoData, error: faturamentoError } = await supabaseClient
-      .from('faturamento_dados')
+      .from('faturamento')
       .select('*')
-      .eq('periodo', periodo);
+      .ilike('data_emissao', `${periodo}%`);
 
     if (faturamentoError) {
       console.error('Erro ao buscar dados do faturamento:', faturamentoError);
@@ -62,7 +62,7 @@ serve(async (req) => {
       }
       acc[item.cliente_nome].exames.push(item);
       acc[item.cliente_nome].total_exames++;
-      acc[item.cliente_nome].valor_total += item.valor_bruto;
+      acc[item.cliente_nome].valor_total += Number(item.valor || 0);
       return acc;
     }, {});
 
