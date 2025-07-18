@@ -14,8 +14,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let supabaseClient: any;
+  let logEntry: any = null;
+  
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -29,7 +32,7 @@ serve(async (req) => {
     console.log('Processando arquivo:', fileName)
 
     // Create log
-    const { data: logEntry, error: logError } = await supabaseClient
+    const { data: logData, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
         filename: fileName,
@@ -42,6 +45,8 @@ serve(async (req) => {
     if (logError) {
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
+    
+    logEntry = logData;
 
     // Download file
     const { data: fileData, error: downloadError } = await supabaseClient.storage
@@ -95,11 +100,11 @@ serve(async (req) => {
 
     console.log('Clientes únicos após remoção de duplicatas:', clientesUnicos.length)
 
-    // Clear existing clients
+    // Clear existing clients - usando uma condição válida
     await supabaseClient
       .from('clientes')
       .delete()
-      .neq('id', 'never-match')
+      .not('id', 'is', null)
 
     // Insert new clients
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
@@ -139,14 +144,18 @@ serve(async (req) => {
     console.error('Erro no processamento:', error.message)
 
     // Update log with error
-    if (logEntry) {
-      await supabaseClient
-        .from('upload_logs')
-        .update({
-          status: 'error',
-          error_message: error.message
-        })
-        .eq('id', logEntry.id)
+    if (logEntry && supabaseClient) {
+      try {
+        await supabaseClient
+          .from('upload_logs')
+          .update({
+            status: 'error',
+            error_message: error.message
+          })
+          .eq('id', logEntry.id)
+      } catch (logUpdateError) {
+        console.error('Erro ao atualizar log:', logUpdateError)
+      }
     }
 
     return new Response(
