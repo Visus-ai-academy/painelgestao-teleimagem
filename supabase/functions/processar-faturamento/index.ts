@@ -16,17 +16,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+  let logData: any = null;
+  
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
 
+  try {
     const { fileName } = await req.json()
     console.log('Processando arquivo:', fileName)
 
     // Criar log de upload
-    const { data: logData, error: logError } = await supabase
+    const { data: logResult, error: logError } = await supabase
       .from('upload_logs')
       .insert({
         filename: fileName,
@@ -35,6 +37,8 @@ serve(async (req) => {
       })
       .select()
       .single()
+
+    logData = logResult;
 
     if (logError) {
       console.error('Erro ao criar log:', logError)
@@ -107,6 +111,21 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Erro no processamento:', error)
+    
+    // Atualizar log com erro se possível
+    try {
+      if (logData?.id) {
+        await supabase
+          .from('upload_logs')
+          .update({
+            status: 'error',
+            error_message: error.message
+          })
+          .eq('id', logData.id)
+      }
+    } catch (logError) {
+      console.error('Erro ao atualizar log:', logError)
+    }
     
     return new Response(JSON.stringify({
       success: false,
