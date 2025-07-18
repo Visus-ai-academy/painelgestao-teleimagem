@@ -234,7 +234,7 @@ export default function PagamentosMedicos() {
 
   const resumosFiltrados = resumos.filter(resumo => {
     const nomeMatch = resumo.medico.nome.toLowerCase().includes(filtroMedico.toLowerCase());
-    const especialidadeMatch = !filtroEspecialidade || resumo.medico.especialidade === filtroEspecialidade;
+    const especialidadeMatch = !filtroEspecialidade || filtroEspecialidade === "all" || resumo.medico.especialidade === filtroEspecialidade;
     return nomeMatch && especialidadeMatch;
   });
 
@@ -294,7 +294,7 @@ export default function PagamentosMedicos() {
                   <SelectValue placeholder="Todas especialidades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas especialidades</SelectItem>
+                  <SelectItem value="all">Todas especialidades</SelectItem>
                   {especialidades.map(esp => (
                     <SelectItem key={esp} value={esp}>{esp}</SelectItem>
                   ))}
