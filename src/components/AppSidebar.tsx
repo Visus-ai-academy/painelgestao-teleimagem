@@ -56,7 +56,6 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Volumetria", url: "/volumetria", requiredRoles: ['user', 'manager', 'admin'] },
-      { title: "Financeiro", url: "/financeiro", requiredRoles: ['manager', 'admin'] },
       { title: "Qualidade", url: "/operacional/qualidade", requiredRoles: ['manager', 'admin'] },
     ]
   },
