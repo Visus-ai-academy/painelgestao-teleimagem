@@ -61,6 +61,7 @@ export type Database = {
           data_assinatura: string | null
           data_envio_assinatura: string | null
           id: string
+          medico_id: string | null
           nome_arquivo: string
           signatarios: Json | null
           status_documento: string
@@ -75,6 +76,7 @@ export type Database = {
           data_assinatura?: string | null
           data_envio_assinatura?: string | null
           id?: string
+          medico_id?: string | null
           nome_arquivo: string
           signatarios?: Json | null
           status_documento?: string
@@ -89,6 +91,7 @@ export type Database = {
           data_assinatura?: string | null
           data_envio_assinatura?: string | null
           id?: string
+          medico_id?: string | null
           nome_arquivo?: string
           signatarios?: Json | null
           status_documento?: string
@@ -102,6 +105,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_clientes_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
             referencedColumns: ["id"]
           },
         ]

@@ -23,7 +23,12 @@ import {
   Edit,
   Trash2,
   Upload,
-  Download
+  Download,
+  Send,
+  FileText,
+  CheckCircle,
+  Clock,
+  AlertCircle
 } from "lucide-react";
 
 interface Colaborador {
@@ -41,6 +46,22 @@ interface Colaborador {
   gestor: string;
   salario: number;
   foto?: string;
+  // Campos específicos para médicos
+  crm?: string;
+  categoria?: string;
+  modalidades?: string[];
+  especialidades?: string[];
+  valoresCombinacoes?: Record<string, Record<string, Record<string, number>>>;
+  documentos?: DocumentoColaborador[];
+}
+
+interface DocumentoColaborador {
+  id: string;
+  tipo_documento: 'contrato_medico' | 'aditivo_medico';
+  nome_arquivo: string;
+  status_documento: 'pendente' | 'assinatura_pendente' | 'assinado' | 'anexado';
+  data_envio?: string;
+  data_assinatura?: string;
 }
 
 const colaboradores: Colaborador[] = [
@@ -57,7 +78,20 @@ const colaboradores: Colaborador[] = [
     cpf: "123.456.789-00",
     permissoes: ["dashboard", "volumetria", "operacional"],
     gestor: "Dra. Ana Costa",
-    salario: 12000
+    salario: 12000,
+    crm: "12345-SP",
+    categoria: "Radiologista Pleno",
+    modalidades: ["Radiologia", "Tomografia"],
+    especialidades: ["Radiologia e Diagnóstico por Imagem"],
+    documentos: [
+      {
+        id: "doc1",
+        tipo_documento: 'contrato_medico',
+        nome_arquivo: 'contrato_joao_silva.pdf',
+        status_documento: 'assinado',
+        data_assinatura: '2022-03-15T10:00:00Z'
+      }
+    ]
   },
   {
     id: "2", 
@@ -72,7 +106,20 @@ const colaboradores: Colaborador[] = [
     cpf: "234.567.890-11",
     permissoes: ["dashboard", "volumetria", "operacional", "qualidade"],
     gestor: "Dr. Fernando Costa",
-    salario: 15000
+    salario: 15000,
+    crm: "23456-SP",
+    categoria: "Cardiologista",
+    modalidades: ["Ecocardiograma"],
+    especialidades: ["Cardiologia"],
+    documentos: [
+      {
+        id: "doc2",
+        tipo_documento: 'contrato_medico',
+        nome_arquivo: 'contrato_maria_santos.pdf',
+        status_documento: 'assinatura_pendente',
+        data_envio: '2024-01-10T09:00:00Z'
+      }
+    ]
   },
   {
     id: "3",
@@ -296,7 +343,7 @@ export default function Colaboradores() {
     });
   };
 
-  const handleNewColaborador = () => {
+  const handleNewColaborador = async () => {
     // Validação básica
     if (!newColaborador.nome || !newColaborador.email || !newColaborador.funcao) {
       toast({
@@ -359,6 +406,11 @@ export default function Colaboradores() {
       }
     }
 
+    // Para médicos, gerar e enviar contrato automaticamente
+    if (newColaborador.departamento === "Médico") {
+      await gerarEnviarContratoMedico();
+    }
+
     // Simular criação do colaborador
     console.log("Dados do médico:", medicoData);
     toast({
@@ -385,6 +437,69 @@ export default function Colaboradores() {
       valoresCombinacoes: {}
     });
     setShowNewColaboradorDialog(false);
+  };
+
+  const gerarEnviarContratoMedico = async () => {
+    try {
+      const response = await supabase.functions.invoke('enviar-contrato-medico', {
+        body: {
+          medicoId: Date.now().toString(), // Seria o ID real do médico
+          nomeMedico: newColaborador.nome,
+          emailMedico: newColaborador.email,
+          crm: "CRM-" + Date.now(), // Seria o CRM real
+          especialidades: medicoData.especialidades,
+          modalidades: medicoData.modalidades,
+          categoria: medicoData.categoria,
+          valoresCombinacoes: medicoData.valoresCombinacoes
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      toast({
+        title: "Contrato enviado",
+        description: `Contrato médico enviado para assinatura de ${newColaborador.nome}`,
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar contrato",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusDocumentoIcon = (status: string) => {
+    switch (status) {
+      case 'assinado':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'assinatura_pendente':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'anexado':
+        return <FileText className="h-4 w-4 text-blue-600" />;
+      case 'pendente':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <FileText className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusDocumentoText = (status: string) => {
+    switch (status) {
+      case 'assinado':
+        return 'Assinado';
+      case 'assinatura_pendente':
+        return 'Aguardando Assinatura';
+      case 'anexado':
+        return 'Anexado';
+      case 'pendente':
+        return 'Pendente';
+      default:
+        return 'Desconhecido';
+    }
   };
 
   const downloadTemplate = () => {
@@ -850,34 +965,72 @@ export default function Colaboradores() {
                     </div>
                     <div>
                       <h3 className="font-semibold">{colaborador.nome}</h3>
-                      <p className="text-sm text-gray-600">{colaborador.funcao}</p>
-                      <p className="text-xs text-gray-500">{colaborador.email}</p>
+                      <div className="text-sm text-gray-600">
+                        {colaborador.funcao} • {colaborador.departamento}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Admitido em {new Date(colaborador.dataAdmissao).toLocaleDateString('pt-BR')}
+                      </div>
+                      {/* Mostrar documentos para médicos */}
+                      {colaborador.departamento === "Medicina" && colaborador.documentos && (
+                        <div className="mt-2">
+                          <div className="text-xs font-medium text-gray-700 mb-1">Documentos:</div>
+                          <div className="space-y-1">
+                            {colaborador.documentos.map((doc) => (
+                              <div key={doc.id} className="flex items-center gap-2 text-xs">
+                                {getStatusDocumentoIcon(doc.status_documento)}
+                                <span className="capitalize">{doc.tipo_documento.replace('_', ' ')}</span>
+                                <span className={`px-2 py-1 rounded ${
+                                  doc.status_documento === 'assinado' ? 'bg-green-100 text-green-800' :
+                                  doc.status_documento === 'assinatura_pendente' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {getStatusDocumentoText(doc.status_documento)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <div className="flex items-center gap-2 mb-1">
-                        {getStatusBadge(colaborador.status)}
-                        <Badge variant="outline">{colaborador.nivel}</Badge>
+                      <div className="text-lg font-semibold text-gray-900">
+                        R$ {colaborador.salario?.toLocaleString('pt-BR')}
                       </div>
-                      <p className="text-sm text-gray-600">Admissão: {new Date(colaborador.dataAdmissao).toLocaleDateString('pt-BR')}</p>
-                      <p className="text-sm text-gray-600">Gestor: {colaborador.gestor}</p>
+                      <div className="text-sm text-gray-500">{colaborador.nivel}</div>
+                      {colaborador.crm && (
+                        <div className="text-xs text-gray-500">CRM: {colaborador.crm}</div>
+                      )}
                     </div>
                     
-                    <div className="flex flex-col gap-1">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Ver
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Acesso
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(colaborador.status)}
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {/* Botão para reenviar contrato se for médico e não estiver assinado */}
+                        {colaborador.departamento === "Medicina" && 
+                         colaborador.documentos?.some(doc => doc.status_documento !== 'assinado') && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-blue-600"
+                            title="Reenviar contrato"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -894,10 +1047,14 @@ export default function Colaboradores() {
                         ))}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Salário</p>
-                      <p className="font-semibold">R$ {colaborador.salario.toLocaleString()}</p>
-                    </div>
+                    {colaborador.crm && (
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Categoria: {colaborador.categoria}</p>
+                        <p className="text-xs text-gray-500">
+                          Modalidades: {colaborador.modalidades?.join(', ') || 'N/A'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
