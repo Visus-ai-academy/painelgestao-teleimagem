@@ -1890,11 +1890,7 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-              onUpload={async (file) => {
-                if (!isPeriodoEditavel(periodoSelecionado)) {
-                  throw new Error(`Período ${periodoSelecionado} está protegido contra modificações. Status: ${getStatusPeriodo(periodoSelecionado)}`);
-                }
-                
+              onUpload={async (file) => {                
                 try {
                   await processClientesFile(file);
                   // Limpar resultados antigos e recarregar clientes
