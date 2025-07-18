@@ -47,7 +47,7 @@ serve(async (req) => {
       const { data: faturamentoData, error: faturamentoError } = await supabase
         .from('faturamento')
         .select('*')
-        .eq('periodo', periodo);
+        .like('numero_fatura', `%${periodo}%`);
 
       if (faturamentoError) {
         console.error('Erro ao buscar dados de faturamento:', faturamentoError);
