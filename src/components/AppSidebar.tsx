@@ -11,7 +11,7 @@ import {
   ChevronDown,
   FileText
 } from "lucide-react";
-import { useLogomarca } from "@/hooks/useLogomarca";
+
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -123,7 +123,6 @@ export function AppSidebar() {
   const location = useLocation();
   const collapsed = state === "collapsed";
   const permissions = useUserPermissions();
-  const { logoUrl } = useLogomarca();
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -167,21 +166,6 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
-        <div className="p-6 border-b bg-gradient-subtle">
-          <div className="flex items-center gap-2">
-            <img 
-              src={logoUrl} 
-              alt="Teleimagem Logo" 
-              className="h-8 w-auto object-contain"
-            />
-            {!collapsed && (
-              <div>
-                <h2 className="font-bold text-lg text-foreground">Teleimagem</h2>
-                <p className="text-sm text-muted-foreground">Sistema de Gestão</p>
-              </div>
-            )}
-          </div>
-        </div>
 
         <div className="space-y-2 flex-1">
           {permissions.loading ? (

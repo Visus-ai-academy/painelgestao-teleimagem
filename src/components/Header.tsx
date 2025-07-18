@@ -33,7 +33,7 @@ export function Header() {
             className="h-8 w-auto object-contain"
           />
           <div className="flex flex-col">
-            <h1 className="text-lg font-semibold text-gray-800 leading-tight">Teleimagem</h1>
+            <h1 className="text-lg font-semibold text-gray-800 leading-tight">Painel de Gestão</h1>
           </div>
         </div>
       </div>
