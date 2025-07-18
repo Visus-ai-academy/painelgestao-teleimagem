@@ -265,6 +265,15 @@ const categoriasMedico = [
   "Especialista"
 ];
 
+const categoriasExame = [
+  "Simples",
+  "Complexo",
+  "Intervencionista",
+  "Contrastado",
+  "Funcional",
+  "Dinâmico"
+];
+
 export default function Colaboradores() {
   const [filtroFuncao, setFiltroFuncao] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -287,7 +296,7 @@ export default function Colaboradores() {
     categoria: "",
     modalidades: [] as string[],
     especialidades: [] as string[],
-    valoresCombinacoes: {} as Record<string, Record<string, Record<string, string>>>, // modalidade -> especialidade -> prioridade -> valor
+    valoresCombinacoes: {} as Record<string, Record<string, Record<string, Record<string, string>>>>, // modalidade -> especialidade -> categoria_exame -> prioridade -> valor
     crm: "",
     rqe: ""
   });
@@ -333,12 +342,13 @@ export default function Colaboradores() {
     }
   };
 
-  const handleValorCombinacaoChange = (modalidade: string, especialidade: string, prioridade: string, valor: string) => {
+  const handleValorCombinacaoChange = (modalidade: string, especialidade: string, categoriaExame: string, prioridade: string, valor: string) => {
     setMedicoData(prev => {
       const newValues = { ...prev.valoresCombinacoes };
       if (!newValues[modalidade]) newValues[modalidade] = {};
       if (!newValues[modalidade][especialidade]) newValues[modalidade][especialidade] = {};
-      newValues[modalidade][especialidade][prioridade] = valor;
+      if (!newValues[modalidade][especialidade][categoriaExame]) newValues[modalidade][especialidade][categoriaExame] = {};
+      newValues[modalidade][especialidade][categoriaExame][prioridade] = valor;
       
       return {
         ...prev,
@@ -391,11 +401,13 @@ export default function Colaboradores() {
       let combinacoesSemValor: string[] = [];
       medicoData.modalidades.forEach(modalidade => {
         medicoData.especialidades.forEach(especialidade => {
-          prioridadesDisponiveis.forEach(prioridade => {
-            const valor = medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade];
-            if (!valor || parseFloat(valor) <= 0) {
-              combinacoesSemValor.push(`${modalidade} - ${especialidade} - ${prioridade}`);
-            }
+          categoriasExame.forEach(categoriaExame => {
+            prioridadesDisponiveis.forEach(prioridade => {
+              const valor = medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[categoriaExame]?.[prioridade];
+              if (!valor || parseFloat(valor) <= 0) {
+                combinacoesSemValor.push(`${modalidade} - ${especialidade} - ${categoriaExame} - ${prioridade}`);
+              }
+            });
           });
         });
       });
@@ -403,7 +415,7 @@ export default function Colaboradores() {
       if (combinacoesSemValor.length > 0) {
         toast({
           title: "Erro",
-          description: `Por favor, defina valores válidos para todas as combinações. Faltam: ${combinacoesSemValor.slice(0, 3).join(', ')}${combinacoesSemValor.length > 3 ? '...' : ''}`,
+          description: `Por favor, defina valores válidos para todas as combinações. Faltam: ${combinacoesSemValor.slice(0, 2).join(', ')}${combinacoesSemValor.length > 2 ? '...' : ''}`,
           variant: "destructive"
         });
         return;
@@ -973,40 +985,45 @@ export default function Colaboradores() {
 
                           {(medicoData.modalidades.length > 0 && medicoData.especialidades.length > 0) && (
                             <div className="col-span-2">
-                              <Label>Valores por Combinação (Modalidade + Especialidade + Prioridade) *</Label>
+                              <Label>Valores por Combinação (Modalidade + Especialidade + Categoria do Exame + Prioridade) *</Label>
                               <div className="space-y-4 mt-2 p-4 border rounded-lg max-h-80 overflow-y-auto bg-muted/30">
                                 {medicoData.modalidades.map((modalidade) => (
                                   <div key={modalidade} className="bg-background p-4 rounded-lg border-l-4 border-primary">
                                     <h4 className="font-medium text-sm mb-3 text-primary">{modalidade}</h4>
                                     {medicoData.especialidades.map((especialidade) => (
                                       <div key={`${modalidade}-${especialidade}`} className="mb-4 last:mb-0">
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 bg-muted/50 p-1 rounded">{especialidade}</h5>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {prioridadesDisponiveis.map((prioridade) => (
-                                            <div key={`${modalidade}-${especialidade}-${prioridade}`} className="space-y-1">
-                                              <Label className="text-xs font-medium">{prioridade}</Label>
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-xs text-muted-foreground">R$</span>
-                                                <Input
-                                                  type="number"
-                                                  step="0.01"
-                                                  min="0"
-                                                  value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade] || ""}
-                                                  onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, prioridade, e.target.value)}
-                                                  placeholder="0,00"
-                                                  className="text-xs h-8"
-                                                />
-                                              </div>
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 bg-muted/50 p-2 rounded">{especialidade}</h5>
+                                        {categoriasExame.map((categoriaExame) => (
+                                          <div key={`${modalidade}-${especialidade}-${categoriaExame}`} className="mb-3 p-2 border border-dashed border-muted-foreground/30 rounded">
+                                            <h6 className="text-xs font-medium text-foreground mb-2 bg-accent/50 p-1 rounded">{categoriaExame}</h6>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              {prioridadesDisponiveis.map((prioridade) => (
+                                                <div key={`${modalidade}-${especialidade}-${categoriaExame}-${prioridade}`} className="space-y-1">
+                                                  <Label className="text-xs font-medium">{prioridade}</Label>
+                                                  <div className="flex items-center gap-1">
+                                                    <span className="text-xs text-muted-foreground">R$</span>
+                                                    <Input
+                                                      type="number"
+                                                      step="0.01"
+                                                      min="0"
+                                                      value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[categoriaExame]?.[prioridade] || ""}
+                                                      onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, categoriaExame, prioridade, e.target.value)}
+                                                      placeholder="0,00"
+                                                      className="text-xs h-8"
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))}
                                             </div>
-                                          ))}
-                                        </div>
+                                          </div>
+                                        ))}
                                       </div>
                                     ))}
                                   </div>
                                 ))}
                               </div>
                               <p className="text-xs text-muted-foreground mt-2 italic">
-                                * Configure valores específicos para cada combinação. A remuneração será calculada automaticamente baseada no volume de exames produzidos.
+                                * Configure valores específicos para cada combinação de 4 fatores: Modalidade + Especialidade + Categoria do Exame + Prioridade. A remuneração será calculada automaticamente baseada no volume de exames produzidos.
                               </p>
                             </div>
                           )}
