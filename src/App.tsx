@@ -19,6 +19,7 @@ import Escala from "./pages/Escala";
 import Financeiro from "./pages/Financeiro";
 import GerarFaturamento from "./pages/GerarFaturamento";
 import ReguaCobranca from "./pages/ReguaCobranca";
+import PagamentosMedicos from "./pages/PagamentosMedicos";
 import ConfiguracaoFaturamento from "./pages/ConfiguracaoFaturamento";
 import ConfiguracaoLogomarca from "./pages/ConfiguracaoLogomarca";
 import GerenciarUsuarios from "./pages/GerenciarUsuarios";
@@ -92,6 +93,11 @@ const App = () => {
                     <Route path="/financeiro/regua-cobranca" element={
                       <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                         <ReguaCobranca />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/financeiro/pagamentos" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <PagamentosMedicos />
                       </RoleProtectedRoute>
                     } />
                     <Route path="/people/*" element={<People />} />
