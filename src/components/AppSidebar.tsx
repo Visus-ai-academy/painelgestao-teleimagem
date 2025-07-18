@@ -52,18 +52,11 @@ const menuItems: MenuItem[] = [
     title: "Dashboard", 
     url: "/", 
     icon: Home,
-    requiredRoles: ['user', 'manager', 'admin']
-  },
-  { 
-    title: "Volumetria", 
-    url: "/volumetria", 
-    icon: BarChart3,
     requiredRoles: ['user', 'manager', 'admin'],
     subItems: [
-      { title: "Volume Diário", url: "/volumetria/diario", requiredRoles: ['user', 'manager', 'admin'] },
-      { title: "Volume Mensal", url: "/volumetria/mensal", requiredRoles: ['user', 'manager', 'admin'] },
-      { title: "Volume Anual", url: "/volumetria/anual", requiredRoles: ['user', 'manager', 'admin'] },
-      { title: "Por Modalidade", url: "/volumetria/modalidade", requiredRoles: ['user', 'manager', 'admin'] },
+      { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
+      { title: "Volumetria", url: "/volumetria", requiredRoles: ['user', 'manager', 'admin'] },
+      { title: "Financeiro", url: "/financeiro", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 
@@ -72,7 +65,6 @@ const menuItems: MenuItem[] = [
     icon: Activity,
     requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Produção", url: "/operacional/producao", requiredRoles: ['manager', 'admin'] },
       { title: "Qualidade", url: "/operacional/qualidade", requiredRoles: ['manager', 'admin'] },
       { title: "Escala", url: "/operacional/escala", requiredRoles: ['manager', 'admin'] },
     ]
@@ -83,7 +75,6 @@ const menuItems: MenuItem[] = [
     icon: DollarSign,
     requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Gerar Faturamento", url: "/financeiro/gerar-faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Régua de Cobrança", url: "/financeiro/regua-cobranca", requiredRoles: ['manager', 'admin'] },
       { title: "Pagamentos Médicos", url: "/financeiro/pagamentos", requiredRoles: ['admin'] },
