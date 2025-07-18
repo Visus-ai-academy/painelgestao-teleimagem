@@ -12,11 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLogomarca } from "@/hooks/useLogomarca";
 
 export function Header() {
   const { user, signOut } = useAuth();
-  const { logoUrl } = useLogomarca();
 
   const handleSignOut = async () => {
     await signOut();
@@ -27,11 +25,6 @@ export function Header() {
       <div className="flex items-center gap-4">
         <SidebarTrigger />
         <div className="flex items-center gap-3">
-          <img 
-            src={logoUrl} 
-            alt="Teleimagem Logo" 
-            className="h-8 w-auto object-contain"
-          />
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold text-gray-800 leading-tight">Painel de Gestão</h1>
           </div>

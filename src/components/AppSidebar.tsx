@@ -33,6 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useUserPermissions, useHasMenuPermission, UserRole } from "@/hooks/useUserPermissions";
+import { useLogomarca } from "@/hooks/useLogomarca";
 
 interface MenuItem {
   title: string;
@@ -123,6 +124,7 @@ export function AppSidebar() {
   const location = useLocation();
   const collapsed = state === "collapsed";
   const permissions = useUserPermissions();
+  const { logoUrl } = useLogomarca();
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -166,6 +168,20 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
+        <div className="p-6 border-b bg-gradient-subtle">
+          <div className="flex items-center gap-2">
+            <img 
+              src={logoUrl} 
+              alt="Teleimagem Logo" 
+              className="h-8 w-auto object-contain"
+            />
+            {!collapsed && (
+              <div>
+                <h2 className="font-bold text-lg text-foreground">Painel de Gestão</h2>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="space-y-2 flex-1">
           {permissions.loading ? (
