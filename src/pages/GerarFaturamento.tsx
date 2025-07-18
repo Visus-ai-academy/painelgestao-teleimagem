@@ -35,7 +35,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ControlePeriodo, StatusPeriodoUpload, isPeriodoEditavel, getStatusPeriodo } from "@/components/ControlePeriodo";
+import { Separator } from "@/components/ui/separator";
+import { ControlePeriodo } from "@/components/ControlePeriodo";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -1200,31 +1201,11 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-                onUpload={async (file) => {
-                  if (!isPeriodoEditavel(periodoSelecionado)) {
-                    throw new Error(`Período ${periodoSelecionado} está protegido contra modificações. Status: ${getStatusPeriodo(periodoSelecionado)}`);
-                  }
-                  
-                  try {
-                    await processClientesFile(file);
-                    // Limpar resultados antigos e recarregar clientes
-                    setResultados([]);
-                    setRelatoriosGerados(0);
-                    setEmailsEnviados(0);
-                    await carregarClientes();
-                    
-                    toast({
-                      title: "Upload Concluído",
-                      description: `Clientes carregados para o período ${periodoSelecionado}!`,
-                    });
-                  } catch (error: any) {
-                    toast({
-                      title: "Erro no Upload",
-                      description: error.message,
-                      variant: "destructive",
-                    });
-                  }
-                }}
+              onUpload={async (file) => {
+                if (!isPeriodoEditavel(periodoSelecionado)) {
+                  throw new Error(`Período ${periodoSelecionado} está protegido contra modificações. Status: ${getStatusPeriodo(periodoSelecionado)}`);
+                }
+                
                 try {
                   await processClientesFile(file);
                   // Limpar resultados antigos e recarregar clientes
@@ -1235,7 +1216,7 @@ export default function GerarFaturamento() {
                   
                   toast({
                     title: "Upload Concluído",
-                    description: "Clientes carregados com sucesso! Agora você pode gerar relatórios.",
+                    description: `Clientes carregados para o período ${periodoSelecionado}!`,
                   });
                 } catch (error: any) {
                   toast({
@@ -1344,9 +1325,10 @@ export default function GerarFaturamento() {
                   });
                 }
               }}
-              icon={<FileBarChart2 className="h-5 w-5" />}
+               icon={<FileBarChart2 className="h-5 w-5" />}
              />
            </div>
+           </>
            )}
          </TabsContent>
 
