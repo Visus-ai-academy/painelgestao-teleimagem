@@ -312,10 +312,6 @@ function gerarPDFCliente(cliente: ClienteResumo, periodo: string): jsPDF {
     format: 'a4'
   });
 
-  // Configurar senha (4 primeiros dígitos do CNPJ)
-  const senha = cliente.cnpj.replace(/\D/g, '').substring(0, 4);
-  pdf.setUserPermissions(['print'], senha);
-
   const pageWidth = 297; // A4 landscape width
   const pageHeight = 210; // A4 landscape height
   let yPosition = 20;
