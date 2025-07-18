@@ -24,7 +24,13 @@ serve(async (req) => {
   )
 
   try {
-    const { fileName } = await req.json()
+    const body = await req.json()
+    const fileName = body?.fileName
+    
+    if (!fileName) {
+      throw new Error('Nome do arquivo é obrigatório')
+    }
+    
     console.log('Processando arquivo:', fileName)
 
     // Criar log de upload
@@ -55,15 +61,28 @@ serve(async (req) => {
       throw new Error('Erro ao baixar arquivo')
     }
 
+    if (!fileData) {
+      throw new Error('Arquivo não encontrado no storage')
+    }
+
     // Converter para ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer()
     
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error('Arquivo vazio ou corrompido')
+    }
+    
     // Ler arquivo Excel
     const workbook = read(arrayBuffer)
+    
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Planilha não encontrada no arquivo')
+    }
+    
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
     const jsonData = utils.sheet_to_json(worksheet)
 
-    console.log('Dados extraídos:', jsonData.length, 'registros')
+    console.log('Dados extraídos:', jsonData?.length || 0, 'registros')
 
     // Processar dados
     const faturamentoData = jsonData.map((row: any) => ({
@@ -91,13 +110,15 @@ serve(async (req) => {
     }
 
     // Atualizar log de sucesso
-    await supabase
-      .from('upload_logs')
-      .update({
-        status: 'completed',
-        records_processed: faturamentoData.length
-      })
-      .eq('id', logData.id)
+    if (logData?.id) {
+      await supabase
+        .from('upload_logs')
+        .update({
+          status: 'completed',
+          records_processed: faturamentoData.length
+        })
+        .eq('id', logData.id)
+    }
 
     console.log('Processamento concluído com sucesso')
 
