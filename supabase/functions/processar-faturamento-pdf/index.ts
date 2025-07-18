@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,23 +120,22 @@ serve(async (req) => {
 
     for (const [nomeCliente, resumo] of clientesResumo) {
       try {
-        console.log(`Gerando PDF para cliente: ${nomeCliente}`);
+        console.log(`Processando cliente: ${nomeCliente}`);
         
-        // Gerar PDF
-        const pdf = gerarPDFCliente(resumo, periodo);
-        const pdfBytes = pdf.output('arraybuffer');
+        // Por enquanto, vamos criar um relatório em texto simples
+        const relatorioTexto = gerarRelatorioTexto(resumo, periodo);
         
-        // Upload do PDF para storage
-        const nomeArquivo = `faturamento_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+        // Upload do relatório como arquivo de texto
+        const nomeArquivo = `faturamento_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.txt`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('uploads')
-          .upload(`relatorios/${nomeArquivo}`, pdfBytes, {
-            contentType: 'application/pdf',
+          .upload(`relatorios/${nomeArquivo}`, relatorioTexto, {
+            contentType: 'text/plain',
             upsert: true
           });
 
         if (uploadError) {
-          console.error(`Erro no upload do PDF para ${nomeCliente}:`, uploadError);
+          console.error(`Erro no upload do relatório para ${nomeCliente}:`, uploadError);
           pdfsGerados.push({
             cliente: nomeCliente,
             erro: `Erro no upload: ${uploadError.message}`,
@@ -146,7 +144,7 @@ serve(async (req) => {
           continue;
         }
 
-        // URL pública do PDF
+        // URL pública do relatório
         const { data: { publicUrl } } = supabase.storage
           .from('uploads')
           .getPublicUrl(`relatorios/${nomeArquivo}`);
@@ -161,7 +159,7 @@ serve(async (req) => {
           email_enviado: false
         });
 
-        console.log(`PDF gerado com sucesso para ${nomeCliente}: ${publicUrl}`);
+        console.log(`Relatório gerado com sucesso para ${nomeCliente}: ${publicUrl}`);
 
       } catch (error) {
         console.error(`Erro ao processar cliente ${nomeCliente}:`, error);
@@ -173,7 +171,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Processamento concluído: ${pdfsGerados.length} PDFs processados`);
+    console.log(`Processamento concluído: ${pdfsGerados.length} relatórios processados`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -206,72 +204,41 @@ serve(async (req) => {
   }
 });
 
-function gerarPDFCliente(cliente: ClienteResumo, periodo: string): jsPDF {
+function gerarRelatorioTexto(cliente: ClienteResumo, periodo: string): string {
   try {
-    console.log(`Gerando PDF para cliente: ${cliente.nome}`);
+    console.log(`Gerando relatório em texto para cliente: ${cliente.nome}`);
     
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    const relatorio = `
+RELATÓRIO DE FATURAMENTO
+========================
 
-    const pageWidth = 210;
-    let yPosition = 20;
+Cliente: ${cliente.nome}
+Período: ${formatarPeriodo(periodo)}
+Data de Geração: ${new Date().toLocaleString('pt-BR')}
 
-    // Título
-    pdf.setFontSize(16);
-    pdf.setFont(undefined, 'bold');
-    pdf.text('RELATÓRIO DE FATURAMENTO', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
+RESUMO FINANCEIRO
+-----------------
+Total de Laudos: ${cliente.totalLaudos}
+Valor Total: R$ ${cliente.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 
-    // Dados do cliente
-    pdf.setFontSize(12);
-    pdf.text(`Cliente: ${cliente.nome}`, 20, yPosition);
-    yPosition += 10;
-    pdf.text(`Período: ${formatarPeriodo(periodo)}`, 20, yPosition);
-    yPosition += 20;
+DETALHAMENTO DOS EXAMES
+-----------------------
+${cliente.exames.slice(0, 20).map((exame, index) => {
+  const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
+  return `${index + 1}. Cliente: ${exame.cliente || exame.Cliente || ''} - Valor: R$ ${valor.toFixed(2)}`;
+}).join('\n')}
 
-    // Resumo financeiro
-    pdf.setFont(undefined, 'bold');
-    pdf.text('RESUMO FINANCEIRO', 20, yPosition);
-    yPosition += 10;
-    
-    pdf.setFont(undefined, 'normal');
-    pdf.text(`Total de Laudos: ${cliente.totalLaudos}`, 20, yPosition);
-    yPosition += 8;
-    pdf.text(`Valor Total: R$ ${cliente.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, yPosition);
-    yPosition += 20;
+${cliente.exames.length > 20 ? `\n... e mais ${cliente.exames.length - 20} exames` : ''}
 
-    // Detalhamento
-    pdf.setFont(undefined, 'bold');
-    pdf.text('DETALHAMENTO', 20, yPosition);
-    yPosition += 10;
+---
+Relatório gerado automaticamente pelo sistema
+    `;
 
-    // Lista simplificada dos exames
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(10);
-    
-    cliente.exames.slice(0, 10).forEach((exame, index) => {
-      if (yPosition > 260) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
-      pdf.text(`${index + 1}. Cliente: ${exame.cliente || exame.Cliente || ''} - Valor: R$ ${valor.toFixed(2)}`, 20, yPosition);
-      yPosition += 6;
-    });
-
-    if (cliente.exames.length > 10) {
-      pdf.text(`... e mais ${cliente.exames.length - 10} exames`, 20, yPosition);
-    }
-
-    console.log(`PDF gerado com sucesso para cliente: ${cliente.nome}`);
-    return pdf;
+    console.log(`Relatório em texto gerado com sucesso para cliente: ${cliente.nome}`);
+    return relatorio;
   } catch (error: any) {
-    console.error(`Erro ao gerar PDF para cliente ${cliente.nome}:`, error);
-    throw new Error(`Falha na geração do PDF: ${error.message}`);
+    console.error(`Erro ao gerar relatório para cliente ${cliente.nome}:`, error);
+    throw new Error(`Falha na geração do relatório: ${error.message}`);
   }
 }
 
