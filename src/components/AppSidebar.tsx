@@ -11,7 +11,7 @@ import {
   ChevronDown,
   FileText
 } from "lucide-react";
-import teleimagemlLogo from "@/assets/teleimagem-logo.jpg";
+import { useLogomarca } from "@/hooks/useLogomarca";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -123,6 +123,7 @@ export function AppSidebar() {
   const location = useLocation();
   const collapsed = state === "collapsed";
   const permissions = useUserPermissions();
+  const { logoUrl } = useLogomarca();
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -169,7 +170,7 @@ export function AppSidebar() {
         <div className="p-6 border-b bg-gradient-subtle">
           <div className="flex items-center gap-2">
             <img 
-              src={teleimagemlLogo} 
+              src={logoUrl} 
               alt="Teleimagem Logo" 
               className="h-8 w-auto object-contain"
             />

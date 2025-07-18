@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useLogomarca } from '@/hooks/useLogomarca';
 
 export default function ConfiguracaoLogomarca() {
   const [uploading, setUploading] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const { toast } = useToast();
+  const { logoUrl, refreshLogo } = useLogomarca();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -56,13 +57,14 @@ export default function ConfiguracaoLogomarca() {
         .from('logomarcas')
         .getPublicUrl(fileName);
 
-      setLogoUrl(publicUrl);
-
       toast({
         title: "Sucesso",
         description: "Logomarca enviada com sucesso!",
         variant: "default"
       });
+
+      // Atualizar a logomarca em toda a aplicação
+      refreshLogo();
 
     } catch (error: any) {
       console.error('Erro no upload:', error);
@@ -86,11 +88,13 @@ export default function ConfiguracaoLogomarca() {
         throw error;
       }
 
-      setLogoUrl(null);
       toast({
         title: "Sucesso",
         description: "Logomarca removida com sucesso!",
       });
+
+      // Atualizar a logomarca em toda a aplicação
+      refreshLogo();
 
     } catch (error: any) {
       console.error('Erro ao remover:', error);
@@ -102,26 +106,6 @@ export default function ConfiguracaoLogomarca() {
     }
   };
 
-  // Carregar logomarca existente ao inicializar
-  React.useEffect(() => {
-    const loadExistingLogo = async () => {
-      try {
-        const { data: { publicUrl } } = supabase.storage
-          .from('logomarcas')
-          .getPublicUrl('logomarca.jpg');
-        
-        // Verificar se a imagem existe
-        const response = await fetch(publicUrl, { method: 'HEAD' });
-        if (response.ok) {
-          setLogoUrl(publicUrl);
-        }
-      } catch (error) {
-        console.log('Nenhuma logomarca encontrada');
-      }
-    };
-
-    loadExistingLogo();
-  }, []);
 
   return (
     <div className="p-6 space-y-6">

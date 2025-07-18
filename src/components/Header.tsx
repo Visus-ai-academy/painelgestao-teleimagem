@@ -12,10 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import teleimagemlLogo from "@/assets/teleimagem-logo.jpg";
+import { useLogomarca } from "@/hooks/useLogomarca";
 
 export function Header() {
   const { user, signOut } = useAuth();
+  const { logoUrl } = useLogomarca();
 
   const handleSignOut = async () => {
     await signOut();
@@ -27,7 +28,7 @@ export function Header() {
         <SidebarTrigger />
         <div className="flex items-center gap-3">
           <img 
-            src={teleimagemlLogo} 
+            src={logoUrl} 
             alt="Teleimagem Logo" 
             className="h-8 w-auto object-contain"
           />
