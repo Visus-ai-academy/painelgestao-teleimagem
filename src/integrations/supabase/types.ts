@@ -348,6 +348,78 @@ export type Database = {
         }
         Relationships: []
       }
+      exames: {
+        Row: {
+          categoria: string
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          data_exame: string
+          especialidade: string
+          id: string
+          medico_id: string
+          modalidade: string
+          observacoes: string | null
+          paciente_nome: string
+          quantidade: number
+          status: string
+          updated_at: string
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          categoria: string
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          data_exame: string
+          especialidade: string
+          id?: string
+          medico_id: string
+          modalidade: string
+          observacoes?: string | null
+          paciente_nome: string
+          quantidade?: number
+          status?: string
+          updated_at?: string
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          categoria?: string
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_exame?: string
+          especialidade?: string
+          id?: string
+          medico_id?: string
+          modalidade?: string
+          observacoes?: string | null
+          paciente_nome?: string
+          quantidade?: number
+          status?: string
+          updated_at?: string
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exames_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exames_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faturamento: {
         Row: {
           cliente_email: string | null
@@ -517,6 +589,68 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pagamentos_medicos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_pagamento: string | null
+          descontos: number
+          detalhes: Json | null
+          id: string
+          medico_id: string
+          observacoes: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          status: string
+          total_exames: number
+          updated_at: string
+          valor_bruto: number
+          valor_liquido: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string | null
+          descontos?: number
+          detalhes?: Json | null
+          id?: string
+          medico_id: string
+          observacoes?: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          status?: string
+          total_exames?: number
+          updated_at?: string
+          valor_bruto?: number
+          valor_liquido?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string | null
+          descontos?: number
+          detalhes?: Json | null
+          id?: string
+          medico_id?: string
+          observacoes?: string | null
+          periodo_fim?: string
+          periodo_inicio?: string
+          status?: string
+          total_exames?: number
+          updated_at?: string
+          valor_bruto?: number
+          valor_liquido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_medicos_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prioridades: {
         Row: {
