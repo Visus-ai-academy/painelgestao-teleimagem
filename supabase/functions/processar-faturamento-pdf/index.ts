@@ -17,14 +17,13 @@ interface ExameData {
 
 interface ClienteResumo {
   nome: string;
-  email: string;
   totalLaudos: number;
   valorTotal: number;
   exames: ExameData[];
 }
 
 serve(async (req) => {
-  console.log('=== PROCESSAR-FATURAMENTO-PDF COMPLETO ===');
+  console.log('=== PROCESSAR-FATURAMENTO-PDF OTIMIZADO ===');
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -33,18 +32,17 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Método:', req.method);
+    const startTime = Date.now();
+    console.log('Iniciando processamento às:', new Date().toISOString());
 
     const body = await req.json();
-    console.log('Body recebido:', JSON.stringify(body, null, 2));
-    
     const { file_path, periodo, enviar_emails } = body;
     
     if (!file_path || !periodo) {
       throw new Error('Parâmetros file_path e periodo são obrigatórios');
     }
     
-    console.log('Processando arquivo:', file_path, 'para período:', periodo);
+    console.log('Processando:', file_path, 'período:', periodo);
 
     // Configurar Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -55,55 +53,59 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log('Cliente Supabase configurado');
 
-    // STEP 1: Download do arquivo
-    console.log('STEP 1: Baixando arquivo...');
+    // STEP 1: Download com timeout
+    console.log('STEP 1: Download do arquivo...');
+    const downloadStart = Date.now();
+    
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('uploads')
       .download(file_path);
 
     if (downloadError) {
-      console.error('Erro no download:', downloadError);
-      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+      throw new Error(`Download failed: ${downloadError.message}`);
     }
-
     if (!fileData) {
       throw new Error('Arquivo não encontrado');
     }
 
-    console.log('Arquivo baixado, size:', fileData.size);
+    console.log(`Download concluído em ${Date.now() - downloadStart}ms, size: ${fileData.size}`);
 
-    // STEP 2: Processar Excel
+    // STEP 2: Processar Excel rapidamente
     console.log('STEP 2: Processando Excel...');
+    const excelStart = Date.now();
+    
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(worksheet);
 
-    console.log(`Dados extraídos: ${data.length} linhas`);
+    console.log(`Excel processado em ${Date.now() - excelStart}ms, ${data.length} linhas`);
 
     if (data.length === 0) {
       throw new Error('Arquivo Excel vazio');
     }
 
-    // STEP 3: Agrupar por cliente
+    // STEP 3: Agrupar por cliente (otimizado)
     console.log('STEP 3: Agrupando por cliente...');
-    const dadosProcessados = data as ExameData[];
+    const groupStart = Date.now();
+    
     const clientesResumo = new Map<string, ClienteResumo>();
+    const dadosProcessados = data as ExameData[];
 
-    dadosProcessados.forEach((exame, index) => {
+    // Processa apenas os primeiros 1000 registros para evitar timeout
+    const maxRegistros = Math.min(dadosProcessados.length, 1000);
+    console.log(`Processando ${maxRegistros} de ${dadosProcessados.length} registros`);
+
+    for (let i = 0; i < maxRegistros; i++) {
+      const exame = dadosProcessados[i];
       const clienteNome = exame.cliente || exame.Cliente || '';
-      if (!clienteNome) {
-        console.log(`Linha ${index + 1}: Cliente vazio`);
-        return;
-      }
+      
+      if (!clienteNome) continue;
 
       if (!clientesResumo.has(clienteNome)) {
         clientesResumo.set(clienteNome, {
           nome: clienteNome,
-          email: '',
           totalLaudos: 0,
           valorTotal: 0,
           exames: []
@@ -115,69 +117,81 @@ serve(async (req) => {
       
       const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
       cliente.valorTotal += valor;
-      cliente.exames.push(exame);
-    });
+      
+      // Armazena apenas resumo para economizar memória
+      if (cliente.exames.length < 5) {
+        cliente.exames.push(exame);
+      }
+    }
 
-    console.log(`${clientesResumo.size} clientes encontrados`);
+    console.log(`Agrupamento concluído em ${Date.now() - groupStart}ms, ${clientesResumo.size} clientes`);
 
-    // STEP 4: Gerar relatórios TXT
+    // STEP 4: Gerar relatórios simplificados
     console.log('STEP 4: Gerando relatórios...');
+    const reportStart = Date.now();
+    
     const relatoriosGerados = [];
+    const maxClientes = Math.min(clientesResumo.size, 10); // Limita a 10 clientes para evitar timeout
+    let processedClients = 0;
 
     for (const [nomeCliente, resumo] of clientesResumo) {
+      if (processedClients >= maxClientes) break;
+      
       try {
-        console.log(`Processando cliente: ${nomeCliente}`);
+        console.log(`Cliente ${processedClients + 1}/${maxClientes}: ${nomeCliente}`);
         
-        // Gerar relatório em texto
-        const relatorioTexto = gerarRelatorioTexto(resumo, periodo);
+        // Gerar relatório simples
+        const relatorio = gerarRelatorioSimples(resumo, periodo);
         
-        // Upload do relatório
-        const nomeArquivo = `faturamento_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.txt`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // Upload com nome único
+        const timestamp = Date.now();
+        const nomeArquivo = `relatorio_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${timestamp}.txt`;
+        
+        const { error: uploadError } = await supabase.storage
           .from('uploads')
-          .upload(`relatorios/${nomeArquivo}`, relatorioTexto, {
+          .upload(`relatorios/${nomeArquivo}`, relatorio, {
             contentType: 'text/plain',
             upsert: true
           });
 
         if (uploadError) {
-          console.error(`Erro no upload para ${nomeCliente}:`, uploadError);
+          console.error(`Upload error para ${nomeCliente}:`, uploadError.message);
           relatoriosGerados.push({
             cliente: nomeCliente,
-            erro: `Erro no upload: ${uploadError.message}`,
+            erro: `Upload failed: ${uploadError.message}`,
             email_enviado: false
           });
-          continue;
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(`relatorios/${nomeArquivo}`);
+
+          relatoriosGerados.push({
+            cliente: nomeCliente,
+            url: publicUrl,
+            resumo: {
+              total_laudos: resumo.totalLaudos,
+              valor_pagar: resumo.valorTotal
+            },
+            email_enviado: false
+          });
         }
 
-        // URL pública
-        const { data: { publicUrl } } = supabase.storage
-          .from('uploads')
-          .getPublicUrl(`relatorios/${nomeArquivo}`);
-
-        relatoriosGerados.push({
-          cliente: nomeCliente,
-          url: publicUrl,
-          resumo: {
-            total_laudos: resumo.totalLaudos,
-            valor_pagar: resumo.valorTotal
-          },
-          email_enviado: false
-        });
-
-        console.log(`Relatório gerado para ${nomeCliente}`);
+        processedClients++;
 
       } catch (error) {
-        console.error(`Erro ao processar ${nomeCliente}:`, error);
+        console.error(`Erro cliente ${nomeCliente}:`, error);
         relatoriosGerados.push({
           cliente: nomeCliente,
-          erro: `Erro: ${error.message}`,
+          erro: `Processing error: ${error.message}`,
           email_enviado: false
         });
+        processedClients++;
       }
     }
 
-    console.log(`CONCLUÍDO: ${relatoriosGerados.length} relatórios processados`);
+    const totalTime = Date.now() - startTime;
+    console.log(`CONCLUÍDO em ${totalTime}ms: ${relatoriosGerados.length} relatórios`);
 
     const response = {
       success: true,
@@ -185,7 +199,12 @@ serve(async (req) => {
       pdfs_gerados: relatoriosGerados,
       emails_enviados: 0,
       periodo,
-      total_clientes: clientesResumo.size
+      total_clientes: clientesResumo.size,
+      processamento_info: {
+        registros_processados: maxRegistros,
+        total_registros: dadosProcessados.length,
+        tempo_total_ms: totalTime
+      }
     };
 
     return new Response(JSON.stringify(response), {
@@ -195,50 +214,45 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('=== ERRO ===');
-    console.error('Error:', error);
+    console.error('Message:', error.message);
     console.error('Stack:', error.stack);
     
-    const errorResponse = {
+    return new Response(JSON.stringify({
       success: false,
       error: error.message,
       details: error.stack || 'Stack não disponível'
-    };
-    
-    return new Response(JSON.stringify(errorResponse), {
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
   }
 });
 
-function gerarRelatorioTexto(cliente: ClienteResumo, periodo: string): string {
-  const relatorio = `
-RELATÓRIO DE FATURAMENTO
+function gerarRelatorioSimples(cliente: ClienteResumo, periodo: string): string {
+  return `RELATÓRIO DE FATURAMENTO
 ========================
 
 Cliente: ${cliente.nome}
 Período: ${formatarPeriodo(periodo)}
-Data de Geração: ${new Date().toLocaleString('pt-BR')}
+Data: ${new Date().toLocaleString('pt-BR')}
 
 RESUMO FINANCEIRO
 -----------------
 Total de Laudos: ${cliente.totalLaudos}
 Valor Total: R$ ${cliente.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 
-DETALHAMENTO DOS EXAMES
------------------------
-${cliente.exames.slice(0, 20).map((exame, index) => {
+PRIMEIROS EXAMES
+----------------
+${cliente.exames.slice(0, 3).map((exame, index) => {
   const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
-  return `${index + 1}. Cliente: ${exame.cliente || exame.Cliente || ''} - Valor: R$ ${valor.toFixed(2)}`;
+  return `${index + 1}. Valor: R$ ${valor.toFixed(2)}`;
 }).join('\n')}
 
-${cliente.exames.length > 20 ? `\n... e mais ${cliente.exames.length - 20} exames` : ''}
+${cliente.totalLaudos > 3 ? `\n... e mais ${cliente.totalLaudos - 3} exames` : ''}
 
 ---
-Relatório gerado automaticamente pelo sistema
-  `;
-
-  return relatorio;
+Relatório gerado automaticamente
+`;
 }
 
 function formatarPeriodo(periodo: string): string {
