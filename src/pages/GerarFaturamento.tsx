@@ -1860,16 +1860,16 @@ export default function GerarFaturamento() {
           
           {fonteDados === 'upload' && (
           <>
-            {/* Aviso sobre período selecionado - versão mais permissiva para faturamento */}
-            <Card className="border-blue-500 bg-blue-50">
+            {/* Informação sobre o período selecionado para uploads de faturamento */}
+            <Card className="border-blue-200 bg-blue-50">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-blue-600" />
                   <div>
-                    <h3 className="font-semibold text-blue-800">Período para Faturamento: {periodoSelecionado}</h3>
+                    <h3 className="font-semibold text-blue-800">Upload de Dados de Faturamento</h3>
                     <p className="text-sm text-blue-700">
-                      Uploads de faturamento podem ser processados para qualquer período. 
-                      Configure o período desejado na aba "Configuração".
+                      Os uploads de dados de faturamento podem ser processados para qualquer período. 
+                      Período atual selecionado: <strong>{periodoSelecionado}</strong>
                     </p>
                   </div>
                   <Button 
@@ -1877,7 +1877,7 @@ export default function GerarFaturamento() {
                     size="sm"
                     onClick={() => setActiveTab('configuracao')}
                   >
-                    Configurar Período
+                    Configurar
                   </Button>
                 </div>
               </CardContent>
