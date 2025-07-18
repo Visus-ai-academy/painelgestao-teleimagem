@@ -176,7 +176,7 @@ serve(async (req) => {
         console.log(`Fazendo upload do PDF: ${pathStorage}`);
         
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('documentos-clientes')
+          .from('uploads')
           .upload(pathStorage, pdfBytes, {
             contentType: 'application/pdf',
             upsert: true
@@ -191,7 +191,7 @@ serve(async (req) => {
 
         // Obter URL do arquivo
         const { data: urlData } = supabase.storage
-          .from('documentos-clientes')
+          .from('uploads')
           .getPublicUrl(pathStorage);
 
         const pdfInfo = {
