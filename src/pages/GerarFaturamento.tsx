@@ -1948,20 +1948,30 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-              onUpload={async (file) => {                
+              onUpload={async (file) => {
+                console.log('🔥 INICIANDO UPLOAD DE CLIENTES');
+                console.log('🔥 Arquivo:', file.name, 'Tamanho:', file.size);
+                
                 try {
-                  await processClientesFile(file);
+                  console.log('🔥 Chamando processClientesFile...');
+                  const resultado = await processClientesFile(file);
+                  console.log('🔥 Resultado do processamento:', resultado);
+                  
                   // Limpar resultados antigos e recarregar clientes
                   setResultados([]);
                   setRelatoriosGerados(0);
                   setEmailsEnviados(0);
-                  await carregarClientes();
+                  
+                  console.log('🔥 Recarregando clientes...');
+                  const clientesCarregadosResult = await carregarClientes();
+                  console.log('🔥 Clientes carregados após upload:', clientesCarregadosResult.length);
                   
                   toast({
                     title: "Upload Concluído",
-                    description: `Clientes carregados para o período ${periodoSelecionado}!`,
+                    description: `Clientes carregados para o período ${periodoSelecionado}! Total: ${clientesCarregadosResult.length}`,
                   });
                 } catch (error: any) {
+                  console.error('🔥 ERRO NO UPLOAD DE CLIENTES:', error);
                   toast({
                     title: "Erro no Upload",
                     description: error.message,
