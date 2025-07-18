@@ -35,7 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { ControlePeriodo, StatusPeriodoUpload, isPeriodoEditavel, getStatusPeriodo } from "@/components/ControlePeriodo";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -49,11 +49,67 @@ interface ConfiguracaoFonte {
 // Período atual (julho/2025)
 const PERIODO_ATUAL = "2025-07";
 
+// Função para verificar se um período pode ser editado
+const isPeriodoEditavel = (periodo: string): boolean => {
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+  const mesAtual = hoje.getMonth() + 1; // getMonth() retorna 0-11
+  const diaAtual = hoje.getDate();
+  
+  const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
+  
+  // Se é período futuro, não pode editar
+  if (anoPeriodo > anoAtual || (anoPeriodo === anoAtual && mesPeriodo > mesAtual)) {
+    return false;
+  }
+  
+  // Se é período anterior ao atual, não pode editar (dados históricos)
+  if (anoPeriodo < anoAtual || (anoPeriodo === anoAtual && mesPeriodo < mesAtual)) {
+    return false;
+  }
+  
+  // Se é o mês atual mas depois do dia 5, considera fechado (exemplo de regra)
+  if (anoPeriodo === anoAtual && mesPeriodo === mesAtual && diaAtual > 5) {
+    return false;
+  }
+  
+  // Período atual e dentro do prazo de edição
+  return true;
+};
+
+// Função para obter status do período
+const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico' | 'futuro' => {
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+  const mesAtual = hoje.getMonth() + 1;
+  const diaAtual = hoje.getDate();
+  
+  const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
+  
+  if (anoPeriodo > anoAtual || (anoPeriodo === anoAtual && mesPeriodo > mesAtual)) {
+    return 'futuro';
+  }
+  
+  if (anoPeriodo < anoAtual || (anoPeriodo === anoAtual && mesPeriodo < mesAtual)) {
+    return 'historico';
+  }
+  
+  if (anoPeriodo === anoAtual && mesPeriodo === mesAtual) {
+    return diaAtual <= 5 ? 'editavel' : 'fechado';
+  }
+  
+  return 'fechado';
+};
+
 export default function GerarFaturamento() {
   const [activeTab, setActiveTab] = useState("faturamento");
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  
+  // Controle de período para upload
+  const [periodoSelecionado, setPeriodoSelecionado] = useState(PERIODO_ATUAL);
+  const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
   
   // Configuração da fonte de dados
   const [fonteDados, setFonteDados] = useState<FonteDados>('upload');
@@ -682,6 +738,14 @@ export default function GerarFaturamento() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Controle de Período */}
+          <ControlePeriodo
+            periodoSelecionado={periodoSelecionado}
+            setPeriodoSelecionado={setPeriodoSelecionado}
+            mostrarApenasEditaveis={mostrarApenasEditaveis}
+            setMostrarApenasEditaveis={setMostrarApenasEditaveis}
+          />
         </TabsContent>
 
         <TabsContent value="faturamento" className="space-y-6 mt-6">
@@ -1084,6 +1148,50 @@ export default function GerarFaturamento() {
           )}
           
           {fonteDados === 'upload' && (
+          <>
+            {/* Aviso sobre período selecionado */}
+            <Card className={`border-2 ${
+              isPeriodoEditavel(periodoSelecionado) ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
+            }`}>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  {isPeriodoEditavel(periodoSelecionado) ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <h3 className="font-semibold text-green-800">Período Editável: {periodoSelecionado}</h3>
+                        <p className="text-sm text-green-700">Os uploads para este período serão processados normalmente.</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <h3 className="font-semibold text-red-800">Período Protegido: {periodoSelecionado}</h3>
+                        <p className="text-sm text-red-700">
+                          {getStatusPeriodo(periodoSelecionado) === 'historico' 
+                            ? 'Dados históricos não podem ser modificados.' 
+                            : getStatusPeriodo(periodoSelecionado) === 'fechado'
+                            ? 'Período fechado - dados protegidos contra alteração.'
+                            : 'Período futuro não disponível para upload.'
+                          }
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setActiveTab('configuracao');
+                          setPeriodoSelecionado(PERIODO_ATUAL);
+                        }}
+                      >
+                        Alterar Período
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <FileUpload
@@ -1092,7 +1200,31 @@ export default function GerarFaturamento() {
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={10}
               expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-              onUpload={async (file) => {
+                onUpload={async (file) => {
+                  if (!isPeriodoEditavel(periodoSelecionado)) {
+                    throw new Error(`Período ${periodoSelecionado} está protegido contra modificações. Status: ${getStatusPeriodo(periodoSelecionado)}`);
+                  }
+                  
+                  try {
+                    await processClientesFile(file);
+                    // Limpar resultados antigos e recarregar clientes
+                    setResultados([]);
+                    setRelatoriosGerados(0);
+                    setEmailsEnviados(0);
+                    await carregarClientes();
+                    
+                    toast({
+                      title: "Upload Concluído",
+                      description: `Clientes carregados para o período ${periodoSelecionado}!`,
+                    });
+                  } catch (error: any) {
+                    toast({
+                      title: "Erro no Upload",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  }
+                }}
                 try {
                   await processClientesFile(file);
                   // Limpar resultados antigos e recarregar clientes
