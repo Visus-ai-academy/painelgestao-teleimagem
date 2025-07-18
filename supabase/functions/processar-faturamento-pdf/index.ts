@@ -157,32 +157,42 @@ serve(async (req) => {
     console.log('Clientes processados:', clientesMap.size);
 
     // Gerar PDFs e enviar emails para cada cliente
+    // NOTA: Este processamento é independente das validações temporais do sistema principal
     const pdfsGerados = [];
     const emailsEnviados = [];
     
     for (const [chaveCliente, cliente] of clientesMap) {
       try {
+        console.log(`Processando cliente: ${cliente.nome} para período: ${periodo}`);
+        
         const pdf = gerarPDFCliente(cliente, periodo);
         const pdfBytes = pdf.output('arraybuffer');
         
-        // Upload do PDF para storage
-        const nomeArquivo = `${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+        // Upload do PDF para storage usando path único para evitar conflitos
+        const timestamp = Date.now();
+        const nomeArquivo = `${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${timestamp}.pdf`;
+        const pathStorage = `faturamento/${periodo}/${nomeArquivo}`;
+        
+        console.log(`Fazendo upload do PDF: ${pathStorage}`);
+        
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documentos-clientes')
-          .upload(`faturamento/${periodo}/${nomeArquivo}`, pdfBytes, {
+          .upload(pathStorage, pdfBytes, {
             contentType: 'application/pdf',
             upsert: true
           });
 
         if (uploadError) {
           console.error('Erro ao fazer upload do PDF:', uploadError);
-          continue;
+          throw new Error(`Erro no upload: ${uploadError.message}`);
         }
+
+        console.log('PDF uploaded successfully:', uploadData);
 
         // Obter URL do arquivo
         const { data: urlData } = supabase.storage
           .from('documentos-clientes')
-          .getPublicUrl(`faturamento/${periodo}/${nomeArquivo}`);
+          .getPublicUrl(pathStorage);
 
         const pdfInfo = {
           cliente: cliente.nome,
@@ -255,13 +265,16 @@ Tel.: 41 99255-1964`;
           pdfInfo.erro_email = 'Email do cliente não encontrado no cadastro';
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
         pdfsGerados.push({
           cliente: cliente.nome,
-          erro: error.message,
+          erro: `Erro no processamento: ${error.message}`,
           email_enviado: false,
-          erro_email: null
+          erro_email: null,
+          arquivo: '',
+          url: '',
+          resumo: { total_laudos: 0, valor_pagar: 0 }
         });
       }
     }

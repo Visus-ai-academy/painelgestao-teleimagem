@@ -391,6 +391,9 @@ export default function GerarFaturamento() {
       return;
     }
 
+    // Para faturamento, permitir processamento independente da validação de período
+    console.log(`Processando faturamento para período: ${periodoSelecionado}`);
+
     setStatusProcessamento({
       processando: true,
       mensagem: 'Fazendo upload do arquivo...',
@@ -414,6 +417,12 @@ export default function GerarFaturamento() {
         progresso: 50
       });
 
+      console.log('Chamando edge function com parâmetros:', {
+        file_path: `uploads/${nomeArquivo}`,
+        periodo: periodoSelecionado,
+        enviar_emails: enviarEmails
+      });
+
       // Chamar edge function para processar
       const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
         body: {
@@ -422,6 +431,8 @@ export default function GerarFaturamento() {
           enviar_emails: enviarEmails
         }
       });
+
+      console.log('Resposta da edge function:', { data, error });
 
       if (error) {
         throw new Error(`Erro no processamento: ${error.message}`);
@@ -967,6 +978,14 @@ export default function GerarFaturamento() {
                           <strong>Assunto:</strong> Relatório de volumetria - Faturamento Teleimagem - Mês/Ano
                         </div>
                       )}
+                      
+                      {/* Aviso sobre validação de período */}
+                      {getStatusPeriodo(periodoSelecionado) !== 'editavel' && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                          <strong>Atenção:</strong> O período {periodoSelecionado} está com status "{getStatusPeriodo(periodoSelecionado)}". 
+                          O processamento de faturamento funcionará normalmente, pois é independente das validações de upload de dados.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -975,7 +994,17 @@ export default function GerarFaturamento() {
               {/* Botão de processamento */}
               <div className="flex justify-center">
                 <Button
-                  onClick={handleProcessarFaturamento}
+                  onClick={() => {
+                    const statusPeriodo = getStatusPeriodo(periodoSelecionado);
+                    if (statusPeriodo !== 'editavel') {
+                      // Confirmar processamento para período fechado/histórico
+                      if (confirm(`O período ${periodoSelecionado} está com status "${statusPeriodo}". Deseja continuar com o processamento do faturamento? Isso é permitido pois a geração de relatórios é independente das validações de upload de dados.`)) {
+                        handleProcessarFaturamento();
+                      }
+                    } else {
+                      handleProcessarFaturamento();
+                    }
+                  }}
                   disabled={!arquivoFaturamento || statusProcessamento.processando}
                   size="lg"
                   className="px-8"
@@ -989,6 +1018,11 @@ export default function GerarFaturamento() {
                     <>
                       <FileBarChart2 className="h-4 w-4 mr-2" />
                       Processar e Gerar PDFs
+                      {getStatusPeriodo(periodoSelecionado) !== 'editavel' && (
+                        <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded">
+                          Período {getStatusPeriodo(periodoSelecionado)}
+                        </span>
+                      )}
                     </>
                   )}
                 </Button>
