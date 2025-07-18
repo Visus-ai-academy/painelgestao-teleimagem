@@ -189,9 +189,28 @@ const modalidadesDisponiveis = [
   "Eletrocardiograma"
 ];
 
+const especialidadesDisponiveis = [
+  "Radiologia e Diagnóstico por Imagem",
+  "Cardiologia",
+  "Neurologia",
+  "Ortopedia",
+  "Ginecologia",
+  "Urologia",
+  "Gastroenterologia",
+  "Pneumologia",
+  "Pediatria",
+  "Medicina Nuclear"
+];
+
+const prioridadesDisponiveis = [
+  "Normal",
+  "Urgente",
+  "Emergência"
+];
+
 const categoriasMedico = [
   "Radiologista Pleno",
-  "Radiologista Sênior",
+  "Radiologista Sênior", 
   "Cardiologista",
   "Clínico Geral",
   "Especialista"
@@ -217,7 +236,8 @@ export default function Colaboradores() {
   const [medicoData, setMedicoData] = useState({
     categoria: "",
     modalidades: [] as string[],
-    valoresPorModalidade: {} as Record<string, string>
+    especialidades: [] as string[],
+    valoresCombinacoes: {} as Record<string, Record<string, Record<string, string>>> // modalidade -> especialidade -> prioridade -> valor
   });
   const { toast } = useToast();
 
@@ -237,32 +257,42 @@ export default function Colaboradores() {
     if (checked) {
       setMedicoData(prev => ({
         ...prev,
-        modalidades: [...prev.modalidades, modalidade],
-        valoresPorModalidade: {
-          ...prev.valoresPorModalidade,
-          [modalidade]: ""
-        }
+        modalidades: [...prev.modalidades, modalidade]
       }));
     } else {
       setMedicoData(prev => ({
         ...prev,
-        modalidades: prev.modalidades.filter(m => m !== modalidade),
-        valoresPorModalidade: {
-          ...prev.valoresPorModalidade,
-          [modalidade]: undefined
-        }
+        modalidades: prev.modalidades.filter(m => m !== modalidade)
       }));
     }
   };
 
-  const handleValorModalidadeChange = (modalidade: string, valor: string) => {
-    setMedicoData(prev => ({
-      ...prev,
-      valoresPorModalidade: {
-        ...prev.valoresPorModalidade,
-        [modalidade]: valor
-      }
-    }));
+  const handleEspecialidadeChange = (especialidade: string, checked: boolean) => {
+    if (checked) {
+      setMedicoData(prev => ({
+        ...prev,
+        especialidades: [...prev.especialidades, especialidade]
+      }));
+    } else {
+      setMedicoData(prev => ({
+        ...prev,
+        especialidades: prev.especialidades.filter(e => e !== especialidade)
+      }));
+    }
+  };
+
+  const handleValorCombinacaoChange = (modalidade: string, especialidade: string, prioridade: string, valor: string) => {
+    setMedicoData(prev => {
+      const newValues = { ...prev.valoresCombinacoes };
+      if (!newValues[modalidade]) newValues[modalidade] = {};
+      if (!newValues[modalidade][especialidade]) newValues[modalidade][especialidade] = {};
+      newValues[modalidade][especialidade][prioridade] = valor;
+      
+      return {
+        ...prev,
+        valoresCombinacoes: newValues
+      };
+    });
   };
 
   const handleNewColaborador = () => {
@@ -296,16 +326,32 @@ export default function Colaboradores() {
         return;
       }
 
-      // Verificar se todos os valores das modalidades foram preenchidos
-      const modalidadesSemValor = medicoData.modalidades.filter(
-        modalidade => !medicoData.valoresPorModalidade[modalidade] || 
-                     parseFloat(medicoData.valoresPorModalidade[modalidade]) <= 0
-      );
+      if (medicoData.especialidades.length === 0) {
+        toast({
+          title: "Erro", 
+          description: "Por favor, selecione pelo menos uma especialidade.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Verificar se todos os valores das combinações foram preenchidos
+      let combinacoesSemValor: string[] = [];
+      medicoData.modalidades.forEach(modalidade => {
+        medicoData.especialidades.forEach(especialidade => {
+          prioridadesDisponiveis.forEach(prioridade => {
+            const valor = medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade];
+            if (!valor || parseFloat(valor) <= 0) {
+              combinacoesSemValor.push(`${modalidade} - ${especialidade} - ${prioridade}`);
+            }
+          });
+        });
+      });
       
-      if (modalidadesSemValor.length > 0) {
+      if (combinacoesSemValor.length > 0) {
         toast({
           title: "Erro",
-          description: `Por favor, defina valores válidos para: ${modalidadesSemValor.join(', ')}`,
+          description: `Por favor, defina valores válidos para todas as combinações. Faltam: ${combinacoesSemValor.slice(0, 3).join(', ')}${combinacoesSemValor.length > 3 ? '...' : ''}`,
           variant: "destructive"
         });
         return;
@@ -313,6 +359,7 @@ export default function Colaboradores() {
     }
 
     // Simular criação do colaborador
+    console.log("Dados do médico:", medicoData);
     toast({
       title: "Colaborador criado",
       description: `${newColaborador.nome} foi adicionado com sucesso!`,
@@ -333,7 +380,8 @@ export default function Colaboradores() {
     setMedicoData({
       categoria: "",
       modalidades: [],
-      valoresPorModalidade: {}
+      especialidades: [],
+      valoresCombinacoes: {}
     });
     setShowNewColaboradorDialog(false);
   };
@@ -704,32 +752,62 @@ export default function Colaboradores() {
                         </div>
                       </div>
 
-                      {medicoData.modalidades.length > 0 && (
+                      <div className="col-span-2">
+                        <Label>Especialidades *</Label>
+                        <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
+                          {especialidadesDisponiveis.map((especialidade) => (
+                            <div key={especialidade} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={especialidade}
+                                checked={medicoData.especialidades.includes(especialidade)}
+                                onCheckedChange={(checked) => 
+                                  handleEspecialidadeChange(especialidade, checked as boolean)
+                                }
+                              />
+                              <Label htmlFor={especialidade} className="text-sm font-normal">
+                                {especialidade}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {(medicoData.modalidades.length > 0 && medicoData.especialidades.length > 0) && (
                         <div className="col-span-2">
-                          <Label>Valores por Modalidade *</Label>
-                          <div className="space-y-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
+                          <Label>Valores por Combinação (Modalidade + Especialidade + Prioridade) *</Label>
+                          <div className="space-y-4 mt-2 p-4 border rounded-lg max-h-96 overflow-y-auto">
                             {medicoData.modalidades.map((modalidade) => (
-                              <div key={modalidade} className="flex items-center justify-between gap-3">
-                                <Label className="text-sm font-medium min-w-0 flex-1">
-                                  {modalidade}
-                                </Label>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">R$</span>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={medicoData.valoresPorModalidade[modalidade] || ""}
-                                    onChange={(e) => handleValorModalidadeChange(modalidade, e.target.value)}
-                                    placeholder="0,00"
-                                    className="w-24"
-                                  />
-                                </div>
+                              <div key={modalidade} className="border-l-4 border-blue-200 pl-4">
+                                <h4 className="font-medium text-sm mb-3 text-blue-700">{modalidade}</h4>
+                                {medicoData.especialidades.map((especialidade) => (
+                                  <div key={`${modalidade}-${especialidade}`} className="mb-4 last:mb-0">
+                                    <h5 className="text-xs font-medium text-gray-600 mb-2">{especialidade}</h5>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {prioridadesDisponiveis.map((prioridade) => (
+                                        <div key={`${modalidade}-${especialidade}-${prioridade}`} className="space-y-1">
+                                          <Label className="text-xs">{prioridade}</Label>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-xs">R$</span>
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              min="0"
+                                              value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade] || ""}
+                                              onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, prioridade, e.target.value)}
+                                              placeholder="0,00"
+                                              className="text-xs h-8"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             ))}
                           </div>
                           <p className="text-xs text-gray-500 mt-2">
-                            * Valor por exame realizado. Este valor será multiplicado pelo volume produzido para calcular o pagamento.
+                            * Defina valores específicos para cada combinação. Estes valores serão utilizados para calcular o repasse médico baseado no volume produzido.
                           </p>
                         </div>
                       )}
