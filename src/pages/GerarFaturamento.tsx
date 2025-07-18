@@ -173,19 +173,21 @@ export default function GerarFaturamento() {
   // Carregar clientes da base de dados (inicialização)
   const carregarClientes = async () => {
     try {
-      console.log('Iniciando carregamento de clientes...');
+      console.log('🔍 Iniciando carregamento de clientes...');
       
       const { data, error } = await supabase
         .from('clientes')
         .select('id, nome, email, ativo')
         .eq('ativo', true);
 
-      console.log('Resultado da consulta:', { data, error });
+      console.log('🔍 Resultado da consulta clientes:', { data, error, count: data?.length });
 
       if (error) {
-        console.error('Erro na consulta:', error);
+        console.error('❌ Erro na consulta clientes:', error);
         throw error;
       }
+
+      console.log('📊 Total de clientes ativos encontrados:', data?.length || 0);
 
       // Filtrar clientes com email válido
       const clientesComEmail = data?.filter(cliente => 
@@ -509,17 +511,30 @@ export default function GerarFaturamento() {
     let relatoriosCount = 0;
 
     try {
+      console.log('🔍 Verificando clientes carregados:', clientesCarregados.length);
+      
       // Garantir que temos clientes carregados
       const clientesParaProcessar = clientesCarregados.length > 0 ? clientesCarregados : await carregarClientes();
       
+      console.log('🔍 Clientes para processar:', clientesParaProcessar.length);
+      console.log('🔍 Lista de clientes:', clientesParaProcessar.map(c => ({ id: c.id, nome: c.nome, email: c.email })));
+      
       if (clientesParaProcessar.length === 0) {
-        toast({
-          title: "Nenhum Cliente Encontrado",
-          description: "Faça upload dos clientes antes de gerar relatórios. Vá para a aba 'Upload de Dados'.",
-          variant: "destructive",
-        });
-        setProcessandoTodos(false);
-        return;
+        // Vamos tentar recarregar uma vez mais antes de falhar
+        console.log('🔄 Tentando recarregar clientes uma vez mais...');
+        const clientesRecarregados = await carregarClientes();
+        
+        if (clientesRecarregados.length === 0) {
+          toast({
+            title: "Nenhum Cliente Encontrado",
+            description: "Faça upload dos clientes antes de gerar relatórios. Vá para a aba 'Upload de Dados'.",
+            variant: "destructive",
+          });
+          setProcessandoTodos(false);
+          return;
+        } else {
+          console.log('✅ Clientes encontrados após recarregamento:', clientesRecarregados.length);
+        }
       }
       
       console.log('Gerando relatórios para clientes:', clientesParaProcessar.map(c => c.nome));
@@ -1422,6 +1437,27 @@ export default function GerarFaturamento() {
                         Fazer Tudo (Automático)
                       </>
                     )}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    onClick={async () => {
+                      console.log('🔍 Debug - Verificando tabela clientes...');
+                      const { data, error, count } = await supabase
+                        .from('clientes')
+                        .select('*', { count: 'exact' });
+                      
+                      console.log('📊 Debug - Todos os clientes na tabela:', { data, error, count });
+                      
+                      toast({
+                        title: "Debug - Clientes na Tabela",
+                        description: `Total: ${count || 0} registros encontrados. Veja console para detalhes.`,
+                      });
+                    }}
+                    disabled={processandoTodos}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Debug - Ver Tabela
                   </Button>
                   
                   <Button 
