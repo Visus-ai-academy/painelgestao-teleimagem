@@ -280,13 +280,16 @@ export default function Colaboradores() {
     telefone: "",
     cpf: "",
     gestor: "",
-    salario: ""
+    salario: "",
+    endereco: ""
   });
   const [medicoData, setMedicoData] = useState({
     categoria: "",
     modalidades: [] as string[],
     especialidades: [] as string[],
-    valoresCombinacoes: {} as Record<string, Record<string, Record<string, string>>> // modalidade -> especialidade -> prioridade -> valor
+    valoresCombinacoes: {} as Record<string, Record<string, Record<string, string>>>, // modalidade -> especialidade -> prioridade -> valor
+    crm: "",
+    rqe: ""
   });
   const { toast } = useToast();
 
@@ -429,13 +432,16 @@ export default function Colaboradores() {
       telefone: "",
       cpf: "",
       gestor: "",
-      salario: ""
+      salario: "",
+      endereco: ""
     });
     setMedicoData({
       categoria: "",
       modalidades: [],
       especialidades: [],
-      valoresCombinacoes: {}
+      valoresCombinacoes: {},
+      crm: "",
+      rqe: ""
     });
     setShowNewColaboradorDialog(false);
   };
@@ -721,229 +727,272 @@ export default function Colaboradores() {
                     <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
                   </DialogHeader>
                   <ScrollArea className="flex-1 pr-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <Label htmlFor="nome">Nome *</Label>
-                      <Input
-                        id="nome"
-                        value={newColaborador.nome}
-                        onChange={(e) => setNewColaborador({...newColaborador, nome: e.target.value})}
-                        placeholder="Nome completo"
-                      />
-                    </div>
-                    
-                    {/* Campos específicos para médicos - Categoria e Modalidades logo após o nome */}
-                    {newColaborador.departamento === "Médico" && (
-                      <>
+                  <div className="space-y-6">
+                    {/* SEÇÃO 1: DADOS PESSOAIS */}
+                    <div className="space-y-4">
+                      <div className="pb-2 border-b">
+                        <h3 className="text-lg font-semibold text-primary">Dados Pessoais</h3>
+                        <p className="text-sm text-muted-foreground">Informações básicas do colaborador</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                          <Label htmlFor="nome">Nome Completo *</Label>
+                          <Input
+                            id="nome"
+                            value={newColaborador.nome}
+                            onChange={(e) => setNewColaborador({...newColaborador, nome: e.target.value})}
+                            placeholder="Nome completo do colaborador"
+                          />
+                        </div>
+                        
                         <div>
-                          <Label htmlFor="categoria">Categoria *</Label>
-                          <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
+                          <Label htmlFor="cpf">CPF *</Label>
+                          <Input
+                            id="cpf"
+                            value={newColaborador.cpf}
+                            onChange={(e) => setNewColaborador({...newColaborador, cpf: e.target.value})}
+                            placeholder="000.000.000-00"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="email">Email *</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={newColaborador.email}
+                            onChange={(e) => setNewColaborador({...newColaborador, email: e.target.value})}
+                            placeholder="email@exemplo.com"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="telefone">Telefone *</Label>
+                          <Input
+                            id="telefone"
+                            value={newColaborador.telefone}
+                            onChange={(e) => setNewColaborador({...newColaborador, telefone: e.target.value})}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                        
+                        <div className="col-span-2">
+                          <Label htmlFor="endereco">Endereço</Label>
+                          <Input
+                            id="endereco"
+                            value={newColaborador.endereco}
+                            onChange={(e) => setNewColaborador({...newColaborador, endereco: e.target.value})}
+                            placeholder="Rua, número, bairro, cidade - UF"
+                          />
+                        </div>
+                        
+                        {newColaborador.departamento === "Médico" && (
+                          <>
+                            <div>
+                              <Label htmlFor="crm">CRM *</Label>
+                              <Input
+                                id="crm"
+                                value={medicoData.crm || ''}
+                                onChange={(e) => setMedicoData({...medicoData, crm: e.target.value})}
+                                placeholder="12345-SP"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label htmlFor="rqe">RQE</Label>
+                              <Input
+                                id="rqe"
+                                value={medicoData.rqe || ''}
+                                onChange={(e) => setMedicoData({...medicoData, rqe: e.target.value})}
+                                placeholder="RQE12345"
+                              />
+                            </div>
+                          </>
+                        )}
+                        
+                        <div>
+                          <Label htmlFor="funcao">Função *</Label>
+                          <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione a categoria" />
+                              <SelectValue placeholder="Selecione a função" />
                             </SelectTrigger>
                             <SelectContent>
-                              {categoriasMedico.map((categoria) => (
-                                <SelectItem key={categoria} value={categoria}>
-                                  {categoria}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
+                              <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
+                              <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
+                              <SelectItem value="Enfermeira">Enfermeira</SelectItem>
+                              <SelectItem value="Administrador TI">Administrador TI</SelectItem>
+                              <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
+                              <SelectItem value="Recepcionista">Recepcionista</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-
+                        
                         <div>
-                          <Label>Modalidades que Lauda *</Label>
-                          <div className="grid grid-cols-1 gap-2 mt-2 p-3 border rounded-lg max-h-32 overflow-y-auto">
-                            {modalidadesDisponiveis.slice(0, 6).map((modalidade) => (
-                              <div key={modalidade} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`modal-${modalidade}`}
-                                  checked={medicoData.modalidades.includes(modalidade)}
-                                  onCheckedChange={(checked) => 
-                                    handleModalidadeChange(modalidade, checked as boolean)
-                                  }
-                                />
-                                <Label htmlFor={`modal-${modalidade}`} className="text-xs font-normal">
-                                  {modalidade}
-                                </Label>
-                              </div>
-                            ))}
-                            {modalidadesDisponiveis.length > 6 && (
-                              <div className="text-xs text-muted-foreground">
-                                +{modalidadesDisponiveis.length - 6} modalidades...
-                              </div>
-                            )}
+                          <Label htmlFor="departamento">Departamento</Label>
+                          <Select value={newColaborador.departamento} onValueChange={(value) => setNewColaborador({...newColaborador, departamento: value})}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o departamento" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Comercial">Comercial</SelectItem>
+                              <SelectItem value="Operacional">Operacional</SelectItem>
+                              <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
+                              <SelectItem value="Médico">Médico</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="nivel">Nível</Label>
+                          <Select value={newColaborador.nivel} onValueChange={(value) => setNewColaborador({...newColaborador, nivel: value})}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o nível" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Júnior">Júnior</SelectItem>
+                              <SelectItem value="Pleno">Pleno</SelectItem>
+                              <SelectItem value="Sênior">Sênior</SelectItem>
+                              <SelectItem value="Especialista">Especialista</SelectItem>
+                              <SelectItem value="Coordenador">Coordenador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="gestor">Gestor</Label>
+                          <Input
+                            id="gestor"
+                            value={newColaborador.gestor}
+                            onChange={(e) => setNewColaborador({...newColaborador, gestor: e.target.value})}
+                            placeholder="Nome do gestor"
+                          />
+                        </div>
+                        
+                        {newColaborador.departamento !== "Médico" && (
+                          <div>
+                            <Label htmlFor="salario">Salário</Label>
+                            <Input
+                              id="salario"
+                              type="number"
+                              value={newColaborador.salario}
+                              onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
+                              placeholder="5000"
+                            />
                           </div>
-                        </div>
-                      </>
-                    )}
-                    
-                    <div>
-                      <Label htmlFor="email">Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={newColaborador.email}
-                        onChange={(e) => setNewColaborador({...newColaborador, email: e.target.value})}
-                        placeholder="email@exemplo.com"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="funcao">Função *</Label>
-                      <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a função" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
-                          <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
-                          <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
-                          <SelectItem value="Enfermeira">Enfermeira</SelectItem>
-                          <SelectItem value="Administrador TI">Administrador TI</SelectItem>
-                          <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
-                          <SelectItem value="Recepcionista">Recepcionista</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="departamento">Departamento</Label>
-                      <Select value={newColaborador.departamento} onValueChange={(value) => setNewColaborador({...newColaborador, departamento: value})}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o departamento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Comercial">Comercial</SelectItem>
-                          <SelectItem value="Operacional">Operacional</SelectItem>
-                          <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
-                          <SelectItem value="Médico">Médico</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="nivel">Nível</Label>
-                      <Select value={newColaborador.nivel} onValueChange={(value) => setNewColaborador({...newColaborador, nivel: value})}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o nível" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Júnior">Júnior</SelectItem>
-                          <SelectItem value="Pleno">Pleno</SelectItem>
-                          <SelectItem value="Sênior">Sênior</SelectItem>
-                          <SelectItem value="Especialista">Especialista</SelectItem>
-                          <SelectItem value="Coordenador">Coordenador</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="telefone">Telefone</Label>
-                      <Input
-                        id="telefone"
-                        value={newColaborador.telefone}
-                        onChange={(e) => setNewColaborador({...newColaborador, telefone: e.target.value})}
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cpf">CPF</Label>
-                      <Input
-                        id="cpf"
-                        value={newColaborador.cpf}
-                        onChange={(e) => setNewColaborador({...newColaborador, cpf: e.target.value})}
-                        placeholder="123.456.789-00"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="gestor">Gestor</Label>
-                      <Input
-                        id="gestor"
-                        value={newColaborador.gestor}
-                        onChange={(e) => setNewColaborador({...newColaborador, gestor: e.target.value})}
-                        placeholder="Nome do gestor"
-                      />
-                    </div>
-                    {newColaborador.departamento !== "Médico" && (
-                      <div>
-                        <Label htmlFor="salario">Salário</Label>
-                        <Input
-                          id="salario"
-                          type="number"
-                          value={newColaborador.salario}
-                          onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
-                          placeholder="5000"
-                        />
+                        )}
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Campos específicos para médicos - Especialidades e Valores */}
-                  {newColaborador.departamento === "Médico" && (
-                    <>
-                      <Separator className="col-span-2 my-4" />
-                      <div className="col-span-2">
-                        <h3 className="text-lg font-semibold mb-4">Especialidades e Valores de Repasse</h3>
-                      </div>
+                    </div>
 
-                      <div className="col-span-2">
-                        <Label>Especialidades *</Label>
-                        <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
-                          {especialidadesDisponiveis.map((especialidade) => (
-                            <div key={especialidade} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={especialidade}
-                                checked={medicoData.especialidades.includes(especialidade)}
-                                onCheckedChange={(checked) => 
-                                  handleEspecialidadeChange(especialidade, checked as boolean)
-                                }
-                              />
-                              <Label htmlFor={especialidade} className="text-sm font-normal">
-                                {especialidade}
-                              </Label>
+                    {/* SEÇÃO 2: SERVIÇOS MÉDICOS */}
+                    {newColaborador.departamento === "Médico" && (
+                      <div className="space-y-4">
+                        <div className="pb-2 border-b">
+                          <h3 className="text-lg font-semibold text-primary">Serviços Médicos</h3>
+                          <p className="text-sm text-muted-foreground">Defina as modalidades, especialidades e valores por serviço</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="categoria">Categoria *</Label>
+                            <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a categoria" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categoriasMedico.map((categoria) => (
+                                  <SelectItem key={categoria} value={categoria}>
+                                    {categoria}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="col-span-2">
+                            <Label>Modalidades que Lauda *</Label>
+                            <div className="grid grid-cols-3 gap-3 mt-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
+                              {modalidadesDisponiveis.map((modalidade) => (
+                                <div key={modalidade} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`modal-${modalidade}`}
+                                    checked={medicoData.modalidades.includes(modalidade)}
+                                    onCheckedChange={(checked) => 
+                                      handleModalidadeChange(modalidade, checked as boolean)
+                                    }
+                                  />
+                                  <Label htmlFor={`modal-${modalidade}`} className="text-sm font-normal">
+                                    {modalidade}
+                                  </Label>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                          </div>
 
-                      {(medicoData.modalidades.length > 0 && medicoData.especialidades.length > 0) && (
-                        <div className="col-span-2">
-                          <Label>Valores por Combinação (Modalidade + Especialidade + Prioridade) *</Label>
-                          <div className="space-y-4 mt-2 p-4 border rounded-lg max-h-96 overflow-y-auto">
-                            {medicoData.modalidades.map((modalidade) => (
-                              <div key={modalidade} className="border-l-4 border-blue-200 pl-4">
-                                <h4 className="font-medium text-sm mb-3 text-blue-700">{modalidade}</h4>
-                                {medicoData.especialidades.map((especialidade) => (
-                                  <div key={`${modalidade}-${especialidade}`} className="mb-4 last:mb-0">
-                                    <h5 className="text-xs font-medium text-gray-600 mb-2">{especialidade}</h5>
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {prioridadesDisponiveis.map((prioridade) => (
-                                        <div key={`${modalidade}-${especialidade}-${prioridade}`} className="space-y-1">
-                                          <Label className="text-xs">{prioridade}</Label>
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-xs">R$</span>
-                                            <Input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade] || ""}
-                                              onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, prioridade, e.target.value)}
-                                              placeholder="0,00"
-                                              className="text-xs h-8"
-                                            />
-                                          </div>
+                          <div className="col-span-2">
+                            <Label>Especialidades *</Label>
+                            <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
+                              {especialidadesDisponiveis.map((especialidade) => (
+                                <div key={especialidade} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={especialidade}
+                                    checked={medicoData.especialidades.includes(especialidade)}
+                                    onCheckedChange={(checked) => 
+                                      handleEspecialidadeChange(especialidade, checked as boolean)
+                                    }
+                                  />
+                                  <Label htmlFor={especialidade} className="text-sm font-normal">
+                                    {especialidade}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {(medicoData.modalidades.length > 0 && medicoData.especialidades.length > 0) && (
+                            <div className="col-span-2">
+                              <Label>Valores por Combinação (Modalidade + Especialidade + Prioridade) *</Label>
+                              <div className="space-y-4 mt-2 p-4 border rounded-lg max-h-80 overflow-y-auto bg-muted/30">
+                                {medicoData.modalidades.map((modalidade) => (
+                                  <div key={modalidade} className="bg-background p-4 rounded-lg border-l-4 border-primary">
+                                    <h4 className="font-medium text-sm mb-3 text-primary">{modalidade}</h4>
+                                    {medicoData.especialidades.map((especialidade) => (
+                                      <div key={`${modalidade}-${especialidade}`} className="mb-4 last:mb-0">
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 bg-muted/50 p-1 rounded">{especialidade}</h5>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {prioridadesDisponiveis.map((prioridade) => (
+                                            <div key={`${modalidade}-${especialidade}-${prioridade}`} className="space-y-1">
+                                              <Label className="text-xs font-medium">{prioridade}</Label>
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-xs text-muted-foreground">R$</span>
+                                                <Input
+                                                  type="number"
+                                                  step="0.01"
+                                                  min="0"
+                                                  value={medicoData.valoresCombinacoes[modalidade]?.[especialidade]?.[prioridade] || ""}
+                                                  onChange={(e) => handleValorCombinacaoChange(modalidade, especialidade, prioridade, e.target.value)}
+                                                  placeholder="0,00"
+                                                  className="text-xs h-8"
+                                                />
+                                              </div>
+                                            </div>
+                                          ))}
                                         </div>
-                                      ))}
-                                    </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 ))}
                               </div>
-                            ))}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            * Defina valores específicos para cada combinação. Estes valores serão utilizados para calcular o repasse médico baseado no volume produzido.
-                          </p>
+                              <p className="text-xs text-muted-foreground mt-2 italic">
+                                * Configure valores específicos para cada combinação. A remuneração será calculada automaticamente baseada no volume de exames produzidos.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </>
-                  )}
+                      </div>
+                    )}
+                  </div>
                   </ScrollArea>
                   
                   <div className="flex justify-end gap-2 pt-4 border-t">
