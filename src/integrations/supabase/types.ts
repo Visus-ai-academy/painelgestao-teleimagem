@@ -53,6 +53,59 @@ export type Database = {
         }
         Relationships: []
       }
+      documentos_clientes: {
+        Row: {
+          clicksign_document_key: string | null
+          cliente_id: string
+          created_at: string
+          data_assinatura: string | null
+          data_envio_assinatura: string | null
+          id: string
+          nome_arquivo: string
+          signatarios: Json | null
+          status_documento: string
+          tipo_documento: string
+          updated_at: string
+          url_arquivo: string | null
+        }
+        Insert: {
+          clicksign_document_key?: string | null
+          cliente_id: string
+          created_at?: string
+          data_assinatura?: string | null
+          data_envio_assinatura?: string | null
+          id?: string
+          nome_arquivo: string
+          signatarios?: Json | null
+          status_documento?: string
+          tipo_documento: string
+          updated_at?: string
+          url_arquivo?: string | null
+        }
+        Update: {
+          clicksign_document_key?: string | null
+          cliente_id?: string
+          created_at?: string
+          data_assinatura?: string | null
+          data_envio_assinatura?: string | null
+          id?: string
+          nome_arquivo?: string
+          signatarios?: Json | null
+          status_documento?: string
+          tipo_documento?: string
+          updated_at?: string
+          url_arquivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_clientes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emails_cobranca: {
         Row: {
           assunto: string

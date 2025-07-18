@@ -41,9 +41,15 @@ import {
   Download,
   Trash2,
   Upload,
+  Send,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Eye,
 } from "lucide-react";
 import { FilterBar } from "@/components/FilterBar";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ContratoCliente {
   id: string;
@@ -73,6 +79,18 @@ interface ContratoCliente {
   valorSuporte?: number;
   // Histórico de alterações
   termosAditivos?: TermoAditivo[];
+  documentos?: DocumentoCliente[];
+}
+
+interface DocumentoCliente {
+  id: string;
+  tipo_documento: 'contrato' | 'termo_aditivo' | 'termo_renovacao';
+  nome_arquivo: string;
+  url_arquivo?: string;
+  status_documento: 'pendente' | 'anexado' | 'assinatura_pendente' | 'assinado';
+  clicksign_document_key?: string;
+  data_envio_assinatura?: string;
+  data_assinatura?: string;
 }
 
 interface TermoAditivo {
@@ -147,6 +165,15 @@ const contratosData: ContratoCliente[] = [
     valorIntegracao: 500.00,
     cobrancaSuporte: true,
     termosAditivos: [],
+    documentos: [
+      {
+        id: "doc1",
+        tipo_documento: 'contrato',
+        nome_arquivo: 'contrato_hospital_sao_lucas.pdf',
+        status_documento: 'assinado',
+        data_assinatura: '2024-01-01T10:00:00Z'
+      }
+    ]
   },
   {
     id: "2",
@@ -166,7 +193,16 @@ const contratosData: ContratoCliente[] = [
     cobrancaIntegracao: false,
     cobrancaSuporte: true,
     valorSuporte: 200.00,
-    termosAditivos: []
+    termosAditivos: [],
+    documentos: [
+      {
+        id: "doc2",
+        tipo_documento: 'contrato',
+        nome_arquivo: 'contrato_vida_plena.pdf',
+        status_documento: 'assinatura_pendente',
+        data_envio_assinatura: '2024-05-15T09:00:00Z'
+      }
+    ]
   },
   {
     id: "3",
@@ -183,7 +219,15 @@ const contratosData: ContratoCliente[] = [
     cnpj: "11.222.333/0001-44",
     cobrancaIntegracao: false,
     cobrancaSuporte: false,
-    termosAditivos: []
+    termosAditivos: [],
+    documentos: [
+      {
+        id: "doc3",
+        tipo_documento: 'contrato',
+        nome_arquivo: 'contrato_centro_norte.pdf',
+        status_documento: 'pendente'
+      }
+    ]
   },
 ];
 
@@ -377,15 +421,96 @@ export default function ContratosClientes() {
     setShowEditarContrato(true);
   };
 
-  const handleGerarContrato = (contratoId: string) => {
+  const enviarParaAssinatura = async (contrato: ContratoCliente) => {
+    try {
+      const response = await supabase.functions.invoke('enviar-contrato-clicksign', {
+        body: {
+          clienteId: contrato.id,
+          contratoId: contrato.id,
+          nomeCliente: contrato.cliente,
+          emailCliente: contrato.emailFinanceiro || contrato.emailOperacional || 'cliente@email.com',
+          tipoDocumento: 'contrato',
+          nomeDocumento: `contrato_${contrato.cliente.toLowerCase().replace(/\s+/g, '_')}.pdf`
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      toast({
+        title: "Contrato enviado",
+        description: `Contrato enviado para assinatura de ${contrato.cliente}`,
+      });
+
+      // Atualizar status do documento
+      const contratosAtualizados = contratos.map(c => {
+        if (c.id === contrato.id) {
+          return {
+            ...c,
+            documentos: [
+              ...(c.documentos || []),
+              {
+                id: Date.now().toString(),
+                tipo_documento: 'contrato' as const,
+                nome_arquivo: `contrato_${contrato.cliente.toLowerCase().replace(/\s+/g, '_')}.pdf`,
+                status_documento: 'assinatura_pendente' as const,
+                data_envio_assinatura: new Date().toISOString()
+              }
+            ]
+          };
+        }
+        return c;
+      });
+      setContratos(contratosAtualizados);
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar contrato",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusDocumentoIcon = (status: string) => {
+    switch (status) {
+      case 'assinado':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'assinatura_pendente':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'anexado':
+        return <FileCheck className="h-4 w-4 text-blue-600" />;
+      case 'pendente':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <FileText className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusDocumentoText = (status: string) => {
+    switch (status) {
+      case 'assinado':
+        return 'Assinado';
+      case 'assinatura_pendente':
+        return 'Aguardando Assinatura';
+      case 'anexado':
+        return 'Anexado';
+      case 'pendente':
+        return 'Pendente';
+      default:
+        return 'Desconhecido';
+    }
+  };
+
+  const handleGerarContrato = async (contratoId: string) => {
     const contrato = contratos.find(c => c.id === contratoId);
     if (contrato) {
-      // Gerar PDF do contrato usando template
+      // Gerar PDF do contrato usando template (implementar template)
       console.log("Gerando contrato PDF para:", contrato.cliente);
-      toast({
-        title: "Contrato gerado",
-        description: `Contrato PDF gerado para ${contrato.cliente}`,
-      });
+      
+      // Enviar automaticamente para ClickSign
+      await enviarParaAssinatura(contrato);
     }
   };
 
@@ -920,6 +1045,7 @@ export default function ContratosClientes() {
                 <TableHead>Vigência</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Serviços Contratados</TableHead>
+                <TableHead>Documentos</TableHead>
                 <TableHead>Índice Reajuste</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -949,6 +1075,39 @@ export default function ContratosClientes() {
                           </span>
                         </div>
                       ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {contrato.documentos && contrato.documentos.length > 0 ? (
+                        contrato.documentos.map((doc) => (
+                          <div key={doc.id} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
+                            <div className="flex items-center gap-2">
+                              {getStatusDocumentoIcon(doc.status_documento)}
+                              <span className="capitalize">{doc.tipo_documento.replace('_', ' ')}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                doc.status_documento === 'assinado' ? 'bg-green-100 text-green-800' :
+                                doc.status_documento === 'assinatura_pendente' ? 'bg-yellow-100 text-yellow-800' :
+                                doc.status_documento === 'anexado' ? 'bg-blue-100 text-blue-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {getStatusDocumentoText(doc.status_documento)}
+                              </span>
+                              {doc.url_arquivo && (
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs text-gray-500 italic">
+                          Nenhum documento anexado
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
