@@ -720,7 +720,7 @@ export default function Colaboradores() {
                     <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
                   </DialogHeader>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
+                    <div className="col-span-2">
                       <Label htmlFor="nome">Nome *</Label>
                       <Input
                         id="nome"
@@ -729,6 +729,53 @@ export default function Colaboradores() {
                         placeholder="Nome completo"
                       />
                     </div>
+                    
+                    {/* Campos específicos para médicos - Categoria e Modalidades logo após o nome */}
+                    {newColaborador.departamento === "Médico" && (
+                      <>
+                        <div>
+                          <Label htmlFor="categoria">Categoria *</Label>
+                          <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categoriasMedico.map((categoria) => (
+                                <SelectItem key={categoria} value={categoria}>
+                                  {categoria}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Modalidades que Lauda *</Label>
+                          <div className="grid grid-cols-1 gap-2 mt-2 p-3 border rounded-lg max-h-32 overflow-y-auto">
+                            {modalidadesDisponiveis.slice(0, 6).map((modalidade) => (
+                              <div key={modalidade} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`modal-${modalidade}`}
+                                  checked={medicoData.modalidades.includes(modalidade)}
+                                  onCheckedChange={(checked) => 
+                                    handleModalidadeChange(modalidade, checked as boolean)
+                                  }
+                                />
+                                <Label htmlFor={`modal-${modalidade}`} className="text-xs font-normal">
+                                  {modalidade}
+                                </Label>
+                              </div>
+                            ))}
+                            {modalidadesDisponiveis.length > 6 && (
+                              <div className="text-xs text-muted-foreground">
+                                +{modalidadesDisponiveis.length - 6} modalidades...
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
                     <div>
                       <Label htmlFor="email">Email *</Label>
                       <Input
@@ -826,48 +873,12 @@ export default function Colaboradores() {
                     )}
                   </div>
                   
-                  {/* Campos específicos para médicos */}
+                  {/* Campos específicos para médicos - Especialidades e Valores */}
                   {newColaborador.departamento === "Médico" && (
                     <>
                       <Separator className="col-span-2 my-4" />
                       <div className="col-span-2">
-                        <h3 className="text-lg font-semibold mb-4">Informações Médicas</h3>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <Label htmlFor="categoria">Categoria *</Label>
-                        <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a categoria" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categoriasMedico.map((categoria) => (
-                              <SelectItem key={categoria} value={categoria}>
-                                {categoria}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="col-span-2">
-                        <Label>Modalidades que Lauda *</Label>
-                        <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
-                          {modalidadesDisponiveis.map((modalidade) => (
-                            <div key={modalidade} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={modalidade}
-                                checked={medicoData.modalidades.includes(modalidade)}
-                                onCheckedChange={(checked) => 
-                                  handleModalidadeChange(modalidade, checked as boolean)
-                                }
-                              />
-                              <Label htmlFor={modalidade} className="text-sm font-normal">
-                                {modalidade}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
+                        <h3 className="text-lg font-semibold mb-4">Especialidades e Valores de Repasse</h3>
                       </div>
 
                       <div className="col-span-2">
