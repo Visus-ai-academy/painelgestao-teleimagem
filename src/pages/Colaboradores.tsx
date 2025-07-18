@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { FilterBar } from "@/components/FilterBar";
 import { FileUpload } from "@/components/FileUpload";
 import { useToast } from "@/hooks/use-toast";
@@ -174,6 +176,27 @@ const funcoes = [
   { nome: "Coordenador", count: 6, departamento: "Gestão" }
 ];
 
+const modalidadesDisponiveis = [
+  "Radiologia",
+  "Tomografia",
+  "Ressonância",
+  "Ultrassom",
+  "Mamografia",
+  "Densitometria",
+  "Medicina Nuclear",
+  "PET-CT",
+  "Ecocardiograma",
+  "Eletrocardiograma"
+];
+
+const categoriasMedico = [
+  "Radiologista Pleno",
+  "Radiologista Sênior",
+  "Cardiologista",
+  "Clínico Geral",
+  "Especialista"
+];
+
 export default function Colaboradores() {
   const [filtroFuncao, setFiltroFuncao] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -191,6 +214,11 @@ export default function Colaboradores() {
     gestor: "",
     salario: ""
   });
+  const [medicoData, setMedicoData] = useState({
+    categoria: "",
+    modalidades: [] as string[],
+    valoresPorModalidade: {} as Record<string, string>
+  });
   const { toast } = useToast();
 
   const handleFileUpload = async (file: File) => {
@@ -205,6 +233,38 @@ export default function Colaboradores() {
     setShowUploadDialog(false);
   };
 
+  const handleModalidadeChange = (modalidade: string, checked: boolean) => {
+    if (checked) {
+      setMedicoData(prev => ({
+        ...prev,
+        modalidades: [...prev.modalidades, modalidade],
+        valoresPorModalidade: {
+          ...prev.valoresPorModalidade,
+          [modalidade]: ""
+        }
+      }));
+    } else {
+      setMedicoData(prev => ({
+        ...prev,
+        modalidades: prev.modalidades.filter(m => m !== modalidade),
+        valoresPorModalidade: {
+          ...prev.valoresPorModalidade,
+          [modalidade]: undefined
+        }
+      }));
+    }
+  };
+
+  const handleValorModalidadeChange = (modalidade: string, valor: string) => {
+    setMedicoData(prev => ({
+      ...prev,
+      valoresPorModalidade: {
+        ...prev.valoresPorModalidade,
+        [modalidade]: valor
+      }
+    }));
+  };
+
   const handleNewColaborador = () => {
     // Validação básica
     if (!newColaborador.nome || !newColaborador.email || !newColaborador.funcao) {
@@ -214,6 +274,42 @@ export default function Colaboradores() {
         variant: "destructive"
       });
       return;
+    }
+
+    // Validação específica para médicos
+    if (newColaborador.departamento === "Médico") {
+      if (!medicoData.categoria) {
+        toast({
+          title: "Erro",
+          description: "Por favor, selecione a categoria do médico.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (medicoData.modalidades.length === 0) {
+        toast({
+          title: "Erro", 
+          description: "Por favor, selecione pelo menos uma modalidade.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Verificar se todos os valores das modalidades foram preenchidos
+      const modalidadesSemValor = medicoData.modalidades.filter(
+        modalidade => !medicoData.valoresPorModalidade[modalidade] || 
+                     parseFloat(medicoData.valoresPorModalidade[modalidade]) <= 0
+      );
+      
+      if (modalidadesSemValor.length > 0) {
+        toast({
+          title: "Erro",
+          description: `Por favor, defina valores válidos para: ${modalidadesSemValor.join(', ')}`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     // Simular criação do colaborador
@@ -233,6 +329,11 @@ export default function Colaboradores() {
       cpf: "",
       gestor: "",
       salario: ""
+    });
+    setMedicoData({
+      categoria: "",
+      modalidades: [],
+      valoresPorModalidade: {}
     });
     setShowNewColaboradorDialog(false);
   };
@@ -558,7 +659,84 @@ export default function Colaboradores() {
                       />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2 mt-6">
+                  
+                  {/* Campos específicos para médicos */}
+                  {newColaborador.departamento === "Médico" && (
+                    <>
+                      <Separator className="col-span-2 my-4" />
+                      <div className="col-span-2">
+                        <h3 className="text-lg font-semibold mb-4">Informações Médicas</h3>
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <Label htmlFor="categoria">Categoria *</Label>
+                        <Select value={medicoData.categoria} onValueChange={(value) => setMedicoData({...medicoData, categoria: value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categoriasMedico.map((categoria) => (
+                              <SelectItem key={categoria} value={categoria}>
+                                {categoria}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="col-span-2">
+                        <Label>Modalidades que Lauda *</Label>
+                        <div className="grid grid-cols-2 gap-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
+                          {modalidadesDisponiveis.map((modalidade) => (
+                            <div key={modalidade} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={modalidade}
+                                checked={medicoData.modalidades.includes(modalidade)}
+                                onCheckedChange={(checked) => 
+                                  handleModalidadeChange(modalidade, checked as boolean)
+                                }
+                              />
+                              <Label htmlFor={modalidade} className="text-sm font-normal">
+                                {modalidade}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {medicoData.modalidades.length > 0 && (
+                        <div className="col-span-2">
+                          <Label>Valores por Modalidade *</Label>
+                          <div className="space-y-3 mt-2 p-4 border rounded-lg max-h-64 overflow-y-auto">
+                            {medicoData.modalidades.map((modalidade) => (
+                              <div key={modalidade} className="flex items-center justify-between gap-3">
+                                <Label className="text-sm font-medium min-w-0 flex-1">
+                                  {modalidade}
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">R$</span>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={medicoData.valoresPorModalidade[modalidade] || ""}
+                                    onChange={(e) => handleValorModalidadeChange(modalidade, e.target.value)}
+                                    placeholder="0,00"
+                                    className="w-24"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            * Valor por exame realizado. Este valor será multiplicado pelo volume produzido para calcular o pagamento.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  <div className="flex justify-end gap-2 mt-6 col-span-2">
                     <Button variant="outline" onClick={() => setShowNewColaboradorDialog(false)}>
                       Cancelar
                     </Button>
