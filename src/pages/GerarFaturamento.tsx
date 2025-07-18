@@ -1860,46 +1860,25 @@ export default function GerarFaturamento() {
           
           {fonteDados === 'upload' && (
           <>
-            {/* Aviso sobre período selecionado */}
-            <Card className={`border-2 ${
-              isPeriodoEditavel(periodoSelecionado) ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
-            }`}>
+            {/* Aviso sobre período selecionado - versão mais permissiva para faturamento */}
+            <Card className="border-blue-500 bg-blue-50">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  {isPeriodoEditavel(periodoSelecionado) ? (
-                    <>
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <div>
-                        <h3 className="font-semibold text-green-800">Período Editável: {periodoSelecionado}</h3>
-                        <p className="text-sm text-green-700">Os uploads para este período serão processados normalmente.</p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="h-5 w-5 text-red-600" />
-                      <div>
-                        <h3 className="font-semibold text-red-800">Período Protegido: {periodoSelecionado}</h3>
-                        <p className="text-sm text-red-700">
-                          {getStatusPeriodo(periodoSelecionado) === 'historico' 
-                            ? 'Dados históricos não podem ser modificados.' 
-                            : getStatusPeriodo(periodoSelecionado) === 'fechado'
-                            ? 'Período fechado - dados protegidos contra alteração.'
-                            : 'Período futuro não disponível para upload.'
-                          }
-                        </p>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setActiveTab('configuracao');
-                          setPeriodoSelecionado(PERIODO_ATUAL);
-                        }}
-                      >
-                        Alterar Período
-                      </Button>
-                    </>
-                  )}
+                  <CheckCircle className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold text-blue-800">Período para Faturamento: {periodoSelecionado}</h3>
+                    <p className="text-sm text-blue-700">
+                      Uploads de faturamento podem ser processados para qualquer período. 
+                      Configure o período desejado na aba "Configuração".
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setActiveTab('configuracao')}
+                  >
+                    Configurar Período
+                  </Button>
                 </div>
               </CardContent>
             </Card>
