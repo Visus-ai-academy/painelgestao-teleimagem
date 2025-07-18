@@ -722,11 +722,11 @@ export default function Colaboradores() {
                     Novo Colaborador
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
                   </DialogHeader>
-                  <ScrollArea className="flex-1 pr-4">
+                  <ScrollArea className="flex-1 pr-4 overflow-y-auto">
                   <div className="space-y-6">
                     {/* SEÇÃO 1: DADOS PESSOAIS */}
                     <div className="space-y-4">
@@ -829,20 +829,41 @@ export default function Colaboradores() {
                           </Select>
                         </div>
                         
-                        <div>
-                          <Label htmlFor="departamento">Departamento</Label>
-                          <Select value={newColaborador.departamento} onValueChange={(value) => setNewColaborador({...newColaborador, departamento: value})}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o departamento" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Comercial">Comercial</SelectItem>
-                              <SelectItem value="Operacional">Operacional</SelectItem>
-                              <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
-                              <SelectItem value="Médico">Médico</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                         <div>
+                           <Label htmlFor="departamento">Departamento *</Label>
+                           <Select 
+                             value={newColaborador.departamento} 
+                             onValueChange={(value) => {
+                               setNewColaborador({...newColaborador, departamento: value});
+                               // Se não for médico, limpar dados médicos
+                               if (value !== "Médico") {
+                                 setMedicoData({
+                                   categoria: "",
+                                   modalidades: [],
+                                   especialidades: [],
+                                   valoresCombinacoes: {},
+                                   crm: "",
+                                   rqe: ""
+                                 });
+                               }
+                             }}
+                           >
+                             <SelectTrigger className={newColaborador.departamento === "Médico" ? "border-primary" : ""}>
+                               <SelectValue placeholder="Selecione o departamento" />
+                             </SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="Comercial">Comercial</SelectItem>
+                               <SelectItem value="Operacional">Operacional</SelectItem>
+                               <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
+                               <SelectItem value="Médico">Médico</SelectItem>
+                             </SelectContent>
+                           </Select>
+                           {newColaborador.departamento === "Médico" && (
+                             <p className="text-xs text-primary mt-1">
+                               ✓ Seção de "Serviços Médicos" será exibida abaixo
+                             </p>
+                           )}
+                         </div>
                         
                         <div>
                           <Label htmlFor="nivel">Nível</Label>
