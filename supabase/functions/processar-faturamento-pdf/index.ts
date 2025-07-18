@@ -40,39 +40,61 @@ serve(async (req) => {
     console.log('Criando cliente Supabase...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // STEP 1: Buscar clientes do banco (com timeout)
-    console.log('STEP 1: Buscando clientes...');
+    // STEP 1: Buscar dados reais do faturamento
+    console.log('STEP 1: Buscando dados do faturamento...');
     
     try {
-      const { data: clientesDB, error: clientesError } = await supabase
-        .from('clientes')
-        .select('id, nome, email, cnpj, telefone')
-        .eq('ativo', true)
-        .limit(100); // Limitar para evitar timeout
+      const { data: faturamentoData, error: faturamentoError } = await supabase
+        .from('faturamento')
+        .select('*')
+        .eq('periodo', periodo);
 
-      if (clientesError) {
-        console.error('Erro ao buscar clientes:', clientesError);
-        // Continuar sem clientes do banco se houver erro
+      if (faturamentoError) {
+        console.error('Erro ao buscar dados de faturamento:', faturamentoError);
+        throw new Error(`Erro ao buscar faturamento: ${faturamentoError.message}`);
       }
 
-      console.log(`Clientes encontrados: ${clientesDB?.length || 0}`);
+      console.log(`Registros de faturamento encontrados: ${faturamentoData?.length || 0}`);
 
-      // STEP 2: Simular processamento bem-sucedido com dados realistas
-      console.log('STEP 2: Simulando processamento...');
+      if (!faturamentoData || faturamentoData.length === 0) {
+        throw new Error(`Nenhum dado de faturamento encontrado para o período ${periodo}. Verifique se o arquivo foi processado corretamente.`);
+      }
 
-      // Usar apenas clientes reais do banco de dados
-      const clientesProcessados = (clientesDB || []).map((cliente, index) => ({
-        cliente: cliente.nome,
-        email: cliente.email || `contato@${cliente.nome.toLowerCase().replace(/\s+/g, '')}.com.br`,
-        cnpj: cliente.cnpj || `${String(12345678 + index).padStart(8, '0')}/0001-${String(10 + index).padStart(2, '0')}`,
-        url: null, // Não gerar URLs externas
-        resumo: {
-          total_laudos: Math.floor(Math.random() * 100) + 20,
-          valor_pagar: Math.floor(Math.random() * 20000) + 5000
-        },
-        email_enviado: false,
-        relatorio_texto: `RELATÓRIO DE FATURAMENTO - ${cliente.nome}\nPeríodo: ${periodo}\nData: ${new Date().toLocaleString('pt-BR')}\n\nRESUMO FINANCEIRO\nTotal de Laudos: ${Math.floor(Math.random() * 100) + 20}\nValor Total: R$ ${(Math.floor(Math.random() * 20000) + 5000).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-      }));
+      // STEP 2: Processar dados reais agrupados por cliente
+      console.log('STEP 2: Processando dados reais...');
+      
+      // Agrupar por cliente
+      const clientesAgrupados = faturamentoData.reduce((acc: any, registro: any) => {
+        const cliente = registro.nome;
+        if (!acc[cliente]) {
+          acc[cliente] = {
+            nome: cliente,
+            email: registro.email || `contato@${cliente.toLowerCase().replace(/\s+/g, '')}.com.br`,
+            registros: [],
+            total_laudos: 0,
+            valor_total: 0
+          };
+        }
+        acc[cliente].registros.push(registro);
+        acc[cliente].total_laudos += registro.quantidade || 1;
+        acc[cliente].valor_total += parseFloat(registro.valor_bruto) || 0;
+        return acc;
+      }, {});
+
+      const clientesProcessados = Object.values(clientesAgrupados).map((cliente: any) => {
+        return {
+          cliente: cliente.nome,
+          email: cliente.email,
+          cnpj: cliente.registros[0]?.numero_fatura || 'N/A',
+          url: null, // PDF será gerado posteriormente
+          resumo: {
+            total_laudos: cliente.total_laudos,
+            valor_pagar: Math.round(cliente.valor_total * 100) / 100
+          },
+          email_enviado: false,
+          relatorio_texto: `RELATÓRIO DE FATURAMENTO - ${cliente.nome}\nPeríodo: ${periodo}\nData: ${new Date().toLocaleString('pt-BR')}\n\nRESUMO FINANCEIRO\nTotal de Laudos: ${cliente.total_laudos}\nValor Total: R$ ${cliente.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        };
+      });
 
       console.log('Processamento simulado concluído');
 
