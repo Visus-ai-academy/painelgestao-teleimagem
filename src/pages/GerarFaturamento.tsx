@@ -103,7 +103,7 @@ const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico'
 };
 
 export default function GerarFaturamento() {
-  const [activeTab, setActiveTab] = useState("faturamento");
+  const [activeTab, setActiveTab] = useState("faturamento-dados");
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
@@ -136,6 +136,18 @@ export default function GerarFaturamento() {
     uploadUrl?: string;
     dataUpload: string;
   }>>([]);
+
+  // Estado para arquivo de faturamento
+  const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
+  const [statusProcessamento, setStatusProcessamento] = useState<{
+    processando: boolean;
+    mensagem: string;
+    progresso: number;
+  }>({
+    processando: false,
+    mensagem: '',
+    progresso: 0
+  });
   
   const [resultados, setResultados] = useState<Array<{
     clienteId: string;
@@ -364,6 +376,110 @@ export default function GerarFaturamento() {
       title: "Relatórios Prontos",
       description: `${clientesComRelatorio.length} relatórios prontos para envio`,
     });
+  };
+
+  // Função para processar arquivo de faturamento e gerar PDFs
+  const handleProcessarFaturamento = async () => {
+    if (!arquivoFaturamento) {
+      toast({
+        title: "Arquivo Necessário",
+        description: "Faça upload do arquivo de faturamento primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setStatusProcessamento({
+      processando: true,
+      mensagem: 'Fazendo upload do arquivo...',
+      progresso: 20
+    });
+
+    try {
+      // Upload do arquivo para storage
+      const nomeArquivo = `faturamento_${Date.now()}_${arquivoFaturamento.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documentos-clientes')
+        .upload(`uploads/${nomeArquivo}`, arquivoFaturamento);
+
+      if (uploadError) {
+        throw new Error(`Erro no upload: ${uploadError.message}`);
+      }
+
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Processando dados e gerando PDFs...',
+        progresso: 50
+      });
+
+      // Chamar edge function para processar
+      const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
+        body: {
+          file_path: `uploads/${nomeArquivo}`,
+          periodo: periodoSelecionado
+        }
+      });
+
+      if (error) {
+        throw new Error(`Erro no processamento: ${error.message}`);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro desconhecido no processamento');
+      }
+
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Atualizando resultados...',
+        progresso: 80
+      });
+
+      // Atualizar resultados com os PDFs gerados
+      const novosResultados = data.pdfs_gerados.map((pdf: any) => ({
+        clienteId: `cliente-${pdf.cliente}`,
+        clienteNome: pdf.cliente,
+        relatorioGerado: true,
+        emailEnviado: false,
+        emailDestino: `${pdf.cliente.toLowerCase().replace(/\s+/g, '')}@email.com`, // Email fictício
+        linkRelatorio: pdf.url,
+        dataProcessamento: new Date().toLocaleString('pt-BR'),
+        detalhesRelatorio: {
+          total_laudos: pdf.resumo.total_laudos,
+          valor_total: pdf.resumo.valor_pagar
+        }
+      }));
+
+      setResultados(novosResultados);
+      setRelatoriosGerados(data.pdfs_gerados.length);
+
+      setStatusProcessamento({
+        processando: false,
+        mensagem: '',
+        progresso: 100
+      });
+
+      toast({
+        title: "Processamento Concluído",
+        description: `${data.pdfs_gerados.length} relatórios PDF gerados com sucesso`,
+      });
+
+      // Mudar para aba de envio
+      setActiveTab("emails");
+
+    } catch (error: any) {
+      console.error('Erro no processamento:', error);
+      setStatusProcessamento({
+        processando: false,
+        mensagem: '',
+        progresso: 0
+      });
+
+      toast({
+        title: "Erro no Processamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   // Primeira etapa: Gerar todos os relatórios
@@ -660,7 +776,11 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="faturamento-dados" className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            Arquivo Faturamento
+          </TabsTrigger>
           <TabsTrigger value="configuracao" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Configuração
@@ -682,6 +802,200 @@ export default function GerarFaturamento() {
             Base de Dados
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="faturamento-dados" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Upload de Arquivo de Faturamento - {periodoSelecionado}
+              </CardTitle>
+              <CardDescription>
+                Faça upload do arquivo Excel contendo os dados de faturamento para gerar relatórios PDF individuais por cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Estrutura esperada do arquivo */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-blue-900">Estrutura do Arquivo Excel</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = '/templates/template_faturamento_dados.csv';
+                      link.download = 'template_faturamento_dados.csv';
+                      link.click();
+                    }}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Baixar Template
+                  </Button>
+                </div>
+                <p className="text-sm text-blue-800 mb-3">O arquivo deve conter as seguintes colunas:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-blue-700">
+                  <div>• Data do Exame</div>
+                  <div>• Nome do Paciente</div>
+                  <div>• Nome do Cliente</div>
+                  <div>• CNPJ Cliente</div>
+                  <div>• Nome do Médico Laudador</div>
+                  <div>• Modalidade</div>
+                  <div>• Especialidade</div>
+                  <div>• Categoria</div>
+                  <div>• Prioridade</div>
+                  <div>• Quantidade de Laudos</div>
+                  <div>• Valor</div>
+                  <div>• Franquia (opcional)</div>
+                  <div>• Ajuste (opcional)</div>
+                </div>
+              </div>
+
+              {/* Status do processamento */}
+              {statusProcessamento.processando && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="h-5 w-5 text-yellow-600 animate-spin" />
+                    <div>
+                      <h3 className="font-semibold text-yellow-900">Processando...</h3>
+                      <p className="text-sm text-yellow-800">{statusProcessamento.mensagem}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="w-full bg-yellow-200 rounded-full h-2">
+                      <div 
+                        className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${statusProcessamento.progresso}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload de arquivo */}
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <label className="cursor-pointer">
+                    <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <span className="text-lg font-medium text-gray-700">
+                      {arquivoFaturamento ? arquivoFaturamento.name : 'Selecione o arquivo de faturamento'}
+                    </span>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Formatos aceitos: .xlsx, .xls
+                    </p>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setArquivoFaturamento(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {arquivoFaturamento && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-900">{arquivoFaturamento.name}</p>
+                          <p className="text-sm text-green-700">
+                            {(arquivoFaturamento.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setArquivoFaturamento(null)}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Controle de período */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Período do Faturamento</h3>
+                <ControlePeriodo
+                  periodoSelecionado={periodoSelecionado}
+                  setPeriodoSelecionado={setPeriodoSelecionado}
+                  mostrarApenasEditaveis={mostrarApenasEditaveis}
+                  setMostrarApenasEditaveis={setMostrarApenasEditaveis}
+                />
+              </div>
+
+              {/* Botão de processamento */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleProcessarFaturamento}
+                  disabled={!arquivoFaturamento || statusProcessamento.processando}
+                  size="lg"
+                  className="px-8"
+                >
+                  {statusProcessamento.processando ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <FileBarChart2 className="h-4 w-4 mr-2" />
+                      Processar e Gerar PDFs
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Resultados do processamento */}
+              {resultados.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-4">Relatórios Gerados</h3>
+                  <div className="grid gap-3">
+                    {resultados.map((resultado) => (
+                      <div key={resultado.clienteId} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{resultado.clienteNome}</p>
+                          {resultado.detalhesRelatorio && (
+                            <p className="text-sm text-gray-600">
+                              {resultado.detalhesRelatorio.total_laudos} laudos - 
+                              R$ {resultado.detalhesRelatorio.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {resultado.relatorioGerado && (
+                            <Badge variant="default" className="bg-green-100 text-green-800">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              PDF Gerado
+                            </Badge>
+                          )}
+                          {resultado.linkRelatorio && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(resultado.linkRelatorio)}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="configuracao" className="space-y-6 mt-6">
           {/* Configuração da Fonte de Dados */}

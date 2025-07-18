@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.processar-financeiro]
 verify_jwt = false
 
+[functions.processar-faturamento-pdf]
+verify_jwt = false
+
 [functions.gerar-relatorio-faturamento]
 verify_jwt = false
 

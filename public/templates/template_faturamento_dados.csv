@@ -1,0 +1,4 @@
+Data do Exame,Nome do Paciente,Nome do Cliente,CNPJ Cliente,Nome do Médico Laudador,Modalidade,Especialidade,Categoria,Prioridade,Quantidade de Laudos,Valor,Franquia,Ajuste
+2025-07-01,João Silva,Hospital ABC,12.345.678/0001-90,Dr. Carlos Santos,Radiografia,Radiologia,Normal,Urgente,1,150.00,0.00,0.00
+2025-07-01,Maria Santos,Clínica XYZ,98.765.432/0001-10,Dr. Ana Lima,Tomografia,Radiologia,Normal,Rotina,1,450.00,0.00,0.00
+2025-07-02,Pedro Costa,Hospital ABC,12.345.678/0001-90,Dr. Carlos Santos,Ressonância,Radiologia,Contrastada,Urgente,1,800.00,50.00,0.00
