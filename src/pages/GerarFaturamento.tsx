@@ -155,38 +155,6 @@ export default function GerarFaturamento() {
     }
   };
 
-  const criarClientesTeste = async () => {
-    try {
-      const clientesTeste = [
-        { nome: 'IMAX', email: 'adm@medforlife.com.br' },
-        { nome: 'MRI', email: 'administracao@teleimagem.com.br' },
-        { nome: 'PARANAVAI', email: 'financeiro@dustestudio.com.br' }
-      ];
-
-      const { error } = await supabase
-        .from('clientes')
-        .insert(clientesTeste.map(cliente => ({
-          nome: cliente.nome,
-          email: cliente.email,
-          ativo: true
-        })));
-
-      if (error) throw error;
-
-      toast({
-        title: "Clientes criados",
-        description: `${clientesTeste.length} clientes de teste criados com sucesso`,
-      });
-
-      await carregarClientes();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao criar clientes",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
 
   // Carregar clientes apenas na inicialização
   useEffect(() => {
