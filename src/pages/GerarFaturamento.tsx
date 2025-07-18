@@ -570,16 +570,6 @@ export default function GerarFaturamento() {
                     Limpar
                   </Button>
                   
-                  {clientesCarregados.length === 0 && (
-                    <Button 
-                      variant="outline"
-                      onClick={criarClientesTeste}
-                      disabled={processandoTodos}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Criar Clientes Teste
-                    </Button>
-                  )}
                 </div>
               </div>
             </CardContent>
