@@ -1708,6 +1708,131 @@ export default function GerarFaturamento() {
               )}
             </CardContent>
           </Card>
+
+          {/* Upload de Arquivo de Faturamento */}
+          <Card className="border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-orange-600" />
+                Upload de Arquivo de Faturamento
+              </CardTitle>
+              <CardDescription>
+                Faça upload do arquivo Excel contendo os dados de faturamento para gerar relatórios PDF individuais por cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Estrutura esperada do arquivo */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-blue-900">Estrutura do Arquivo Excel</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = '/templates/template_faturamento_dados.csv';
+                      link.download = 'template_faturamento_dados.csv';
+                      link.click();
+                    }}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Baixar Template
+                  </Button>
+                </div>
+                <p className="text-sm text-blue-800 mb-3">O arquivo deve conter as seguintes colunas:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-blue-700">
+                  <div>• Data do Exame</div>
+                  <div>• Nome do Paciente</div>
+                  <div>• Nome do Cliente</div>
+                  <div>• CNPJ Cliente</div>
+                  <div>• Nome do Médico Laudador</div>
+                  <div>• Modalidade</div>
+                  <div>• Especialidade</div>
+                  <div>• Categoria</div>
+                  <div>• Prioridade</div>
+                  <div>• Quantidade de Laudos</div>
+                  <div>• Valor</div>
+                  <div>• Franquia (opcional)</div>
+                  <div>• Ajuste (opcional)</div>
+                </div>
+              </div>
+
+              {/* Upload de arquivo */}
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-orange-300 rounded-lg p-6 text-center bg-white">
+                  <label className="cursor-pointer">
+                    <Upload className="h-12 w-12 text-orange-400 mx-auto mb-4" />
+                    <span className="text-lg font-medium text-gray-700">
+                      {arquivoFaturamento ? arquivoFaturamento.name : 'Selecione o arquivo de faturamento'}
+                    </span>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Formatos aceitos: .xlsx, .xls
+                    </p>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setArquivoFaturamento(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {arquivoFaturamento && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-900">{arquivoFaturamento.name}</p>
+                          <p className="text-sm text-green-700">
+                            {(arquivoFaturamento.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleProcessarFaturamento}
+                          disabled={statusProcessamento.processando}
+                          size="lg"
+                          className="min-w-[200px]"
+                        >
+                          {statusProcessamento.processando ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Processando...
+                            </>
+                          ) : (
+                            <>
+                              <FileBarChart2 className="h-4 w-4 mr-2" />
+                              Processar e Gerar PDFs
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setArquivoFaturamento(null)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                <strong>ℹ️ Como funciona:</strong> O arquivo será processado, os dados serão agrupados por cliente, 
+                e relatórios PDF individuais serão gerados automaticamente. Configure o período e opções de envio 
+                na aba "Configuração".
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6 mt-6">
@@ -1766,129 +1891,6 @@ export default function GerarFaturamento() {
                 </ol>
               </div>
 
-              {/* Upload de Arquivo de Faturamento */}
-              <Card className="border-orange-200 bg-orange-50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-5 w-5 text-orange-600" />
-                    Upload de Arquivo de Faturamento
-                  </CardTitle>
-                  <CardDescription>
-                    Faça upload do arquivo Excel contendo os dados de faturamento para gerar relatórios PDF individuais por cliente
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Estrutura esperada do arquivo */}
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-blue-900">Estrutura do Arquivo Excel</h3>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = '/templates/template_faturamento_dados.csv';
-                          link.download = 'template_faturamento_dados.csv';
-                          link.click();
-                        }}
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Baixar Template
-                      </Button>
-                    </div>
-                    <p className="text-sm text-blue-800 mb-3">O arquivo deve conter as seguintes colunas:</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-blue-700">
-                      <div>• Data do Exame</div>
-                      <div>• Nome do Paciente</div>
-                      <div>• Nome do Cliente</div>
-                      <div>• CNPJ Cliente</div>
-                      <div>• Nome do Médico Laudador</div>
-                      <div>• Modalidade</div>
-                      <div>• Especialidade</div>
-                      <div>• Categoria</div>
-                      <div>• Prioridade</div>
-                      <div>• Quantidade de Laudos</div>
-                      <div>• Valor</div>
-                      <div>• Franquia (opcional)</div>
-                      <div>• Ajuste (opcional)</div>
-                    </div>
-                  </div>
-
-                  {/* Upload de arquivo */}
-                  <div className="space-y-4">
-                    <div className="border-2 border-dashed border-orange-300 rounded-lg p-6 text-center bg-white">
-                      <label className="cursor-pointer">
-                        <Upload className="h-12 w-12 text-orange-400 mx-auto mb-4" />
-                        <span className="text-lg font-medium text-gray-700">
-                          {arquivoFaturamento ? arquivoFaturamento.name : 'Selecione o arquivo de faturamento'}
-                        </span>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Formatos aceitos: .xlsx, .xls
-                        </p>
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setArquivoFaturamento(file);
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {arquivoFaturamento && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                            <div>
-                              <p className="font-medium text-green-900">{arquivoFaturamento.name}</p>
-                              <p className="text-sm text-green-700">
-                                {(arquivoFaturamento.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={handleProcessarFaturamento}
-                              disabled={statusProcessamento.processando}
-                              size="sm"
-                            >
-                              {statusProcessamento.processando ? (
-                                <>
-                                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                                  Processando...
-                                </>
-                              ) : (
-                                <>
-                                  <FileBarChart2 className="h-3 w-3 mr-1" />
-                                  Processar e Gerar PDFs
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setArquivoFaturamento(null)}
-                            >
-                              Remover
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                    <strong>ℹ️ Como funciona:</strong> O arquivo será processado, os dados serão agrupados por cliente, 
-                    e relatórios PDF individuais serão gerados automaticamente. Configure o período e opções de envio 
-                    na aba "Configuração".
-                  </div>
-                </CardContent>
-              </Card>
             </>
           ) : (
             <Card className="border-gray-200">
