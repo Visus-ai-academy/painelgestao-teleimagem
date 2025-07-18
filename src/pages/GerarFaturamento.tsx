@@ -1003,15 +1003,87 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6 mt-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
-            <ol className="list-decimal list-inside space-y-1 text-blue-800">
-              <li><strong>Primeiro:</strong> Upload de Clientes (cria os IDs na base)</li>
-              <li><strong>Segundo:</strong> Upload de Exames (vincula aos clientes)</li>
-              <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
-              <li><strong>Último:</strong> Escalas e Financeiro (opcionais)</li>
-            </ol>
-          </div>
+          {/* Status da Fonte de Dados */}
+          <Card className={`border-2 ${
+            fonteDados === 'upload' ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+          }`}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                {fonteDados === 'upload' ? (
+                  <>
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-blue-800">Upload de Dados Ativo</h3>
+                      <p className="text-sm text-blue-700">Esta aba está ativa. Os uploads serão processados normalmente.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-700">Upload de Dados Inativo</h3>
+                      <p className="text-sm text-gray-600">
+                        Fonte atual: <strong>{
+                          fonteDados === 'mobilemed' ? 'Integração Mobilemed' : 'Banco Local'
+                        }</strong>. 
+                        Para usar uploads, vá em "Configuração" e selecione "Upload de Arquivo".
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setActiveTab('configuracao');
+                        setFonteDados('upload');
+                      }}
+                    >
+                      Ativar Upload
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {fonteDados === 'upload' ? (
+            <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
+                <ol className="list-decimal list-inside space-y-1 text-blue-800">
+                  <li><strong>Primeiro:</strong> Upload de Clientes (cria os IDs na base)</li>
+                  <li><strong>Segundo:</strong> Upload de Exames (vincula aos clientes)</li>
+                  <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
+                  <li><strong>Último:</strong> Escalas e Financeiro (opcionais)</li>
+                </ol>
+              </div>
+            </>
+          ) : (
+            <Card className="border-gray-200">
+              <CardContent className="pt-6 text-center">
+                <div className="space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
+                    <Upload className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-700">Upload de Dados Desativado</h3>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Para usar esta funcionalidade, configure a fonte de dados como "Upload de Arquivo" na aba Configuração.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      setActiveTab('configuracao');
+                      setFonteDados('upload');
+                    }}
+                  >
+                    Ir para Configuração
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {fonteDados === 'upload' && (
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <FileUpload
@@ -1141,9 +1213,10 @@ export default function GerarFaturamento() {
                 }
               }}
               icon={<FileBarChart2 className="h-5 w-5" />}
-            />
-          </div>
-        </TabsContent>
+             />
+           </div>
+           )}
+         </TabsContent>
 
         <TabsContent value="database" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
