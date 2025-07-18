@@ -36,7 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { ControlePeriodo } from "@/components/ControlePeriodo";
+import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -946,12 +946,11 @@ export default function GerarFaturamento() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h4 className="font-medium mb-2">Período do Faturamento</h4>
-                    <ControlePeriodo
+                    <ControlePeriodoFaturamento
                       periodoSelecionado={periodoSelecionado}
                       setPeriodoSelecionado={setPeriodoSelecionado}
-                      mostrarApenasEditaveis={mostrarApenasEditaveis}
-                      setMostrarApenasEditaveis={setMostrarApenasEditaveis}
+                      mostrarApenasDisponiveis={mostrarApenasEditaveis}
+                      setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
                     />
                   </div>
                   
@@ -979,13 +978,12 @@ export default function GerarFaturamento() {
                         </div>
                       )}
                       
-                      {/* Aviso sobre validação de período */}
-                      {getStatusPeriodo(periodoSelecionado) !== 'editavel' && (
-                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                          <strong>Atenção:</strong> O período {periodoSelecionado} está com status "{getStatusPeriodo(periodoSelecionado)}". 
-                          O processamento de faturamento funcionará normalmente, pois é independente das validações de upload de dados.
-                        </div>
-                      )}
+                      {/* Aviso sobre independência do faturamento */}
+                      <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                        <strong>ℹ️ Importante:</strong> A geração de relatórios de faturamento é independente 
+                        das validações de período para upload de dados operacionais. Relatórios podem ser 
+                        gerados para qualquer período que contenha dados.
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -994,17 +992,7 @@ export default function GerarFaturamento() {
               {/* Botão de processamento */}
               <div className="flex justify-center">
                 <Button
-                  onClick={() => {
-                    const statusPeriodo = getStatusPeriodo(periodoSelecionado);
-                    if (statusPeriodo !== 'editavel') {
-                      // Confirmar processamento para período fechado/histórico
-                      if (confirm(`O período ${periodoSelecionado} está com status "${statusPeriodo}". Deseja continuar com o processamento do faturamento? Isso é permitido pois a geração de relatórios é independente das validações de upload de dados.`)) {
-                        handleProcessarFaturamento();
-                      }
-                    } else {
-                      handleProcessarFaturamento();
-                    }
-                  }}
+                  onClick={handleProcessarFaturamento}
                   disabled={!arquivoFaturamento || statusProcessamento.processando}
                   size="lg"
                   className="px-8"
@@ -1018,11 +1006,6 @@ export default function GerarFaturamento() {
                     <>
                       <FileBarChart2 className="h-4 w-4 mr-2" />
                       Processar e Gerar PDFs
-                      {getStatusPeriodo(periodoSelecionado) !== 'editavel' && (
-                        <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded">
-                          Período {getStatusPeriodo(periodoSelecionado)}
-                        </span>
-                      )}
                     </>
                   )}
                 </Button>
@@ -1279,12 +1262,12 @@ export default function GerarFaturamento() {
             </CardContent>
           </Card>
 
-          {/* Controle de Período */}
-          <ControlePeriodo
+          {/* Controle de Período para Configuração */}
+          <ControlePeriodoFaturamento
             periodoSelecionado={periodoSelecionado}
             setPeriodoSelecionado={setPeriodoSelecionado}
-            mostrarApenasEditaveis={mostrarApenasEditaveis}
-            setMostrarApenasEditaveis={setMostrarApenasEditaveis}
+            mostrarApenasDisponiveis={mostrarApenasEditaveis}
+            setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
           />
         </TabsContent>
 
