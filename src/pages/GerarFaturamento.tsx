@@ -414,6 +414,8 @@ export default function GerarFaturamento() {
         throw new Error(`Erro no upload: ${uploadError.message}`);
       }
 
+      console.log('Upload realizado com sucesso:', uploadData);
+
       setStatusProcessamento({
         processando: true,
         mensagem: 'Processando dados e gerando PDFs...',
@@ -421,7 +423,7 @@ export default function GerarFaturamento() {
       });
 
       console.log('Chamando edge function com parâmetros:', {
-        file_path: `uploads/${nomeArquivo}`,
+        file_path: nomeArquivo,
         periodo: periodoSelecionado,
         enviar_emails: enviarEmails
       });
