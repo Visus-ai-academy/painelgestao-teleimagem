@@ -81,7 +81,7 @@ serve(async (req) => {
         data_vencimento: new Date().toISOString().split('T')[0],
         data_pagamento: null,
         valor: 100.00,
-        status: 'pendente'
+        status: 'em_aberto'
       },
       {
         omie_id: `TEST_${Date.now()}_2`,
@@ -92,7 +92,7 @@ serve(async (req) => {
         data_vencimento: new Date().toISOString().split('T')[0],
         data_pagamento: null,
         valor: 200.00,
-        status: 'pendente'
+        status: 'em_aberto'
       }
     ];
 
