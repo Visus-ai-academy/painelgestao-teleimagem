@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { read, utils } from "https://esm.sh/xlsx@0.18.5";
-import jsPDF from "https://esm.sh/jspdf@2.5.1";
+import jsPDF from "npm:jspdf@2.5.1";
 import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
@@ -43,19 +43,29 @@ interface ClienteResumo {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    console.log('Iniciando processamento de faturamento PDF...');
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Variáveis de ambiente do Supabase não configuradas');
+    }
 
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY') || '');
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { file_path, periodo, enviar_emails = true } = await req.json();
+    // Verificar se Resend está configurado
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+    const body = await req.json();
+    const { file_path, periodo, enviar_emails = true } = body;
     
     if (!file_path || !periodo) {
       throw new Error('Parâmetros file_path e periodo são obrigatórios');
@@ -63,18 +73,51 @@ serve(async (req) => {
     
     console.log('Processando arquivo:', file_path, 'para período:', periodo);
 
-    // Download do arquivo Excel
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('uploads')
-      .download(file_path);
-
-    if (downloadError) {
-      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+    // Download do arquivo Excel com retry
+    let fileData;
+    let downloadError;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`Tentativa ${attempt} de download do arquivo...`);
+      const result = await supabase.storage
+        .from('uploads')
+        .download(file_path);
+      
+      if (result.error) {
+        downloadError = result.error;
+        console.warn(`Tentativa ${attempt} falhou:`, result.error.message);
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      } else {
+        fileData = result.data;
+        downloadError = null;
+        break;
+      }
     }
 
-    // Ler arquivo Excel
+    if (downloadError) {
+      throw new Error(`Erro ao baixar arquivo após 3 tentativas: ${downloadError.message}`);
+    }
+
+    if (!fileData) {
+      throw new Error('Arquivo não encontrado ou vazio');
+    }
+
+    // Ler arquivo Excel com tratamento de erro
+    console.log('Lendo arquivo Excel...');
     const arrayBuffer = await fileData.arrayBuffer();
+    
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('Arquivo Excel está vazio');
+    }
+    
     const workbook = read(arrayBuffer);
+    
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Arquivo Excel não contém planilhas válidas');
+    }
+    
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const rawData = utils.sheet_to_json(worksheet);
 
@@ -212,8 +255,8 @@ serve(async (req) => {
 
         pdfsGerados.push(pdfInfo);
 
-        // Enviar email se solicitado e se cliente tem email
-        if (enviar_emails && cliente.email && Deno.env.get('RESEND_API_KEY')) {
+        // Enviar email se solicitado, se cliente tem email e se Resend está configurado
+        if (enviar_emails && cliente.email && resend) {
           try {
             const [ano, mes] = periodo.split('-');
             const nomesMeses = [
@@ -267,7 +310,7 @@ Tel.: 41 99255-1964`;
           }
         } else if (enviar_emails && !cliente.email) {
           pdfInfo.erro_email = 'Email do cliente não encontrado no cadastro';
-        } else if (enviar_emails && !Deno.env.get('RESEND_API_KEY')) {
+        } else if (enviar_emails && !resend) {
           pdfInfo.erro_email = 'API Key do Resend não configurada';
         }
 
@@ -301,9 +344,16 @@ Tel.: 41 99255-1964`;
 
   } catch (error: any) {
     console.error('Erro no processamento:', error);
+    
+    // Log detalhado do erro para debug
+    console.error('Stack trace:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message,
+      details: error.stack || 'Stack trace não disponível'
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -312,11 +362,14 @@ Tel.: 41 99255-1964`;
 });
 
 function gerarPDFCliente(cliente: ClienteResumo, periodo: string): jsPDF {
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a4'
-  });
+  try {
+    console.log(`Gerando PDF para cliente: ${cliente.nome}`);
+    
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
 
   const pageWidth = 297; // A4 landscape width
   const pageHeight = 210; // A4 landscape height
@@ -430,7 +483,12 @@ function gerarPDFCliente(cliente: ClienteResumo, periodo: string): jsPDF {
   pdf.setFontSize(10);
   pdf.text(infoGeracao, pageWidth / 2, pageHeight / 2, { align: 'center' });
 
-  return pdf;
+    console.log(`PDF gerado com sucesso para cliente: ${cliente.nome}`);
+    return pdf;
+  } catch (error: any) {
+    console.error(`Erro ao gerar PDF para cliente ${cliente.nome}:`, error);
+    throw new Error(`Falha na geração do PDF: ${error.message}`);
+  }
 }
 
 function formatarPeriodo(periodo: string): string {
