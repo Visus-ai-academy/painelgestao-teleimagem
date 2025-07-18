@@ -71,10 +71,12 @@ serve(async (req) => {
     console.log('5. Arquivo baixado, tamanho:', fileData.size)
 
     // Por enquanto, vamos inserir apenas dados de teste para verificar se o problema é na leitura do Excel
+    // Usando o período atual (2025-01) no número da fatura para que o frontend encontre os dados
+    const periodoAtual = '2025-01';
     const dadosTeste = [
       {
         omie_id: `TEST_${Date.now()}_1`,
-        numero_fatura: `NF_TEST_${Date.now()}_1`,
+        numero_fatura: `NF_${periodoAtual}_TEST_1`,
         cliente_nome: 'Cliente Teste 1',
         cliente_email: 'teste1@email.com',
         data_emissao: new Date().toISOString().split('T')[0],
@@ -85,7 +87,7 @@ serve(async (req) => {
       },
       {
         omie_id: `TEST_${Date.now()}_2`,
-        numero_fatura: `NF_TEST_${Date.now()}_2`,
+        numero_fatura: `NF_${periodoAtual}_TEST_2`,
         cliente_nome: 'Cliente Teste 2',
         cliente_email: 'teste2@email.com',
         data_emissao: new Date().toISOString().split('T')[0],
