@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { FilterBar } from "@/components/FilterBar";
 import { FileUpload } from "@/components/FileUpload";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
   UserCheck, 
@@ -696,16 +697,18 @@ export default function Colaboradores() {
                         placeholder="Nome do gestor"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="salario">Salário</Label>
-                      <Input
-                        id="salario"
-                        type="number"
-                        value={newColaborador.salario}
-                        onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
-                        placeholder="5000"
-                      />
-                    </div>
+                    {newColaborador.departamento !== "Médico" && (
+                      <div>
+                        <Label htmlFor="salario">Salário</Label>
+                        <Input
+                          id="salario"
+                          type="number"
+                          value={newColaborador.salario}
+                          onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
+                          placeholder="5000"
+                        />
+                      </div>
+                    )}
                   </div>
                   
                   {/* Campos específicos para médicos */}

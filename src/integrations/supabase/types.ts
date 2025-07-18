@@ -207,11 +207,14 @@ export type Database = {
       medicos: {
         Row: {
           ativo: boolean
+          categoria: string | null
           created_at: string
           crm: string
           email: string | null
           especialidade: string
+          especialidades: string[] | null
           id: string
+          modalidades: string[] | null
           nome: string
           telefone: string | null
           updated_at: string
@@ -219,11 +222,14 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           crm: string
           email?: string | null
           especialidade: string
+          especialidades?: string[] | null
           id?: string
+          modalidades?: string[] | null
           nome: string
           telefone?: string | null
           updated_at?: string
@@ -231,17 +237,61 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           crm?: string
           email?: string | null
           especialidade?: string
+          especialidades?: string[] | null
           id?: string
+          modalidades?: string[] | null
           nome?: string
           telefone?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      medicos_valores_repasse: {
+        Row: {
+          created_at: string | null
+          especialidade: string
+          id: string
+          medico_id: string
+          modalidade: string
+          prioridade: string
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          created_at?: string | null
+          especialidade: string
+          id?: string
+          medico_id: string
+          modalidade: string
+          prioridade: string
+          updated_at?: string | null
+          valor: number
+        }
+        Update: {
+          created_at?: string | null
+          especialidade?: string
+          id?: string
+          medico_id?: string
+          modalidade?: string
+          prioridade?: string
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicos_valores_repasse_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
