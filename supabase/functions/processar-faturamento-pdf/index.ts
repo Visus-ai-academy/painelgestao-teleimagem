@@ -53,9 +53,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY') || '');
 
     const { file_path, periodo, enviar_emails = true } = await req.json();
+    
+    if (!file_path || !periodo) {
+      throw new Error('Parâmetros file_path e periodo são obrigatórios');
+    }
     
     console.log('Processando arquivo:', file_path, 'para período:', periodo);
 
@@ -209,7 +213,7 @@ serve(async (req) => {
         pdfsGerados.push(pdfInfo);
 
         // Enviar email se solicitado e se cliente tem email
-        if (enviar_emails && cliente.email) {
+        if (enviar_emails && cliente.email && Deno.env.get('RESEND_API_KEY')) {
           try {
             const [ano, mes] = periodo.split('-');
             const nomesMeses = [
@@ -263,6 +267,8 @@ Tel.: 41 99255-1964`;
           }
         } else if (enviar_emails && !cliente.email) {
           pdfInfo.erro_email = 'Email do cliente não encontrado no cadastro';
+        } else if (enviar_emails && !Deno.env.get('RESEND_API_KEY')) {
+          pdfInfo.erro_email = 'API Key do Resend não configurada';
         }
 
       } catch (error: any) {
