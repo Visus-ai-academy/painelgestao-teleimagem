@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generate } from "https://esm.sh/@pdfme/generator@4.5.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,20 +82,152 @@ serve(async (req) => {
         return acc;
       }, {});
 
-      const clientesProcessados = Object.values(clientesAgrupados).map((cliente: any) => {
-        return {
-          cliente: cliente.nome,
-          email: cliente.email,
-          cnpj: cliente.registros[0]?.numero_fatura || 'N/A',
-          url: null, // PDF será gerado posteriormente
-          resumo: {
-            total_laudos: cliente.total_laudos,
-            valor_pagar: Math.round(cliente.valor_total * 100) / 100
-          },
-          email_enviado: false,
-          relatorio_texto: `RELATÓRIO DE FATURAMENTO - ${cliente.nome}\nPeríodo: ${periodo}\nData: ${new Date().toLocaleString('pt-BR')}\n\nRESUMO FINANCEIRO\nTotal de Laudos: ${cliente.total_laudos}\nValor Total: R$ ${cliente.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-        };
-      });
+      // STEP 3: Gerar PDFs reais para cada cliente
+      console.log('STEP 3: Gerando PDFs...');
+      
+      const template = {
+        basePdf: null, // PDF em branco
+        schemas: [
+          {
+            "title": {
+              "type": "text",
+              "position": { "x": 50, "y": 50 },
+              "width": 495,
+              "height": 30,
+              "fontSize": 20,
+              "fontColor": "#2563eb",
+              "fontName": "Helvetica"
+            },
+            "periodo": {
+              "type": "text", 
+              "position": { "x": 50, "y": 90 },
+              "width": 200,
+              "height": 20,
+              "fontSize": 12,
+              "fontColor": "#374151"
+            },
+            "data": {
+              "type": "text",
+              "position": { "x": 350, "y": 90 },
+              "width": 195,
+              "height": 20,
+              "fontSize": 12,
+              "fontColor": "#374151"
+            },
+            "cliente": {
+              "type": "text",
+              "position": { "x": 50, "y": 130 },
+              "width": 300,
+              "height": 25,
+              "fontSize": 16,
+              "fontColor": "#111827"
+            },
+            "resumo_titulo": {
+              "type": "text",
+              "position": { "x": 50, "y": 180 },
+              "width": 495,
+              "height": 20,
+              "fontSize": 14,
+              "fontColor": "#1f2937"
+            },
+            "total_laudos": {
+              "type": "text",
+              "position": { "x": 50, "y": 210 },
+              "width": 200,
+              "height": 20,
+              "fontSize": 12,
+              "fontColor": "#374151"
+            },
+            "valor_total": {
+              "type": "text",
+              "position": { "x": 50, "y": 240 },
+              "width": 200,
+              "height": 20,
+              "fontSize": 12,
+              "fontColor": "#374151"
+            }
+          }
+        ]
+      };
+
+      const clientesProcessados = await Promise.all(
+        Object.values(clientesAgrupados).map(async (cliente: any) => {
+          try {
+            // Preparar dados para o PDF
+            const inputs = [
+              {
+                title: `RELATÓRIO DE FATURAMENTO - ${cliente.nome}`,
+                periodo: `Período: ${periodo}`,
+                data: `Data: ${new Date().toLocaleString('pt-BR')}`,
+                cliente: `Cliente: ${cliente.nome}`,
+                resumo_titulo: "RESUMO FINANCEIRO:",
+                total_laudos: `Total de Laudos: ${cliente.total_laudos}`,
+                valor_total: `Valor Total: R$ ${cliente.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+              }
+            ];
+
+            console.log(`Gerando PDF para ${cliente.nome}...`);
+            
+            // Gerar PDF usando pdfme
+            const pdf = await generate({ 
+              template, 
+              inputs 
+            });
+
+            // Fazer upload do PDF para o storage
+            const nomeArquivoPdf = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('uploads')
+              .upload(nomeArquivoPdf, new Blob([pdf], { type: 'application/pdf' }), {
+                contentType: 'application/pdf',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error(`Erro no upload do PDF para ${cliente.nome}:`, uploadError);
+              throw uploadError;
+            }
+
+            // Obter URL pública do PDF
+            const { data: urlData } = supabase.storage
+              .from('uploads')
+              .getPublicUrl(nomeArquivoPdf);
+
+            console.log(`PDF gerado com sucesso para ${cliente.nome}: ${urlData.publicUrl}`);
+
+            return {
+              cliente: cliente.nome,
+              email: cliente.email,
+              cnpj: cliente.registros[0]?.numero_fatura || 'N/A',
+              url: urlData.publicUrl,
+              resumo: {
+                total_laudos: cliente.total_laudos,
+                valor_pagar: Math.round(cliente.valor_total * 100) / 100
+              },
+              email_enviado: false,
+              pdf_gerado: true,
+              arquivo_pdf: nomeArquivoPdf
+            };
+
+          } catch (pdfError) {
+            console.error(`Erro ao gerar PDF para ${cliente.nome}:`, pdfError);
+            return {
+              cliente: cliente.nome,
+              email: cliente.email,
+              cnpj: cliente.registros[0]?.numero_fatura || 'N/A',
+              url: null,
+              resumo: {
+                total_laudos: cliente.total_laudos,
+                valor_pagar: Math.round(cliente.valor_total * 100) / 100
+              },
+              email_enviado: false,
+              pdf_gerado: false,
+              erro_pdf: pdfError.message
+            };
+          }
+        })
+      );
 
       console.log('Processamento simulado concluído');
 
