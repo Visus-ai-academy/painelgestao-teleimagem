@@ -407,8 +407,8 @@ export default function GerarFaturamento() {
       // Upload do arquivo para storage
       const nomeArquivo = `faturamento_${Date.now()}_${arquivoFaturamento.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documentos-clientes')
-        .upload(`uploads/${nomeArquivo}`, arquivoFaturamento);
+        .from('uploads')
+        .upload(nomeArquivo, arquivoFaturamento);
 
       if (uploadError) {
         throw new Error(`Erro no upload: ${uploadError.message}`);
@@ -429,7 +429,7 @@ export default function GerarFaturamento() {
       // Chamar edge function para processar
       const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
         body: {
-          file_path: `uploads/${nomeArquivo}`,
+          file_path: nomeArquivo,
           periodo: periodoSelecionado,
           enviar_emails: enviarEmails
         }
@@ -1213,133 +1213,130 @@ export default function GerarFaturamento() {
                   <div className="flex items-center gap-3">
                     <FileText className="h-8 w-8 text-green-600" />
                     <div>
-                      <div className="text-2xl font-bold text-green-900">{relatoriosProntos.length}</div>
-                      <div className="text-sm text-green-700">Relatórios Carregados</div>
+                      <div className="text-2xl font-bold text-green-900">{resultados.filter(r => r.relatorioGerado).length}</div>
+                      <div className="text-sm text-green-700">Relatórios Gerados</div>
                     </div>
                   </div>
                 </div>
                 <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <AlertTriangle className="h-8 w-8 text-orange-600" />
+                    <Mail className="h-8 w-8 text-orange-600" />
                     <div>
                       <div className="text-2xl font-bold text-orange-900">
-                        {clientesCarregados.length - relatoriosProntos.length}
+                        {resultados.filter(r => r.emailEnviado).length}
                       </div>
-                      <div className="text-sm text-orange-700">Pendentes</div>
+                      <div className="text-sm text-orange-700">Emails Enviados</div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Lista de Clientes e Upload */}
-              {clientesCarregados.length > 0 ? (
+              {/* Lista de Relatórios Gerados pelo Sistema */}
+              {resultados.length > 0 ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Clientes e Relatórios</h3>
-                    <Button 
-                      onClick={handleCarregarRelatoriosProntos}
-                      disabled={relatoriosProntos.length === 0}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Preparar para Envio ({relatoriosProntos.length})
-                    </Button>
+                    <h3 className="text-lg font-semibold">Relatórios Gerados pelo Sistema</h3>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={recarregarClientes}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Atualizar
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="grid gap-4">
-                    {clientesCarregados.map((cliente) => {
-                      const relatorioPronto = relatoriosProntos.find(r => r.clienteId === cliente.id);
-                      
-                      return (
-                        <div key={cliente.id} className="border rounded-lg p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium">{cliente.nome}</h4>
-                              <p className="text-sm text-muted-foreground">{cliente.email}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {relatorioPronto ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Carregado
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Pendente
-                                </Badge>
-                              )}
-                            </div>
+                    {resultados.map((resultado) => (
+                      <div key={resultado.clienteId} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{resultado.clienteNome}</h4>
+                            <p className="text-sm text-muted-foreground">{resultado.emailDestino}</p>
+                            {resultado.detalhesRelatorio && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                {resultado.detalhesRelatorio.total_laudos} laudos - 
+                                R$ {resultado.detalhesRelatorio.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            )}
                           </div>
-                          
-                          {relatorioPronto ? (
-                            <div className="p-3 bg-green-50 border border-green-200 rounded flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-green-600" />
-                                <span className="text-sm text-green-700">{relatorioPronto.nomeArquivo}</span>
-                                <span className="text-xs text-green-600">({relatorioPronto.dataUpload})</span>
-                              </div>
-                              <div className="flex gap-2">
+                          <div className="flex items-center gap-2">
+                            {resultado.relatorioGerado ? (
+                              <Badge variant="default" className="bg-green-100 text-green-800">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                PDF Gerado
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pendente
+                              </Badge>
+                            )}
+                            {resultado.emailEnviado && (
+                              <Badge variant="default" className="bg-blue-100 text-blue-800">
+                                <Mail className="h-3 w-3 mr-1" />
+                                Email Enviado
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {resultado.relatorioGerado && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-green-600" />
+                              <span className="text-sm text-green-700">
+                                Relatório gerado em {resultado.dataProcessamento}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              {resultado.linkRelatorio && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => window.open(relatorioPronto.uploadUrl)}
+                                  onClick={() => window.open(resultado.linkRelatorio)}
                                 >
                                   <ExternalLink className="h-3 w-3 mr-1" />
-                                  Ver
+                                  Visualizar PDF
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setRelatoriosProntos(prev => prev.filter(r => r.clienteId !== cliente.id));
-                                    setResultados(prev => prev.map(r => 
-                                      r.clienteId === cliente.id 
-                                        ? { ...r, relatorioGerado: false, linkRelatorio: undefined }
-                                        : r
-                                    ));
-                                  }}
-                                >
-                                  Remover
-                                </Button>
-                              </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="p-3 border-2 border-dashed border-gray-200 rounded">
-                              <label className="flex flex-col items-center justify-center cursor-pointer">
-                                <Upload className="h-6 w-6 text-gray-400 mb-2" />
-                                <span className="text-sm text-gray-600">
-                                  Clique para fazer upload do relatório PDF
-                                </span>
-                                <input
-                                  type="file"
-                                  accept=".pdf,.xlsx,.xls"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      handleUploadRelatorio(cliente.id, file);
-                                      e.target.value = ''; // Reset input
-                                    }
-                                  }}
-                                />
-                              </label>
+                          </div>
+                        )}
+
+                        {resultado.erro && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-red-600" />
+                              <span className="text-sm text-red-700">Erro: {resultado.erro}</span>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          </div>
+                        )}
+
+                        {resultado.erroEmail && (
+                          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                              <span className="text-sm text-yellow-700">Email: {resultado.erroEmail}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
                 <div className="text-center p-8 border-2 border-dashed border-gray-200 rounded-lg">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum Cliente Carregado</h3>
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum Relatório Gerado</h3>
                   <p className="text-gray-500 mb-4">
-                    Faça upload da lista de clientes primeiro na aba "Upload de Dados"
+                    Vá para a aba "Gerar" para processar o arquivo de faturamento e gerar relatórios
                   </p>
-                  <Button onClick={() => setActiveTab("uploads")} variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Ir para Upload de Dados
+                  <Button onClick={() => setActiveTab("faturamento")} variant="outline">
+                    <FileBarChart2 className="h-4 w-4 mr-2" />
+                    Ir para Gerar Relatórios
                   </Button>
                 </div>
               )}

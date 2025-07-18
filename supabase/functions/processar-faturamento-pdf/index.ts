@@ -61,7 +61,7 @@ serve(async (req) => {
 
     // Download do arquivo Excel
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from('documentos-clientes')
+      .from('uploads')
       .download(file_path);
 
     if (downloadError) {
