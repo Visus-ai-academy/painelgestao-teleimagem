@@ -83,19 +83,37 @@ serve(async (req) => {
     const jsonData = utils.sheet_to_json(worksheet)
 
     console.log('Dados extraídos:', jsonData?.length || 0, 'registros')
+    
+    // Debug: Log column names from first row
+    if (jsonData && jsonData.length > 0) {
+      console.log('Colunas encontradas:', Object.keys(jsonData[0]))
+      console.log('Primeira linha de dados:', jsonData[0])
+    }
 
-    // Processar dados
-    const faturamentoData = jsonData.map((row: any) => ({
-      omie_id: row['ID'] || row['id'] || '',
-      numero_fatura: row['Número da Fatura'] || row['numero_fatura'] || '',
-      cliente_nome: row['Cliente'] || row['cliente_nome'] || '',
-      cliente_email: row['Email'] || row['cliente_email'] || '',
-      data_emissao: row['Data de Emissão'] || row['data_emissao'] || '',
-      data_vencimento: row['Data de Vencimento'] || row['data_vencimento'] || '',
-      data_pagamento: row['Data de Pagamento'] || row['data_pagamento'] || null,
-      valor: parseFloat(row['Valor'] || row['valor'] || '0'),
-      status: row['Status'] || row['status'] || 'pendente'
-    })).filter(item => item.numero_fatura && item.cliente_nome)
+    // Processar dados com mapeamento mais flexível
+    const faturamentoData = jsonData.map((row: any) => {
+      // Buscar as colunas por diferentes variações de nomes
+      const getColumnValue = (possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+            return row[name]
+          }
+        }
+        return ''
+      }
+
+      return {
+        omie_id: getColumnValue(['ID', 'id', 'omie_id', 'Id']),
+        numero_fatura: getColumnValue(['Número da Fatura', 'numero_fatura', 'NumeroFatura', 'Numero', 'numero']),
+        cliente_nome: getColumnValue(['Cliente', 'cliente_nome', 'ClienteNome', 'Nome Cliente', 'nome_cliente']),
+        cliente_email: getColumnValue(['Email', 'cliente_email', 'ClienteEmail', 'E-mail', 'email']),
+        data_emissao: getColumnValue(['Data de Emissão', 'data_emissao', 'DataEmissao', 'Emissão', 'emissao']),
+        data_vencimento: getColumnValue(['Data de Vencimento', 'data_vencimento', 'DataVencimento', 'Vencimento', 'vencimento']),
+        data_pagamento: getColumnValue(['Data de Pagamento', 'data_pagamento', 'DataPagamento', 'Pagamento', 'pagamento']) || null,
+        valor: parseFloat(getColumnValue(['Valor', 'valor', 'ValorTotal', 'Total', 'total']) || '0'),
+        status: getColumnValue(['Status', 'status', 'Situação', 'situacao']) || 'pendente'
+      }
+    }).filter(item => item.cliente_nome && item.cliente_nome.trim() !== '')
 
     console.log('Dados processados:', faturamentoData.length, 'registros válidos')
 
