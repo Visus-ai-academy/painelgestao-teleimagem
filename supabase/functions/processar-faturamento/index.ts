@@ -103,12 +103,12 @@ serve(async (req) => {
       }
 
       return {
-        omie_id: getColumnValue(['ID', 'id', 'omie_id', 'Id']),
-        numero_fatura: getColumnValue(['Número da Fatura', 'numero_fatura', 'NumeroFatura', 'Numero', 'numero']),
+        omie_id: getColumnValue(['ID', 'id', 'omie_id', 'Id']) || `FAT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        numero_fatura: getColumnValue(['Número da Fatura', 'numero_fatura', 'NumeroFatura', 'Numero', 'numero']) || `${Date.now()}`,
         cliente_nome: getColumnValue(['Cliente', 'cliente_nome', 'ClienteNome', 'Nome Cliente', 'nome_cliente']),
         cliente_email: getColumnValue(['Email', 'cliente_email', 'ClienteEmail', 'E-mail', 'email']),
         data_emissao: getColumnValue(['Data de Emissão', 'data_emissao', 'DataEmissao', 'Emissão', 'emissao']),
-        data_vencimento: getColumnValue(['Data de Vencimento', 'data_vencimento', 'DataVencimento', 'Vencimento', 'vencimento']),
+        data_vencimento: getColumnValue(['Data de Vencimento', 'data_vencimento', 'DataVencimento', 'Vencimento', 'vencimento']) || getColumnValue(['Data de Emissão', 'data_emissao', 'DataEmissao', 'Emissão', 'emissao']),
         data_pagamento: getColumnValue(['Data de Pagamento', 'data_pagamento', 'DataPagamento', 'Pagamento', 'pagamento']) || null,
         valor: parseFloat(getColumnValue(['Valor', 'valor', 'ValorTotal', 'Total', 'total']) || '0'),
         status: getColumnValue(['Status', 'status', 'Situação', 'situacao']) || 'pendente'
