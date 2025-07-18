@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
+import { MatrixRain } from "@/components/MatrixRain";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -821,7 +822,7 @@ export default function GerarFaturamento() {
           </TabsTrigger>
           <TabsTrigger value="faturamento" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
-            Envio de Emails
+            Gerar
           </TabsTrigger>
           <TabsTrigger value="uploads" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
@@ -1391,7 +1392,7 @@ export default function GerarFaturamento() {
                     ) : (
                       <>
                         <FileText className="h-5 w-5 mr-2" />
-                        Preparar Relatórios ({relatoriosProntos.length})
+                        Gerar Relatórios ({relatoriosProntos.length})
                       </>
                     )}
                   </Button>
@@ -1512,49 +1513,70 @@ export default function GerarFaturamento() {
             </Card>
           </div>
 
-          {/* Gráficos Velocímetro */}
+          {/* Gráficos Velocímetro ou Matrix Rain durante processamento */}
           <Card>
             <CardHeader>
-              <CardTitle>Progresso do Faturamento</CardTitle>
+              <CardTitle>{processandoTodos ? "Processando..." : "Progresso do Faturamento"}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
-                <Speedometer
-                  value={clientesCarregados.length}
-                  max={clientesCarregados.length}
-                  label="Clientes Cadastrados"
-                  unit=""
-                  colorThresholds={{
-                    low: { threshold: 30, color: "#3b82f6" },
-                    medium: { threshold: 70, color: "#3b82f6" },
-                    high: { threshold: 100, color: "#3b82f6" }
-                  }}
-                />
-                
-                <Speedometer
-                  value={relatoriosGerados}
-                  max={clientesCarregados.length}
-                  label="Relatórios Gerados"
-                  unit=""
-                  colorThresholds={{
-                    low: { threshold: 40, color: "#f59e0b" },
-                    medium: { threshold: 80, color: "#10b981" },
-                    high: { threshold: 100, color: "#10b981" }
-                  }}
-                />
-                
-                <Speedometer
-                  value={emailsEnviados}
-                  max={clientesCarregados.length}
-                  label="E-mails Enviados"
-                  unit=""
-                  colorThresholds={{
-                    low: { threshold: 40, color: "#ef4444" },
-                    medium: { threshold: 80, color: "#f59e0b" },
-                    high: { threshold: 100, color: "#10b981" }
-                  }}
-                />
-              </div>
+              {processandoTodos ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                  <div className="flex flex-col items-center space-y-4">
+                    <h3 className="text-lg font-semibold text-green-400">SISTEMA ATIVO</h3>
+                    <MatrixRain width={350} height={250} speed={40} fontSize={12} opacity={0.9} />
+                    <div className="text-center">
+                      <p className="text-sm text-green-600 font-mono">GERANDO RELATÓRIOS...</p>
+                      <p className="text-xs text-muted-foreground mt-1">Processando dados dos clientes</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center space-y-4">
+                    <h3 className="text-lg font-semibold text-green-400">STATUS: ONLINE</h3>
+                    <MatrixRain width={350} height={250} speed={35} fontSize={14} opacity={0.8} />
+                    <div className="text-center">
+                      <p className="text-sm text-green-600 font-mono">SISTEMA OPERACIONAL</p>
+                      <p className="text-xs text-muted-foreground mt-1">Aguarde a conclusão do processo</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
+                  <Speedometer
+                    value={clientesCarregados.length}
+                    max={clientesCarregados.length}
+                    label="Clientes Cadastrados"
+                    unit=""
+                    colorThresholds={{
+                      low: { threshold: 30, color: "#3b82f6" },
+                      medium: { threshold: 70, color: "#3b82f6" },
+                      high: { threshold: 100, color: "#3b82f6" }
+                    }}
+                  />
+                  
+                  <Speedometer
+                    value={relatoriosGerados}
+                    max={clientesCarregados.length}
+                    label="Relatórios Gerados"
+                    unit=""
+                    colorThresholds={{
+                      low: { threshold: 40, color: "#f59e0b" },
+                      medium: { threshold: 80, color: "#10b981" },
+                      high: { threshold: 100, color: "#10b981" }
+                    }}
+                  />
+                  
+                  <Speedometer
+                    value={emailsEnviados}
+                    max={clientesCarregados.length}
+                    label="E-mails Enviados"
+                    unit=""
+                    colorThresholds={{
+                      low: { threshold: 40, color: "#ef4444" },
+                      medium: { threshold: 80, color: "#f59e0b" },
+                      high: { threshold: 100, color: "#10b981" }
+                    }}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
