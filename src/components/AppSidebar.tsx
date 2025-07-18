@@ -11,6 +11,7 @@ import {
   ChevronDown,
   FileText
 } from "lucide-react";
+import teleimagemlLogo from "@/assets/teleimagem-logo.jpg";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -167,13 +168,15 @@ export function AppSidebar() {
       <SidebarContent>
         <div className="p-6 border-b bg-gradient-subtle">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center shadow-3d animate-bounce-in">
-              <TrendingUp className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img 
+              src={teleimagemlLogo} 
+              alt="Teleimagem Logo" 
+              className="h-8 w-auto object-contain"
+            />
             {!collapsed && (
               <div>
-                <h2 className="font-bold text-lg text-foreground">MedSystem</h2>
-                <p className="text-sm text-muted-foreground">Dashboard</p>
+                <h2 className="font-bold text-lg text-foreground">Teleimagem</h2>
+                <p className="text-sm text-muted-foreground">Sistema de Gestão</p>
               </div>
             )}
           </div>

@@ -42,7 +42,7 @@ export default function ConfiguracaoLogomarca() {
       const fileName = `logomarca.${fileExt}`;
       
       const { data, error } = await supabase.storage
-        .from('uploads')
+        .from('logomarcas')
         .upload(fileName, file, {
           upsert: true // Substitui se já existir
         });
@@ -53,7 +53,7 @@ export default function ConfiguracaoLogomarca() {
 
       // Obter URL pública da imagem
       const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
+        .from('logomarcas')
         .getPublicUrl(fileName);
 
       setLogoUrl(publicUrl);
@@ -79,7 +79,7 @@ export default function ConfiguracaoLogomarca() {
   const handleRemoveLogo = async () => {
     try {
       const { error } = await supabase.storage
-        .from('uploads')
+        .from('logomarcas')
         .remove(['logomarca.jpg', 'logomarca.png', 'logomarca.jpeg']);
 
       if (error) {
@@ -107,7 +107,7 @@ export default function ConfiguracaoLogomarca() {
     const loadExistingLogo = async () => {
       try {
         const { data: { publicUrl } } = supabase.storage
-          .from('uploads')
+          .from('logomarcas')
           .getPublicUrl('logomarca.jpg');
         
         // Verificar se a imagem existe
