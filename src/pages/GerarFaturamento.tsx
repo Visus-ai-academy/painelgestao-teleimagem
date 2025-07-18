@@ -1710,7 +1710,29 @@ export default function GerarFaturamento() {
           </Card>
 
           {/* Botão principal para gerar relatórios */}
-          <Card className="border-green-200 bg-green-50">
+          <Card className={`border-green-200 ${statusProcessamento.processando ? 'relative' : 'bg-green-50'}`}>
+            {statusProcessamento.processando && (
+              <div className="absolute inset-0 bg-black/80 rounded-lg overflow-hidden z-10">
+                <MatrixRain width={800} height={600} fontSize={12} opacity={0.8} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/70 p-6 rounded-lg border border-green-400/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-4">
+                      <RefreshCw className="h-8 w-8 text-green-400 animate-spin" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-green-400">Processando Relatórios</h3>
+                        <p className="text-green-300">{statusProcessamento.mensagem}</p>
+                        <div className="mt-2 w-64 bg-green-900 rounded-full h-2">
+                          <div 
+                            className="bg-green-400 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${statusProcessamento.progresso}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileBarChart2 className="h-5 w-5 text-green-600" />
@@ -1828,9 +1850,6 @@ export default function GerarFaturamento() {
                       {statusProcessamento.processando ? (
                         <>
                           <RefreshCw className="h-5 w-5 mr-3 animate-spin" />
-                          <div className="relative w-32 h-6 bg-green-800 rounded overflow-hidden mr-3">
-                            <MatrixRain width={128} height={24} fontSize={8} opacity={0.6} />
-                          </div>
                           Processando...
                         </>
                       ) : (
