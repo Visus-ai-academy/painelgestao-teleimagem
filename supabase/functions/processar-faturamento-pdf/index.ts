@@ -86,7 +86,7 @@ serve(async (req) => {
       throw new Error('Arquivo Excel vazio');
     }
 
-    // STEP 3: Agrupar por cliente (otimizado)
+    // STEP 3: Agrupar por cliente (otimizado e normalizado)
     console.log('STEP 3: Agrupando por cliente...');
     const groupStart = Date.now();
     
@@ -97,22 +97,45 @@ serve(async (req) => {
     const maxRegistros = Math.min(dadosProcessados.length, 1000);
     console.log(`Processando ${maxRegistros} de ${dadosProcessados.length} registros`);
 
+    // Função para normalizar nome do cliente
+    function normalizarNomeCliente(nome: string): string {
+      return nome
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, ' ') // Remove espaços extras
+        .replace(/[^\w\s]/g, '') // Remove caracteres especiais
+        .replace(/\b(LTDA|LTD|SA|S\.A\.|EIRELI|ME|EPP)\b/g, '') // Remove sufixos comuns
+        .trim();
+    }
+
     for (let i = 0; i < maxRegistros; i++) {
       const exame = dadosProcessados[i];
-      const clienteNome = exame.cliente || exame.Cliente || '';
+      const clienteNomeOriginal = exame.cliente || exame.Cliente || '';
       
-      if (!clienteNome) continue;
+      if (!clienteNomeOriginal) {
+        console.log(`Linha ${i + 1}: Cliente vazio`);
+        continue;
+      }
 
-      if (!clientesResumo.has(clienteNome)) {
-        clientesResumo.set(clienteNome, {
-          nome: clienteNome,
+      // Normalizar nome do cliente para evitar duplicatas
+      const clienteNomeNormalizado = normalizarNomeCliente(clienteNomeOriginal);
+      
+      if (!clienteNomeNormalizado) {
+        console.log(`Linha ${i + 1}: Cliente inválido após normalização: "${clienteNomeOriginal}"`);
+        continue;
+      }
+
+      if (!clientesResumo.has(clienteNomeNormalizado)) {
+        clientesResumo.set(clienteNomeNormalizado, {
+          nome: clienteNomeOriginal, // Mantém o nome original para exibição
           totalLaudos: 0,
           valorTotal: 0,
           exames: []
         });
+        console.log(`Novo cliente encontrado: "${clienteNomeOriginal}" -> normalizado: "${clienteNomeNormalizado}"`);
       }
 
-      const cliente = clientesResumo.get(clienteNome)!;
+      const cliente = clientesResumo.get(clienteNomeNormalizado)!;
       cliente.totalLaudos++;
       
       const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
@@ -124,7 +147,15 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Agrupamento concluído em ${Date.now() - groupStart}ms, ${clientesResumo.size} clientes`);
+    console.log(`Agrupamento concluído em ${Date.now() - groupStart}ms`);
+    console.log(`${clientesResumo.size} clientes únicos encontrados:`);
+    
+    // Log detalhado dos clientes encontrados
+    let clienteIndex = 1;
+    for (const [nomeNormalizado, resumo] of clientesResumo) {
+      console.log(`Cliente ${clienteIndex}: "${resumo.nome}" (${resumo.totalLaudos} laudos, R$ ${resumo.valorTotal.toFixed(2)})`);
+      clienteIndex++;
+    }
 
     // STEP 4: Gerar relatórios simplificados
     console.log('STEP 4: Gerando relatórios...');
