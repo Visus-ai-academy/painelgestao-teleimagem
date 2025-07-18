@@ -245,7 +245,7 @@ export default function PagamentosMedicos() {
     liquido: acc.liquido + resumo.valor_liquido
   }), { exames: 0, bruto: 0, descontos: 0, liquido: 0 });
 
-  const especialidades = [...new Set(medicos.map(m => m.especialidade))];
+  const especialidades = [...new Set(medicos.map(m => m.especialidade).filter(esp => esp && esp.trim() !== ''))];
 
   return (
     <div className="space-y-6 p-6">
