@@ -139,6 +139,7 @@ export default function GerarFaturamento() {
 
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
+  const [enviarEmails, setEnviarEmails] = useState(true);
   const [statusProcessamento, setStatusProcessamento] = useState<{
     processando: boolean;
     mensagem: string;
@@ -158,6 +159,7 @@ export default function GerarFaturamento() {
     linkRelatorio?: string;
     arquivos?: Array<{ tipo: string; url: string; nome: string }>;
     erro?: string;
+    erroEmail?: string;
     dataProcessamento?: string;
     relatorioData?: any;
     detalhesRelatorio?: {
@@ -416,7 +418,8 @@ export default function GerarFaturamento() {
       const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
         body: {
           file_path: `uploads/${nomeArquivo}`,
-          periodo: periodoSelecionado
+          periodo: periodoSelecionado,
+          enviar_emails: enviarEmails
         }
       });
 
@@ -439,18 +442,21 @@ export default function GerarFaturamento() {
         clienteId: `cliente-${pdf.cliente}`,
         clienteNome: pdf.cliente,
         relatorioGerado: true,
-        emailEnviado: false,
-        emailDestino: `${pdf.cliente.toLowerCase().replace(/\s+/g, '')}@email.com`, // Email fictício
+        emailEnviado: pdf.email_enviado || false,
+        emailDestino: 'email@cliente.com', // Será atualizado conforme cadastro
         linkRelatorio: pdf.url,
         dataProcessamento: new Date().toLocaleString('pt-BR'),
         detalhesRelatorio: {
           total_laudos: pdf.resumo.total_laudos,
           valor_total: pdf.resumo.valor_pagar
-        }
+        },
+        erro: pdf.erro,
+        erroEmail: pdf.erro_email
       }));
 
       setResultados(novosResultados);
       setRelatoriosGerados(data.pdfs_gerados.length);
+      setEmailsEnviados(data.emails_enviados || 0);
 
       setStatusProcessamento({
         processando: false,
@@ -460,11 +466,13 @@ export default function GerarFaturamento() {
 
       toast({
         title: "Processamento Concluído",
-        description: `${data.pdfs_gerados.length} relatórios PDF gerados com sucesso`,
+        description: `${data.pdfs_gerados.length} relatórios PDF gerados${enviarEmails ? ` e ${data.emails_enviados} emails enviados` : ''} com sucesso`,
       });
 
-      // Mudar para aba de envio
-      setActiveTab("emails");
+      // Mudar para aba de envio se emails não foram enviados
+      if (!enviarEmails) {
+        setActiveTab("emails");
+      }
 
     } catch (error: any) {
       console.error('Erro no processamento:', error);
@@ -921,15 +929,47 @@ export default function GerarFaturamento() {
                 )}
               </div>
 
-              {/* Controle de período */}
+              {/* Controle de período e opções */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Período do Faturamento</h3>
-                <ControlePeriodo
-                  periodoSelecionado={periodoSelecionado}
-                  setPeriodoSelecionado={setPeriodoSelecionado}
-                  mostrarApenasEditaveis={mostrarApenasEditaveis}
-                  setMostrarApenasEditaveis={setMostrarApenasEditaveis}
-                />
+                <h3 className="text-lg font-semibold">Configurações</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-2">Período do Faturamento</h4>
+                    <ControlePeriodo
+                      periodoSelecionado={periodoSelecionado}
+                      setPeriodoSelecionado={setPeriodoSelecionado}
+                      mostrarApenasEditaveis={mostrarApenasEditaveis}
+                      setMostrarApenasEditaveis={setMostrarApenasEditaveis}
+                    />
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Opções de Envio</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={enviarEmails}
+                          onCheckedChange={setEnviarEmails}
+                          id="enviar-emails"
+                        />
+                        <Label htmlFor="enviar-emails">Enviar emails automaticamente</Label>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {enviarEmails 
+                          ? "Os PDFs serão gerados e enviados automaticamente por email para cada cliente."
+                          : "Apenas os PDFs serão gerados. Os emails poderão ser enviados posteriormente."
+                        }
+                      </p>
+                      {enviarEmails && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                          <strong>Remetente:</strong> financeiro@teleimagem.com.br<br/>
+                          <strong>Assunto:</strong> Relatório de volumetria - Faturamento Teleimagem - Mês/Ano
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Botão de processamento */}
@@ -957,7 +997,7 @@ export default function GerarFaturamento() {
               {/* Resultados do processamento */}
               {resultados.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-4">Relatórios Gerados</h3>
+                  <h3 className="text-lg font-semibold mb-4">Relatórios Processados</h3>
                   <div className="grid gap-3">
                     {resultados.map((resultado) => (
                       <div key={resultado.clienteId} className="flex items-center justify-between p-3 border rounded-lg">
@@ -969,12 +1009,24 @@ export default function GerarFaturamento() {
                               R$ {resultado.detalhesRelatorio.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
                           )}
+                          {resultado.erro && (
+                            <p className="text-sm text-red-600">Erro: {resultado.erro}</p>
+                          )}
+                          {resultado.erroEmail && (
+                            <p className="text-sm text-yellow-600">Email: {resultado.erroEmail}</p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {resultado.relatorioGerado && (
                             <Badge variant="default" className="bg-green-100 text-green-800">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              PDF Gerado
+                              PDF
+                            </Badge>
+                          )}
+                          {resultado.emailEnviado && (
+                            <Badge variant="default" className="bg-blue-100 text-blue-800">
+                              <Mail className="h-3 w-3 mr-1" />
+                              Email
                             </Badge>
                           )}
                           {resultado.linkRelatorio && (

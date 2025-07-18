@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { read, utils } from "https://esm.sh/xlsx@0.18.5";
 import jsPDF from "https://esm.sh/jspdf@2.5.1";
+import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,6 +28,7 @@ interface ExameData {
 interface ClienteResumo {
   nome: string;
   cnpj: string;
+  email?: string;
   exames: ExameData[];
   total_laudos: number;
   valor_bruto: number;
@@ -51,7 +53,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { file_path, periodo } = await req.json();
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
+
+    const { file_path, periodo, enviar_emails = true } = await req.json();
     
     console.log('Processando arquivo:', file_path, 'para período:', periodo);
 
@@ -71,6 +75,23 @@ serve(async (req) => {
     const rawData = utils.sheet_to_json(worksheet);
 
     console.log('Dados do Excel:', rawData.length, 'linhas');
+
+    // Buscar emails dos clientes no banco de dados
+    const { data: clientesDB, error: clientesError } = await supabase
+      .from('clientes')
+      .select('nome, email')
+      .eq('ativo', true);
+
+    if (clientesError) {
+      console.error('Erro ao buscar clientes:', clientesError);
+    }
+
+    const emailsClientes = new Map<string, string>();
+    clientesDB?.forEach(cliente => {
+      if (cliente.email) {
+        emailsClientes.set(cliente.nome.toLowerCase(), cliente.email);
+      }
+    });
 
     // Processar dados e agrupar por cliente
     const clientesMap = new Map<string, ClienteResumo>();
@@ -98,6 +119,7 @@ serve(async (req) => {
         clientesMap.set(chaveCliente, {
           nome: exame.nome_cliente,
           cnpj: exame.cnpj_cliente,
+          email: emailsClientes.get(exame.nome_cliente.toLowerCase()),
           exames: [],
           total_laudos: 0,
           valor_bruto: 0,
@@ -134,8 +156,9 @@ serve(async (req) => {
 
     console.log('Clientes processados:', clientesMap.size);
 
-    // Gerar PDFs para cada cliente
+    // Gerar PDFs e enviar emails para cada cliente
     const pdfsGerados = [];
+    const emailsEnviados = [];
     
     for (const [chaveCliente, cliente] of clientesMap) {
       try {
@@ -161,28 +184,98 @@ serve(async (req) => {
           .from('documentos-clientes')
           .getPublicUrl(`faturamento/${periodo}/${nomeArquivo}`);
 
-        pdfsGerados.push({
+        const pdfInfo = {
           cliente: cliente.nome,
           arquivo: nomeArquivo,
           url: urlData.publicUrl,
           resumo: {
             total_laudos: cliente.total_laudos,
             valor_pagar: cliente.valor_pagar
+          },
+          email_enviado: false,
+          erro_email: null
+        };
+
+        pdfsGerados.push(pdfInfo);
+
+        // Enviar email se solicitado e se cliente tem email
+        if (enviar_emails && cliente.email) {
+          try {
+            const [ano, mes] = periodo.split('-');
+            const nomesMeses = [
+              'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+              'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ];
+            const mesNome = nomesMeses[parseInt(mes) - 1];
+            
+            const assunto = `Relatório de volumetria - Faturamento Teleimagem - ${mesNome}/${ano}`;
+            
+            const corpoEmail = `Prezados!
+
+Segue lista de exames referente a nota fiscal citada no e-mail.
+
+Evite pagamento de juros e multa ou a suspensão dos serviços, quitando o pagamento no vencimento.
+
+Atte.
+Robson D'avila
+Financeiro - Teleimagem
+Tel.: 41 99255-1964`;
+
+            // Preparar anexo (PDF como base64)
+            const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+
+            const emailResponse = await resend.emails.send({
+              from: 'Financeiro Teleimagem <financeiro@teleimagem.com.br>',
+              to: [cliente.email],
+              subject: assunto,
+              text: corpoEmail,
+              attachments: [
+                {
+                  filename: nomeArquivo,
+                  content: pdfBase64,
+                  content_type: 'application/pdf'
+                }
+              ]
+            });
+
+            console.log(`Email enviado para ${cliente.nome}:`, emailResponse);
+
+            pdfInfo.email_enviado = true;
+            emailsEnviados.push({
+              cliente: cliente.nome,
+              email: cliente.email,
+              email_id: emailResponse.data?.id
+            });
+
+          } catch (emailError: any) {
+            console.error(`Erro ao enviar email para ${cliente.nome}:`, emailError);
+            pdfInfo.erro_email = emailError.message;
           }
-        });
+        } else if (enviar_emails && !cliente.email) {
+          pdfInfo.erro_email = 'Email do cliente não encontrado no cadastro';
+        }
 
       } catch (error) {
-        console.error(`Erro ao gerar PDF para ${cliente.nome}:`, error);
+        console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
+        pdfsGerados.push({
+          cliente: cliente.nome,
+          erro: error.message,
+          email_enviado: false,
+          erro_email: null
+        });
       }
     }
 
     console.log('PDFs gerados:', pdfsGerados.length);
+    console.log('Emails enviados:', emailsEnviados.length);
 
     return new Response(JSON.stringify({
       success: true,
       message: `${pdfsGerados.length} relatórios gerados com sucesso`,
       clientes_processados: clientesMap.size,
-      pdfs_gerados: pdfsGerados
+      pdfs_gerados: pdfsGerados,
+      emails_enviados: emailsEnviados.length,
+      emails_detalhes: emailsEnviados
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
