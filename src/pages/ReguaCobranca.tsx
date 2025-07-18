@@ -79,18 +79,18 @@ export default function ReguaCobranca() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      // Carregar faturas da nova tabela faturamento
-      const { data: faturasData, error: faturasError } = await supabase
+      // Carregar faturas da nova tabela faturamento - usando any para contornar limitações de tipo
+      const { data: faturasData, error: faturasError } = await (supabase as any)
         .from('faturamento')
         .select('*')
         .order('data_emissao', { ascending: false });
 
       if (faturasError) throw faturasError;
 
-      setFaturas((faturasData || []) as any[]);
+      setFaturas((faturasData || []) as OmieFatura[]);
 
-      // Carregar emails de cobrança
-      const { data: emailsData, error: emailsError } = await supabase
+      // Carregar emails de cobrança - usando any para contornar limitações de tipo
+      const { data: emailsData, error: emailsError } = await (supabase as any)
         .from('emails_cobranca')
         .select('*')
         .order('enviado_em', { ascending: false })
@@ -98,10 +98,10 @@ export default function ReguaCobranca() {
 
       if (emailsError) throw emailsError;
 
-      setEmails(emailsData || []);
+      setEmails((emailsData || []) as EmailCobranca[]);
 
       // Calcular métricas
-      calcularMetricas((faturasData || []) as any[], emailsData || []);
+      calcularMetricas((faturasData || []) as OmieFatura[], (emailsData || []) as EmailCobranca[]);
 
     } catch (error: any) {
       toast({
