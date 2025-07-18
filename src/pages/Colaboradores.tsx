@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { FilterBar } from "@/components/FilterBar";
 import { FileUpload } from "@/components/FileUpload";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useMedicoData } from "@/hooks/useMedicoData";
 import { 
   Users, 
   UserCheck, 
@@ -225,56 +226,17 @@ const funcoes = [
   { nome: "Coordenador", count: 6, departamento: "Gestão" }
 ];
 
-const modalidadesDisponiveis = [
-  "Radiologia",
-  "Tomografia",
-  "Ressonância",
-  "Ultrassom",
-  "Mamografia",
-  "Densitometria",
-  "Medicina Nuclear",
-  "PET-CT",
-  "Ecocardiograma",
-  "Eletrocardiograma"
-];
-
-const especialidadesDisponiveis = [
-  "Radiologia e Diagnóstico por Imagem",
-  "Cardiologia",
-  "Neurologia",
-  "Ortopedia",
-  "Ginecologia",
-  "Urologia",
-  "Gastroenterologia",
-  "Pneumologia",
-  "Pediatria",
-  "Medicina Nuclear"
-];
-
-const prioridadesDisponiveis = [
-  "Normal",
-  "Urgente",
-  "Emergência"
-];
-
-const categoriasMedico = [
-  "Radiologista Pleno",
-  "Radiologista Sênior", 
-  "Cardiologista",
-  "Clínico Geral",
-  "Especialista"
-];
-
-const categoriasExame = [
-  "Simples",
-  "Complexo",
-  "Intervencionista",
-  "Contrastado",
-  "Funcional",
-  "Dinâmico"
-];
-
 export default function Colaboradores() {
+  const { toast } = useToast();
+  const { 
+    modalidadesDisponiveis, 
+    especialidadesDisponiveis, 
+    categoriasExameDisponiveis: categoriasExame, 
+    prioridadesDisponiveis, 
+    categoriasMedicoDisponiveis: categoriasMedico,
+    loading: loadingMedicoData,
+    error: errorMedicoData 
+  } = useMedicoData();
   const [filtroFuncao, setFiltroFuncao] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [busca, setBusca] = useState("");
@@ -300,7 +262,6 @@ export default function Colaboradores() {
     crm: "",
     rqe: ""
   });
-  const { toast } = useToast();
 
   const handleFileUpload = async (file: File) => {
     // Simular processamento do arquivo CSV
@@ -568,6 +529,33 @@ export default function Colaboradores() {
 
   const colaboradoresAtivos = colaboradores.filter(c => c.status === "Ativo").length;
   const totalColaboradores = colaboradores.length;
+
+  // Mostrar loading se ainda estiver carregando dados das listas
+  if (loadingMedicoData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Colaboradores</h1>
+          <p className="text-gray-600 mt-1">Carregando configurações...</p>
+        </div>
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar erro se houver problema ao carregar
+  if (errorMedicoData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Colaboradores</h1>
+          <p className="text-red-600 mt-1">Erro ao carregar configurações: {errorMedicoData}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
