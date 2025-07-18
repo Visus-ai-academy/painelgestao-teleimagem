@@ -3,7 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FilterBar } from "@/components/FilterBar";
+import { FileUpload } from "@/components/FileUpload";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Users, 
   UserCheck, 
@@ -13,7 +18,9 @@ import {
   Settings, 
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Upload,
+  Download
 } from "lucide-react";
 
 interface Colaborador {
@@ -171,6 +178,86 @@ export default function Colaboradores() {
   const [filtroFuncao, setFiltroFuncao] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [busca, setBusca] = useState("");
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showNewColaboradorDialog, setShowNewColaboradorDialog] = useState(false);
+  const [newColaborador, setNewColaborador] = useState({
+    nome: "",
+    email: "",
+    funcao: "",
+    departamento: "",
+    nivel: "",
+    telefone: "",
+    cpf: "",
+    gestor: "",
+    salario: ""
+  });
+  const { toast } = useToast();
+
+  const handleFileUpload = async (file: File) => {
+    // Simular processamento do arquivo CSV
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    toast({
+      title: "Upload realizado",
+      description: `Arquivo ${file.name} processado com sucesso! 12 colaboradores foram importados.`,
+    });
+    
+    setShowUploadDialog(false);
+  };
+
+  const handleNewColaborador = () => {
+    // Validação básica
+    if (!newColaborador.nome || !newColaborador.email || !newColaborador.funcao) {
+      toast({
+        title: "Erro",
+        description: "Por favor, preencha os campos obrigatórios: Nome, Email e Função.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Simular criação do colaborador
+    toast({
+      title: "Colaborador criado",
+      description: `${newColaborador.nome} foi adicionado com sucesso!`,
+    });
+
+    // Limpar formulário e fechar dialog
+    setNewColaborador({
+      nome: "",
+      email: "",
+      funcao: "",
+      departamento: "",
+      nivel: "",
+      telefone: "",
+      cpf: "",
+      gestor: "",
+      salario: ""
+    });
+    setShowNewColaboradorDialog(false);
+  };
+
+  const downloadTemplate = () => {
+    // Simular download do template CSV
+    const csvContent = "nome,email,funcao,departamento,nivel,telefone,cpf,gestor,salario\n" +
+                      "João Silva,joao@exemplo.com,Médico,Medicina,Pleno,(11)99999-9999,123.456.789-00,Dr. Ana,12000";
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'template_colaboradores.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    toast({
+      title: "Template baixado",
+      description: "Template CSV foi baixado com sucesso!",
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -312,10 +399,179 @@ export default function Colaboradores() {
                 Ativos
               </Button>
             </div>
-            <Button className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Novo Colaborador
-            </Button>
+            
+            <div className="flex gap-2">
+              <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Upload CSV
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Upload de Colaboradores</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-gray-600">
+                        Faça upload de um arquivo CSV com os dados dos colaboradores
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={downloadTemplate}
+                        className="flex items-center gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Baixar Template
+                      </Button>
+                    </div>
+                    <FileUpload
+                      title="Importar Colaboradores"
+                      description="Arraste e solte o arquivo CSV aqui ou clique para selecionar"
+                      acceptedTypes={['.csv', 'text/csv']}
+                      maxSizeInMB={5}
+                      expectedFormat={[
+                        'Nome, Email, Função, Departamento, Nível',
+                        'Telefone, CPF, Gestor, Salário',
+                        'Formato: CSV separado por vírgula'
+                      ]}
+                      onUpload={handleFileUpload}
+                      icon={<Upload className="h-5 w-5" />}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showNewColaboradorDialog} onOpenChange={setShowNewColaboradorDialog}>
+                <DialogTrigger asChild>
+                  <Button className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Novo Colaborador
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="nome">Nome *</Label>
+                      <Input
+                        id="nome"
+                        value={newColaborador.nome}
+                        onChange={(e) => setNewColaborador({...newColaborador, nome: e.target.value})}
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newColaborador.email}
+                        onChange={(e) => setNewColaborador({...newColaborador, email: e.target.value})}
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="funcao">Função *</Label>
+                      <Select value={newColaborador.funcao} onValueChange={(value) => setNewColaborador({...newColaborador, funcao: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a função" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Médico Radiologista">Médico Radiologista</SelectItem>
+                          <SelectItem value="Médico Cardiologista">Médico Cardiologista</SelectItem>
+                          <SelectItem value="Técnico em Radiologia">Técnico em Radiologia</SelectItem>
+                          <SelectItem value="Enfermeira">Enfermeira</SelectItem>
+                          <SelectItem value="Administrador TI">Administrador TI</SelectItem>
+                          <SelectItem value="Analista Financeiro">Analista Financeiro</SelectItem>
+                          <SelectItem value="Recepcionista">Recepcionista</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="departamento">Departamento</Label>
+                      <Select value={newColaborador.departamento} onValueChange={(value) => setNewColaborador({...newColaborador, departamento: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o departamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Medicina">Medicina</SelectItem>
+                          <SelectItem value="Técnico">Técnico</SelectItem>
+                          <SelectItem value="Enfermagem">Enfermagem</SelectItem>
+                          <SelectItem value="TI">TI</SelectItem>
+                          <SelectItem value="Financeiro">Financeiro</SelectItem>
+                          <SelectItem value="Atendimento">Atendimento</SelectItem>
+                          <SelectItem value="Gestão">Gestão</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="nivel">Nível</Label>
+                      <Select value={newColaborador.nivel} onValueChange={(value) => setNewColaborador({...newColaborador, nivel: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Júnior">Júnior</SelectItem>
+                          <SelectItem value="Pleno">Pleno</SelectItem>
+                          <SelectItem value="Sênior">Sênior</SelectItem>
+                          <SelectItem value="Especialista">Especialista</SelectItem>
+                          <SelectItem value="Coordenador">Coordenador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="telefone">Telefone</Label>
+                      <Input
+                        id="telefone"
+                        value={newColaborador.telefone}
+                        onChange={(e) => setNewColaborador({...newColaborador, telefone: e.target.value})}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cpf">CPF</Label>
+                      <Input
+                        id="cpf"
+                        value={newColaborador.cpf}
+                        onChange={(e) => setNewColaborador({...newColaborador, cpf: e.target.value})}
+                        placeholder="123.456.789-00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="gestor">Gestor</Label>
+                      <Input
+                        id="gestor"
+                        value={newColaborador.gestor}
+                        onChange={(e) => setNewColaborador({...newColaborador, gestor: e.target.value})}
+                        placeholder="Nome do gestor"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="salario">Salário</Label>
+                      <Input
+                        id="salario"
+                        type="number"
+                        value={newColaborador.salario}
+                        onChange={(e) => setNewColaborador({...newColaborador, salario: e.target.value})}
+                        placeholder="5000"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-6">
+                    <Button variant="outline" onClick={() => setShowNewColaboradorDialog(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleNewColaborador}>
+                      Cadastrar Colaborador
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </CardContent>
       </Card>
