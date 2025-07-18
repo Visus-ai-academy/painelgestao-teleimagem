@@ -53,6 +53,36 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracao_protecao: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dias_edicao_mes_anterior: number
+          id: string
+          permite_dados_futuros: boolean
+          permite_edicao_historico: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dias_edicao_mes_anterior?: number
+          id?: string
+          permite_dados_futuros?: boolean
+          permite_edicao_historico?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dias_edicao_mes_anterior?: number
+          id?: string
+          permite_dados_futuros?: boolean
+          permite_edicao_historico?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documentos_clientes: {
         Row: {
           clicksign_document_key: string | null
@@ -489,6 +519,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_data: {
+        Args: { data_referencia: string }
+        Returns: boolean
+      }
+      can_insert_data: {
+        Args: { data_referencia: string }
+        Returns: boolean
+      }
+      can_view_data: {
+        Args: { data_referencia: string }
+        Returns: boolean
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
