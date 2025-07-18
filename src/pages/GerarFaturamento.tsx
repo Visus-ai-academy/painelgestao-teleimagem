@@ -428,7 +428,18 @@ export default function GerarFaturamento() {
         enviar_emails: enviarEmails
       });
 
-      // Chamar edge function para processar
+      // Primeiro processar os dados do arquivo
+      const { data: processData, error: processError } = await supabase.functions.invoke('processar-faturamento', {
+        body: { fileName: nomeArquivo }
+      });
+
+      if (processError) {
+        throw new Error(`Erro ao processar dados: ${processError.message}`);
+      }
+
+      console.log('Dados processados:', processData);
+
+      // Agora gerar os relatórios
       const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
         body: {
           file_path: nomeArquivo,
