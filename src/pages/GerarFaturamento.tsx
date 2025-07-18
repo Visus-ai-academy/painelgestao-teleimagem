@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 import { MatrixRain } from "@/components/MatrixRain";
+import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -394,9 +395,6 @@ export default function GerarFaturamento() {
       return;
     }
 
-    // Para faturamento, permitir processamento independente da validação de período
-    console.log(`Processando faturamento para período: ${periodoSelecionado}`);
-
     setStatusProcessamento({
       processando: true,
       mensagem: 'Fazendo upload do arquivo...',
@@ -414,18 +412,10 @@ export default function GerarFaturamento() {
         throw new Error(`Erro no upload: ${uploadError.message}`);
       }
 
-      console.log('Upload realizado com sucesso:', uploadData);
-
       setStatusProcessamento({
         processando: true,
-        mensagem: 'Processando dados e gerando PDFs...',
-        progresso: 50
-      });
-
-      console.log('Chamando edge function com parâmetros:', {
-        file_path: nomeArquivo,
-        periodo: periodoSelecionado,
-        enviar_emails: enviarEmails
+        mensagem: 'Processando dados...',
+        progresso: 40
       });
 
       // Primeiro processar os dados do arquivo
@@ -437,88 +427,107 @@ export default function GerarFaturamento() {
         throw new Error(`Erro ao processar dados: ${processError.message}`);
       }
 
-      console.log('Dados processados:', processData);
-
-      // Agora gerar os relatórios
-      const { data, error } = await supabase.functions.invoke('processar-faturamento-pdf', {
-        body: {
-          file_path: nomeArquivo,
-          periodo: periodoSelecionado,
-          enviar_emails: enviarEmails
-        }
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Buscando dados processados...',
+        progresso: 60
       });
 
-      console.log('Resposta da edge function:', { data, error });
+      // Buscar dados processados da tabela faturamento
+      const { data: faturamentoData, error: faturamentoError } = await supabase
+        .from('faturamento')
+        .select('*')
+        .ilike('numero_fatura', `%${periodoSelecionado}%`);
 
-      if (error) {
-        throw new Error(`Erro no processamento: ${error.message}`);
+      if (faturamentoError) {
+        throw new Error(`Erro ao buscar dados: ${faturamentoError.message}`);
       }
 
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Erro desconhecido no processamento');
+      if (!faturamentoData || faturamentoData.length === 0) {
+        throw new Error('Nenhum dado de faturamento encontrado para o período');
       }
 
       setStatusProcessamento({
         processando: true,
-        mensagem: 'Atualizando resultados...',
+        mensagem: 'Gerando PDFs localmente...',
         progresso: 80
       });
 
-      // Verificar se é resposta de teste
-      if (data.message === 'Teste de conectividade realizado com sucesso') {
-        setResultados([{
-          clienteId: 'teste-conectividade',
-          clienteNome: 'Teste de Conectividade',
-          relatorioGerado: true,
-          emailEnviado: false,
-          emailDestino: 'teste@exemplo.com',
-          linkRelatorio: '#',
-          dataProcessamento: new Date().toLocaleString('pt-BR'),
-          detalhesRelatorio: {
-            total_laudos: 0,
+      // Agrupar dados por cliente
+      const clientesAgrupados = faturamentoData.reduce((acc: any, item: any) => {
+        if (!acc[item.cliente_nome]) {
+          acc[item.cliente_nome] = {
+            cliente_nome: item.cliente_nome,
+            exames: [],
+            total_exames: 0,
             valor_total: 0
+          };
+        }
+        acc[item.cliente_nome].exames.push(item);
+        acc[item.cliente_nome].total_exames++;
+        acc[item.cliente_nome].valor_total += item.valor_bruto;
+        return acc;
+      }, {});
+
+      // Gerar PDFs usando a biblioteca local
+      const novosResultados = [];
+      let sucessos = 0;
+      
+      for (const clienteNome in clientesAgrupados) {
+        try {
+          const clienteData: FaturamentoData = {
+            ...clientesAgrupados[clienteNome],
+            periodo: periodoSelecionado
+          };
+
+          const pdfBlob = await generatePDF(clienteData);
+          const pdfFileName = `relatorio_${clienteNome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodoSelecionado}.pdf`;
+          
+          // Upload do PDF para o storage
+          const { error: pdfUploadError } = await supabase.storage
+            .from('uploads')
+            .upload(`pdfs/${pdfFileName}`, pdfBlob);
+
+          if (pdfUploadError) {
+            console.error(`Erro no upload do PDF para ${clienteNome}:`, pdfUploadError);
           }
-        }]);
 
-        setStatusProcessamento({
-          processando: false,
-          mensagem: 'Teste de conectividade concluído com sucesso!',
-          progresso: 100
-        });
+          const { data: { publicUrl } } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(`pdfs/${pdfFileName}`);
 
-        toast({
-          title: "Teste Realizado",
-          description: "Edge function está funcionando corretamente. O sistema está pronto para processar dados reais.",
-        });
-        return;
+          novosResultados.push({
+            clienteId: `cliente-${clienteNome}`,
+            clienteNome: clienteNome,
+            relatorioGerado: true,
+            emailEnviado: false,
+            emailDestino: 'email@cliente.com',
+            linkRelatorio: publicUrl,
+            dataProcessamento: new Date().toLocaleString('pt-BR'),
+            detalhesRelatorio: {
+              total_laudos: clienteData.total_exames,
+              valor_total: clienteData.valor_total
+            }
+          });
+          
+          sucessos++;
+          console.log(`PDF gerado para ${clienteNome}: ${publicUrl}`);
+          
+        } catch (error) {
+          console.error(`Erro ao gerar PDF para ${clienteNome}:`, error);
+          novosResultados.push({
+            clienteId: `cliente-${clienteNome}`,
+            clienteNome: clienteNome,
+            relatorioGerado: false,
+            emailEnviado: false,
+            emailDestino: 'email@cliente.com',
+            erro: `Erro ao gerar PDF: ${error}`
+          });
+        }
       }
-
-      // Atualizar resultados com os PDFs gerados (quando implementado)
-      if (data.pdfs_gerados && Array.isArray(data.pdfs_gerados)) {
-        const novosResultados = data.pdfs_gerados.map((pdf: any) => ({
-          clienteId: `cliente-${pdf.cliente}`,
-          clienteNome: pdf.cliente,
-          relatorioGerado: true,
-          emailEnviado: pdf.email_enviado || false,
-          emailDestino: 'email@cliente.com',
-          linkRelatorio: pdf.url,
-          dataProcessamento: new Date().toLocaleString('pt-BR'),
-          detalhesRelatorio: {
-            total_laudos: pdf.resumo?.total_laudos || 0,
-            valor_total: pdf.resumo?.valor_pagar || 0
-          },
-          erro: pdf.erro,
-          erroEmail: pdf.erro_email
-        }));
-        setResultados(novosResultados);
-        setRelatoriosGerados(novosResultados.length);
-        setEmailsEnviados(data.emails_enviados || 0);
-      } else {
-        // Fallback para quando não há dados de PDFs ainda
-        setResultados([]);
-        setRelatoriosGerados(0);
-        setEmailsEnviados(0);
-      }
+      
+      setResultados(novosResultados);
+      setRelatoriosGerados(sucessos);
 
       setStatusProcessamento({
         processando: false,
@@ -526,12 +535,9 @@ export default function GerarFaturamento() {
         progresso: 100
       });
 
-      const totalRelatorios = data.pdfs_gerados?.length || 0;
-      const totalEmails = data.emails_enviados || 0;
-
       toast({
         title: "Processamento Concluído",
-        description: `${totalRelatorios} relatórios PDF gerados${enviarEmails ? ` e ${totalEmails} emails enviados` : ''} com sucesso`,
+        description: `${sucessos} relatórios PDF gerados com sucesso`,
       });
 
       // Mudar para aba de envio se emails não foram enviados
