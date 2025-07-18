@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { read, utils } from "https://esm.sh/xlsx@0.18.5";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,36 +9,28 @@ const corsHeaders = {
 };
 
 interface ExameData {
-  data_exame: string;
-  nome_paciente: string;
-  nome_cliente: string;
-  cnpj_cliente: string;
-  nome_medico_laudador: string;
-  modalidade: string;
-  especialidade: string;
-  categoria: string;
-  prioridade: string;
-  quantidade_laudos: number;
-  valor: number;
-  franquia?: number;
-  ajuste?: number;
+  cliente?: string;
+  Cliente?: string;
+  valor_pagar?: number;
+  'Valor a Pagar'?: number;
+  data_exame?: string;
+  nome_paciente?: string;
+  nome_medico_laudador?: string;
+  modalidade?: string;
+  especialidade?: string;
+  categoria?: string;
+  prioridade?: string;
+  quantidade_laudos?: number;
+  valor?: number;
+  [key: string]: any;
 }
 
 interface ClienteResumo {
   nome: string;
-  cnpj: string;
-  email?: string;
+  email: string;
+  totalLaudos: number;
+  valorTotal: number;
   exames: ExameData[];
-  total_laudos: number;
-  valor_bruto: number;
-  franquia: number;
-  ajuste: number;
-  sub_total: number;
-  irrf: number;
-  csll: number;
-  pis: number;
-  cofins: number;
-  valor_pagar: number;
 }
 
 serve(async (req) => {
@@ -67,10 +60,128 @@ serve(async (req) => {
     
     console.log('Processando arquivo:', file_path, 'para período:', periodo);
 
+    // Baixar arquivo do storage
+    console.log('Tentativa 1 de download do arquivo...');
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('uploads')
+      .download(file_path);
+
+    if (downloadError) {
+      console.error('Erro no download:', downloadError);
+      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+    }
+
+    if (!fileData) {
+      throw new Error('Arquivo não encontrado no storage');
+    }
+
+    // Converter para ArrayBuffer e processar Excel
+    console.log('Lendo arquivo Excel...');
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+
+    console.log(`Dados do Excel: ${data.length} linhas`);
+
+    if (data.length === 0) {
+      throw new Error('Arquivo Excel está vazio ou não contém dados válidos');
+    }
+
+    // Processar dados e agrupar por cliente
+    const dadosProcessados = data as ExameData[];
+    const clientesResumo = new Map<string, ClienteResumo>();
+
+    dadosProcessados.forEach((exame) => {
+      const clienteNome = exame.cliente || exame.Cliente || '';
+      if (!clienteNome) return;
+
+      if (!clientesResumo.has(clienteNome)) {
+        clientesResumo.set(clienteNome, {
+          nome: clienteNome,
+          email: '',
+          totalLaudos: 0,
+          valorTotal: 0,
+          exames: []
+        });
+      }
+
+      const cliente = clientesResumo.get(clienteNome)!;
+      cliente.totalLaudos++;
+      cliente.valorTotal += Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
+      cliente.exames.push(exame);
+    });
+
+    console.log(`${clientesResumo.size} clientes únicos encontrados`);
+
+    // Gerar PDFs para cada cliente
+    const pdfsGerados = [];
+    let emailsEnviados = 0;
+
+    for (const [nomeCliente, resumo] of clientesResumo) {
+      try {
+        console.log(`Gerando PDF para cliente: ${nomeCliente}`);
+        
+        // Gerar PDF
+        const pdf = gerarPDFCliente(resumo, periodo);
+        const pdfBytes = pdf.output('arraybuffer');
+        
+        // Upload do PDF para storage
+        const nomeArquivo = `faturamento_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(`relatorios/${nomeArquivo}`, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error(`Erro no upload do PDF para ${nomeCliente}:`, uploadError);
+          pdfsGerados.push({
+            cliente: nomeCliente,
+            erro: `Erro no upload: ${uploadError.message}`,
+            email_enviado: false
+          });
+          continue;
+        }
+
+        // URL pública do PDF
+        const { data: { publicUrl } } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(`relatorios/${nomeArquivo}`);
+
+        pdfsGerados.push({
+          cliente: nomeCliente,
+          url: publicUrl,
+          resumo: {
+            total_laudos: resumo.totalLaudos,
+            valor_pagar: resumo.valorTotal
+          },
+          email_enviado: false
+        });
+
+        console.log(`PDF gerado com sucesso para ${nomeCliente}: ${publicUrl}`);
+
+      } catch (error) {
+        console.error(`Erro ao processar cliente ${nomeCliente}:`, error);
+        pdfsGerados.push({
+          cliente: nomeCliente,
+          erro: `Erro no processamento: ${error.message}`,
+          email_enviado: false
+        });
+      }
+    }
+
+    console.log(`Processamento concluído: ${pdfsGerados.length} PDFs processados`);
+
     return new Response(JSON.stringify({
       success: true,
-      message: 'Teste de conectividade realizado com sucesso',
-      parametros: { file_path, periodo, enviar_emails }
+      message: 'Processamento de faturamento concluído',
+      pdfs_gerados: pdfsGerados,
+      emails_enviados: emailsEnviados,
+      periodo,
+      total_clientes: clientesResumo.size
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
@@ -100,122 +211,61 @@ function gerarPDFCliente(cliente: ClienteResumo, periodo: string): jsPDF {
     console.log(`Gerando PDF para cliente: ${cliente.nome}`);
     
     const pdf = new jsPDF({
-      orientation: 'landscape',
+      orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-  const pageWidth = 297; // A4 landscape width
-  const pageHeight = 210; // A4 landscape height
-  let yPosition = 20;
+    const pageWidth = 210;
+    let yPosition = 20;
 
-  // Parte superior - Logomarca e título
-  pdf.setFontSize(20);
-  pdf.setFont(undefined, 'bold');
-  pdf.text('RELATÓRIO DE VOLUMETRIA - FATURAMENTO', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 15;
+    // Título
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('RELATÓRIO DE FATURAMENTO', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
 
-  // Quadro 1 - Dados do cliente
-  pdf.setFontSize(12);
-  pdf.setFont(undefined, 'normal');
-  const quadro1Y = yPosition;
-  pdf.rect(10, quadro1Y, pageWidth - 20, 25);
-  
-  pdf.text(`Cliente: ${cliente.nome}`, 15, quadro1Y + 8);
-  pdf.text(`CNPJ: ${cliente.cnpj}`, 15, quadro1Y + 16);
-  pdf.text(`Período: ${formatarPeriodo(periodo)}`, 15, quadro1Y + 24);
-  yPosition = quadro1Y + 35;
+    // Dados do cliente
+    pdf.setFontSize(12);
+    pdf.text(`Cliente: ${cliente.nome}`, 20, yPosition);
+    yPosition += 10;
+    pdf.text(`Período: ${formatarPeriodo(periodo)}`, 20, yPosition);
+    yPosition += 20;
 
-  // Quadro 2 - Resumo Financeiro
-  const quadro2Y = yPosition;
-  pdf.rect(10, quadro2Y, pageWidth - 20, 60);
-  
-  pdf.setFont(undefined, 'bold');
-  pdf.text('RESUMO FINANCEIRO', 15, quadro2Y + 8);
-  pdf.setFont(undefined, 'normal');
-  
-  const resumoLines = [
-    `Total de Laudos: ${cliente.total_laudos.toLocaleString()}`,
-    `Valor Bruto: R$ ${cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `Franquia: R$ ${cliente.franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `Ajuste: R$ ${cliente.ajuste.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `Sub Total: R$ ${cliente.sub_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `IRRF (1,5%): R$ ${cliente.irrf.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `CSLL (1%): R$ ${cliente.csll.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `PIS (0,65%): R$ ${cliente.pis.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    `COFINS (3%): R$ ${cliente.cofins.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-  ];
-  
-  resumoLines.forEach((line, index) => {
-    pdf.text(line, 15, quadro2Y + 16 + (index * 5));
-  });
-  
-  pdf.setFont(undefined, 'bold');
-  pdf.text(`VALOR A PAGAR: R$ ${cliente.valor_pagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 15, quadro2Y + 56);
-  yPosition = quadro2Y + 70;
-
-  // Quadro 3 - Detalhamento dos Exames
-  pdf.setFont(undefined, 'bold');
-  pdf.text('DETALHAMENTO DOS EXAMES', 15, yPosition);
-  yPosition += 10;
-
-  // Cabeçalho da tabela
-  const colunas = [
-    'Data', 'Paciente', 'Médico', 'Modalidade', 'Especialidade', 
-    'Categoria', 'Prioridade', 'Qtd', 'Valor', 'Franquia', 'Ajuste'
-  ];
-  
-  const colWidths = [25, 40, 40, 25, 25, 25, 20, 15, 20, 20, 20];
-  let xPos = 15;
-  
-  pdf.setFontSize(8);
-  colunas.forEach((col, index) => {
-    pdf.text(col, xPos, yPosition);
-    xPos += colWidths[index];
-  });
-  
-  yPosition += 5;
-  pdf.line(10, yPosition, pageWidth - 10, yPosition);
-  yPosition += 5;
-
-  // Dados dos exames
-  pdf.setFont(undefined, 'normal');
-  cliente.exames.forEach((exame) => {
-    if (yPosition > pageHeight - 20) {
-      pdf.addPage();
-      yPosition = 20;
-    }
-
-    xPos = 15;
-    const dados = [
-      formatarData(exame.data_exame),
-      truncateText(exame.nome_paciente, 35),
-      truncateText(exame.nome_medico_laudador, 35),
-      truncateText(exame.modalidade, 20),
-      truncateText(exame.especialidade, 20),
-      truncateText(exame.categoria, 20),
-      truncateText(exame.prioridade, 15),
-      exame.quantidade_laudos.toString(),
-      `R$ ${exame.valor.toFixed(2)}`,
-      `R$ ${(exame.franquia || 0).toFixed(2)}`,
-      `R$ ${(exame.ajuste || 0).toFixed(2)}`
-    ];
+    // Resumo financeiro
+    pdf.setFont(undefined, 'bold');
+    pdf.text('RESUMO FINANCEIRO', 20, yPosition);
+    yPosition += 10;
     
-    dados.forEach((dado, index) => {
-      pdf.text(dado, xPos, yPosition);
-      xPos += colWidths[index];
+    pdf.setFont(undefined, 'normal');
+    pdf.text(`Total de Laudos: ${cliente.totalLaudos}`, 20, yPosition);
+    yPosition += 8;
+    pdf.text(`Valor Total: R$ ${cliente.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, yPosition);
+    yPosition += 20;
+
+    // Detalhamento
+    pdf.setFont(undefined, 'bold');
+    pdf.text('DETALHAMENTO', 20, yPosition);
+    yPosition += 10;
+
+    // Lista simplificada dos exames
+    pdf.setFont(undefined, 'normal');
+    pdf.setFontSize(10);
+    
+    cliente.exames.slice(0, 10).forEach((exame, index) => {
+      if (yPosition > 260) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+      
+      const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
+      pdf.text(`${index + 1}. Cliente: ${exame.cliente || exame.Cliente || ''} - Valor: R$ ${valor.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
     });
-    
-    yPosition += 4;
-  });
 
-  // Adicionar última página com informações de geração
-  pdf.addPage();
-  const agora = new Date();
-  const infoGeracao = `Relatório gerado automaticamente em ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
-  
-  pdf.setFontSize(10);
-  pdf.text(infoGeracao, pageWidth / 2, pageHeight / 2, { align: 'center' });
+    if (cliente.exames.length > 10) {
+      pdf.text(`... e mais ${cliente.exames.length - 10} exames`, 20, yPosition);
+    }
 
     console.log(`PDF gerado com sucesso para cliente: ${cliente.nome}`);
     return pdf;
