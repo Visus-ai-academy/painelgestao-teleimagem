@@ -57,6 +57,7 @@ interface ContratoCliente {
   indiceReajuste: "IPCA" | "IGP-M" | "INPC" | "CDI";
   percentualUltimos12Meses?: number;
   // Dados do cliente
+  cnpj?: string;
   endereco?: string;
   telefone?: string;
   emailFinanceiro?: string;
@@ -70,6 +71,23 @@ interface ContratoCliente {
   valorIntegracao?: number;
   cobrancaSuporte: boolean;
   valorSuporte?: number;
+  // Histórico de alterações
+  termosAditivos?: TermoAditivo[];
+}
+
+interface TermoAditivo {
+  id: string;
+  data: string;
+  motivo: string;
+  servicosAlterados: {
+    servicoId: string;
+    valorAnterior: number;
+    valorNovo: number;
+    modalidade: string;
+    especialidade: string;
+    categoria: string;
+  }[];
+  geradoPor: string;
 }
 
 interface ServicoContratado {
@@ -82,6 +100,7 @@ interface ServicoContratado {
 }
 
 interface NovoCliente {
+  cnpj: string;
   nome: string;
   endereco: string;
   telefone: string;
@@ -105,6 +124,7 @@ const contratosData: ContratoCliente[] = [
   {
     id: "1",
     cliente: "Hospital São Lucas",
+    cnpj: "12.345.678/0001-90",
     dataInicio: "2024-01-01",
     dataFim: "2024-12-31",
     status: "Ativo",
@@ -126,7 +146,7 @@ const contratosData: ContratoCliente[] = [
     cobrancaIntegracao: true,
     valorIntegracao: 500.00,
     cobrancaSuporte: true,
-    valorSuporte: 300.00
+    termosAditivos: [],
   },
   {
     id: "2",
@@ -142,9 +162,11 @@ const contratosData: ContratoCliente[] = [
     diasParaVencer: 45,
     indiceReajuste: "IGP-M",
     percentualUltimos12Meses: 5.45,
+    cnpj: "98.765.432/0001-10",
     cobrancaIntegracao: false,
     cobrancaSuporte: true,
-    valorSuporte: 200.00
+    valorSuporte: 200.00,
+    termosAditivos: []
   },
   {
     id: "3",
@@ -158,17 +180,22 @@ const contratosData: ContratoCliente[] = [
     valorTotal: 120.00,
     diasParaVencer: -30,
     indiceReajuste: "INPC",
+    cnpj: "11.222.333/0001-44",
     cobrancaIntegracao: false,
-    cobrancaSuporte: false
+    cobrancaSuporte: false,
+    termosAditivos: []
   },
 ];
 
 export default function ContratosClientes() {
   const [contratos, setContratos] = useState<ContratoCliente[]>(contratosData);
   const [showNovoContrato, setShowNovoContrato] = useState(false);
+  const [showEditarContrato, setShowEditarContrato] = useState(false);
+  const [contratoEditando, setContratoEditando] = useState<ContratoCliente | null>(null);
   const { toast } = useToast();
   
   const [novoCliente, setNovoCliente] = useState<NovoCliente>({
+    cnpj: "",
     nome: "",
     endereco: "",
     telefone: "",
@@ -248,10 +275,10 @@ export default function ContratosClientes() {
   };
 
   const salvarCliente = () => {
-    if (!novoCliente.nome || !novoCliente.dataInicio || !novoCliente.dataFim || novoCliente.servicos.length === 0) {
+    if (!novoCliente.cnpj || !novoCliente.nome || !novoCliente.dataInicio || !novoCliente.dataFim || novoCliente.servicos.length === 0) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha nome, datas e adicione pelo menos um serviço.",
+        description: "Preencha CNPJ, nome, datas e adicione pelo menos um serviço.",
         variant: "destructive",
       });
       return;
@@ -260,6 +287,7 @@ export default function ContratosClientes() {
     const novoContrato: ContratoCliente = {
       id: Date.now().toString(),
       cliente: novoCliente.nome,
+      cnpj: novoCliente.cnpj,
       dataInicio: novoCliente.dataInicio,
       dataFim: novoCliente.dataFim,
       status: "Ativo",
@@ -279,6 +307,7 @@ export default function ContratosClientes() {
       valorIntegracao: novoCliente.valorIntegracao,
       cobrancaSuporte: novoCliente.cobrancaSuporte,
       valorSuporte: novoCliente.valorSuporte,
+      termosAditivos: [],
     };
 
     setContratos(prev => [...prev, novoContrato]);
@@ -286,6 +315,7 @@ export default function ContratosClientes() {
     
     // Reset form
     setNovoCliente({
+      cnpj: "",
       nome: "",
       endereco: "",
       telefone: "",
@@ -309,6 +339,42 @@ export default function ContratosClientes() {
       title: "Cliente cadastrado",
       description: `Cliente ${novoContrato.cliente} cadastrado com sucesso!`,
     });
+  };
+
+  const gerarTermoAditivo = (contrato: ContratoCliente, servicosAlterados: any[]) => {
+    const termoAditivo: TermoAditivo = {
+      id: Date.now().toString(),
+      data: new Date().toISOString().split('T')[0],
+      motivo: "Alteração de valores de serviços contratados",
+      servicosAlterados,
+      geradoPor: "Sistema", // Aqui seria o usuário logado
+    };
+
+    // Atualizar contrato com novo termo aditivo
+    const contratosAtualizados = contratos.map(c => {
+      if (c.id === contrato.id) {
+        return {
+          ...c,
+          termosAditivos: [...(c.termosAditivos || []), termoAditivo]
+        };
+      }
+      return c;
+    });
+
+    setContratos(contratosAtualizados);
+
+    toast({
+      title: "Termo Aditivo Gerado",
+      description: `Termo aditivo gerado automaticamente para ${contrato.cliente}`,
+    });
+
+    // Aqui seria gerado o PDF do termo aditivo
+    console.log("Gerando PDF do termo aditivo:", termoAditivo);
+  };
+
+  const editarContrato = (contrato: ContratoCliente) => {
+    setContratoEditando(contrato);
+    setShowEditarContrato(true);
   };
 
   const handleGerarContrato = (contratoId: string) => {
@@ -432,10 +498,20 @@ export default function ContratosClientes() {
             </DialogHeader>
             
             <div className="space-y-6 py-4">
-              {/* Dados Básicos */}
+              {/* Dados Principais - CNPJ e Nome primeiro */}
               <div className="space-y-4">
-                <h4 className="font-medium text-sm text-gray-900">Dados Básicos</h4>
+                <h4 className="font-medium text-sm text-gray-900">Dados Principais</h4>
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cnpj">CNPJ *</Label>
+                    <Input
+                      id="cnpj"
+                      value={novoCliente.cnpj}
+                      onChange={(e) => setNovoCliente(prev => ({ ...prev, cnpj: e.target.value }))}
+                      placeholder="XX.XXX.XXX/XXXX-XX"
+                      maxLength={18}
+                    />
+                  </div>
                   <div>
                     <Label htmlFor="nome">Nome do Cliente *</Label>
                     <Input
@@ -445,6 +521,13 @@ export default function ContratosClientes() {
                       placeholder="Nome da empresa/clínica..."
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Dados Complementares */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-gray-900">Dados Complementares</h4>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="telefone">Telefone</Label>
                     <Input
@@ -452,6 +535,15 @@ export default function ContratosClientes() {
                       value={novoCliente.telefone}
                       onChange={(e) => setNovoCliente(prev => ({ ...prev, telefone: e.target.value }))}
                       placeholder="(11) 9999-9999"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="site">Site</Label>
+                    <Input
+                      id="site"
+                      value={novoCliente.site}
+                      onChange={(e) => setNovoCliente(prev => ({ ...prev, site: e.target.value }))}
+                      placeholder="www.cliente.com.br"
                     />
                   </div>
                 </div>
@@ -881,6 +973,14 @@ export default function ContratosClientes() {
                         Gerar Contrato
                       </Button>
                       <Button variant="outline" size="sm">
+                        <Download className="h-3 w-3 mr-1" />
+                        {(contrato.termosAditivos?.length || 0) > 0 ? `Contrato + ${contrato.termosAditivos?.length} Aditivos` : 'Contrato'}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => editarContrato(contrato)}
+                      >
                         Editar
                       </Button>
                     </div>
@@ -891,6 +991,138 @@ export default function ContratosClientes() {
           </Table>
         </CardContent>
       </Card>
+      
+      {/* Dialog para Editar Contrato */}
+      {contratoEditando && (
+        <Dialog open={showEditarContrato} onOpenChange={setShowEditarContrato}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Contrato - {contratoEditando.cliente}</DialogTitle>
+              <DialogDescription>
+                Alterações nos valores dos serviços geram automaticamente um Termo Aditivo
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+              {/* Histórico de Termos Aditivos */}
+              {contratoEditando.termosAditivos && contratoEditando.termosAditivos.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm text-gray-900">Histórico de Alterações</h4>
+                  <div className="space-y-2">
+                    {contratoEditando.termosAditivos.map((termo) => (
+                      <div key={termo.id} className="p-3 bg-blue-50 border rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-blue-800">
+                              Termo Aditivo - {new Date(termo.data).toLocaleDateString('pt-BR')}
+                            </p>
+                            <p className="text-xs text-blue-600">{termo.motivo}</p>
+                            <div className="mt-2 space-y-1">
+                              {termo.servicosAlterados.map((servico, index) => (
+                                <div key={index} className="text-xs text-gray-600">
+                                  {servico.modalidade}/{servico.especialidade} - {servico.categoria}: 
+                                  <span className="text-red-600 line-through ml-1">
+                                    R$ {servico.valorAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                  <span className="text-green-600 font-medium ml-1">
+                                    R$ {servico.valorNovo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-3 w-3 mr-1" />
+                            PDF
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Edição de Serviços */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-gray-900">Serviços Contratados</h4>
+                <div className="space-y-2">
+                  {contratoEditando.servicos.map((servico, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-white border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline">{servico.modalidade}/{servico.especialidade}</Badge>
+                        <span className="text-sm">{servico.categoria}</span>
+                        <span className="text-sm text-gray-500">({servico.prioridade})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">R$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={servico.valor}
+                          onChange={(e) => {
+                            const novoValor = parseFloat(e.target.value) || 0;
+                            const valorAnterior = servico.valor;
+                            
+                            // Atualizar o valor do serviço
+                            const servicosAtualizados = contratoEditando.servicos.map((s, i) => 
+                              i === index ? { ...s, valor: novoValor } : s
+                            );
+                            
+                            const contratoAtualizado = {
+                              ...contratoEditando,
+                              servicos: servicosAtualizados
+                            };
+                            
+                            setContratoEditando(contratoAtualizado);
+                            
+                            // Se o valor mudou, gerar termo aditivo
+                            if (novoValor !== valorAnterior && novoValor > 0) {
+                              const servicosAlterados = [{
+                                servicoId: `${servico.modalidade}-${servico.especialidade}-${servico.categoria}`,
+                                valorAnterior,
+                                valorNovo: novoValor,
+                                modalidade: servico.modalidade,
+                                especialidade: servico.especialidade,
+                                categoria: servico.categoria,
+                              }];
+                              
+                              setTimeout(() => {
+                                gerarTermoAditivo(contratoAtualizado, servicosAlterados);
+                              }, 1000);
+                            }
+                          }}
+                          className="w-24 text-right"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditarContrato(false)}>
+                Fechar
+              </Button>
+              <Button onClick={() => {
+                // Salvar alterações no contrato
+                const contratosAtualizados = contratos.map(c => 
+                  c.id === contratoEditando.id ? contratoEditando : c
+                );
+                setContratos(contratosAtualizados);
+                setShowEditarContrato(false);
+                
+                toast({
+                  title: "Contrato atualizado",
+                  description: `Alterações salvas para ${contratoEditando.cliente}`,
+                });
+              }}>
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
