@@ -111,6 +111,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Configuração de Faturamento", url: "/configuracao/faturamento", requiredRoles: ['admin'] },
       { title: "Gerenciar Usuários", url: "/configuracao/usuarios", requiredRoles: ['admin'] },
+      { title: "Listas do Sistema", url: "/configuracao/listas", requiredRoles: ['admin'] },
       { title: "Logomarca", url: "/configuracao/logomarca", requiredRoles: ['admin'] },
     ]
   },

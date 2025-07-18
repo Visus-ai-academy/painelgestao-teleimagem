@@ -31,6 +31,7 @@ import Colaboradores from "./pages/Colaboradores";
 import TreinamentoEquipe from "./pages/TreinamentoEquipe";
 import ContratosClientes from "./pages/ContratosClientes";
 import ContratosFornecedores from "./pages/ContratosFornecedores";
+import GerenciarListas from "./pages/GerenciarListas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -139,6 +140,11 @@ const App = () => {
                     <Route path="/configuracao/logomarca" element={
                       <RoleProtectedRoute requiredRoles={['admin']}>
                         <ConfiguracaoLogomarca />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/configuracao/listas" element={
+                      <RoleProtectedRoute requiredRoles={['admin']}>
+                        <GerenciarListas />
                       </RoleProtectedRoute>
                     } />
                     <Route path="*" element={<NotFound />} />
