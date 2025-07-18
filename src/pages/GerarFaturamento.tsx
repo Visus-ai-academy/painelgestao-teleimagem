@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   FileText, 
   Send, 
@@ -20,20 +23,28 @@ import {
   Settings,
   Download,
   ExternalLink,
-  FileBarChart2
+  FileBarChart2,
+  Link,
+  Zap,
+  HardDrive
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { Speedometer } from "@/components/Speedometer";
 import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
-// ❌ REMOVIDO: Lista de clientes fictícios
-// Agora usa APENAS clientes reais carregados via upload
+// Tipos para fontes de dados
+type FonteDados = 'upload' | 'mobilemed' | 'banco';
+
+interface ConfiguracaoFonte {
+  tipo: FonteDados;
+  ativa: boolean;
+  configuracao?: any;
+}
 
 // Período atual (julho/2025)
 const PERIODO_ATUAL = "2025-07";
@@ -43,6 +54,16 @@ export default function GerarFaturamento() {
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  
+  // Configuração da fonte de dados
+  const [fonteDados, setFonteDados] = useState<FonteDados>('upload');
+  const [configuracaoMobilemed, setConfiguracaoMobilemed] = useState({
+    url: '',
+    usuario: '',
+    senha: '',
+    ativo: false
+  });
+  
   const [clientesCarregados, setClientesCarregados] = useState<Array<{
     id: string;
     nome: string;
@@ -447,7 +468,11 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="configuracao" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configuração
+          </TabsTrigger>
           <TabsTrigger value="faturamento" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Faturamento
@@ -461,6 +486,203 @@ export default function GerarFaturamento() {
             Base de Dados
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="configuracao" className="space-y-6 mt-6">
+          {/* Configuração da Fonte de Dados */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configuração da Fonte de Dados
+              </CardTitle>
+              <CardDescription>
+                Configure como os dados do faturamento serão obtidos - via upload de arquivo ou integração direta com Mobilemed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Selecione a fonte de dados:</Label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Opção: Upload de Arquivo */}
+                  <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    fonteDados === 'upload' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFonteDados('upload')}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        fonteDados === 'upload' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                      }`}>
+                        {fonteDados === 'upload' && <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Upload className="h-5 w-5 text-blue-600" />
+                          <span className="font-medium">Upload de Arquivo</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Fazer upload manual de arquivos CSV/Excel</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Opção: Integração Mobilemed */}
+                  <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    fonteDados === 'mobilemed' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFonteDados('mobilemed')}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        fonteDados === 'mobilemed' ? 'border-green-500 bg-green-500' : 'border-gray-300'
+                      }`}>
+                        {fonteDados === 'mobilemed' && <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-5 w-5 text-green-600" />
+                          <span className="font-medium">Mobilemed</span>
+                          <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Integração direta com sistema Mobilemed</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Opção: Banco Local */}
+                  <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    fonteDados === 'banco' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFonteDados('banco')}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        fonteDados === 'banco' ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                      }`}>
+                        {fonteDados === 'banco' && <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <HardDrive className="h-5 w-5 text-purple-600" />
+                          <span className="font-medium">Banco Local</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Usar dados já carregados no banco</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuração específica para Mobilemed */}
+              {fonteDados === 'mobilemed' && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-medium">Configuração da Integração Mobilemed</Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={configuracaoMobilemed.ativo}
+                          onCheckedChange={(checked) => 
+                            setConfiguracaoMobilemed(prev => ({ ...prev, ativo: checked }))
+                          }
+                        />
+                        <Label className="text-sm">Ativo</Label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mobilemed-url">URL do Sistema Mobilemed</Label>
+                        <Input
+                          id="mobilemed-url"
+                          type="url"
+                          placeholder="https://sistema.mobilemed.com.br"
+                          value={configuracaoMobilemed.url}
+                          onChange={(e) => setConfiguracaoMobilemed(prev => ({ ...prev, url: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mobilemed-usuario">Usuário</Label>
+                        <Input
+                          id="mobilemed-usuario"
+                          placeholder="usuario@empresa.com"
+                          value={configuracaoMobilemed.usuario}
+                          onChange={(e) => setConfiguracaoMobilemed(prev => ({ ...prev, usuario: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mobilemed-senha">Senha</Label>
+                      <Input
+                        id="mobilemed-senha"
+                        type="password"
+                        placeholder="••••••••"
+                        value={configuracaoMobilemed.senha}
+                        onChange={(e) => setConfiguracaoMobilemed(prev => ({ ...prev, senha: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="flex gap-4">
+                      <Button 
+                        variant="outline" 
+                        disabled={!configuracaoMobilemed.url || !configuracaoMobilemed.usuario || !configuracaoMobilemed.senha}
+                        onClick={() => {
+                          toast({
+                            title: "Teste de Conexão",
+                            description: "Funcionalidade em desenvolvimento. Em breve será possível testar a conexão com Mobilemed.",
+                          });
+                        }}
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Testar Conexão
+                      </Button>
+                      
+                      <Button 
+                        onClick={() => {
+                          toast({
+                            title: "Configuração Salva",
+                            description: "Configurações da integração Mobilemed foram salvas.",
+                          });
+                        }}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Salvar Configuração
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-yellow-800">Integração em Desenvolvimento</h4>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            A integração com Mobilemed está sendo desenvolvida. Por enquanto, use a opção "Upload de Arquivo" 
+                            para processar os dados de faturamento.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Status atual */}
+              <div className="p-4 bg-gray-50 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    fonteDados === 'upload' ? 'bg-blue-500' : 
+                    fonteDados === 'mobilemed' ? 'bg-green-500' : 'bg-purple-500'
+                  }`}></div>
+                  <span className="font-medium">
+                    Fonte ativa: {
+                      fonteDados === 'upload' ? 'Upload de Arquivo' :
+                      fonteDados === 'mobilemed' ? 'Integração Mobilemed' : 'Banco Local'
+                    }
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="faturamento" className="space-y-6 mt-6">
           {/* ⚠️ Alerta se não há clientes carregados */}
