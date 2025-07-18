@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -715,10 +716,11 @@ export default function Colaboradores() {
                     Novo Colaborador
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Cadastrar Novo Colaborador</DialogTitle>
                   </DialogHeader>
+                  <ScrollArea className="flex-1 pr-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <Label htmlFor="nome">Nome *</Label>
@@ -942,8 +944,9 @@ export default function Colaboradores() {
                       )}
                     </>
                   )}
+                  </ScrollArea>
                   
-                  <div className="flex justify-end gap-2 mt-6 col-span-2">
+                  <div className="flex justify-end gap-2 pt-4 border-t">
                     <Button variant="outline" onClick={() => setShowNewColaboradorDialog(false)}>
                       Cancelar
                     </Button>
