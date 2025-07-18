@@ -12,15 +12,6 @@ interface ExameData {
   Cliente?: string;
   valor_pagar?: number;
   'Valor a Pagar'?: number;
-  data_exame?: string;
-  nome_paciente?: string;
-  nome_medico_laudador?: string;
-  modalidade?: string;
-  especialidade?: string;
-  categoria?: string;
-  prioridade?: string;
-  quantidade_laudos?: number;
-  valor?: number;
   [key: string]: any;
 }
 
@@ -33,34 +24,42 @@ interface ClienteResumo {
 }
 
 serve(async (req) => {
+  console.log('=== INICIANDO PROCESSAR-FATURAMENTO-PDF ===');
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Iniciando processamento de faturamento PDF...');
+    console.log('Método da requisição:', req.method);
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Variáveis de ambiente não configuradas');
       throw new Error('Variáveis de ambiente do Supabase não configuradas');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Cliente Supabase criado com sucesso');
 
     const body = await req.json();
+    console.log('Body recebido:', JSON.stringify(body, null, 2));
+    
     const { file_path, periodo, enviar_emails = true } = body;
     
     if (!file_path || !periodo) {
+      console.error('Parâmetros faltando:', { file_path, periodo });
       throw new Error('Parâmetros file_path e periodo são obrigatórios');
     }
     
     console.log('Processando arquivo:', file_path, 'para período:', periodo);
 
-    // Baixar arquivo do storage
-    console.log('Tentativa 1 de download do arquivo...');
+    // STEP 1: Download do arquivo
+    console.log('STEP 1: Baixando arquivo do storage...');
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('uploads')
       .download(file_path);
@@ -71,30 +70,43 @@ serve(async (req) => {
     }
 
     if (!fileData) {
+      console.error('Arquivo não encontrado');
       throw new Error('Arquivo não encontrado no storage');
     }
 
-    // Converter para ArrayBuffer e processar Excel
-    console.log('Lendo arquivo Excel...');
+    console.log('Arquivo baixado com sucesso, size:', fileData.size);
+
+    // STEP 2: Processar Excel
+    console.log('STEP 2: Processando arquivo Excel...');
     const arrayBuffer = await fileData.arrayBuffer();
+    console.log('ArrayBuffer criado, size:', arrayBuffer.byteLength);
+    
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    console.log('Workbook criado, sheets:', workbook.SheetNames);
+    
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
 
-    console.log(`Dados do Excel: ${data.length} linhas`);
+    console.log(`Dados extraídos do Excel: ${data.length} linhas`);
 
     if (data.length === 0) {
       throw new Error('Arquivo Excel está vazio ou não contém dados válidos');
     }
 
-    // Processar dados e agrupar por cliente
+    // STEP 3: Agrupar por cliente
+    console.log('STEP 3: Agrupando dados por cliente...');
     const dadosProcessados = data as ExameData[];
     const clientesResumo = new Map<string, ClienteResumo>();
 
-    dadosProcessados.forEach((exame) => {
+    dadosProcessados.forEach((exame, index) => {
+      console.log(`Processando linha ${index + 1}:`, Object.keys(exame));
+      
       const clienteNome = exame.cliente || exame.Cliente || '';
-      if (!clienteNome) return;
+      if (!clienteNome) {
+        console.log(`Linha ${index + 1}: Cliente não encontrado`);
+        return;
+      }
 
       if (!clientesResumo.has(clienteNome)) {
         clientesResumo.set(clienteNome, {
@@ -108,24 +120,31 @@ serve(async (req) => {
 
       const cliente = clientesResumo.get(clienteNome)!;
       cliente.totalLaudos++;
-      cliente.valorTotal += Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
+      
+      const valor = Number(exame.valor_pagar || exame['Valor a Pagar'] || 0);
+      cliente.valorTotal += valor;
       cliente.exames.push(exame);
+      
+      if (index < 5) {
+        console.log(`Cliente: ${clienteNome}, Valor: ${valor}`);
+      }
     });
 
     console.log(`${clientesResumo.size} clientes únicos encontrados`);
 
-    // Gerar PDFs para cada cliente
-    const pdfsGerados = [];
+    // STEP 4: Gerar relatórios
+    console.log('STEP 4: Gerando relatórios...');
+    const relatoriosGerados = [];
     let emailsEnviados = 0;
 
     for (const [nomeCliente, resumo] of clientesResumo) {
       try {
         console.log(`Processando cliente: ${nomeCliente}`);
         
-        // Por enquanto, vamos criar um relatório em texto simples
+        // Gerar relatório em texto
         const relatorioTexto = gerarRelatorioTexto(resumo, periodo);
         
-        // Upload do relatório como arquivo de texto
+        // Upload do relatório
         const nomeArquivo = `faturamento_${nomeCliente.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.txt`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('uploads')
@@ -135,8 +154,8 @@ serve(async (req) => {
           });
 
         if (uploadError) {
-          console.error(`Erro no upload do relatório para ${nomeCliente}:`, uploadError);
-          pdfsGerados.push({
+          console.error(`Erro no upload para ${nomeCliente}:`, uploadError);
+          relatoriosGerados.push({
             cliente: nomeCliente,
             erro: `Erro no upload: ${uploadError.message}`,
             email_enviado: false
@@ -149,7 +168,7 @@ serve(async (req) => {
           .from('uploads')
           .getPublicUrl(`relatorios/${nomeArquivo}`);
 
-        pdfsGerados.push({
+        relatoriosGerados.push({
           cliente: nomeCliente,
           url: publicUrl,
           resumo: {
@@ -159,11 +178,11 @@ serve(async (req) => {
           email_enviado: false
         });
 
-        console.log(`Relatório gerado com sucesso para ${nomeCliente}: ${publicUrl}`);
+        console.log(`Relatório gerado para ${nomeCliente}: ${publicUrl}`);
 
       } catch (error) {
         console.error(`Erro ao processar cliente ${nomeCliente}:`, error);
-        pdfsGerados.push({
+        relatoriosGerados.push({
           cliente: nomeCliente,
           erro: `Erro no processamento: ${error.message}`,
           email_enviado: false
@@ -171,33 +190,39 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Processamento concluído: ${pdfsGerados.length} relatórios processados`);
+    console.log(`PROCESSAMENTO CONCLUÍDO: ${relatoriosGerados.length} relatórios processados`);
 
-    return new Response(JSON.stringify({
+    const response = {
       success: true,
       message: 'Processamento de faturamento concluído',
-      pdfs_gerados: pdfsGerados,
+      pdfs_gerados: relatoriosGerados,
       emails_enviados: emailsEnviados,
       periodo,
       total_clientes: clientesResumo.size
-    }), {
+    };
+
+    console.log('Resposta final:', JSON.stringify(response, null, 2));
+
+    return new Response(JSON.stringify(response), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
 
-
   } catch (error: any) {
-    console.error('Erro no processamento:', error);
-    
-    // Log detalhado do erro para debug
+    console.error('=== ERRO NO PROCESSAMENTO ===');
+    console.error('Erro:', error);
     console.error('Stack trace:', error.stack);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
     
-    return new Response(JSON.stringify({
+    const errorResponse = {
       success: false,
       error: error.message,
       details: error.stack || 'Stack trace não disponível'
-    }), {
+    };
+
+    console.log('Resposta de erro:', JSON.stringify(errorResponse, null, 2));
+    
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
@@ -243,25 +268,14 @@ Relatório gerado automaticamente pelo sistema
 }
 
 function formatarPeriodo(periodo: string): string {
-  const [ano, mes] = periodo.split('-');
-  const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-  return `${meses[parseInt(mes) - 1]} de ${ano}`;
-}
-
-function formatarData(data: string): string {
-  if (!data) return '';
   try {
-    const date = new Date(data);
-    return date.toLocaleDateString('pt-BR');
+    const [ano, mes] = periodo.split('-');
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return `${meses[parseInt(mes) - 1]} de ${ano}`;
   } catch {
-    return data;
+    return periodo;
   }
-}
-
-function truncateText(text: string, maxLength: number): string {
-  if (!text) return '';
-  return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
 }
