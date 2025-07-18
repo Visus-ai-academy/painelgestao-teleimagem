@@ -126,6 +126,17 @@ export default function GerarFaturamento() {
     nome: string;
     email: string;
   }>>([]);
+  
+  // Estado para relatórios prontos
+  const [relatoriosProntos, setRelatoriosProntos] = useState<Array<{
+    clienteId: string;
+    clienteNome: string;
+    arquivo: File;
+    nomeArquivo: string;
+    uploadUrl?: string;
+    dataUpload: string;
+  }>>([]);
+  
   const [resultados, setResultados] = useState<Array<{
     clienteId: string;
     clienteNome: string;
@@ -238,6 +249,122 @@ export default function GerarFaturamento() {
   useEffect(() => {
     carregarClientes();
   }, []);
+
+  // Função para fazer upload de relatório pronto
+  const handleUploadRelatorio = async (clienteId: string, file: File) => {
+    try {
+      const cliente = clientesCarregados.find(c => c.id === clienteId);
+      if (!cliente) {
+        throw new Error("Cliente não encontrado");
+      }
+
+      // Simular upload - em produção seria para storage do Supabase
+      const uploadUrl = URL.createObjectURL(file);
+      
+      const novoRelatorio = {
+        clienteId,
+        clienteNome: cliente.nome,
+        arquivo: file,
+        nomeArquivo: file.name,
+        uploadUrl,
+        dataUpload: new Date().toLocaleString('pt-BR')
+      };
+
+      setRelatoriosProntos(prev => {
+        // Remove relatório anterior do mesmo cliente se existir
+        const filtered = prev.filter(r => r.clienteId !== clienteId);
+        return [...filtered, novoRelatorio];
+      });
+
+      // Atualizar resultados para mostrar que o relatório está disponível
+      setResultados(prev => {
+        const existing = prev.find(r => r.clienteId === clienteId);
+        if (existing) {
+          return prev.map(r => 
+            r.clienteId === clienteId 
+              ? { ...r, relatorioGerado: true, linkRelatorio: uploadUrl, dataProcessamento: novoRelatorio.dataUpload }
+              : r
+          );
+        } else {
+          return [...prev, {
+            clienteId,
+            clienteNome: cliente.nome,
+            relatorioGerado: true,
+            emailEnviado: false,
+            emailDestino: cliente.email,
+            linkRelatorio: uploadUrl,
+            dataProcessamento: novoRelatorio.dataUpload
+          }];
+        }
+      });
+
+      toast({
+        title: "Relatório Carregado",
+        description: `Relatório para ${cliente.nome} foi carregado com sucesso`,
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Erro no Upload",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para carregar relatórios prontos em lote
+  const handleCarregarRelatoriosProntos = () => {
+    // Verificar se há relatórios carregados
+    const clientesComRelatorio = relatoriosProntos.filter(rel => 
+      clientesCarregados.some(cliente => cliente.id === rel.clienteId)
+    );
+
+    if (clientesComRelatorio.length === 0) {
+      toast({
+        title: "Nenhum Relatório Encontrado",
+        description: "Faça upload dos relatórios primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Marcar como prontos para envio
+    setResultados(prev => {
+      const novosResultados = [...prev];
+      
+      clientesComRelatorio.forEach(rel => {
+        const existingIndex = novosResultados.findIndex(r => r.clienteId === rel.clienteId);
+        if (existingIndex >= 0) {
+          novosResultados[existingIndex] = {
+            ...novosResultados[existingIndex],
+            relatorioGerado: true,
+            linkRelatorio: rel.uploadUrl,
+            dataProcessamento: rel.dataUpload
+          };
+        } else {
+          const cliente = clientesCarregados.find(c => c.id === rel.clienteId)!;
+          novosResultados.push({
+            clienteId: rel.clienteId,
+            clienteNome: rel.clienteNome,
+            relatorioGerado: true,
+            emailEnviado: false,
+            emailDestino: cliente.email,
+            linkRelatorio: rel.uploadUrl,
+            dataProcessamento: rel.dataUpload
+          });
+        }
+      });
+      
+      return novosResultados;
+    });
+
+    setRelatoriosGerados(clientesComRelatorio.length);
+    
+    toast({
+      title: "Relatórios Prontos",
+      description: `${clientesComRelatorio.length} relatórios prontos para envio`,
+    });
+  };
 
   // Primeira etapa: Gerar todos os relatórios
   const handleGerarTodosRelatorios = async () => {
@@ -371,7 +498,7 @@ export default function GerarFaturamento() {
       if (clientesComRelatorio.length === 0) {
         toast({
           title: "Nenhum Relatório Disponível",
-          description: "Gere os relatórios primeiro antes de enviar os emails.",
+          description: "Carregue os relatórios prontos primeiro antes de enviar os emails.",
           variant: "destructive",
         });
         setProcessandoTodos(false);
@@ -388,10 +515,18 @@ export default function GerarFaturamento() {
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo de delay
           }
 
+          // Encontrar o relatório pronto para este cliente
+          const relatorioPronto = relatoriosProntos.find(r => r.clienteId === cliente.clienteId);
+          
           const responseEmail = await supabase.functions.invoke('enviar-relatorio-email', {
             body: {
               cliente_id: cliente.clienteId,
-              relatorio: cliente.relatorioData
+              relatorio: {
+                arquivo_nome: relatorioPronto?.nomeArquivo || 'relatorio.pdf',
+                arquivo_url: cliente.linkRelatorio,
+                periodo: PERIODO_ATUAL,
+                tipo: 'relatorio_pronto'
+              }
             }
           });
 
@@ -525,14 +660,18 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="configuracao" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Configuração
           </TabsTrigger>
-          <TabsTrigger value="faturamento" className="flex items-center gap-2">
+          <TabsTrigger value="relatorios-prontos" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Faturamento
+            Relatórios Prontos
+          </TabsTrigger>
+          <TabsTrigger value="faturamento" className="flex items-center gap-2">
+            <Send className="h-4 w-4" />
+            Envio de Emails
           </TabsTrigger>
           <TabsTrigger value="uploads" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
@@ -749,6 +888,167 @@ export default function GerarFaturamento() {
           />
         </TabsContent>
 
+        <TabsContent value="relatorios-prontos" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Relatórios Prontos - {PERIODO_ATUAL}
+              </CardTitle>
+              <CardDescription>
+                Faça upload dos relatórios de faturamento já prontos para cada cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Resumo */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-8 w-8 text-blue-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
+                      <div className="text-sm text-blue-700">Clientes Ativos</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-900">{relatoriosProntos.length}</div>
+                      <div className="text-sm text-green-700">Relatórios Carregados</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-8 w-8 text-orange-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-orange-900">
+                        {clientesCarregados.length - relatoriosProntos.length}
+                      </div>
+                      <div className="text-sm text-orange-700">Pendentes</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Clientes e Upload */}
+              {clientesCarregados.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Clientes e Relatórios</h3>
+                    <Button 
+                      onClick={handleCarregarRelatoriosProntos}
+                      disabled={relatoriosProntos.length === 0}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Preparar para Envio ({relatoriosProntos.length})
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {clientesCarregados.map((cliente) => {
+                      const relatorioPronto = relatoriosProntos.find(r => r.clienteId === cliente.id);
+                      
+                      return (
+                        <div key={cliente.id} className="border rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium">{cliente.nome}</h4>
+                              <p className="text-sm text-muted-foreground">{cliente.email}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {relatorioPronto ? (
+                                <Badge variant="default" className="bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Carregado
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Pendente
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {relatorioPronto ? (
+                            <div className="p-3 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-green-600" />
+                                <span className="text-sm text-green-700">{relatorioPronto.nomeArquivo}</span>
+                                <span className="text-xs text-green-600">({relatorioPronto.dataUpload})</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => window.open(relatorioPronto.uploadUrl)}
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Ver
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setRelatoriosProntos(prev => prev.filter(r => r.clienteId !== cliente.id));
+                                    setResultados(prev => prev.map(r => 
+                                      r.clienteId === cliente.id 
+                                        ? { ...r, relatorioGerado: false, linkRelatorio: undefined }
+                                        : r
+                                    ));
+                                  }}
+                                >
+                                  Remover
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 border-2 border-dashed border-gray-200 rounded">
+                              <label className="flex flex-col items-center justify-center cursor-pointer">
+                                <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                                <span className="text-sm text-gray-600">
+                                  Clique para fazer upload do relatório PDF
+                                </span>
+                                <input
+                                  type="file"
+                                  accept=".pdf,.xlsx,.xls"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      handleUploadRelatorio(cliente.id, file);
+                                      e.target.value = ''; // Reset input
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center p-8 border-2 border-dashed border-gray-200 rounded-lg">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum Cliente Carregado</h3>
+                  <p className="text-gray-500 mb-4">
+                    Faça upload da lista de clientes primeiro na aba "Upload de Dados"
+                  </p>
+                  <Button onClick={() => setActiveTab("uploads")} variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Ir para Upload de Dados
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="faturamento" className="space-y-6 mt-6">
           {/* ⚠️ Alerta se não há clientes carregados */}
           {clientesCarregados.length === 0 && (
@@ -781,20 +1081,20 @@ export default function GerarFaturamento() {
                 
                 <div className="flex justify-center gap-4 flex-wrap">
                   <Button 
-                    onClick={handleGerarTodosRelatorios}
-                    disabled={processandoTodos || clientesCarregados.length === 0}
+                    onClick={handleCarregarRelatoriosProntos}
+                    disabled={processandoTodos || relatoriosProntos.length === 0}
                     size="lg"
                     className="min-w-[180px]"
                   >
                     {processandoTodos ? (
                       <>
                         <Clock className="h-5 w-5 mr-2 animate-spin" />
-                        Gerando...
+                        Preparando...
                       </>
                     ) : (
                       <>
                         <FileText className="h-5 w-5 mr-2" />
-                        Gerar Relatórios
+                        Preparar Relatórios ({relatoriosProntos.length})
                       </>
                     )}
                   </Button>
@@ -820,8 +1120,11 @@ export default function GerarFaturamento() {
                   </Button>
                   
                   <Button 
-                    onClick={handleProcessarTodosClientes}
-                    disabled={processandoTodos || clientesCarregados.length === 0}
+                    onClick={() => {
+                      handleCarregarRelatoriosProntos();
+                      setTimeout(() => handleEnviarEmails(), 2000);
+                    }}
+                    disabled={processandoTodos || relatoriosProntos.length === 0}
                     size="lg"
                     className="min-w-[200px]"
                     variant="outline"
