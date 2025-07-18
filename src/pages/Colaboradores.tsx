@@ -498,13 +498,10 @@ export default function Colaboradores() {
                           <SelectValue placeholder="Selecione o departamento" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Medicina">Medicina</SelectItem>
-                          <SelectItem value="Técnico">Técnico</SelectItem>
-                          <SelectItem value="Enfermagem">Enfermagem</SelectItem>
-                          <SelectItem value="TI">TI</SelectItem>
-                          <SelectItem value="Financeiro">Financeiro</SelectItem>
-                          <SelectItem value="Atendimento">Atendimento</SelectItem>
-                          <SelectItem value="Gestão">Gestão</SelectItem>
+                          <SelectItem value="Comercial">Comercial</SelectItem>
+                          <SelectItem value="Operacional">Operacional</SelectItem>
+                          <SelectItem value="Adm. Financeiro">Adm. Financeiro</SelectItem>
+                          <SelectItem value="Médico">Médico</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
