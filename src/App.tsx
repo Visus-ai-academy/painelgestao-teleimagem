@@ -34,6 +34,7 @@ import ContratosClientes from "./pages/ContratosClientes";
 import ContratosFornecedores from "./pages/ContratosFornecedores";
 import GerenciarListas from "./pages/GerenciarListas";
 import EstruturaVendas from "./pages/EstruturaVendas";
+import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
 import ArquiteturaProjeto from "./pages/ArquiteturaProjeto";
 import NotFound from "./pages/NotFound";
 
@@ -155,11 +156,16 @@ const App = () => {
                         <GerenciarListas />
                       </RoleProtectedRoute>
                     } />
-                    <Route path="/estrutura-vendas" element={
-                      <RoleProtectedRoute requiredRoles={['admin']}>
-                        <EstruturaVendas />
-                      </RoleProtectedRoute>
-                    } />
+                     <Route path="/estrutura-vendas" element={
+                       <RoleProtectedRoute requiredRoles={['admin']}>
+                         <EstruturaVendas />
+                       </RoleProtectedRoute>
+                     } />
+                     <Route path="/configuracao-importacao" element={
+                       <RoleProtectedRoute requiredRoles={['admin']}>
+                         <ConfiguracaoImportacao />
+                       </RoleProtectedRoute>
+                     } />
                     <Route path="/arquitetura" element={
                       <RoleProtectedRoute requiredRoles={['admin']}>
                         <ArquiteturaProjeto />

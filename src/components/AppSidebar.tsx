@@ -117,6 +117,7 @@ const menuItems: MenuItem[] = [
       { title: "Listas do Sistema", url: "/configuracao/listas", requiredRoles: ['admin'] },
       { title: "Logomarca", url: "/configuracao/logomarca", requiredRoles: ['admin'] },
       { title: "Estrutura de Vendas", url: "/estrutura-vendas", requiredRoles: ['admin'] },
+      { title: "Configuração Importação", url: "/configuracao-importacao", requiredRoles: ['admin'] },
       { title: "Arquitetura do Projeto", url: "/arquitetura", requiredRoles: ['admin'] },
     ]
   },

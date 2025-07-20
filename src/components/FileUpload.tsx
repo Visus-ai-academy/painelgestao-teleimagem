@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface FileUploadProps {
   title: string;
@@ -22,6 +23,7 @@ interface UploadState {
   progress: number;
   status: 'idle' | 'uploading' | 'success' | 'error';
   message?: string;
+  details?: any;
 }
 
 export function FileUpload({
@@ -86,31 +88,40 @@ export function FileUpload({
   const handleUpload = useCallback(async () => {
     if (!state.file) return;
 
-    setState(prev => ({ ...prev, isUploading: true, status: 'uploading', progress: 0 }));
+    setState(prev => ({ ...prev, isUploading: true, status: 'uploading', progress: 30 }));
 
     try {
-      // Simular progresso
-      const progressInterval = setInterval(() => {
-        setState(prev => ({
-          ...prev,
-          progress: Math.min(prev.progress + 10, 90)
-        }));
-      }, 200);
+      // 1. Upload do arquivo
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `${timestamp}_${state.file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filename, state.file);
 
-      await onUpload(state.file);
+      if (uploadError) throw uploadError;
+      
+      setState(prev => ({ ...prev, progress: 60 }));
 
-      clearInterval(progressInterval);
+      // 2. Processar arquivo com detecção automática de template
+      const { data, error } = await supabase.functions.invoke('processar-importacao-inteligente', {
+        body: { filename }
+      });
+
+      if (error) throw error;
+
       setState(prev => ({
         ...prev,
         isUploading: false,
         progress: 100,
         status: 'success',
-        message: 'Upload concluído com sucesso!'
+        message: data.message || 'Upload concluído com sucesso!',
+        details: data.details
       }));
 
       toast({
         title: "Upload realizado",
-        description: "Arquivo enviado e processado com sucesso!",
+        description: data.message || "Arquivo enviado e processado com sucesso!",
       });
 
     } catch (error) {
@@ -127,14 +138,15 @@ export function FileUpload({
         variant: "destructive"
       });
     }
-  }, [state.file, onUpload, toast]);
+  }, [state.file, toast]);
 
   const clearFile = useCallback(() => {
     setState({
       file: null,
       isUploading: false,
       progress: 0,
-      status: 'idle'
+      status: 'idle',
+      details: undefined
     });
   }, []);
 
@@ -213,6 +225,13 @@ export function FileUpload({
             {state.status === 'success' && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-sm text-green-800">{state.message}</p>
+                {state.details && (
+                  <div className="mt-2 text-xs text-green-700 space-y-1">
+                    <p><strong>Template detectado:</strong> {state.details.template_detected}</p>
+                    <p><strong>Registros importados:</strong> {state.details.records_imported}</p>
+                    <p><strong>Registros com erro:</strong> {state.details.records_failed}</p>
+                  </div>
+                )}
               </div>
             )}
 

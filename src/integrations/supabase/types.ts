@@ -654,6 +654,158 @@ export type Database = {
         }
         Relationships: []
       }
+      field_mappings: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          default_value: string | null
+          field_type: string
+          file_type: string
+          id: string
+          is_required: boolean
+          order_index: number
+          source_field: string
+          target_field: string
+          target_table: string
+          template_name: string
+          transformation_rules: Json | null
+          updated_at: string
+          validation_rules: Json | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_value?: string | null
+          field_type?: string
+          file_type: string
+          id?: string
+          is_required?: boolean
+          order_index?: number
+          source_field: string
+          target_field: string
+          target_table: string
+          template_name: string
+          transformation_rules?: Json | null
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_value?: string | null
+          field_type?: string
+          file_type?: string
+          id?: string
+          is_required?: boolean
+          order_index?: number
+          source_field?: string
+          target_field?: string
+          target_table?: string
+          template_name?: string
+          transformation_rules?: Json | null
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Relationships: []
+      }
+      import_history: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_details: Json | null
+          file_type: string
+          filename: string
+          id: string
+          import_summary: Json | null
+          mapping_used: Json | null
+          preview_data: Json | null
+          records_failed: number | null
+          records_imported: number | null
+          status: string
+          template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_details?: Json | null
+          file_type: string
+          filename: string
+          id?: string
+          import_summary?: Json | null
+          mapping_used?: Json | null
+          preview_data?: Json | null
+          records_failed?: number | null
+          records_imported?: number | null
+          status?: string
+          template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_details?: Json | null
+          file_type?: string
+          filename?: string
+          id?: string
+          import_summary?: Json | null
+          mapping_used?: Json | null
+          preview_data?: Json | null
+          records_failed?: number | null
+          records_imported?: number | null
+          status?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_history_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "import_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_templates: {
+        Row: {
+          active: boolean
+          auto_detect_columns: Json | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          file_type: string
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          auto_detect_columns?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_type: string
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          auto_detect_columns?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_type?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lgpd_consent: {
         Row: {
           consent_type: string
