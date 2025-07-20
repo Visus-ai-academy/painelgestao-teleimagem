@@ -14,6 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          id: string
+          ip_address: unknown | null
+          new_data: Json | null
+          old_data: Json | null
+          operation: string
+          record_id: string
+          session_id: string | null
+          severity: string | null
+          table_name: string
+          timestamp: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: unknown | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation: string
+          record_id: string
+          session_id?: string | null
+          severity?: string | null
+          table_name: string
+          timestamp?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: unknown | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation?: string
+          record_id?: string
+          session_id?: string | null
+          severity?: string | null
+          table_name?: string
+          timestamp?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_logs: {
+        Row: {
+          backup_location: string | null
+          backup_type: string
+          checksum: string | null
+          end_time: string | null
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          start_time: string | null
+          status: string
+        }
+        Insert: {
+          backup_location?: string | null
+          backup_type: string
+          checksum?: string | null
+          end_time?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          start_time?: string | null
+          status: string
+        }
+        Update: {
+          backup_location?: string | null
+          backup_type?: string
+          checksum?: string | null
+          end_time?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          start_time?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       categorias_exame: {
         Row: {
           ativo: boolean
@@ -149,6 +233,75 @@ export type Database = {
         }
         Relationships: []
       }
+      data_access_logs: {
+        Row: {
+          action: string
+          data_classification: string | null
+          id: string
+          ip_address: unknown | null
+          resource_id: string | null
+          resource_type: string
+          sensitive_data_accessed: boolean | null
+          timestamp: string | null
+          user_agent: string | null
+          user_email: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          data_classification?: string | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type: string
+          sensitive_data_accessed?: boolean | null
+          timestamp?: string | null
+          user_agent?: string | null
+          user_email: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          data_classification?: string | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type?: string
+          sensitive_data_accessed?: boolean | null
+          timestamp?: string | null
+          user_agent?: string | null
+          user_email?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      data_retention_policies: {
+        Row: {
+          auto_delete: boolean | null
+          created_at: string | null
+          id: string
+          legal_hold: boolean | null
+          retention_period_days: number
+          table_name: string
+        }
+        Insert: {
+          auto_delete?: boolean | null
+          created_at?: string | null
+          id?: string
+          legal_hold?: boolean | null
+          retention_period_days: number
+          table_name: string
+        }
+        Update: {
+          auto_delete?: boolean | null
+          created_at?: string | null
+          id?: string
+          legal_hold?: boolean | null
+          retention_period_days?: number
+          table_name?: string
+        }
+        Relationships: []
+      }
       documentos_clientes: {
         Row: {
           clicksign_document_key: string | null
@@ -255,6 +408,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      encrypted_data: {
+        Row: {
+          created_at: string | null
+          encrypted_value: string
+          encryption_algorithm: string | null
+          field_name: string
+          hash_value: string | null
+          id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          encrypted_value: string
+          encryption_algorithm?: string | null
+          field_name: string
+          hash_value?: string | null
+          id?: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          created_at?: string | null
+          encrypted_value?: string
+          encryption_algorithm?: string | null
+          field_name?: string
+          hash_value?: string | null
+          id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
       }
       escalas_medicas: {
         Row: {
@@ -468,6 +654,87 @@ export type Database = {
         }
         Relationships: []
       }
+      lgpd_consent: {
+        Row: {
+          consent_type: string
+          email: string
+          expires_at: string | null
+          granted: boolean
+          id: string
+          ip_address: unknown | null
+          legal_basis: string
+          purpose: string
+          timestamp: string | null
+          user_agent: string | null
+          user_id: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          consent_type: string
+          email: string
+          expires_at?: string | null
+          granted: boolean
+          id?: string
+          ip_address?: unknown | null
+          legal_basis: string
+          purpose: string
+          timestamp?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          consent_type?: string
+          email?: string
+          expires_at?: string | null
+          granted?: boolean
+          id?: string
+          ip_address?: unknown | null
+          legal_basis?: string
+          purpose?: string
+          timestamp?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: []
+      }
+      login_attempts: {
+        Row: {
+          city: string | null
+          country: string | null
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown
+          success: boolean
+          timestamp: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address: unknown
+          success: boolean
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          success?: boolean
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       medicos: {
         Row: {
           ativo: boolean
@@ -652,6 +919,51 @@ export type Database = {
           },
         ]
       }
+      password_policies: {
+        Row: {
+          created_at: string | null
+          history_count: number | null
+          id: string
+          lockout_duration_minutes: number | null
+          max_age_days: number | null
+          max_attempts: number | null
+          min_length: number | null
+          require_lowercase: boolean | null
+          require_numbers: boolean | null
+          require_symbols: boolean | null
+          require_uppercase: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          history_count?: number | null
+          id?: string
+          lockout_duration_minutes?: number | null
+          max_age_days?: number | null
+          max_attempts?: number | null
+          min_length?: number | null
+          require_lowercase?: boolean | null
+          require_numbers?: boolean | null
+          require_symbols?: boolean | null
+          require_uppercase?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          history_count?: number | null
+          id?: string
+          lockout_duration_minutes?: number | null
+          max_age_days?: number | null
+          max_attempts?: number | null
+          min_length?: number | null
+          require_lowercase?: boolean | null
+          require_numbers?: boolean | null
+          require_symbols?: boolean | null
+          require_uppercase?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       prioridades: {
         Row: {
           ativo: boolean
@@ -759,6 +1071,48 @@ export type Database = {
           },
         ]
       }
+      security_alerts: {
+        Row: {
+          alert_type: string
+          auto_resolved: boolean | null
+          description: string
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          severity: string
+          status: string | null
+          timestamp: string | null
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          alert_type: string
+          auto_resolved?: boolean | null
+          description: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          severity: string
+          status?: string | null
+          timestamp?: string | null
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          auto_resolved?: boolean | null
+          description?: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          severity?: string
+          status?: string | null
+          timestamp?: string | null
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       upload_logs: {
         Row: {
           created_at: string
@@ -789,6 +1143,36 @@ export type Database = {
           records_processed?: number | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_2fa: {
+        Row: {
+          backup_codes: string[] | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          last_used: string | null
+          secret: string
+          user_id: string
+        }
+        Insert: {
+          backup_codes?: string[] | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_used?: string | null
+          secret: string
+          user_id: string
+        }
+        Update: {
+          backup_codes?: string[] | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_used?: string | null
+          secret?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -863,6 +1247,16 @@ export type Database = {
         Args: { data_referencia: string }
         Returns: boolean
       }
+      create_security_alert: {
+        Args: {
+          p_alert_type: string
+          p_severity: string
+          p_title: string
+          p_description: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
@@ -874,6 +1268,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_personal_data: {
+        Args: { data: string }
+        Returns: string
+      }
       is_admin: {
         Args: { _user_id?: string }
         Returns: boolean
@@ -882,8 +1280,37 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: boolean
       }
+      log_audit_event: {
+        Args: {
+          p_table_name: string
+          p_operation: string
+          p_record_id: string
+          p_old_data?: Json
+          p_new_data?: Json
+          p_severity?: string
+        }
+        Returns: string
+      }
+      log_data_access: {
+        Args: {
+          p_resource_type: string
+          p_resource_id?: string
+          p_action?: string
+          p_sensitive?: boolean
+          p_classification?: string
+        }
+        Returns: string
+      }
       promote_user_to_admin: {
         Args: { user_email: string }
+        Returns: boolean
+      }
+      validate_cnpj: {
+        Args: { cnpj: string }
+        Returns: boolean
+      }
+      validate_cpf: {
+        Args: { cpf: string }
         Returns: boolean
       }
     }
