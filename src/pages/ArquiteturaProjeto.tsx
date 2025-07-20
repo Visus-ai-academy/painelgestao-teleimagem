@@ -900,6 +900,11 @@ const ArquiteturaProjeto = () => {
 
         {/* 1. MAPA MENTAL - Overview e Navegação */}
         <TabsContent value="mindmap" className="flex-1 relative m-0">
+          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              <strong>🧠 Mapa Mental:</strong> Overview conceitual com núcleo central e ramificações por área (Operacional, Financeiro, People, Gestão, Dados)
+            </p>
+          </div>
           <ReactFlow
             nodes={mindMapNodesState}
             edges={mindMapEdgesState}
@@ -941,6 +946,11 @@ const ArquiteturaProjeto = () => {
 
         {/* 2. ERD INTERATIVO - Relações Detalhadas do Banco */}
         <TabsContent value="erd" className="flex-1 relative m-0">
+          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              <strong>🗄️ ERD Interativo:</strong> Diagrama entidade-relacionamento do banco com todas as tabelas Supabase, foreign keys em vermelho e agrupamento por contexto
+            </p>
+          </div>
           <ReactFlow
             nodes={erdNodesState}
             edges={erdEdgesState}
@@ -982,6 +992,11 @@ const ArquiteturaProjeto = () => {
 
         {/* 3. DIAGRAMA DE ARQUITETURA TÉCNICA */}
         <TabsContent value="architecture" className="flex-1 relative m-0">
+          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              <strong>🏗️ Arquitetura Técnica:</strong> Camadas Frontend (React), Backend (Supabase), e Integrações Externas (Email, PDF, ClickSign, Omie) com conexões diretas
+            </p>
+          </div>
           <ReactFlow
             nodes={archNodesState}
             edges={archEdgesState}
@@ -1023,6 +1038,11 @@ const ArquiteturaProjeto = () => {
 
         {/* 4. FLUXOS DE PROCESSO PRINCIPAIS */}
         <TabsContent value="process" className="flex-1 relative m-0">
+          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              <strong>⚡ Fluxos de Processo:</strong> Workflows principais: Upload/Processamento, Autenticação, Faturamento e Escala Médica com steps sequenciais
+            </p>
+          </div>
           <ReactFlow
             nodes={processNodesState}
             edges={processEdgesState}
