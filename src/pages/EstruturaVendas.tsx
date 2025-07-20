@@ -66,8 +66,14 @@ export default function EstruturaVendas() {
     // Manutenção mensal = 20% do valor de implantação
     const valorManutencao = valorImplantacao * 0.20;
     
-    // Valor mensal (infraestrutura + manutenção)
-    const valorMensal = custoMensalInfra + valorManutencao;
+    // Valor mensal base (infraestrutura + manutenção)
+    const valorMensalBase = custoMensalInfra + valorManutencao;
+    
+    // Aplicar margem de 150% e impostos de 20% sobre a mensalidade
+    const margemMensal = valorMensalBase * 1.5; // 150% de margem
+    const valorMensalComMargem = valorMensalBase + margemMensal;
+    const impostosMensal = valorMensalComMargem * 0.20; // 20% de impostos
+    const valorMensal = valorMensalComMargem + impostosMensal;
     
     // ROI do cliente
     const roiMensal = economiaMensal - valorMensal;
@@ -141,6 +147,10 @@ export default function EstruturaVendas() {
     doc.text(`• Infraestrutura: R$ ${custos.custoMensalInfra.toLocaleString('pt-BR')}`, 25, yPos);
     yPos += 10;
     doc.text(`• Suporte (20% implantação): R$ ${custos.valorManutencao.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Margem (150%): R$ ${((custos.custoMensalInfra + custos.valorManutencao) * 1.5).toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Impostos (20%): R$ ${(((custos.custoMensalInfra + custos.valorManutencao) * 2.5) * 0.20).toLocaleString('pt-BR')}`, 25, yPos);
     yPos += 15;
     
     doc.setFont("helvetica", "bold");
@@ -342,6 +352,14 @@ export default function EstruturaVendas() {
             <div className="flex justify-between">
               <span>Manutenção (20% da Implantação)</span>
               <span className="font-bold">R$ {custos.valorManutencao.toLocaleString('pt-BR')}</span>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Margem (150%)</span>
+              <span>R$ {((custos.custoMensalInfra + custos.valorManutencao) * 1.5).toLocaleString('pt-BR')}</span>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Impostos (20%)</span>
+              <span>R$ {(((custos.custoMensalInfra + custos.valorManutencao) * 2.5) * 0.20).toLocaleString('pt-BR')}</span>
             </div>
             <Separator />
             <div className="flex justify-between text-lg font-bold">
