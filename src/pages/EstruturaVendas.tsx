@@ -19,6 +19,7 @@ import {
   FileText,
   Download
 } from "lucide-react";
+import jsPDF from "jspdf";
 
 export default function EstruturaVendas() {
   const [usuarios, setUsuarios] = useState(10);
@@ -53,12 +54,20 @@ export default function EstruturaVendas() {
     const fatorEscala = Math.max(1, usuarios / 10); // Base 10 usuários
     const custoMensalInfra = Object.values(custosInfraestrutura).reduce((sum, custo) => sum + (custo * fatorEscala), 0);
     
-    // Valor de implantação (one-time)
-    const valorImplantacao = custoDesenvolvimento + valorKnowHow;
+    // Aplicar margem de 150% sobre custos
+    const custoTotal = custoDesenvolvimento + valorKnowHow;
+    const margemLucro = custoTotal * 1.5; // 150% de margem
+    const valorComMargem = custoTotal + margemLucro;
     
-    // Valor mensal (infraestrutura + margem + suporte)
-    const margemSuporte = custoMensalInfra * 2.5; // 150% de margem
-    const valorMensal = custoMensalInfra + margemSuporte;
+    // Aplicar impostos de 20%
+    const impostos = valorComMargem * 0.20;
+    const valorImplantacao = valorComMargem + impostos;
+    
+    // Manutenção mensal = 20% do valor de implantação
+    const valorManutencao = valorImplantacao * 0.20;
+    
+    // Valor mensal (infraestrutura + manutenção)
+    const valorMensal = custoMensalInfra + valorManutencao;
     
     // ROI do cliente
     const roiMensal = economiaMensal - valorMensal;
@@ -67,8 +76,13 @@ export default function EstruturaVendas() {
     return {
       custoDesenvolvimento,
       valorKnowHow,
+      custoTotal,
+      margemLucro,
+      valorComMargem,
+      impostos,
       valorImplantacao,
       custoMensalInfra,
+      valorManutencao,
       valorMensal,
       economiaMensal,
       roiMensal,
@@ -79,22 +93,79 @@ export default function EstruturaVendas() {
 
   const custos = calcularCustos();
 
-  const gerarProposta = () => {
-    const proposta = {
-      cliente: "Nome do Cliente",
-      usuarios,
-      custos,
-      configuracao,
-      dataGeracao: new Date().toLocaleDateString('pt-BR')
-    };
+  const gerarPropostaPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
     
-    const blob = new Blob([JSON.stringify(proposta, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `proposta-comercial-${usuarios}-usuarios.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Cabeçalho
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("PROPOSTA COMERCIAL", pageWidth / 2, 30, { align: "center" });
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text("Sistema de Gestão Médica TeleImagem", pageWidth / 2, 45, { align: "center" });
+    
+    // Informações do cliente
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO CLIENTE:", 20, 70);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Número de Usuários: ${usuarios}`, 20, 85);
+    doc.text(`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, 95);
+    
+    // Valores
+    doc.setFont("helvetica", "bold");
+    doc.text("VALORES DA PROPOSTA:", 20, 120);
+    doc.setFont("helvetica", "normal");
+    
+    let yPos = 135;
+    doc.text("IMPLANTAÇÃO (Valor Único):", 20, yPos);
+    yPos += 10;
+    doc.text(`• Desenvolvimento: R$ ${custos.custoDesenvolvimento.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Know-how: R$ ${custos.valorKnowHow.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Margem (150%): R$ ${custos.margemLucro.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Impostos (20%): R$ ${custos.impostos.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 15;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL IMPLANTAÇÃO: R$ ${custos.valorImplantacao.toLocaleString('pt-BR')}`, 20, yPos);
+    yPos += 20;
+    
+    doc.setFont("helvetica", "normal");
+    doc.text("MANUTENÇÃO MENSAL:", 20, yPos);
+    yPos += 10;
+    doc.text(`• Infraestrutura: R$ ${custos.custoMensalInfra.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Suporte (20% implantação): R$ ${custos.valorManutencao.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 15;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL MENSAL: R$ ${custos.valorMensal.toLocaleString('pt-BR')}`, 20, yPos);
+    yPos += 20;
+    
+    // ROI
+    doc.setFont("helvetica", "bold");
+    doc.text("RETORNO SOBRE INVESTIMENTO:", 20, yPos);
+    yPos += 10;
+    doc.setFont("helvetica", "normal");
+    doc.text(`• Economia mensal: R$ ${custos.economiaMensal.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• ROI mensal: R$ ${custos.roiMensal.toLocaleString('pt-BR')}`, 25, yPos);
+    yPos += 10;
+    doc.text(`• Payback: ${custos.paybackMeses.toFixed(1)} meses`, 25, yPos);
+    yPos += 10;
+    doc.text(`• ROI anual: ${((custos.roiMensal * 12 / custos.valorImplantacao) * 100).toFixed(0)}%`, 25, yPos);
+    
+    // Rodapé
+    doc.setFontSize(10);
+    doc.text("Esta proposta é válida por 30 dias.", 20, 270);
+    doc.text("Valores não incluem customizações específicas.", 20, 280);
+    
+    doc.save(`proposta-comercial-${usuarios}-usuarios.pdf`);
   };
 
   return (
@@ -207,6 +278,14 @@ export default function EstruturaVendas() {
               <span>Know-how e Propriedade Intelectual</span>
               <span className="font-bold">R$ {custos.valorKnowHow.toLocaleString('pt-BR')}</span>
             </div>
+            <div className="flex justify-between">
+              <span>Margem de Lucro (150%)</span>
+              <span className="font-bold">R$ {custos.margemLucro.toLocaleString('pt-BR')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Impostos (20%)</span>
+              <span className="font-bold">R$ {custos.impostos.toLocaleString('pt-BR')}</span>
+            </div>
             <Separator />
             <div className="flex justify-between text-lg font-bold">
               <span>Total Implantação</span>
@@ -261,8 +340,8 @@ export default function EstruturaVendas() {
               <span className="font-bold">R$ {custos.custoMensalInfra.toLocaleString('pt-BR')}</span>
             </div>
             <div className="flex justify-between">
-              <span>Suporte e Margem (150%)</span>
-              <span className="font-bold">R$ {(custos.valorMensal - custos.custoMensalInfra).toLocaleString('pt-BR')}</span>
+              <span>Manutenção (20% da Implantação)</span>
+              <span className="font-bold">R$ {custos.valorManutencao.toLocaleString('pt-BR')}</span>
             </div>
             <Separator />
             <div className="flex justify-between text-lg font-bold">
@@ -387,9 +466,9 @@ export default function EstruturaVendas() {
 
       {/* Ações */}
       <div className="flex gap-4">
-        <Button onClick={gerarProposta} className="flex items-center gap-2">
+        <Button onClick={gerarPropostaPDF} className="flex items-center gap-2">
           <Download className="h-4 w-4" />
-          Gerar Proposta Comercial
+          Gerar Proposta PDF
         </Button>
         
         <Button variant="outline" className="flex items-center gap-2">
