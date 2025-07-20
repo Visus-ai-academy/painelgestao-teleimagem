@@ -9,7 +9,8 @@ import {
   Target,
   Award,
   ChevronDown,
-  FileText
+  FileText,
+  Network
 } from "lucide-react";
 
 import { NavLink, useLocation } from "react-router-dom";
@@ -115,6 +116,7 @@ const menuItems: MenuItem[] = [
       { title: "Gerenciar Usuários", url: "/configuracao/usuarios", requiredRoles: ['admin'] },
       { title: "Listas do Sistema", url: "/configuracao/listas", requiredRoles: ['admin'] },
       { title: "Logomarca", url: "/configuracao/logomarca", requiredRoles: ['admin'] },
+      { title: "Arquitetura do Projeto", url: "/arquitetura", requiredRoles: ['admin'] },
     ]
   },
 ];
