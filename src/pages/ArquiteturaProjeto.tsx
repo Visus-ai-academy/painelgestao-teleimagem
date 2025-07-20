@@ -628,29 +628,36 @@ const ArquiteturaProjeto = () => {
     {
       id: 'email-service',
       type: 'default',
-      position: { x: 150, y: 650 },
+      position: { x: 120, y: 650 },
       data: { label: '📧 Email\n(Resend)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'pdf-service',
       type: 'default',
-      position: { x: 300, y: 650 },
+      position: { x: 260, y: 650 },
       data: { label: '📄 PDF\n(jsPDF)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'clicksign',
       type: 'default',
-      position: { x: 450, y: 650 },
+      position: { x: 400, y: 650 },
       data: { label: '✍️ Assinatura\n(ClickSign)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'omie',
       type: 'default',
-      position: { x: 600, y: 650 },
+      position: { x: 540, y: 650 },
       data: { label: '💼 ERP\n(Omie)' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+    },
+    {
+      id: 'mobilemed',
+      type: 'default',
+      position: { x: 680, y: 650 },
+      data: { label: '🏥 Sistema\n(Mobilemed)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     }
   ], []);
@@ -678,11 +685,13 @@ const ArquiteturaProjeto = () => {
     { id: 'int-pdf', source: 'integrations', target: 'pdf-service', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'int-click', source: 'integrations', target: 'clicksign', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'int-omie', source: 'integrations', target: 'omie', type: 'smoothstep', style: { stroke: '#a855f7' } },
+    { id: 'int-mobilemed', source: 'integrations', target: 'mobilemed', type: 'smoothstep', style: { stroke: '#a855f7' } },
 
     // Direct connections
     { id: 'pages-auth', source: 'pages', target: 'auth-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
     { id: 'pages-db', source: 'pages', target: 'database-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
     { id: 'edge-email', source: 'edge-functions', target: 'email-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
+    { id: 'mobilemed-volumetria', source: 'mobilemed', target: 'database-service', type: 'smoothstep', style: { stroke: '#10b981', strokeDasharray: '10,5' }, label: 'Dados Volumetria' },
   ], []);
 
   // 4. FLUXOS DE PROCESSO PRINCIPAIS
@@ -994,7 +1003,7 @@ const ArquiteturaProjeto = () => {
         <TabsContent value="architecture" className="flex-1 relative m-0">
           <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
             <p className="text-sm text-muted-foreground">
-              <strong>🏗️ Arquitetura Técnica:</strong> Camadas Frontend (React), Backend (Supabase), e Integrações Externas (Email, PDF, ClickSign, Omie) com conexões diretas
+              <strong>🏗️ Arquitetura Técnica:</strong> Camadas Frontend (React), Backend (Supabase), e Integrações Externas (Email, PDF, ClickSign, Omie, Mobilemed) com conexões diretas
             </p>
           </div>
           <ReactFlow
