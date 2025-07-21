@@ -152,8 +152,8 @@ serve(async (req) => {
       const telefone = clienteData.telefone || null;
       const endereco = clienteData.endereco || null;
       const cnpj = clienteData.cnpj || null;
-      // Corrigido: buscar pelo campo mapeado, não pelo source field
-      const status = clienteData.ativo || 'A'; // Padrão: Ativo
+      // Corrigido: buscar pelo campo mapeado Status
+      const status = clienteData.Status || 'A'; // Padrão: Ativo
       
       if (index < 3) {
         console.log(`Campos extraídos - Nome: "${nome}", Email: "${email}", Status: "${status}"`)
@@ -163,11 +163,11 @@ serve(async (req) => {
       let ativo = true; // Padrão
       
       // Se o campo foi mapeado como boolean direto
-      if (typeof clienteData.ativo === 'boolean') {
-        ativo = clienteData.ativo;
-      } else if (typeof clienteData.ativo === 'string') {
+      if (typeof clienteData.Status === 'boolean') {
+        ativo = clienteData.Status;
+      } else if (typeof clienteData.Status === 'string') {
         // Se veio como string, processar
-        const statusStr = String(clienteData.ativo).toUpperCase();
+        const statusStr = String(clienteData.Status).toUpperCase();
         if (statusStr === 'I' || statusStr === 'C' || statusStr === 'INATIVO' || statusStr === 'FALSE') {
           ativo = false;
         } else if (statusStr === 'A' || statusStr === 'ATIVO' || statusStr === 'TRUE') {
