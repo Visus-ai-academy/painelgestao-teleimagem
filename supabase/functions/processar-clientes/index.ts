@@ -105,16 +105,30 @@ serve(async (req) => {
     const clientes = jsonData.map((row: any, index: number) => {
       const clienteData: any = {}
       
+      // LOG DETALHADO DOS DADOS BRUTOS
+      if (index < 3) {
+        console.log(`=== LINHA ${index} RAW ===`)
+        console.log('Dados brutos da linha:', JSON.stringify(row, null, 2))
+        console.log('Campos disponíveis:', Object.keys(row))
+      }
+      
       // Processar cada campo do arquivo usando os mapeamentos
       Object.keys(row).forEach(sourceField => {
         const targetField = sourceToTargetMap[sourceField]
         if (targetField) {
           clienteData[targetField] = row[sourceField]
+          if (index < 3) {
+            console.log(`Mapeamento: "${sourceField}" -> "${targetField}" = "${row[sourceField]}"`)
+          }
+        } else {
+          if (index < 3) {
+            console.log(`Campo não mapeado: "${sourceField}" = "${row[sourceField]}"`)
+          }
         }
       })
       
       if (index < 3) {
-        console.log(`Cliente ${index} mapeado:`, JSON.stringify(clienteData, null, 2))
+        console.log(`Cliente ${index} após mapeamento:`, JSON.stringify(clienteData, null, 2))
       }
       
       // Campos obrigatórios mapeados dinamicamente
@@ -125,6 +139,10 @@ serve(async (req) => {
       const cnpj = clienteData.cnpj || null;
       const status = clienteData.Status || 'A'; // Padrão: Ativo
       
+      if (index < 3) {
+        console.log(`Campos extraídos - Nome: "${nome}", Email: "${email}", Status: "${status}"`)
+      }
+      
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
       let ativo = true; // Padrão
       if (status === 'I' || status === 'C') {
@@ -133,7 +151,7 @@ serve(async (req) => {
         ativo = true;
       }
       
-      return {
+      const clienteFinal = {
         nome: String(nome).trim(),
         email: String(email).trim(),
         telefone: telefone,
@@ -145,8 +163,14 @@ serve(async (req) => {
         data_termino_vigencia: clienteData.data_termino_vigencia || null,
         ativo: ativo
       };
+      
+      if (index < 3) {
+        console.log(`Cliente ${index} FINAL:`, JSON.stringify(clienteFinal, null, 2))
+      }
+      
+      return clienteFinal;
     }).filter((cliente, index) => {
-      const valido = cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
+      const valido = cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined' && cliente.nome.toLowerCase() !== 'null'
       if (index < 5) {
         console.log(`Cliente ${index} válido: ${valido}, nome: "${cliente.nome}"`)
       }
