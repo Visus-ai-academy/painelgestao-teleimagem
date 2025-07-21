@@ -91,37 +91,25 @@ export function FileUpload({
     setState(prev => ({ ...prev, isUploading: true, status: 'uploading', progress: 30 }));
 
     try {
-      // 1. Upload do arquivo
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${timestamp}_${state.file.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filename, state.file);
+      setState(prev => ({ ...prev, progress: 50, message: 'Processando arquivo...' }));
 
-      if (uploadError) throw uploadError;
-      
-      setState(prev => ({ ...prev, progress: 60 }));
-
-      // 2. Processar arquivo com detecção automática de template
-      const { data, error } = await supabase.functions.invoke('processar-importacao-inteligente', {
-        body: { filename }
-      });
-
-      if (error) throw error;
+      // Usar a função onUpload passada pelo componente pai
+      if (onUpload) {
+        await onUpload(state.file);
+      }
 
       setState(prev => ({
         ...prev,
         isUploading: false,
         progress: 100,
         status: 'success',
-        message: data.message || 'Upload concluído com sucesso!',
-        details: data.details
+        message: 'Upload concluído com sucesso!',
+        details: null
       }));
 
       toast({
         title: "Upload realizado",
-        description: data.message || "Arquivo enviado e processado com sucesso!",
+        description: "Arquivo enviado e processado com sucesso!",
       });
 
     } catch (error) {
