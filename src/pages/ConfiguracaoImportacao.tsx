@@ -207,6 +207,36 @@ export default function ConfiguracaoImportacao() {
     }
   };
 
+  const syncTemplate = async () => {
+    if (!selectedTemplate || !selectedFileType) {
+      toast.error('Selecione um template e tipo de arquivo')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('sincronizar-template', {
+        body: {
+          templateName: selectedTemplate,
+          fileType: selectedFileType
+        }
+      })
+
+      if (error) throw error
+
+      if (data?.success) {
+        toast.success(`Template sincronizado! Arquivo: ${data.fileName}`)
+      } else {
+        throw new Error(data?.error || 'Erro desconhecido')
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar template:', error)
+      toast.error('Erro ao sincronizar template')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const openEditDialog = (mapping?: FieldMapping) => {
     if (mapping) {
       setEditingMapping(mapping);
@@ -296,6 +326,15 @@ export default function ConfiguracaoImportacao() {
                     </SelectContent>
                   </Select>
                 </div>
+                <Button
+                  onClick={syncTemplate}
+                  disabled={!selectedTemplate || !selectedFileType || loading}
+                  className="mt-6"
+                  variant="outline"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Sincronizar Template
+                </Button>
                 <Button onClick={() => openEditDialog()} className="mt-6">
                   <Plus className="w-4 h-4 mr-2" />
                   Novo Mapeamento
