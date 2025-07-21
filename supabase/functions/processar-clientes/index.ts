@@ -77,6 +77,15 @@ serve(async (req) => {
     const clientes = jsonData.map((row: any) => {
       const nome = row['Cliente (Nome Fantasia)'] || '';
       const email = row['e-mail'] || '';
+      const status = row['Status'] || 'A'; // Padrão: Ativo
+      
+      // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
+      let ativo = true; // Padrão
+      if (status === 'I' || status === 'C') {
+        ativo = false;
+      } else if (status === 'A') {
+        ativo = true;
+      }
       
       return {
         nome: String(nome).trim(),
@@ -84,7 +93,7 @@ serve(async (req) => {
         telefone: row['contato'] || null,
         endereco: row['endereco'] || null,
         cnpj: row['CNPJ/CPF'] || null,
-        ativo: true
+        ativo: ativo
       };
     })
 
