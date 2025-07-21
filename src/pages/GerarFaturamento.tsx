@@ -767,51 +767,43 @@ export default function GerarFaturamento() {
   // Função combinada que executa as duas etapas sequencialmente
   const handleProcessarTodosClientes = async () => {
     try {
-      // Primeira etapa: gerar todos os relatórios
+      // Primeira etapa: SEMPRE gerar todos os relatórios para clientes ativos
+      console.log('🚀 Iniciando geração de relatórios para todos os clientes ativos...');
       await handleGerarTodosRelatorios();
       
       // Aguardar um momento para UI atualizar
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Segunda etapa: usar um callback para obter o estado atualizado
-      setResultados(resultadosAtuais => {
-        const clientesParaEmail = resultadosAtuais.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
-        
-        console.log('Estado completo dos resultados:', resultadosAtuais.map(r => ({
-          nome: r.clienteNome,
-          relatorioGerado: r.relatorioGerado,
-          emailEnviado: r.emailEnviado,
-          erro: r.erro,
-          temDadosRelatorio: !!r.relatorioData
-        })));
-        
-        console.log('Clientes disponíveis para email após geração:', clientesParaEmail.map(c => c.clienteNome));
-        
-        // Executar envio de emails de forma assíncrona
-        if (clientesParaEmail.length > 0) {
-          handleEnviarEmailsInterno(clientesParaEmail).catch(error => {
-            console.error('Erro no envio de emails:', error);
-          });
-        } else {
-          // Verificar se todos têm relatórios mas com erro
-          const todosComRelatorio = resultadosAtuais.filter(r => r.relatorioGerado);
-          if (todosComRelatorio.length > 0) {
-            toast({
-              title: "Relatórios Gerados, mas Emails Não Enviados", 
-              description: "Todos os relatórios foram gerados, mas houve problemas para identificar clientes válidos para envio. Tente usar o botão 'Enviar Emails' separadamente.",
-              variant: "destructive",
+      // Segunda etapa: enviar emails APENAS se a opção estiver habilitada
+      if (enviarEmails) {
+        console.log('📧 Opção de envio de emails habilitada - enviando automaticamente...');
+        setResultados(resultadosAtuais => {
+          const clientesParaEmail = resultadosAtuais.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+          
+          console.log('Clientes disponíveis para email após geração:', clientesParaEmail.map(c => c.clienteNome));
+          
+          // Executar envio de emails de forma assíncrona apenas se houver clientes válidos
+          if (clientesParaEmail.length > 0) {
+            handleEnviarEmailsInterno(clientesParaEmail).catch(error => {
+              console.error('Erro no envio de emails:', error);
             });
           } else {
             toast({
-              title: "Nenhum Relatório Válido",
-              description: "Não foi possível gerar relatórios válidos para envio de emails.",
+              title: "Relatórios Gerados, mas Nenhum Email Enviado", 
+              description: "Todos os relatórios foram gerados, mas não há clientes válidos para envio de email.",
               variant: "destructive",
             });
           }
-        }
-        
-        return resultadosAtuais; // Retornar o estado sem alterações
-      });
+          
+          return resultadosAtuais; // Retornar o estado sem alterações
+        });
+      } else {
+        console.log('📧 Opção de envio de emails desabilitada - apenas relatórios gerados');
+        toast({
+          title: "Relatórios Gerados", 
+          description: `Relatórios gerados com sucesso! Envio de emails está desabilitado. Use o botão 'Enviar Emails' se desejar enviar.`,
+        });
+      }
       
     } catch (error: any) {
       console.error("Erro no processamento automático:", error);
@@ -1041,103 +1033,175 @@ export default function GerarFaturamento() {
             </Card>
           )}
 
-          {/* Botão Principal no Topo */}
+          {/* Processo Separado: Gerar Relatórios e Enviar Emails */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="text-center space-y-4">
-                <div>
-                  <h2 className="text-xl font-semibold">Gerar Relatórios PDF</h2>
-                  <p className="text-muted-foreground">Gera automaticamente relatórios PDF com layout completo (logomarca + resumo financeiro + detalhamento) para todos os clientes ativos e envia por email</p>
-                  {clientesCarregados.length > 0 && (
-                    <p className="text-sm text-blue-600 mt-2">
-                      ✅ {clientesCarregados.length} clientes carregados na base de dados
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Send className="h-5 w-5" />
+                Gerar Relatórios de Faturamento
+              </CardTitle>
+              <CardDescription>
+                Primeiro gere relatórios para todos os clientes ativos, depois envie emails se necessário - {PERIODO_ATUAL}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Controle de envio de emails */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enviar-emails"
+                    checked={enviarEmails}
+                    onCheckedChange={setEnviarEmails}
+                  />
+                  <Label htmlFor="enviar-emails" className="text-sm font-medium">
+                    Enviar emails após gerar relatórios (apenas quando usar "Fazer Tudo")
+                  </Label>
+                </div>
+                <p className="text-xs text-blue-700 mt-2">
+                  {enviarEmails 
+                    ? '✅ Emails serão enviados automaticamente quando usar "Fazer Tudo"' 
+                    : '🚫 Emails NÃO serão enviados automaticamente. Use "Enviar Emails" separadamente.'}
+                </p>
+              </div>
+
+              {/* Status atual */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded">
+                  <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
+                  <div className="text-sm text-blue-700">Clientes Ativos</div>
+                </div>
+                <div className="text-center p-3 bg-green-50 border border-green-200 rounded">
+                  <div className="text-2xl font-bold text-green-900">{relatoriosGerados}</div>
+                  <div className="text-sm text-green-700">Relatórios Gerados</div>
+                </div>
+                <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded">
+                  <div className="text-2xl font-bold text-orange-900">{emailsEnviados}</div>
+                  <div className="text-sm text-orange-700">Emails Enviados</div>
+                </div>
+                <div className="text-center p-3 bg-gray-50 border border-gray-200 rounded">
+                  <div className="text-2xl font-bold text-gray-900">{resultados.filter(r => r.erro).length}</div>
+                  <div className="text-sm text-gray-700">Erros</div>
+                </div>
+              </div>
+
+              {/* Botões de ação separados por etapas */}
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Etapa 1: Gerar Relatórios para Todos os Clientes Ativos
+                  </h4>
+                  <div className="flex flex-col sm:flex-row gap-3 items-center">
+                    <Button 
+                      onClick={handleGerarTodosRelatorios}
+                      disabled={processandoTodos || clientesCarregados.length === 0}
+                      size="lg"
+                      className="min-w-[250px] bg-green-600 hover:bg-green-700"
+                    >
+                      {processandoTodos ? (
+                        <>
+                          <Clock className="h-5 w-5 mr-2 animate-spin" />
+                          Gerando Relatórios...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-5 w-5 mr-2" />
+                          Gerar Relatórios ({clientesCarregados.length} clientes)
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-green-700">
+                      Gera relatórios PDF para todos os clientes ativos
                     </p>
-                  )}
+                  </div>
                 </div>
                 
-                <div className="flex justify-center gap-4 flex-wrap">
-                  <Button 
-                    onClick={handleGerarTodosRelatorios}
-                    disabled={processandoTodos || clientesCarregados.length === 0}
-                    size="lg"
-                    className="min-w-[180px]"
-                  >
-                    {processandoTodos ? (
-                      <>
-                        <Clock className="h-5 w-5 mr-2 animate-spin" />
-                        Gerando PDF para Todos...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-5 w-5 mr-2" />
-                        Gerar Relatórios PDF ({clientesCarregados.length} clientes)
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button 
-                    onClick={handleEnviarEmails}
-                    disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length === 0}
-                    size="lg"
-                    className="min-w-[180px]"
-                    variant="secondary"
-                  >
-                    {processandoTodos ? (
-                      <>
-                        <Clock className="h-5 w-5 mr-2 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-5 w-5 mr-2" />
-                        Enviar Emails
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => {
-                      handleCarregarRelatoriosProntos();
-                      setTimeout(() => handleEnviarEmails(), 2000);
-                    }}
-                    disabled={processandoTodos || relatoriosProntos.length === 0}
-                    size="lg"
-                    className="min-w-[200px]"
-                    variant="outline"
-                  >
-                    {processandoTodos ? (
-                      <>
-                        <Clock className="h-5 w-5 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-5 w-5 mr-2" />
-                        Fazer Tudo (Automático)
-                      </>
-                    )}
-                  </Button>
-                  
-                  
-                  <Button 
-                    variant="outline"
-                    onClick={recarregarClientes}
-                    disabled={processandoTodos}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Recarregar Clientes
-                  </Button>
-                  
-                  <Button 
-                    variant="outline"
-                    onClick={limparResultados}
-                    disabled={processandoTodos}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Limpar
-                  </Button>
-                  
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Etapa 2: Enviar Emails (Opcional)
+                  </h4>
+                  <div className="flex flex-col sm:flex-row gap-3 items-center">
+                    <Button 
+                      onClick={handleEnviarEmails}
+                      disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length === 0}
+                      size="lg"
+                      className="min-w-[250px]"
+                      variant="outline"
+                    >
+                      {processandoTodos ? (
+                        <>
+                          <Clock className="h-5 w-5 mr-2 animate-spin" />
+                          Enviando Emails...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-5 w-5 mr-2" />
+                          Enviar Emails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length} prontos)
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-blue-700">
+                      Envia relatórios por email apenas para clientes com PDFs gerados
+                    </p>
+                  </div>
                 </div>
+                
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Processo Automático (Etapas 1 + 2)
+                  </h4>
+                  <div className="flex flex-col sm:flex-row gap-3 items-center">
+                    <Button 
+                      onClick={handleProcessarTodosClientes}
+                      disabled={processandoTodos || clientesCarregados.length === 0}
+                      size="lg"
+                      className="min-w-[250px] bg-purple-600 hover:bg-purple-700"
+                    >
+                      {processandoTodos ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-5 w-5 mr-2" />
+                          Fazer Tudo ({enviarEmails ? 'Gerar + Enviar' : 'Apenas Gerar'})
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-purple-700">
+                      {enviarEmails 
+                        ? 'Gera relatórios e envia emails automaticamente' 
+                        : 'Gera apenas relatórios (emails desabilitados)'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+                  
+              
+              {/* Botões utilitários */}
+              <div className="flex flex-wrap gap-2 justify-center pt-4 border-t">
+                <Button 
+                  variant="outline"
+                  onClick={recarregarClientes}
+                  disabled={processandoTodos}
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Recarregar Clientes
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  onClick={limparResultados}
+                  disabled={processandoTodos}
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Limpar Resultados
+                </Button>
               </div>
             </CardContent>
           </Card>
