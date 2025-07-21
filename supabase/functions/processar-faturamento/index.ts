@@ -106,17 +106,40 @@ serve(async (req) => {
       
       if (!row || row.length === 0) continue // Pular linhas vazias
       
+      // Função auxiliar para converter datas
+      const parseDate = (value: any): string => {
+        if (!value) return new Date().toISOString().split('T')[0]
+        
+        // Se é um número do Excel (dias desde 1900)
+        if (typeof value === 'number' && value > 0) {
+          const excelEpoch = new Date(1900, 0, 1)
+          const date = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000)
+          return date.toISOString().split('T')[0]
+        }
+        
+        // Se é string, tentar converter
+        if (typeof value === 'string') {
+          const date = new Date(value)
+          if (!isNaN(date.getTime())) {
+            return date.toISOString().split('T')[0]
+          }
+        }
+        
+        // Fallback para data atual
+        return new Date().toISOString().split('T')[0]
+      }
+      
       // Mapear campos baseado no template CSV de faturamento
       const registro = {
-        omie_id: row[0] || `GEN_${Date.now()}_${i}`, // ID único se não fornecido
-        numero_fatura: row[1] || `NF_${Date.now()}_${i}`,
-        cliente_nome: row[2] || 'Cliente Não Informado',
-        cliente_email: row[3] || null,
-        data_emissao: row[4] ? new Date(row[4]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        data_vencimento: row[5] ? new Date(row[5]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        data_pagamento: row[6] ? new Date(row[6]).toISOString().split('T')[0] : null,
+        omie_id: row[0] ? String(row[0]) : `GEN_${Date.now()}_${i}`,
+        numero_fatura: row[1] ? String(row[1]) : `NF_${Date.now()}_${i}`,
+        cliente_nome: row[2] ? String(row[2]) : 'Cliente Não Informado',
+        cliente_email: row[3] ? String(row[3]) : null,
+        data_emissao: parseDate(row[4]),
+        data_vencimento: parseDate(row[5]),
+        data_pagamento: row[6] ? parseDate(row[6]) : null,
         valor: parseFloat(row[7]) || 0,
-        status: row[8] || 'em_aberto'
+        status: row[8] ? String(row[8]) : 'em_aberto'
       }
       
       dadosFaturamento.push(registro)
