@@ -35,6 +35,7 @@ import Colaboradores from "./pages/Colaboradores";
 import TreinamentoEquipe from "./pages/TreinamentoEquipe";
 import ContratosClientes from "./pages/ContratosClientes";
 import ContratosFornecedores from "./pages/ContratosFornecedores";
+import CadastroClientes from "./pages/CadastroClientes";
 import GerenciarListas from "./pages/GerenciarListas";
 import EstruturaVendas from "./pages/EstruturaVendas";
 import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
@@ -209,6 +210,15 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <TreinamentoEquipe />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/clientes/cadastro" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <CadastroClientes />
+                  </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
             } />

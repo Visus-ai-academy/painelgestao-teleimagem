@@ -97,14 +97,20 @@ const menuItems: MenuItem[] = [
     ]
   },
   { 
-    title: "Contratos", 
-    url: "/contratos", 
-    icon: FileText,
+    title: "Clientes", 
+    url: "/clientes", 
+    icon: Users2,
     requiredRoles: ['manager', 'admin'],
     subItems: [
+      { title: "Cadastro de Clientes", url: "/clientes/cadastro", requiredRoles: ['manager', 'admin'] },
       { title: "Contratos Clientes", url: "/contratos/clientes", requiredRoles: ['manager', 'admin'] },
-      { title: "Contratos Fornecedores", url: "/contratos/fornecedores", requiredRoles: ['admin'] },
     ]
+  },
+  { 
+    title: "Contratos Fornecedores", 
+    url: "/contratos/fornecedores", 
+    icon: FileText,
+    requiredRoles: ['admin'],
   },
   { 
     title: "Configuração", 
@@ -161,7 +167,8 @@ export function AppSidebar() {
       'operacional': ['admin', 'manager'],
       'financeiro': ['admin', 'manager'],
       'people': ['admin', 'manager'],
-      'contratos': ['admin', 'manager'],
+      'clientes': ['admin', 'manager'],
+      'contratos-fornecedores': ['admin'],
       'configuracao': ['admin'],
       'volumetria': ['admin', 'manager', 'user'],
     };
