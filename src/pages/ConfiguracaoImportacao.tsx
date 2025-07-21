@@ -83,6 +83,81 @@ export default function ConfiguracaoImportacao() {
     { value: "phone", label: "Telefone" }
   ];
 
+  // Função para gerar template Excel dinamicamente
+  const generateExcelTemplate = async (templateType: string) => {
+    try {
+      // Buscar os mapeamentos do template para gerar os cabeçalhos corretos
+      const { data: mappings, error } = await supabase
+        .from('field_mappings')
+        .select('source_field, target_field, field_type, is_required')
+        .eq('file_type', templateType)
+        .eq('active', true)
+        .order('order_index');
+
+      if (error) throw error;
+
+      if (!mappings || mappings.length === 0) {
+        toast.error(`Nenhum mapeamento encontrado para ${templateType}`);
+        return;
+      }
+
+      // Criar dados para o Excel
+      const headers = mappings.map(m => m.source_field);
+      const exampleRow = mappings.map(m => {
+        switch (m.field_type) {
+          case 'cnpj':
+            return '12.345.678/0001-90';
+          case 'cpf':
+            return '123.456.789-00';
+          case 'email':
+            return 'exemplo@email.com';
+          case 'phone':
+            return '(11) 99999-9999';
+          case 'date':
+            return '2024-01-15';
+          case 'number':
+            return '100';
+          case 'boolean':
+            return 'true';
+          default:
+            return 'Exemplo';
+        }
+      });
+
+      // Criar workbook e worksheet
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      const wsData = [headers, exampleRow];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Adicionar comentários nos cabeçalhos com informações do tipo
+      mappings.forEach((mapping, index) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: index });
+        if (!ws[cellRef]) ws[cellRef] = { v: mapping.source_field };
+        
+        ws[cellRef].c = [{
+          a: 'sistema',
+          t: `Tipo: ${mapping.field_type}${mapping.is_required ? ' (Obrigatório)' : ' (Opcional)'}\nMapeia para: ${mapping.target_field}`
+        }];
+      });
+
+      // Ajustar largura das colunas
+      const colWidths = headers.map(header => ({ wch: Math.max(header.length, 15) }));
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Template');
+      
+      // Gerar e baixar o arquivo
+      const fileName = `template_${templateType}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast.success(`Template Excel gerado: ${fileName}`);
+    } catch (error) {
+      console.error('Erro ao gerar template Excel:', error);
+      toast.error('Erro ao gerar template Excel');
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -357,115 +432,181 @@ export default function ConfiguracaoImportacao() {
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Clientes</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para importação de dados de clientes
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_clientes.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_clientes.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('clientes')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
 
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Exames</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para importação de dados de exames
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_exames.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_exames.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('exames')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
 
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Faturamento</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para importação de dados de faturamento
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_faturamento.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_faturamento.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('faturamento')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
 
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Contratos</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para importação de dados de contratos
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_contratos.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_contratos.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('contratos')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
 
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Faturas</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para importação de dados de faturas
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_faturas.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_faturas.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('faturas')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
 
             <Card className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-medium">Faturamento Dados</h3>
-                <span className="text-xs text-muted-foreground">CSV</span>
+                <span className="text-xs text-muted-foreground">CSV / Excel</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Template para dados detalhados de faturamento
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => window.open('/templates/template_faturamento_dados.csv', '_blank')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => window.open('/templates/template_faturamento_dados.csv', '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => generateExcelTemplate('faturamento_dados')}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             </Card>
           </div>
         </CardContent>
