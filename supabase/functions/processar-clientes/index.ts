@@ -92,37 +92,28 @@ serve(async (req) => {
 
     console.log('Mapa source->target:', JSON.stringify(sourceToTargetMap, null, 2))
 
-    // Map data using dynamic field mappings automatically
-    const clientes = jsonData.map((row: any) => {
-      const clienteData: any = {}
-      
-      // Processar cada campo do arquivo usando os mapeamentos
-      Object.keys(row).forEach(sourceField => {
-        const targetField = sourceToTargetMap[sourceField]
-        if (targetField) {
-          clienteData[targetField] = row[sourceField]
-        }
-      })
-      
-      console.log('Exemplo de clienteData:', Object.keys(clienteData).length > 0 ? Object.keys(clienteData) : 'vazio')
-      
-      // Campos obrigatórios mapeados dinamicamente
-      const nome = clienteData.nome || '';
-      const email = clienteData['e-mail'] || clienteData.email || '';
-      const telefone = clienteData.contato || clienteData.telefone || null;
-      const endereco = clienteData.endereco || null;
-      const cnpj = clienteData.cnpj || null;
-      const status = clienteData.Status || 'A'; // Padrão: Ativo
-      
-      // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
-      let ativo = true; // Padrão
-      if (status === 'I' || status === 'C') {
-        ativo = false;
-      } else if (status === 'A') {
-        ativo = true;
+    // Versão simplificada para debug - usar campos diretos do arquivo
+    console.log('=== PROCESSAMENTO SIMPLIFICADO ===')
+    const clientes = jsonData.map((row: any, index: number) => {
+      if (index < 3) {
+        console.log(`Linha ${index}:`, JSON.stringify(row, null, 2))
       }
       
-      return {
+      // Usar nomes diretos dos campos do arquivo
+      const nome = row['Cliente (Nome Fantasia)'] || '';
+      const email = row['e-mail'] || '';
+      const telefone = row['contato'] || null;
+      const endereco = row['endereco'] || null;
+      const cnpj = row['CNPJ/CPF'] || null;
+      const status = row['Status'] || 'A';
+      
+      // Transform status codes
+      let ativo = true;
+      if (status === 'I' || status === 'C') {
+        ativo = false;
+      }
+      
+      const cliente = {
         nome: String(nome).trim(),
         email: String(email).trim(),
         telefone: telefone,
@@ -130,6 +121,12 @@ serve(async (req) => {
         cnpj: cnpj,
         ativo: ativo
       };
+      
+      if (index < 3) {
+        console.log(`Cliente ${index} processado:`, JSON.stringify(cliente, null, 2))
+      }
+      
+      return cliente;
     })
 
     console.log('Total de clientes mapeados:', clientes.length)
