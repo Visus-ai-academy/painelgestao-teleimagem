@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.51.0'
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,39 +71,69 @@ serve(async (req) => {
 
     console.log('5. Arquivo baixado, tamanho:', fileData.size)
 
-    // Por enquanto, vamos inserir apenas dados de teste para verificar se o problema é na leitura do Excel
-    // Usando o período atual (2025-01) no número da fatura para que o frontend encontre os dados
-    const periodoAtual = '2025-01';
-    const dadosTeste = [
-      {
-        omie_id: `TEST_${Date.now()}_1`,
-        numero_fatura: `NF_${periodoAtual}_TEST_1`,
-        cliente_nome: 'Cliente Teste 1',
-        cliente_email: 'teste1@email.com',
-        data_emissao: new Date().toISOString().split('T')[0],
-        data_vencimento: new Date().toISOString().split('T')[0],
-        data_pagamento: null,
-        valor: 100.00,
-        status: 'em_aberto'
-      },
-      {
-        omie_id: `TEST_${Date.now()}_2`,
-        numero_fatura: `NF_${periodoAtual}_TEST_2`,
-        cliente_nome: 'Cliente Teste 2',
-        cliente_email: 'teste2@email.com',
-        data_emissao: new Date().toISOString().split('T')[0],
-        data_vencimento: new Date().toISOString().split('T')[0],
-        data_pagamento: null,
-        valor: 200.00,
-        status: 'em_aberto'
+    // Processar arquivo Excel
+    console.log('6. Processando arquivo Excel...')
+    
+    // Converter o arquivo para buffer
+    const arrayBuffer = await fileData.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    
+    // Ler arquivo Excel
+    const workbook = XLSX.read(uint8Array, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    
+    // Converter para JSON
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+    
+    console.log('7. Dados extraídos do Excel:', jsonData.length, 'linhas')
+    
+    if (jsonData.length < 2) {
+      throw new Error('Arquivo Excel vazio ou sem dados')
+    }
+
+    // Primeira linha são os cabeçalhos
+    const headers = jsonData[0] as string[]
+    const dataRows = jsonData.slice(1)
+    
+    console.log('8. Cabeçalhos encontrados:', headers)
+    
+    // Mapear dados para o formato da tabela faturamento
+    const dadosFaturamento = []
+    
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i] as any[]
+      
+      if (!row || row.length === 0) continue // Pular linhas vazias
+      
+      // Mapear campos baseado no template CSV de faturamento
+      const registro = {
+        omie_id: row[0] || `GEN_${Date.now()}_${i}`, // ID único se não fornecido
+        numero_fatura: row[1] || `NF_${Date.now()}_${i}`,
+        cliente_nome: row[2] || 'Cliente Não Informado',
+        cliente_email: row[3] || null,
+        data_emissao: row[4] ? new Date(row[4]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        data_vencimento: row[5] ? new Date(row[5]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        data_pagamento: row[6] ? new Date(row[6]).toISOString().split('T')[0] : null,
+        valor: parseFloat(row[7]) || 0,
+        status: row[8] || 'em_aberto'
       }
-    ];
+      
+      dadosFaturamento.push(registro)
+    }
+    
+    console.log('9. Dados mapeados:', dadosFaturamento.length, 'registros')
+    
+    if (dadosFaturamento.length === 0) {
+      throw new Error('Nenhum dado válido encontrado no arquivo')
+    }
 
-    console.log('6. Inserindo dados de teste...')
-
+    // Inserir dados no banco
+    console.log('10. Inserindo dados no banco...')
+    
     const { data: insertData, error: insertError } = await supabase
       .from('faturamento')
-      .insert(dadosTeste)
+      .insert(dadosFaturamento)
       .select()
 
     if (insertError) {
@@ -110,9 +141,7 @@ serve(async (req) => {
       throw new Error('Erro ao inserir faturamento: ' + insertError.message)
     }
 
-    console.log('6.1 Dados inseridos:', insertData?.length || 0, 'registros')
-
-    console.log('7. Dados inseridos com sucesso')
+    console.log('11. Dados inseridos:', insertData?.length || 0, 'registros')
 
     // Atualizar log de sucesso
     if (logData?.id) {
@@ -120,18 +149,18 @@ serve(async (req) => {
         .from('upload_logs')
         .update({
           status: 'completed',
-          records_processed: dadosTeste.length
+          records_processed: dadosFaturamento.length
         })
         .eq('id', logData.id)
     }
 
-    console.log('8. Processamento concluído com sucesso')
+    console.log('12. Processamento concluído com sucesso')
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Arquivo processado com sucesso (modo teste)',
-      recordsProcessed: dadosTeste.length,
-      note: 'Usando dados de teste temporariamente'
+      message: 'Arquivo processado com sucesso',
+      recordsProcessed: dadosFaturamento.length,
+      sampleData: dadosFaturamento.slice(0, 3) // Primeiros 3 registros como amostra
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
