@@ -152,10 +152,6 @@ export default function GerarFaturamento() {
     };
   }>>([]);
   
-  // Estados para geração de relatório individual
-  const [clienteSelecionadoRelatorio, setClienteSelecionadoRelatorio] = useState('');
-  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
-  
   const { toast } = useToast();
 
   // Carregar clientes da base de dados (inicialização)
@@ -827,71 +823,6 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função para gerar relatório individual
-  const handleGerarRelatorioIndividual = async () => {
-    if (!clienteSelecionadoRelatorio) {
-      toast({
-        title: "Cliente Necessário",
-        description: "Selecione um cliente para gerar o relatório",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setGerandoRelatorio(true);
-
-    try {
-      // Buscar dados do cliente selecionado
-      const clienteSelecionado = clientesCarregados.find(c => c.id === clienteSelecionadoRelatorio);
-      
-      if (!clienteSelecionado) {
-        throw new Error("Cliente não encontrado");
-      }
-
-      toast({
-        title: "Iniciando Geração",
-        description: `Gerando relatório para ${clienteSelecionado.nome}...`,
-      });
-
-      // Chamar edge function para gerar relatório
-      const { data: relatorioData, error: relatorioError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
-        body: {
-          cliente_id: clienteSelecionadoRelatorio,
-          periodo: PERIODO_ATUAL // formato: "2025-01"
-        }
-      });
-
-      if (relatorioError) {
-        throw new Error(`Erro ao gerar relatório: ${relatorioError.message}`);
-      }
-
-      if (!relatorioData?.success) {
-        throw new Error(relatorioData?.details || 'Erro desconhecido na geração do relatório');
-      }
-
-      // Abrir PDF em nova aba
-      if (relatorioData.arquivos && relatorioData.arquivos.length > 0) {
-        const pdfUrl = relatorioData.arquivos[0].url;
-        window.open(pdfUrl, '_blank');
-      }
-
-      toast({
-        title: "Relatório Gerado",
-        description: `PDF gerado com sucesso para ${clienteSelecionado.nome}! Total: ${relatorioData.resumo?.total_laudos || 0} laudos, Valor: R$ ${relatorioData.resumo?.valor_total?.toFixed(2) || '0,00'}`,
-      });
-
-    } catch (error: any) {
-      console.error('Erro ao gerar relatório individual:', error);
-      toast({
-        title: "Erro na Geração",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setGerandoRelatorio(false);
-    }
-  };
-
   const limparResultados = () => {
     // ✅ Limpar completamente a lista e contadores
     setResultados([]);
@@ -1115,8 +1046,8 @@ export default function GerarFaturamento() {
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Processar Faturamento - {PERIODO_ATUAL}</h2>
-                  <p className="text-muted-foreground">Gera relatórios e envia por email para todos os clientes</p>
+                  <h2 className="text-xl font-semibold">Gerar Relatórios PDF - {PERIODO_ATUAL}</h2>
+                  <p className="text-muted-foreground">Gera automaticamente relatórios PDF com layout completo (logomarca + resumo financeiro + detalhamento) para todos os clientes ativos e envia por email</p>
                   {clientesCarregados.length > 0 && (
                     <p className="text-sm text-blue-600 mt-2">
                       ✅ {clientesCarregados.length} clientes carregados na base de dados
@@ -1126,20 +1057,20 @@ export default function GerarFaturamento() {
                 
                 <div className="flex justify-center gap-4 flex-wrap">
                   <Button 
-                    onClick={handleCarregarRelatoriosProntos}
-                    disabled={processandoTodos || relatoriosProntos.length === 0}
+                    onClick={handleGerarTodosRelatorios}
+                    disabled={processandoTodos || clientesCarregados.length === 0}
                     size="lg"
                     className="min-w-[180px]"
                   >
                     {processandoTodos ? (
                       <>
                         <Clock className="h-5 w-5 mr-2 animate-spin" />
-                        Preparando...
+                        Gerando PDF para Todos...
                       </>
                     ) : (
                       <>
                         <FileText className="h-5 w-5 mr-2" />
-                        Gerar Relatórios ({relatoriosProntos.length})
+                        Gerar Relatórios PDF ({clientesCarregados.length} clientes)
                       </>
                     )}
                   </Button>
@@ -1806,60 +1737,18 @@ export default function GerarFaturamento() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Gerar Relatório PDF
-                </CardTitle>
-                <CardDescription>
-                  Gerar relatório individual para teste com layout completo (logomarca, título, resumo financeiro e detalhamento)
-                </CardDescription>
+                <CardTitle>Configuração do Sistema</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">Layout do Relatório:</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Logomarca Teleimagem</li>
-                    <li>• Título: Demonstrativo de Faturamento</li>
-                    <li>• Quadro 1: Resumo Financeiro (totais, impostos)</li>
-                    <li>• Quadro 2: Detalhamento dos Exames (tabela completa)</li>
-                  </ul>
+                <div className="space-y-2">
+                  <Label>Status da Conexão:</Label>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">Conectado ao Supabase</span>
+                  </div>
                 </div>
-
-                <div className="space-y-3">
-                  <Label>Selecionar Cliente para Relatório</Label>
-                  <select 
-                    className="w-full p-2 border rounded-md"
-                    value={clienteSelecionadoRelatorio}
-                    onChange={(e) => setClienteSelecionadoRelatorio(e.target.value)}
-                  >
-                    <option value="">Selecione um cliente...</option>
-                    {clientesCarregados.map(cliente => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <Button 
-                  onClick={handleGerarRelatorioIndividual}
-                  disabled={!clienteSelecionadoRelatorio || gerandoRelatorio}
-                  className="w-full"
-                >
-                  {gerandoRelatorio ? (
-                    <>
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                      Gerando PDF...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Gerar Relatório PDF
-                    </>
-                  )}
-                </Button>
-
-                <div className="space-y-2 mt-6">
+                
+                <div className="space-y-2">
                   <Label>Edge Functions:</Label>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -1876,6 +1765,11 @@ export default function GerarFaturamento() {
                     </div>
                   </div>
                 </div>
+
+                <Button className="w-full">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Abrir Painel Supabase
+                </Button>
               </CardContent>
             </Card>
           </div>
