@@ -121,6 +121,12 @@ const menuItems: MenuItem[] = [
       { title: "Arquitetura do Projeto", url: "/arquitetura", requiredRoles: ['admin'] },
     ]
   },
+  { 
+    title: "Relatório de Implementações", 
+    url: "/relatorio-implementacoes", 
+    icon: FileText,
+    requiredRoles: ['admin'],
+  },
 ];
 
 export function AppSidebar() {

@@ -23,6 +23,8 @@ import ReguaCobranca from "./pages/ReguaCobranca";
 import PagamentosMedicos from "./pages/PagamentosMedicos";
 import ConfiguracaoFaturamento from "./pages/ConfiguracaoFaturamento";
 import ConfiguracaoLogomarca from "./pages/ConfiguracaoLogomarca";
+import ArquiteturaProjeto from "./pages/ArquiteturaProjeto";
+import RelatorioImplementacoes from "./pages/RelatorioImplementacoes";
 import GerenciarUsuarios from "./pages/GerenciarUsuarios";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
@@ -36,7 +38,6 @@ import ContratosFornecedores from "./pages/ContratosFornecedores";
 import GerenciarListas from "./pages/GerenciarListas";
 import EstruturaVendas from "./pages/EstruturaVendas";
 import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
-import ArquiteturaProjeto from "./pages/ArquiteturaProjeto";
 import Seguranca from "./pages/Seguranca";
 import NotFound from "./pages/NotFound";
 
@@ -298,6 +299,13 @@ const App = () => {
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <Seguranca />
                   </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/relatorio-implementacoes" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RelatorioImplementacoes />
                 </Layout>
               </ProtectedRoute>
             } />
