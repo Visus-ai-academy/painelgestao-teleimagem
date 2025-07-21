@@ -144,14 +144,14 @@ export async function processClientesFile(file: File) {
     await uploadFile(file, 'uploads', fileName)
     console.log('Upload concluído, chamando edge function...')
 
-    const { data, error } = await supabase.functions.invoke('processar-clientes', {
+    const { data, error } = await supabase.functions.invoke('processar-importacao-inteligente', {
       body: { fileName }
     })
 
-    console.log('Resposta da edge function processar-clientes:', { data, error })
+    console.log('Resposta da edge function processar-importacao-inteligente:', { data, error })
 
     if (error) {
-      console.error('Erro da edge function processar-clientes:', error)
+      console.error('Erro da edge function processar-importacao-inteligente:', error)
       throw new Error(`Erro ao processar clientes: ${error.message}`)
     }
 

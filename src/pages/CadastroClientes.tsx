@@ -245,7 +245,7 @@ export default function CadastroClientes() {
 
               // 2. Chamar edge function para processar
               const { data, error: processError } = await supabase.functions
-                .invoke('processar-clientes', {
+                .invoke('processar-importacao-inteligente', {
                   body: { fileName }
                 });
 
