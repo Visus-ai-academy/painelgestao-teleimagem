@@ -78,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: dadosFaturamento, error: faturamentoError } = await supabase
       .from('faturamento')
       .select('*')
-      .eq('nome', cliente.nome)
+      .eq('cliente_nome', cliente.nome)
       .gte('data_emissao', data_inicio)
       .lte('data_emissao', data_fim)
       .order('data_emissao', { ascending: true });
