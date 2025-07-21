@@ -233,15 +233,31 @@ export default function CadastroClientes() {
           ]}
           onUpload={async (file: File) => {
             try {
-              // Aqui será implementada a lógica de upload via edge function
-              console.log('Arquivo selecionado:', file.name);
-              // Simular processamento
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              // 1. Upload do arquivo para o storage
+              const fileName = `${Date.now()}-${file.name}`;
               
-              toast({
-                title: "Upload realizado com sucesso!",
-                description: "Os clientes foram processados.",
-              });
+              const { error: uploadError } = await supabase.storage
+                .from('uploads')
+                .upload(fileName, file);
+
+              if (uploadError) throw uploadError;
+
+              // 2. Chamar edge function para processar
+              const { data, error: processError } = await supabase.functions
+                .invoke('processar-clientes', {
+                  body: { fileName }
+                });
+
+              if (processError) throw processError;
+
+              if (data.success) {
+                toast({
+                  title: "Upload realizado com sucesso!",
+                  description: `${data.registros_processados} clientes foram processados.`,
+                });
+              } else {
+                throw new Error(data.error || 'Erro no processamento');
+              }
               
               // Recarregar lista de clientes
               carregarClientes();
