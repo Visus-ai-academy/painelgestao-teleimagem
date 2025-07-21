@@ -341,6 +341,135 @@ export default function ConfiguracaoImportacao() {
         </CardContent>
       </Card>
 
+      {/* Seção de Downloads de Templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            Download de Templates CSV
+          </CardTitle>
+          <CardDescription>
+            Baixe os templates CSV para preenchimento e importação de dados
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Clientes</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para importação de dados de clientes
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_clientes.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Exames</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para importação de dados de exames
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_exames.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Faturamento</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para importação de dados de faturamento
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_faturamento.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Contratos</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para importação de dados de contratos
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_contratos.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Faturas</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para importação de dados de faturas
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_faturas.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Faturamento Dados</h3>
+                <span className="text-xs text-muted-foreground">CSV</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Template para dados detalhados de faturamento
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => window.open('/templates/template_faturamento_dados.csv', '_blank')}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="mappings" className="space-y-6">
         <TabsList>
