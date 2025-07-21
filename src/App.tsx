@@ -40,7 +40,6 @@ import GerenciarListas from "./pages/GerenciarListas";
 import EstruturaVendas from "./pages/EstruturaVendas";
 import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
 import Seguranca from "./pages/Seguranca";
-import MapeamentoCampos from "./pages/MapeamentoCampos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -309,15 +308,6 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <Seguranca />
-                  </RoleProtectedRoute>
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/mapeamento-campos" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['admin']}>
-                    <MapeamentoCampos />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
