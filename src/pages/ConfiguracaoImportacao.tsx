@@ -76,7 +76,11 @@ export default function ConfiguracaoImportacao() {
     { value: "text", label: "Texto" },
     { value: "number", label: "Número" },
     { value: "date", label: "Data" },
-    { value: "boolean", label: "Booleano" }
+    { value: "boolean", label: "Booleano" },
+    { value: "cnpj", label: "CNPJ" },
+    { value: "cpf", label: "CPF" },
+    { value: "email", label: "Email" },
+    { value: "phone", label: "Telefone" }
   ];
 
   useEffect(() => {
