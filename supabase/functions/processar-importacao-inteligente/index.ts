@@ -268,6 +268,13 @@ serve(async (req) => {
           for (let i = 0; i < processedData.length; i += batchSize) {
             const batch = processedData.slice(i, i + batchSize)
             
+            // Para clientes, adicionar o campo status baseado no campo ativo
+            if (targetTable === 'clientes') {
+              batch.forEach(cliente => {
+                cliente.status = cliente.ativo ? 'Ativo' : 'Inativo'
+              })
+            }
+            
             const { error: insertError } = await supabaseClient
               .from(targetTable)
               .insert(batch)

@@ -161,8 +161,9 @@ export default function GerarFaturamento() {
       
       const { data, error } = await supabase
         .from('clientes')
-        .select('id, nome, email, ativo')
-        .eq('ativo', true);
+        .select('id, nome, email, ativo, status')
+        .eq('ativo', true)
+        .eq('status', 'Ativo');
 
       console.log('🔍 Resultado da consulta clientes:', { data, error, count: data?.length });
 
@@ -214,8 +215,9 @@ export default function GerarFaturamento() {
     try {
       const { data, error } = await supabase
         .from('clientes')
-        .select('id, nome, email')
+        .select('id, nome, email, status')
         .eq('ativo', true)
+        .eq('status', 'Ativo')
         .not('email', 'is', null);
 
       if (error) throw error;

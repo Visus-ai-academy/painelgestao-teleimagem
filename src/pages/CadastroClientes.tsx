@@ -25,6 +25,7 @@ interface Cliente {
   data_inicio_contrato?: string;
   data_termino_vigencia?: string;
   ativo: boolean;
+  status: string;
 }
 
 export default function CadastroClientes() {
@@ -43,7 +44,8 @@ export default function CadastroClientes() {
     cod_cliente: "",
     data_inicio_contrato: "",
     data_termino_vigencia: "",
-    ativo: true
+    ativo: true,
+    status: "Ativo"
   });
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -94,7 +96,7 @@ export default function CadastroClientes() {
     try {
       const { error } = await supabase
         .from('clientes')
-        .insert([clienteData]);
+        .insert([{...clienteData, status: clienteData.ativo ? 'Ativo' : 'Inativo'}]);
 
       if (error) throw error;
 
@@ -113,7 +115,8 @@ export default function CadastroClientes() {
         cod_cliente: "",
         data_inicio_contrato: "",
         data_termino_vigencia: "",
-        ativo: true
+        ativo: true,
+        status: "Ativo"
       });
       
       carregarClientes();
@@ -137,7 +140,8 @@ export default function CadastroClientes() {
       cod_cliente: cliente.cod_cliente || "",
       data_inicio_contrato: cliente.data_inicio_contrato || "",
       data_termino_vigencia: cliente.data_termino_vigencia || "",
-      ativo: cliente.ativo
+      ativo: cliente.ativo,
+      status: cliente.status || (cliente.ativo ? "Ativo" : "Inativo")
     });
     setShowEditarCliente(true);
   };
@@ -172,9 +176,13 @@ export default function CadastroClientes() {
 
   const handleInativarCliente = async (cliente: Cliente) => {
     try {
+      const novoStatus = cliente.ativo ? 'Inativo' : 'Ativo';
       const { error } = await supabase
         .from('clientes')
-        .update({ ativo: !cliente.ativo })
+        .update({ 
+          ativo: !cliente.ativo,
+          status: novoStatus
+        })
         .eq('id', cliente.id);
 
       if (error) throw error;
