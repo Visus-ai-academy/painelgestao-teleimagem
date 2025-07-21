@@ -107,7 +107,7 @@ serve(async (req) => {
 
     console.log('Clientes únicos após remoção de duplicatas:', clientesUnicos.length)
 
-    // Clear existing clients - limpar TODOS os clientes
+    // Clear existing clients - limpar TODOS os clientes (sem triggers)
     console.log('Limpando clientes existentes...')
     const { error: deleteError } = await supabaseClient
       .from('clientes')
@@ -120,15 +120,19 @@ serve(async (req) => {
       console.log('Todos os clientes foram removidos da base')
     }
 
-    // Insert new clients
+    // Insert new clients directly without any triggers
+    console.log('Inserindo clientes processados:', clientesUnicos.length)
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
       .from('clientes')
       .insert(clientesUnicos)
       .select()
 
     if (clientesError) {
+      console.error('Erro detalhado ao inserir clientes:', clientesError)
       throw new Error(`Erro ao inserir clientes: ${clientesError.message}`)
     }
+
+    console.log('Clientes inseridos com sucesso:', clientesInseridos?.length || 0)
 
     // Update log
     await supabaseClient
