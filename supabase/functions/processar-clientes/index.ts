@@ -174,10 +174,26 @@ serve(async (req) => {
       
       return clienteFinal;
     }).filter((cliente, index) => {
-      const valido = cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined' && cliente.nome.toLowerCase() !== 'null'
-      if (index < 5) {
-        console.log(`Cliente ${index} válido: ${valido}, nome: "${cliente.nome}"`)
-      }
+      console.log(`=== VALIDAÇÃO CLIENTE ${index} ===`)
+      console.log('Cliente completo:', JSON.stringify(cliente, null, 2))
+      console.log('Nome do cliente:', `"${cliente.nome}"`)
+      console.log('Tipo do nome:', typeof cliente.nome)
+      console.log('Tamanho do nome:', cliente.nome ? cliente.nome.length : 'undefined')
+      
+      const nomeExiste = cliente.nome && cliente.nome !== undefined
+      const nomeNaoVazio = cliente.nome && cliente.nome.trim() !== ''
+      const nomeNaoUndefined = cliente.nome !== 'undefined'
+      const nomeNaoNull = cliente.nome && cliente.nome.toLowerCase() !== 'null'
+      
+      console.log('Verificações:')
+      console.log('- Nome existe:', nomeExiste)
+      console.log('- Nome não vazio:', nomeNaoVazio)
+      console.log('- Nome não "undefined":', nomeNaoUndefined)
+      console.log('- Nome não "null":', nomeNaoNull)
+      
+      const valido = nomeExiste && nomeNaoVazio && nomeNaoUndefined && nomeNaoNull
+      console.log(`RESULTADO: Cliente ${index} é válido: ${valido}`)
+      
       return valido
     })
 
