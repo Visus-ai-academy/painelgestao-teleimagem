@@ -161,7 +161,10 @@ export default function CadastroClientes() {
     try {
       const { error } = await supabase
         .from('clientes')
-        .update(clienteData)
+        .update({
+          ...clienteData,
+          status: clienteData.ativo ? 'Ativo' : 'Inativo'
+        })
         .eq('id', clienteEditando.id);
 
       if (error) throw error;
@@ -627,7 +630,11 @@ export default function CadastroClientes() {
                     <TableCell>
                       <Badge 
                         variant={cliente.ativo ? "default" : "destructive"}
-                        className={cliente.ativo ? "" : "bg-red-100 text-red-800 border-red-300"}
+                        className={
+                          cliente.ativo 
+                            ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200" 
+                            : "bg-red-100 text-red-800 border-red-300 hover:bg-red-200"
+                        }
                       >
                         {cliente.status || (cliente.ativo ? "Ativo" : "Inativo")}
                       </Badge>
