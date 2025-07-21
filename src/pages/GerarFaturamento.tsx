@@ -1046,7 +1046,7 @@ export default function GerarFaturamento() {
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Gerar Relatórios PDF - {PERIODO_ATUAL}</h2>
+                  <h2 className="text-xl font-semibold">Gerar Relatórios PDF</h2>
                   <p className="text-muted-foreground">Gera automaticamente relatórios PDF com layout completo (logomarca + resumo financeiro + detalhamento) para todos os clientes ativos e envia por email</p>
                   {clientesCarregados.length > 0 && (
                     <p className="text-sm text-blue-600 mt-2">
@@ -1118,26 +1118,6 @@ export default function GerarFaturamento() {
                     )}
                   </Button>
                   
-                  <Button 
-                    variant="outline"
-                    onClick={async () => {
-                      console.log('🔍 Debug - Verificando tabela clientes...');
-                      const { data, error, count } = await supabase
-                        .from('clientes')
-                        .select('*', { count: 'exact' });
-                      
-                      console.log('📊 Debug - Todos os clientes na tabela:', { data, error, count });
-                      
-                      toast({
-                        title: "Debug - Clientes na Tabela",
-                        description: `Total: ${count || 0} registros encontrados. Veja console para detalhes.`,
-                      });
-                    }}
-                    disabled={processandoTodos}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Debug - Ver Tabela
-                  </Button>
                   
                   <Button 
                     variant="outline"
@@ -1699,81 +1679,6 @@ export default function GerarFaturamento() {
            </div>
         </TabsContent>
 
-        <TabsContent value="database" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Status das Tabelas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">exames_realizados</p>
-                      <p className="text-sm text-muted-foreground">Exames processados</p>
-                    </div>
-                    <Badge variant="default">Ativo</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">contratos_clientes</p>
-                      <p className="text-sm text-muted-foreground">Regras de faturamento</p>
-                    </div>
-                    <Badge variant="default">Ativo</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">faturas_geradas</p>
-                      <p className="text-sm text-muted-foreground">Histórico de faturas</p>
-                    </div>
-                    <Badge variant="default">Ativo</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuração do Sistema</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Status da Conexão:</Label>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm">Conectado ao Supabase</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Edge Functions:</Label>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>gerar-relatorio-faturamento</span>
-                      <Badge variant="default">Ativo</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>enviar-relatorio-email</span>
-                      <Badge variant="default">Ativo</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>processar-faturamento</span>
-                      <Badge variant="default">Ativo</Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <Button className="w-full">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Painel Supabase
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
       </Tabs>
     </div>
   );
