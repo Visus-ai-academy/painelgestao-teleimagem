@@ -1,0 +1,1 @@
+DELETE FROM clientes WHERE id = '42e840a1-1734-4b55-b3db-b473cdc59e73';
