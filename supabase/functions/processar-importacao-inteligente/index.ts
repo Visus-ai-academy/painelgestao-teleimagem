@@ -179,41 +179,57 @@ serve(async (req) => {
               value = mapping.default_value
             }
             
-            // Validar campo obrigatório
-            if (mapping.is_required && (!value || value === '')) {
-              throw new Error(`Campo obrigatório '${mapping.source_field}' está vazio na linha ${i + 1}`)
+            // Tratar valores undefined ou vazios
+            if (value === undefined || value === null || value === '' || value === 'undefined') {
+              if (mapping.is_required) {
+                throw new Error(`Campo obrigatório '${mapping.source_field}' está vazio na linha ${i + 1}`)
+              } else {
+                // Para campos não obrigatórios, deixar null em vez de "undefined"
+                processedRow[mapping.target_field] = null
+                return
+              }
             }
             
             // Converter tipo de dados
-            if (value !== null && value !== '') {
-              switch (mapping.field_type) {
-                case 'number':
-                  const numValue = typeof value === 'string' ? 
-                    parseFloat(value.replace(/[^\d.-]/g, '')) : value
-                  processedRow[mapping.target_field] = isNaN(numValue) ? null : numValue
-                  break
-                  
-                case 'date':
-                  if (typeof value === 'number') {
-                    // Excel serial date
-                    const date = new Date((value - 25569) * 86400 * 1000)
-                    processedRow[mapping.target_field] = date.toISOString().split('T')[0]
-                  } else if (typeof value === 'string') {
-                    const parsedDate = new Date(value)
-                    processedRow[mapping.target_field] = isNaN(parsedDate.getTime()) ? 
-                      null : parsedDate.toISOString().split('T')[0]
+            switch (mapping.field_type) {
+              case 'number':
+                const numValue = typeof value === 'string' ? 
+                  parseFloat(value.replace(/[^\d.-]/g, '')) : value
+                processedRow[mapping.target_field] = isNaN(numValue) ? null : numValue
+                break
+                
+              case 'date':
+                if (typeof value === 'number') {
+                  // Excel serial date
+                  const date = new Date((value - 25569) * 86400 * 1000)
+                  processedRow[mapping.target_field] = date.toISOString().split('T')[0]
+                } else if (typeof value === 'string') {
+                  const parsedDate = new Date(value)
+                  processedRow[mapping.target_field] = isNaN(parsedDate.getTime()) ? 
+                    null : parsedDate.toISOString().split('T')[0]
+                } else {
+                  processedRow[mapping.target_field] = null
+                }
+                break
+                
+              case 'boolean':
+                processedRow[mapping.target_field] = Boolean(value)
+                break
+                
+              default: // text
+                let stringValue = String(value).trim()
+                
+                // Formatação especial para CNPJ
+                if (mapping.target_field === 'cnpj' && stringValue) {
+                  // Remove qualquer formatação existente
+                  const cleanCnpj = stringValue.replace(/\D/g, '')
+                  // Aplica formatação 00.000.000/0000-00
+                  if (cleanCnpj.length === 14) {
+                    stringValue = cleanCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
                   }
-                  break
-                  
-                case 'boolean':
-                  processedRow[mapping.target_field] = Boolean(value)
-                  break
-                  
-                default: // text
-                  processedRow[mapping.target_field] = String(value).trim()
-              }
-            } else {
-              processedRow[mapping.target_field] = null
+                }
+                
+                processedRow[mapping.target_field] = stringValue
             }
           })
           
