@@ -68,16 +68,40 @@ serve(async (req) => {
     console.log('Primeiras 3 linhas dos dados:', JSON.stringify(jsonData.slice(0, 3), null, 2))
     console.log('Cabeçalhos detectados:', Object.keys(jsonData[0] || {}))
     
+    // Buscar mapeamentos de campo do template
+    const { data: mappings, error: mappingError } = await supabaseClient
+      .from('field_mappings')
+      .select('source_field, target_field')
+      .eq('template_name', 'MobileMed - Clientes')
+      .eq('file_type', 'clientes')
+      .eq('active', true)
+      .order('order_index')
+
+    if (mappingError) {
+      console.log('Erro ao buscar mapeamentos:', mappingError)
+      throw new Error('Erro ao buscar configuração de mapeamento')
+    }
+
+    console.log('Mapeamentos encontrados:', JSON.stringify(mappings, null, 2))
+
+    // Criar mapa de campos
+    const fieldMap: Record<string, string> = {}
+    mappings?.forEach((mapping: any) => {
+      fieldMap[mapping.target_field] = mapping.source_field
+    })
+
+    console.log('Mapa de campos:', JSON.stringify(fieldMap, null, 2))
+
     if (jsonData.length === 0) {
       console.log('ERRO: Arquivo está vazio ou não foi possível extrair dados')
       throw new Error('Arquivo vazio ou formato inválido')
     }
 
-    // Map data using template field names
+    // Map data using dynamic field mappings
     const clientes = jsonData.map((row: any) => {
-      const nome = row['nome'] || '';
-      const email = row['email'] || '';
-      const status = row['Status'] || 'A'; // Padrão: Ativo
+      const nome = row[fieldMap['nome']] || '';
+      const email = row[fieldMap['email']] || '';
+      const status = row['Status'] || row['status'] || 'A'; // Padrão: Ativo
       
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
       let ativo = true; // Padrão
@@ -90,9 +114,9 @@ serve(async (req) => {
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row['telefone'] || null,
-        endereco: row['endereco'] || null,
-        cnpj: row['cnpj'] || null,
+        telefone: row[fieldMap['telefone']] || null,
+        endereco: row[fieldMap['endereco']] || null,
+        cnpj: row[fieldMap['cnpj']] || null,
         ativo: ativo
       };
     })
