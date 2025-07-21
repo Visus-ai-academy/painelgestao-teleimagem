@@ -1,4 +1,4 @@
-nome,email,cnpj,endereco,contato,cod_cliente,data_inicio_contrato,data_termino_vigencia,ativo
-Hospital São Lucas,contato@saolucas.com.br,12.345.678/0001-90,"Rua das Flores, 123 - São Paulo/SP",João Silva,CLI001,2024-01-01,2024-12-31,true
-Clínica Vida Plena,admin@vidaplena.com.br,98.765.432/0001-10,"Av. Paulista, 456 - São Paulo/SP",Maria Santos,CLI002,2024-01-15,2024-12-31,true
-Centro Médico Norte,faturamento@centronorte.com.br,11.222.333/0001-44,"Rua Norte, 789 - São Paulo/SP",Pedro Costa,CLI003,2024-02-01,2024-12-31,true
+Contagem de Cliente (Nome Fantasia),cnpj,email,contato,endereço,Status,data inicio contrato,data termino de vigência,cod cliente
+"Hospital São Lucas",12.345.678/0001-90,contato@saolucas.com.br,"João Silva","Rua das Flores, 123 - São Paulo/SP",A,2024-01-01,2024-12-31,CLI001
+"Clínica Vida Plena",98.765.432/0001-10,admin@vidaplena.com,"Maria Santos","Av. Principal, 456 - Rio de Janeiro/RJ",A,2024-01-01,2024-12-31,CLI002
+"Centro Médico Norte",11.222.333/0001-44,comercial@centronorte.com.br,"Pedro Costa","Rua Norte, 789 - Brasília/DF",I,2024-01-01,2024-12-31,CLI003
