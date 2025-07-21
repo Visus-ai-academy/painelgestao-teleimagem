@@ -100,14 +100,17 @@ serve(async (req) => {
 
     console.log('6. Inserindo dados de teste...')
 
-    const { error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from('faturamento')
       .insert(dadosTeste)
+      .select()
 
     if (insertError) {
-      console.error('Erro ao inserir dados:', insertError)
-      throw new Error('Erro ao inserir dados: ' + insertError.message)
+      console.error('Erro ao inserir dados de faturamento:', insertError)
+      throw new Error('Erro ao inserir faturamento: ' + insertError.message)
     }
+
+    console.log('6.1 Dados inseridos:', insertData?.length || 0, 'registros')
 
     console.log('7. Dados inseridos com sucesso')
 
