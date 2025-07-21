@@ -168,8 +168,12 @@ export type Database = {
         Row: {
           ativo: boolean | null
           cnpj: string | null
+          cod_cliente: string | null
+          contato: string | null
           created_at: string
           created_by: string | null
+          data_inicio_contrato: string | null
+          data_termino_vigencia: string | null
           email: string | null
           endereco: string | null
           id: string
@@ -180,8 +184,12 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           cnpj?: string | null
+          cod_cliente?: string | null
+          contato?: string | null
           created_at?: string
           created_by?: string | null
+          data_inicio_contrato?: string | null
+          data_termino_vigencia?: string | null
           email?: string | null
           endereco?: string | null
           id?: string
@@ -192,8 +200,12 @@ export type Database = {
         Update: {
           ativo?: boolean | null
           cnpj?: string | null
+          cod_cliente?: string | null
+          contato?: string | null
           created_at?: string
           created_by?: string | null
+          data_inicio_contrato?: string | null
+          data_termino_vigencia?: string | null
           email?: string | null
           endereco?: string | null
           id?: string

@@ -139,6 +139,10 @@ serve(async (req) => {
         telefone: telefone,
         endereco: endereco,
         cnpj: cnpj,
+        contato: clienteData.contato || null,
+        cod_cliente: clienteData.cod_cliente || null,
+        data_inicio_contrato: clienteData.data_inicio_contrato || null,
+        data_termino_vigencia: clienteData.data_termino_vigencia || null,
         ativo: ativo
       };
     }).filter((cliente, index) => {
