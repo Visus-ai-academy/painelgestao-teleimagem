@@ -76,9 +76,13 @@ serve(async (req) => {
 
     // Simple mapping - usar campos diretos
     console.log('=== MAPEANDO DADOS ===')
-    const clientes = jsonData.map((row: any) => {
+    const clientes = jsonData.map((row: any, index: number) => {
       const nome = row['Cliente (Nome Fantasia)'] || '';
       const email = row['e-mail'] || '';
+      
+      if (index < 3) {
+        console.log(`Linha ${index} - Nome: "${nome}", Email: "${email}"`)
+      }
       
       return {
         nome: String(nome).trim(),
@@ -88,7 +92,13 @@ serve(async (req) => {
         cnpj: row['CNPJ/CPF'] || null,
         ativo: true
       };
-    }).filter(cliente => cliente.nome && cliente.nome.trim() !== '')
+    }).filter((cliente, index) => {
+      const valido = cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
+      if (index < 5) {
+        console.log(`Cliente ${index} válido: ${valido}, nome: "${cliente.nome}"`)
+      }
+      return valido
+    })
 
     console.log('Clientes válidos:', clientes.length)
     console.log('Primeiro cliente:', JSON.stringify(clientes[0], null, 2))
