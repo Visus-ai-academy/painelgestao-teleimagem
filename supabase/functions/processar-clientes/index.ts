@@ -69,28 +69,77 @@ serve(async (req) => {
 
     console.log('Dados extraídos do Excel:', jsonData.length, 'linhas')
     console.log('Primeira linha de exemplo:', JSON.stringify(jsonData[0], null, 2))
+    console.log('Cabeçalhos disponíveis:', Object.keys(jsonData[0] || {}))
 
     if (jsonData.length === 0) {
       throw new Error('Arquivo vazio')
     }
 
-    // Simple mapping - usar campos diretos
+    // Buscar mapeamentos de campo do template
+    console.log('=== BUSCANDO MAPEAMENTOS ===')
+    const { data: mappings, error: mappingError } = await supabaseClient
+      .from('field_mappings')
+      .select('source_field, target_field')
+      .eq('template_name', 'MobileMed - Clientes')
+      .eq('file_type', 'clientes')
+      .eq('active', true)
+      .order('order_index')
+
+    if (mappingError) {
+      console.log('Erro ao buscar mapeamentos:', mappingError)
+      throw new Error('Erro ao buscar configuração de mapeamento')
+    }
+
+    console.log('Mapeamentos encontrados:', JSON.stringify(mappings, null, 2))
+
+    // Criar mapa de campos automaticamente (source -> target)
+    const sourceToTargetMap: Record<string, string> = {}
+    mappings?.forEach((mapping: any) => {
+      sourceToTargetMap[mapping.source_field] = mapping.target_field
+    })
+
+    console.log('Mapa source->target:', JSON.stringify(sourceToTargetMap, null, 2))
+
+    // Map data using dynamic field mappings automatically
     console.log('=== MAPEANDO DADOS ===')
     const clientes = jsonData.map((row: any, index: number) => {
-      const nome = row['Cliente (Nome Fantasia)'] || '';
-      const email = row['e-mail'] || '';
+      const clienteData: any = {}
+      
+      // Processar cada campo do arquivo usando os mapeamentos
+      Object.keys(row).forEach(sourceField => {
+        const targetField = sourceToTargetMap[sourceField]
+        if (targetField) {
+          clienteData[targetField] = row[sourceField]
+        }
+      })
       
       if (index < 3) {
-        console.log(`Linha ${index} - Nome: "${nome}", Email: "${email}"`)
+        console.log(`Cliente ${index} mapeado:`, JSON.stringify(clienteData, null, 2))
+      }
+      
+      // Campos obrigatórios mapeados dinamicamente
+      const nome = clienteData.nome || '';
+      const email = clienteData.email || '';
+      const telefone = clienteData.telefone || null;
+      const endereco = clienteData.endereco || null;
+      const cnpj = clienteData.cnpj || null;
+      const status = clienteData.Status || 'A'; // Padrão: Ativo
+      
+      // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
+      let ativo = true; // Padrão
+      if (status === 'I' || status === 'C') {
+        ativo = false;
+      } else if (status === 'A') {
+        ativo = true;
       }
       
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row['contato'] || null,
-        endereco: row['endereco'] || null,
-        cnpj: row['CNPJ/CPF'] || null,
-        ativo: true
+        telefone: telefone,
+        endereco: endereco,
+        cnpj: cnpj,
+        ativo: ativo
       };
     }).filter((cliente, index) => {
       const valido = cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
@@ -101,7 +150,9 @@ serve(async (req) => {
     })
 
     console.log('Clientes válidos:', clientes.length)
-    console.log('Primeiro cliente:', JSON.stringify(clientes[0], null, 2))
+    if (clientes.length > 0) {
+      console.log('Primeiro cliente processado:', JSON.stringify(clientes[0], null, 2))
+    }
 
     // Clear existing clients
     console.log('=== LIMPANDO CLIENTES EXISTENTES ===')
