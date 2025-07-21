@@ -191,32 +191,28 @@ export default function GerarFaturamento() {
 
       console.log('📊 Total de clientes ativos encontrados:', data?.length || 0);
 
-      // Filtrar clientes com email válido
-      const clientesComEmail = data?.filter(cliente => 
-        cliente.email && 
-        cliente.email.trim() !== '' && 
-        cliente.email.includes('@')
-      ) || [];
+      // Carregar todos os clientes ativos (removido filtro de email)
+      const clientesAtivos = data || [];
       
-      console.log('Clientes filtrados com email:', clientesComEmail);
+      console.log('Clientes carregados (todos):', clientesAtivos);
       
-      setClientesCarregados(clientesComEmail);
+      setClientesCarregados(clientesAtivos);
       
       // Sempre inicializar resultados quando há clientes
-      if (clientesComEmail.length > 0) {
-        setResultados(clientesComEmail.map(cliente => ({
+      if (clientesAtivos.length > 0) {
+        setResultados(clientesAtivos.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
           relatorioGerado: false,
           emailEnviado: false,
-          emailDestino: cliente.email,
+          emailDestino: cliente.email || '',
         })));
-        console.log('Lista populada com clientes reais:', clientesComEmail.length);
+        console.log('Lista populada com clientes reais:', clientesAtivos.length);
       } else {
         setResultados([]);
       }
       
-      return clientesComEmail;
+      return clientesAtivos;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       setClientesCarregados([]);
@@ -242,15 +238,15 @@ export default function GerarFaturamento() {
 
       if (error) throw error;
 
-      const clientesComEmail = data?.filter(cliente => cliente.email && cliente.email.trim() !== '') || [];
-      setClientesCarregados(clientesComEmail);
+      const clientesAtivos = data || [];
+      setClientesCarregados(clientesAtivos);
       
       toast({
         title: "Clientes atualizados",
-        description: `${clientesComEmail.length} clientes carregados da base`,
+        description: `${clientesAtivos.length} clientes carregados da base`,
       });
       
-      return clientesComEmail;
+      return clientesAtivos;
     } catch (error) {
       console.error('Erro ao recarregar clientes:', error);
       toast({
