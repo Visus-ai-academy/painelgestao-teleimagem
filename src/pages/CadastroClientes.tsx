@@ -370,7 +370,7 @@ export default function CadastroClientes() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nome">Nome*</Label>
+                <Label htmlFor="nome" className="text-sm font-semibold text-foreground">Nome*</Label>
                 <Input
                   id="nome"
                   value={clienteData.nome}
@@ -380,7 +380,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="email">Email*</Label>
+                <Label htmlFor="email" className="text-sm font-semibold text-foreground">Email*</Label>
                 <Input
                   id="email"
                   type="email"
@@ -391,7 +391,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="cnpj">CNPJ</Label>
+                <Label htmlFor="cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
                 <Input
                   id="cnpj"
                   value={clienteData.cnpj}
@@ -401,7 +401,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="cod_cliente">Código Cliente</Label>
+                <Label htmlFor="cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
                 <Input
                   id="cod_cliente"
                   value={clienteData.cod_cliente}
@@ -411,7 +411,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contato">Contato</Label>
+                <Label htmlFor="contato" className="text-sm font-semibold text-foreground">Contato</Label>
                 <Input
                   id="contato"
                   value={clienteData.contato}
@@ -421,7 +421,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="data_inicio">Data Início Contrato</Label>
+                <Label htmlFor="data_inicio" className="text-sm font-semibold text-foreground">Data Início Contrato</Label>
                 <Input
                   id="data_inicio"
                   type="date"
@@ -431,7 +431,7 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="data_fim">Data Término Vigência</Label>
+                <Label htmlFor="data_fim" className="text-sm font-semibold text-foreground">Data Término Vigência</Label>
                 <Input
                   id="data_fim"
                   type="date"
@@ -446,12 +446,12 @@ export default function CadastroClientes() {
                   checked={clienteData.ativo}
                   onCheckedChange={(checked) => handleInputChange("ativo", checked)}
                 />
-                <Label htmlFor="ativo">Cliente Ativo</Label>
+                <Label htmlFor="ativo" className="text-sm font-semibold text-foreground">Cliente Ativo</Label>
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="endereco">Endereço</Label>
+              <Label htmlFor="endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
               <Textarea
                 id="endereco"
                 value={clienteData.endereco}
@@ -688,7 +688,7 @@ export default function CadastroClientes() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-nome">Nome*</Label>
+                  <Label htmlFor="edit-nome" className="text-sm font-semibold text-foreground">Nome*</Label>
                   <Input
                     id="edit-nome"
                     value={clienteData.nome}
@@ -698,7 +698,7 @@ export default function CadastroClientes() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-email">Email*</Label>
+                  <Label htmlFor="edit-email" className="text-sm font-semibold text-foreground">Email*</Label>
                   <Input
                     id="edit-email"
                     type="email"
@@ -709,7 +709,7 @@ export default function CadastroClientes() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-cnpj">CNPJ</Label>
+                  <Label htmlFor="edit-cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
                   <Input
                     id="edit-cnpj"
                     value={clienteData.cnpj}
@@ -719,7 +719,7 @@ export default function CadastroClientes() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-cod_cliente">Código Cliente</Label>
+                  <Label htmlFor="edit-cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
                   <Input
                     id="edit-cod_cliente"
                     value={clienteData.cod_cliente}
@@ -734,7 +734,7 @@ export default function CadastroClientes() {
                     checked={clienteData.ativo}
                     onCheckedChange={(checked) => handleInputChange("ativo", checked)}
                   />
-                  <Label htmlFor="edit-ativo">Cliente Ativo</Label>
+                  <Label htmlFor="edit-ativo" className="text-sm font-semibold text-foreground">Cliente Ativo</Label>
                 </div>
               </div>
               
