@@ -205,61 +205,6 @@ export default function CadastroClientes() {
         </div>
       </div>
 
-      {/* Upload de Clientes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload de Clientes
-          </CardTitle>
-          <CardDescription>
-            Faça upload de uma planilha com os dados dos clientes. Os clientes existentes não serão excluídos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FileUpload 
-            title="Upload de Clientes"
-            description="Selecione um arquivo CSV ou Excel com os dados dos clientes"
-            acceptedTypes={['.csv', '.xlsx', '.xls']}
-            maxSizeInMB={10}
-            expectedFormat={[
-              'Nome do cliente',
-              'Email do cliente',
-              'CNPJ (opcional)',
-              'Endereço (opcional)',
-              'Contato (opcional)',
-              'Código cliente (opcional)',
-              'Data início contrato (opcional)',
-              'Data término vigência (opcional)',
-              'Status ativo (opcional)'
-            ]}
-            onUpload={async (file: File) => {
-              try {
-                // Aqui será implementada a lógica de upload via edge function
-                console.log('Arquivo selecionado:', file.name);
-                // Simular processamento
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                toast({
-                  title: "Upload realizado com sucesso!",
-                  description: "Os clientes foram processados.",
-                });
-                
-                // Recarregar lista de clientes
-                carregarClientes();
-              } catch (error: any) {
-                toast({
-                  title: "Erro no upload",
-                  description: error.message,
-                  variant: "destructive"
-                });
-              }
-            }}
-            icon={<Upload className="h-5 w-5" />}
-          />
-        </CardContent>
-      </Card>
-
       {/* Ações e Cadastro Manual */}
       <div className="flex gap-4">
         <Button 
@@ -269,6 +214,48 @@ export default function CadastroClientes() {
           <Plus className="h-4 w-4" />
           Novo Cliente
         </Button>
+        
+        <FileUpload 
+          title="Upload de Clientes"
+          description="Selecione um arquivo CSV ou Excel com os dados dos clientes"
+          acceptedTypes={['.csv', '.xlsx', '.xls']}
+          maxSizeInMB={10}
+          expectedFormat={[
+            'Nome do cliente',
+            'Email do cliente',
+            'CNPJ (opcional)',
+            'Endereço (opcional)',
+            'Contato (opcional)',
+            'Código cliente (opcional)',
+            'Data início contrato (opcional)',
+            'Data término vigência (opcional)',
+            'Status ativo (opcional)'
+          ]}
+          onUpload={async (file: File) => {
+            try {
+              // Aqui será implementada a lógica de upload via edge function
+              console.log('Arquivo selecionado:', file.name);
+              // Simular processamento
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              toast({
+                title: "Upload realizado com sucesso!",
+                description: "Os clientes foram processados.",
+              });
+              
+              // Recarregar lista de clientes
+              carregarClientes();
+            } catch (error: any) {
+              toast({
+                title: "Erro no upload",
+                description: error.message,
+                variant: "destructive"
+              });
+            }
+          }}
+          icon={<Upload className="h-5 w-5" />}
+          variant="button"
+        />
       </div>
 
       {/* Formulário de Novo Cliente */}

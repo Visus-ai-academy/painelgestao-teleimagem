@@ -15,6 +15,7 @@ interface FileUploadProps {
   expectedFormat: string[];
   onUpload: (file: File) => Promise<void>;
   icon?: React.ReactNode;
+  variant?: 'card' | 'button';
 }
 
 interface UploadState {
@@ -33,7 +34,8 @@ export function FileUpload({
   maxSizeInMB,
   expectedFormat,
   onUpload,
-  icon
+  icon,
+  variant = 'card'
 }: FileUploadProps) {
   const [state, setState] = useState<UploadState>({
     file: null,
@@ -138,6 +140,81 @@ export function FileUpload({
     });
   }, []);
 
+  const handleButtonClick = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = acceptedTypes.join(',');
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleFileSelect(file);
+        setState(prev => ({ ...prev, file, status: 'idle' }));
+        
+        // Fazer upload automaticamente para a variante button
+        if (variant === 'button') {
+          try {
+            setState(prev => ({ ...prev, isUploading: true, status: 'uploading', progress: 30 }));
+            setState(prev => ({ ...prev, progress: 50, message: 'Processando arquivo...' }));
+            
+            await onUpload(file);
+            
+            setState(prev => ({
+              ...prev,
+              isUploading: false,
+              progress: 100,
+              status: 'success',
+              message: 'Upload concluído com sucesso!',
+              details: null,
+              file: null // Limpar arquivo após sucesso na variante button
+            }));
+
+            toast({
+              title: "Upload realizado",
+              description: "Arquivo enviado e processado com sucesso!",
+            });
+          } catch (error) {
+            setState(prev => ({
+              ...prev,
+              isUploading: false,
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Erro no upload',
+              file: null // Limpar arquivo após erro na variante button
+            }));
+
+            toast({
+              title: "Erro no upload",
+              description: error instanceof Error ? error.message : "Erro desconhecido",
+              variant: "destructive"
+            });
+          }
+        }
+      }
+    };
+    input.click();
+  }, [acceptedTypes, onUpload, variant, handleFileSelect, toast]);
+
+  if (variant === 'button') {
+    return (
+      <Button 
+        onClick={handleButtonClick}
+        disabled={state.isUploading}
+        className="flex items-center gap-2"
+      >
+        {state.isUploading ? (
+          <>
+            <Upload className="h-4 w-4 animate-spin" />
+            Enviando...
+          </>
+        ) : (
+          <>
+            {icon || <Upload className="h-4 w-4" />}
+            {title}
+          </>
+        )}
+      </Button>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -225,7 +302,7 @@ export function FileUpload({
 
             {state.status === 'error' && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-800">{state.message}</p>
+                <p className="text-sm text-red-808">{state.message}</p>
               </div>
             )}
 
