@@ -28,8 +28,10 @@ serve(async (req) => {
       }
     )
 
+    console.log('=== DEBUGGER PROCESSAR CLIENTES ===')
     const { fileName } = await req.json()
-    console.log('Processando arquivo:', fileName)
+    console.log('Arquivo recebido:', fileName)
+    console.log('Tipo de arquivo:', typeof fileName)
 
     // Create log
     const { data: logData, error: logError } = await supabaseClient
