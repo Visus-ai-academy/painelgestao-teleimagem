@@ -72,8 +72,12 @@ serve(async (req) => {
     console.log('Cabeçalhos disponíveis:', Object.keys(jsonData[0] || {}))
 
     if (jsonData.length === 0) {
+      console.log('ERRO: Arquivo está vazio - nenhuma linha encontrada')
       throw new Error('Arquivo vazio')
     }
+    
+    console.log('VERIFICAÇÃO: Total de linhas no arquivo:', jsonData.length)
+    console.log('VERIFICAÇÃO: Primeira linha (cabeçalhos?):', JSON.stringify(jsonData[0], null, 2))
 
     // Buscar mapeamentos de campo do template
     console.log('=== BUSCANDO MAPEAMENTOS ===')
