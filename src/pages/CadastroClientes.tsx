@@ -10,6 +10,7 @@ import { Users, Upload, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -449,13 +450,32 @@ export default function CadastroClientes() {
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant={cliente.ativo ? "destructive" : "default"}
-                          onClick={() => handleInativarCliente(cliente)}
-                        >
-                          {cliente.ativo ? "Inativar" : "Ativar"}
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant={cliente.ativo ? "destructive" : "default"}
+                              className="h-8 px-2 text-xs"
+                            >
+                              {cliente.ativo ? "Inativar" : "Ativar"}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar {cliente.ativo ? "Inativação" : "Ativação"}</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja {cliente.ativo ? "inativar" : "ativar"} o cliente "{cliente.nome}"?
+                                {cliente.ativo && " Esta ação pode afetar contratos e faturamentos ativos."}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleInativarCliente(cliente)}>
+                                Confirmar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
