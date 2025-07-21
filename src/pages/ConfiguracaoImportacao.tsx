@@ -84,7 +84,7 @@ export default function ConfiguracaoImportacao() {
     if (selectedTemplate) {
       loadFieldMappings(selectedTemplate);
     }
-  }, [selectedTemplate]);
+  }, [selectedTemplate, selectedFileType]);
 
   const loadData = async () => {
     try {
@@ -131,6 +131,7 @@ export default function ConfiguracaoImportacao() {
         .from("field_mappings")
         .select("*")
         .eq("template_name", templateName)
+        .eq("file_type", selectedFileType)
         .eq("active", true)
         .order("order_index");
 
