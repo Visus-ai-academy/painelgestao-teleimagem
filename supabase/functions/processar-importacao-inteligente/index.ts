@@ -219,15 +219,24 @@ serve(async (req) => {
               default: // text
                  let stringValue = String(value).trim()
                  
-                 // Formatação especial para CNPJ
-                 if (mapping.target_field === 'cnpj' && stringValue) {
-                   // Remove qualquer formatação existente
-                   const cleanCnpj = stringValue.replace(/\D/g, '')
-                   // Aplica formatação 00.000.000/0000-00
-                   if (cleanCnpj.length === 14) {
-                     stringValue = cleanCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-                   }
-                 }
+                  // Formatação especial para CNPJ
+                  if (mapping.target_field === 'cnpj' && stringValue) {
+                    // Remove qualquer formatação existente (pontos, barras, hífens, espaços)
+                    const cleanCnpj = stringValue.replace(/[^\d]/g, '')
+                    
+                    // Se tem 14 dígitos, aplica formatação 00.000.000/0000-00
+                    if (cleanCnpj.length === 14) {
+                      stringValue = cleanCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+                    } else if (cleanCnpj.length > 0) {
+                      // Se não tem 14 dígitos mas tem algum número, usar como está (dados incompletos)
+                      stringValue = cleanCnpj
+                    } else {
+                      // Se não tem números, manter string original
+                      stringValue = stringValue
+                    }
+                    
+                    console.log(`CNPJ processado: original="${value}" -> limpo="${cleanCnpj}" -> formatado="${stringValue}"`)
+                  }
                  
                  // Tratamento especial para campo Status (A=Ativo, I=Inativo)
                  if (mapping.source_field?.toLowerCase().includes('status')) {

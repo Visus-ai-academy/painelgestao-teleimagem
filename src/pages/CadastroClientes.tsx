@@ -580,21 +580,21 @@ export default function CadastroClientes() {
                   <TableHead>
                     <Button
                       variant="ghost"
-                      onClick={() => handleOrdenacao('email')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Email
-                      {renderIconeOrdenacao('email')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
                       onClick={() => handleOrdenacao('cnpj')}
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                     >
                       CNPJ
                       {renderIconeOrdenacao('cnpj')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleOrdenacao('email')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Email
+                      {renderIconeOrdenacao('email')}
                     </Button>
                   </TableHead>
                   <TableHead>
@@ -624,8 +624,8 @@ export default function CadastroClientes() {
                 {clientesFiltrados.map((cliente) => (
                   <TableRow key={cliente.id}>
                     <TableCell className="font-medium">{cliente.nome}</TableCell>
-                    <TableCell>{cliente.email}</TableCell>
                     <TableCell>{cliente.cnpj}</TableCell>
+                    <TableCell>{cliente.email}</TableCell>
                     <TableCell>{cliente.cod_cliente}</TableCell>
                     <TableCell>
                       <Badge 
