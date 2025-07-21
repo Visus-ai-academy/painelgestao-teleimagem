@@ -629,7 +629,7 @@ export default function CadastroClientes() {
                         variant={cliente.ativo ? "default" : "destructive"}
                         className={cliente.ativo ? "" : "bg-red-100 text-red-800 border-red-300"}
                       >
-                        {cliente.ativo ? "Ativo" : "Inativo"}
+                        {cliente.status || (cliente.ativo ? "Ativo" : "Inativo")}
                       </Badge>
                     </TableCell>
                     <TableCell>
