@@ -1,7 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Users, Database, DollarSign, FileText, Settings, Lock, Eye, UserCheck, CheckCircle } from "lucide-react";
+import { Shield, Users, Database, DollarSign, FileText, Settings, Lock, Eye, UserCheck, CheckCircle, Download } from "lucide-react";
+import jsPDF from 'jspdf';
+
 
 const RelatorioImplementacoes = () => {
   const implementacoes = [
@@ -158,6 +161,105 @@ const RelatorioImplementacoes = () => {
     periodo: "17 a 21 de Julho de 2024"
   };
 
+  const gerarPDF = () => {
+    const doc = new jsPDF();
+    let yPosition = 20;
+    
+    // Título
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RELATÓRIO DE IMPLEMENTAÇÕES', 105, yPosition, { align: 'center' });
+    yPosition += 10;
+    
+    // Período
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Período: ${estatisticas.periodo}`, 105, yPosition, { align: 'center' });
+    yPosition += 20;
+    
+    // Estatísticas
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ESTATÍSTICAS GERAIS', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`• Total de Sistemas: ${estatisticas.totalImplementacoes}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`• Funcionalidades: ${estatisticas.totalFuncionalidades}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`• Edge Functions: ${estatisticas.totalEdgeFunctions}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`• Dias de Desenvolvimento: 5`, 20, yPosition);
+    yPosition += 15;
+    
+    // Implementações
+    implementacoes.forEach((impl, index) => {
+      // Verificar se precisa de nova página
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      // Título da implementação
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${index + 1}. ${impl.titulo}`, 20, yPosition);
+      yPosition += 8;
+      
+      // Data
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`Implementado em: ${impl.data}`, 20, yPosition);
+      yPosition += 10;
+      
+      // Funcionalidades
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Funcionalidades:', 20, yPosition);
+      yPosition += 6;
+      
+      doc.setFont('helvetica', 'normal');
+      impl.itens.forEach((item) => {
+        // Verificar se precisa quebrar linha
+        const splitText = doc.splitTextToSize(`• ${item}`, 170);
+        doc.text(splitText, 25, yPosition);
+        yPosition += splitText.length * 4;
+        
+        // Verificar se precisa de nova página
+        if (yPosition > 270) {
+          doc.addPage();
+          yPosition = 20;
+        }
+      });
+      
+      // Edge Functions (se existir)
+      if (impl.edgeFunctions && impl.edgeFunctions.length > 0) {
+        yPosition += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Edge Functions:', 20, yPosition);
+        yPosition += 6;
+        
+        doc.setFont('helvetica', 'normal');
+        impl.edgeFunctions.forEach((func) => {
+          doc.text(`• ${func}`, 25, yPosition);
+          yPosition += 4;
+          
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 20;
+          }
+        });
+      }
+      
+      yPosition += 10;
+    });
+    
+    // Salvar PDF
+    doc.save('relatorio-implementacoes.pdf');
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -168,6 +270,14 @@ const RelatorioImplementacoes = () => {
         <p className="text-xl text-muted-foreground">
           Período: {estatisticas.periodo}
         </p>
+        <Button 
+          onClick={gerarPDF}
+          className="mt-4"
+          size="lg"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Gerar PDF
+        </Button>
       </div>
 
       {/* Estatísticas */}
