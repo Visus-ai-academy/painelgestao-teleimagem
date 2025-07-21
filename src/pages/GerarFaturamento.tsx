@@ -152,6 +152,10 @@ export default function GerarFaturamento() {
     };
   }>>([]);
   
+  // Estados para geração de relatório individual
+  const [clienteSelecionadoRelatorio, setClienteSelecionadoRelatorio] = useState('');
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  
   const { toast } = useToast();
 
   // Carregar clientes da base de dados (inicialização)
@@ -820,6 +824,71 @@ export default function GerarFaturamento() {
         description: error.message || "Erro durante o processamento automático",
         variant: "destructive",
       });
+    }
+  };
+
+  // Função para gerar relatório individual
+  const handleGerarRelatorioIndividual = async () => {
+    if (!clienteSelecionadoRelatorio) {
+      toast({
+        title: "Cliente Necessário",
+        description: "Selecione um cliente para gerar o relatório",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGerandoRelatorio(true);
+
+    try {
+      // Buscar dados do cliente selecionado
+      const clienteSelecionado = clientesCarregados.find(c => c.id === clienteSelecionadoRelatorio);
+      
+      if (!clienteSelecionado) {
+        throw new Error("Cliente não encontrado");
+      }
+
+      toast({
+        title: "Iniciando Geração",
+        description: `Gerando relatório para ${clienteSelecionado.nome}...`,
+      });
+
+      // Chamar edge function para gerar relatório
+      const { data: relatorioData, error: relatorioError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
+        body: {
+          cliente_id: clienteSelecionadoRelatorio,
+          periodo: PERIODO_ATUAL // formato: "2025-01"
+        }
+      });
+
+      if (relatorioError) {
+        throw new Error(`Erro ao gerar relatório: ${relatorioError.message}`);
+      }
+
+      if (!relatorioData?.success) {
+        throw new Error(relatorioData?.details || 'Erro desconhecido na geração do relatório');
+      }
+
+      // Abrir PDF em nova aba
+      if (relatorioData.arquivos && relatorioData.arquivos.length > 0) {
+        const pdfUrl = relatorioData.arquivos[0].url;
+        window.open(pdfUrl, '_blank');
+      }
+
+      toast({
+        title: "Relatório Gerado",
+        description: `PDF gerado com sucesso para ${clienteSelecionado.nome}! Total: ${relatorioData.resumo?.total_laudos || 0} laudos, Valor: R$ ${relatorioData.resumo?.valor_total?.toFixed(2) || '0,00'}`,
+      });
+
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório individual:', error);
+      toast({
+        title: "Erro na Geração",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setGerandoRelatorio(false);
     }
   };
 
@@ -1737,18 +1806,60 @@ export default function GerarFaturamento() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Configuração do Sistema</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Gerar Relatório PDF
+                </CardTitle>
+                <CardDescription>
+                  Gerar relatório individual para teste com layout completo (logomarca, título, resumo financeiro e detalhamento)
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Status da Conexão:</Label>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm">Conectado ao Supabase</span>
-                  </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Layout do Relatório:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Logomarca Teleimagem</li>
+                    <li>• Título: Demonstrativo de Faturamento</li>
+                    <li>• Quadro 1: Resumo Financeiro (totais, impostos)</li>
+                    <li>• Quadro 2: Detalhamento dos Exames (tabela completa)</li>
+                  </ul>
                 </div>
-                
-                <div className="space-y-2">
+
+                <div className="space-y-3">
+                  <Label>Selecionar Cliente para Relatório</Label>
+                  <select 
+                    className="w-full p-2 border rounded-md"
+                    value={clienteSelecionadoRelatorio}
+                    onChange={(e) => setClienteSelecionadoRelatorio(e.target.value)}
+                  >
+                    <option value="">Selecione um cliente...</option>
+                    {clientesCarregados.map(cliente => (
+                      <option key={cliente.id} value={cliente.id}>
+                        {cliente.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <Button 
+                  onClick={handleGerarRelatorioIndividual}
+                  disabled={!clienteSelecionadoRelatorio || gerandoRelatorio}
+                  className="w-full"
+                >
+                  {gerandoRelatorio ? (
+                    <>
+                      <Clock className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando PDF...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Gerar Relatório PDF
+                    </>
+                  )}
+                </Button>
+
+                <div className="space-y-2 mt-6">
                   <Label>Edge Functions:</Label>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -1759,13 +1870,12 @@ export default function GerarFaturamento() {
                       <span>enviar-relatorio-email</span>
                       <Badge variant="default">Ativo</Badge>
                     </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>processar-faturamento</span>
+                      <Badge variant="default">Ativo</Badge>
+                    </div>
                   </div>
                 </div>
-
-                <Button className="w-full">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Painel Supabase
-                </Button>
               </CardContent>
             </Card>
           </div>
