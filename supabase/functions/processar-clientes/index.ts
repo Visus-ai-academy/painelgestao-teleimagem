@@ -67,9 +67,20 @@ serve(async (req) => {
     const worksheet = workbook.Sheets[sheetName]
     const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
+    console.log('=== ANÁLISE DETALHADA DOS DADOS ===')
     console.log('Dados extraídos do Excel:', jsonData.length, 'linhas')
-    console.log('Primeira linha de exemplo:', JSON.stringify(jsonData[0], null, 2))
-    console.log('Cabeçalhos disponíveis:', Object.keys(jsonData[0] || {}))
+    
+    if (jsonData.length > 0) {
+      console.log('Primeira linha de exemplo:', JSON.stringify(jsonData[0], null, 2))
+      console.log('Cabeçalhos disponíveis:', Object.keys(jsonData[0] || {}))
+      console.log('Primeiras 3 linhas completas:')
+      for (let i = 0; i < Math.min(3, jsonData.length); i++) {
+        console.log(`Linha ${i}:`, JSON.stringify(jsonData[i], null, 2))
+      }
+    } else {
+      console.log('ERRO: Arquivo está vazio - nenhuma linha encontrada')
+      throw new Error('Arquivo vazio ou sem dados válidos')
+    }
 
     if (jsonData.length === 0) {
       console.log('ERRO: Arquivo está vazio - nenhuma linha encontrada')
