@@ -11,6 +11,8 @@ import {
   Background,
   Panel,
   Position,
+  Handle,
+  ConnectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,18 +123,13 @@ export default function MapeamentoVisual() {
     // Criar nós para campos source (esquerda)
     const sourceNodes: Node[] = sourceFields.map((field, index) => ({
       id: `source-${field}`,
-      type: 'default',
+      type: 'sourceNode',
       position: { x: 50, y: 50 + index * 80 },
       data: { 
-        label: (
-          <div className="text-center">
-            <div className="font-medium text-blue-700">{field}</div>
-            <Badge variant="outline" className="text-xs mt-1">Arquivo</Badge>
-          </div>
-        )
+        label: field,
+        field: field
       },
       style: sourceNodeStyle,
-      sourcePosition: Position.Right,
     }));
 
     // Criar nós para campos target (direita)
@@ -140,22 +137,16 @@ export default function MapeamentoVisual() {
       const mapping = mappingData.find(m => m.target_field === field);
       return {
         id: `target-${field}`,
-        type: 'default',
+        type: 'targetNode',
         position: { x: 600, y: 50 + index * 80 },
         data: { 
-          label: (
-            <div className="text-center">
-              <div className="font-medium text-green-700">{field}</div>
-              <div className="text-xs text-gray-500">{mapping?.target_table}</div>
-              <Badge variant="outline" className="text-xs mt-1">
-                {mapping?.field_type}
-                {mapping?.is_required && ' *'}
-              </Badge>
-            </div>
-          )
+          label: field,
+          field: field,
+          table: mapping?.target_table,
+          type: mapping?.field_type,
+          required: mapping?.is_required
         },
         style: targetNodeStyle,
-        targetPosition: Position.Left,
       };
     });
 
@@ -259,6 +250,40 @@ export default function MapeamentoVisual() {
     toast.success('Mapeamentos salvos com sucesso!');
   };
 
+  // Componentes customizados para os nós
+  const SourceNode = ({ data }: { data: any }) => {
+    return (
+      <div className="px-4 py-2 bg-blue-50 border-2 border-blue-300 rounded-lg min-w-[150px]">
+        <Handle type="source" position={Position.Right} className="w-3 h-3 bg-blue-500" />
+        <div className="text-center">
+          <div className="font-medium text-blue-700">{data.label}</div>
+          <Badge variant="outline" className="text-xs mt-1">Arquivo</Badge>
+        </div>
+      </div>
+    );
+  };
+
+  const TargetNode = ({ data }: { data: any }) => {
+    return (
+      <div className="px-4 py-2 bg-green-50 border-2 border-green-300 rounded-lg min-w-[150px]">
+        <Handle type="target" position={Position.Left} className="w-3 h-3 bg-green-500" />
+        <div className="text-center">
+          <div className="font-medium text-green-700">{data.label}</div>
+          <div className="text-xs text-gray-500">{data.table}</div>
+          <Badge variant="outline" className="text-xs mt-1">
+            {data.type}
+            {data.required && ' *'}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
+
+  const nodeTypes = {
+    sourceNode: SourceNode,
+    targetNode: TargetNode,
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -308,10 +333,12 @@ export default function MapeamentoVisual() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgesDelete={onEdgeDelete}
+          nodeTypes={nodeTypes}
           fitView
-          nodesDraggable={false}
+          nodesDraggable={true}
           nodesConnectable={true}
           elementsSelectable={true}
+          connectionMode={ConnectionMode.Loose}
         >
           <Controls />
           <Background />
