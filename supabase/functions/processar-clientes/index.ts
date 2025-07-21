@@ -104,7 +104,7 @@ serve(async (req) => {
         }
       })
       
-      console.log('Cliente processado:', JSON.stringify(clienteData, null, 2))
+      console.log('Exemplo de clienteData:', Object.keys(clienteData).length > 0 ? Object.keys(clienteData) : 'vazio')
       
       // Campos obrigatórios mapeados dinamicamente
       const nome = clienteData.nome || '';
