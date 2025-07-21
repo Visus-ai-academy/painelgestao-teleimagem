@@ -72,17 +72,17 @@ serve(async (req) => {
       throw new Error('Arquivo vazio ou formato inválido')
     }
 
-    // Map data
+    // Map data using template field names
     const clientes = jsonData.map((row: any) => {
-      const nome = row.nome || row.Nome || row.NOME || row.cliente || row.Cliente || '';
-      const email = row.email || row.Email || row.EMAIL || '';
+      const nome = row['Cliente (Nome Fantasia)'] || '';
+      const email = row['e-mail'] || '';
       
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row.telefone || row.Telefone || null,
-        endereco: row.endereco || row.Endereco || null,
-        cnpj: row.cnpj || row.CNPJ || null,
+        telefone: row['contato'] || null,
+        endereco: row['endereco'] || null,
+        cnpj: row['CNPJ/CPF'] || null,
         ativo: true
       };
     })
