@@ -1653,7 +1653,7 @@ export default function GerarFaturamento() {
                   <div className="p-4 bg-muted rounded-lg">
                     <h4 className="font-medium mb-2">Estrutura do Template (11 colunas):</h4>
                     <p className="text-sm text-muted-foreground">
-                      Paciente → Cliente → Médico → Data → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → Quantidade → Valor
+                      Cliente → Paciente → Médico → Data_Exame → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → Quantidade → Valor_Bruto
                     </p>
                   </div>
                   <Button asChild variant="outline" className="w-full">
@@ -1668,7 +1668,7 @@ export default function GerarFaturamento() {
 
             <FileUpload
               title="Upload Laudos Para Faturamento"
-              description="Upload de arquivo de laudos para faturamento seguindo o template com as colunas: Paciente, Cliente, Médico, Data, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, [Reservado], Valor. Baixar template CSV: /templates/template_faturamento.csv"
+              description="Upload de arquivo de laudos para faturamento seguindo o template com as colunas: Cliente, Paciente, Médico, Data_Exame, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, Quantidade, Valor_Bruto. Baixar template CSV: /templates/template_faturamento.csv"
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={25}
               expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
