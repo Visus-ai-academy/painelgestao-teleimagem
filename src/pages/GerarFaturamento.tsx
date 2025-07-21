@@ -1566,154 +1566,38 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6 mt-6">
-          {/* Status da Fonte de Dados */}
-          <Card className={`border-2 ${
-            fonteDados === 'upload' ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
-          }`}>
+          <Card className="border-blue-200 bg-blue-50">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                {fonteDados === 'upload' ? (
-                  <>
-                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <h3 className="font-semibold text-blue-800">Upload de Dados Ativo</h3>
-                      <p className="text-sm text-blue-700">Esta aba está ativa. Os uploads serão processados normalmente.</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-5 w-5 text-gray-600" />
-                    <div>
-                      <h3 className="font-semibold text-gray-700">Upload de Dados Inativo</h3>
-                      <p className="text-sm text-gray-600">
-                        Fonte atual: <strong>{
-                          fonteDados === 'mobilemed' ? 'Integração Mobilemed' : 'Banco Local'
-                        }</strong>. 
-                        Para usar uploads, vá em "Configuração" e selecione "Upload de Arquivo".
-                      </p>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setActiveTab('configuracao');
-                        setFonteDados('upload');
-                      }}
-                    >
-                      Ativar Upload
-                    </Button>
-                  </>
-                )}
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold text-blue-800">Upload de Dados</h3>
+                  <p className="text-sm text-blue-700">
+                    Configure a fonte de dados na página de Configuração de Faturamento.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/configuracao/faturamento'}
+                >
+                  Configurar
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {fonteDados === 'upload' ? (
-            <>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
-                <ol className="list-decimal list-inside space-y-1 text-blue-800">
-                  <li><strong>Primeiro:</strong> Upload de Clientes (cria os IDs na base)</li>
-                  <li><strong>Segundo:</strong> Upload de Exames (vincula aos clientes)</li>
-                  <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
-                  <li><strong>Quarto:</strong> Escalas e Financeiro (opcionais)</li>
-                  <li><strong>Quinto:</strong> <strong>Arquivo de Faturamento</strong> (para geração de relatórios PDF)</li>
-                </ol>
-              </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
+            <ol className="list-decimal list-inside space-y-1 text-blue-800">
+              <li><strong>Primeiro:</strong> Upload de Exames (dados principais)</li>
+              <li><strong>Segundo:</strong> Upload de Contratos (opcional, regras de preço)</li>
+              <li><strong>Terceiro:</strong> Escalas e Financeiro (opcionais)</li>
+              <li><strong>Quarto:</strong> <strong>Arquivo de Faturamento</strong> (para geração de relatórios PDF)</li>
+            </ol>
+          </div>
 
-            </>
-          ) : (
-            <Card className="border-gray-200">
-              <CardContent className="pt-6 text-center">
-                <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                    <Upload className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Upload de Dados Desativado</h3>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Para usar esta funcionalidade, configure a fonte de dados como "Upload de Arquivo" na aba Configuração.
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={() => {
-                      setActiveTab('configuracao');
-                      setFonteDados('upload');
-                    }}
-                  >
-                    Ir para Configuração
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {fonteDados === 'upload' && (
-          <>
-            {/* Informação sobre o período selecionado para uploads de faturamento */}
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold text-blue-800">Upload de Dados de Faturamento</h3>
-                    <p className="text-sm text-blue-700">
-                      Os uploads de dados de faturamento podem ser processados para qualquer período. 
-                      Período atual selecionado: <strong>{periodoSelecionado}</strong>
-                    </p>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setActiveTab('configuracao')}
-                  >
-                    Configurar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <FileUpload
-              title="Upload de Clientes"
-              description="Lista de clientes com emails para envio dos relatórios"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={10}
-              expectedFormat={["nome, email, telefone, endereco, cnpj, ativo"]}
-              onUpload={async (file) => {
-                console.log('🔥 INICIANDO UPLOAD DE CLIENTES');
-                console.log('🔥 Arquivo:', file.name, 'Tamanho:', file.size);
-                
-                try {
-                  console.log('🔥 Chamando processClientesFile...');
-                  const resultado = await processClientesFile(file);
-                  console.log('🔥 Resultado do processamento:', resultado);
-                  
-                  // Limpar resultados antigos e recarregar clientes
-                  setResultados([]);
-                  setRelatoriosGerados(0);
-                  setEmailsEnviados(0);
-                  
-                  console.log('🔥 Recarregando clientes...');
-                  const clientesCarregadosResult = await carregarClientes();
-                  console.log('🔥 Clientes carregados após upload:', clientesCarregadosResult.length);
-                  
-                  toast({
-                    title: "Upload Concluído",
-                    description: `Clientes carregados para o período ${periodoSelecionado}! Total: ${clientesCarregadosResult.length}`,
-                  });
-                } catch (error: any) {
-                  console.error('🔥 ERRO NO UPLOAD DE CLIENTES:', error);
-                  toast({
-                    title: "Erro no Upload",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                }
-              }}
-              icon={<Users className="h-5 w-5" />}
-            />
-
             <FileUpload
               title="Upload de Exames Realizados"
               description="Arraste e solte arquivos CSV/Excel aqui ou clique para selecionar"
@@ -1753,6 +1637,7 @@ export default function GerarFaturamento() {
               onUpload={processFinanceiroFile}
               icon={<DollarSign className="h-5 w-5" />}
             />
+
             {/* Template Download Section */}
             <Card className="mb-6">
               <CardHeader>
@@ -1812,9 +1697,7 @@ export default function GerarFaturamento() {
               }}
                icon={<FileBarChart2 className="h-5 w-5" />}
              />
-            </div>
-            </>
-          )}
+           </div>
         </TabsContent>
 
         <TabsContent value="database" className="space-y-6 mt-6">

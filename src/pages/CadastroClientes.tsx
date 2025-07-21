@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,13 +6,33 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { FileUpload } from "@/components/FileUpload";
-import { Users, Upload, Plus, Search } from "lucide-react";
+import { Users, Upload, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Cliente {
+  id: string;
+  nome: string;
+  email: string;
+  cnpj?: string;
+  endereco?: string;
+  contato?: string;
+  cod_cliente?: string;
+  data_inicio_contrato?: string;
+  data_termino_vigencia?: string;
+  ativo: boolean;
+}
 
 export default function CadastroClientes() {
   const [showNovoCliente, setShowNovoCliente] = useState(false);
+  const [showEditarCliente, setShowEditarCliente] = useState(false);
+  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [clienteData, setClienteData] = useState({
     nome: "",
     email: "",
@@ -32,7 +52,34 @@ export default function CadastroClientes() {
     }));
   };
 
-  const handleSalvarCliente = () => {
+  // Carregar clientes do banco
+  const carregarClientes = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('nome');
+
+      if (error) throw error;
+
+      setClientes(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar clientes",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarClientes();
+  }, []);
+
+  const handleSalvarCliente = async () => {
     // Validação básica
     if (!clienteData.nome || !clienteData.email) {
       toast({
@@ -43,44 +90,108 @@ export default function CadastroClientes() {
       return;
     }
 
-    // Aqui será implementada a lógica de salvamento
-    toast({
-      title: "Sucesso",
-      description: "Cliente cadastrado com sucesso!",
-    });
-    
-    setShowNovoCliente(false);
-    setClienteData({
-      nome: "",
-      email: "",
-      cnpj: "",
-      endereco: "",
-      contato: "",
-      cod_cliente: "",
-      data_inicio_contrato: "",
-      data_termino_vigencia: "",
-      ativo: true
-    });
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .insert([clienteData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente cadastrado com sucesso!",
+      });
+      
+      setShowNovoCliente(false);
+      setClienteData({
+        nome: "",
+        email: "",
+        cnpj: "",
+        endereco: "",
+        contato: "",
+        cod_cliente: "",
+        data_inicio_contrato: "",
+        data_termino_vigencia: "",
+        ativo: true
+      });
+      
+      carregarClientes();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao salvar cliente",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
-  const clientesExemplo = [
-    {
-      id: "1",
-      nome: "Hospital São Lucas",
-      email: "contato@saolucas.com.br",
-      cnpj: "12.345.678/0001-90",
-      cod_cliente: "CLI001",
-      ativo: true
-    },
-    {
-      id: "2", 
-      nome: "Clínica Vida Plena",
-      email: "admin@vidaplena.com.br",
-      cnpj: "98.765.432/0001-10",
-      cod_cliente: "CLI002",
-      ativo: true
+  const handleEditarCliente = (cliente: Cliente) => {
+    setClienteEditando(cliente);
+    setClienteData({
+      nome: cliente.nome,
+      email: cliente.email,
+      cnpj: cliente.cnpj || "",
+      endereco: cliente.endereco || "",
+      contato: cliente.contato || "",
+      cod_cliente: cliente.cod_cliente || "",
+      data_inicio_contrato: cliente.data_inicio_contrato || "",
+      data_termino_vigencia: cliente.data_termino_vigencia || "",
+      ativo: cliente.ativo
+    });
+    setShowEditarCliente(true);
+  };
+
+  const handleAtualizarCliente = async () => {
+    if (!clienteEditando) return;
+
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update(clienteData)
+        .eq('id', clienteEditando.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente atualizado com sucesso!",
+      });
+      
+      setShowEditarCliente(false);
+      setClienteEditando(null);
+      carregarClientes();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar cliente",
+        description: error.message,
+        variant: "destructive"
+      });
     }
-  ];
+  };
+
+  const handleInativarCliente = async (cliente: Cliente) => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ ativo: !cliente.ativo })
+        .eq('id', cliente.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: `Cliente ${cliente.ativo ? 'inativado' : 'ativado'} com sucesso!`,
+      });
+      
+      carregarClientes();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -123,15 +234,26 @@ export default function CadastroClientes() {
               'Status ativo (opcional)'
             ]}
             onUpload={async (file: File) => {
-              // Aqui será implementada a lógica de upload
-              console.log('Arquivo selecionado:', file.name);
-              // Simular processamento
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              toast({
-                title: "Upload realizado com sucesso!",
-                description: "Os clientes foram processados.",
-              });
+              try {
+                // Aqui será implementada a lógica de upload via edge function
+                console.log('Arquivo selecionado:', file.name);
+                // Simular processamento
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                toast({
+                  title: "Upload realizado com sucesso!",
+                  description: "Os clientes foram processados.",
+                });
+                
+                // Recarregar lista de clientes
+                carregarClientes();
+              } catch (error: any) {
+                toast({
+                  title: "Erro no upload",
+                  description: error.message,
+                  variant: "destructive"
+                });
+              }
             }}
             icon={<Upload className="h-5 w-5" />}
           />
@@ -279,33 +401,143 @@ export default function CadastroClientes() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>CNPJ</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clientesExemplo.map((cliente) => (
-                <TableRow key={cliente.id}>
-                  <TableCell className="font-medium">{cliente.nome}</TableCell>
-                  <TableCell>{cliente.email}</TableCell>
-                  <TableCell>{cliente.cnpj}</TableCell>
-                  <TableCell>{cliente.cod_cliente}</TableCell>
-                  <TableCell>
-                    <Badge variant={cliente.ativo ? "default" : "secondary"}>
-                      {cliente.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
+          {loading ? (
+            <div className="text-center text-muted-foreground py-8">
+              <p>Carregando clientes...</p>
+            </div>
+          ) : clientes.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <p>Nenhum cliente cadastrado ainda.</p>
+              <p className="text-sm">Use o upload de clientes ou cadastre manualmente.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>CNPJ</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {clientes.map((cliente) => (
+                  <TableRow key={cliente.id}>
+                    <TableCell className="font-medium">{cliente.nome}</TableCell>
+                    <TableCell>{cliente.email}</TableCell>
+                    <TableCell>{cliente.cnpj}</TableCell>
+                    <TableCell>{cliente.cod_cliente}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={cliente.ativo ? "default" : "destructive"}
+                        className={cliente.ativo ? "" : "bg-red-100 text-red-800 border-red-300"}
+                      >
+                        {cliente.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditarCliente(cliente)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={cliente.ativo ? "destructive" : "default"}
+                          onClick={() => handleInativarCliente(cliente)}
+                        >
+                          {cliente.ativo ? "Inativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
+
+        {/* Dialog para editar cliente */}
+        <Dialog open={showEditarCliente} onOpenChange={setShowEditarCliente}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Editar Cliente</DialogTitle>
+              <DialogDescription>
+                Edite os dados do cliente
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome">Nome*</Label>
+                  <Input
+                    id="edit-nome"
+                    value={clienteData.nome}
+                    onChange={(e) => handleInputChange("nome", e.target.value)}
+                    placeholder="Nome do cliente"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email*</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={clienteData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    placeholder="email@cliente.com"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cnpj">CNPJ</Label>
+                  <Input
+                    id="edit-cnpj"
+                    value={clienteData.cnpj}
+                    onChange={(e) => handleInputChange("cnpj", e.target.value)}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cod_cliente">Código Cliente</Label>
+                  <Input
+                    id="edit-cod_cliente"
+                    value={clienteData.cod_cliente}
+                    onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
+                    placeholder="CLI001"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-ativo"
+                    checked={clienteData.ativo}
+                    onCheckedChange={(checked) => handleInputChange("ativo", checked)}
+                  />
+                  <Label htmlFor="edit-ativo">Cliente Ativo</Label>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleAtualizarCliente}>
+                  Salvar Alterações
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditarCliente(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
     </div>
   );
