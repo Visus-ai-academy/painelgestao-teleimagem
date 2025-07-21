@@ -45,7 +45,13 @@ serve(async (req) => {
       }
     )
 
-    const { filename } = await req.json()
+    const requestBody = await req.json()
+    const filename = requestBody.filename || requestBody.fileName
+    
+    if (!filename) {
+      throw new Error('Nome do arquivo não fornecido')
+    }
+    
     console.log('Processando arquivo:', filename)
 
     // Criar log de processamento
