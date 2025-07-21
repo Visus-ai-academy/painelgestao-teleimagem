@@ -88,12 +88,23 @@ serve(async (req) => {
       };
     })
 
+    console.log('Total de clientes mapeados:', clientes.length)
+
     // Filter valid clients
     const clientesValidos = clientes.filter(cliente => 
       cliente.nome && cliente.nome.trim() !== '' && cliente.nome !== 'undefined'
     )
 
-    console.log('Clientes válidos:', clientesValidos.length)
+    console.log('Clientes válidos (com nome preenchido):', clientesValidos.length)
+    
+    // Log dos clientes inválidos para debug
+    const clientesInvalidos = clientes.filter(cliente => 
+      !cliente.nome || cliente.nome.trim() === '' || cliente.nome === 'undefined'
+    )
+    if (clientesInvalidos.length > 0) {
+      console.log('Clientes inválidos encontrados:', clientesInvalidos.length)
+      console.log('Exemplos de clientes inválidos:', JSON.stringify(clientesInvalidos.slice(0, 3), null, 2))
+    }
 
     // Remove duplicates based on nome + email combination
     const clientesUnicos = clientesValidos.reduce((acc: any[], cliente: any) => {
@@ -105,7 +116,9 @@ serve(async (req) => {
       return acc
     }, [])
 
+    const duplicatasRemovidas = clientesValidos.length - clientesUnicos.length
     console.log('Clientes únicos após remoção de duplicatas:', clientesUnicos.length)
+    console.log('Duplicatas removidas:', duplicatasRemovidas)
 
     // Clear existing clients - limpar TODOS os clientes (sem triggers)
     console.log('Limpando clientes existentes...')
