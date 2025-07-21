@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2, Eye, Download, Upload } from "lucide-react";
+import { Pencil, Plus, Trash2, Eye, Download, Upload, Save, X, Edit } from "lucide-react";
 
 interface FieldMapping {
   id: string;
@@ -60,6 +60,8 @@ export default function ConfiguracaoImportacao() {
   const [editingMapping, setEditingMapping] = useState<Partial<FieldMapping>>({});
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const fileTypes = [
     { value: "exames", label: "Exames" },
@@ -237,6 +239,38 @@ export default function ConfiguracaoImportacao() {
     }
   }
 
+  const saveTemplate = async () => {
+    try {
+      setLoading(true);
+      // Aqui você pode adicionar lógica adicional para salvar o template
+      // Por enquanto, apenas desabilita o modo de edição
+      setIsEditingTemplate(false);
+      setHasUnsavedChanges(false);
+      toast.success("Template salvo com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar template:", error);
+      toast.error("Erro ao salvar template");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    if (hasUnsavedChanges) {
+      if (confirm("Tem certeza que deseja cancelar? As alterações não salvas serão perdidas.")) {
+        setIsEditingTemplate(false);
+        setHasUnsavedChanges(false);
+        loadFieldMappings(selectedTemplate);
+      }
+    } else {
+      setIsEditingTemplate(false);
+    }
+  };
+
+  const enableEdit = () => {
+    setIsEditingTemplate(true);
+  };
+
   const openEditDialog = (mapping?: FieldMapping) => {
     if (mapping) {
       setEditingMapping(mapping);
@@ -298,7 +332,11 @@ export default function ConfiguracaoImportacao() {
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <Label htmlFor="template-select">Template</Label>
-                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                  <Select 
+                    value={selectedTemplate} 
+                    onValueChange={setSelectedTemplate}
+                    disabled={isEditingTemplate}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um template" />
                     </SelectTrigger>
@@ -313,7 +351,11 @@ export default function ConfiguracaoImportacao() {
                 </div>
                 <div className="flex-1">
                   <Label htmlFor="filetype-select">Tipo de Arquivo</Label>
-                  <Select value={selectedFileType} onValueChange={setSelectedFileType}>
+                  <Select 
+                    value={selectedFileType} 
+                    onValueChange={setSelectedFileType}
+                    disabled={isEditingTemplate}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -326,19 +368,51 @@ export default function ConfiguracaoImportacao() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  onClick={syncTemplate}
-                  disabled={!selectedTemplate || !selectedFileType || loading}
-                  className="mt-6"
-                  variant="outline"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Sincronizar Template
-                </Button>
-                <Button onClick={() => openEditDialog()} className="mt-6">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Mapeamento
-                </Button>
+                
+                {!isEditingTemplate ? (
+                  <>
+                    <Button
+                      onClick={syncTemplate}
+                      disabled={!selectedTemplate || !selectedFileType || loading}
+                      className="mt-6"
+                      variant="outline"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Sincronizar Template
+                    </Button>
+                    <Button onClick={enableEdit} className="mt-6" variant="secondary">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar Template
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={saveTemplate}
+                      disabled={loading}
+                      className="mt-6"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar Template
+                    </Button>
+                    <Button
+                      onClick={cancelEdit}
+                      className="mt-6"
+                      variant="outline"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={() => openEditDialog()} 
+                      className="mt-6"
+                      disabled={!isEditingTemplate}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Novo Mapeamento
+                    </Button>
+                  </>
+                )}
               </div>
 
               <Table>
@@ -376,6 +450,7 @@ export default function ConfiguracaoImportacao() {
                             size="sm"
                             variant="outline"
                             onClick={() => openEditDialog(mapping)}
+                            disabled={!isEditingTemplate}
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -383,6 +458,7 @@ export default function ConfiguracaoImportacao() {
                             size="sm"
                             variant="outline"
                             onClick={() => deleteFieldMapping(mapping.id)}
+                            disabled={!isEditingTemplate}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
