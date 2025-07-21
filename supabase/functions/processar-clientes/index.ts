@@ -65,6 +65,12 @@ serve(async (req) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
     console.log('Dados encontrados:', jsonData.length, 'registros')
+    console.log('Primeiras 3 linhas dos dados:', JSON.stringify(jsonData.slice(0, 3), null, 2))
+    
+    if (jsonData.length === 0) {
+      console.log('ERRO: Arquivo está vazio ou não foi possível extrair dados')
+      throw new Error('Arquivo vazio ou formato inválido')
+    }
 
     // Map data
     const clientes = jsonData.map((row: any) => {
