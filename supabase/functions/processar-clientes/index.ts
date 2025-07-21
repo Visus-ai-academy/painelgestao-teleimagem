@@ -100,11 +100,18 @@ serve(async (req) => {
 
     console.log('Clientes únicos após remoção de duplicatas:', clientesUnicos.length)
 
-    // Clear existing clients - usando uma condição válida
-    await supabaseClient
+    // Clear existing clients - limpar TODOS os clientes
+    console.log('Limpando clientes existentes...')
+    const { error: deleteError } = await supabaseClient
       .from('clientes')
       .delete()
-      .not('id', 'is', null)
+      .neq('id', '00000000-0000-0000-0000-000000000000') // delete all records
+    
+    if (deleteError) {
+      console.warn('Aviso ao limpar clientes:', deleteError)
+    } else {
+      console.log('Todos os clientes foram removidos da base')
+    }
 
     // Insert new clients
     const { data: clientesInseridos, error: clientesError } = await supabaseClient
