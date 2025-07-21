@@ -84,31 +84,35 @@ serve(async (req) => {
 
     console.log('Mapeamentos encontrados:', JSON.stringify(mappings, null, 2))
 
-    // Criar mapa de campos
-    const fieldMap: Record<string, string> = {}
+    // Criar mapa de campos automaticamente (source -> target)
+    const sourceToTargetMap: Record<string, string> = {}
     mappings?.forEach((mapping: any) => {
-      fieldMap[mapping.target_field] = mapping.source_field
+      sourceToTargetMap[mapping.source_field] = mapping.target_field
     })
 
-    console.log('Mapa de campos:', JSON.stringify(fieldMap, null, 2))
+    console.log('Mapa source->target:', JSON.stringify(sourceToTargetMap, null, 2))
 
-    if (jsonData.length === 0) {
-      console.log('ERRO: Arquivo está vazio ou não foi possível extrair dados')
-      throw new Error('Arquivo vazio ou formato inválido')
-    }
-
-    // Map data using dynamic field mappings
+    // Map data using dynamic field mappings automatically
     const clientes = jsonData.map((row: any) => {
-      const nomeField = mappings?.find(m => m.target_field === 'nome')?.source_field || 'Cliente (Nome Fantasia)';
-      const emailField = mappings?.find(m => m.target_field === 'e-mail')?.source_field || 'e-mail';
-      const telefoneField = mappings?.find(m => m.target_field === 'contato')?.source_field || 'contato';
-      const enderecoField = mappings?.find(m => m.target_field === 'endereco')?.source_field || 'endereco';
-      const cnpjField = mappings?.find(m => m.target_field === 'cnpj')?.source_field || 'CNPJ/CPF';
-      const statusField = mappings?.find(m => m.target_field === 'Status')?.source_field || 'Status';
+      const clienteData: any = {}
       
-      const nome = row[nomeField] || '';
-      const email = row[emailField] || '';
-      const status = row[statusField] || 'A'; // Padrão: Ativo
+      // Processar cada campo do arquivo usando os mapeamentos
+      Object.keys(row).forEach(sourceField => {
+        const targetField = sourceToTargetMap[sourceField]
+        if (targetField) {
+          clienteData[targetField] = row[sourceField]
+        }
+      })
+      
+      console.log('Cliente processado:', JSON.stringify(clienteData, null, 2))
+      
+      // Campos obrigatórios mapeados dinamicamente
+      const nome = clienteData.nome || '';
+      const email = clienteData['e-mail'] || clienteData.email || '';
+      const telefone = clienteData.contato || clienteData.telefone || null;
+      const endereco = clienteData.endereco || null;
+      const cnpj = clienteData.cnpj || null;
+      const status = clienteData.Status || 'A'; // Padrão: Ativo
       
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
       let ativo = true; // Padrão
@@ -121,9 +125,9 @@ serve(async (req) => {
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row[telefoneField] || null,
-        endereco: row[enderecoField] || null,
-        cnpj: row[cnpjField] || null,
+        telefone: telefone,
+        endereco: endereco,
+        cnpj: cnpj,
         ativo: ativo
       };
     })
