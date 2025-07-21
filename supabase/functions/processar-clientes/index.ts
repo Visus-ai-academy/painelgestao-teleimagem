@@ -66,6 +66,7 @@ serve(async (req) => {
 
     console.log('Dados encontrados:', jsonData.length, 'registros')
     console.log('Primeiras 3 linhas dos dados:', JSON.stringify(jsonData.slice(0, 3), null, 2))
+    console.log('Cabeçalhos detectados:', Object.keys(jsonData[0] || {}))
     
     if (jsonData.length === 0) {
       console.log('ERRO: Arquivo está vazio ou não foi possível extrair dados')
