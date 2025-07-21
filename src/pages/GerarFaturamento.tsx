@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { Speedometer } from "@/components/Speedometer";
-import { processExamesFile, processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile } from "@/lib/supabase";
+import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -867,8 +867,6 @@ export default function GerarFaturamento() {
           </TabsTrigger>
         </TabsList>
 
-
-
         <TabsContent value="relatorios-prontos" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -1602,24 +1600,13 @@ export default function GerarFaturamento() {
             <h3 className="font-semibold text-green-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
             <ol className="list-decimal list-inside space-y-1 text-green-800">
               <li><strong>Primeiro:</strong> Upload de Clientes (na página "Cadastro de Clientes")</li>
-              <li><strong>Segundo:</strong> Upload de Exames (dados principais)</li>
-              <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
-              <li><strong>Quarto:</strong> Escalas e Financeiro (opcionais)</li>
-              <li><strong>Quinto:</strong> <strong>Arquivo de Faturamento</strong> (para geração de relatórios PDF)</li>
+              <li><strong>Segundo:</strong> Upload de Contratos (opcional, regras de preço)</li>
+              <li><strong>Terceiro:</strong> Escalas e Financeiro (opcionais)</li>
+              <li><strong>Quarto:</strong> <strong>Upload Laudos Para Faturamento</strong> (para geração de relatórios PDF)</li>
             </ol>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <FileUpload
-              title="Upload de Exames Realizados"
-              description="Arraste e solte arquivos CSV/Excel aqui ou clique para selecionar"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={50}
-              expectedFormat={["paciente, cliente_id, medico, data_exame", "modalidade, especialidade, valor_bruto"]}
-              onUpload={processExamesFile}
-              icon={<FileSpreadsheet className="h-5 w-5" />}
-            />
-
             <FileUpload
               title="Upload de Contratos/Regras"
               description="Upload de tabela de preços e contratos"
@@ -1680,28 +1667,28 @@ export default function GerarFaturamento() {
             </Card>
 
             <FileUpload
-              title="Upload de Faturamento"
-              description="Upload de arquivo de faturamento seguindo o template com as colunas: Paciente, Cliente, Médico, Data, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, [Reservado], Valor. Baixar template CSV: /templates/template_faturamento.csv"
+              title="Upload Laudos Para Faturamento"
+              description="Upload de arquivo de laudos para faturamento seguindo o template com as colunas: Paciente, Cliente, Médico, Data, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, [Reservado], Valor. Baixar template CSV: /templates/template_faturamento.csv"
               acceptedTypes={['.csv', '.xlsx', '.xls']}
               maxSizeInMB={25}
               expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
               onUpload={async (file) => {
                 try {
-                  console.log('🔥 UPLOAD DE FATURAMENTO INICIADO - ARQUIVO:', file.name);
+                  console.log('🔥 UPLOAD DE LAUDOS PARA FATURAMENTO INICIADO - ARQUIVO:', file.name);
                   console.log('🔥 TAMANHO DO ARQUIVO:', file.size, 'bytes');
                   console.log('🔥 TIPO DO ARQUIVO:', file.type);
                   
                   await processFaturamentoFile(file);
                   
-                  console.log('🔥 UPLOAD DE FATURAMENTO CONCLUÍDO COM SUCESSO');
+                  console.log('🔥 UPLOAD DE LAUDOS PARA FATURAMENTO CONCLUÍDO COM SUCESSO');
                   toast({
-                    title: "Upload de Faturamento Concluído",
-                    description: "Dados de faturamento carregados com sucesso!",
+                    title: "Upload de Laudos Concluído",
+                    description: "Dados de laudos para faturamento carregados com sucesso!",
                   });
                 } catch (error: any) {
-                  console.error('🔥 ERRO NO UPLOAD DE FATURAMENTO:', error);
+                  console.error('🔥 ERRO NO UPLOAD DE LAUDOS PARA FATURAMENTO:', error);
                   toast({
-                    title: "Erro no Upload de Faturamento",
+                    title: "Erro no Upload de Laudos",
                     description: error.message,
                     variant: "destructive",
                   });
