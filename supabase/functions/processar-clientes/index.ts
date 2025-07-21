@@ -152,7 +152,11 @@ serve(async (req) => {
       const telefone = clienteData.telefone || null;
       const endereco = clienteData.endereco || null;
       const cnpj = clienteData.cnpj || null;
-      // Corrigido: buscar pelo campo mapeado Status
+      const contato = clienteData.contato || null;
+      const cod_cliente = clienteData.cod_cliente || null;
+      const data_inicio_contrato = clienteData.data_inicio_contrato || null;
+      const data_termino_vigencia = clienteData.data_termino_vigencia || null;
+      // Buscar pelo campo mapeado Status
       const status = clienteData.Status || 'A'; // Padrão: Ativo
       
       if (index < 3) {
@@ -189,10 +193,10 @@ serve(async (req) => {
         telefone: telefone,
         endereco: endereco,
         cnpj: cnpj,
-        contato: clienteData.contato || null,
-        cod_cliente: clienteData.cod_cliente || null,
-        data_inicio_contrato: clienteData.data_inicio_contrato || null,
-        data_termino_vigencia: clienteData.data_termino_vigencia || null,
+        contato: contato,
+        cod_cliente: cod_cliente,
+        data_inicio_contrato: data_inicio_contrato,
+        data_termino_vigencia: data_termino_vigencia,
         ativo: ativo
       };
       
