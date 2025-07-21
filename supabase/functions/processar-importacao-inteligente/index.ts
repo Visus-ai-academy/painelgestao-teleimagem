@@ -217,19 +217,38 @@ serve(async (req) => {
                 break
                 
               default: // text
-                let stringValue = String(value).trim()
-                
-                // Formatação especial para CNPJ
-                if (mapping.target_field === 'cnpj' && stringValue) {
-                  // Remove qualquer formatação existente
-                  const cleanCnpj = stringValue.replace(/\D/g, '')
-                  // Aplica formatação 00.000.000/0000-00
-                  if (cleanCnpj.length === 14) {
-                    stringValue = cleanCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-                  }
-                }
-                
-                processedRow[mapping.target_field] = stringValue
+                 let stringValue = String(value).trim()
+                 
+                 // Formatação especial para CNPJ
+                 if (mapping.target_field === 'cnpj' && stringValue) {
+                   // Remove qualquer formatação existente
+                   const cleanCnpj = stringValue.replace(/\D/g, '')
+                   // Aplica formatação 00.000.000/0000-00
+                   if (cleanCnpj.length === 14) {
+                     stringValue = cleanCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+                   }
+                 }
+                 
+                 // Tratamento especial para campo Status (A=Ativo, I=Inativo)
+                 if (mapping.source_field?.toLowerCase().includes('status')) {
+                   if (stringValue.toUpperCase() === 'A') {
+                     // Se for "A", definir como ativo
+                     processedRow['ativo'] = true
+                     processedRow['status'] = 'Ativo'
+                   } else if (stringValue.toUpperCase() === 'I') {
+                     // Se for "I", definir como inativo
+                     processedRow['ativo'] = false
+                     processedRow['status'] = 'Inativo'
+                   } else {
+                     // Padrão: ativo
+                     processedRow['ativo'] = true
+                     processedRow['status'] = 'Ativo'
+                   }
+                   // Não processar mais este campo pois já tratamos
+                   return
+                 }
+                 
+                 processedRow[mapping.target_field] = stringValue
             }
           })
           
@@ -268,10 +287,13 @@ serve(async (req) => {
           for (let i = 0; i < processedData.length; i += batchSize) {
             const batch = processedData.slice(i, i + batchSize)
             
-            // Para clientes, adicionar o campo status baseado no campo ativo
+            // Para clientes, garantir que o status está definido se não foi processado
             if (targetTable === 'clientes') {
               batch.forEach(cliente => {
-                cliente.status = cliente.ativo ? 'Ativo' : 'Inativo'
+                // Só definir status se não foi definido pelo processamento
+                if (cliente.status === undefined) {
+                  cliente.status = cliente.ativo ? 'Ativo' : 'Inativo'
+                }
               })
             }
             
