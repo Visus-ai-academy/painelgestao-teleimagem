@@ -563,7 +563,7 @@ export default function GerarFaturamento() {
         if (clientesRecarregados.length === 0) {
           toast({
             title: "Nenhum Cliente Encontrado",
-            description: "Faça upload dos clientes antes de gerar relatórios. Vá para a aba 'Upload de Dados'.",
+            description: "Faça upload dos clientes antes de gerar relatórios. Vá para a página 'Cadastro de Clientes'.",
             variant: "destructive",
           });
           setProcessandoTodos(false);
@@ -1034,7 +1034,7 @@ export default function GerarFaturamento() {
                   <AlertTriangle className="h-5 w-5" />
                   <div>
                     <h3 className="font-semibold">Nenhum Cliente Encontrado</h3>
-                    <p className="text-sm">Faça upload da lista de clientes primeiro na aba "Upload de Dados".</p>
+                    <p className="text-sm">Faça upload da lista de clientes primeiro na página "Cadastro de Clientes".</p>
                   </div>
                 </div>
               </CardContent>
@@ -1419,7 +1419,7 @@ export default function GerarFaturamento() {
               <CardDescription>
                 {clientesCarregados.length > 0 
                   ? `${clientesCarregados.length} clientes encontrados. Configure o período e gere os relatórios.`
-                  : "Nenhum Cliente Encontrado - Faça upload da lista de clientes primeiro na aba 'Upload de Dados'."
+                  : "Nenhum Cliente Encontrado - Faça upload da lista de clientes primeiro na página 'Cadastro de Clientes'."
                 }
               </CardDescription>
             </CardHeader>
@@ -1553,11 +1553,11 @@ export default function GerarFaturamento() {
                   <div>
                     <h3 className="font-semibold text-gray-700">Nenhum Cliente Encontrado</h3>
                     <p className="text-sm text-gray-600 mt-2">
-                      Faça upload da lista de clientes primeiro na aba "Upload de Dados".
+                      Faça upload da lista de clientes primeiro na página "Cadastro de Clientes".
                     </p>
                   </div>
-                  <Button onClick={() => setActiveTab("uploads")}>
-                    Ir para Upload de Dados
+                  <Button onClick={() => window.location.href = '/clientes/cadastro'}>
+                    Ir para Cadastro de Clientes
                   </Button>
                 </div>
               )}
@@ -1573,27 +1573,37 @@ export default function GerarFaturamento() {
                 <div>
                   <h3 className="font-semibold text-blue-800">Upload de Dados</h3>
                   <p className="text-sm text-blue-700">
-                    Configure a fonte de dados na página de Configuração de Faturamento.
+                    Upload de clientes foi movido para a página "Cadastro de Clientes". Configure outras fontes de dados na página de Configuração de Faturamento.
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.location.href = '/configuracao/faturamento'}
-                >
-                  Configurar
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/clientes/cadastro'}
+                  >
+                    Cadastro de Clientes
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/configuracao/faturamento'}
+                  >
+                    Configurar
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-blue-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
-            <ol className="list-decimal list-inside space-y-1 text-blue-800">
-              <li><strong>Primeiro:</strong> Upload de Exames (dados principais)</li>
-              <li><strong>Segundo:</strong> Upload de Contratos (opcional, regras de preço)</li>
-              <li><strong>Terceiro:</strong> Escalas e Financeiro (opcionais)</li>
-              <li><strong>Quarto:</strong> <strong>Arquivo de Faturamento</strong> (para geração de relatórios PDF)</li>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-green-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
+            <ol className="list-decimal list-inside space-y-1 text-green-800">
+              <li><strong>Primeiro:</strong> Upload de Clientes (na página "Cadastro de Clientes")</li>
+              <li><strong>Segundo:</strong> Upload de Exames (dados principais)</li>
+              <li><strong>Terceiro:</strong> Upload de Contratos (opcional, regras de preço)</li>
+              <li><strong>Quarto:</strong> Escalas e Financeiro (opcionais)</li>
+              <li><strong>Quinto:</strong> <strong>Arquivo de Faturamento</strong> (para geração de relatórios PDF)</li>
             </ol>
           </div>
 
