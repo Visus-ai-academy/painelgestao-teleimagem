@@ -99,9 +99,16 @@ serve(async (req) => {
 
     // Map data using dynamic field mappings
     const clientes = jsonData.map((row: any) => {
-      const nome = row[fieldMap['nome']] || '';
-      const email = row[fieldMap['email']] || '';
-      const status = row['Status'] || row['status'] || 'A'; // Padrão: Ativo
+      const nomeField = mappings?.find(m => m.target_field === 'nome')?.source_field || 'Cliente (Nome Fantasia)';
+      const emailField = mappings?.find(m => m.target_field === 'e-mail')?.source_field || 'e-mail';
+      const telefoneField = mappings?.find(m => m.target_field === 'contato')?.source_field || 'contato';
+      const enderecoField = mappings?.find(m => m.target_field === 'endereco')?.source_field || 'endereco';
+      const cnpjField = mappings?.find(m => m.target_field === 'cnpj')?.source_field || 'CNPJ/CPF';
+      const statusField = mappings?.find(m => m.target_field === 'Status')?.source_field || 'Status';
+      
+      const nome = row[nomeField] || '';
+      const email = row[emailField] || '';
+      const status = row[statusField] || 'A'; // Padrão: Ativo
       
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
       let ativo = true; // Padrão
@@ -114,9 +121,9 @@ serve(async (req) => {
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row[fieldMap['telefone']] || null,
-        endereco: row[fieldMap['endereco']] || null,
-        cnpj: row[fieldMap['cnpj']] || null,
+        telefone: row[telefoneField] || null,
+        endereco: row[enderecoField] || null,
+        cnpj: row[cnpjField] || null,
         ativo: ativo
       };
     })
