@@ -238,24 +238,31 @@ serve(async (req) => {
                     console.log(`CNPJ processado: original="${value}" -> limpo="${cleanCnpj}" -> formatado="${stringValue}"`)
                   }
                  
-                 // Tratamento especial para campo Status (A=Ativo, I=Inativo)
-                 if (mapping.source_field?.toLowerCase().includes('status')) {
-                   if (stringValue.toUpperCase() === 'A') {
-                     // Se for "A", definir como ativo
-                     processedRow['ativo'] = true
-                     processedRow['status'] = 'Ativo'
-                   } else if (stringValue.toUpperCase() === 'I') {
-                     // Se for "I", definir como inativo
-                     processedRow['ativo'] = false
-                     processedRow['status'] = 'Inativo'
-                   } else {
-                     // Padrão: ativo
-                     processedRow['ativo'] = true
-                     processedRow['status'] = 'Ativo'
-                   }
-                   // Não processar mais este campo pois já tratamos
-                   return
-                 }
+                  // Tratamento especial para campo Status (A=Ativo, I=Inativo)
+                  if (mapping.source_field?.toLowerCase().includes('status') || 
+                      mapping.target_field?.toLowerCase().includes('status')) {
+                    
+                    console.log(`Status processando: source_field="${mapping.source_field}", target_field="${mapping.target_field}", value="${stringValue}"`)
+                    
+                    if (stringValue.toUpperCase() === 'A') {
+                      // Se for "A", definir como ativo
+                      processedRow['ativo'] = true
+                      processedRow['status'] = 'Ativo'
+                      console.log(`Status definido como ATIVO para valor: ${stringValue}`)
+                    } else if (stringValue.toUpperCase() === 'I') {
+                      // Se for "I", definir como inativo
+                      processedRow['ativo'] = false
+                      processedRow['status'] = 'Inativo'
+                      console.log(`Status definido como INATIVO para valor: ${stringValue}`)
+                    } else {
+                      // Valor não reconhecido, usar padrão
+                      processedRow['ativo'] = true
+                      processedRow['status'] = 'Ativo'
+                      console.log(`Status PADRÃO (ativo) para valor não reconhecido: ${stringValue}`)
+                    }
+                    // Não processar mais este campo pois já tratamos
+                    return
+                  }
                  
                  processedRow[mapping.target_field] = stringValue
             }
