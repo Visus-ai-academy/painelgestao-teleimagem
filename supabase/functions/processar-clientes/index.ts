@@ -75,8 +75,8 @@ serve(async (req) => {
 
     // Map data using template field names
     const clientes = jsonData.map((row: any) => {
-      const nome = row['Cliente (Nome Fantasia)'] || '';
-      const email = row['e-mail'] || '';
+      const nome = row['nome'] || '';
+      const email = row['email'] || '';
       const status = row['Status'] || 'A'; // Padrão: Ativo
       
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
@@ -90,9 +90,9 @@ serve(async (req) => {
       return {
         nome: String(nome).trim(),
         email: String(email).trim(),
-        telefone: row['contato'] || null,
+        telefone: row['telefone'] || null,
         endereco: row['endereco'] || null,
-        cnpj: row['CNPJ/CPF'] || null,
+        cnpj: row['cnpj'] || null,
         ativo: ativo
       };
     })
