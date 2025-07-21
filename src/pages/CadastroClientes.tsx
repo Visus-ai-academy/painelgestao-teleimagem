@@ -486,6 +486,28 @@ export default function CadastroClientes() {
           <CardDescription>
             Lista dos clientes ativos e inativos do sistema
           </CardDescription>
+          
+          {/* Contadores */}
+          <div className="flex flex-wrap gap-4 pt-2">
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-sm font-medium text-blue-700">
+                Total: {clientes.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-md">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-sm font-medium text-green-700">
+                Ativos: {clientes.filter(c => c.ativo).length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-red-50 border border-red-200 rounded-md">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <span className="text-sm font-medium text-red-700">
+                Inativos: {clientes.filter(c => !c.ativo).length}
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Controles de Busca e Filtro */}
