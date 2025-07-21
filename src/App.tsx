@@ -39,6 +39,7 @@ import CadastroClientes from "./pages/CadastroClientes";
 import GerenciarListas from "./pages/GerenciarListas";
 import EstruturaVendas from "./pages/EstruturaVendas";
 import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
+import MapeamentoVisual from "./pages/MapeamentoVisual";
 import Seguranca from "./pages/Seguranca";
 import NotFound from "./pages/NotFound";
 
@@ -308,6 +309,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <Seguranca />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/mapeamento-visual" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['admin']}>
+                    <MapeamentoVisual />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

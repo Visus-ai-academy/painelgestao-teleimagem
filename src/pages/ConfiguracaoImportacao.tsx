@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2, Eye, Download, Upload, Save, X, Edit } from "lucide-react";
+import { Pencil, Plus, Trash2, Eye, Download, Upload, Save, X, Edit, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface FieldMapping {
   id: string;
@@ -312,6 +313,29 @@ export default function ConfiguracaoImportacao() {
           </p>
         </div>
       </div>
+
+      {/* Card de acesso ao Mapeamento Visual */}
+      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-purple-600 text-xl">🎯</div>
+              <div>
+                <h3 className="font-semibold text-purple-900">Mapeamento Visual</h3>
+                <p className="text-sm text-purple-700">
+                  Interface visual para conectar campos arrastando linhas - tipo mapa mental
+                </p>
+              </div>
+            </div>
+            <Link to="/mapeamento-visual">
+              <Button variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-100">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Abrir Mapeamento
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
 
       <Tabs defaultValue="mappings" className="space-y-6">
