@@ -163,7 +163,9 @@ export default function GerarFaturamento() {
         .from('clientes')
         .select('id, nome, email, ativo, status')
         .eq('ativo', true)
-        .eq('status', 'Ativo');
+        .eq('status', 'Ativo')
+        .not('email', 'is', null)
+        .neq('email', ''); // Excluir emails vazios
 
       console.log('🔍 Resultado da consulta clientes:', { data, error, count: data?.length });
 
@@ -673,8 +675,14 @@ export default function GerarFaturamento() {
     let emailsCount = 0;
 
     try {
-      // Usar clientes customizados ou filtrar do estado atual
-      const clientesComRelatorio = clientesCustomizados || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+      // Usar clientes customizados ou filtrar do estado atual (apenas com email)
+      const clientesComRelatorio = clientesCustomizados || resultados.filter(r => 
+        r.relatorioGerado && 
+        !r.emailEnviado && 
+        !r.erro && 
+        r.emailDestino && 
+        r.emailDestino.trim() !== ''
+      );
       
       console.log('Estado atual dos resultados:', resultados.map(r => ({ 
         nome: r.clienteNome, 
@@ -686,7 +694,7 @@ export default function GerarFaturamento() {
       if (clientesComRelatorio.length === 0) {
         toast({
           title: "Nenhum Relatório Disponível",
-          description: "Carregue os relatórios prontos primeiro antes de enviar os emails.",
+          description: "Carregue os relatórios prontos primeiro e certifique-se de que os clientes tenham email cadastrado antes de enviar os emails.",
           variant: "destructive",
         });
         setProcessandoTodos(false);
@@ -778,7 +786,13 @@ export default function GerarFaturamento() {
       if (enviarEmails) {
         console.log('📧 Opção de envio de emails habilitada - enviando automaticamente...');
         setResultados(resultadosAtuais => {
-          const clientesParaEmail = resultadosAtuais.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro);
+          const clientesParaEmail = resultadosAtuais.filter(r => 
+            r.relatorioGerado && 
+            !r.emailEnviado && 
+            !r.erro && 
+            r.emailDestino && 
+            r.emailDestino.trim() !== ''
+          );
           
           console.log('Clientes disponíveis para email após geração:', clientesParaEmail.map(c => c.clienteNome));
           
@@ -790,7 +804,7 @@ export default function GerarFaturamento() {
           } else {
             toast({
               title: "Relatórios Gerados, mas Nenhum Email Enviado", 
-              description: "Todos os relatórios foram gerados, mas não há clientes válidos para envio de email.",
+              description: "Todos os relatórios foram gerados, mas não há clientes válidos com email cadastrado para envio de email.",
               variant: "destructive",
             });
           }
@@ -801,7 +815,7 @@ export default function GerarFaturamento() {
         console.log('📧 Opção de envio de emails desabilitada - apenas relatórios gerados');
         toast({
           title: "Relatórios Gerados", 
-          description: `Relatórios gerados com sucesso! Envio de emails está desabilitado. Use o botão 'Enviar Emails' se desejar enviar.`,
+          description: `Relatórios gerados com sucesso! Envio de emails está desabilitado. Use o botão 'Enviar Emails' se desejar enviar para clientes com email cadastrado.`,
         });
       }
       
@@ -1119,12 +1133,12 @@ export default function GerarFaturamento() {
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    Etapa 2: Enviar Emails (Opcional)
+                    Etapa 2: Enviar Emails
                   </h4>
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     <Button 
                       onClick={handleEnviarEmails}
-                      disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length === 0}
+                      disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro && r.emailDestino).length === 0}
                       size="lg"
                       className="min-w-[250px]"
                       variant="outline"
@@ -1137,12 +1151,12 @@ export default function GerarFaturamento() {
                       ) : (
                         <>
                           <Mail className="h-5 w-5 mr-2" />
-                          Enviar Emails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro).length} prontos)
+                          Enviar Emails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro && r.emailDestino).length} prontos)
                         </>
                       )}
                     </Button>
                     <p className="text-sm text-blue-700">
-                      Envia relatórios por email apenas para clientes com PDFs gerados
+                      Envia relatórios por email apenas para clientes com PDFs gerados e com e-mail cadastrado
                     </p>
                   </div>
                 </div>
