@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2, Eye, Download, Upload, Save, X, Edit } from "lucide-react";
+import { Pencil, Plus, Trash2, Eye, Download, Upload, Save, X, Edit, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface FieldMapping {
   id: string;
@@ -312,6 +313,29 @@ export default function ConfiguracaoImportacao() {
           </p>
         </div>
       </div>
+
+      {/* Card de acesso rápido ao Mapeamento de Campos */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-blue-600 text-xl">🔗</div>
+              <div>
+                <h3 className="font-semibold text-blue-900">Visualizar Mapeamentos</h3>
+                <p className="text-sm text-blue-700">
+                  Veja um diagrama visual de como os campos se conectam entre arquivos e banco de dados
+                </p>
+              </div>
+            </div>
+            <Link to="/mapeamento-campos">
+              <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Ver Mapeamentos
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="mappings" className="space-y-6">
         <TabsList>
