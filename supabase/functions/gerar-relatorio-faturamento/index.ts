@@ -206,7 +206,7 @@ serve(async (req: Request) => {
           }
           
           doc.text((item.data_exame || item.data_emissao || '-').substring(0, 10), 25, yPosition);
-          doc.text((item.paciente || '-').substring(0, 20), 50, yPosition);
+          doc.text((item.cliente || item.cliente_nome || '-').substring(0, 20), 50, yPosition); // Nome do paciente
           doc.text((item.medico || '-').substring(0, 15), 90, yPosition);
           doc.text((item.modalidade || '-').substring(0, 15), 120, yPosition);
           doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition);
