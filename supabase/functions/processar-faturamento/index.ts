@@ -113,15 +113,17 @@ serve(async (req) => {
       return cliente?.id || null
     }
 
-    // Mapear dados com validação de datas
+    // Mapear dados simplificado para reduzir processamento
     const dadosMapeados = []
-    const maxRecords = 500 // Aumentar limite
+    const maxRecords = 100 // Reduzir drasticamente para evitar timeout
     
     console.log(`9. Processando os primeiros ${maxRecords} registros...`)
     
+    const hoje = new Date().toISOString().split('T')[0]
+    const vencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    
     for (let i = 1; i < Math.min(jsonData.length, maxRecords + 1); i++) {
       const row = jsonData[i] as any[]
-      
       if (!row || row.length === 0) continue
 
       const codigoCliente = row[0]?.toString().trim()
@@ -129,34 +131,14 @@ serve(async (req) => {
 
       const clienteId = encontrarClienteId(codigoCliente)
       
-      // Validar e formatar data do exame
-      let dataExame = new Date()
-      if (row[3]) {
-        try {
-          const dataStr = row[3].toString()
-          if (dataStr && dataStr !== 'undefined') {
-            dataExame = new Date(dataStr)
-            // Verificar se a data é válida
-            if (isNaN(dataExame.getTime()) || dataExame.getFullYear() > 2030 || dataExame.getFullYear() < 2020) {
-              console.log(`Data inválida na linha ${i}: ${dataStr}, usando data atual`)
-              dataExame = new Date()
-            }
-          }
-        } catch (error) {
-          console.log(`Erro ao processar data na linha ${i}: ${row[3]}, usando data atual`)
-          dataExame = new Date()
-        }
-      }
-
-      const registro = {
+      dadosMapeados.push({
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
         cliente_id: clienteId,
-        cliente: row[1]?.toString() || 'Paciente Não Informado',
         cliente_nome: row[1]?.toString() || 'Paciente Não Informado',
         paciente: codigoCliente,
         medico: row[2]?.toString() || 'Médico Não Informado',
-        data_exame: dataExame.toISOString().split('T')[0], // Formato YYYY-MM-DD
+        data_exame: hoje,
         modalidade: row[4]?.toString() || 'Não Informado',
         especialidade: row[5]?.toString() || 'Não Informado',
         categoria: row[6]?.toString() || 'Não Informado',
@@ -165,11 +147,9 @@ serve(async (req) => {
         quantidade: parseInt(row[9]?.toString() || '1'),
         valor_bruto: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
         valor: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
-        data_emissao: new Date().toISOString().split('T')[0],
-        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 dias
-      }
-      
-      dadosMapeados.push(registro)
+        data_emissao: hoje,
+        data_vencimento: vencimento
+      })
     }
 
     console.log('10. Dados mapeados:', dadosMapeados.length, 'registros')
