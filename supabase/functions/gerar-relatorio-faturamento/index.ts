@@ -165,10 +165,10 @@ serve(async (req: Request) => {
     const percentualCSLL = 1.0; // 1.0%
     const percentualIRRF = 1.5; // 1.5%
     
-    const valorPIS = baseCalculoImpostos * (percentualPIS / 100);
-    const valorCOFINS = baseCalculoImpostos * (percentualCOFINS / 100);
-    const valorCSLL = baseCalculoImpostos * (percentualCSLL / 100);
-    const valorIRRF = baseCalculoImpostos * (percentualIRRF / 100);
+    const valorPIS = parseFloat((baseCalculoImpostos * (percentualPIS / 100)).toFixed(2));
+    const valorCOFINS = parseFloat((baseCalculoImpostos * (percentualCOFINS / 100)).toFixed(2));
+    const valorCSLL = parseFloat((baseCalculoImpostos * (percentualCSLL / 100)).toFixed(2));
+    const valorIRRF = parseFloat((baseCalculoImpostos * (percentualIRRF / 100)).toFixed(2));
     
     // Cálculo do Valor a Pagar: valor Bruto + Franquia + ajustes - impostos
     const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
