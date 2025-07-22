@@ -38,13 +38,17 @@ serve(async (req: Request) => {
       .from('clientes')
       .select('nome')
       .eq('id', cliente_id)
-      .single();
+      .maybeSingle();
 
-    console.log('Cliente encontrado:', cliente, 'Erro:', clienteError);
+    console.log('Cliente encontrado:', cliente, 'Erro:', clienteError?.message);
 
     if (!cliente) {
-      return new Response(JSON.stringify({ success: false, error: 'Cliente não encontrado' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      console.log('Cliente não encontrado para ID:', cliente_id);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Cliente não encontrado para ID: ${cliente_id}` 
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
