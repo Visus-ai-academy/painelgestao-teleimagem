@@ -126,35 +126,100 @@ serve(async (req: Request) => {
 
     console.log('Total de dados únicos encontrados:', allData.length);
 
-    // Gerar PDF do relatório
+    // Calcular resumo
+    const valorTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
+    const totalExames = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+
+    // Gerar arquivo PDF e salvar no storage
     let pdfUrl = null;
     if (allData.length > 0) {
       try {
         console.log('Gerando PDF do relatório...');
         
-        const pdfResponse = await supabase.functions.invoke('processar-faturamento-pdf', {
-          body: {
-            cliente_nome: cliente.nome,
-            periodo: periodo,
-            dados: allData,
-            template: 'relatorio-faturamento'
-          }
-        });
+        // Criar conteúdo básico do PDF como HTML
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Relatório de Faturamento - ${cliente.nome}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .info { margin: 10px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .summary { background-color: #f9f9f9; padding: 15px; margin-top: 20px; border-left: 4px solid #007cba; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Relatório de Faturamento</h1>
+            <div class="info"><strong>Cliente:</strong> ${cliente.nome}</div>
+            <div class="info"><strong>Período:</strong> ${periodo}</div>
+            <div class="info"><strong>Data do Relatório:</strong> ${new Date().toLocaleDateString('pt-BR')}</div>
+          </div>
+          
+          <div class="summary">
+            <h3>Resumo</h3>
+            <p><strong>Total de Exames:</strong> ${totalExames}</p>
+            <p><strong>Valor Total:</strong> R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Paciente</th>
+                <th>Médico</th>
+                <th>Modalidade</th>
+                <th>Especialidade</th>
+                <th>Quantidade</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allData.map(item => `
+                <tr>
+                  <td>${item.data_exame || item.data_emissao || '-'}</td>
+                  <td>${item.paciente || '-'}</td>
+                  <td>${item.medico || '-'}</td>
+                  <td>${item.modalidade || '-'}</td>
+                  <td>${item.especialidade || '-'}</td>
+                  <td>${item.quantidade || 1}</td>
+                  <td>R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+        `;
 
-        if (pdfResponse.data?.pdfUrl) {
-          pdfUrl = pdfResponse.data.pdfUrl;
-          console.log('PDF gerado com sucesso:', pdfUrl);
+        // Salvar HTML no storage
+        const fileName = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.html`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('relatorios-faturamento')
+          .upload(fileName, new Blob([htmlContent], { type: 'text/html' }), {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Erro no upload do HTML:', uploadError);
         } else {
-          console.error('Erro ao gerar PDF:', pdfResponse.error);
+          const { data: { publicUrl } } = supabase.storage
+            .from('relatorios-faturamento')
+            .getPublicUrl(fileName);
+          
+          pdfUrl = publicUrl;
+          console.log('Relatório HTML gerado com sucesso:', pdfUrl);
         }
       } catch (pdfError) {
-        console.error('Erro na geração do PDF:', pdfError);
+        console.error('Erro na geração do relatório:', pdfError);
       }
     }
-
-    // Calcular resumo
-    const valorTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
-    const totalExames = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
 
     // Sempre retornar sucesso, mesmo sem dados
     const response = {
@@ -165,7 +230,7 @@ serve(async (req: Request) => {
       totalRegistros: allData.length,
       dadosEncontrados: allData.length > 0,
       dados: allData,
-      arquivos: pdfUrl ? [{ tipo: 'pdf', url: pdfUrl, nome: `relatorio_${cliente.nome}_${periodo}.pdf` }] : [],
+      arquivos: pdfUrl ? [{ tipo: 'html', url: pdfUrl, nome: `relatorio_${cliente.nome}_${periodo}.html` }] : [],
       resumo: {
         total_laudos: totalExames,
         valor_total: valorTotal,
