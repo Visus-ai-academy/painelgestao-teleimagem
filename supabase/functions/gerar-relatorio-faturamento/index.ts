@@ -130,11 +130,10 @@ serve(async (req: Request) => {
     const valorTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
     const totalExames = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
 
-    // Gerar arquivo HTML e salvar no storage
+    // Gerar arquivo HTML sempre (mesmo sem dados)
     let pdfUrl = null;
-    if (allData.length > 0) {
-      try {
-        console.log('Gerando relatório HTML...');
+    try {
+      console.log('Gerando relatório HTML...');
         
         // Criar conteúdo do relatório em HTML
         const htmlContent = `
@@ -344,7 +343,6 @@ serve(async (req: Request) => {
       } catch (pdfError) {
         console.error('Erro na geração do relatório:', pdfError);
       }
-    }
 
     // Sempre retornar sucesso, mesmo sem dados
     const response = {
