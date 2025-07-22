@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Volumetria from "./pages/Volumetria";
+import VolumetriaMobileMed from "./pages/VolumetriaMobileMed";
 import Operacional from "./pages/Operacional";
 import OperacionalProducao from "./pages/OperacionalProducao";
 import OperacionalQualidade from "./pages/OperacionalQualidade";
@@ -84,6 +85,15 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <Volumetria />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/volumetria/mobilemed" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <VolumetriaMobileMed />
+                  </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
             } />
