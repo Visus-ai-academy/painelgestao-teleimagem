@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.51.0'
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
@@ -8,7 +9,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('=== PROCESSAR-FATURAMENTO V5 - SÍNCRONO ===')
+  console.log('=== PROCESSAR-FATURAMENTO V6 - CORRIGIDO ===')
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -22,7 +23,7 @@ serve(async (req) => {
   let logData: any = null;
 
   try {
-    console.log('1. Iniciando processamento síncrono...')
+    console.log('1. Iniciando processamento corrigido...')
     
     const body = await req.json()
     const fileName = body?.fileName
@@ -80,7 +81,7 @@ serve(async (req) => {
     // Otimização: buscar apenas clientes que aparecem no Excel
     console.log('8.1. Extraindo códigos únicos do Excel...')
     const codigosUnicos = [...new Set(
-      jsonData.slice(1, 101) // Apenas os primeiros 100 registros
+      jsonData.slice(1, 501) // Aumentar para os primeiros 500 registros
         .map(row => row[0]?.toString().trim())
         .filter(Boolean)
     )]
@@ -98,9 +99,9 @@ serve(async (req) => {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
     }
 
-    console.log('8.2. Clientes encontrados:', clientesCadastrados?.length || 0)
+    console.log('8.4. Clientes encontrados:', clientesCadastrados?.length || 0)
 
-    // Função simplificada para encontrar cliente
+    // Função para encontrar cliente
     const encontrarClienteId = (codigoCliente: string): string | null => {
       if (!codigoCliente || !clientesCadastrados) return null
       
@@ -112,11 +113,11 @@ serve(async (req) => {
       return cliente?.id || null
     }
 
-    // Mapear dados - PROCESSAMENTO MUITO CONSERVADOR
+    // Mapear dados com validação de datas
     const dadosMapeados = []
-    const maxRecords = 100 // LIMITE MUITO BAIXO para teste
+    const maxRecords = 500 // Aumentar limite
     
-    console.log(`9. Processando apenas os primeiros ${maxRecords} registros...`)
+    console.log(`9. Processando os primeiros ${maxRecords} registros...`)
     
     for (let i = 1; i < Math.min(jsonData.length, maxRecords + 1); i++) {
       const row = jsonData[i] as any[]
@@ -128,6 +129,25 @@ serve(async (req) => {
 
       const clienteId = encontrarClienteId(codigoCliente)
       
+      // Validar e formatar data do exame
+      let dataExame = new Date()
+      if (row[3]) {
+        try {
+          const dataStr = row[3].toString()
+          if (dataStr && dataStr !== 'undefined') {
+            dataExame = new Date(dataStr)
+            // Verificar se a data é válida
+            if (isNaN(dataExame.getTime()) || dataExame.getFullYear() > 2030 || dataExame.getFullYear() < 2020) {
+              console.log(`Data inválida na linha ${i}: ${dataStr}, usando data atual`)
+              dataExame = new Date()
+            }
+          }
+        } catch (error) {
+          console.log(`Erro ao processar data na linha ${i}: ${row[3]}, usando data atual`)
+          dataExame = new Date()
+        }
+      }
+
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
@@ -136,7 +156,7 @@ serve(async (req) => {
         cliente_nome: row[1]?.toString() || 'Paciente Não Informado',
         paciente: codigoCliente,
         medico: row[2]?.toString() || 'Médico Não Informado',
-        data_exame: new Date(row[3]?.toString() || Date.now()),
+        data_exame: dataExame.toISOString().split('T')[0], // Formato YYYY-MM-DD
         modalidade: row[4]?.toString() || 'Não Informado',
         especialidade: row[5]?.toString() || 'Não Informado',
         categoria: row[6]?.toString() || 'Não Informado',
@@ -145,8 +165,8 @@ serve(async (req) => {
         quantidade: parseInt(row[9]?.toString() || '1'),
         valor_bruto: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
         valor: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
-        data_emissao: new Date(),
-        data_vencimento: new Date(),
+        data_emissao: new Date().toISOString().split('T')[0],
+        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
         status: 'Ativo'
       }
       
@@ -158,26 +178,27 @@ serve(async (req) => {
     // Identificar períodos
     const periodos = new Set<string>()
     dadosMapeados.forEach(item => {
-      const periodo = item.data_emissao.toISOString().slice(0, 7) // YYYY-MM
+      const periodo = item.data_emissao.slice(0, 7) // YYYY-MM
       periodos.add(periodo)
     })
     
     const periodosArray = Array.from(periodos)
     console.log('11. Períodos identificados:', periodosArray)
 
-    // Remover dados existentes - UM PERÍODO POR VEZ
+    // Remover dados existentes por período
     for (const periodo of periodosArray) {
       console.log(`Removendo dados do período ${periodo}`)
       
-      const inicioMes = new Date(`${periodo}-01`)
-      const fimMes = new Date(inicioMes)
-      fimMes.setMonth(fimMes.getMonth() + 1)
+      const inicioMes = `${periodo}-01`
+      const proximoMes = new Date(`${periodo}-01`)
+      proximoMes.setMonth(proximoMes.getMonth() + 1)
+      const fimMes = proximoMes.toISOString().split('T')[0]
       
       const { error: deleteError } = await supabase
         .from('faturamento')
         .delete()
-        .gte('data_emissao', inicioMes.toISOString())
-        .lt('data_emissao', fimMes.toISOString())
+        .gte('data_emissao', inicioMes)
+        .lt('data_emissao', fimMes)
 
       if (deleteError) {
         console.log(`Erro ao remover dados do período ${periodo}:`, deleteError.message)
@@ -186,9 +207,9 @@ serve(async (req) => {
       }
     }
 
-    // Inserir dados - LOTES MUITO PEQUENOS
-    console.log('12. Inserindo dados em lotes pequenos...')
-    const batchSize = 10 // MUITO PEQUENO
+    // Inserir dados em lotes
+    console.log('12. Inserindo dados em lotes...')
+    const batchSize = 50 // Lotes maiores mas seguros
     let totalInseridos = 0
 
     for (let i = 0; i < dadosMapeados.length; i += batchSize) {
@@ -201,16 +222,28 @@ serve(async (req) => {
 
       if (insertError) {
         console.error(`Erro no lote ${Math.floor(i/batchSize) + 1}:`, insertError.message)
+        // Tentar inserir registros individualmente se o lote falhar
+        for (const registro of lote) {
+          const { error: singleError } = await supabase
+            .from('faturamento')
+            .insert([registro])
+          
+          if (!singleError) {
+            totalInseridos++
+          } else {
+            console.error(`Erro ao inserir registro individual:`, singleError.message)
+          }
+        }
       } else {
         totalInseridos += lote.length
         console.log(`Lote inserido com sucesso. Total: ${totalInseridos}`)
-        
-        // Atualizar progresso
-        await supabase
-          .from('upload_logs')
-          .update({ records_processed: totalInseridos })
-          .eq('id', logData.id)
       }
+      
+      // Atualizar progresso
+      await supabase
+        .from('upload_logs')
+        .update({ records_processed: totalInseridos })
+        .eq('id', logData.id)
     }
 
     // Finalizar
@@ -226,7 +259,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Processamento síncrono concluído - ${totalInseridos} registros inseridos`,
+      message: `Processamento concluído com sucesso - ${totalInseridos} registros inseridos`,
       recordsProcessed: totalInseridos,
       periodosSubstituidos: periodosArray
     }), {
