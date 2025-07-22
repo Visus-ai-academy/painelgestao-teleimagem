@@ -95,7 +95,8 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento - usando todas as colunas possíveis
+    // Buscar dados de faturamento - corrigindo o mapeamento
+    // O nome da clínica está na coluna 'paciente', não 'cliente'
     const queries = [
       // 1. Por cliente_id (relacionamento direto)
       supabase
@@ -105,19 +106,19 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por nome completo do cliente na coluna 'cliente_nome'
+      // 2. Por nome completo do cliente na coluna 'paciente' (mapeamento correto)
       supabase
         .from('faturamento')
         .select('*')
-        .eq('cliente_nome', cliente.nome)
+        .eq('paciente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Por busca parcial no nome do cliente na coluna 'cliente_nome'
+      // 3. Por busca parcial no nome do cliente na coluna 'paciente'
       supabase
         .from('faturamento')
         .select('*')
-        .ilike('cliente_nome', `%${cliente.nome}%`)
+        .ilike('paciente', `%${cliente.nome}%`)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim)
     ];
