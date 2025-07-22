@@ -166,8 +166,7 @@ serve(async (req) => {
         valor_bruto: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
         valor: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
         data_emissao: new Date().toISOString().split('T')[0],
-        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-        status: 'em_aberto'
+        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 dias
       }
       
       dadosMapeados.push(registro)
