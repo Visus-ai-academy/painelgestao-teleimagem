@@ -70,7 +70,7 @@ export default function Volumetria() {
       if (error) throw error;
 
       const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
-      setClientes(empresasUnicas);
+      setClientes(empresasUnicas.sort());
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
     }
@@ -83,9 +83,19 @@ export default function Volumetria() {
     switch (periodo) {
       case "todos":
         return null; // Sem filtro de data
+      case "ultimos_5_dias":
+        dataInicio = new Date(hoje);
+        dataInicio.setDate(hoje.getDate() - 4);
+        dataFim = new Date(hoje);
+        break;
       case "hoje":
         dataInicio = new Date(hoje);
         dataFim = new Date(hoje);
+        break;
+      case "semana_atual":
+        const primeiroDiaSemana = hoje.getDate() - hoje.getDay();
+        dataInicio = new Date(hoje.setDate(primeiroDiaSemana));
+        dataFim = new Date(hoje.setDate(primeiroDiaSemana + 6));
         break;
       case "mes_atual":
         dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -343,20 +353,54 @@ export default function Volumetria() {
 
   const calcularCrescimento = async () => {
     try {
-      // Obter dados do período anterior para comparação
-      const { inicio: inicioAtual, fim: fimAtual } = getDateFilter();
+      const dateFilter = getDateFilter();
       
-      // Calcular período anterior
+      // Se não há filtro de data (todos os dados), não calcular crescimento
+      if (!dateFilter) {
+        setCrescimentoData({
+          total_atual: totalData?.total_exames || 0,
+          total_anterior: 0,
+          crescimento: "0",
+          tipo: "crescimento"
+        });
+        return;
+      }
+
+      // Calcular período anterior baseado no tipo de período
       let inicioAnterior, fimAnterior;
-      const inicioDate = new Date(inicioAtual);
-      const fimDate = new Date(fimAtual);
+      const inicioDate = new Date(dateFilter.inicio);
+      const fimDate = new Date(dateFilter.fim);
       
-      if (periodo.includes("mes")) {
-        inicioAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth() - 1, 1);
-        fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
-      } else {
-        inicioAnterior = new Date(inicioDate.getFullYear() - 1, inicioDate.getMonth(), inicioDate.getDate());
-        fimAnterior = new Date(fimDate.getFullYear() - 1, fimDate.getMonth(), fimDate.getDate());
+      switch (periodo) {
+        case "ultimos_5_dias":
+          inicioAnterior = new Date(inicioDate);
+          inicioAnterior.setDate(inicioDate.getDate() - 5);
+          fimAnterior = new Date(fimDate);
+          fimAnterior.setDate(fimDate.getDate() - 5);
+          break;
+        case "hoje":
+          inicioAnterior = new Date(inicioDate);
+          inicioAnterior.setDate(inicioDate.getDate() - 1);
+          fimAnterior = new Date(fimDate);
+          fimAnterior.setDate(fimDate.getDate() - 1);
+          break;
+        case "semana_atual":
+          inicioAnterior = new Date(inicioDate);
+          inicioAnterior.setDate(inicioDate.getDate() - 7);
+          fimAnterior = new Date(fimDate);
+          fimAnterior.setDate(fimDate.getDate() - 7);
+          break;
+        case "mes_atual":
+          inicioAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth() - 1, 1);
+          fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
+          break;
+        case "ano_atual":
+          inicioAnterior = new Date(inicioDate.getFullYear() - 1, 0, 1);
+          fimAnterior = new Date(inicioDate.getFullYear() - 1, 11, 31);
+          break;
+        default:
+          inicioAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth() - 1, 1);
+          fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
       }
 
       let queryAnterior = supabase
@@ -413,7 +457,9 @@ export default function Volumetria() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os Dados</SelectItem>
+            <SelectItem value="ultimos_5_dias">Últimos 5 Dias</SelectItem>
             <SelectItem value="hoje">Hoje</SelectItem>
+            <SelectItem value="semana_atual">Semana Atual</SelectItem>
             <SelectItem value="mes_atual">Mês Atual</SelectItem>
             <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
             <SelectItem value="ano_atual">Ano Atual</SelectItem>
