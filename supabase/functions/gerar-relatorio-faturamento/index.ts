@@ -409,7 +409,7 @@ serve(async (req: Request) => {
           doc.text((item.categoria || '-').substring(0, 12), 205, yPosition + 2);
           doc.text((item.prioridade || '-').substring(0, 12), 230, yPosition + 2);
           doc.text((item.quantidade || '1').toString(), 250, yPosition + 2);
-          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 260, yPosition + 2);
+          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
           
           yPosition += 6;
         }
