@@ -421,7 +421,8 @@ export default function GerarFaturamento() {
       const { data: faturamentoData, error: faturamentoError } = await supabase
         .from('faturamento')
         .select('*')
-        .ilike('numero_fatura', `%${periodoSelecionado}%`);
+        .gte('data_emissao', `${periodoSelecionado}-01`)
+        .lt('data_emissao', `${periodoSelecionado === '2025-07' ? '2025-08' : new Date(new Date(periodoSelecionado + '-01').setMonth(new Date(periodoSelecionado + '-01').getMonth() + 1)).toISOString().substring(0, 7)}-01`);
 
       if (faturamentoError) {
         throw new Error(`Erro ao buscar dados: ${faturamentoError.message}`);
