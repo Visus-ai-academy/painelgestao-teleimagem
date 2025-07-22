@@ -418,11 +418,16 @@ export default function GerarFaturamento() {
       });
 
       // Buscar dados processados da tabela faturamento
+      const inicioMes = `${periodoSelecionado}-01`;
+      const proximoMes = new Date(`${periodoSelecionado}-01`);
+      proximoMes.setMonth(proximoMes.getMonth() + 1);
+      const fimMes = proximoMes.toISOString().split('T')[0];
+      
       const { data: faturamentoData, error: faturamentoError } = await supabase
         .from('faturamento')
         .select('*')
-        .gte('data_emissao', `${periodoSelecionado}-01`)
-        .lt('data_emissao', `${periodoSelecionado === '2025-07' ? '2025-08' : new Date(new Date(periodoSelecionado + '-01').setMonth(new Date(periodoSelecionado + '-01').getMonth() + 1)).toISOString().substring(0, 7)}-01`);
+        .gte('data_emissao', inicioMes)
+        .lt('data_emissao', fimMes);
 
       if (faturamentoError) {
         throw new Error(`Erro ao buscar dados: ${faturamentoError.message}`);
