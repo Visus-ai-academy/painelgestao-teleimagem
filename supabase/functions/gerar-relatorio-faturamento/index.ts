@@ -51,8 +51,8 @@ serve(async (req: Request) => {
     // Calcular período
     const [ano, mes] = periodo.split('-');
     const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
-    const dataInicio = `${ano}-${mes}-01`;
-    const dataFim = `${ano}-${mes}-${ultimoDia}`;
+    const dataInicio = `${ano}-${mes.padStart(2, '0')}-01`;
+    const dataFim = `${ano}-${mes.padStart(2, '0')}-${ultimoDia.toString().padStart(2, '0')}`;
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
     console.log(`Cliente ID recebido: ${cliente_id}`);
