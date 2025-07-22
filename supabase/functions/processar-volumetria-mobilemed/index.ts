@@ -196,6 +196,120 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): Volume
   }
 }
 
+// Função de processamento em background
+async function processFileInBackground(
+  supabaseClient: any,
+  file_path: string,
+  arquivo_fonte: 'data_laudo' | 'data_exame',
+  uploadLogId: string
+) {
+  try {
+    console.log('Iniciando processamento em background');
+    
+    // Baixar arquivo do storage
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(file_path);
+
+    if (downloadError) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+    }
+
+    console.log('Arquivo baixado com sucesso');
+
+    // Ler arquivo Excel
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    
+    if (!workbook.SheetNames.length) {
+      throw new Error('Arquivo Excel não possui planilhas');
+    }
+
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+    console.log(`Dados extraídos: ${jsonData.length} linhas`);
+
+    if (jsonData.length === 0) {
+      throw new Error('Arquivo Excel está vazio');
+    }
+
+    // Processar dados em chunks menores para evitar timeout
+    const processedRecords: VolumetriaRecord[] = [];
+    const errors: string[] = [];
+    const chunkSize = 1000; // Processar em chunks de 1000 linhas
+
+    for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += chunkSize) {
+      const chunk = jsonData.slice(chunkStart, chunkStart + chunkSize);
+      
+      for (let i = 0; i < chunk.length; i++) {
+        const row = chunk[i];
+        const record = processRow(row, arquivo_fonte);
+        
+        if (record) {
+          processedRecords.push(record);
+        } else {
+          errors.push(`Linha ${chunkStart + i + 2}: Dados inválidos ou incompletos`);
+        }
+      }
+
+      // Log de progresso
+      console.log(`Processadas ${Math.min(chunkStart + chunkSize, jsonData.length)} de ${jsonData.length} linhas`);
+    }
+
+    console.log(`Registros processados: ${processedRecords.length}`);
+    console.log(`Erros encontrados: ${errors.length}`);
+
+    if (processedRecords.length === 0) {
+      throw new Error('Nenhum registro válido encontrado no arquivo');
+    }
+
+    // Inserir dados no banco em lotes menores
+    const batchSize = 50; // Reduzido para evitar timeout
+    let totalInserted = 0;
+
+    for (let i = 0; i < processedRecords.length; i += batchSize) {
+      const batch = processedRecords.slice(i, i + batchSize);
+      
+      const { error: insertError } = await supabaseClient
+        .from('volumetria_mobilemed')
+        .insert(batch);
+
+      if (insertError) {
+        console.error('Erro ao inserir lote:', insertError);
+        errors.push(`Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
+      } else {
+        totalInserted += batch.length;
+        console.log(`Lote inserido: ${batch.length} registros (${totalInserted}/${processedRecords.length})`);
+      }
+    }
+
+    // Atualizar log de upload com sucesso
+    await supabaseClient
+      .from('upload_logs')
+      .update({
+        status: totalInserted > 0 ? 'completed' : 'error',
+        records_processed: totalInserted,
+        error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
+      })
+      .eq('id', uploadLogId);
+
+    console.log('Processamento concluído com sucesso');
+
+  } catch (error) {
+    console.error('Erro durante processamento em background:', error);
+    
+    // Atualizar log com erro
+    await supabaseClient
+      .from('upload_logs')
+      .update({
+        status: 'error',
+        error_message: error.message || 'Erro desconhecido durante processamento'
+      })
+      .eq('id', uploadLogId);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -241,137 +355,41 @@ serve(async (req) => {
 
     console.log('Log criado:', uploadLog.id);
 
-    try {
-      // Baixar arquivo do storage
-      const { data: fileData, error: downloadError } = await supabaseClient.storage
-        .from('uploads')
-        .download(file_path);
+    // Iniciar processamento em background
+    const backgroundTask = processFileInBackground(
+      supabaseClient,
+      file_path,
+      arquivo_fonte as 'data_laudo' | 'data_exame',
+      uploadLog.id
+    );
 
-      if (downloadError) {
-        console.error('Erro ao baixar arquivo:', downloadError);
-        throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
-      }
-
-      console.log('Arquivo baixado com sucesso');
-
-      // Ler arquivo Excel
-      const arrayBuffer = await fileData.arrayBuffer();
-      const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-      
-      if (!workbook.SheetNames.length) {
-        throw new Error('Arquivo Excel não possui planilhas');
-      }
-
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      console.log(`Dados extraídos: ${jsonData.length} linhas`);
-
-      if (jsonData.length === 0) {
-        throw new Error('Arquivo Excel está vazio');
-      }
-
-      // Processar dados
-      const processedRecords: VolumetriaRecord[] = [];
-      const errors: string[] = [];
-
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        const record = processRow(row, arquivo_fonte as 'data_laudo' | 'data_exame');
-        
-        if (record) {
-          processedRecords.push(record);
-        } else {
-          errors.push(`Linha ${i + 2}: Dados inválidos ou incompletos`);
-        }
-      }
-
-      console.log(`Registros processados: ${processedRecords.length}`);
-      console.log(`Erros encontrados: ${errors.length}`);
-
-      if (processedRecords.length === 0) {
-        throw new Error('Nenhum registro válido encontrado no arquivo');
-      }
-
-      // Inserir dados no banco em lotes
-      const batchSize = 100;
-      let totalInserted = 0;
-
-      for (let i = 0; i < processedRecords.length; i += batchSize) {
-        const batch = processedRecords.slice(i, i + batchSize);
-        
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(batch);
-
-        if (insertError) {
-          console.error('Erro ao inserir lote:', insertError);
-          errors.push(`Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
-        } else {
-          totalInserted += batch.length;
-          console.log(`Lote inserido: ${batch.length} registros`);
-        }
-      }
-
-      // Atualizar log de upload
-      await supabaseClient
-        .from('upload_logs')
-        .update({
-          status: totalInserted > 0 ? 'completed' : 'error',
-          records_processed: totalInserted,
-          error_message: errors.length > 0 ? errors.join('; ') : null
-        })
-        .eq('id', uploadLog.id);
-
-      console.log('Processamento concluído');
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          records_processed: totalInserted,
-          total_lines: jsonData.length,
-          errors: errors,
-          arquivo_fonte: arquivo_fonte,
-          upload_log_id: uploadLog.id
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-
-    } catch (processingError) {
-      console.error('Erro durante processamento:', processingError);
-      
-      // Atualizar log com erro
-      try {
-        await supabaseClient
-          .from('upload_logs')
-          .update({
-            status: 'error',
-            error_message: processingError.message || 'Erro desconhecido'
-          })
-          .eq('id', uploadLog.id);
-      } catch (logUpdateError) {
-        console.error('Erro ao atualizar log:', logUpdateError);
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: processingError.message || 'Erro durante processamento',
-          upload_log_id: uploadLog.id
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    // Usar waitUntil para permitir que o processamento continue em background
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      EdgeRuntime.waitUntil(backgroundTask);
+    } else {
+      // Fallback para ambientes que não suportam waitUntil
+      backgroundTask.catch(console.error);
     }
+
+    // Retornar resposta imediata
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Processamento iniciado em background',
+        upload_log_id: uploadLog.id,
+        arquivo_fonte: arquivo_fonte,
+        status: 'processing'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
     console.error('Erro na função processar-volumetria-mobilemed:', error);
     return new Response(
       JSON.stringify({
+        success: false,
         error: error.message,
         details: 'Erro interno na função de processamento'
       }),
@@ -381,4 +399,9 @@ serve(async (req) => {
       }
     );
   }
+});
+
+// Tratar shutdown da função
+addEventListener('beforeunload', (ev) => {
+  console.log('Function shutdown due to:', ev.detail?.reason);
 });
