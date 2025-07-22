@@ -1128,10 +1128,7 @@ export default function GerarFaturamento() {
                     className="absolute inset-0 transition-all duration-500"
                     style={{ 
                       width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%',
-                      background: `linear-gradient(90deg, 
-                        rgba(34, 197, 94, 0.3) 0%,
-                        rgba(34, 197, 94, 0.8) 50%,
-                        rgba(34, 197, 94, 0.3) 100%)`
+                      boxShadow: 'inset -10px 0 15px -5px rgba(34, 197, 94, 0.5)'
                     }}
                   />
                   <div className="relative z-10">
