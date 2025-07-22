@@ -87,15 +87,15 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por nome do cliente no campo paciente (onde estão os códigos das clínicas)
+      // 2. Por código da clínica no campo cliente
       supabase
         .from('faturamento')
         .select('*')
-        .eq('paciente', cliente.nome)
+        .eq('cliente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Por campo cliente_nome
+      // 3. Por código da clínica no campo cliente_nome
       supabase
         .from('faturamento')
         .select('*')
@@ -206,7 +206,7 @@ serve(async (req: Request) => {
           }
           
           doc.text((item.data_exame || item.data_emissao || '-').substring(0, 10), 25, yPosition);
-          doc.text((item.cliente || item.cliente_nome || '-').substring(0, 20), 50, yPosition); // Nome do paciente
+          doc.text((item.paciente || '-').substring(0, 20), 50, yPosition); // Nome do paciente
           doc.text((item.medico || '-').substring(0, 15), 90, yPosition);
           doc.text((item.modalidade || '-').substring(0, 15), 120, yPosition);
           doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition);
