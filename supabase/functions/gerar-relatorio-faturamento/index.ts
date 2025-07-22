@@ -226,8 +226,8 @@ serve(async (req: Request) => {
             const base64String = btoa(binary);
             const imageFormat = ext.toUpperCase() === 'JPG' ? 'JPEG' : ext.toUpperCase();
             
-            // Adicionar imagem ao PDF com dimensões adequadas (mais largura, menos altura)
-            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 130, 8, 40, 25);
+            // Adicionar imagem ao PDF com dimensões adequadas e posição mais alta
+            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 130, 5, 40, 25);
             logoAdded = true;
             console.log(`Logomarca ${fileName} carregada com sucesso no PDF`);
             break;
@@ -238,10 +238,10 @@ serve(async (req: Request) => {
           // Se não encontrou logomarca, mostrar placeholder
           doc.setDrawColor(200, 200, 200);
           doc.setLineWidth(0.5);
-          doc.rect(130, 8, 40, 25);
+          doc.rect(130, 5, 40, 25);
           doc.setFontSize(8);
           doc.setTextColor(128, 128, 128);
-          doc.text('LOGOMARCA', 150, 22, { align: 'center' });
+          doc.text('LOGOMARCA', 150, 19, { align: 'center' });
           console.log('Nenhuma logomarca encontrada, usando placeholder');
         }
       } catch (logoError) {
@@ -249,10 +249,10 @@ serve(async (req: Request) => {
         // Mostrar placeholder em caso de erro
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.5);
-        doc.rect(130, 8, 40, 25);
+        doc.rect(130, 5, 40, 25);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text('LOGOMARCA', 150, 22, { align: 'center' });
+        doc.text('LOGOMARCA', 150, 19, { align: 'center' });
       }
       
       // === CABEÇALHO ===
