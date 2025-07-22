@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { Speedometer } from "@/components/Speedometer";
-import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile } from "@/lib/supabase";
+import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -1754,6 +1754,45 @@ export default function GerarFaturamento() {
               }}
                icon={<FileBarChart2 className="h-5 w-5" />}
              />
+             
+             {/* Botão para limpar uploads antigos */}
+             <div className="mt-4">
+               <Button
+                 onClick={async () => {
+                   try {
+                     console.log('Iniciando limpeza de uploads antigos...');
+                     const result = await limparUploadsAntigos();
+                     console.log('Resultado da limpeza:', result);
+                     
+                     if (result.success) {
+                       toast({
+                         title: "Limpeza Concluída",
+                         description: `${result.uploads_cancelados || 0} uploads antigos foram cancelados`,
+                       });
+                     } else {
+                       toast({
+                         title: "Erro na Limpeza",
+                         description: result.error || "Erro desconhecido",
+                         variant: "destructive",
+                       });
+                     }
+                   } catch (error: any) {
+                     console.error('Erro na limpeza:', error);
+                     toast({
+                       title: "Erro na Limpeza",
+                       description: error.message,
+                       variant: "destructive",
+                     });
+                   }
+                 }}
+                 variant="outline"
+                 size="sm"
+                 className="w-full"
+               >
+                 <HardDrive className="h-4 w-4 mr-2" />
+                 Limpar Uploads Antigos
+               </Button>
+             </div>
            </div>
         </TabsContent>
 
