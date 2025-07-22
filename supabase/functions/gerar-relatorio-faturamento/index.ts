@@ -86,19 +86,19 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por nome do cliente (exato)
+      // 2. Por nome do cliente no campo paciente (onde estão os códigos das clínicas)
+      supabase
+        .from('faturamento')
+        .select('*')
+        .eq('paciente', cliente.nome)
+        .gte('data_emissao', dataInicio)
+        .lt('data_emissao', dataFim),
+      
+      // 3. Por campo cliente_nome
       supabase
         .from('faturamento')
         .select('*')
         .eq('cliente_nome', cliente.nome)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim),
-      
-      // 3. Por campo cliente (se existir)
-      supabase
-        .from('faturamento')
-        .select('*')
-        .eq('cliente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim)
     ];
