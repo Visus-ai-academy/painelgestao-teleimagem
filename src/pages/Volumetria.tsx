@@ -47,6 +47,11 @@ export default function Volumetria() {
   const [prioridadeData, setPrioridadeData] = useState<any[]>([]);
   const [atrasosData, setAtrasosData] = useState<any>(null);
   const [crescimentoData, setCrescimentoData] = useState<any>(null);
+  
+  // Estados para análise de atrasos por dimensão
+  const [atrasosModalidade, setAtrasosModalidade] = useState<any[]>([]);
+  const [atrasosEspecialidade, setAtrasosEspecialidade] = useState<any[]>([]);
+  const [atrasosCliente, setAtrasosCliente] = useState<any[]>([]);
 
   const [clientes, setClientes] = useState<string[]>([]);
 
@@ -249,8 +254,82 @@ export default function Volumetria() {
     
     setPrioridadeData(prioridadeArray);
 
+    // Análise de atrasos por dimensão
+    processarAtrasosDetalhados(rawData, atrasados);
+
     // Calcular crescimento (comparar com período anterior)
     await calcularCrescimento();
+  };
+
+  const processarAtrasosDetalhados = (rawData: VolumetriaData[], atrasados: VolumetriaData[]) => {
+    // Atrasos por Modalidade
+    const atrasosPorModalidade = rawData.reduce((acc: any, item) => {
+      const key = item.MODALIDADE || "Não informado";
+      if (!acc[key]) {
+        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
+      }
+      acc[key].total_registros += 1;
+      
+      // Verificar se está atrasado
+      if (atrasados.some(a => a.id === item.id)) {
+        acc[key].atrasados += 1;
+      }
+      
+      return acc;
+    }, {});
+
+    const modalidadeAtrasosArray = Object.values(atrasosPorModalidade).map((item: any) => ({
+      ...item,
+      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+    }));
+
+    setAtrasosModalidade(modalidadeAtrasosArray);
+
+    // Atrasos por Especialidade
+    const atrasosPorEspecialidade = rawData.reduce((acc: any, item) => {
+      const key = item.ESPECIALIDADE || "Não informado";
+      if (!acc[key]) {
+        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
+      }
+      acc[key].total_registros += 1;
+      
+      // Verificar se está atrasado
+      if (atrasados.some(a => a.id === item.id)) {
+        acc[key].atrasados += 1;
+      }
+      
+      return acc;
+    }, {});
+
+    const especialidadeAtrasosArray = Object.values(atrasosPorEspecialidade).map((item: any) => ({
+      ...item,
+      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+    }));
+
+    setAtrasosEspecialidade(especialidadeAtrasosArray);
+
+    // Atrasos por Cliente
+    const atrasosPorCliente = rawData.reduce((acc: any, item) => {
+      const key = item.EMPRESA;
+      if (!acc[key]) {
+        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
+      }
+      acc[key].total_registros += 1;
+      
+      // Verificar se está atrasado
+      if (atrasados.some(a => a.id === item.id)) {
+        acc[key].atrasados += 1;
+      }
+      
+      return acc;
+    }, {});
+
+    const clienteAtrasosArray = Object.values(atrasosPorCliente).map((item: any) => ({
+      ...item,
+      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+    }));
+
+    setAtrasosCliente(clienteAtrasosArray);
   };
 
   const calcularCrescimento = async () => {
@@ -543,6 +622,167 @@ export default function Volumetria() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Análise Detalhada de Atrasos */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+            Análise Detalhada de Atrasos
+          </h2>
+          <p className="text-muted-foreground">Desdobramento dos atrasos por dimensão</p>
+        </div>
+
+        {/* Atrasos por Modalidade */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-600" />
+              Atrasos por Modalidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gráfico */}
+              <div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={atrasosModalidade}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="nome" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
+                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Tabela */}
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {atrasosModalidade.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{item.nome}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.atrasados} de {item.total_registros} exames
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge 
+                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
+                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
+                      >
+                        {item.percentual_atraso}%
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Atrasos por Especialidade */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" />
+              Atrasos por Especialidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gráfico */}
+              <div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={atrasosEspecialidade}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="nome" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
+                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Tabela */}
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {atrasosEspecialidade.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{item.nome}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.atrasados} de {item.total_registros} exames
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge 
+                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
+                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
+                      >
+                        {item.percentual_atraso}%
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Atrasos por Cliente */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-600" />
+              Atrasos por Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gráfico */}
+              <div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={atrasosCliente}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="nome" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
+                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Tabela */}
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {atrasosCliente.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{item.nome}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.atrasados} de {item.total_registros} exames
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge 
+                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
+                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
+                      >
+                        {item.percentual_atraso}%
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
