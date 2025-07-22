@@ -134,7 +134,6 @@ serve(async (req) => {
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
-        cliente_nome: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
         cliente: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
         paciente: row[0] ? String(row[0]) : 'Paciente Não Informado', // Paciente (coluna 0)
         medico: row[2] ? String(row[2]) : 'Médico Não Informado', // Medico (coluna 2)
@@ -163,20 +162,31 @@ serve(async (req) => {
       throw new Error('Nenhum dado válido encontrado no arquivo')
     }
 
-    // Inserir dados no banco
+    // Inserir dados no banco em lotes para evitar timeout
     console.log('10. Inserindo dados no banco...')
     
-    const { data: insertData, error: insertError } = await supabase
-      .from('faturamento')
-      .insert(dadosFaturamento)
-      .select()
+    const batchSize = 1000; // Processar em lotes de 1000 registros
+    let totalInseridos = 0;
+    
+    for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
+      const lote = dadosFaturamento.slice(i, i + batchSize);
+      console.log(`Inserindo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(dadosFaturamento.length/batchSize)}: ${lote.length} registros`);
+      
+      const { data: insertData, error: insertError } = await supabase
+        .from('faturamento')
+        .insert(lote)
+        .select()
 
-    if (insertError) {
-      console.error('Erro ao inserir dados de faturamento:', insertError)
-      throw new Error('Erro ao inserir faturamento: ' + insertError.message)
+      if (insertError) {
+        console.error('Erro ao inserir lote de faturamento:', insertError)
+        throw new Error('Erro ao inserir faturamento (lote): ' + insertError.message)
+      }
+
+      totalInseridos += insertData?.length || 0;
+      console.log(`Lote inserido: ${insertData?.length || 0} registros`);
     }
 
-    console.log('11. Dados inseridos:', insertData?.length || 0, 'registros')
+    console.log('11. Total de dados inseridos:', totalInseridos, 'registros')
 
     // Atualizar log de sucesso
     if (logData?.id) {
