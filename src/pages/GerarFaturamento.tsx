@@ -41,8 +41,8 @@ import { MatrixRain } from "@/components/MatrixRain";
 import { ProcessingSpeedometer } from "@/components/ProcessingSpeedometer";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
-// Período atual (julho/2025)
-const PERIODO_ATUAL = "2025-07";
+// Período atual (junho/2025) - onde estão os dados carregados
+const PERIODO_ATUAL = "2025-06";
 
 // Função para verificar se um período pode ser editado
 const isPeriodoEditavel = (periodo: string): boolean => {
