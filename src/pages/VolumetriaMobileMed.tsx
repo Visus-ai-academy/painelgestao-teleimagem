@@ -43,9 +43,18 @@ interface Stats {
   total_valores: number;
 }
 
+interface FilteredStats {
+  total_registros: number;
+  total_valores: number;
+  empresas_filtradas: number;
+  especialidades_filtradas: number;
+  modalidades_filtradas: number;
+}
+
 export default function VolumetriaMobileMed() {
   const [data, setData] = useState<VolumetriaData[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [filteredStats, setFilteredStats] = useState<FilteredStats | null>(null);
   const [loading, setLoading] = useState(false); // Não iniciar carregando
   const [loadingFilters, setLoadingFilters] = useState(false);
   const [filters, setFilters] = useState({
