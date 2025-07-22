@@ -18,14 +18,19 @@ interface VolumetriaData {
   arquivo_fonte: string;
   EMPRESA: string;
   NOME_PACIENTE: string;
+  CODIGO_PACIENTE: string;
+  ESTUDO_DESCRICAO: string;
+  ACCESSION_NUMBER: string;
   ESPECIALIDADE: string;
   MODALIDADE: string;
   MEDICO: string;
+  PRIORIDADE: string;
   VALORES: number;
-  data_referencia: string;
-  DATA_REALIZACAO: string;
-  DATA_LAUDO: string;
   STATUS: string;
+  DATA_REALIZACAO: string;
+  HORA_REALIZACAO: string;
+  DATA_LAUDO: string;
+  HORA_LAUDO: string;
   data_upload: string;
 }
 
@@ -64,10 +69,15 @@ export default function VolumetriaMobileMed() {
     try {
       setLoading(true);
       
-      // Construir query com filtros
+      // Construir query com filtros - selecionando apenas campos necessários para performance
       let query = supabase
         .from('volumetria_mobilemed')
-        .select('*')
+        .select(`
+          id, arquivo_fonte, EMPRESA, NOME_PACIENTE, CODIGO_PACIENTE, 
+          ESTUDO_DESCRICAO, ACCESSION_NUMBER, ESPECIALIDADE, MODALIDADE, 
+          MEDICO, PRIORIDADE, VALORES, STATUS, DATA_REALIZACAO, 
+          HORA_REALIZACAO, DATA_LAUDO, HORA_LAUDO, data_upload
+        `)
         .order('data_upload', { ascending: false });
 
       if (filters.empresa && filters.empresa !== '__all__') {
@@ -83,13 +93,21 @@ export default function VolumetriaMobileMed() {
         query = query.eq('arquivo_fonte', filters.arquivo_fonte);
       }
       if (filters.data_inicio) {
-        query = query.gte('data_referencia', filters.data_inicio);
+        if (filters.arquivo_fonte === 'data_laudo') {
+          query = query.gte('DATA_LAUDO', filters.data_inicio);
+        } else {
+          query = query.gte('DATA_REALIZACAO', filters.data_inicio);
+        }
       }
       if (filters.data_fim) {
-        query = query.lte('data_referencia', filters.data_fim);
+        if (filters.arquivo_fonte === 'data_laudo') {
+          query = query.lte('DATA_LAUDO', filters.data_fim);
+        } else {
+          query = query.lte('DATA_REALIZACAO', filters.data_fim);
+        }
       }
 
-      const { data: volumetriaData, error } = await query.limit(1000);
+      const { data: volumetriaData, error } = await query.limit(500); // Reduzindo para 500 para melhor performance
 
       if (error) throw error;
 
@@ -368,7 +386,7 @@ export default function VolumetriaMobileMed() {
             <CardHeader>
               <CardTitle>Dados de Volumetria</CardTitle>
               <CardDescription>
-                Mostrando {data.length} registros {data.length === 1000 ? '(limitado a 1000)' : ''}
+                Mostrando {data.length} registros {data.length === 500 ? '(limitado a 500 para melhor performance)' : ''}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -378,13 +396,17 @@ export default function VolumetriaMobileMed() {
                     <TableRow>
                       <TableHead>Empresa</TableHead>
                       <TableHead>Paciente</TableHead>
+                      <TableHead>Código Paciente</TableHead>
+                      <TableHead>Accession Number</TableHead>
                       <TableHead>Especialidade</TableHead>
                       <TableHead>Modalidade</TableHead>
                       <TableHead>Médico</TableHead>
-                      <TableHead>Valores</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Data Ref.</TableHead>
+                      <TableHead>Prioridade</TableHead>
+                      <TableHead className="text-right">Valores</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Data Realização</TableHead>
+                      <TableHead>Data Laudo</TableHead>
+                      <TableHead>Tipo Arquivo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -392,20 +414,26 @@ export default function VolumetriaMobileMed() {
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.EMPRESA}</TableCell>
                         <TableCell>{item.NOME_PACIENTE}</TableCell>
+                        <TableCell>{item.CODIGO_PACIENTE || '-'}</TableCell>
+                        <TableCell>{item.ACCESSION_NUMBER || '-'}</TableCell>
                         <TableCell>{item.ESPECIALIDADE}</TableCell>
                         <TableCell>{item.MODALIDADE}</TableCell>
                         <TableCell>{item.MEDICO}</TableCell>
-                        <TableCell className="text-right">{item.VALORES}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.arquivo_fonte === 'data_laudo' ? 'default' : 'secondary'}>
-                            {item.arquivo_fonte === 'data_laudo' ? 'Laudo' : 'Exame'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.data_referencia ? format(parseISO(item.data_referencia), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </TableCell>
+                        <TableCell>{item.PRIORIDADE || '-'}</TableCell>
+                        <TableCell className="text-right">{item.VALORES?.toLocaleString() || 0}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{item.STATUS || 'N/A'}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {item.DATA_REALIZACAO ? format(parseISO(item.DATA_REALIZACAO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {item.DATA_LAUDO ? format(parseISO(item.DATA_LAUDO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={item.arquivo_fonte === 'data_laudo' ? 'default' : 'secondary'}>
+                            {item.arquivo_fonte === 'data_laudo' ? 'Data Laudo' : 'Data Exame'}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
