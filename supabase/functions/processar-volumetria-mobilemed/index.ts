@@ -8,36 +8,37 @@ const corsHeaders = {
 };
 
 interface VolumetriaRecord {
-  empresa: string;
-  nome_paciente: string;
-  codigo_paciente?: string;
-  estudo_descricao?: string;
-  accession_number?: string;
-  modalidade?: string;
-  prioridade?: string;
-  valores?: number;
-  especialidade?: string;
-  medico?: string;
-  duplicado?: string;
-  data_realizacao?: Date;
-  hora_realizacao?: string;
-  data_transferencia?: Date;
-  hora_transferencia?: string;
-  data_laudo?: Date;
-  hora_laudo?: string;
-  data_prazo?: Date;
-  hora_prazo?: string;
-  status?: string;
-  data_reassinatura?: Date;
-  hora_reassinatura?: string;
-  medico_reassinatura?: string;
-  segunda_assinatura?: string;
-  possui_imagens_chave?: string;
-  imagens_chaves?: number;
-  imagens_capturadas?: number;
-  codigo_interno?: number;
-  digitador?: string;
-  complementar?: string;
+  // Campos exatos do arquivo - sem mapeamento necessário
+  EMPRESA: string;
+  NOME_PACIENTE: string;
+  CODIGO_PACIENTE?: string;
+  ESTUDO_DESCRICAO?: string;
+  ACCESSION_NUMBER?: string;
+  MODALIDADE?: string;
+  PRIORIDADE?: string;
+  VALORES?: number;
+  ESPECIALIDADE?: string;
+  MEDICO?: string;
+  DUPLICADO?: string;
+  DATA_REALIZACAO?: Date;
+  HORA_REALIZACAO?: string;
+  DATA_TRANSFERENCIA?: Date;
+  HORA_TRANSFERENCIA?: string;
+  DATA_LAUDO?: Date;
+  HORA_LAUDO?: string;
+  DATA_PRAZO?: Date;
+  HORA_PRAZO?: string;
+  STATUS?: string;
+  DATA_REASSINATURA?: Date;
+  HORA_REASSINATURA?: string;
+  MEDICO_REASSINATURA?: string;
+  SEGUNDA_ASSINATURA?: string;
+  POSSUI_IMAGENS_CHAVE?: string;
+  IMAGENS_CHAVES?: number;
+  IMAGENS_CAPTURADAS?: number;
+  CODIGO_INTERNO?: number;
+  DIGITADOR?: string;
+  COMPLEMENTAR?: string;
   arquivo_fonte: 'data_laudo' | 'data_exame';
 }
 
@@ -147,46 +148,46 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): Volume
     }
 
     const record: VolumetriaRecord = {
-      // Campos obrigatórios
-      empresa: String(row['EMPRESA']).trim(),
-      nome_paciente: String(row['NOME_PACIENTE']).trim(),
+      // Campos obrigatórios - usar nomes exatos das colunas
+      EMPRESA: String(row['EMPRESA']).trim(),
+      NOME_PACIENTE: String(row['NOME_PACIENTE']).trim(),
       arquivo_fonte: arquivoFonte,
       
-      // Campos opcionais de texto
-      codigo_paciente: row['CODIGO_PACIENTE'] ? String(row['CODIGO_PACIENTE']).trim() : null,
-      estudo_descricao: row['ESTUDO_DESCRICAO'] ? String(row['ESTUDO_DESCRICAO']).trim() : null,
-      accession_number: row['ACCESSION_NUMBER'] ? String(row['ACCESSION_NUMBER']).trim() : null,
-      modalidade: row['MODALIDADE'] ? String(row['MODALIDADE']).trim() : null,
-      prioridade: row['PRIORIDADE'] ? String(row['PRIORIDADE']).trim() : null,
-      especialidade: row['ESPECIALIDADE'] ? String(row['ESPECIALIDADE']).trim() : null,
-      medico: row['MEDICO'] ? String(row['MEDICO']).trim() : null,
-      duplicado: row['DUPLICADO'] ? String(row['DUPLICADO']).trim() : null,
-      status: row['STATUS'] ? String(row['STATUS']).trim() : null,
-      medico_reassinatura: row['MEDICO_REASSINATURA'] ? String(row['MEDICO_REASSINATURA']).trim() : null,
-      segunda_assinatura: row['SEGUNDA_ASSINATURA'] ? String(row['SEGUNDA_ASSINATURA']).trim() : null,
-      possui_imagens_chave: row['POSSUI_IMAGENS_CHAVE'] ? String(row['POSSUI_IMAGENS_CHAVE']).trim() : null,
-      digitador: row['DIGITADOR'] ? String(row['DIGITADOR']).trim() : null,
-      complementar: row['COMPLEMENTAR'] ? String(row['COMPLEMENTAR']).trim() : null,
+      // Campos opcionais de texto - usar nomes exatos
+      CODIGO_PACIENTE: row['CODIGO_PACIENTE'] ? String(row['CODIGO_PACIENTE']).trim() : null,
+      ESTUDO_DESCRICAO: row['ESTUDO_DESCRICAO'] ? String(row['ESTUDO_DESCRICAO']).trim() : null,
+      ACCESSION_NUMBER: row['ACCESSION_NUMBER'] ? String(row['ACCESSION_NUMBER']).trim() : null,
+      MODALIDADE: row['MODALIDADE'] ? String(row['MODALIDADE']).trim() : null,
+      PRIORIDADE: row['PRIORIDADE'] ? String(row['PRIORIDADE']).trim() : null,
+      ESPECIALIDADE: row['ESPECIALIDADE'] ? String(row['ESPECIALIDADE']).trim() : null,
+      MEDICO: row['MEDICO'] ? String(row['MEDICO']).trim() : null,
+      DUPLICADO: row['DUPLICADO'] ? String(row['DUPLICADO']).trim() : null,
+      STATUS: row['STATUS'] ? String(row['STATUS']).trim() : null,
+      MEDICO_REASSINATURA: row['MEDICO_REASSINATURA'] ? String(row['MEDICO_REASSINATURA']).trim() : null,
+      SEGUNDA_ASSINATURA: row['SEGUNDA_ASSINATURA'] ? String(row['SEGUNDA_ASSINATURA']).trim() : null,
+      POSSUI_IMAGENS_CHAVE: row['POSSUI_IMAGENS_CHAVE'] ? String(row['POSSUI_IMAGENS_CHAVE']).trim() : null,
+      DIGITADOR: row['DIGITADOR'] ? String(row['DIGITADOR']).trim() : null,
+      COMPLEMENTAR: row['COMPLEMENTAR'] ? String(row['COMPLEMENTAR']).trim() : null,
       
-      // Campos numéricos
-      valores: row['VALORES'] ? convertValues(row['VALORES']) : null,
-      imagens_chaves: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : null,
-      imagens_capturadas: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : null,
-      codigo_interno: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : null,
+      // Campos numéricos - usar nomes exatos
+      VALORES: row['VALORES'] ? convertValues(row['VALORES']) : null,
+      IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : null,
+      IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : null,
+      CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : null,
       
-      // Campos de data - converter para string ISO
-      data_realizacao: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : null,
-      data_transferencia: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : null,
-      data_laudo: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : null,
-      data_prazo: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : null,
-      data_reassinatura: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : null,
+      // Campos de data - usar nomes exatos
+      DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : null,
+      DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : null,
+      DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : null,
+      DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : null,
+      DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : null,
       
-      // Campos de hora
-      hora_realizacao: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : null,
-      hora_transferencia: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : null,
-      hora_laudo: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : null,
-      hora_prazo: row['HORA_PRAZO'] ? convertTime(String(row['HORA_PRAZO'])) : null,
-      hora_reassinatura: row['HORA_REASSINATURA'] ? convertTime(String(row['HORA_REASSINATURA'])) : null,
+      // Campos de hora - usar nomes exatos
+      HORA_REALIZACAO: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : null,
+      HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : null,
+      HORA_LAUDO: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : null,
+      HORA_PRAZO: row['HORA_PRAZO'] ? convertTime(String(row['HORA_PRAZO'])) : null,
+      HORA_REASSINATURA: row['HORA_REASSINATURA'] ? convertTime(String(row['HORA_REASSINATURA'])) : null,
     };
 
     return record;

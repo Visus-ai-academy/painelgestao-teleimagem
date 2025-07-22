@@ -1432,121 +1432,121 @@ export type Database = {
       }
       volumetria_mobilemed: {
         Row: {
-          accession_number: string | null
+          ACCESSION_NUMBER: string | null
           arquivo_fonte: string
-          codigo_interno: number | null
-          codigo_paciente: string | null
-          complementar: string | null
+          CODIGO_INTERNO: number | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
           created_at: string
           created_by: string | null
-          data_laudo: string | null
-          data_prazo: string | null
-          data_realizacao: string | null
-          data_reassinatura: string | null
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
           data_referencia: string | null
-          data_transferencia: string | null
+          DATA_TRANSFERENCIA: string | null
           data_upload: string
-          digitador: string | null
-          duplicado: string | null
-          empresa: string
-          especialidade: string | null
-          estudo_descricao: string | null
-          hora_laudo: string | null
-          hora_prazo: string | null
-          hora_realizacao: string | null
-          hora_reassinatura: string | null
-          hora_transferencia: string | null
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
           id: string
-          imagens_capturadas: number | null
-          imagens_chaves: number | null
-          medico: string | null
-          medico_reassinatura: string | null
-          modalidade: string | null
-          nome_paciente: string
-          possui_imagens_chave: string | null
-          prioridade: string | null
-          segunda_assinatura: string | null
-          status: string | null
+          IMAGENS_CAPTURADAS: number | null
+          IMAGENS_CHAVES: number | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
           updated_at: string
-          valores: number | null
+          VALORES: number | null
         }
         Insert: {
-          accession_number?: string | null
+          ACCESSION_NUMBER?: string | null
           arquivo_fonte: string
-          codigo_interno?: number | null
-          codigo_paciente?: string | null
-          complementar?: string | null
+          CODIGO_INTERNO?: number | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
           created_at?: string
           created_by?: string | null
-          data_laudo?: string | null
-          data_prazo?: string | null
-          data_realizacao?: string | null
-          data_reassinatura?: string | null
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
           data_referencia?: string | null
-          data_transferencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
           data_upload?: string
-          digitador?: string | null
-          duplicado?: string | null
-          empresa: string
-          especialidade?: string | null
-          estudo_descricao?: string | null
-          hora_laudo?: string | null
-          hora_prazo?: string | null
-          hora_realizacao?: string | null
-          hora_reassinatura?: string | null
-          hora_transferencia?: string | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA: string
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
           id?: string
-          imagens_capturadas?: number | null
-          imagens_chaves?: number | null
-          medico?: string | null
-          medico_reassinatura?: string | null
-          modalidade?: string | null
-          nome_paciente: string
-          possui_imagens_chave?: string | null
-          prioridade?: string | null
-          segunda_assinatura?: string | null
-          status?: string | null
+          IMAGENS_CAPTURADAS?: number | null
+          IMAGENS_CHAVES?: number | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE: string
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
           updated_at?: string
-          valores?: number | null
+          VALORES?: number | null
         }
         Update: {
-          accession_number?: string | null
+          ACCESSION_NUMBER?: string | null
           arquivo_fonte?: string
-          codigo_interno?: number | null
-          codigo_paciente?: string | null
-          complementar?: string | null
+          CODIGO_INTERNO?: number | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
           created_at?: string
           created_by?: string | null
-          data_laudo?: string | null
-          data_prazo?: string | null
-          data_realizacao?: string | null
-          data_reassinatura?: string | null
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
           data_referencia?: string | null
-          data_transferencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
           data_upload?: string
-          digitador?: string | null
-          duplicado?: string | null
-          empresa?: string
-          especialidade?: string | null
-          estudo_descricao?: string | null
-          hora_laudo?: string | null
-          hora_prazo?: string | null
-          hora_realizacao?: string | null
-          hora_reassinatura?: string | null
-          hora_transferencia?: string | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
           id?: string
-          imagens_capturadas?: number | null
-          imagens_chaves?: number | null
-          medico?: string | null
-          medico_reassinatura?: string | null
-          modalidade?: string | null
-          nome_paciente?: string
-          possui_imagens_chave?: string | null
-          prioridade?: string | null
-          segunda_assinatura?: string | null
-          status?: string | null
+          IMAGENS_CAPTURADAS?: number | null
+          IMAGENS_CHAVES?: number | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
           updated_at?: string
-          valores?: number | null
+          VALORES?: number | null
         }
         Relationships: []
       }
