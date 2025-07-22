@@ -59,7 +59,6 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Volumetria", url: "/volumetria", requiredRoles: ['user', 'manager', 'admin'] },
-      { title: "Volumetria MobileMed", url: "/volumetria/mobilemed", requiredRoles: ['manager', 'admin'] },
       { title: "Qualidade", url: "/operacional/qualidade", requiredRoles: ['manager', 'admin'] },
     ]
   },
