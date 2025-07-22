@@ -218,7 +218,7 @@ export default function Volumetria() {
       ...item,
       percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
       percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-    }));
+    })).sort((a, b) => b.total_exames - a.total_exames);
     
     setEmpresaData(empresaArray);
 
