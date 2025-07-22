@@ -234,3 +234,19 @@ export async function processFaturamentoFile(file: File) {
     throw error
   }
 }
+
+export async function limparUploadsAntigos() {
+  try {
+    const { data, error } = await supabase.functions.invoke('limpar-uploads')
+    
+    if (error) {
+      console.error('Erro ao limpar uploads:', error)
+      return { success: false, error: error.message }
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Erro na limpeza:', error)
+    return { success: false, error: 'Erro interno' }
+  }
+}
