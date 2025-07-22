@@ -340,16 +340,32 @@ serve(async (req) => {
       );
 
     } catch (processingError) {
+      console.error('Erro durante processamento:', processingError);
+      
       // Atualizar log com erro
-      await supabaseClient
-        .from('upload_logs')
-        .update({
-          status: 'error',
-          error_message: processingError.message
-        })
-        .eq('id', uploadLog.id);
+      try {
+        await supabaseClient
+          .from('upload_logs')
+          .update({
+            status: 'error',
+            error_message: processingError.message || 'Erro desconhecido'
+          })
+          .eq('id', uploadLog.id);
+      } catch (logUpdateError) {
+        console.error('Erro ao atualizar log:', logUpdateError);
+      }
 
-      throw processingError;
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: processingError.message || 'Erro durante processamento',
+          upload_log_id: uploadLog.id
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
   } catch (error) {
