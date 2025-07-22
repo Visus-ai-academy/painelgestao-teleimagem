@@ -10,31 +10,50 @@ const corsHeaders = {
 
 // Função para converter data do Excel para formato ISO
 const formatExcelDate = (excelDate: any): string => {
-  if (!excelDate) return new Date().toISOString().split('T')[0];
+  console.log('formatExcelDate - valor recebido:', excelDate, 'tipo:', typeof excelDate);
+  
+  if (!excelDate) {
+    console.log('Data vazia, mantendo original');
+    return excelDate; // Retorna vazio para não mascarar o problema
+  }
   
   // Se já está em formato de data válido
   if (excelDate instanceof Date) {
-    return excelDate.toISOString().split('T')[0];
+    const formatted = excelDate.toISOString().split('T')[0];
+    console.log('Data convertida de Date:', formatted);
+    return formatted;
   }
   
   // Se é string, tentar converter
   if (typeof excelDate === 'string') {
-    const date = new Date(excelDate);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split('T')[0];
+    // Tentar diferentes formatos de data
+    const formats = [
+      excelDate, // formato original
+      excelDate.replace(/\//g, '-'), // trocar / por -
+      excelDate.split('/').reverse().join('-') // DD/MM/YYYY para YYYY-MM-DD
+    ];
+    
+    for (const format of formats) {
+      const date = new Date(format);
+      if (!isNaN(date.getTime())) {
+        const formatted = date.toISOString().split('T')[0];
+        console.log(`Data convertida de string "${excelDate}" para:`, formatted);
+        return formatted;
+      }
     }
   }
   
   // Se é número (formato Excel serial date)
   if (typeof excelDate === 'number') {
-    // Excel conta dias desde 1900-01-01, mas com bug no ano 1900
     const excelEpoch = new Date(1900, 0, 1);
-    const date = new Date(excelEpoch.getTime() + (excelDate - 1) * 24 * 60 * 60 * 1000);
-    return date.toISOString().split('T')[0];
+    const date = new Date(excelEpoch.getTime() + (excelDate - 2) * 24 * 60 * 60 * 1000);
+    const formatted = date.toISOString().split('T')[0];
+    console.log(`Data convertida de número Excel ${excelDate} para:`, formatted);
+    return formatted;
   }
   
-  // Fallback para data atual
-  return new Date().toISOString().split('T')[0];
+  console.log('Não foi possível converter a data:', excelDate);
+  return excelDate?.toString() || '';
 };
 
 serve(async (req) => {
