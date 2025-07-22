@@ -14,6 +14,9 @@ interface VolumetriaData {
   PRIORIDADE: string;
   DATA_REALIZACAO: string;
   DATA_LAUDO: string;
+  HORA_LAUDO: string;
+  DATA_PRAZO: string;
+  HORA_PRAZO: string;
   VALORES: number;
   STATUS: string;
 }
@@ -135,13 +138,18 @@ export default function Volumetria() {
     const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
     const totalRegistros = rawData.length;
     
-    // Cálculo de atrasos (considerando DATA_LAUDO vs DATA_REALIZACAO)
+    // Cálculo de atrasos (DATA_LAUDO + HORA_LAUDO > DATA_PRAZO + HORA_PRAZO)
     const atrasados = rawData.filter(item => {
-      if (!item.DATA_LAUDO || !item.DATA_REALIZACAO) return false;
-      const dataRealizacao = new Date(item.DATA_REALIZACAO);
-      const dataLaudo = new Date(item.DATA_LAUDO);
-      const diffDias = (dataLaudo.getTime() - dataRealizacao.getTime()) / (1000 * 60 * 60 * 24);
-      return diffDias > 1; // Considerando atraso se passou de 1 dia
+      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+      
+      // Combinar data e hora do laudo
+      const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+      
+      // Combinar data e hora do prazo
+      const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+      
+      // Verificar se laudo foi entregue após o prazo
+      return dataHoraLaudo > dataHoraPrazo;
     });
 
     const totalAtrasados = atrasados.length;
@@ -169,12 +177,11 @@ export default function Volumetria() {
       acc[key].total_exames += item.VALORES || 0;
       acc[key].total_registros += 1;
       
-      // Verificar atraso
-      if (item.DATA_LAUDO && item.DATA_REALIZACAO) {
-        const dataRealizacao = new Date(item.DATA_REALIZACAO);
-        const dataLaudo = new Date(item.DATA_LAUDO);
-        const diffDias = (dataLaudo.getTime() - dataRealizacao.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDias > 1) acc[key].atrasados += 1;
+      // Verificar atraso usando critério correto (DATA_LAUDO + HORA_LAUDO > DATA_PRAZO + HORA_PRAZO)
+      if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
+        const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+        const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+        if (dataHoraLaudo > dataHoraPrazo) acc[key].atrasados += 1;
       }
       
       return acc;
