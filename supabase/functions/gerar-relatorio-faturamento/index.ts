@@ -40,7 +40,7 @@ serve(async (req: Request) => {
     // Buscar dados do cliente
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
-      .select('nome')
+      .select('nome, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
 
@@ -154,97 +154,120 @@ serve(async (req: Request) => {
     const valorBrutoTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
     const totalLaudos = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
     
-    // Calcular impostos (percentuais fixos para exemplo - podem ser configuráveis)
+    // Calcular impostos (percentuais conforme solicitado)
     const percentualPIS = 0.65; // 0.65%
     const percentualCOFINS = 3.0; // 3%
-    const percentualCSLL = 1.08; // 1.08%
-    const percentualIR = 1.08; // 1.08%
-    const percentualISSQN = 5.0; // 5%
+    const percentualCSLL = 1.0; // 1.0%
+    const percentualIRRF = 1.5; // 1.5%
     
     const valorPIS = valorBrutoTotal * (percentualPIS / 100);
     const valorCOFINS = valorBrutoTotal * (percentualCOFINS / 100);
     const valorCSLL = valorBrutoTotal * (percentualCSLL / 100);
-    const valorIR = valorBrutoTotal * (percentualIR / 100);
-    const valorISSQN = valorBrutoTotal * (percentualISSQN / 100);
-    
-    const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIR + valorISSQN;
-    const valorAPagar = valorBrutoTotal - totalImpostos;
+    const valorIRRF = valorBrutoTotal * (percentualIRRF / 100);
     
     // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
     const franquia = 0;
     const ajustes = 0;
-    const integracao = 0;
+    
+    // Cálculo do Valor a Pagar: valor Bruto + Franquia + ajustes - impostos
+    const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
+    const valorAPagar = valorBrutoTotal + franquia + ajustes - totalImpostos;
 
     // Gerar PDF sempre (mesmo sem dados)
     let pdfUrl = null;
     try {
       console.log('Gerando relatório PDF...');
       
-      // Criar novo documento PDF
-      const doc = new jsPDF();
+      // Criar novo documento PDF em formato paisagem
+      const doc = new jsPDF('landscape', 'mm', 'a4');
       
       // Configurar fonte
       doc.setFont('helvetica');
       
+      // === LOGOMARCA ===
+      // Espaço reservado para logomarca (pode ser carregada do storage futuramente)
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.rect(135, 10, 25, 15);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+      
       // === CABEÇALHO ===
-      doc.setFontSize(20);
+      doc.setFontSize(22);
       doc.setTextColor(0, 124, 186); // #007cba
-      doc.text('RELATÓRIO DE FATURAMENTO', 105, 20, { align: 'center' });
+      doc.text('RELATÓRIO DE FATURAMENTO', 148, 35, { align: 'center' });
       
       // Informações do cliente
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Cliente: ${cliente.nome}`, 20, 50);
+      if (cliente.cnpj) {
+        doc.setFontSize(12);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`CNPJ: ${cliente.cnpj}`, 20, 60);
+      }
+      
       doc.setFontSize(14);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Cliente: ${cliente.nome}`, 20, 35);
-      doc.text(`Período: ${periodo}`, 20, 45);
-      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 150, 35);
+      doc.text(`Período: ${periodo}`, 20, cliente.cnpj ? 70 : 60);
+      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 220, 50);
       
       // Linha separadora
       doc.setDrawColor(0, 124, 186);
       doc.setLineWidth(1);
-      doc.line(20, 55, 190, 55);
+      doc.line(20, cliente.cnpj ? 75 : 65, 277, cliente.cnpj ? 75 : 65);
       
       // === QUADRO 1 - RESUMO DO CLIENTE ===
+      const yQuadro1 = cliente.cnpj ? 85 : 75;
       doc.setFontSize(16);
       doc.setTextColor(0, 124, 186);
-      doc.text('QUADRO 1 - RESUMO DO CLIENTE', 20, 70);
+      doc.text('QUADRO 1 - RESUMO', 20, yQuadro1);
       
-      // Caixa do resumo
+      // Caixa do resumo (mais larga para paisagem)
       doc.setDrawColor(0, 124, 186);
       doc.setLineWidth(0.5);
-      doc.rect(20, 75, 170, 65);
+      doc.rect(20, yQuadro1 + 5, 257, 55);
       
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
       
-      // Coluna da esquerda
-      doc.text(`Total de Laudos Realizados: ${totalLaudos.toLocaleString('pt-BR')}`, 25, 85);
-      doc.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 95);
-      doc.text(`Franquia: R$ ${franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 105);
-      doc.text(`Ajustes: R$ ${ajustes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 115);
-      doc.text(`Integração: R$ ${integracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 125);
+      // Layout em linhas conforme solicitado
+      let yLine = yQuadro1 + 15;
+      doc.text(`Total de Laudos: ${totalLaudos.toLocaleString('pt-BR')}`, 25, yLine);
       
-      // Coluna da direita - Impostos
-      doc.text('IMPOSTOS:', 110, 85);
-      doc.text(`PIS (${percentualPIS}%): R$ ${valorPIS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 95);
-      doc.text(`COFINS (${percentualCOFINS}%): R$ ${valorCOFINS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 105);
-      doc.text(`CSLL (${percentualCSLL}%): R$ ${valorCSLL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 115);
-      doc.text(`IR (${percentualIR}%): R$ ${valorIR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 125);
-      doc.text(`ISSQN (${percentualISSQN}%): R$ ${valorISSQN.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 135);
+      yLine += 8;
+      doc.text(`Franquia: R$ ${franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
-      // Valor total dos impostos e valor a pagar
-      doc.setDrawColor(0, 0, 0);
-      doc.line(25, 128, 185, 128);
+      yLine += 8;
+      doc.text(`Ajustes: R$ ${ajustes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
-      doc.setFontSize(14);
-      doc.setTextColor(255, 0, 0);
-      doc.text(`Total de Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 138);
+      // Impostos na coluna da direita
+      yLine = yQuadro1 + 15;
+      doc.text(`PIS (${percentualPIS}%): R$ ${valorPIS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
       
+      yLine += 8;
+      doc.text(`COFINS (${percentualCOFINS}%): R$ ${valorCOFINS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
+      
+      yLine += 8;
+      doc.text(`CSLL (${percentualCSLL}%): R$ ${valorCSLL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
+      
+      yLine += 8;
+      doc.text(`IRRF (${percentualIRRF}%): R$ ${valorIRRF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
+      
+      // Linha separadora antes do Valor a Pagar
+      doc.setDrawColor(0, 124, 186);
+      doc.setLineWidth(1);
+      doc.line(25, yQuadro1 + 45, 270, yQuadro1 + 45);
+      
+      // Valor a Pagar destacado
       doc.setFontSize(16);
       doc.setTextColor(0, 128, 0);
-      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 105, 155, { align: 'center' });
+      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 55, { align: 'center' });
       
       // === QUADRO 2 - DETALHAMENTO ===
-      let yPosition = 175;
+      const yQuadro2 = yQuadro1 + 75;
+      let yPosition = yQuadro2;
       doc.setFontSize(16);
       doc.setTextColor(0, 124, 186);
       doc.text('QUADRO 2 - DETALHAMENTO', 20, yPosition);
@@ -252,22 +275,22 @@ serve(async (req: Request) => {
       yPosition += 10;
       
       if (allData.length > 0) {
-        // Cabeçalho da tabela detalhada
+        // Cabeçalho da tabela detalhada (mais larga para paisagem)
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
         doc.setFillColor(0, 124, 186);
-        doc.rect(20, yPosition, 170, 8, 'F');
+        doc.rect(20, yPosition, 257, 8, 'F');
         
         doc.text('Data', 22, yPosition + 5);
-        doc.text('Paciente', 35, yPosition + 5);
-        doc.text('Médico', 55, yPosition + 5);
-        doc.text('Exame', 72, yPosition + 5);
-        doc.text('Modal.', 95, yPosition + 5);
-        doc.text('Espec.', 108, yPosition + 5);
-        doc.text('Categ.', 121, yPosition + 5);
-        doc.text('Prior.', 134, yPosition + 5);
-        doc.text('Qtd', 147, yPosition + 5);
-        doc.text('Valor', 160, yPosition + 5);
+        doc.text('Paciente', 40, yPosition + 5);
+        doc.text('Médico', 80, yPosition + 5);
+        doc.text('Exame', 120, yPosition + 5);
+        doc.text('Modal.', 160, yPosition + 5);
+        doc.text('Espec.', 180, yPosition + 5);
+        doc.text('Categ.', 205, yPosition + 5);
+        doc.text('Prior.', 230, yPosition + 5);
+        doc.text('Qtd', 250, yPosition + 5);
+        doc.text('Valor', 260, yPosition + 5);
         
         yPosition += 12;
         doc.setTextColor(0, 0, 0);
@@ -276,26 +299,26 @@ serve(async (req: Request) => {
         for (let i = 0; i < allData.length; i++) {
           const item = allData[i];
           
-          if (yPosition > 275) { // Nova página se necessário
-            doc.addPage();
+          if (yPosition > 190) { // Nova página se necessário (formato paisagem tem menos altura)
+            doc.addPage('landscape');
             yPosition = 30;
             
             // Repetir cabeçalho na nova página
             doc.setFontSize(8);
             doc.setTextColor(255, 255, 255);
             doc.setFillColor(0, 124, 186);
-            doc.rect(20, yPosition, 170, 8, 'F');
+            doc.rect(20, yPosition, 257, 8, 'F');
             
             doc.text('Data', 22, yPosition + 5);
-            doc.text('Paciente', 35, yPosition + 5);
-            doc.text('Médico', 55, yPosition + 5);
-            doc.text('Exame', 72, yPosition + 5);
-            doc.text('Modal.', 95, yPosition + 5);
-            doc.text('Espec.', 108, yPosition + 5);
-            doc.text('Categ.', 121, yPosition + 5);
-            doc.text('Prior.', 134, yPosition + 5);
-            doc.text('Qtd', 147, yPosition + 5);
-            doc.text('Valor', 160, yPosition + 5);
+            doc.text('Paciente', 40, yPosition + 5);
+            doc.text('Médico', 80, yPosition + 5);
+            doc.text('Exame', 120, yPosition + 5);
+            doc.text('Modal.', 160, yPosition + 5);
+            doc.text('Espec.', 180, yPosition + 5);
+            doc.text('Categ.', 205, yPosition + 5);
+            doc.text('Prior.', 230, yPosition + 5);
+            doc.text('Qtd', 250, yPosition + 5);
+            doc.text('Valor', 260, yPosition + 5);
             
             yPosition += 12;
             doc.setTextColor(0, 0, 0);
@@ -304,20 +327,20 @@ serve(async (req: Request) => {
           // Alternar cores das linhas
           if (i % 2 === 1) {
             doc.setFillColor(240, 240, 240);
-            doc.rect(20, yPosition - 2, 170, 6, 'F');
+            doc.rect(20, yPosition - 2, 257, 6, 'F');
           }
           
           doc.setFontSize(7);
-          doc.text((item.data_exame || item.data_emissao || '-').substring(0, 8), 22, yPosition + 2);
-          doc.text((item.cliente || '-').substring(0, 12), 35, yPosition + 2); // Nome do paciente na coluna cliente
-          doc.text((item.medico || '-').substring(0, 12), 55, yPosition + 2);
-          doc.text((item.nome_exame || '-').substring(0, 15), 72, yPosition + 2);
-          doc.text((item.modalidade || '-').substring(0, 8), 95, yPosition + 2);
-          doc.text((item.especialidade || '-').substring(0, 8), 108, yPosition + 2);
-          doc.text((item.categoria || '-').substring(0, 8), 121, yPosition + 2);
-          doc.text((item.prioridade || '-').substring(0, 8), 134, yPosition + 2);
-          doc.text((item.quantidade || '1').toString(), 147, yPosition + 2);
-          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition + 2);
+          doc.text((item.data_exame || item.data_emissao || '-').substring(0, 10), 22, yPosition + 2);
+          doc.text((item.cliente || '-').substring(0, 20), 40, yPosition + 2); // Nome do paciente na coluna cliente
+          doc.text((item.medico || '-').substring(0, 20), 80, yPosition + 2);
+          doc.text((item.nome_exame || '-').substring(0, 20), 120, yPosition + 2);
+          doc.text((item.modalidade || '-').substring(0, 12), 160, yPosition + 2);
+          doc.text((item.especialidade || '-').substring(0, 12), 180, yPosition + 2);
+          doc.text((item.categoria || '-').substring(0, 12), 205, yPosition + 2);
+          doc.text((item.prioridade || '-').substring(0, 12), 230, yPosition + 2);
+          doc.text((item.quantidade || '1').toString(), 250, yPosition + 2);
+          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 260, yPosition + 2);
           
           yPosition += 6;
         }
@@ -325,7 +348,7 @@ serve(async (req: Request) => {
         // Mensagem de nenhum dado encontrado
         doc.setFontSize(14);
         doc.setTextColor(128, 128, 128);
-        doc.text('Nenhum dado encontrado para o período selecionado', 105, yPosition + 30, { align: 'center' });
+        doc.text('Nenhum dado encontrado para o período selecionado', 148, yPosition + 30, { align: 'center' });
       }
       
       // Rodapé
@@ -334,9 +357,8 @@ serve(async (req: Request) => {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text('Relatório gerado automaticamente pelo Sistema de Faturamento', 105, 280, { align: 'center' });
-        doc.text(`© ${new Date().getFullYear()} - Todos os direitos reservados`, 105, 285, { align: 'center' });
-        doc.text(`Página ${i} de ${pageCount}`, 190, 290, { align: 'right' });
+        doc.text('Relatório gerado automaticamente pelo Sistema de Faturamento © 2025 - Todos os direitos reservados', 148, 200, { align: 'center' });
+        doc.text(`Página ${i} de ${pageCount}`, 270, 200, { align: 'right' });
       }
       
       // Converter PDF para buffer
