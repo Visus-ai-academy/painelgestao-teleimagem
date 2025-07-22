@@ -129,17 +129,28 @@ serve(async (req) => {
         return new Date().toISOString().split('T')[0]
       }
       
-      // Mapear campos baseado no template CSV de faturamento
+      // Mapear campos baseado no template CSV de faturamento correto
+      // Template: Paciente;Cliente;Medico;Data_Exame;Modalidade;Especialidade;Categoria;Prioridade;Nome_Exame;Quantidade;Valor_Bruto
       const registro = {
-        omie_id: row[0] ? String(row[0]) : `GEN_${Date.now()}_${i}`,
-        numero_fatura: row[1] ? String(row[1]) : `NF_${Date.now()}_${i}`,
-        cliente_nome: row[2] ? String(row[2]) : 'Cliente Não Informado',
-        cliente_email: row[3] ? String(row[3]) : null,
-        data_emissao: parseDate(row[4]),
-        data_vencimento: parseDate(row[5]),
-        data_pagamento: row[6] ? parseDate(row[6]) : null,
-        valor: parseFloat(row[7]) || 0,
-        status: row[8] ? String(row[8]) : 'em_aberto'
+        omie_id: `FAT_${Date.now()}_${i}`,
+        numero_fatura: `NF_${Date.now()}_${i}`,
+        cliente_nome: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
+        cliente_email: null, // Não disponível no template
+        data_emissao: parseDate(row[3]), // Data_Exame (coluna 3)
+        data_vencimento: parseDate(row[3]), // Usar mesma data do exame
+        data_pagamento: null, // Não disponível no template
+        valor: parseFloat(row[10]) || 0, // Valor_Bruto (coluna 10)
+        status: 'em_aberto',
+        // Campos extras específicos do faturamento de laudos
+        paciente: row[0] ? String(row[0]) : 'Paciente Não Informado', // Paciente (coluna 0)
+        medico: row[2] ? String(row[2]) : 'Médico Não Informado', // Medico (coluna 2)
+        modalidade: row[4] ? String(row[4]) : null, // Modalidade (coluna 4)
+        especialidade: row[5] ? String(row[5]) : null, // Especialidade (coluna 5)
+        categoria: row[6] ? String(row[6]) : 'NORMAL', // Categoria (coluna 6)
+        prioridade: row[7] ? String(row[7]) : 'NORMAL', // Prioridade (coluna 7)
+        nome_exame: row[8] ? String(row[8]) : 'Exame Não Especificado', // Nome_Exame (coluna 8)
+        quantidade: parseInt(row[9]) || 1, // Quantidade (coluna 9)
+        valor_bruto: parseFloat(row[10]) || 0 // Valor_Bruto (coluna 10)
       }
       
       dadosFaturamento.push(registro)
