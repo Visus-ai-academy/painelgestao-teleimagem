@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import jsPDF from "https://esm.sh/jspdf@2.5.1";
+// Removendo jsPDF temporariamente para testar se o erro está na biblioteca
+// import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -168,34 +169,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`💵 Resumo calculado:`, resumo);
 
-    // 6. GERAR PDF (LAYOUT BASEADO NO SCRIPT PYTHON)
-    const pdfContent = await gerarPDFCompleto({
-      cliente,
-      periodo,
-      resumo,
-      exames: examesDetalhados
-    });
-
-    // 7. SALVAR PDF NO STORAGE
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    // 6. RETORNAR DADOS SEM PDF (TESTE)
+    console.log(`✅ Dados processados com sucesso - ${examesDetalhados.length} exames`);
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('relatorios-faturamento')
-      .upload(nomeArquivo, pdfContent, {
-        contentType: 'application/pdf',
-        cacheControl: '3600'
-      });
-      
-    if (uploadError) {
-      console.error('❌ Erro ao salvar PDF:', uploadError);
-      throw new Error(`Erro ao salvar PDF: ${uploadError.message}`);
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('relatorios-faturamento')
-      .getPublicUrl(nomeArquivo);
-
-    console.log(`✅ PDF salvo com sucesso: ${publicUrl}`);
+    // Temporariamente desabilitando geração de PDF para testar
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.json`;
+    const publicUrl = `https://exemplo.com/${nomeArquivo}`;
 
     // 8. RESPOSTA FINAL
     return new Response(
