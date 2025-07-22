@@ -43,10 +43,10 @@ export default function VolumetriaMobileMed() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    empresa: '',
-    especialidade: '',
-    modalidade: '',
-    arquivo_fonte: '',
+    empresa: '__all__',
+    especialidade: '__all__',
+    modalidade: '__all__',
+    arquivo_fonte: '__all__',
     data_inicio: '',
     data_fim: ''
   });
@@ -70,16 +70,16 @@ export default function VolumetriaMobileMed() {
         .select('*')
         .order('data_upload', { ascending: false });
 
-      if (filters.empresa) {
+      if (filters.empresa && filters.empresa !== '__all__') {
         query = query.eq('EMPRESA', filters.empresa);
       }
-      if (filters.especialidade) {
+      if (filters.especialidade && filters.especialidade !== '__all__') {
         query = query.eq('ESPECIALIDADE', filters.especialidade);
       }
-      if (filters.modalidade) {
+      if (filters.modalidade && filters.modalidade !== '__all__') {
         query = query.eq('MODALIDADE', filters.modalidade);
       }
-      if (filters.arquivo_fonte) {
+      if (filters.arquivo_fonte && filters.arquivo_fonte !== '__all__') {
         query = query.eq('arquivo_fonte', filters.arquivo_fonte);
       }
       if (filters.data_inicio) {
@@ -168,10 +168,10 @@ export default function VolumetriaMobileMed() {
 
   const clearFilters = () => {
     setFilters({
-      empresa: '',
-      especialidade: '',
-      modalidade: '',
-      arquivo_fonte: '',
+      empresa: '__all__',
+      especialidade: '__all__',
+      modalidade: '__all__',
+      arquivo_fonte: '__all__',
       data_inicio: '',
       data_fim: ''
     });
@@ -284,7 +284,7 @@ export default function VolumetriaMobileMed() {
                       <SelectValue placeholder="Selecione a empresa" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as empresas</SelectItem>
+                      <SelectItem value="__all__">Todas as empresas</SelectItem>
                       {empresas.map(empresa => (
                         <SelectItem key={empresa} value={empresa}>{empresa}</SelectItem>
                       ))}
@@ -299,7 +299,7 @@ export default function VolumetriaMobileMed() {
                       <SelectValue placeholder="Selecione a especialidade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as especialidades</SelectItem>
+                      <SelectItem value="__all__">Todas as especialidades</SelectItem>
                       {especialidades.map(esp => (
                         <SelectItem key={esp} value={esp}>{esp}</SelectItem>
                       ))}
@@ -314,7 +314,7 @@ export default function VolumetriaMobileMed() {
                       <SelectValue placeholder="Selecione a modalidade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as modalidades</SelectItem>
+                      <SelectItem value="__all__">Todas as modalidades</SelectItem>
                       {modalidades.map(mod => (
                         <SelectItem key={mod} value={mod}>{mod}</SelectItem>
                       ))}
@@ -329,7 +329,7 @@ export default function VolumetriaMobileMed() {
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos os tipos</SelectItem>
+                      <SelectItem value="__all__">Todos os tipos</SelectItem>
                       <SelectItem value="data_laudo">Data Laudo</SelectItem>
                       <SelectItem value="data_exame">Data Exame</SelectItem>
                     </SelectContent>
