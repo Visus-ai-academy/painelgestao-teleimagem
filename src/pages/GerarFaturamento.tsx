@@ -1124,11 +1124,18 @@ export default function GerarFaturamento() {
                   <div className="text-sm text-blue-700">Clientes Ativos</div>
                 </div>
                 <div className="relative text-center p-3 bg-green-50 border border-green-200 rounded overflow-hidden">
-                  {/* Efeito de preenchimento lateral */}
+                  {/* Efeito de preenchimento lateral com riscos */}
                   <div 
-                    className="absolute inset-0 bg-gradient-to-r from-green-200 to-transparent transition-all duration-1000 ease-out"
+                    className="absolute inset-0 transition-all duration-500 ease-in-out"
                     style={{ 
-                      width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%' 
+                      width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%',
+                      background: `repeating-linear-gradient(
+                        45deg,
+                        rgba(34, 197, 94, 0.6),
+                        rgba(34, 197, 94, 0.6) 10px,
+                        rgba(34, 197, 94, 0.8) 10px,
+                        rgba(34, 197, 94, 0.8) 20px
+                      )`
                     }}
                   />
                   <div className="relative z-10">
