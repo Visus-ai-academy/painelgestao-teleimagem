@@ -178,8 +178,6 @@ export default function Volumetria() {
   };
 
   const processarDados = async (rawData: VolumetriaData[]) => {
-    console.log('=== PROCESSANDO DADOS ===');
-    console.log('Total de dados recebidos:', rawData.length);
     // Totais gerais
     const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
     const totalRegistros = rawData.length;
