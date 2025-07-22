@@ -327,12 +327,14 @@ serve(async (req: Request) => {
       
       // Valor a Pagar destacado
       doc.setFontSize(16);
-      doc.setTextColor(0, 128, 0);
+      doc.setTextColor(0, 0, 0); // Cor preta em vez de verde
       doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 55, { align: 'center' });
       
+      // === NOVA PÁGINA PARA QUADRO 2 ===
+      doc.addPage('landscape');
+      
       // === QUADRO 2 - DETALHAMENTO ===
-      const yQuadro2 = yQuadro1 + 75;
-      let yPosition = yQuadro2;
+      let yPosition = 30; // Começa do topo da nova página
       doc.setFontSize(16);
       doc.setTextColor(0, 124, 186);
       doc.text('QUADRO 2 - DETALHAMENTO', 20, yPosition);
