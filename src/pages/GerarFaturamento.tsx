@@ -456,7 +456,7 @@ export default function GerarFaturamento() {
         
         // Mapear item para a estrutura esperada pelo PDF
         const exameFormatado = {
-          paciente: item.paciente || 'Nome não informado',
+          paciente: item.cliente || item.cliente_nome || item.paciente || 'Nome não informado',
           data_exame: item.data_exame,
           modalidade: item.modalidade || 'Não informado',
           especialidade: item.especialidade || 'Não informado',
