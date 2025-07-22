@@ -235,17 +235,17 @@ async function processFileInBackground(
       throw new Error('Arquivo Excel está vazio');
     }
 
-    // Processar dados em chunks muito menores para evitar timeout
-    const processedRecords: VolumetriaRecord[] = [];
+    // Processar dados em micro-lotes com pausas para evitar timeout
     const errors: string[] = [];
-    const chunkSize = 100; // Reduzido drasticamente para 100 linhas
-    const insertBatchSize = 20; // Inserções menores
+    const microChunkSize = 50; // Micro-lotes de apenas 50 linhas
+    const insertBatchSize = 10; // Inserções mínimas
+    let totalInserted = 0;
 
-    for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += chunkSize) {
-      const chunk = jsonData.slice(chunkStart, chunkStart + chunkSize);
+    for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += microChunkSize) {
+      const chunk = jsonData.slice(chunkStart, chunkStart + microChunkSize);
       const chunkRecords: VolumetriaRecord[] = [];
       
-      // Processar chunk
+      // Processar micro-chunk
       for (let i = 0; i < chunk.length; i++) {
         const row = chunk[i];
         const record = processRow(row, arquivo_fonte);
@@ -257,7 +257,7 @@ async function processFileInBackground(
         }
       }
 
-      // Inserir chunk imediatamente em mini-lotes
+      // Inserir em mini-mini-lotes
       for (let j = 0; j < chunkRecords.length; j += insertBatchSize) {
         const miniBatch = chunkRecords.slice(j, j + insertBatchSize);
         
@@ -270,22 +270,23 @@ async function processFileInBackground(
             console.error('Erro ao inserir mini-lote:', insertError);
             errors.push(`Erro no mini-lote: ${insertError.message}`);
           } else {
-            processedRecords.push(...miniBatch);
+            totalInserted += miniBatch.length;
           }
         } catch (insertErr) {
           console.error('Erro crítico na inserção:', insertErr);
           errors.push(`Erro crítico: ${insertErr}`);
         }
+        
+        // Pausa obrigatória a cada inserção para reduzir CPU
+        await new Promise(resolve => setTimeout(resolve, 5));
       }
 
-      // Log de progresso mais frequente
-      const processed = Math.min(chunkStart + chunkSize, jsonData.length);
-      console.log(`Processadas ${processed} de ${jsonData.length} linhas (${processedRecords.length} inseridas)`);
+      // Log de progresso
+      const processed = Math.min(chunkStart + microChunkSize, jsonData.length);
+      console.log(`Processadas ${processed} de ${jsonData.length} linhas (${totalInserted} inseridas)`);
       
-      // Yield periodicamente para evitar timeout
-      if (chunkStart % 500 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
+      // Pausa maior a cada micro-chunk
+      await new Promise(resolve => setTimeout(resolve, 20));
     }
 
     // Atualizar log de upload com sucesso
@@ -293,8 +294,8 @@ async function processFileInBackground(
       const { error: updateError } = await supabaseClient
         .from('upload_logs')
         .update({
-          status: processedRecords.length > 0 ? 'completed' : 'error',
-          records_processed: processedRecords.length,
+          status: totalInserted > 0 ? 'completed' : 'error',
+          records_processed: totalInserted,
           error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
         })
         .eq('id', uploadLogId);
