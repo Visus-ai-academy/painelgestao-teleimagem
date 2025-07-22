@@ -102,55 +102,68 @@ serve(async (req) => {
     // Mapear dados para o formato da tabela faturamento
     const dadosFaturamento = []
     
+    // Função auxiliar para limpar e validar string
+    const cleanString = (value: any, fallback: string = ''): string => {
+      if (!value || value === null || value === undefined) return fallback;
+      return String(value).trim() || fallback;
+    }
+    
+    // Função auxiliar para converter datas
+    const parseDate = (value: any): string => {
+      if (!value) return new Date().toISOString().split('T')[0]
+      
+      // Se é um número do Excel (dias desde 1900)
+      if (typeof value === 'number' && value > 0) {
+        const excelEpoch = new Date(1900, 0, 1)
+        const date = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000)
+        return date.toISOString().split('T')[0]
+      }
+      
+      // Se é string, tentar converter
+      if (typeof value === 'string') {
+        const date = new Date(value)
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split('T')[0]
+        }
+      }
+      
+      // Fallback para data atual
+      return new Date().toISOString().split('T')[0]
+    }
+    
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i] as any[]
       
       if (!row || row.length === 0) continue // Pular linhas vazias
       
-      // Função auxiliar para converter datas
-      const parseDate = (value: any): string => {
-        if (!value) return new Date().toISOString().split('T')[0]
-        
-        // Se é um número do Excel (dias desde 1900)
-        if (typeof value === 'number' && value > 0) {
-          const excelEpoch = new Date(1900, 0, 1)
-          const date = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000)
-          return date.toISOString().split('T')[0]
-        }
-        
-        // Se é string, tentar converter
-        if (typeof value === 'string') {
-          const date = new Date(value)
-          if (!isNaN(date.getTime())) {
-            return date.toISOString().split('T')[0]
-          }
-        }
-        
-        // Fallback para data atual
-        return new Date().toISOString().split('T')[0]
+      // Validação obrigatória: cliente_nome não pode ser null
+      const clienteNome = cleanString(row[1], 'Cliente Não Informado');
+      if (!clienteNome || clienteNome.trim() === '') {
+        console.warn(`Linha ${i + 2}: Cliente vazio, pulando registro`);
+        continue;
       }
       
-      // Mapear campos baseado no template CSV de faturamento e mapeamentos
-      // Template: Paciente;Cliente;Medico;Data_Exame;Modalidade;Especialidade;Categoria;Prioridade;Nome_Exame;Quantidade;Valor_Bruto
+      // Mapear campos com validação melhorada
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
-        cliente: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
-        paciente: row[0] ? String(row[0]) : 'Paciente Não Informado', // Paciente (coluna 0)
-        medico: row[2] ? String(row[2]) : 'Médico Não Informado', // Medico (coluna 2)
-        data_exame: parseDate(row[3]), // Data_Exame (coluna 3)
-        modalidade: row[4] ? String(row[4]) : 'Não Informado', // Modalidade (coluna 4)
-        especialidade: row[5] ? String(row[5]) : 'Não Informado', // Especialidade (coluna 5)
-        categoria: row[6] ? String(row[6]) : 'NORMAL', // Categoria (coluna 6)
-        prioridade: row[7] ? String(row[7]) : 'NORMAL', // Prioridade (coluna 7)
-        nome_exame: row[8] ? String(row[8]) : 'Exame Não Informado', // Nome_Exame (coluna 8)
-        quantidade: parseInt(row[9]) || 1, // Quantidade (coluna 9)
-        valor_bruto: parseFloat(row[10]) || 0, // Valor_Bruto (coluna 10)
+        cliente: cleanString(row[1], 'Cliente Não Informado'),
+        cliente_nome: cleanString(row[1], 'Cliente Não Informado'), // Garantir que não seja null
+        paciente: cleanString(row[0], 'Paciente Não Informado'),
+        medico: cleanString(row[2], 'Médico Não Informado'),
+        data_exame: parseDate(row[3]),
+        modalidade: cleanString(row[4], 'Não Informado'),
+        especialidade: cleanString(row[5], 'Não Informado'),
+        categoria: cleanString(row[6], 'NORMAL'),
+        prioridade: cleanString(row[7], 'NORMAL'),
+        nome_exame: cleanString(row[8], 'Exame Não Informado'),
+        quantidade: Math.max(parseInt(row[9]) || 1, 1), // Mínimo 1
+        valor_bruto: Math.max(parseFloat(row[10]) || 0, 0), // Não negativo
         cliente_email: null,
-        data_emissao: parseDate(row[3]), // Data_Exame (coluna 3)
-        data_vencimento: parseDate(row[3]), // Usar mesma data do exame
+        data_emissao: parseDate(row[3]),
+        data_vencimento: parseDate(row[3]),
         data_pagamento: null,
-        valor: parseFloat(row[10]) || 0, // Valor_Bruto (coluna 10)
+        valor: Math.max(parseFloat(row[10]) || 0, 0), // Não negativo
         status: 'em_aberto'
       }
       
@@ -166,47 +179,86 @@ serve(async (req) => {
     // Iniciar processamento em background e retornar resposta imediata
     console.log('10. Iniciando processamento em background...')
     
-    // Função de processamento em background
+    // Função de processamento em background com otimizações
     const processarDados = async () => {
       try {
-        const batchSize = 1000;
+        const batchSize = 500; // Reduzido de 1000 para 500
         let totalInseridos = 0;
+        let totalFalhados = 0;
+        const maxRetries = 3;
         
         for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
           const lote = dadosFaturamento.slice(i, i + batchSize);
-          console.log(`Inserindo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(dadosFaturamento.length/batchSize)}: ${lote.length} registros`);
+          const batchNumber = Math.floor(i/batchSize) + 1;
+          const totalBatches = Math.ceil(dadosFaturamento.length/batchSize);
           
-          const { data: insertData, error: insertError } = await supabase
-            .from('faturamento')
-            .insert(lote)
-            .select()
+          console.log(`Inserindo lote ${batchNumber}/${totalBatches}: ${lote.length} registros`);
+          
+          let retryCount = 0;
+          let success = false;
+          
+          while (retryCount < maxRetries && !success) {
+            try {
+              // Usar UPSERT em vez de INSERT simples
+              const { data: insertData, error: insertError } = await supabase
+                .from('faturamento')
+                .upsert(lote, { 
+                  onConflict: 'omie_id',
+                  ignoreDuplicates: false 
+                })
+                .select()
 
-          if (insertError) {
-            console.error('Erro ao inserir lote de faturamento:', insertError)
-            // Atualizar log com erro
-            await supabase
-              .from('upload_logs')
-              .update({
-                status: 'error',
-                error_message: insertError.message,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', logData.id)
-            return;
+              if (insertError) {
+                console.error(`Erro no lote ${batchNumber}, tentativa ${retryCount + 1}:`, insertError)
+                retryCount++;
+                
+                if (retryCount >= maxRetries) {
+                  console.error(`Lote ${batchNumber} falhou após ${maxRetries} tentativas`);
+                  totalFalhados += lote.length;
+                  break;
+                }
+                
+                // Aguardar antes de tentar novamente (backoff exponencial)
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+                continue;
+              }
+
+              totalInseridos += insertData?.length || 0;
+              console.log(`Lote ${batchNumber} inserido: ${insertData?.length || 0} registros`);
+              success = true;
+              
+              // Pequena pausa entre lotes para não sobrecarregar
+              if (batchNumber < totalBatches) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              
+            } catch (error) {
+              console.error(`Erro inesperado no lote ${batchNumber}:`, error);
+              retryCount++;
+              
+              if (retryCount >= maxRetries) {
+                totalFalhados += lote.length;
+                break;
+              }
+              
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+            }
           }
-
-          totalInseridos += insertData?.length || 0;
-          console.log(`Lote inserido: ${insertData?.length || 0} registros`);
         }
 
-        console.log('11. Total de dados inseridos:', totalInseridos, 'registros')
+        console.log('11. Processamento concluído!')
+        console.log(`- Total inseridos: ${totalInseridos} registros`)
+        console.log(`- Total falhados: ${totalFalhados} registros`)
         
-        // Atualizar log de sucesso
+        const finalStatus = totalFalhados > 0 ? 'completed_with_errors' : 'completed';
+        
+        // Atualizar log final
         await supabase
           .from('upload_logs')
           .update({
-            status: 'completed',
+            status: finalStatus,
             records_processed: totalInseridos,
+            error_message: totalFalhados > 0 ? `${totalFalhados} registros falharam` : null,
             updated_at: new Date().toISOString()
           })
           .eq('id', logData.id)
