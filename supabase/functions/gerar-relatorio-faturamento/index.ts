@@ -77,7 +77,7 @@ serve(async (req: Request) => {
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
     console.log(`Buscando no campo 'cliente' por: ${cliente.nome}`);
 
-    // Buscar dados de faturamento na coluna 'cliente' por AKCPALMAS
+    // Buscar dados de faturamento - múltiplas estratégias
     const queries = [
       // 1. Por cliente_id (relacionamento direto)
       supabase
@@ -87,7 +87,7 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por código da clínica na coluna 'cliente' (correto conforme informado)
+      // 2. Por nome completo do cliente na coluna 'cliente'
       supabase
         .from('faturamento')
         .select('*')
@@ -95,8 +95,13 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Query vazia para manter compatibilidade
-      Promise.resolve({ data: [], error: null })
+      // 3. Por busca parcial no nome do cliente (case-insensitive)
+      supabase
+        .from('faturamento')
+        .select('*')
+        .ilike('cliente', `%${cliente.nome}%`)
+        .gte('data_emissao', dataInicio)
+        .lt('data_emissao', dataFim)
     ];
 
     const results = await Promise.all(queries);
@@ -127,8 +132,29 @@ serve(async (req: Request) => {
     console.log('Total de dados únicos encontrados:', allData.length);
 
     // Calcular resumo usando valor_bruto e quantidade
-    const valorTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
-    const totalExames = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+    const valorBrutoTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
+    const totalLaudos = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+    
+    // Calcular impostos (percentuais fixos para exemplo - podem ser configuráveis)
+    const percentualPIS = 0.65; // 0.65%
+    const percentualCOFINS = 3.0; // 3%
+    const percentualCSLL = 1.08; // 1.08%
+    const percentualIR = 1.08; // 1.08%
+    const percentualISSQN = 5.0; // 5%
+    
+    const valorPIS = valorBrutoTotal * (percentualPIS / 100);
+    const valorCOFINS = valorBrutoTotal * (percentualCOFINS / 100);
+    const valorCSLL = valorBrutoTotal * (percentualCSLL / 100);
+    const valorIR = valorBrutoTotal * (percentualIR / 100);
+    const valorISSQN = valorBrutoTotal * (percentualISSQN / 100);
+    
+    const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIR + valorISSQN;
+    const valorAPagar = valorBrutoTotal - totalImpostos;
+    
+    // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
+    const franquia = 0;
+    const ajustes = 0;
+    const integracao = 0;
 
     // Gerar PDF sempre (mesmo sem dados)
     let pdfUrl = null;
@@ -141,87 +167,146 @@ serve(async (req: Request) => {
       // Configurar fonte
       doc.setFont('helvetica');
       
-      // Cabeçalho
+      // === CABEÇALHO ===
       doc.setFontSize(20);
       doc.setTextColor(0, 124, 186); // #007cba
-      doc.text('Relatório de Faturamento', 105, 20, { align: 'center' });
+      doc.text('RELATÓRIO DE FATURAMENTO', 105, 20, { align: 'center' });
       
       // Informações do cliente
-      doc.setFontSize(12);
+      doc.setFontSize(14);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Cliente: ${cliente.nome}`, 20, 40);
-      doc.text(`Período: ${periodo}`, 20, 50);
-      doc.text(`Data do Relatório: ${new Date().toLocaleDateString('pt-BR', { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}`, 20, 60);
+      doc.text(`Cliente: ${cliente.nome}`, 20, 35);
+      doc.text(`Período: ${periodo}`, 20, 45);
+      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 150, 35);
       
       // Linha separadora
       doc.setDrawColor(0, 124, 186);
-      doc.line(20, 70, 190, 70);
+      doc.setLineWidth(1);
+      doc.line(20, 55, 190, 55);
       
-      // Resumo executivo
+      // === QUADRO 1 - RESUMO DO CLIENTE ===
       doc.setFontSize(16);
       doc.setTextColor(0, 124, 186);
-      doc.text('Resumo Executivo', 20, 85);
+      doc.text('QUADRO 1 - RESUMO DO CLIENTE', 20, 70);
+      
+      // Caixa do resumo
+      doc.setDrawColor(0, 124, 186);
+      doc.setLineWidth(0.5);
+      doc.rect(20, 75, 170, 65);
       
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Total de Exames: ${totalExames.toLocaleString('pt-BR')}`, 20, 100);
-      doc.text(`Valor Total: R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 110);
-      doc.text(`Registros Encontrados: ${allData.length}`, 20, 120);
+      
+      // Coluna da esquerda
+      doc.text(`Total de Laudos Realizados: ${totalLaudos.toLocaleString('pt-BR')}`, 25, 85);
+      doc.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 95);
+      doc.text(`Franquia: R$ ${franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 105);
+      doc.text(`Ajustes: R$ ${ajustes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 115);
+      doc.text(`Integração: R$ ${integracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 125);
+      
+      // Coluna da direita - Impostos
+      doc.text('IMPOSTOS:', 110, 85);
+      doc.text(`PIS (${percentualPIS}%): R$ ${valorPIS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 95);
+      doc.text(`COFINS (${percentualCOFINS}%): R$ ${valorCOFINS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 105);
+      doc.text(`CSLL (${percentualCSLL}%): R$ ${valorCSLL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 115);
+      doc.text(`IR (${percentualIR}%): R$ ${valorIR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 125);
+      doc.text(`ISSQN (${percentualISSQN}%): R$ ${valorISSQN.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, 135);
+      
+      // Valor total dos impostos e valor a pagar
+      doc.setDrawColor(0, 0, 0);
+      doc.line(25, 128, 185, 128);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(255, 0, 0);
+      doc.text(`Total de Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, 138);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 128, 0);
+      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 105, 155, { align: 'center' });
+      
+      // === QUADRO 2 - DETALHAMENTO ===
+      let yPosition = 175;
+      doc.setFontSize(16);
+      doc.setTextColor(0, 124, 186);
+      doc.text('QUADRO 2 - DETALHAMENTO', 20, yPosition);
+      
+      yPosition += 10;
       
       if (allData.length > 0) {
-        // Cabeçalho da tabela
-        let yPosition = 140;
-        doc.setFontSize(10);
+        // Cabeçalho da tabela detalhada
+        doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
         doc.setFillColor(0, 124, 186);
-        doc.rect(20, yPosition - 5, 170, 10, 'F');
+        doc.rect(20, yPosition, 170, 8, 'F');
         
-        doc.text('Data', 25, yPosition);
-        doc.text('Paciente', 50, yPosition);
-        doc.text('Médico', 90, yPosition);
-        doc.text('Modalidade', 120, yPosition);
-        doc.text('Valor', 160, yPosition);
+        doc.text('Data', 22, yPosition + 5);
+        doc.text('Paciente', 35, yPosition + 5);
+        doc.text('Médico', 55, yPosition + 5);
+        doc.text('Exame', 72, yPosition + 5);
+        doc.text('Modal.', 95, yPosition + 5);
+        doc.text('Espec.', 108, yPosition + 5);
+        doc.text('Categ.', 121, yPosition + 5);
+        doc.text('Prior.', 134, yPosition + 5);
+        doc.text('Qtd', 147, yPosition + 5);
+        doc.text('Valor', 160, yPosition + 5);
         
-        yPosition += 15;
+        yPosition += 12;
         doc.setTextColor(0, 0, 0);
         
-        // Dados da tabela
-        for (let i = 0; i < Math.min(allData.length, 20); i++) { // Limitar a 20 registros por página
+        // Dados da tabela detalhada
+        for (let i = 0; i < allData.length; i++) {
           const item = allData[i];
           
-          if (yPosition > 270) { // Nova página se necessário
+          if (yPosition > 275) { // Nova página se necessário
             doc.addPage();
             yPosition = 30;
+            
+            // Repetir cabeçalho na nova página
+            doc.setFontSize(8);
+            doc.setTextColor(255, 255, 255);
+            doc.setFillColor(0, 124, 186);
+            doc.rect(20, yPosition, 170, 8, 'F');
+            
+            doc.text('Data', 22, yPosition + 5);
+            doc.text('Paciente', 35, yPosition + 5);
+            doc.text('Médico', 55, yPosition + 5);
+            doc.text('Exame', 72, yPosition + 5);
+            doc.text('Modal.', 95, yPosition + 5);
+            doc.text('Espec.', 108, yPosition + 5);
+            doc.text('Categ.', 121, yPosition + 5);
+            doc.text('Prior.', 134, yPosition + 5);
+            doc.text('Qtd', 147, yPosition + 5);
+            doc.text('Valor', 160, yPosition + 5);
+            
+            yPosition += 12;
+            doc.setTextColor(0, 0, 0);
           }
           
-          doc.text((item.data_exame || item.data_emissao || '-').substring(0, 10), 25, yPosition);
-          doc.text((item.paciente || '-').substring(0, 20), 50, yPosition); // Nome do paciente atendido
-          doc.text((item.medico || '-').substring(0, 15), 90, yPosition);
-          doc.text((item.modalidade || '-').substring(0, 15), 120, yPosition);
-          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition);
+          // Alternar cores das linhas
+          if (i % 2 === 1) {
+            doc.setFillColor(240, 240, 240);
+            doc.rect(20, yPosition - 2, 170, 6, 'F');
+          }
           
-          yPosition += 8;
-        }
-        
-        if (allData.length > 20) {
-          yPosition += 10;
-          doc.setFontSize(10);
-          doc.setTextColor(128, 128, 128);
-          doc.text(`... e mais ${allData.length - 20} registros`, 20, yPosition);
+          doc.setFontSize(7);
+          doc.text((item.data_exame || item.data_emissao || '-').substring(0, 8), 22, yPosition + 2);
+          doc.text((item.paciente || '-').substring(0, 12), 35, yPosition + 2);
+          doc.text((item.medico || '-').substring(0, 12), 55, yPosition + 2);
+          doc.text((item.nome_exame || '-').substring(0, 15), 72, yPosition + 2);
+          doc.text((item.modalidade || '-').substring(0, 8), 95, yPosition + 2);
+          doc.text((item.especialidade || '-').substring(0, 8), 108, yPosition + 2);
+          doc.text((item.categoria || '-').substring(0, 8), 121, yPosition + 2);
+          doc.text((item.prioridade || '-').substring(0, 8), 134, yPosition + 2);
+          doc.text((item.quantidade || '1').toString(), 147, yPosition + 2);
+          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition + 2);
+          
+          yPosition += 6;
         }
       } else {
         // Mensagem de nenhum dado encontrado
         doc.setFontSize(14);
         doc.setTextColor(128, 128, 128);
-        doc.text('Nenhum dado encontrado', 105, 160, { align: 'center' });
-        doc.setFontSize(10);
-        doc.text('Não foram encontrados registros de faturamento para este cliente no período selecionado.', 105, 175, { align: 'center' });
+        doc.text('Nenhum dado encontrado para o período selecionado', 105, yPosition + 30, { align: 'center' });
       }
       
       // Rodapé
@@ -273,9 +358,10 @@ serve(async (req: Request) => {
       dados: allData,
       arquivos: pdfUrl ? [{ tipo: 'pdf', url: pdfUrl, nome: `relatorio_${cliente.nome}_${periodo}.pdf` }] : [],
       resumo: {
-        total_laudos: totalExames,
-        valor_total: valorTotal,
-        total_exames: totalExames
+        total_laudos: totalLaudos,
+        valor_bruto_total: valorBrutoTotal,
+        valor_a_pagar: valorAPagar,
+        total_impostos: totalImpostos
       },
       timestamp: new Date().toISOString()
     };
