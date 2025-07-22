@@ -99,6 +99,49 @@ serve(async (req) => {
     
     console.log('8. Cabeçalhos encontrados:', headers)
     
+    // Buscar todos os clientes cadastrados para associação
+    console.log('8.1. Buscando clientes cadastrados...')
+    const { data: clientesCadastrados, error: clientesError } = await supabase
+      .from('clientes')
+      .select('id, nome, cod_cliente')
+    
+    if (clientesError) {
+      console.error('Erro ao buscar clientes:', clientesError)
+      throw new Error('Erro ao buscar clientes cadastrados')
+    }
+    
+    console.log('8.2. Clientes encontrados:', clientesCadastrados?.length || 0)
+    
+    // Função para encontrar cliente_id baseado no nome
+    const encontrarClienteId = (nomeCliente: string): string | null => {
+      if (!nomeCliente || !clientesCadastrados) return null
+      
+      const nomeClienteLimpo = nomeCliente.trim().toUpperCase()
+      
+      // Buscar por correspondência exata
+      let cliente = clientesCadastrados.find(c => 
+        c.nome?.toUpperCase() === nomeClienteLimpo ||
+        c.cod_cliente?.toUpperCase() === nomeClienteLimpo
+      )
+      
+      if (cliente) return cliente.id
+      
+      // Buscar por correspondência parcial (contém)
+      cliente = clientesCadastrados.find(c => 
+        c.nome?.toUpperCase().includes(nomeClienteLimpo) ||
+        nomeClienteLimpo.includes(c.nome?.toUpperCase() || '') ||
+        c.cod_cliente?.toUpperCase().includes(nomeClienteLimpo) ||
+        nomeClienteLimpo.includes(c.cod_cliente?.toUpperCase() || '')
+      )
+      
+      if (cliente) {
+        console.log(`Associação encontrada: "${nomeCliente}" -> "${cliente.nome}" (${cliente.id})`)
+        return cliente.id
+      }
+      
+      return null
+    }
+
     // Mapear dados para o formato da tabela faturamento
     const dadosFaturamento = []
     
@@ -143,10 +186,14 @@ serve(async (req) => {
         continue;
       }
       
+      // Encontrar cliente_id correspondente
+      const clienteIdEncontrado = encontrarClienteId(clienteNome)
+      
       // Mapear campos com validação melhorada
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
+        cliente_id: clienteIdEncontrado, // Associar ao cliente cadastrado
         cliente: cleanString(row[1], 'Cliente Não Informado'),
         cliente_nome: cleanString(row[1], 'Cliente Não Informado'), // Garantir que não seja null
         paciente: cleanString(row[0], 'Paciente Não Informado'),
