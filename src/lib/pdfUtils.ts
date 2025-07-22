@@ -18,6 +18,10 @@ export interface FaturamentoData {
 }
 
 export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
+  console.log('🔍 Dados recebidos no generatePDF:', data);
+  console.log('🔍 Exames array:', data.exames);
+  console.log('🔍 Primeiro exame:', data.exames[0]);
+  
   // Criar elemento HTML temporário para o relatório
   const reportElement = document.createElement('div');
   reportElement.style.position = 'absolute';
