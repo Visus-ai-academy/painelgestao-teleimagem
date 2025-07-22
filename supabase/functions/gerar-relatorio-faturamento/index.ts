@@ -109,36 +109,38 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento - primeiro por cliente_id, depois por nome se necessário
-    console.log('Buscando dados por cliente_id...');
+    // Buscar dados de faturamento - removendo duplicatas baseadas em campos únicos
+    console.log('Buscando dados por cliente_id e removendo duplicatas...');
     
     let { data: dataByClienteId, error: errorClienteId } = await supabase
       .from('faturamento')
-      .select('*')
+      .select('DISTINCT ON (cliente, data_emissao, valor_bruto, nome_exame) *')
       .eq('cliente_id', cliente_id)
       .gte('data_emissao', dataInicio)
-      .lt('data_emissao', dataFim);
+      .lt('data_emissao', dataFim)
+      .order('cliente, data_emissao, valor_bruto, nome_exame, created_at');
 
-    console.log(`Dados encontrados por cliente_id: ${dataByClienteId?.length || 0}`);
+    console.log(`Dados encontrados por cliente_id (sem duplicatas): ${dataByClienteId?.length || 0}`);
 
     let finalData = dataByClienteId || [];
     
-    // Se não encontrou por cliente_id, buscar por nome do cliente
+    // Se não encontrou por cliente_id, buscar por nome do cliente (também removendo duplicatas)
     if (finalData.length === 0) {
       console.log('Nenhum dado encontrado por cliente_id, buscando por nome do cliente...');
       
       const { data: dataByNome, error: errorNome } = await supabase
         .from('faturamento')
-        .select('*')
+        .select('DISTINCT ON (cliente, data_emissao, valor_bruto, nome_exame) *')
         .eq('paciente', cliente.nome)
         .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim);
+        .lt('data_emissao', dataFim)
+        .order('cliente, data_emissao, valor_bruto, nome_exame, created_at');
 
       if (errorNome) {
         console.error('Erro ao buscar por nome:', errorNome);
       } else {
         finalData = dataByNome || [];
-        console.log(`Dados encontrados por nome: ${finalData.length}`);
+        console.log(`Dados encontrados por nome (sem duplicatas): ${finalData.length}`);
       }
     }
 
