@@ -44,87 +44,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Cliente: ${cliente.nome}, Período: ${data_inicio} até ${data_fim}`);
 
-    // Buscar dados de faturamento CORRIGIDO - agrupados por número da fatura
-    const { data: faturamento, error } = await supabase
+    // Buscar todos os dados de faturamento
+    const { data: faturamentoRaw, error } = await supabase
       .from('faturamento')
-      .select('numero_fatura, cliente, nome_exame, medico, modalidade, especialidade, data_emissao, SUM(quantidade) as quantidade, SUM(valor_bruto) as valor_bruto')
+      .select('*')
       .eq('paciente', cliente.nome)
       .gte('data_emissao', data_inicio)
-      .lte('data_emissao', data_fim)
-      .groupBy('numero_fatura, cliente, nome_exame, medico, modalidade, especialidade, data_emissao');
-
-    console.log(`Dados encontrados: ${faturamento?.length || 0} registros agrupados`);
+      .lte('data_emissao', data_fim);
 
     if (error) {
       console.error('Erro ao buscar faturamento:', error);
-      
-      // Busca simples sem agrupamento como fallback
-      const { data: faturamentoSimples } = await supabase
-        .from('faturamento')
-        .select('*')
-        .eq('paciente', cliente.nome)
-        .gte('data_emissao', data_inicio)
-        .lte('data_emissao', data_fim);
-        
-      if (!faturamentoSimples || faturamentoSimples.length === 0) {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Nenhum dado encontrado',
-            debug: {
-              cliente: cliente.nome,
-              periodo,
-              filtro: `paciente = '${cliente.nome}' AND data_emissao BETWEEN '${data_inicio}' AND '${data_fim}'`
-            }
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // Use dados simples se agrupamento falhar
-      const registrosUnicos = new Map();
-      faturamentoSimples.forEach(item => {
-        const key = `${item.numero_fatura}_${item.cliente}_${item.nome_exame}`;
-        if (!registrosUnicos.has(key)) {
-          registrosUnicos.set(key, {
-            ...item,
-            quantidade: Number(item.quantidade) || 1,
-            valor_bruto: Number(item.valor_bruto) || Number(item.valor) || 0
-          });
-        } else {
-          const existing = registrosUnicos.get(key);
-          existing.quantidade += Number(item.quantidade) || 1;
-          existing.valor_bruto += Number(item.valor_bruto) || Number(item.valor) || 0;
-        }
-      });
-      
-      const dadosAgrupados = Array.from(registrosUnicos.values());
-      console.log(`Fallback: ${dadosAgrupados.length} registros únicos`);
-      
-      const total_laudos = dadosAgrupados.reduce((sum, item) => sum + item.quantidade, 0);
-      const valor_bruto = dadosAgrupados.reduce((sum, item) => sum + item.valor_bruto, 0);
-      
-      console.log(`Totais fallback: ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
-      
       return new Response(
-        JSON.stringify({ 
-          success: true,
-          cliente: cliente.nome,
-          periodo,
-          total_registros: dadosAgrupados.length,
-          total_laudos,
-          valor_bruto: valor_bruto.toFixed(2),
-          message: `Relatório gerado (fallback): ${dadosAgrupados.length} registros, ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`,
-          dados: dadosAgrupados.slice(0, 5) // Amostra dos primeiros 5 registros
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ success: false, error: `Erro ao buscar dados: ${error.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!faturamento || faturamento.length === 0) {
+    if (!faturamentoRaw || faturamentoRaw.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -139,11 +75,42 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular totais CORRETOS
-    const total_laudos = faturamento.reduce((sum, item) => sum + (item.quantidade || 1), 0);
-    const valor_bruto = faturamento.reduce((sum, item) => sum + (Number(item.valor_bruto) || Number(item.valor) || 0), 0);
+    // APLICAR REGRA DE AGRUPAMENTO: agrupar por chave única para eliminar duplicatas
+    const registrosUnicos = new Map();
     
-    // Impostos
+    faturamentoRaw.forEach(item => {
+      // Chave única: data + cliente + exame + medico + modalidade + especialidade
+      const key = `${item.data_emissao}_${item.cliente}_${item.nome_exame}_${item.medico}_${item.modalidade}_${item.especialidade}`;
+      
+      if (!registrosUnicos.has(key)) {
+        registrosUnicos.set(key, {
+          data_emissao: item.data_emissao,
+          cliente: item.cliente,
+          nome_exame: item.nome_exame,
+          medico: item.medico,
+          modalidade: item.modalidade,
+          especialidade: item.especialidade,
+          prioridade: item.prioridade,
+          categoria: item.categoria,
+          quantidade: Number(item.quantidade) || 1,
+          valor_bruto: Number(item.valor_bruto) || Number(item.valor) || 0
+        });
+      } else {
+        // Se já existe, soma quantidade e valor
+        const existing = registrosUnicos.get(key);
+        existing.quantidade += Number(item.quantidade) || 1;
+        existing.valor_bruto += Number(item.valor_bruto) || Number(item.valor) || 0;
+      }
+    });
+    
+    const faturamento = Array.from(registrosUnicos.values());
+    
+    // CALCULAR TOTAIS seguindo a regra: registros únicos, soma quantidades, soma valores
+    const total_registros = faturamento.length;
+    const total_laudos = faturamento.reduce((sum, item) => sum + item.quantidade, 0);
+    const valor_bruto = faturamento.reduce((sum, item) => sum + item.valor_bruto, 0);
+    
+    // Impostos calculados sobre valor bruto
     const irrf = valor_bruto * 0.015;
     const csll = valor_bruto * 0.01;
     const pis = valor_bruto * 0.0065;
@@ -151,9 +118,9 @@ const handler = async (req: Request): Promise<Response> => {
     const impostos = irrf + csll + pis + cofins;
     const valor_liquido = valor_bruto - impostos;
 
-    console.log(`Total correto: ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
+    console.log(`Totais calculados: ${total_registros} registros, ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
 
-    // Gerar PDF usando Puppeteer (via service)
+    // Gerar PDF usando serviço externo
     const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -187,6 +154,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     <div class="resumo">
         <h3>RESUMO FINANCEIRO</h3>
+        <p><strong>Total de registros únicos:</strong> ${total_registros}</p>
         <p><strong>Total de laudos:</strong> ${total_laudos}</p>
         <p><strong>Valor bruto:</strong> R$ ${valor_bruto.toFixed(2)}</p>
         <p><strong>IRRF (1,5%):</strong> R$ ${irrf.toFixed(2)}</p>
@@ -197,7 +165,7 @@ const handler = async (req: Request): Promise<Response> => {
         <p class="valor-destaque"><strong>Valor líquido a pagar: R$ ${valor_liquido.toFixed(2)}</strong></p>
     </div>
 
-    <h3>DETALHAMENTO DOS EXAMES</h3>
+    <h3>DETALHAMENTO DOS EXAMES (${total_registros} registros únicos)</h3>
     <table>
         <thead>
             <tr>
@@ -216,12 +184,12 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                     <td>${new Date(item.data_emissao).toLocaleDateString('pt-BR')}</td>
                     <td>${item.cliente || 'N/A'}</td>
-                    <td>${item.nome_exame || item.modalidade + ' - ' + item.especialidade || 'N/A'}</td>
+                    <td>${item.nome_exame || (item.modalidade + ' - ' + item.especialidade) || 'N/A'}</td>
                     <td>${item.medico || 'N/A'}</td>
                     <td>${item.modalidade || 'N/A'}</td>
                     <td>${item.especialidade || 'N/A'}</td>
-                    <td>${item.quantidade || 1}</td>
-                    <td class="text-right">R$ ${(Number(item.valor_bruto) || Number(item.valor) || 0).toFixed(2)}</td>
+                    <td>${item.quantidade}</td>
+                    <td class="text-right">R$ ${item.valor_bruto.toFixed(2)}</td>
                 </tr>
             `).join('')}
         </tbody>
@@ -229,7 +197,7 @@ const handler = async (req: Request): Promise<Response> => {
 </body>
 </html>`;
 
-    // Converter HTML para PDF usando puppeteer-service
+    // Converter HTML para PDF
     const pdfResponse = await fetch('https://pdf-service.deno.dev/convert', {
       method: 'POST',
       headers: {
@@ -275,6 +243,7 @@ const handler = async (req: Request): Promise<Response> => {
         success: true,
         cliente: cliente.nome,
         periodo,
+        total_registros,
         total_laudos,
         valor_bruto: valor_bruto.toFixed(2),
         valor_liquido: valor_liquido.toFixed(2),
@@ -283,7 +252,7 @@ const handler = async (req: Request): Promise<Response> => {
           url: publicUrl,
           nome: nomeArquivo
         }],
-        message: `Relatório gerado: ${total_laudos} laudos, valor bruto R$ ${valor_bruto.toFixed(2)}, líquido R$ ${valor_liquido.toFixed(2)}`
+        message: `Relatório gerado: ${total_registros} registros, ${total_laudos} laudos, valor bruto R$ ${valor_bruto.toFixed(2)}`
       }),
       {
         status: 200,
