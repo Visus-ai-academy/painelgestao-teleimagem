@@ -116,16 +116,16 @@ const handler = async (req: Request): Promise<Response> => {
     let fonteDados = 'faturamento';
       
     examesDetalhados = dadosFaturamento.map(item => ({
-      data_estudo: item.data_emissao || data_inicio,
-      paciente: 'NÃO INFORMADO', 
-      nome_exame: `Fatura ${item.numero_fatura}`,
-      laudado_por: 'NÃO INFORMADO',
-      prioridade: 'NORMAL',
-      modalidade: 'FATURAMENTO',
-      especialidade: 'GERAL', 
-      categoria: 'NORMAL',
-      laudos: 1,
-      valor: Number(item.valor) || 0
+      data_estudo: item.data_exame || item.data_emissao || data_inicio,
+      paciente: item.paciente || 'NÃO INFORMADO', 
+      nome_exame: item.nome_exame || `${item.modalidade || ''} ${item.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
+      laudado_por: item.medico || 'NÃO INFORMADO',
+      prioridade: item.prioridade || 'NORMAL',
+      modalidade: item.modalidade || 'NÃO INFORMADO',
+      especialidade: item.especialidade || 'NÃO INFORMADO', 
+      categoria: item.categoria || 'NORMAL',
+      laudos: item.quantidade || 1,
+      valor: Number(item.valor_bruto) || Number(item.valor) || 0
     }));
 
     console.log(`📈 Fonte de dados: ${fonteDados}`);

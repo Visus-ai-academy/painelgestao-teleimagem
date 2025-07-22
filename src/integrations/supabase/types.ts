@@ -623,49 +623,82 @@ export type Database = {
       }
       faturamento: {
         Row: {
+          categoria: string | null
+          cliente: string | null
           cliente_email: string | null
           cliente_nome: string
           created_at: string
           data_emissao: string
+          data_exame: string | null
           data_pagamento: string | null
           data_vencimento: string
+          especialidade: string | null
           id: string
+          medico: string | null
+          modalidade: string | null
+          nome_exame: string | null
           numero_fatura: string
           omie_id: string
+          paciente: string | null
+          prioridade: string | null
+          quantidade: number | null
           status: string
           sync_date: string
           updated_at: string
           valor: number
+          valor_bruto: number | null
         }
         Insert: {
+          categoria?: string | null
+          cliente?: string | null
           cliente_email?: string | null
           cliente_nome: string
           created_at?: string
           data_emissao: string
+          data_exame?: string | null
           data_pagamento?: string | null
           data_vencimento: string
+          especialidade?: string | null
           id?: string
+          medico?: string | null
+          modalidade?: string | null
+          nome_exame?: string | null
           numero_fatura: string
           omie_id: string
+          paciente?: string | null
+          prioridade?: string | null
+          quantidade?: number | null
           status: string
           sync_date?: string
           updated_at?: string
           valor: number
+          valor_bruto?: number | null
         }
         Update: {
+          categoria?: string | null
+          cliente?: string | null
           cliente_email?: string | null
           cliente_nome?: string
           created_at?: string
           data_emissao?: string
+          data_exame?: string | null
           data_pagamento?: string | null
           data_vencimento?: string
+          especialidade?: string | null
           id?: string
+          medico?: string | null
+          modalidade?: string | null
+          nome_exame?: string | null
           numero_fatura?: string
           omie_id?: string
+          paciente?: string | null
+          prioridade?: string | null
+          quantidade?: number | null
           status?: string
           sync_date?: string
           updated_at?: string
           valor?: number
+          valor_bruto?: number | null
         }
         Relationships: []
       }

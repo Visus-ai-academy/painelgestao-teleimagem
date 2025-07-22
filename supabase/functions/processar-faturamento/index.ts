@@ -129,17 +129,27 @@ serve(async (req) => {
         return new Date().toISOString().split('T')[0]
       }
       
-      // Mapear campos baseado no template CSV de faturamento correto
+      // Mapear campos baseado no template CSV de faturamento e mapeamentos
       // Template: Paciente;Cliente;Medico;Data_Exame;Modalidade;Especialidade;Categoria;Prioridade;Nome_Exame;Quantidade;Valor_Bruto
-      // Mapeando APENAS para campos que existem na tabela faturamento
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
         cliente_nome: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
-        cliente_email: null, // Não disponível no template
+        cliente: row[1] ? String(row[1]) : 'Cliente Não Informado', // Cliente (coluna 1)
+        paciente: row[0] ? String(row[0]) : 'Paciente Não Informado', // Paciente (coluna 0)
+        medico: row[2] ? String(row[2]) : 'Médico Não Informado', // Medico (coluna 2)
+        data_exame: parseDate(row[3]), // Data_Exame (coluna 3)
+        modalidade: row[4] ? String(row[4]) : 'Não Informado', // Modalidade (coluna 4)
+        especialidade: row[5] ? String(row[5]) : 'Não Informado', // Especialidade (coluna 5)
+        categoria: row[6] ? String(row[6]) : 'NORMAL', // Categoria (coluna 6)
+        prioridade: row[7] ? String(row[7]) : 'NORMAL', // Prioridade (coluna 7)
+        nome_exame: row[8] ? String(row[8]) : 'Exame Não Informado', // Nome_Exame (coluna 8)
+        quantidade: parseInt(row[9]) || 1, // Quantidade (coluna 9)
+        valor_bruto: parseFloat(row[10]) || 0, // Valor_Bruto (coluna 10)
+        cliente_email: null,
         data_emissao: parseDate(row[3]), // Data_Exame (coluna 3)
         data_vencimento: parseDate(row[3]), // Usar mesma data do exame
-        data_pagamento: null, // Não disponível no template
+        data_pagamento: null,
         valor: parseFloat(row[10]) || 0, // Valor_Bruto (coluna 10)
         status: 'em_aberto'
       }
