@@ -7,6 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Reduzir limites para arquivos grandes
+const MAX_RECORDS_PER_BATCH = 50; // Reduzido de 100
+const MAX_CHUNK_SIZE = 500; // Reduzido de 2000
+
 // Adicionar timeout de 5 minutos para a função
 const FUNCTION_TIMEOUT = 5 * 60 * 1000; // 5 minutos
 
@@ -299,16 +303,17 @@ serve(async (req) => {
     // Função de processamento em background - apenas para o chunk atual
     const processarDados = async () => {
       try {
-        const batchSize = 100; // Ainda menor para garantir que funcione
+        const batchSize = 25; // Muito menor para garantir que funcione
         let totalInseridos = 0;
         let totalFalhados = 0;
-        const maxRetries = 1; // Apenas 1 retry
         const startTime = Date.now();
-        const maxProcessingTime = 2 * 60 * 1000; // 2 minutos máximo
+        const maxProcessingTime = 90 * 1000; // 90 segundos máximo
+        
+        console.log(`Processando ${currentChunk.length} registros em lotes de ${batchSize}`)
         
         // Processar apenas o chunk atual, não todos os dados
         for (let i = 0; i < currentChunk.length; i += batchSize) {
-          // Verificar timeout
+          // Verificar timeout muito antes
           if (Date.now() - startTime > maxProcessingTime) {
             console.log('Timeout atingido, salvando progresso...');
             break;
