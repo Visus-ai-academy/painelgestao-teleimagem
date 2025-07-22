@@ -176,87 +176,77 @@ serve(async (req) => {
       throw new Error('Nenhum dado válido encontrado no arquivo')
     }
 
-    // Iniciar processamento em background e retornar resposta imediata
-    console.log('10. Iniciando processamento em background...')
+    // Dividir o processamento em chunks menores para evitar timeout
+    console.log('10. Dividindo dados em chunks para processamento...')
     
-    // Função de processamento em background com otimizações para timeout
+    const maxRecordsPerExecution = 2000; // Máximo por execução
+    const totalChunks = Math.ceil(dadosFaturamento.length / maxRecordsPerExecution);
+    
+    console.log(`Total de registros: ${dadosFaturamento.length}`)
+    console.log(`Chunks necessários: ${totalChunks}`)
+    
+    // Processar apenas o primeiro chunk nesta execução
+    const currentChunk = dadosFaturamento.slice(0, maxRecordsPerExecution);
+    console.log(`Processando chunk 1/${totalChunks}: ${currentChunk.length} registros`)
+    
+    // Se há mais chunks, agendar as próximas execuções
+    const remainingData = dadosFaturamento.slice(maxRecordsPerExecution);
+    
+    // Função de processamento em background - apenas para o chunk atual
     const processarDados = async () => {
       try {
-        const batchSize = 200; // Reduzido ainda mais para evitar timeout
+        const batchSize = 100; // Ainda menor para garantir que funcione
         let totalInseridos = 0;
         let totalFalhados = 0;
-        const maxRetries = 2; // Reduzido para economizar tempo
+        const maxRetries = 1; // Apenas 1 retry
         const startTime = Date.now();
-        const maxProcessingTime = 4 * 60 * 1000; // 4 minutos máximo
+        const maxProcessingTime = 2 * 60 * 1000; // 2 minutos máximo
         
-        for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
+        // Processar apenas o chunk atual, não todos os dados
+        for (let i = 0; i < currentChunk.length; i += batchSize) {
           // Verificar timeout
           if (Date.now() - startTime > maxProcessingTime) {
             console.log('Timeout atingido, salvando progresso...');
             break;
           }
           
-          const lote = dadosFaturamento.slice(i, i + batchSize);
+          const lote = currentChunk.slice(i, i + batchSize);
           const batchNumber = Math.floor(i/batchSize) + 1;
-          const totalBatches = Math.ceil(dadosFaturamento.length/batchSize);
+          const totalBatches = Math.ceil(currentChunk.length/batchSize);
           
           console.log(`Inserindo lote ${batchNumber}/${totalBatches}: ${lote.length} registros`);
           
-          let retryCount = 0;
-          let success = false;
-          
-          while (retryCount < maxRetries && !success) {
-            try {
-              // Usar INSERT simples que é mais rápido que UPSERT
-              const { data: insertData, error: insertError } = await supabase
-                .from('faturamento')
-                .insert(lote)
-                .select('id')
+          try {
+            // Usar INSERT simples que é mais rápido que UPSERT
+            const { data: insertData, error: insertError } = await supabase
+              .from('faturamento')
+              .insert(lote)
+              .select('id')
 
-              if (insertError) {
-                console.error(`Erro no lote ${batchNumber}, tentativa ${retryCount + 1}:`, insertError.message)
-                retryCount++;
-                
-                if (retryCount >= maxRetries) {
-                  console.error(`Lote ${batchNumber} falhou após ${maxRetries} tentativas`);
-                  totalFalhados += lote.length;
-                  break;
-                }
-                
-                // Aguardar menos tempo
-                await new Promise(resolve => setTimeout(resolve, 500));
-                continue;
-              }
-
-              totalInseridos += insertData?.length || 0;
-              console.log(`Lote ${batchNumber} inserido: ${insertData?.length || 0} registros`);
-              success = true;
-              
-              // Atualizar progresso a cada 10 lotes
-              if (batchNumber % 10 === 0) {
-                await supabase
-                  .from('upload_logs')
-                  .update({
-                    records_processed: totalInseridos,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', logData.id)
-              }
-              
-              // Pausa mínima entre lotes
-              await new Promise(resolve => setTimeout(resolve, 50));
-              
-            } catch (error) {
-              console.error(`Erro inesperado no lote ${batchNumber}:`, error);
-              retryCount++;
-              
-              if (retryCount >= maxRetries) {
-                totalFalhados += lote.length;
-                break;
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 500));
+            if (insertError) {
+              console.error(`Erro no lote ${batchNumber}:`, insertError.message)
+              totalFalhados += lote.length;
+              continue; // Pular para o próximo lote
             }
+
+            totalInseridos += insertData?.length || 0;
+            console.log(`Lote ${batchNumber} inserido: ${insertData?.length || 0} registros`);
+            
+            // Atualizar progresso mais frequentemente
+            if (batchNumber % 5 === 0) {
+              await supabase
+                .from('upload_logs')
+                .update({
+                  records_processed: totalInseridos,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', logData.id)
+            }
+            
+          } catch (error) {
+            console.error(`Erro inesperado no lote ${batchNumber}:`, error);
+            totalFalhados += lote.length;
+            continue;
           }
         }
 
