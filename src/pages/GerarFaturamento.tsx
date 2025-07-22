@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 import { MatrixRain } from "@/components/MatrixRain";
+import { ProcessingSpeedometer } from "@/components/ProcessingSpeedometer";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Período atual (julho/2025)
@@ -100,6 +101,7 @@ export default function GerarFaturamento() {
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(false);
   
   // Controle de período para upload
   const [periodoSelecionado, setPeriodoSelecionado] = useState(PERIODO_ATUAL);
@@ -1059,6 +1061,13 @@ export default function GerarFaturamento() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Velocímetro de Status do Processamento */}
+              <div className="mb-6">
+                <ProcessingSpeedometer 
+                  fileType="faturamento"
+                  onReadyToGenerate={setSistemaProntoParagerar}
+                />
+              </div>
               {/* Controle de envio de emails */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center space-x-2">
@@ -1169,14 +1178,20 @@ export default function GerarFaturamento() {
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     <Button 
                       onClick={handleProcessarTodosClientes}
-                      disabled={processandoTodos || clientesCarregados.length === 0}
+                      disabled={processandoTodos || !sistemaProntoParagerar}
                       size="lg"
                       className="min-w-[250px] bg-purple-600 hover:bg-purple-700"
+                      title={!sistemaProntoParagerar ? "Aguarde o processamento dos dados de faturamento" : ""}
                     >
                       {processandoTodos ? (
                         <>
                           <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
                           Processando...
+                        </>
+                      ) : !sistemaProntoParagerar ? (
+                        <>
+                          <Clock className="h-5 w-5 mr-2" />
+                          Aguardando Dados...
                         </>
                       ) : (
                         <>
