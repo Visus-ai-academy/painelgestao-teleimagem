@@ -6,17 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const handler = async (req: Request): Promise<Response> => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-    const { cliente_id, periodo } = body;
+    const { cliente_id, periodo } = await req.json();
     
-    console.log(`Gerando relatório para cliente: ${cliente_id}, período: ${periodo}`);
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -25,241 +22,90 @@ const handler = async (req: Request): Promise<Response> => {
     // Buscar cliente
     const { data: cliente } = await supabase
       .from('clientes')
-      .select('*')
+      .select('nome')
       .eq('id', cliente_id)
       .single();
 
     if (!cliente) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Cliente não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Cliente não encontrado' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Calcular datas
+    // Calcular período
     const [ano, mes] = periodo.split('-');
-    const data_inicio = `${ano}-${mes}-01`;
     const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
-    const data_fim = `${ano}-${mes}-${ultimoDia.toString().padStart(2, '0')}`;
+    const dataInicio = `${ano}-${mes}-01`;
+    const dataFim = `${ano}-${mes}-${ultimoDia}`;
 
-    console.log(`Cliente: ${cliente.nome}, Período: ${data_inicio} até ${data_fim}`);
-
-    // Buscar todos os dados de faturamento
-    const { data: faturamentoRaw, error } = await supabase
+    // Buscar faturamento
+    const { data: dados } = await supabase
       .from('faturamento')
-      .select('*')
+      .select('data_emissao, cliente, nome_exame, medico, modalidade, especialidade, quantidade, valor_bruto')
       .eq('paciente', cliente.nome)
-      .gte('data_emissao', data_inicio)
-      .lte('data_emissao', data_fim);
+      .gte('data_emissao', dataInicio)
+      .lte('data_emissao', dataFim);
 
-    if (error) {
-      console.error('Erro ao buscar faturamento:', error);
-      return new Response(
-        JSON.stringify({ success: false, error: `Erro ao buscar dados: ${error.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!dados || dados.length === 0) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Nenhum dado encontrado para ${cliente.nome} no período ${periodo}` 
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    if (!faturamentoRaw || faturamentoRaw.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Nenhum dado encontrado',
-          debug: {
-            cliente: cliente.nome,
-            periodo,
-            filtro: `paciente = '${cliente.nome}' AND data_emissao BETWEEN '${data_inicio}' AND '${data_fim}'`
-          }
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // APLICAR REGRA DE AGRUPAMENTO: agrupar por chave única para eliminar duplicatas
-    const registrosUnicos = new Map();
-    
-    faturamentoRaw.forEach(item => {
-      // Chave única: data + cliente + exame + medico + modalidade + especialidade
-      const key = `${item.data_emissao}_${item.cliente}_${item.nome_exame}_${item.medico}_${item.modalidade}_${item.especialidade}`;
-      
-      if (!registrosUnicos.has(key)) {
-        registrosUnicos.set(key, {
-          data_emissao: item.data_emissao,
-          cliente: item.cliente,
-          nome_exame: item.nome_exame,
-          medico: item.medico,
-          modalidade: item.modalidade,
-          especialidade: item.especialidade,
-          prioridade: item.prioridade,
-          categoria: item.categoria,
-          quantidade: Number(item.quantidade) || 1,
-          valor_bruto: Number(item.valor_bruto) || Number(item.valor) || 0
-        });
+    // Agrupar registros únicos
+    const unicos = new Map();
+    dados.forEach(item => {
+      const chave = `${item.data_emissao}_${item.cliente}_${item.nome_exame}_${item.medico}`;
+      if (unicos.has(chave)) {
+        const existente = unicos.get(chave);
+        existente.quantidade += Number(item.quantidade) || 1;
+        existente.valor_bruto += Number(item.valor_bruto) || 0;
       } else {
-        // Se já existe, soma quantidade e valor
-        const existing = registrosUnicos.get(key);
-        existing.quantidade += Number(item.quantidade) || 1;
-        existing.valor_bruto += Number(item.valor_bruto) || Number(item.valor) || 0;
+        unicos.set(chave, {
+          ...item,
+          quantidade: Number(item.quantidade) || 1,
+          valor_bruto: Number(item.valor_bruto) || 0
+        });
       }
     });
-    
-    const faturamento = Array.from(registrosUnicos.values());
-    
-    // CALCULAR TOTAIS seguindo a regra: registros únicos, soma quantidades, soma valores
-    const total_registros = faturamento.length;
-    const total_laudos = faturamento.reduce((sum, item) => sum + item.quantidade, 0);
-    const valor_bruto = faturamento.reduce((sum, item) => sum + item.valor_bruto, 0);
-    
-    // Impostos calculados sobre valor bruto
-    const irrf = valor_bruto * 0.015;
-    const csll = valor_bruto * 0.01;
-    const pis = valor_bruto * 0.0065;
-    const cofins = valor_bruto * 0.03;
-    const impostos = irrf + csll + pis + cofins;
-    const valor_liquido = valor_bruto - impostos;
 
-    console.log(`Totais calculados: ${total_registros} registros, ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
+    const registros = Array.from(unicos.values());
+    const totalRegistros = registros.length;
+    const totalLaudos = registros.reduce((sum, r) => sum + r.quantidade, 0);
+    const valorBruto = registros.reduce((sum, r) => sum + r.valor_bruto, 0);
 
-    // Gerar relatório em HTML (temporariamente, até resolver PDF)
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Relatório de Faturamento - ${cliente.nome}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .title { font-size: 18px; font-weight: bold; color: #0066cc; }
-        .info { margin: 20px 0; }
-        .resumo { background: #f9f9f9; padding: 15px; margin: 20px 0; border: 1px solid #ddd; }
-        .valor-destaque { font-weight: bold; color: #0066cc; font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-        th { background-color: #0066cc; color: white; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f8f8f8; }
-        .text-right { text-align: right; }
-        @media print {
-            body { margin: 0; }
-            .header { page-break-inside: avoid; }
-            table { page-break-inside: auto; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
-        }
-    </style>
-    <script>
-        window.onload = function() {
-            // Auto print quando abrir
-            setTimeout(() => window.print(), 1000);
-        }
-    </script>
-</head>
-<body>
-    <div class="header">
-        <div class="title">DEMONSTRATIVO DE FATURAMENTO</div>
-        <div>TELEIMAGEM - Diagnóstico por Imagem</div>
-    </div>
-    
-    <div class="info">
-        <strong>Cliente:</strong> ${cliente.nome}<br>
-        <strong>Período:</strong> ${mes}/${ano}<br>
-        <strong>Data de Geração:</strong> ${new Date().toLocaleDateString('pt-BR')}
-    </div>
+    // Impostos
+    const irrf = valorBruto * 0.015;
+    const csll = valorBruto * 0.01;
+    const pis = valorBruto * 0.0065;
+    const cofins = valorBruto * 0.03;
+    const valorLiquido = valorBruto - (irrf + csll + pis + cofins);
 
-    <div class="resumo">
-        <h3>RESUMO FINANCEIRO</h3>
-        <p><strong>Total de registros únicos:</strong> ${total_registros}</p>
-        <p><strong>Total de laudos:</strong> ${total_laudos}</p>
-        <p><strong>Valor bruto:</strong> R$ ${valor_bruto.toFixed(2)}</p>
-        <p><strong>IRRF (1,5%):</strong> R$ ${irrf.toFixed(2)}</p>
-        <p><strong>CSLL (1,0%):</strong> R$ ${csll.toFixed(2)}</p>
-        <p><strong>PIS (0,65%):</strong> R$ ${pis.toFixed(2)}</p>
-        <p><strong>Cofins (3,0%):</strong> R$ ${cofins.toFixed(2)}</p>
-        <p><strong>Total de impostos:</strong> R$ ${impostos.toFixed(2)}</p>
-        <p class="valor-destaque"><strong>Valor líquido a pagar: R$ ${valor_liquido.toFixed(2)}</strong></p>
-    </div>
-
-    <h3>DETALHAMENTO DOS EXAMES (${total_registros} registros únicos)</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Paciente</th>
-                <th>Exame</th>
-                <th>Médico</th>
-                <th>Modalidade</th>
-                <th>Especialidade</th>
-                <th>Qtd</th>
-                <th class="text-right">Valor</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${faturamento.map(item => `
-                <tr>
-                    <td>${new Date(item.data_emissao).toLocaleDateString('pt-BR')}</td>
-                    <td>${item.cliente || 'N/A'}</td>
-                    <td>${item.nome_exame || (item.modalidade + ' - ' + item.especialidade) || 'N/A'}</td>
-                    <td>${item.medico || 'N/A'}</td>
-                    <td>${item.modalidade || 'N/A'}</td>
-                    <td>${item.especialidade || 'N/A'}</td>
-                    <td>${item.quantidade}</td>
-                    <td class="text-right">R$ ${item.valor_bruto.toFixed(2)}</td>
-                </tr>
-            `).join('')}
-        </tbody>
-    </table>
-</body>
-</html>`;
-
-    // Salvar HTML no storage (com auto-print para gerar PDF no navegador)
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.html`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('relatorios-faturamento')
-      .upload(nomeArquivo, htmlContent, {
-        contentType: 'text/html',
-        cacheControl: '3600'
-      });
-      
-    if (uploadError) {
-      console.error('Erro ao salvar HTML:', uploadError);
-      throw new Error(`Erro ao salvar HTML: ${uploadError.message}`);
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('relatorios-faturamento')
-      .getPublicUrl(nomeArquivo);
-
-    console.log(`HTML salvo: ${publicUrl}`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        cliente: cliente.nome,
-        periodo,
-        total_registros,
-        total_laudos,
-        valor_bruto: valor_bruto.toFixed(2),
-        valor_liquido: valor_liquido.toFixed(2),
-        arquivos: [{
-          tipo: 'html',
-          url: publicUrl,
-          nome: nomeArquivo
-        }],
-        message: `Relatório gerado: ${total_registros} registros, ${total_laudos} laudos, valor bruto R$ ${valor_bruto.toFixed(2)}. Use Ctrl+P para salvar como PDF.`
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      cliente: cliente.nome,
+      periodo,
+      total_registros: totalRegistros,
+      total_laudos: totalLaudos,
+      valor_bruto: valorBruto.toFixed(2),
+      valor_liquido: valorLiquido.toFixed(2),
+      message: `Relatório: ${totalRegistros} registros, ${totalLaudos} laudos, R$ ${valorBruto.toFixed(2)}`
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
     console.error('Erro:', error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-};
-
-serve(handler);
+});
