@@ -429,6 +429,9 @@ export default function GerarFaturamento() {
         .gte('data_emissao', inicioMes)
         .lt('data_emissao', fimMes);
 
+      console.log('🔍 DEBUG: Dados brutos da tabela faturamento:', faturamentoData?.slice(0, 3));
+      console.log('🔍 DEBUG: Total de registros:', faturamentoData?.length);
+
       if (faturamentoError) {
         throw new Error(`Erro ao buscar dados: ${faturamentoError.message}`);
       }
@@ -445,6 +448,8 @@ export default function GerarFaturamento() {
 
       // Agrupar dados por cliente
       const clientesAgrupados = faturamentoData.reduce((acc: any, item: any) => {
+        console.log('🔍 DEBUG: Item individual:', item);
+        
         if (!acc[item.cliente_nome]) {
           acc[item.cliente_nome] = {
             cliente_nome: item.cliente_nome,
@@ -465,6 +470,8 @@ export default function GerarFaturamento() {
           valor_bruto: item.valor_bruto || 0
         };
         
+        console.log('🔍 DEBUG: Exame formatado:', exameFormatado);
+        
         acc[item.cliente_nome].exames.push(exameFormatado);
         acc[item.cliente_nome].total_exames++;
         acc[item.cliente_nome].valor_total += item.valor_bruto || 0;
@@ -481,6 +488,9 @@ export default function GerarFaturamento() {
             ...clientesAgrupados[clienteNome],
             periodo: periodoSelecionado
           };
+
+          console.log('🔍 DEBUG: Dados enviados para PDF:', clienteData);
+          console.log('🔍 DEBUG: Exames no clienteData:', clienteData.exames?.slice(0, 2));
 
           const pdfBlob = await generatePDF(clienteData);
           const pdfFileName = `relatorio_${clienteNome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodoSelecionado}.pdf`;
