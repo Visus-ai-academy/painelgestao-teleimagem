@@ -90,42 +90,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`💰 Dados de faturamento encontrados: ${dadosFaturamento?.length || 0} registros`);
 
-    // 3. BUSCAR EXAMES COMO FALLBACK
-    const { data: examesRealizados, error: examesError } = await supabase
-      .from('exames_realizados')
-      .select('*')
-      .eq('cliente_id', cliente_id)
-      .gte('data_exame', data_inicio)
-      .lte('data_exame', data_fim)
-      .order('data_exame', { ascending: true });
-
-    if (examesError) {
-      console.error('❌ Erro ao buscar exames:', examesError);
-      throw new Error(`Erro ao buscar exames: ${examesError.message}`);
-    }
-
-    console.log(`🩺 Exames encontrados: ${examesRealizados?.length || 0} registros`);
-
-    // 4. USAR DADOS DE FATURAMENTO (PRIORIDADE)
-    let examesDetalhados: ExameDetalhado[] = [];
-    let fonteDados = 'faturamento';
-
-    if (dadosFaturamento && dadosFaturamento.length > 0) {
-      console.log('📊 Usando dados da tabela FATURAMENTO');
-      
-      examesDetalhados = dadosFaturamento.map(item => ({
-        data_estudo: item.data_exame || item.data_emissao || data_inicio,
-        paciente: item.paciente || 'NÃO INFORMADO', 
-        nome_exame: item.nome_exame || `${item.modalidade || ''} ${item.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
-        laudado_por: item.medico || 'NÃO INFORMADO',
-        prioridade: item.prioridade || 'NORMAL',
-        modalidade: item.modalidade || 'NÃO INFORMADO',
-        especialidade: item.especialidade || 'NÃO INFORMADO', 
-        categoria: item.categoria || 'NORMAL',
-        laudos: item.quantidade || 1,
-        valor: item.valor_bruto || 0
-      }));
-    } else {
+    // Verificar se temos dados suficientes para gerar o relatório
+    if (!dadosFaturamento || dadosFaturamento.length === 0) {
       console.log('❌ Nenhum dado de faturamento encontrado para o período');
       console.log(`Cliente: ${cliente.nome}, Período: ${periodo}`);
       
@@ -143,6 +109,24 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    // 4. PROCESSAR DADOS DE FATURAMENTO
+    console.log('📊 Usando dados da tabela FATURAMENTO');
+    let examesDetalhados: ExameDetalhado[] = [];
+    let fonteDados = 'faturamento';
+      
+    examesDetalhados = dadosFaturamento.map(item => ({
+      data_estudo: item.data_exame || item.data_emissao || data_inicio,
+      paciente: item.paciente || 'NÃO INFORMADO', 
+      nome_exame: item.nome_exame || `${item.modalidade || ''} ${item.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
+      laudado_por: item.medico || 'NÃO INFORMADO',
+      prioridade: item.prioridade || 'NORMAL',
+      modalidade: item.modalidade || 'NÃO INFORMADO',
+      especialidade: item.especialidade || 'NÃO INFORMADO', 
+      categoria: item.categoria || 'NORMAL',
+      laudos: item.quantidade || 1,
+      valor: item.valor_bruto || 0
+    }));
 
     console.log(`📈 Fonte de dados: ${fonteDados}`);
     console.log(`📝 Total de exames processados: ${examesDetalhados.length}`);
