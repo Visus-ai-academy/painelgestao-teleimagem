@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
-import { MatrixRain } from "@/components/MatrixRain";
+
 import { ProcessingSpeedometer } from "@/components/ProcessingSpeedometer";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -1267,16 +1267,25 @@ export default function GerarFaturamento() {
 
           {/* Cards de Resumo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="relative overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Relatórios Gerados</CardTitle>
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{relatoriosGerados}</div>
-                <p className="text-xs text-muted-foreground">
-                  relatórios gerados
-                </p>
+              <CardContent className="relative">
+                {/* Efeito de preenchimento lateral */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-green-100 to-transparent transition-all duration-1000 ease-out"
+                  style={{ 
+                    width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%' 
+                  }}
+                />
+                <div className="relative z-10">
+                  <div className="text-2xl font-bold">{relatoriosGerados}</div>
+                  <p className="text-xs text-muted-foreground">
+                    relatórios gerados
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -1304,7 +1313,12 @@ export default function GerarFaturamento() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                   <div className="flex flex-col items-center space-y-4">
                     <h3 className="text-lg font-semibold text-green-400">SISTEMA ATIVO</h3>
-                    <MatrixRain width={350} height={250} speed={40} fontSize={12} opacity={0.9} />
+                    <div className="w-[350px] h-[250px] bg-gray-900 rounded flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-green-400 text-2xl font-mono mb-2">⚡</div>
+                        <p className="text-green-400 font-mono">PROCESSANDO...</p>
+                      </div>
+                    </div>
                     <div className="text-center">
                       <p className="text-sm text-green-600 font-mono">GERANDO RELATÓRIOS...</p>
                       <p className="text-xs text-muted-foreground mt-1">Processando dados dos clientes</p>
@@ -1312,7 +1326,12 @@ export default function GerarFaturamento() {
                   </div>
                   <div className="flex flex-col items-center space-y-4">
                     <h3 className="text-lg font-semibold text-green-400">STATUS: ONLINE</h3>
-                    <MatrixRain width={350} height={250} speed={35} fontSize={14} opacity={0.8} />
+                    <div className="w-[350px] h-[250px] bg-gray-900 rounded flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-green-400 text-2xl font-mono mb-2">🟢</div>
+                        <p className="text-green-400 font-mono">SISTEMA ONLINE</p>
+                      </div>
+                    </div>
                     <div className="text-center">
                       <p className="text-sm text-green-600 font-mono">SISTEMA OPERACIONAL</p>
                       <p className="text-xs text-muted-foreground mt-1">Aguarde a conclusão do processo</p>
@@ -1494,7 +1513,12 @@ export default function GerarFaturamento() {
           <Card className={`border-green-200 ${statusProcessamento.processando ? 'relative' : 'bg-green-50'}`}>
             {statusProcessamento.processando && (
               <div className="absolute inset-0 bg-black/80 rounded-lg overflow-hidden z-10">
-                <MatrixRain width={800} height={600} fontSize={12} opacity={0.8} />
+                <div className="w-full h-full bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-green-400 text-4xl font-mono mb-4">⚡</div>
+                    <p className="text-green-400 font-mono text-lg">PROCESSANDO</p>
+                  </div>
+                </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-black/70 p-6 rounded-lg border border-green-400/50 backdrop-blur-sm">
                     <div className="flex items-center gap-4">
