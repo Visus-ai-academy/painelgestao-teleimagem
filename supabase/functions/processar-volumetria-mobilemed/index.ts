@@ -286,28 +286,40 @@ async function processFileInBackground(
     }
 
     // Atualizar log de upload com sucesso
-    await supabaseClient
-      .from('upload_logs')
-      .update({
-        status: totalInserted > 0 ? 'completed' : 'error',
-        records_processed: totalInserted,
-        error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
-      })
-      .eq('id', uploadLogId);
+    try {
+      const { error: updateError } = await supabaseClient
+        .from('upload_logs')
+        .update({
+          status: totalInserted > 0 ? 'completed' : 'error',
+          records_processed: totalInserted,
+          error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
+        })
+        .eq('id', uploadLogId);
+
+      if (updateError) {
+        console.error('Erro ao atualizar log final:', updateError);
+      }
+    } catch (updateErr) {
+      console.error('Erro crítico ao atualizar status:', updateErr);
+    }
 
     console.log('Processamento concluído com sucesso');
 
   } catch (error) {
     console.error('Erro durante processamento em background:', error);
     
-    // Atualizar log com erro
-    await supabaseClient
-      .from('upload_logs')
-      .update({
-        status: 'error',
-        error_message: error.message || 'Erro desconhecido durante processamento'
-      })
-      .eq('id', uploadLogId);
+    // Atualizar log com erro - com proteção contra null
+    try {
+      await supabaseClient
+        .from('upload_logs')
+        .update({
+          status: 'error',
+          error_message: error?.message || String(error) || 'Erro desconhecido durante processamento'
+        })
+        .eq('id', uploadLogId);
+    } catch (finalErr) {
+      console.error('Erro crítico ao atualizar status de erro:', finalErr);
+    }
   }
 }
 
