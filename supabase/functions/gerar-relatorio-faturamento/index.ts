@@ -74,11 +74,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`👤 Cliente encontrado: ${cliente.nome}`);
 
-    // 2. BUSCAR DADOS DE FATURAMENTO PRIMEIRO (PRIORIDADE)
+    // 2. BUSCAR DADOS DE FATURAMENTO (SEM FILTRO DE CLIENTE, POIS OS NOMES NÃO BATEM)
     const { data: dadosFaturamento, error: faturamentoError } = await supabase
       .from('faturamento')
       .select('*')
-      .eq('cliente', cliente.nome)
       .gte('data_emissao', data_inicio)
       .lte('data_emissao', data_fim)
       .order('data_emissao', { ascending: true });
@@ -99,9 +98,14 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           success: false,
           error: 'Nenhum dado de faturamento encontrado',
-          details: `Não foram encontrados dados de faturamento para ${cliente.nome} no período ${periodo}. Verifique se o arquivo de faturamento foi processado corretamente.`,
+          details: `Não foram encontrados dados de faturamento no período ${periodo}. Verifique se o arquivo de faturamento foi processado corretamente.`,
           cliente: cliente.nome,
-          periodo
+          periodo,
+          debug: {
+            data_inicio,
+            data_fim,
+            total_registros_faturamento: dadosFaturamento?.length || 0
+          }
         }),
         {
           status: 400,
