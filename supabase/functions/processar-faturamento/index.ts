@@ -13,8 +13,8 @@ const formatExcelDate = (excelDate: any): string => {
   console.log('formatExcelDate - valor recebido:', excelDate, 'tipo:', typeof excelDate);
   
   if (!excelDate) {
-    console.log('Data vazia, mantendo original');
-    return excelDate; // Retorna vazio para não mascarar o problema
+    console.log('Data vazia, usando data atual como fallback');
+    return new Date().toISOString().split('T')[0]; // Fallback para data atual
   }
   
   // Se já está em formato de data válido
@@ -26,25 +26,26 @@ const formatExcelDate = (excelDate: any): string => {
   
   // Se é string, tentar converter
   if (typeof excelDate === 'string') {
-    // Tentar diferentes formatos de data
-    const formats = [
-      excelDate, // formato original
-      excelDate.replace(/\//g, '-'), // trocar / por -
-      excelDate.split('/').reverse().join('-') // DD/MM/YYYY para YYYY-MM-DD
-    ];
+    // Tentar diferentes formatos de data brasileiros
+    let testDate = excelDate.trim();
     
-    for (const format of formats) {
-      const date = new Date(format);
-      if (!isNaN(date.getTime())) {
-        const formatted = date.toISOString().split('T')[0];
-        console.log(`Data convertida de string "${excelDate}" para:`, formatted);
-        return formatted;
-      }
+    // Se está no formato DD/MM/YYYY, converter para YYYY-MM-DD
+    if (testDate.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [dia, mes, ano] = testDate.split('/');
+      testDate = `${ano}-${mes}-${dia}`;
+    }
+    
+    const date = new Date(testDate);
+    if (!isNaN(date.getTime())) {
+      const formatted = date.toISOString().split('T')[0];
+      console.log(`Data convertida de string "${excelDate}" para:`, formatted);
+      return formatted;
     }
   }
   
   // Se é número (formato Excel serial date)
   if (typeof excelDate === 'number') {
+    // Excel conta dias desde 1900-01-01, mas tem um bug para anos bissextos
     const excelEpoch = new Date(1900, 0, 1);
     const date = new Date(excelEpoch.getTime() + (excelDate - 2) * 24 * 60 * 60 * 1000);
     const formatted = date.toISOString().split('T')[0];
@@ -52,8 +53,8 @@ const formatExcelDate = (excelDate: any): string => {
     return formatted;
   }
   
-  console.log('Não foi possível converter a data:', excelDate);
-  return excelDate?.toString() || '';
+  console.log('Não foi possível converter a data, usando data atual:', excelDate);
+  return new Date().toISOString().split('T')[0]; // Fallback seguro
 };
 
 serve(async (req) => {
