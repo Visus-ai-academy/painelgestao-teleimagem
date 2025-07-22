@@ -109,24 +109,41 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento por nome do cliente (paciente) removendo duplicatas
-    console.log('Buscando dados por nome do cliente e removendo duplicatas...');
+    // Buscar dados de faturamento - primeiro por cliente_id, depois por nome
+    console.log('Buscando dados por cliente_id...');
     
-    const { data: finalData, error: faturamentoError } = await supabase
+    let { data: dataByClienteId, error: errorClienteId } = await supabase
       .from('faturamento')
-      .select('DISTINCT ON (cliente, data_emissao, valor_bruto, nome_exame) *')
-      .eq('paciente', cliente.nome)
+      .select('*')
+      .eq('cliente_id', cliente_id)
       .gte('data_emissao', dataInicio)
-      .lt('data_emissao', dataFim)
-      .order('cliente, data_emissao, valor_bruto, nome_exame, created_at');
+      .lt('data_emissao', dataFim);
 
-    if (faturamentoError) {
-      console.error('Erro ao buscar dados de faturamento:', faturamentoError);
-    } else {
-      console.log(`Dados encontrados (sem duplicatas): ${finalData?.length || 0}`);
-      if (finalData && finalData.length > 0) {
-        console.log('Primeiros dados encontrados:', JSON.stringify(finalData.slice(0, 2)));
+    console.log(`Dados encontrados por cliente_id: ${dataByClienteId?.length || 0}`);
+
+    let finalData = dataByClienteId || [];
+    
+    // Se não encontrou por cliente_id, buscar por nome do cliente
+    if (finalData.length === 0) {
+      console.log('Nenhum dado encontrado por cliente_id, buscando por nome do cliente...');
+      
+      const { data: dataByNome, error: errorNome } = await supabase
+        .from('faturamento')
+        .select('*')
+        .eq('paciente', cliente.nome)
+        .gte('data_emissao', dataInicio)
+        .lt('data_emissao', dataFim);
+
+      if (errorNome) {
+        console.error('Erro ao buscar por nome:', errorNome);
+      } else {
+        finalData = dataByNome || [];
+        console.log(`Dados encontrados por nome: ${finalData.length}`);
       }
+    }
+
+    if (errorClienteId && finalData.length === 0) {
+      console.error('Erro ao buscar dados de faturamento:', errorClienteId);
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
