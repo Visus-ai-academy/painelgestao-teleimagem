@@ -40,14 +40,17 @@ serve(async (req: Request) => {
     const dataFim = `${ano}-${mes}-${ultimoDia}`;
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
+    console.log(`Cliente ID recebido: ${cliente_id}`);
 
     // Buscar faturamento - usar cliente_id se possível, senão filtrar por nome
-    let { data: dados } = await supabase
+    let { data: dados, error: errorClienteId } = await supabase
       .from('faturamento')
       .select('*')
       .eq('cliente_id', cliente_id)
       .gte('data_emissao', dataInicio)
       .lte('data_emissao', dataFim);
+
+    console.log(`Busca por cliente_id: ${dados?.length || 0} registros, erro: ${errorClienteId?.message || 'nenhum'}`);
 
     // Se não encontrou por cliente_id, tentar por nome
     if (!dados || dados.length === 0) {
@@ -58,9 +61,22 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lte('data_emissao', dataFim);
       dados = result.data;
+      console.log(`Busca por nome: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
     }
 
-    console.log(`Dados encontrados: ${dados?.length || 0} registros`);
+    // Se ainda não encontrou, tentar buscar por cliente_nome
+    if (!dados || dados.length === 0) {
+      const result = await supabase
+        .from('faturamento')
+        .select('*')
+        .eq('cliente_nome', cliente.nome)
+        .gte('data_emissao', dataInicio)
+        .lte('data_emissao', dataFim);
+      dados = result.data;
+      console.log(`Busca por cliente_nome: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
+    }
+
+    console.log(`Total de dados encontrados: ${dados?.length || 0} registros`);
 
     if (!dados || dados.length === 0) {
       return new Response(JSON.stringify({ 
