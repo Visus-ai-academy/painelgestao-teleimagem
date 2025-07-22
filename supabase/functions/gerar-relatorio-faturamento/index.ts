@@ -123,14 +123,15 @@ serve(async (req: Request) => {
 
     let finalData = dataByClienteId || [];
     
-    // Se não encontrou por cliente_id, buscar por nome do cliente
+    // Se não encontrou por cliente_id, buscar por nome do cliente no campo paciente
     if (finalData.length === 0) {
       console.log('Nenhum dado encontrado por cliente_id, buscando por nome do cliente...');
       
+      // Tentar buscar por diferentes variações do nome
       const { data: dataByNome, error: errorNome } = await supabase
         .from('faturamento')
         .select('*')
-        .eq('paciente', cliente.nome)
+        .or(`paciente.ilike.%${cliente.nome}%,paciente.eq.${cliente.nome}`)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim);
 
@@ -139,6 +140,19 @@ serve(async (req: Request) => {
       } else {
         finalData = dataByNome || [];
         console.log(`Dados encontrados por nome: ${finalData.length}`);
+      }
+      
+      // Se ainda não encontrou, tentar buscar todos os dados do período para debug
+      if (finalData.length === 0) {
+        console.log('Tentando buscar todos os dados do período para debug...');
+        const { data: allData, error: allError } = await supabase
+          .from('faturamento')
+          .select('cliente, cliente_nome, paciente')
+          .gte('data_emissao', dataInicio)
+          .lt('data_emissao', dataFim)
+          .limit(10);
+        
+        console.log('Dados do período encontrados:', JSON.stringify(allData));
       }
     }
 
