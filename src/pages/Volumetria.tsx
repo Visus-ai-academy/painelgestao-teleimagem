@@ -127,39 +127,48 @@ export default function Volumetria() {
   };
 
   const loadData = async () => {
-    console.log('=== INÍCIO LOAD DATA ===');
-    console.log('Período selecionado:', periodo);
-    console.log('Cliente selecionado:', cliente);
     try {
       setLoading(true);
       const dateFilter = getDateFilter();
-      console.log('Date filter resultado:', dateFilter);
 
-      let query = supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .limit(100000); // Remover limite padrão do Supabase
+      // Carregar TODOS os dados usando paginação para evitar limite do Supabase
+      let allData: VolumetriaData[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      // Aplicar filtro de data se não for "todos"
-      if (dateFilter) {
-        query = query.gte('data_referencia', dateFilter.inicio)
-                     .lte('data_referencia', dateFilter.fim);
+      while (hasMore) {
+        let query = supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        // Aplicar filtro de data se não for "todos"
+        if (dateFilter) {
+          query = query.gte('data_referencia', dateFilter.inicio)
+                       .lte('data_referencia', dateFilter.fim);
+        }
+
+        if (cliente !== "todos") {
+          query = query.eq('EMPRESA', cliente);
+        }
+
+        const { data: pageData, error } = await query;
+        if (error) throw error;
+
+        if (pageData && pageData.length > 0) {
+          allData = [...allData, ...pageData];
+          hasMore = pageData.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
-      if (cliente !== "todos") {
-        query = query.eq('EMPRESA', cliente);
-      }
-
-      const { data: volumetriaData, error } = await query;
-      if (error) throw error;
-      
-      console.log('Total de registros carregados:', volumetriaData?.length);
-      console.log('Primeiros 3 registros:', volumetriaData?.slice(0, 3));
-
-      setData(volumetriaData || []);
+      setData(allData);
       
       // Processar dados
-      await processarDados(volumetriaData || []);
+      await processarDados(allData);
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
