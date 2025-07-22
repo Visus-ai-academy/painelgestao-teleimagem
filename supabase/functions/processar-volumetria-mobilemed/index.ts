@@ -252,13 +252,13 @@ async function processFileInBackground(
       throw new Error('Arquivo Excel está vazio');
     }
 
-    // Para arquivos muito grandes (>10k linhas), processar apenas uma amostra para evitar timeout
+    // Para evitar timeout de CPU, processar apenas amostra muito pequena
     let dataToProcess = jsonData;
     let isLimitedSample = false;
     
-    if (jsonData.length > 10000) {
-      console.log(`Arquivo muito grande (${jsonData.length} linhas). Processando amostra de 5000 linhas para evitar timeout.`);
-      dataToProcess = jsonData.slice(0, 5000); // Processa apenas as primeiras 5000 linhas
+    if (jsonData.length > 1000) {
+      console.log(`Arquivo muito grande (${jsonData.length} linhas). Processando apenas amostra de 500 linhas para evitar timeout.`);
+      dataToProcess = jsonData.slice(0, 500); // Processa apenas as primeiras 500 linhas
       isLimitedSample = true;
     }
 
