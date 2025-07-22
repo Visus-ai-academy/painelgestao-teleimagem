@@ -74,10 +74,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`👤 Cliente encontrado: ${cliente.nome}`);
 
-    // 2. BUSCAR DADOS DE FATURAMENTO (SEM FILTRO DE CLIENTE, POIS OS NOMES NÃO BATEM)
+    // 2. BUSCAR DADOS DE FATURAMENTO (CORREÇÃO: paciente = código do cliente)
     const { data: dadosFaturamento, error: faturamentoError } = await supabase
       .from('faturamento')
       .select('*')
+      .eq('paciente', cliente.nome) // CORRETO: paciente contém o código do cliente
       .gte('data_emissao', data_inicio)
       .lte('data_emissao', data_fim)
       .order('data_emissao', { ascending: true });
@@ -88,6 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`💰 Dados de faturamento encontrados: ${dadosFaturamento?.length || 0} registros`);
+    console.log(`🔍 Filtro usado: paciente = '${cliente.nome}' (código do cliente)`);
 
     // Verificar se temos dados suficientes para gerar o relatório
     if (!dadosFaturamento || dadosFaturamento.length === 0) {
@@ -98,13 +100,13 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           success: false,
           error: 'Nenhum dado de faturamento encontrado',
-          details: `Não foram encontrados dados de faturamento no período ${periodo}. Verifique se o arquivo de faturamento foi processado corretamente.`,
+          details: `Não foram encontrados dados de faturamento para cliente ${cliente.nome} no período ${periodo}. Verifique se o arquivo de faturamento foi processado corretamente.`,
           cliente: cliente.nome,
           periodo,
           debug: {
+            filtro_usado: `paciente = '${cliente.nome}'`,
             data_inicio,
-            data_fim,
-            total_registros_faturamento: dadosFaturamento?.length || 0
+            data_fim
           }
         }),
         {
@@ -121,7 +123,7 @@ const handler = async (req: Request): Promise<Response> => {
       
     examesDetalhados = dadosFaturamento.map(item => ({
       data_estudo: item.data_exame || item.data_emissao || data_inicio,
-      paciente: item.paciente || 'NÃO INFORMADO', 
+      paciente: item.cliente || 'NÃO INFORMADO', // CORRETO: cliente contém o nome do paciente
       nome_exame: item.nome_exame || `${item.modalidade || ''} ${item.especialidade || ''}`.trim() || 'EXAME NÃO ESPECIFICADO',
       laudado_por: item.medico || 'NÃO INFORMADO',
       prioridade: item.prioridade || 'NORMAL',
