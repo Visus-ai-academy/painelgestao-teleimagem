@@ -179,15 +179,23 @@ serve(async (req) => {
     // Iniciar processamento em background e retornar resposta imediata
     console.log('10. Iniciando processamento em background...')
     
-    // Função de processamento em background com otimizações
+    // Função de processamento em background com otimizações para timeout
     const processarDados = async () => {
       try {
-        const batchSize = 500; // Reduzido de 1000 para 500
+        const batchSize = 200; // Reduzido ainda mais para evitar timeout
         let totalInseridos = 0;
         let totalFalhados = 0;
-        const maxRetries = 3;
+        const maxRetries = 2; // Reduzido para economizar tempo
+        const startTime = Date.now();
+        const maxProcessingTime = 4 * 60 * 1000; // 4 minutos máximo
         
         for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
+          // Verificar timeout
+          if (Date.now() - startTime > maxProcessingTime) {
+            console.log('Timeout atingido, salvando progresso...');
+            break;
+          }
+          
           const lote = dadosFaturamento.slice(i, i + batchSize);
           const batchNumber = Math.floor(i/batchSize) + 1;
           const totalBatches = Math.ceil(dadosFaturamento.length/batchSize);
@@ -199,17 +207,14 @@ serve(async (req) => {
           
           while (retryCount < maxRetries && !success) {
             try {
-              // Usar UPSERT em vez de INSERT simples
+              // Usar INSERT simples que é mais rápido que UPSERT
               const { data: insertData, error: insertError } = await supabase
                 .from('faturamento')
-                .upsert(lote, { 
-                  onConflict: 'omie_id',
-                  ignoreDuplicates: false 
-                })
-                .select()
+                .insert(lote)
+                .select('id')
 
               if (insertError) {
-                console.error(`Erro no lote ${batchNumber}, tentativa ${retryCount + 1}:`, insertError)
+                console.error(`Erro no lote ${batchNumber}, tentativa ${retryCount + 1}:`, insertError.message)
                 retryCount++;
                 
                 if (retryCount >= maxRetries) {
@@ -218,8 +223,8 @@ serve(async (req) => {
                   break;
                 }
                 
-                // Aguardar antes de tentar novamente (backoff exponencial)
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+                // Aguardar menos tempo
+                await new Promise(resolve => setTimeout(resolve, 500));
                 continue;
               }
 
@@ -227,10 +232,19 @@ serve(async (req) => {
               console.log(`Lote ${batchNumber} inserido: ${insertData?.length || 0} registros`);
               success = true;
               
-              // Pequena pausa entre lotes para não sobrecarregar
-              if (batchNumber < totalBatches) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+              // Atualizar progresso a cada 10 lotes
+              if (batchNumber % 10 === 0) {
+                await supabase
+                  .from('upload_logs')
+                  .update({
+                    records_processed: totalInseridos,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', logData.id)
               }
+              
+              // Pausa mínima entre lotes
+              await new Promise(resolve => setTimeout(resolve, 50));
               
             } catch (error) {
               console.error(`Erro inesperado no lote ${batchNumber}:`, error);
@@ -241,7 +255,7 @@ serve(async (req) => {
                 break;
               }
               
-              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+              await new Promise(resolve => setTimeout(resolve, 500));
             }
           }
         }
