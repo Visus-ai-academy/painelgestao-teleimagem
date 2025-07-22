@@ -626,6 +626,7 @@ export type Database = {
           categoria: string | null
           cliente: string | null
           cliente_email: string | null
+          cliente_id: string | null
           cliente_nome: string
           created_at: string
           data_emissao: string
@@ -652,6 +653,7 @@ export type Database = {
           categoria?: string | null
           cliente?: string | null
           cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nome: string
           created_at?: string
           data_emissao: string
@@ -678,6 +680,7 @@ export type Database = {
           categoria?: string | null
           cliente?: string | null
           cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nome?: string
           created_at?: string
           data_emissao?: string
