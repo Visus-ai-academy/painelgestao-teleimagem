@@ -95,8 +95,7 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento - corrigindo o mapeamento
-    // O nome da clínica está na coluna 'paciente', não 'cliente'
+    // Buscar dados de faturamento - usar a coluna 'cliente' que contém o nome da clínica
     const queries = [
       // 1. Por cliente_id (relacionamento direto)
       supabase
@@ -106,19 +105,19 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por nome completo do cliente na coluna 'paciente' (mapeamento correto)
+      // 2. Por nome completo do cliente na coluna 'cliente' (nome da clínica)
       supabase
         .from('faturamento')
         .select('*')
-        .eq('paciente', cliente.nome)
+        .eq('cliente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Por busca parcial no nome do cliente na coluna 'paciente'
+      // 3. Por busca parcial no nome do cliente na coluna 'cliente'
       supabase
         .from('faturamento')
         .select('*')
-        .ilike('paciente', `%${cliente.nome}%`)
+        .ilike('cliente', `%${cliente.nome}%`)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim)
     ];
@@ -212,8 +211,8 @@ serve(async (req: Request) => {
             const base64String = btoa(binary);
             const imageFormat = ext.toUpperCase() === 'JPG' ? 'JPEG' : ext.toUpperCase();
             
-            // Adicionar imagem ao PDF
-            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 135, 10, 25, 15);
+            // Adicionar imagem ao PDF mantendo proporção adequada
+            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 135, 10, 30, 20);
             logoAdded = true;
             console.log(`Logomarca ${fileName} carregada com sucesso no PDF`);
             break;
@@ -224,10 +223,10 @@ serve(async (req: Request) => {
           // Se não encontrou logomarca, mostrar placeholder
           doc.setDrawColor(200, 200, 200);
           doc.setLineWidth(0.5);
-          doc.rect(135, 10, 25, 15);
+          doc.rect(135, 10, 30, 20);
           doc.setFontSize(8);
           doc.setTextColor(128, 128, 128);
-          doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+          doc.text('LOGOMARCA', 150, 21, { align: 'center' });
           console.log('Nenhuma logomarca encontrada, usando placeholder');
         }
       } catch (logoError) {
@@ -235,10 +234,10 @@ serve(async (req: Request) => {
         // Mostrar placeholder em caso de erro
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.5);
-        doc.rect(135, 10, 25, 15);
+        doc.rect(135, 10, 30, 20);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+        doc.text('LOGOMARCA', 150, 21, { align: 'center' });
       }
       
       // === CABEÇALHO ===
