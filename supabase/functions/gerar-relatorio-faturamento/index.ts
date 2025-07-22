@@ -154,20 +154,23 @@ serve(async (req: Request) => {
     const valorBrutoTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
     const totalLaudos = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
     
+    // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
+    const franquia = 0;
+    const ajustes = 0;
+    
+    // Base de cálculo para impostos: Valor Bruto + Franquia + Ajustes
+    const baseCalculoImpostos = valorBrutoTotal + franquia + ajustes;
+    
     // Calcular impostos (percentuais conforme solicitado)
     const percentualPIS = 0.65; // 0.65%
     const percentualCOFINS = 3.0; // 3%
     const percentualCSLL = 1.0; // 1.0%
     const percentualIRRF = 1.5; // 1.5%
     
-    const valorPIS = valorBrutoTotal * (percentualPIS / 100);
-    const valorCOFINS = valorBrutoTotal * (percentualCOFINS / 100);
-    const valorCSLL = valorBrutoTotal * (percentualCSLL / 100);
-    const valorIRRF = valorBrutoTotal * (percentualIRRF / 100);
-    
-    // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
-    const franquia = 0;
-    const ajustes = 0;
+    const valorPIS = baseCalculoImpostos * (percentualPIS / 100);
+    const valorCOFINS = baseCalculoImpostos * (percentualCOFINS / 100);
+    const valorCSLL = baseCalculoImpostos * (percentualCSLL / 100);
+    const valorIRRF = baseCalculoImpostos * (percentualIRRF / 100);
     
     // Cálculo do Valor a Pagar: valor Bruto + Franquia + ajustes - impostos
     const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
@@ -235,6 +238,9 @@ serve(async (req: Request) => {
       // Layout em linhas conforme solicitado
       let yLine = yQuadro1 + 15;
       doc.text(`Total de Laudos: ${totalLaudos.toLocaleString('pt-BR')}`, 25, yLine);
+      
+      yLine += 8;
+      doc.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
       yLine += 8;
       doc.text(`Franquia: R$ ${franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
