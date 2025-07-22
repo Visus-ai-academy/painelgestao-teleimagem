@@ -115,9 +115,7 @@ export default function Volumetria() {
 
       let query = supabase
         .from('volumetria_mobilemed')
-        .select('*')
-        .gte('data_referencia', inicio)
-        .lte('data_referencia', fim);
+        .select('*');
 
       if (cliente !== "todos") {
         query = query.eq('EMPRESA', cliente);
