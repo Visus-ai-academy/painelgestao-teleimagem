@@ -176,8 +176,49 @@ serve(async (req) => {
       throw new Error('Nenhum dado válido encontrado no arquivo')
     }
 
+    // Identificar períodos dos dados para substituição
+    console.log('10. Identificando períodos dos dados...')
+    const periodosIdentificados = new Set<string>()
+    
+    dadosFaturamento.forEach(registro => {
+      if (registro.data_emissao) {
+        const periodo = registro.data_emissao.substring(0, 7) // YYYY-MM
+        periodosIdentificados.add(periodo)
+      }
+    })
+    
+    const periodosArray = Array.from(periodosIdentificados)
+    console.log('Períodos identificados:', periodosArray)
+    
+    // Remover dados existentes dos mesmos períodos
+    if (periodosArray.length > 0) {
+      console.log('11. Removendo dados existentes dos períodos:', periodosArray)
+      
+      for (const periodo of periodosArray) {
+        const dataInicio = `${periodo}-01`
+        const proximoMes = new Date(periodo + '-01')
+        proximoMes.setMonth(proximoMes.getMonth() + 1)
+        const dataFim = proximoMes.toISOString().substring(0, 10)
+        
+        console.log(`Removendo dados do período ${periodo} (${dataInicio} a ${dataFim})`)
+        
+        const { error: deleteError } = await supabase
+          .from('faturamento')
+          .delete()
+          .gte('data_emissao', dataInicio)
+          .lt('data_emissao', dataFim)
+        
+        if (deleteError) {
+          console.error(`Erro ao remover dados do período ${periodo}:`, deleteError)
+          // Continuar mesmo com erro, apenas logar
+        } else {
+          console.log(`Dados do período ${periodo} removidos com sucesso`)
+        }
+      }
+    }
+
     // Dividir o processamento em chunks menores para evitar timeout
-    console.log('10. Dividindo dados em chunks para processamento...')
+    console.log('12. Dividindo dados em chunks para processamento...')
     
     const maxRecordsPerExecution = 2000; // Máximo por execução
     const totalChunks = Math.ceil(dadosFaturamento.length / maxRecordsPerExecution);
@@ -250,7 +291,7 @@ serve(async (req) => {
           }
         }
 
-        console.log('11. Processamento concluído!')
+        console.log('13. Processamento concluído!')
         console.log(`- Total inseridos: ${totalInseridos} registros`)
         console.log(`- Total falhados: ${totalFalhados} registros`)
         
@@ -283,12 +324,13 @@ serve(async (req) => {
     // Iniciar task em background
     EdgeRuntime.waitUntil(processarDados())
 
-    console.log('12. Processamento iniciado em background, retornando resposta imediata')
+    console.log('14. Processamento iniciado em background, retornando resposta imediata')
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Arquivo processado com sucesso',
+      message: 'Arquivo processado com sucesso - dados do período substituídos',
       recordsProcessed: dadosFaturamento.length,
+      periodosSubstituidos: periodosArray,
       sampleData: dadosFaturamento.slice(0, 3) // Primeiros 3 registros como amostra
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
