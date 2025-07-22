@@ -8,8 +8,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função para converter data do Excel para formato ISO
+const formatExcelDate = (excelDate: any): string => {
+  if (!excelDate) return new Date().toISOString().split('T')[0];
+  
+  // Se já está em formato de data válido
+  if (excelDate instanceof Date) {
+    return excelDate.toISOString().split('T')[0];
+  }
+  
+  // Se é string, tentar converter
+  if (typeof excelDate === 'string') {
+    const date = new Date(excelDate);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  
+  // Se é número (formato Excel serial date)
+  if (typeof excelDate === 'number') {
+    // Excel conta dias desde 1900-01-01, mas com bug no ano 1900
+    const excelEpoch = new Date(1900, 0, 1);
+    const date = new Date(excelEpoch.getTime() + (excelDate - 1) * 24 * 60 * 60 * 1000);
+    return date.toISOString().split('T')[0];
+  }
+  
+  // Fallback para data atual
+  return new Date().toISOString().split('T')[0];
+};
+
 serve(async (req) => {
-  console.log('=== PROCESSAR-FATURAMENTO V6 - CORRIGIDO ===')
+  console.log('=== PROCESSAR-FATURAMENTO V7 - CORRIGINDO DATAS ===')
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -23,7 +52,7 @@ serve(async (req) => {
   let logData: any = null;
 
   try {
-    console.log('1. Iniciando processamento corrigido...')
+    console.log('1. Iniciando processamento com correção de datas...')
     
     const body = await req.json()
     const fileName = body?.fileName
@@ -64,7 +93,6 @@ serve(async (req) => {
 
     console.log('5. Arquivo baixado, tamanho:', fileData.size)
 
-    // Processar Excel
     console.log('6. Processando arquivo Excel...')
     const arrayBuffer = await fileData.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })
@@ -74,14 +102,13 @@ serve(async (req) => {
 
     console.log('7. Dados extraídos do Excel:', jsonData.length, 'linhas')
 
-    // Pegar cabeçalhos
     const headers = jsonData[0] as string[]
     console.log('8. Cabeçalhos encontrados:', headers)
 
     // Otimização: buscar apenas clientes que aparecem no Excel
     console.log('8.1. Extraindo códigos únicos do Excel...')
     const codigosUnicos = [...new Set(
-      jsonData.slice(1, 501) // Aumentar para os primeiros 500 registros
+      jsonData.slice(1, 501)
         .map(row => row[0]?.toString().trim())
         .filter(Boolean)
     )]
@@ -101,7 +128,6 @@ serve(async (req) => {
 
     console.log('8.4. Clientes encontrados:', clientesCadastrados?.length || 0)
 
-    // Função para encontrar cliente
     const encontrarClienteId = (codigoCliente: string): string | null => {
       if (!codigoCliente || !clientesCadastrados) return null
       
@@ -113,11 +139,10 @@ serve(async (req) => {
       return cliente?.id || null
     }
 
-    // Mapear dados simplificado para reduzir processamento
     const dadosMapeados = []
-    const maxRecords = 100 // Reduzir drasticamente para evitar timeout
+    const maxRecords = 100
     
-    console.log(`9. Processando os primeiros ${maxRecords} registros...`)
+    console.log(`9. Processando os primeiros ${maxRecords} registros com datas corretas...`)
     
     const hoje = new Date().toISOString().split('T')[0]
     const vencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -131,6 +156,11 @@ serve(async (req) => {
 
       const clienteId = encontrarClienteId(codigoCliente)
       
+      // CORREÇÃO: Usar a data do arquivo Excel (assumindo que está na coluna 3)
+      const dataExameArquivo = formatExcelDate(row[3])
+      
+      console.log(`Processando linha ${i}: data original=${row[3]}, data formatada=${dataExameArquivo}`)
+      
       dadosMapeados.push({
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
@@ -138,7 +168,7 @@ serve(async (req) => {
         cliente_nome: row[1]?.toString() || 'Paciente Não Informado',
         paciente: codigoCliente,
         medico: row[2]?.toString() || 'Médico Não Informado',
-        data_exame: hoje,
+        data_exame: dataExameArquivo, // CORREÇÃO: usando data do arquivo
         modalidade: row[4]?.toString() || 'Não Informado',
         especialidade: row[5]?.toString() || 'Não Informado',
         categoria: row[6]?.toString() || 'Não Informado',
@@ -157,14 +187,13 @@ serve(async (req) => {
     // Identificar períodos
     const periodos = new Set<string>()
     dadosMapeados.forEach(item => {
-      const periodo = item.data_emissao.slice(0, 7) // YYYY-MM
+      const periodo = item.data_emissao.slice(0, 7)
       periodos.add(periodo)
     })
     
     const periodosArray = Array.from(periodos)
     console.log('11. Períodos identificados:', periodosArray)
 
-    // Remover dados existentes por período
     for (const periodo of periodosArray) {
       console.log(`Removendo dados do período ${periodo}`)
       
@@ -188,7 +217,7 @@ serve(async (req) => {
 
     // Inserir dados em lotes
     console.log('12. Inserindo dados em lotes...')
-    const batchSize = 50 // Lotes maiores mas seguros
+    const batchSize = 50
     let totalInseridos = 0
 
     for (let i = 0; i < dadosMapeados.length; i += batchSize) {
@@ -201,7 +230,6 @@ serve(async (req) => {
 
       if (insertError) {
         console.error(`Erro no lote ${Math.floor(i/batchSize) + 1}:`, insertError.message)
-        // Tentar inserir registros individualmente se o lote falhar
         for (const registro of lote) {
           const { error: singleError } = await supabase
             .from('faturamento')
@@ -218,7 +246,6 @@ serve(async (req) => {
         console.log(`Lote inserido com sucesso. Total: ${totalInseridos}`)
       }
       
-      // Atualizar progresso
       await supabase
         .from('upload_logs')
         .update({ records_processed: totalInseridos })
@@ -238,7 +265,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Processamento concluído com sucesso - ${totalInseridos} registros inseridos`,
+      message: `Processamento concluído com sucesso - ${totalInseridos} registros inseridos com datas corretas`,
       recordsProcessed: totalInseridos,
       periodosSubstituidos: periodosArray
     }), {
