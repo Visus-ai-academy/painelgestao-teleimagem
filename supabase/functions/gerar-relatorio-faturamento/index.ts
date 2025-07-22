@@ -120,12 +120,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Totais calculados: ${total_registros} registros, ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
 
-    // Gerar PDF usando serviço externo
+    // Gerar relatório em HTML (temporariamente, até resolver PDF)
     const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <title>Relatório de Faturamento - ${cliente.nome}</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
         .header { text-align: center; margin-bottom: 30px; }
@@ -138,7 +139,19 @@ const handler = async (req: Request): Promise<Response> => {
         th { background-color: #0066cc; color: white; font-weight: bold; }
         tr:nth-child(even) { background-color: #f8f8f8; }
         .text-right { text-align: right; }
+        @media print {
+            body { margin: 0; }
+            .header { page-break-inside: avoid; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+        }
     </style>
+    <script>
+        window.onload = function() {
+            // Auto print quando abrir
+            setTimeout(() => window.print(), 1000);
+        }
+    </script>
 </head>
 <body>
     <div class="header">
@@ -197,46 +210,26 @@ const handler = async (req: Request): Promise<Response> => {
 </body>
 </html>`;
 
-    // Converter HTML para PDF
-    const pdfResponse = await fetch('https://pdf-service.deno.dev/convert', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        html: htmlContent,
-        format: 'A4',
-        margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
-      })
-    });
-
-    if (!pdfResponse.ok) {
-      throw new Error('Erro ao gerar PDF');
-    }
-
-    const pdfBuffer = await pdfResponse.arrayBuffer();
-    const pdfBytes = new Uint8Array(pdfBuffer);
-
-    // Salvar PDF no storage
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    // Salvar HTML no storage (com auto-print para gerar PDF no navegador)
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.html`;
     
     const { error: uploadError } = await supabase.storage
       .from('relatorios-faturamento')
-      .upload(nomeArquivo, pdfBytes, {
-        contentType: 'application/pdf',
+      .upload(nomeArquivo, htmlContent, {
+        contentType: 'text/html',
         cacheControl: '3600'
       });
       
     if (uploadError) {
-      console.error('Erro ao salvar PDF:', uploadError);
-      throw new Error(`Erro ao salvar PDF: ${uploadError.message}`);
+      console.error('Erro ao salvar HTML:', uploadError);
+      throw new Error(`Erro ao salvar HTML: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
       .from('relatorios-faturamento')
       .getPublicUrl(nomeArquivo);
 
-    console.log(`PDF salvo: ${publicUrl}`);
+    console.log(`HTML salvo: ${publicUrl}`);
 
     return new Response(
       JSON.stringify({ 
@@ -248,11 +241,11 @@ const handler = async (req: Request): Promise<Response> => {
         valor_bruto: valor_bruto.toFixed(2),
         valor_liquido: valor_liquido.toFixed(2),
         arquivos: [{
-          tipo: 'pdf',
+          tipo: 'html',
           url: publicUrl,
           nome: nomeArquivo
         }],
-        message: `Relatório gerado: ${total_registros} registros, ${total_laudos} laudos, valor bruto R$ ${valor_bruto.toFixed(2)}`
+        message: `Relatório gerado: ${total_registros} registros, ${total_laudos} laudos, valor bruto R$ ${valor_bruto.toFixed(2)}. Use Ctrl+P para salvar como PDF.`
       }),
       {
         status: 200,
