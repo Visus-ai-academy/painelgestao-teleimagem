@@ -44,21 +44,83 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Cliente: ${cliente.nome}, Período: ${data_inicio} até ${data_fim}`);
 
-    // Buscar dados de faturamento CORRIGIDO
+    // Buscar dados de faturamento CORRIGIDO - agrupados por número da fatura
     const { data: faturamento, error } = await supabase
       .from('faturamento')
-      .select('*')
+      .select('numero_fatura, cliente, nome_exame, medico, modalidade, especialidade, data_emissao, SUM(quantidade) as quantidade, SUM(valor_bruto) as valor_bruto')
       .eq('paciente', cliente.nome)
       .gte('data_emissao', data_inicio)
-      .lte('data_emissao', data_fim);
+      .lte('data_emissao', data_fim)
+      .groupBy('numero_fatura, cliente, nome_exame, medico, modalidade, especialidade, data_emissao');
 
-    console.log(`Dados encontrados: ${faturamento?.length || 0} registros`);
+    console.log(`Dados encontrados: ${faturamento?.length || 0} registros agrupados`);
 
     if (error) {
       console.error('Erro ao buscar faturamento:', error);
+      
+      // Busca simples sem agrupamento como fallback
+      const { data: faturamentoSimples } = await supabase
+        .from('faturamento')
+        .select('*')
+        .eq('paciente', cliente.nome)
+        .gte('data_emissao', data_inicio)
+        .lte('data_emissao', data_fim);
+        
+      if (!faturamentoSimples || faturamentoSimples.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Nenhum dado encontrado',
+            debug: {
+              cliente: cliente.nome,
+              periodo,
+              filtro: `paciente = '${cliente.nome}' AND data_emissao BETWEEN '${data_inicio}' AND '${data_fim}'`
+            }
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Use dados simples se agrupamento falhar
+      const registrosUnicos = new Map();
+      faturamentoSimples.forEach(item => {
+        const key = `${item.numero_fatura}_${item.cliente}_${item.nome_exame}`;
+        if (!registrosUnicos.has(key)) {
+          registrosUnicos.set(key, {
+            ...item,
+            quantidade: Number(item.quantidade) || 1,
+            valor_bruto: Number(item.valor_bruto) || Number(item.valor) || 0
+          });
+        } else {
+          const existing = registrosUnicos.get(key);
+          existing.quantidade += Number(item.quantidade) || 1;
+          existing.valor_bruto += Number(item.valor_bruto) || Number(item.valor) || 0;
+        }
+      });
+      
+      const dadosAgrupados = Array.from(registrosUnicos.values());
+      console.log(`Fallback: ${dadosAgrupados.length} registros únicos`);
+      
+      const total_laudos = dadosAgrupados.reduce((sum, item) => sum + item.quantidade, 0);
+      const valor_bruto = dadosAgrupados.reduce((sum, item) => sum + item.valor_bruto, 0);
+      
+      console.log(`Totais fallback: ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`);
+      
       return new Response(
-        JSON.stringify({ success: false, error: `Erro ao buscar dados: ${error.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          success: true,
+          cliente: cliente.nome,
+          periodo,
+          total_registros: dadosAgrupados.length,
+          total_laudos,
+          valor_bruto: valor_bruto.toFixed(2),
+          message: `Relatório gerado (fallback): ${dadosAgrupados.length} registros, ${total_laudos} laudos, R$ ${valor_bruto.toFixed(2)}`,
+          dados: dadosAgrupados.slice(0, 5) // Amostra dos primeiros 5 registros
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
     }
 
