@@ -46,7 +46,8 @@ interface Stats {
 export default function VolumetriaMobileMed() {
   const [data, setData] = useState<VolumetriaData[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Não iniciar carregando
+  const [loadingFilters, setLoadingFilters] = useState(false);
   const [filters, setFilters] = useState({
     empresa: '__all__',
     especialidade: '__all__',
@@ -59,10 +60,11 @@ export default function VolumetriaMobileMed() {
   const [especialidades, setEspecialidades] = useState<string[]>([]);
   const [modalidades, setModalidades] = useState<string[]>([]);
   const { toast } = useToast();
-
+  
+  // Carregamento inicial apenas das opções de filtro
   useEffect(() => {
-    loadData();
     loadFilterOptions();
+    loadStats(); // Carregar stats iniciais
   }, []);
 
   const loadData = async () => {
@@ -180,8 +182,10 @@ export default function VolumetriaMobileMed() {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const applyFilters = () => {
-    loadData();
+  const applyFilters = async () => {
+    setLoadingFilters(true);
+    await loadData();
+    setLoadingFilters(false);
   };
 
   const clearFilters = () => {
@@ -374,8 +378,15 @@ export default function VolumetriaMobileMed() {
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={applyFilters}>Aplicar Filtros</Button>
-                <Button variant="outline" onClick={clearFilters}>Limpar Filtros</Button>
+                <Button 
+                  onClick={applyFilters} 
+                  disabled={loadingFilters}
+                >
+                  {loadingFilters ? 'Carregando...' : 'Aplicar Filtros'}
+                </Button>
+                <Button variant="outline" onClick={clearFilters} disabled={loadingFilters}>
+                  Limpar Filtros
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -410,33 +421,50 @@ export default function VolumetriaMobileMed() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.EMPRESA}</TableCell>
-                        <TableCell>{item.NOME_PACIENTE}</TableCell>
-                        <TableCell>{item.CODIGO_PACIENTE || '-'}</TableCell>
-                        <TableCell>{item.ACCESSION_NUMBER || '-'}</TableCell>
-                        <TableCell>{item.ESPECIALIDADE}</TableCell>
-                        <TableCell>{item.MODALIDADE}</TableCell>
-                        <TableCell>{item.MEDICO}</TableCell>
-                        <TableCell>{item.PRIORIDADE || '-'}</TableCell>
-                        <TableCell className="text-right">{item.VALORES?.toLocaleString() || 0}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{item.STATUS || 'N/A'}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.DATA_REALIZACAO ? format(parseISO(item.DATA_REALIZACAO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {item.DATA_LAUDO ? format(parseISO(item.DATA_LAUDO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={item.arquivo_fonte === 'data_laudo' ? 'default' : 'secondary'}>
-                            {item.arquivo_fonte === 'data_laudo' ? 'Data Laudo' : 'Data Exame'}
-                          </Badge>
+                    {data.length === 0 && !loadingFilters ? (
+                      <TableRow>
+                        <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                          {Object.values(filters).some(f => f !== '__all__' && f !== '') 
+                            ? 'Nenhum resultado encontrado com os filtros aplicados. Tente ajustar os filtros.'
+                            : 'Clique em "Aplicar Filtros" para carregar os dados.'
+                          }
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : loadingFilters ? (
+                      <TableRow>
+                        <TableCell colSpan={13} className="text-center py-8">
+                          Carregando dados...
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      data.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.EMPRESA}</TableCell>
+                          <TableCell>{item.NOME_PACIENTE}</TableCell>
+                          <TableCell>{item.CODIGO_PACIENTE || '-'}</TableCell>
+                          <TableCell>{item.ACCESSION_NUMBER || '-'}</TableCell>
+                          <TableCell>{item.ESPECIALIDADE}</TableCell>
+                          <TableCell>{item.MODALIDADE}</TableCell>
+                          <TableCell>{item.MEDICO}</TableCell>
+                          <TableCell>{item.PRIORIDADE || '-'}</TableCell>
+                          <TableCell className="text-right">{item.VALORES?.toLocaleString() || 0}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.STATUS || 'N/A'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {item.DATA_REALIZACAO ? format(parseISO(item.DATA_REALIZACAO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {item.DATA_LAUDO ? format(parseISO(item.DATA_LAUDO), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={item.arquivo_fonte === 'data_laudo' ? 'default' : 'secondary'}>
+                              {item.arquivo_fonte === 'data_laudo' ? 'Data Laudo' : 'Data Exame'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
