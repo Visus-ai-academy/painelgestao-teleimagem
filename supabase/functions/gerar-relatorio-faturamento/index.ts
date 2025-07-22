@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,7 +121,77 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`💵 Resumo calculado:`, resumo);
 
-    // 4. RESPOSTA FINAL
+    // 4. GERAR PDF
+    const doc = new jsPDF('portrait', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 20;
+
+    // Título
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DEMONSTRATIVO DE FATURAMENTO', 20, y);
+    
+    y += 15;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Cliente: ${cliente.nome}`, 20, y);
+    
+    y += 8;
+    const [ano, mes] = periodo.split('-');
+    const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const mesNome = nomesMeses[parseInt(mes)] || mes;
+    doc.text(`Período: ${mesNome}/${ano}`, 20, y);
+
+    y += 15;
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESUMO FINANCEIRO', 20, y);
+    
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total de laudos: ${total_laudos}`, 20, y);
+    y += 6;
+    doc.text(`Valor bruto: R$ ${valor_bruto.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.text(`Valor total: R$ ${valor_total.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.text(`IRRF (1,5%): R$ ${irrf.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.text(`CSLL (1,0%): R$ ${csll.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.text(`PIS (0,65%): R$ ${pis.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.text(`Cofins (3,0%): R$ ${cofins.toFixed(2)}`, 20, y);
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Valor a pagar: R$ ${valor_a_pagar.toFixed(2)}`, 20, y);
+
+    // Gerar PDF como array de bytes
+    const pdfContent = doc.output('arraybuffer');
+    const pdfBytes = new Uint8Array(pdfContent);
+
+    // 5. SALVAR PDF NO STORAGE
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('relatorios-faturamento')
+      .upload(nomeArquivo, pdfBytes, {
+        contentType: 'application/pdf',
+        cacheControl: '3600'
+      });
+      
+    if (uploadError) {
+      console.error('❌ Erro ao salvar PDF:', uploadError);
+      throw new Error(`Erro ao salvar PDF: ${uploadError.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('relatorios-faturamento')
+      .getPublicUrl(nomeArquivo);
+
+    console.log(`✅ PDF salvo com sucesso: ${publicUrl}`);
+
+    // 6. RESPOSTA FINAL
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -129,6 +200,11 @@ const handler = async (req: Request): Promise<Response> => {
         resumo,
         total_exames: dadosFaturamento.length,
         fonte_dados: 'faturamento',
+        arquivos: [{
+          tipo: 'pdf',
+          url: publicUrl,
+          nome: nomeArquivo
+        }],
         message: `Relatório gerado com sucesso - ${total_laudos} laudos, valor total: R$ ${valor_total.toFixed(2)}`
       }),
       {
