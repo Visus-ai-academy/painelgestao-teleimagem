@@ -18,9 +18,7 @@ interface VolumetriaData {
   arquivo_fonte: string;
   EMPRESA: string;
   NOME_PACIENTE: string;
-  CODIGO_PACIENTE: string;
   ESTUDO_DESCRICAO: string;
-  ACCESSION_NUMBER: string;
   ESPECIALIDADE: string;
   MODALIDADE: string;
   MEDICO: string;
@@ -84,8 +82,8 @@ export default function VolumetriaMobileMed() {
       let query = supabase
         .from('volumetria_mobilemed')
         .select(`
-          id, arquivo_fonte, EMPRESA, NOME_PACIENTE, CODIGO_PACIENTE, 
-          ESTUDO_DESCRICAO, ACCESSION_NUMBER, ESPECIALIDADE, MODALIDADE, 
+          id, arquivo_fonte, EMPRESA, NOME_PACIENTE, 
+          ESTUDO_DESCRICAO, ESPECIALIDADE, MODALIDADE, 
           MEDICO, PRIORIDADE, VALORES, STATUS, DATA_REALIZACAO, 
           HORA_REALIZACAO, DATA_LAUDO, HORA_LAUDO, data_upload
         `)
@@ -124,7 +122,25 @@ export default function VolumetriaMobileMed() {
 
       setData(volumetriaData || []);
 
-      // Carregar estatísticas
+      // Calcular estatísticas dos dados filtrados
+      if (volumetriaData && volumetriaData.length > 0) {
+        const empresasUnicas = new Set(volumetriaData.map(d => d.EMPRESA));
+        const especialidadesUnicas = new Set(volumetriaData.map(d => d.ESPECIALIDADE));
+        const modalidadesUnicas = new Set(volumetriaData.map(d => d.MODALIDADE));
+        const totalValores = volumetriaData.reduce((sum, d) => sum + (d.VALORES || 0), 0);
+
+        setFilteredStats({
+          total_registros: volumetriaData.length,
+          total_valores: totalValores,
+          empresas_filtradas: empresasUnicas.size,
+          especialidades_filtradas: especialidadesUnicas.size,
+          modalidades_filtradas: modalidadesUnicas.size
+        });
+      } else {
+        setFilteredStats(null);
+      }
+
+      // Carregar estatísticas gerais
       await loadStats();
 
     } catch (error: any) {
@@ -402,6 +418,39 @@ export default function VolumetriaMobileMed() {
         </TabsContent>
 
         <TabsContent value="dados">
+          {/* Totalizador dos Dados Filtrados */}
+          {filteredStats && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-lg">Totalizador - Dados Filtrados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-primary">{filteredStats.total_registros.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Registros</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{filteredStats.total_valores.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Total Exames</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{filteredStats.empresas_filtradas}</div>
+                    <div className="text-sm text-muted-foreground">Empresas</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">{filteredStats.especialidades_filtradas}</div>
+                    <div className="text-sm text-muted-foreground">Especialidades</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{filteredStats.modalidades_filtradas}</div>
+                    <div className="text-sm text-muted-foreground">Modalidades</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Dados de Volumetria</CardTitle>
@@ -416,8 +465,6 @@ export default function VolumetriaMobileMed() {
                     <TableRow>
                       <TableHead>Empresa</TableHead>
                       <TableHead>Paciente</TableHead>
-                      <TableHead>Código Paciente</TableHead>
-                      <TableHead>Accession Number</TableHead>
                       <TableHead>Especialidade</TableHead>
                       <TableHead>Modalidade</TableHead>
                       <TableHead>Médico</TableHead>
@@ -450,8 +497,6 @@ export default function VolumetriaMobileMed() {
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.EMPRESA}</TableCell>
                           <TableCell>{item.NOME_PACIENTE}</TableCell>
-                          <TableCell>{item.CODIGO_PACIENTE || '-'}</TableCell>
-                          <TableCell>{item.ACCESSION_NUMBER || '-'}</TableCell>
                           <TableCell>{item.ESPECIALIDADE}</TableCell>
                           <TableCell>{item.MODALIDADE}</TableCell>
                           <TableCell>{item.MEDICO}</TableCell>
