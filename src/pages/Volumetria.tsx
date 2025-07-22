@@ -93,9 +93,12 @@ export default function Volumetria() {
         dataFim = new Date(hoje);
         break;
       case "semana_atual":
+        const inicioSemana = new Date(hoje);
         const primeiroDiaSemana = hoje.getDate() - hoje.getDay();
-        dataInicio = new Date(hoje.setDate(primeiroDiaSemana));
-        dataFim = new Date(hoje.setDate(primeiroDiaSemana + 6));
+        inicioSemana.setDate(primeiroDiaSemana);
+        dataInicio = new Date(inicioSemana);
+        dataFim = new Date(inicioSemana);
+        dataFim.setDate(inicioSemana.getDate() + 6);
         break;
       case "mes_atual":
         dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
