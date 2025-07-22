@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.enviar-relatorio-email]
 verify_jwt = false
+
+[functions.sincronizar-mapeamentos]
+verify_jwt = false
