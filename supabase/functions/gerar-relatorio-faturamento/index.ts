@@ -126,6 +126,36 @@ serve(async (req: Request) => {
 
     console.log('Total de dados únicos encontrados:', allData.length);
 
+    // Gerar PDF do relatório
+    let pdfUrl = null;
+    if (allData.length > 0) {
+      try {
+        console.log('Gerando PDF do relatório...');
+        
+        const pdfResponse = await supabase.functions.invoke('processar-faturamento-pdf', {
+          body: {
+            cliente_nome: cliente.nome,
+            periodo: periodo,
+            dados: allData,
+            template: 'relatorio-faturamento'
+          }
+        });
+
+        if (pdfResponse.data?.pdfUrl) {
+          pdfUrl = pdfResponse.data.pdfUrl;
+          console.log('PDF gerado com sucesso:', pdfUrl);
+        } else {
+          console.error('Erro ao gerar PDF:', pdfResponse.error);
+        }
+      } catch (pdfError) {
+        console.error('Erro na geração do PDF:', pdfError);
+      }
+    }
+
+    // Calcular resumo
+    const valorTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
+    const totalExames = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+
     // Sempre retornar sucesso, mesmo sem dados
     const response = {
       success: true,
@@ -135,6 +165,12 @@ serve(async (req: Request) => {
       totalRegistros: allData.length,
       dadosEncontrados: allData.length > 0,
       dados: allData,
+      arquivos: pdfUrl ? [{ tipo: 'pdf', url: pdfUrl, nome: `relatorio_${cliente.nome}_${periodo}.pdf` }] : [],
+      resumo: {
+        total_laudos: totalExames,
+        valor_total: valorTotal,
+        total_exames: totalExames
+      },
       timestamp: new Date().toISOString()
     };
 
