@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { jsPDF } from "https://cdn.skypack.dev/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +8,7 @@ const corsHeaders = {
 
 interface RelatorioRequest {
   cliente_id: string;
-  periodo: string; // formato: "2025-07"
+  periodo: string; // formato: "2025-06"
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -26,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { cliente_id, periodo }: RelatorioRequest = await req.json();
     console.log(`🔥 INICIANDO GERAÇÃO DE RELATÓRIO - Cliente: ${cliente_id}, Período: ${periodo}`);
 
-    // Extrair ano e mês do período (formato: "2025-07")
+    // Extrair ano e mês do período (formato: "2025-06")
     const [ano, mes] = periodo.split('-');
     const data_inicio = `${ano}-${mes.padStart(2, '0')}-01`;
     
@@ -121,75 +120,102 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`💵 Resumo calculado:`, resumo);
 
-    // 4. GERAR PDF
-    const doc = new jsPDF('portrait', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.width;
-    let y = 20;
-
-    // Título
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DEMONSTRATIVO DE FATURAMENTO', 20, y);
-    
-    y += 15;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Cliente: ${cliente.nome}`, 20, y);
-    
-    y += 8;
-    const [ano, mes] = periodo.split('-');
+    // 4. GERAR HTML DO RELATÓRIO
+    const [anoNome, mesNome] = [ano, mes];
     const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    const mesNome = nomesMeses[parseInt(mes)] || mes;
-    doc.text(`Período: ${mesNome}/${ano}`, 20, y);
+    const mesFormatado = nomesMeses[parseInt(mesNome)] || mesNome;
 
-    y += 15;
-    doc.setFont('helvetica', 'bold');
-    doc.text('RESUMO FINANCEIRO', 20, y);
-    
-    y += 10;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Total de laudos: ${total_laudos}`, 20, y);
-    y += 6;
-    doc.text(`Valor bruto: R$ ${valor_bruto.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.text(`Valor total: R$ ${valor_total.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.text(`IRRF (1,5%): R$ ${irrf.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.text(`CSLL (1,0%): R$ ${csll.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.text(`PIS (0,65%): R$ ${pis.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.text(`Cofins (3,0%): R$ ${cofins.toFixed(2)}`, 20, y);
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Valor a pagar: R$ ${valor_a_pagar.toFixed(2)}`, 20, y);
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Faturamento - ${cliente.nome}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #0066cc; text-align: center; }
+            h2 { color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 5px; }
+            .info { margin: 10px 0; }
+            .resumo { background: #f5f5f5; padding: 15px; margin: 20px 0; }
+            .valor-destaque { font-weight: bold; color: #0066cc; font-size: 1.2em; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #0066cc; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h1>DEMONSTRATIVO DE FATURAMENTO</h1>
+        
+        <div class="info">
+            <strong>Cliente:</strong> ${cliente.nome}<br>
+            <strong>Período:</strong> ${mesFormatado}/${anoNome}<br>
+            <strong>Data de Geração:</strong> ${new Date().toLocaleDateString('pt-BR')}
+        </div>
 
-    // Gerar PDF como array de bytes
-    const pdfContent = doc.output('arraybuffer');
-    const pdfBytes = new Uint8Array(pdfContent);
+        <div class="resumo">
+            <h2>RESUMO FINANCEIRO</h2>
+            <p><strong>Total de laudos:</strong> ${total_laudos}</p>
+            <p><strong>Valor bruto:</strong> R$ ${valor_bruto.toFixed(2)}</p>
+            <p><strong>Valor total:</strong> R$ ${valor_total.toFixed(2)}</p>
+            <p><strong>IRRF (1,5%):</strong> R$ ${irrf.toFixed(2)}</p>
+            <p><strong>CSLL (1,0%):</strong> R$ ${csll.toFixed(2)}</p>
+            <p><strong>PIS (0,65%):</strong> R$ ${pis.toFixed(2)}</p>
+            <p><strong>Cofins (3,0%):</strong> R$ ${cofins.toFixed(2)}</p>
+            <p class="valor-destaque"><strong>Valor a pagar: R$ ${valor_a_pagar.toFixed(2)}</strong></p>
+        </div>
 
-    // 5. SALVAR PDF NO STORAGE
-    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.pdf`;
+        <h2>DETALHAMENTO DOS EXAMES</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Paciente</th>
+                    <th>Exame</th>
+                    <th>Médico</th>
+                    <th>Modalidade</th>
+                    <th>Especialidade</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${dadosFaturamento.map(item => `
+                    <tr>
+                        <td>${new Date(item.data_emissao).toLocaleDateString('pt-BR')}</td>
+                        <td>${item.cliente || 'N/A'}</td>
+                        <td>${item.nome_exame || 'N/A'}</td>
+                        <td>${item.medico || 'N/A'}</td>
+                        <td>${item.modalidade || 'N/A'}</td>
+                        <td>${item.especialidade || 'N/A'}</td>
+                        <td>R$ ${(Number(item.valor_bruto) || Number(item.valor) || 0).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </body>
+    </html>`;
+
+    // 5. SALVAR HTML NO STORAGE
+    const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.html`;
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('relatorios-faturamento')
-      .upload(nomeArquivo, pdfBytes, {
-        contentType: 'application/pdf',
+      .upload(nomeArquivo, htmlContent, {
+        contentType: 'text/html',
         cacheControl: '3600'
       });
       
     if (uploadError) {
-      console.error('❌ Erro ao salvar PDF:', uploadError);
-      throw new Error(`Erro ao salvar PDF: ${uploadError.message}`);
+      console.error('❌ Erro ao salvar HTML:', uploadError);
+      throw new Error(`Erro ao salvar HTML: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
       .from('relatorios-faturamento')
       .getPublicUrl(nomeArquivo);
 
-    console.log(`✅ PDF salvo com sucesso: ${publicUrl}`);
+    console.log(`✅ HTML salvo com sucesso: ${publicUrl}`);
 
     // 6. RESPOSTA FINAL
     return new Response(
@@ -201,7 +227,7 @@ const handler = async (req: Request): Promise<Response> => {
         total_exames: dadosFaturamento.length,
         fonte_dados: 'faturamento',
         arquivos: [{
-          tipo: 'pdf',
+          tipo: 'html',
           url: publicUrl,
           nome: nomeArquivo
         }],
