@@ -26,15 +26,15 @@ export function useUploadStatus(fileType: string = 'faturamento') {
 
   const fetchStatus = async () => {
     try {
-      // Buscar apenas uploads em processamento ativo (últimos 2 minutos)
-      const cutoffTime = new Date(Date.now() - 2 * 60 * 1000).toISOString(); // 2 minutos atrás
+      // Buscar uploads ativos (processando) E recém-concluídos (últimos 3 minutos)
+      const cutoffTime = new Date(Date.now() - 3 * 60 * 1000).toISOString();
       
       const { data: uploads, error } = await supabase
         .from('upload_logs')
         .select('status, records_processed, updated_at, created_at')
         .eq('file_type', fileType)
-        .in('status', ['processing']) // Apenas uploads em processamento
-        .gte('updated_at', cutoffTime); // Apenas uploads atualizados nos últimos 2 minutos
+        .in('status', ['processing', 'completed']) // Incluir concluídos também
+        .gte('updated_at', cutoffTime); // Últimos 3 minutos
 
       if (error) {
         console.error('Erro ao buscar status dos uploads:', error);
@@ -43,26 +43,30 @@ export function useUploadStatus(fileType: string = 'faturamento') {
 
       const activeUploads = uploads || [];
       const totalUploads = activeUploads.length;
-      const completedUploads = 0; // Não há uploads completos aqui
+      const completedUploads = activeUploads.filter(u => u.status === 'completed').length;
       const processingUploads = activeUploads.filter(u => u.status === 'processing').length;
-      const errorUploads = 0; // Não há uploads com erro aqui
+      const errorUploads = 0;
       const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.records_processed || 0), 0);
       
       const isProcessing = processingUploads > 0;
       
-      // Cálculo de progresso apenas para uploads ativos
+      // Cálculo de progresso
       let progressPercentage = 0;
       if (processingUploads > 0) {
+        // Há processamento ativo
         const uploadAtual = activeUploads.find(u => u.status === 'processing');
         if (uploadAtual && uploadAtual.records_processed > 0) {
-          // Estimar progresso baseado em registros processados
-          const estimatedTotal = 2000; // Assumir 2000 registros como padrão
+          const estimatedTotal = 2000;
           progressPercentage = Math.min(Math.round((uploadAtual.records_processed / estimatedTotal) * 100), 99);
         } else {
-          progressPercentage = 5; // Iniciando processamento
+          progressPercentage = 5; // Iniciando
         }
+      } else if (completedUploads > 0) {
+        // Há uploads recém-concluídos - mostrar 100%
+        progressPercentage = 100;
       } else {
-        progressPercentage = 0; // Nenhum processamento ativo = 0%
+        // Nenhum upload ativo ou recente
+        progressPercentage = 0;
       }
       
       const lastUpdate = activeUploads.length > 0 
@@ -72,6 +76,7 @@ export function useUploadStatus(fileType: string = 'faturamento') {
       console.log('Upload Status Debug:', {
         totalUploads,
         processingUploads,
+        completedUploads,
         progressPercentage,
         isProcessing,
         activeUploads: activeUploads.length
