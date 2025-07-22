@@ -188,13 +188,58 @@ serve(async (req: Request) => {
       doc.setFont('helvetica');
       
       // === LOGOMARCA ===
-      // Espaço reservado para logomarca (pode ser carregada do storage futuramente)
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.5);
-      doc.rect(135, 10, 25, 15);
-      doc.setFontSize(8);
-      doc.setTextColor(128, 128, 128);
-      doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+      try {
+        // Tentar carregar diferentes extensões de logomarca
+        const extensions = ['png', 'jpg', 'jpeg'];
+        let logoAdded = false;
+
+        for (const ext of extensions) {
+          const fileName = `logomarca.${ext}`;
+          const { data: logoData, error: logoError } = await supabase.storage
+            .from('logomarcas')
+            .download(fileName);
+
+          if (!logoError && logoData) {
+            // Converter blob para array buffer e depois para base64
+            const arrayBuffer = await logoData.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            
+            // Converter para base64
+            let binary = '';
+            for (let i = 0; i < uint8Array.byteLength; i++) {
+              binary += String.fromCharCode(uint8Array[i]);
+            }
+            const base64String = btoa(binary);
+            const imageFormat = ext.toUpperCase() === 'JPG' ? 'JPEG' : ext.toUpperCase();
+            
+            // Adicionar imagem ao PDF
+            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 135, 10, 25, 15);
+            logoAdded = true;
+            console.log(`Logomarca ${fileName} carregada com sucesso no PDF`);
+            break;
+          }
+        }
+
+        if (!logoAdded) {
+          // Se não encontrou logomarca, mostrar placeholder
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.5);
+          doc.rect(135, 10, 25, 15);
+          doc.setFontSize(8);
+          doc.setTextColor(128, 128, 128);
+          doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+          console.log('Nenhuma logomarca encontrada, usando placeholder');
+        }
+      } catch (logoError) {
+        console.error('Erro ao carregar logomarca:', logoError);
+        // Mostrar placeholder em caso de erro
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.rect(135, 10, 25, 15);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text('LOGOMARCA', 147.5, 18, { align: 'center' });
+      }
       
       // === CABEÇALHO ===
       doc.setFontSize(22);
