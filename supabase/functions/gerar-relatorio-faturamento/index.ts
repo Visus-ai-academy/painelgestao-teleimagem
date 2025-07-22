@@ -75,9 +75,9 @@ serve(async (req: Request) => {
     const dataFim = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-01`;
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
-    console.log(`Buscando no campo 'paciente' por: ${cliente.nome}`);
+    console.log(`Buscando no campo 'cliente' por: ${cliente.nome}`);
 
-    // Buscar dados de faturamento - AKCPALMAS deve estar no campo 'paciente'
+    // Buscar dados de faturamento na coluna 'cliente' por AKCPALMAS
     const queries = [
       // 1. Por cliente_id (relacionamento direto)
       supabase
@@ -87,11 +87,11 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por código da clínica no campo 'paciente' (correto)
+      // 2. Por código da clínica na coluna 'cliente' (correto conforme informado)
       supabase
         .from('faturamento')
         .select('*')
-        .eq('paciente', cliente.nome)
+        .eq('cliente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
