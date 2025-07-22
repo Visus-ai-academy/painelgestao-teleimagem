@@ -952,9 +952,12 @@ export default function GerarFaturamento() {
                           if (error) throw error;
 
                           toast({
-                            title: "Arquivo Data_Laudo Processado",
-                            description: `${data.records_processed} registros processados com sucesso`,
+                            title: "Processamento Iniciado",
+                            description: `Arquivo enviado para processamento em background. ID: ${data.upload_log_id}`,
                           });
+
+                          // Opcional: polling para verificar status
+                          console.log('Processamento iniciado:', data);
                         } catch (error: any) {
                           toast({
                             title: "Erro no Processamento",
@@ -996,9 +999,12 @@ export default function GerarFaturamento() {
                           if (error) throw error;
 
                           toast({
-                            title: "Arquivo Data_Exame Processado", 
-                            description: `${data.records_processed} registros processados com sucesso`,
+                            title: "Processamento Iniciado",
+                            description: `Arquivo enviado para processamento em background. ID: ${data.upload_log_id}`,
                           });
+
+                          // Opcional: polling para verificar status
+                          console.log('Processamento iniciado:', data);
                         } catch (error: any) {
                           toast({
                             title: "Erro no Processamento",
