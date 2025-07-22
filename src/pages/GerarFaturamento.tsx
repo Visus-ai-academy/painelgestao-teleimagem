@@ -29,6 +29,7 @@ import {
   HardDrive
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
+import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { Speedometer } from "@/components/Speedometer";
 import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
