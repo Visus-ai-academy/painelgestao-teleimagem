@@ -643,7 +643,6 @@ export type Database = {
           paciente: string | null
           prioridade: string | null
           quantidade: number | null
-          status: string
           sync_date: string
           updated_at: string
           valor: number
@@ -670,7 +669,6 @@ export type Database = {
           paciente?: string | null
           prioridade?: string | null
           quantidade?: number | null
-          status: string
           sync_date?: string
           updated_at?: string
           valor: number
@@ -697,7 +695,6 @@ export type Database = {
           paciente?: string | null
           prioridade?: string | null
           quantidade?: number | null
-          status?: string
           sync_date?: string
           updated_at?: string
           valor?: number
