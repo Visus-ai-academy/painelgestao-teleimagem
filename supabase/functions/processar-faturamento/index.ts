@@ -112,30 +112,30 @@ serve(async (req) => {
     
     console.log('8.2. Clientes encontrados:', clientesCadastrados?.length || 0)
     
-    // Função para encontrar cliente_id baseado no nome
-    const encontrarClienteId = (nomeCliente: string): string | null => {
-      if (!nomeCliente || !clientesCadastrados) return null
+    // Função para encontrar cliente_id baseado no código/nome do cliente
+    const encontrarClienteId = (codigoCliente: string): string | null => {
+      if (!codigoCliente || !clientesCadastrados) return null
       
-      const nomeClienteLimpo = nomeCliente.trim().toUpperCase()
+      const codigoClienteLimpo = codigoCliente.trim().toUpperCase()
       
       // Buscar por correspondência exata
       let cliente = clientesCadastrados.find(c => 
-        c.nome?.toUpperCase() === nomeClienteLimpo ||
-        c.cod_cliente?.toUpperCase() === nomeClienteLimpo
+        c.nome?.toUpperCase() === codigoClienteLimpo ||
+        c.cod_cliente?.toUpperCase() === codigoClienteLimpo
       )
       
       if (cliente) return cliente.id
       
       // Buscar por correspondência parcial (contém)
       cliente = clientesCadastrados.find(c => 
-        c.nome?.toUpperCase().includes(nomeClienteLimpo) ||
-        nomeClienteLimpo.includes(c.nome?.toUpperCase() || '') ||
-        c.cod_cliente?.toUpperCase().includes(nomeClienteLimpo) ||
-        nomeClienteLimpo.includes(c.cod_cliente?.toUpperCase() || '')
+        c.nome?.toUpperCase().includes(codigoClienteLimpo) ||
+        codigoClienteLimpo.includes(c.nome?.toUpperCase() || '') ||
+        c.cod_cliente?.toUpperCase().includes(codigoClienteLimpo) ||
+        codigoClienteLimpo.includes(c.cod_cliente?.toUpperCase() || '')
       )
       
       if (cliente) {
-        console.log(`Associação encontrada: "${nomeCliente}" -> "${cliente.nome}" (${cliente.id})`)
+        console.log(`Associação encontrada: "${codigoCliente}" -> "${cliente.nome}" (${cliente.id})`)
         return cliente.id
       }
       
@@ -179,24 +179,27 @@ serve(async (req) => {
       
       if (!row || row.length === 0) continue // Pular linhas vazias
       
-      // Validação obrigatória: cliente_nome não pode ser null
-      const clienteNome = cleanString(row[1], 'Cliente Não Informado');
-      if (!clienteNome || clienteNome.trim() === '') {
-        console.warn(`Linha ${i + 2}: Cliente vazio, pulando registro`);
+      // O código do cliente está na primeira coluna (paciente)
+      const codigoCliente = cleanString(row[0], 'Cliente Não Informado');
+      if (!codigoCliente || codigoCliente.trim() === '') {
+        console.warn(`Linha ${i + 2}: Código do cliente vazio, pulando registro`);
         continue;
       }
       
-      // Encontrar cliente_id correspondente
-      const clienteIdEncontrado = encontrarClienteId(clienteNome)
+      // O nome do paciente está na segunda coluna (cliente)
+      const nomePaciente = cleanString(row[1], 'Paciente Não Informado');
+      
+      // Encontrar cliente_id baseado no código do cliente
+      const clienteIdEncontrado = encontrarClienteId(codigoCliente)
       
       // Mapear campos com validação melhorada
       const registro = {
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
         cliente_id: clienteIdEncontrado, // Associar ao cliente cadastrado
-        cliente: cleanString(row[1], 'Cliente Não Informado'),
-        cliente_nome: cleanString(row[1], 'Cliente Não Informado'), // Garantir que não seja null
-        paciente: cleanString(row[0], 'Paciente Não Informado'),
+        cliente: nomePaciente, // Nome do paciente vai para o campo cliente
+        cliente_nome: nomePaciente, // Nome do paciente vai para o campo cliente_nome
+        paciente: codigoCliente, // Código do cliente vai para o campo paciente
         medico: cleanString(row[2], 'Médico Não Informado'),
         data_exame: parseDate(row[3]),
         modalidade: cleanString(row[4], 'Não Informado'),
