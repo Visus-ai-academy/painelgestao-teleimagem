@@ -141,48 +141,65 @@ function convertValues(valueStr: string | number): number | null {
 // Função para processar uma linha do Excel
 function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): VolumetriaRecord | null {
   try {
-    // Campos obrigatórios
-    if (!row['EMPRESA'] || !row['NOME_PACIENTE']) {
-      console.warn('Linha ignorada: EMPRESA e NOME_PACIENTE são obrigatórios');
+    // Validação robusta de entrada
+    if (!row || typeof row !== 'object') {
+      console.warn('Linha inválida: objeto row não definido ou inválido');
       return null;
     }
 
+    // Campos obrigatórios com validação null-safe
+    const empresa = row['EMPRESA'];
+    const nomePaciente = row['NOME_PACIENTE'];
+    
+    if (!empresa || !nomePaciente || 
+        typeof empresa !== 'string' && typeof empresa !== 'number' ||
+        typeof nomePaciente !== 'string' && typeof nomePaciente !== 'number') {
+      console.warn('Linha ignorada: EMPRESA e NOME_PACIENTE são obrigatórios e devem ser válidos');
+      return null;
+    }
+
+    // Função helper para conversão segura de string
+    const safeString = (value: any): string | undefined => {
+      if (value === null || value === undefined || value === '') return undefined;
+      return String(value).trim() || undefined;
+    };
+
     const record: VolumetriaRecord = {
-      // Campos obrigatórios - usar nomes exatos das colunas
-      EMPRESA: String(row['EMPRESA']).trim(),
-      NOME_PACIENTE: String(row['NOME_PACIENTE']).trim(),
+      // Campos obrigatórios - conversão segura
+      EMPRESA: String(empresa).trim(),
+      NOME_PACIENTE: String(nomePaciente).trim(),
       arquivo_fonte: arquivoFonte,
       
-      // Campos opcionais de texto - usar nomes exatos
-      CODIGO_PACIENTE: row['CODIGO_PACIENTE'] ? String(row['CODIGO_PACIENTE']).trim() : undefined,
-      ESTUDO_DESCRICAO: row['ESTUDO_DESCRICAO'] ? String(row['ESTUDO_DESCRICAO']).trim() : undefined,
-      ACCESSION_NUMBER: row['ACCESSION_NUMBER'] ? String(row['ACCESSION_NUMBER']).trim() : undefined,
-      MODALIDADE: row['MODALIDADE'] ? String(row['MODALIDADE']).trim() : undefined,
-      PRIORIDADE: row['PRIORIDADE'] ? String(row['PRIORIDADE']).trim() : undefined,
-      ESPECIALIDADE: row['ESPECIALIDADE'] ? String(row['ESPECIALIDADE']).trim() : undefined,
-      MEDICO: row['MEDICO'] ? String(row['MEDICO']).trim() : undefined,
-      DUPLICADO: row['DUPLICADO'] ? String(row['DUPLICADO']).trim() : undefined,
-      STATUS: row['STATUS'] ? String(row['STATUS']).trim() : undefined,
-      MEDICO_REASSINATURA: row['MEDICO_REASSINATURA'] ? String(row['MEDICO_REASSINATURA']).trim() : undefined,
-      SEGUNDA_ASSINATURA: row['SEGUNDA_ASSINATURA'] ? String(row['SEGUNDA_ASSINATURA']).trim() : undefined,
-      POSSUI_IMAGENS_CHAVE: row['POSSUI_IMAGENS_CHAVE'] ? String(row['POSSUI_IMAGENS_CHAVE']).trim() : undefined,
-      DIGITADOR: row['DIGITADOR'] ? String(row['DIGITADOR']).trim() : undefined,
-      COMPLEMENTAR: row['COMPLEMENTAR'] ? String(row['COMPLEMENTAR']).trim() : undefined,
+      // Campos opcionais de texto - conversão null-safe
+      CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
+      ESTUDO_DESCRICAO: safeString(row['ESTUDO_DESCRICAO']),
+      ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
+      MODALIDADE: safeString(row['MODALIDADE']),
+      PRIORIDADE: safeString(row['PRIORIDADE']),
+      ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
+      MEDICO: safeString(row['MEDICO']),
+      DUPLICADO: safeString(row['DUPLICADO']),
+      STATUS: safeString(row['STATUS']),
+      MEDICO_REASSINATURA: safeString(row['MEDICO_REASSINATURA']),
+      SEGUNDA_ASSINATURA: safeString(row['SEGUNDA_ASSINATURA']),
+      POSSUI_IMAGENS_CHAVE: safeString(row['POSSUI_IMAGENS_CHAVE']),
+      DIGITADOR: safeString(row['DIGITADOR']),
+      COMPLEMENTAR: safeString(row['COMPLEMENTAR']),
       
-      // Campos numéricos - usar nomes exatos
+      // Campos numéricos - conversão null-safe
       VALORES: row['VALORES'] ? convertValues(row['VALORES']) : undefined,
       IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : undefined,
       IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
       CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
       
-      // Campos de data - usar nomes exatos
+      // Campos de data - conversão null-safe
       DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : undefined,
       DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : undefined,
       DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : undefined,
       DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : undefined,
       DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : undefined,
       
-      // Campos de hora - usar nomes exatos
+      // Campos de hora - conversão null-safe
       HORA_REALIZACAO: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : undefined,
       HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : undefined,
       HORA_LAUDO: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : undefined,
