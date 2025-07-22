@@ -937,50 +937,16 @@ export default function GerarFaturamento() {
                     />
                   </div>
 
-                  <div>
+                   <div>
                     <Label>Arquivo 2: Data_Exame (Operacional)</Label>
-                    <FileUpload
-                      title="Upload Volumetria - Data Exame"
-                      description="Arquivo com base na DATA_REALIZACAO para controle"
-                      acceptedTypes={['.csv', '.xlsx', '.xls']}
-                      maxSizeInMB={25}
-                      expectedFormat={["EMPRESA, NOME_PACIENTE, DATA_REALIZACAO", "MODALIDADE, ESPECIALIDADE, VALORES"]}
-                      onUpload={async (file) => {
-                        try {
-                          // Upload do arquivo primeiro
-                          const nomeArquivo = `volumetria_exame_${Date.now()}_${file.name}`;
-                          const { error: uploadError } = await supabase.storage
-                            .from('uploads')
-                            .upload(nomeArquivo, file);
-
-                          if (uploadError) throw uploadError;
-
-                          // Chamar a função para processar
-                          const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
-                            body: { 
-                              file_path: nomeArquivo,
-                              arquivo_fonte: 'data_exame'
-                            }
-                          });
-
-                          if (error) throw error;
-
-                          toast({
-                            title: "Processamento Iniciado",
-                            description: `Arquivo enviado para processamento em background. ID: ${data.upload_log_id}`,
-                          });
-
-                          // Opcional: polling para verificar status
-                          console.log('Processamento iniciado:', data);
-                        } catch (error: any) {
-                          toast({
-                            title: "Erro no Processamento",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        }
+                    <VolumetriaUpload
+                      arquivoFonte="data_exame"
+                      onSuccess={() => {
+                        toast({
+                          title: "Upload Concluído",
+                          description: "Dados de volumetria processados com sucesso!",
+                        });
                       }}
-                      icon={<FileText className="h-4 w-4" />}
                     />
                   </div>
                 </div>
