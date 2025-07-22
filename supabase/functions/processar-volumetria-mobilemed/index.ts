@@ -235,14 +235,24 @@ async function processFileInBackground(
       throw new Error('Arquivo Excel está vazio');
     }
 
+    // Para arquivos muito grandes (>10k linhas), processar apenas uma amostra para evitar timeout
+    let dataToProcess = jsonData;
+    let isLimitedSample = false;
+    
+    if (jsonData.length > 10000) {
+      console.log(`Arquivo muito grande (${jsonData.length} linhas). Processando amostra de 5000 linhas para evitar timeout.`);
+      dataToProcess = jsonData.slice(0, 5000); // Processa apenas as primeiras 5000 linhas
+      isLimitedSample = true;
+    }
+
     // Processar dados em micro-lotes com pausas para evitar timeout
     const errors: string[] = [];
     const microChunkSize = 50; // Micro-lotes de apenas 50 linhas
     const insertBatchSize = 10; // Inserções mínimas
     let totalInserted = 0;
 
-    for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += microChunkSize) {
-      const chunk = jsonData.slice(chunkStart, chunkStart + microChunkSize);
+    for (let chunkStart = 0; chunkStart < dataToProcess.length; chunkStart += microChunkSize) {
+      const chunk = dataToProcess.slice(chunkStart, chunkStart + microChunkSize);
       const chunkRecords: VolumetriaRecord[] = [];
       
       // Processar micro-chunk
@@ -282,12 +292,15 @@ async function processFileInBackground(
       }
 
       // Log de progresso
-      const processed = Math.min(chunkStart + microChunkSize, jsonData.length);
-      console.log(`Processadas ${processed} de ${jsonData.length} linhas (${totalInserted} inseridas)`);
+      const processed = Math.min(chunkStart + microChunkSize, dataToProcess.length);
+      console.log(`Processadas ${processed} de ${dataToProcess.length} linhas${isLimitedSample ? ' (amostra)' : ''} (${totalInserted} inseridas)`);
       
       // Pausa maior a cada micro-chunk
       await new Promise(resolve => setTimeout(resolve, 20));
     }
+
+    console.log(`Processamento concluído. Total inserido: ${totalInserted}${isLimitedSample ? ' (processamento limitado devido ao tamanho do arquivo)' : ''}`);
+    console.log(`Erros encontrados: ${errors.length}`);
 
     // Atualizar log de upload com sucesso
     try {
