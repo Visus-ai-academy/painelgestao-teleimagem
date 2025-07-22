@@ -7,8 +7,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Adicionar timeout de 5 minutos para a função
+const FUNCTION_TIMEOUT = 5 * 60 * 1000; // 5 minutos
+
 serve(async (req) => {
-  console.log('=== PROCESSAR-FATURAMENTO V2 ===')
+  console.log('=== PROCESSAR-FATURAMENTO V4 - COM TIMEOUT ===')
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,6 +20,8 @@ serve(async (req) => {
   }
 
   let logData: any = null;
+  let timeoutId: number | null = null;
+  let isProcessingComplete = false;
   
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -24,8 +29,16 @@ serve(async (req) => {
   )
 
   try {
-    console.log('=== PROCESSAR-FATURAMENTO V3 ===')
-    console.log('1. Iniciando processamento...')
+    console.log('=== PROCESSAR-FATURAMENTO V4 ===')
+    console.log('1. Iniciando processamento com timeout...')
+    
+    // Configurar timeout
+    timeoutId = setTimeout(() => {
+      if (!isProcessingComplete) {
+        console.error('TIMEOUT: Processamento excedeu 5 minutos')
+        throw new Error('Timeout: Processamento excedeu 5 minutos')
+      }
+    }, FUNCTION_TIMEOUT)
     
     const body = await req.json()
     const fileName = body?.fileName
@@ -370,11 +383,17 @@ serve(async (req) => {
           .eq('id', logData.id)
       }
     }
-
+    
     // Iniciar task em background
-    EdgeRuntime.waitUntil(processarDados())
+    EdgeRuntime.waitUntil(processarDados().finally(() => {
+      isProcessingComplete = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    }))
 
     console.log('14. Processamento iniciado em background, retornando resposta imediata')
+    
+    // Marcar que a resposta foi enviada (não completamente processado)
+    if (timeoutId) clearTimeout(timeoutId);
 
     return new Response(JSON.stringify({
       success: true,
