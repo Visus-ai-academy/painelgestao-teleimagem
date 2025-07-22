@@ -77,11 +77,22 @@ serve(async (req) => {
     const headers = jsonData[0] as string[]
     console.log('8. Cabeçalhos encontrados:', headers)
 
-    // Buscar clientes
-    console.log('8.1. Buscando clientes cadastrados...')
+    // Otimização: buscar apenas clientes que aparecem no Excel
+    console.log('8.1. Extraindo códigos únicos do Excel...')
+    const codigosUnicos = [...new Set(
+      jsonData.slice(1, 101) // Apenas os primeiros 100 registros
+        .map(row => row[0]?.toString().trim())
+        .filter(Boolean)
+    )]
+    
+    console.log('8.2. Códigos únicos encontrados:', codigosUnicos.length)
+    
+    console.log('8.3. Buscando apenas clientes relevantes...')
     const { data: clientesCadastrados, error: clientesError } = await supabase
       .from('clientes')
       .select('id, nome, cod_cliente')
+      .or(`cod_cliente.in.(${codigosUnicos.join(',')}),nome.in.(${codigosUnicos.join(',')})`)
+      .eq('ativo', true)
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
