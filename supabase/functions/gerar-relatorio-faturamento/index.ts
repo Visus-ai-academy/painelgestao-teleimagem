@@ -42,17 +42,17 @@ serve(async (req: Request) => {
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
     console.log(`Cliente ID recebido: ${cliente_id}`);
 
-    // Buscar faturamento - usar cliente_id se possível, senão filtrar por nome
-    let { data: dados, error: errorClienteId } = await supabase
+    // Buscar faturamento - tentar primeiro por nome do cliente
+    let { data: dados, error: errorNome } = await supabase
       .from('faturamento')
       .select('*')
-      .eq('cliente_id', cliente_id)
+      .eq('cliente_nome', cliente.nome)
       .gte('data_emissao', dataInicio)
       .lte('data_emissao', dataFim);
 
-    console.log(`Busca por cliente_id: ${dados?.length || 0} registros, erro: ${errorClienteId?.message || 'nenhum'}`);
+    console.log(`Busca por cliente_nome: ${dados?.length || 0} registros, erro: ${errorNome?.message || 'nenhum'}`);
 
-    // Se não encontrou por cliente_id, tentar por nome
+    // Se não encontrou por cliente_nome, tentar por campo cliente
     if (!dados || dados.length === 0) {
       const result = await supabase
         .from('faturamento')
@@ -61,19 +61,19 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lte('data_emissao', dataFim);
       dados = result.data;
-      console.log(`Busca por nome: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
+      console.log(`Busca por cliente: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
     }
 
-    // Se ainda não encontrou, tentar buscar por cliente_nome
-    if (!dados || dados.length === 0) {
+    // Se não encontrou, tentar buscar por cliente_id (se não for null)
+    if ((!dados || dados.length === 0) && cliente_id) {
       const result = await supabase
         .from('faturamento')
         .select('*')
-        .eq('cliente_nome', cliente.nome)
+        .eq('cliente_id', cliente_id)
         .gte('data_emissao', dataInicio)
         .lte('data_emissao', dataFim);
       dados = result.data;
-      console.log(`Busca por cliente_nome: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
+      console.log(`Busca por cliente_id: ${dados?.length || 0} registros, erro: ${result.error?.message || 'nenhum'}`);
     }
 
     console.log(`Total de dados encontrados: ${dados?.length || 0} registros`);
