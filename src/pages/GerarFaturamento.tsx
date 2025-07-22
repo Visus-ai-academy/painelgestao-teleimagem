@@ -97,7 +97,7 @@ const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico'
 };
 
 export default function GerarFaturamento() {
-  const [activeTab, setActiveTab] = useState("faturamento");
+  const [activeTab, setActiveTab] = useState("teste-volumetria");
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
@@ -886,7 +886,11 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Teste MobileMed
+          </TabsTrigger>
           <TabsTrigger value="relatorios-prontos" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Relatórios Prontos
@@ -904,6 +908,141 @@ export default function GerarFaturamento() {
             Base de Dados
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="teste-volumetria" className="space-y-4">
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  <CardTitle>Teste de Volumetria MobileMed</CardTitle>
+                </div>
+                <CardDescription>
+                  Teste o processamento dos novos arquivos de volumetria com conversões automáticas
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Arquivo 1: Data_Laudo (Faturamento)</Label>
+                    <FileUpload
+                      title="Upload Volumetria - Data Laudo"
+                      description="Arquivo com base na DATA_LAUDO para faturamento"
+                      acceptedTypes={['.csv', '.xlsx', '.xls']}
+                      maxSizeInMB={25}
+                      expectedFormat={["EMPRESA, NOME_PACIENTE, DATA_LAUDO", "MODALIDADE, ESPECIALIDADE, VALORES"]}
+                      onUpload={async (file) => {
+                        try {
+                          // Upload do arquivo primeiro
+                          const nomeArquivo = `volumetria_laudo_${Date.now()}_${file.name}`;
+                          const { error: uploadError } = await supabase.storage
+                            .from('uploads')
+                            .upload(nomeArquivo, file);
+
+                          if (uploadError) throw uploadError;
+
+                          // Chamar a função para processar
+                          const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
+                            body: { 
+                              file_path: nomeArquivo,
+                              arquivo_fonte: 'data_laudo'
+                            }
+                          });
+
+                          if (error) throw error;
+
+                          toast({
+                            title: "Arquivo Data_Laudo Processado",
+                            description: `${data.records_processed} registros processados com sucesso`,
+                          });
+                        } catch (error: any) {
+                          toast({
+                            title: "Erro no Processamento",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      icon={<FileText className="h-4 w-4" />}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Arquivo 2: Data_Exame (Operacional)</Label>
+                    <FileUpload
+                      title="Upload Volumetria - Data Exame"
+                      description="Arquivo com base na DATA_REALIZACAO para controle"
+                      acceptedTypes={['.csv', '.xlsx', '.xls']}
+                      maxSizeInMB={25}
+                      expectedFormat={["EMPRESA, NOME_PACIENTE, DATA_REALIZACAO", "MODALIDADE, ESPECIALIDADE, VALORES"]}
+                      onUpload={async (file) => {
+                        try {
+                          // Upload do arquivo primeiro
+                          const nomeArquivo = `volumetria_exame_${Date.now()}_${file.name}`;
+                          const { error: uploadError } = await supabase.storage
+                            .from('uploads')
+                            .upload(nomeArquivo, file);
+
+                          if (uploadError) throw uploadError;
+
+                          // Chamar a função para processar
+                          const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
+                            body: { 
+                              file_path: nomeArquivo,
+                              arquivo_fonte: 'data_exame'
+                            }
+                          });
+
+                          if (error) throw error;
+
+                          toast({
+                            title: "Arquivo Data_Exame Processado", 
+                            description: `${data.records_processed} registros processados com sucesso`,
+                          });
+                        } catch (error: any) {
+                          toast({
+                            title: "Erro no Processamento",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      icon={<FileText className="h-4 w-4" />}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2 pt-4">
+                  <Label>Templates de Teste</Label>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href="/templates/template_volumetria_mobilemed_data_laudo.csv" download>
+                        <Download className="h-4 w-4 mr-2" />
+                        Template Data_Laudo
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href="/templates/template_volumetria_mobilemed_data_exame.csv" download>
+                        <Download className="h-4 w-4 mr-2" />
+                        Template Data_Exame
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-muted p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">Conversões Automáticas:</h4>
+                  <ul className="text-sm space-y-1">
+                    <li><Badge variant="secondary">Datas</Badge> dd/mm/aa → Date</li>
+                    <li><Badge variant="secondary">Horas</Badge> hh:mm:ss → Time</li>
+                    <li><Badge variant="secondary">Valores</Badge> 2.50 → 2 (parte inteira)</li>
+                    <li><Badge variant="secondary">Validação</Badge> Campos obrigatórios e formatos</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="relatorios-prontos" className="space-y-6 mt-6">
           <Card>
