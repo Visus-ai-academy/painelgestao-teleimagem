@@ -24,6 +24,7 @@ serve(async (req) => {
   )
 
   try {
+    console.log('=== PROCESSAR-FATURAMENTO V3 ===')
     console.log('1. Iniciando processamento...')
     
     const body = await req.json()
