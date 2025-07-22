@@ -396,8 +396,8 @@ serve(async (req: Request) => {
           }
           
           doc.setFontSize(7);
-          const dataFormatada = (item.data_exame || item.data_emissao) ? 
-            new Date(item.data_exame || item.data_emissao).toLocaleDateString('pt-BR') : '-';
+          const dataFormatada = item.data_exame ? 
+            new Date(item.data_exame + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
           doc.text(dataFormatada, 22, yPosition + 2);
           doc.text((item.cliente_nome || '-').substring(0, 20), 40, yPosition + 2); // Nome do paciente
           doc.text((item.medico || '-').substring(0, 20), 80, yPosition + 2);
