@@ -36,7 +36,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'
 export default function Volumetria() {
   const [data, setData] = useState<VolumetriaData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState<string>("mes_atual");
+  const [periodo, setPeriodo] = useState<string>("todos");
   const [cliente, setCliente] = useState<string>("todos");
   
   // Estados para dados agregados
@@ -81,6 +81,12 @@ export default function Volumetria() {
     let dataInicio, dataFim;
 
     switch (periodo) {
+      case "todos":
+        return null; // Sem filtro de data
+      case "hoje":
+        dataInicio = new Date(hoje);
+        dataFim = new Date(hoje);
+        break;
       case "mes_atual":
         dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
         dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
@@ -98,8 +104,7 @@ export default function Volumetria() {
         dataFim = new Date(hoje.getFullYear() - 1, 11, 31);
         break;
       default:
-        dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+        return null; // Sem filtro de data
     }
 
     return {
@@ -111,11 +116,17 @@ export default function Volumetria() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const { inicio, fim } = getDateFilter();
+      const dateFilter = getDateFilter();
 
       let query = supabase
         .from('volumetria_mobilemed')
         .select('*');
+
+      // Aplicar filtro de data se não for "todos"
+      if (dateFilter) {
+        query = query.gte('data_referencia', dateFilter.inicio)
+                     .lte('data_referencia', dateFilter.fim);
+      }
 
       if (cliente !== "todos") {
         query = query.eq('EMPRESA', cliente);
@@ -401,6 +412,8 @@ export default function Volumetria() {
             <SelectValue placeholder="Selecione o período" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="todos">Todos os Dados</SelectItem>
+            <SelectItem value="hoje">Hoje</SelectItem>
             <SelectItem value="mes_atual">Mês Atual</SelectItem>
             <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
             <SelectItem value="ano_atual">Ano Atual</SelectItem>
