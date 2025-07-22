@@ -75,6 +75,7 @@ serve(async (req: Request) => {
     const dataFim = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-01`;
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
+    console.log(`Buscando no campo 'paciente' por: ${cliente.nome}`);
 
     // Buscar dados de faturamento com múltiplas estratégias
     const queries = [
@@ -108,6 +109,9 @@ serve(async (req: Request) => {
     console.log('Resultados das consultas:');
     results.forEach((result, index) => {
       console.log(`Query ${index + 1}:`, result.data?.length || 0, 'registros, erro:', result.error?.message || 'nenhum');
+      if (result.data && result.data.length > 0) {
+        console.log(`Primeiros dados da Query ${index + 1}:`, JSON.stringify(result.data.slice(0, 2)));
+      }
     });
 
     // Combinar todos os resultados únicos
