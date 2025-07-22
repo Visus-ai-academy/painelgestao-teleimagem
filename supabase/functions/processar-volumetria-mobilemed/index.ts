@@ -235,53 +235,56 @@ async function processFileInBackground(
       throw new Error('Arquivo Excel está vazio');
     }
 
-    // Processar dados em chunks menores para evitar timeout
+    // Processar dados em chunks muito menores para evitar timeout
     const processedRecords: VolumetriaRecord[] = [];
     const errors: string[] = [];
-    const chunkSize = 1000; // Processar em chunks de 1000 linhas
+    const chunkSize = 100; // Reduzido drasticamente para 100 linhas
+    const insertBatchSize = 20; // Inserções menores
 
     for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += chunkSize) {
       const chunk = jsonData.slice(chunkStart, chunkStart + chunkSize);
+      const chunkRecords: VolumetriaRecord[] = [];
       
+      // Processar chunk
       for (let i = 0; i < chunk.length; i++) {
         const row = chunk[i];
         const record = processRow(row, arquivo_fonte);
         
         if (record) {
-          processedRecords.push(record);
+          chunkRecords.push(record);
         } else {
           errors.push(`Linha ${chunkStart + i + 2}: Dados inválidos ou incompletos`);
         }
       }
 
-      // Log de progresso
-      console.log(`Processadas ${Math.min(chunkStart + chunkSize, jsonData.length)} de ${jsonData.length} linhas`);
-    }
+      // Inserir chunk imediatamente em mini-lotes
+      for (let j = 0; j < chunkRecords.length; j += insertBatchSize) {
+        const miniBatch = chunkRecords.slice(j, j + insertBatchSize);
+        
+        try {
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(miniBatch);
 
-    console.log(`Registros processados: ${processedRecords.length}`);
-    console.log(`Erros encontrados: ${errors.length}`);
+          if (insertError) {
+            console.error('Erro ao inserir mini-lote:', insertError);
+            errors.push(`Erro no mini-lote: ${insertError.message}`);
+          } else {
+            processedRecords.push(...miniBatch);
+          }
+        } catch (insertErr) {
+          console.error('Erro crítico na inserção:', insertErr);
+          errors.push(`Erro crítico: ${insertErr}`);
+        }
+      }
 
-    if (processedRecords.length === 0) {
-      throw new Error('Nenhum registro válido encontrado no arquivo');
-    }
-
-    // Inserir dados no banco em lotes menores
-    const batchSize = 50; // Reduzido para evitar timeout
-    let totalInserted = 0;
-
-    for (let i = 0; i < processedRecords.length; i += batchSize) {
-      const batch = processedRecords.slice(i, i + batchSize);
+      // Log de progresso mais frequente
+      const processed = Math.min(chunkStart + chunkSize, jsonData.length);
+      console.log(`Processadas ${processed} de ${jsonData.length} linhas (${processedRecords.length} inseridas)`);
       
-      const { error: insertError } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .insert(batch);
-
-      if (insertError) {
-        console.error('Erro ao inserir lote:', insertError);
-        errors.push(`Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
-      } else {
-        totalInserted += batch.length;
-        console.log(`Lote inserido: ${batch.length} registros (${totalInserted}/${processedRecords.length})`);
+      // Yield periodicamente para evitar timeout
+      if (chunkStart % 500 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
 
@@ -290,8 +293,8 @@ async function processFileInBackground(
       const { error: updateError } = await supabaseClient
         .from('upload_logs')
         .update({
-          status: totalInserted > 0 ? 'completed' : 'error',
-          records_processed: totalInserted,
+          status: processedRecords.length > 0 ? 'completed' : 'error',
+          records_processed: processedRecords.length,
           error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
         })
         .eq('id', uploadLogId);
