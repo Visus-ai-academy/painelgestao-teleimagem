@@ -214,7 +214,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-// FUNÇÃO PARA GERAR PDF COMPLETO (BASEADA NO SCRIPT PYTHON)
+// FUNÇÃO PARA GERAR PDF COMPLETO (REMOVIDA TEMPORARIAMENTE)
+/*
 async function gerarPDFCompleto(dados: {
   cliente: any;
   periodo: string;
@@ -368,5 +369,6 @@ async function gerarPDFCompleto(dados: {
   const pdfArrayBuffer = doc.output('arraybuffer');
   return new Uint8Array(pdfArrayBuffer);
 }
+*/
 
 serve(handler);
