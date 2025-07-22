@@ -42,8 +42,8 @@ serve(async (req: Request) => {
     // Buscar faturamento
     const { data: dados } = await supabase
       .from('faturamento')
-      .select('data_emissao, cliente, nome_exame, medico, modalidade, especialidade, quantidade, valor_bruto')
-      .eq('paciente', cliente.nome)
+      .select('data_emissao, cliente, nome_exame, medico, modalidade, especialidade, quantidade, valor_bruto, paciente')
+      .eq('cliente', cliente.nome)
       .gte('data_emissao', dataInicio)
       .lte('data_emissao', dataFim);
 
@@ -170,104 +170,148 @@ serve(async (req: Request) => {
 </body>
 </html>`;
 
-    // Gerar PDF usando jsPDF (mais confiável)
+    // Gerar PDF usando jsPDF com formatação melhorada
     let pdfBytes;
     let isPdf = true;
     
     try {
       const doc = new jsPDF();
       
-      // Cabeçalho
-      doc.setFontSize(16);
-      doc.setTextColor(0, 102, 204);
-      doc.text('DEMONSTRATIVO DE FATURAMENTO', 105, 20, { align: 'center' });
+      // Função para adicionar cabeçalho
+      const addHeader = () => {
+        doc.setFontSize(16);
+        doc.setTextColor(0, 102, 204);
+        doc.text('DEMONSTRATIVO DE FATURAMENTO', 105, 20, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.setTextColor(102, 102, 102);
+        doc.text('TELEIMAGEM - Diagnóstico por Imagem', 105, 28, { align: 'center' });
+      };
       
-      doc.setFontSize(12);
-      doc.setTextColor(102, 102, 102);
-      doc.text('TELEIMAGEM - Diagnóstico por Imagem', 105, 30, { align: 'center' });
+      addHeader();
       
       // Informações básicas
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      let y = 50;
+      let y = 45;
       doc.text(`Cliente: ${cliente.nome}`, 20, y);
-      doc.text(`Período: ${mesNome}/${ano}`, 20, y + 8);
-      doc.text(`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, y + 16);
+      doc.text(`Período: ${mesNome}/${ano}`, 20, y + 6);
+      doc.text(`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, y + 12);
       
-      // Resumo financeiro
-      y += 35;
-      doc.setFillColor(248, 249, 250);
-      doc.rect(15, y - 5, 180, 50, 'F');
-      doc.setDrawColor(221, 221, 221);
-      doc.rect(15, y - 5, 180, 50);
+      // Resumo financeiro em box
+      y += 25;
+      doc.setFillColor(240, 248, 255);
+      doc.rect(15, y - 3, 180, 45, 'F');
+      doc.setDrawColor(0, 102, 204);
+      doc.rect(15, y - 3, 180, 45);
       
       doc.setFontSize(11);
       doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 102, 204);
       doc.text('RESUMO FINANCEIRO', 20, y + 5);
       
       doc.setFont(undefined, 'normal');
       doc.setFontSize(9);
-      doc.text(`Total de registros únicos: ${totalRegistros}`, 20, y + 15);
-      doc.text(`Total de laudos: ${totalLaudos}`, 20, y + 23);
-      doc.text(`Valor bruto: R$ ${valorBruto.toFixed(2)}`, 20, y + 31);
-      doc.text(`Total de impostos: R$ ${impostos.toFixed(2)}`, 110, y + 31);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Total de registros únicos: ${totalRegistros}`, 20, y + 13);
+      doc.text(`Total de laudos: ${totalLaudos}`, 110, y + 13);
+      doc.text(`Valor bruto: R$ ${valorBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 20, y + 20);
+      doc.text(`IRRF (1,5%): R$ ${irrf.toFixed(2)}`, 20, y + 26);
+      doc.text(`CSLL (1,0%): R$ ${csll.toFixed(2)}`, 75, y + 26);
+      doc.text(`PIS (0,65%): R$ ${pis.toFixed(2)}`, 125, y + 26);
+      doc.text(`Cofins (3,0%): R$ ${cofins.toFixed(2)}`, 20, y + 32);
+      doc.text(`Total impostos: R$ ${impostos.toFixed(2)}`, 100, y + 32);
       
       doc.setFont(undefined, 'bold');
       doc.setTextColor(0, 102, 204);
-      doc.text(`Valor líquido a pagar: R$ ${valorLiquido.toFixed(2)}`, 20, y + 40);
+      doc.setFontSize(10);
+      doc.text(`Valor líquido: R$ ${valorLiquido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 20, y + 38);
       
-      // Tabela de exames (apenas primeiros registros para não quebrar)
-      y += 60;
+      // Tabela de exames
+      y += 55;
       doc.setTextColor(0, 0, 0);
       doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
       doc.text(`DETALHAMENTO DOS EXAMES (${totalRegistros} registros)`, 20, y);
       
-      y += 10;
+      y += 8;
       // Cabeçalho da tabela
       doc.setFillColor(0, 102, 204);
       doc.rect(15, y, 180, 8, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
       doc.text('Data', 18, y + 5);
-      doc.text('Paciente', 35, y + 5);
-      doc.text('Exame', 75, y + 5);
-      doc.text('Médico', 115, y + 5);
-      doc.text('Qtd', 155, y + 5);
-      doc.text('Valor', 170, y + 5);
+      doc.text('Paciente', 38, y + 5);
+      doc.text('Exame', 85, y + 5);
+      doc.text('Médico', 125, y + 5);
+      doc.text('Qtd', 165, y + 5);
+      doc.text('Valor (R$)', 175, y + 5);
       
-      // Dados da tabela (limitado a 20 registros para caber na página)
+      // Dados da tabela com paginação
       doc.setTextColor(0, 0, 0);
       doc.setFont(undefined, 'normal');
-      const maxRegistros = Math.min(registros.length, 20);
+      doc.setFontSize(7);
       
-      for (let i = 0; i < maxRegistros; i++) {
-        const registro = registros[i];
-        y += 8;
-        
-        if (i % 2 === 0) {
-          doc.setFillColor(248, 249, 250);
-          doc.rect(15, y - 2, 180, 6, 'F');
+      let currentY = y + 8;
+      const lineHeight = 6;
+      const maxY = 280; // Limite da página
+      
+      registros.forEach((registro, index) => {
+        // Verificar se precisa de nova página
+        if (currentY > maxY) {
+          doc.addPage();
+          addHeader();
+          currentY = 55;
+          
+          // Recriar cabeçalho da tabela na nova página
+          doc.setFillColor(0, 102, 204);
+          doc.rect(15, currentY, 180, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(8);
+          doc.setFont(undefined, 'bold');
+          doc.text('Data', 18, currentY + 5);
+          doc.text('Paciente', 38, currentY + 5);
+          doc.text('Exame', 85, currentY + 5);
+          doc.text('Médico', 125, currentY + 5);
+          doc.text('Qtd', 165, currentY + 5);
+          doc.text('Valor (R$)', 175, currentY + 5);
+          
+          currentY += 8;
+          doc.setTextColor(0, 0, 0);
+          doc.setFont(undefined, 'normal');
+          doc.setFontSize(7);
         }
         
-        doc.text(new Date(registro.data_emissao).toLocaleDateString('pt-BR'), 18, y + 2);
-        doc.text((registro.cliente || 'N/A').substring(0, 15), 35, y + 2);
-        doc.text((registro.nome_exame || 'N/A').substring(0, 15), 75, y + 2);
-        doc.text((registro.medico || 'N/A').substring(0, 15), 115, y + 2);
-        doc.text(String(registro.quantidade), 155, y + 2);
-        doc.text(`R$ ${registro.valor_bruto.toFixed(2)}`, 170, y + 2);
-      }
-      
-      if (registros.length > 20) {
-        y += 10;
-        doc.setFont(undefined, 'italic');
-        doc.text(`... e mais ${registros.length - 20} registros`, 20, y);
-      }
+        // Linha zebrada
+        if (index % 2 === 0) {
+          doc.setFillColor(248, 249, 250);
+          doc.rect(15, currentY - 1, 180, lineHeight, 'F');
+        }
+        
+        // Dados da linha
+        const data = new Date(registro.data_emissao).toLocaleDateString('pt-BR');
+        const paciente = (registro.paciente || registro.cliente || 'N/A').substring(0, 20);
+        const exame = (registro.nome_exame || 'N/A').substring(0, 18);
+        const medico = (registro.medico || 'N/A').substring(0, 15);
+        const qtd = String(registro.quantidade);
+        const valor = registro.valor_bruto.toFixed(2);
+        
+        doc.text(data, 18, currentY + 4);
+        doc.text(paciente, 38, currentY + 4);
+        doc.text(exame, 85, currentY + 4);
+        doc.text(medico, 125, currentY + 4);
+        doc.text(qtd, 167, currentY + 4, { align: 'center' });
+        doc.text(valor, 192, currentY + 4, { align: 'right' });
+        
+        currentY += lineHeight;
+      });
       
       // Converter para bytes
       const pdfString = doc.output('arraybuffer');
       pdfBytes = new Uint8Array(pdfString);
       
-      console.log('PDF gerado com jsPDF com sucesso');
+      console.log('PDF gerado com jsPDF - formatação melhorada');
     } catch (pdfError) {
       console.log('Erro na geração de PDF, usando HTML como fallback:', pdfError);
       // Fallback para HTML se PDF falhar
