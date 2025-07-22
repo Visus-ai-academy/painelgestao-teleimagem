@@ -13,6 +13,20 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Função para formatar CNPJ
+  const formatarCNPJ = (cnpj: string): string => {
+    if (!cnpj) return '';
+    
+    // Remove caracteres não numéricos
+    const somenteNumeros = cnpj.replace(/\D/g, '');
+    
+    // Se não tem 14 dígitos, retorna como está
+    if (somenteNumeros.length !== 14) return cnpj;
+    
+    // Aplica a formatação: 00.000.000/0000-00
+    return somenteNumeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
   try {
     console.log('Função iniciada');
     
@@ -212,8 +226,8 @@ serve(async (req: Request) => {
             const base64String = btoa(binary);
             const imageFormat = ext.toUpperCase() === 'JPG' ? 'JPEG' : ext.toUpperCase();
             
-            // Adicionar imagem ao PDF mantendo proporção adequada
-            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 135, 10, 30, 20);
+            // Adicionar imagem ao PDF com dimensões adequadas (mais largura, menos altura)
+            doc.addImage(`data:image/${ext};base64,${base64String}`, imageFormat, 130, 8, 40, 25);
             logoAdded = true;
             console.log(`Logomarca ${fileName} carregada com sucesso no PDF`);
             break;
@@ -224,10 +238,10 @@ serve(async (req: Request) => {
           // Se não encontrou logomarca, mostrar placeholder
           doc.setDrawColor(200, 200, 200);
           doc.setLineWidth(0.5);
-          doc.rect(135, 10, 30, 20);
+          doc.rect(130, 8, 40, 25);
           doc.setFontSize(8);
           doc.setTextColor(128, 128, 128);
-          doc.text('LOGOMARCA', 150, 21, { align: 'center' });
+          doc.text('LOGOMARCA', 150, 22, { align: 'center' });
           console.log('Nenhuma logomarca encontrada, usando placeholder');
         }
       } catch (logoError) {
@@ -235,10 +249,10 @@ serve(async (req: Request) => {
         // Mostrar placeholder em caso de erro
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.5);
-        doc.rect(135, 10, 30, 20);
+        doc.rect(130, 8, 40, 25);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text('LOGOMARCA', 150, 21, { align: 'center' });
+        doc.text('LOGOMARCA', 150, 22, { align: 'center' });
       }
       
       // === CABEÇALHO ===
@@ -251,9 +265,9 @@ serve(async (req: Request) => {
       doc.setTextColor(0, 0, 0);
       doc.text(`Cliente: ${cliente.nome}`, 20, 50);
       if (cliente.cnpj) {
-        doc.setFontSize(12);
-        doc.setTextColor(80, 80, 80);
-        doc.text(`CNPJ: ${cliente.cnpj}`, 20, 60);
+        doc.setFontSize(16); // Mesma fonte do campo Cliente
+        doc.setTextColor(0, 0, 0); // Mesma cor do campo Cliente
+        doc.text(`CNPJ: ${formatarCNPJ(cliente.cnpj)}`, 20, 60);
       }
       
       doc.setFontSize(14);
