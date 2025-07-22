@@ -426,7 +426,7 @@ serve(async (req: Request) => {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
-        doc.text('Relatório gerado automaticamente pelo Sistema de Faturamento © 2025 - Todos os direitos reservados', 148, 200, { align: 'center' });
+        doc.text('Relatório gerado automaticamente pelo sistema visus.a.i. © 2025 - Todos os direitos reservados', 148, 200, { align: 'center' });
         doc.text(`Página ${i} de ${pageCount}`, 270, 200, { align: 'right' });
       }
       
