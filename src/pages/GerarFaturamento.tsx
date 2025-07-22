@@ -1123,9 +1123,18 @@ export default function GerarFaturamento() {
                   <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
                   <div className="text-sm text-blue-700">Clientes Ativos</div>
                 </div>
-                <div className="text-center p-3 bg-green-50 border border-green-200 rounded">
-                  <div className="text-2xl font-bold text-green-900">{relatoriosGerados}</div>
-                  <div className="text-sm text-green-700">Relatórios Gerados</div>
+                <div className="relative text-center p-3 bg-green-50 border border-green-200 rounded overflow-hidden">
+                  {/* Efeito de preenchimento lateral */}
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-r from-green-200 to-transparent transition-all duration-1000 ease-out"
+                    style={{ 
+                      width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%' 
+                    }}
+                  />
+                  <div className="relative z-10">
+                    <div className="text-2xl font-bold text-green-900">{relatoriosGerados}</div>
+                    <div className="text-sm text-green-700">Relatórios Gerados</div>
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded">
                   <div className="text-2xl font-bold text-orange-900">{emailsEnviados}</div>
