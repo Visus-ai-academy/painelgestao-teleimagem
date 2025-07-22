@@ -169,38 +169,45 @@ serve(async (req: Request) => {
 </body>
 </html>`;
 
-    // Converter HTML para PDF usando API externa confiável
-    const pdfResponse = await fetch('https://api.html-pdf-api.com/v1/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        html: htmlContent,
-        format: 'A4',
-        printBackground: true,
-        margin: {
-          top: '10mm',
-          bottom: '10mm',
-          left: '10mm',
-          right: '10mm'
-        }
-      })
-    });
-
+    // Gerar PDF usando API confiável
     let pdfBytes;
-    if (pdfResponse.ok) {
-      const pdfBuffer = await pdfResponse.arrayBuffer();
-      pdfBytes = new Uint8Array(pdfBuffer);
-    } else {
-      // Fallback: usar outra API ou salvar como HTML
-      console.log('PDF API falhou, salvando como HTML');
+    let isPdf = false;
+    
+    try {
+      // Usando uma API gratuita e confiável para PDF
+      const pdfResponse = await fetch('https://htmlpdfapi.com/api/v1/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: htmlContent,
+          options: {
+            format: 'A4',
+            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+            printBackground: true
+          }
+        })
+      });
+
+      if (pdfResponse.ok) {
+        const pdfBuffer = await pdfResponse.arrayBuffer();
+        pdfBytes = new Uint8Array(pdfBuffer);
+        isPdf = true;
+        console.log('PDF gerado com sucesso');
+      } else {
+        throw new Error(`PDF API error: ${pdfResponse.status}`);
+      }
+    } catch (pdfError) {
+      console.log('Erro na geração de PDF, usando HTML como fallback:', pdfError);
+      // Fallback para HTML se PDF falhar
       pdfBytes = new TextEncoder().encode(htmlContent);
+      isPdf = false;
     }
 
     // Salvar arquivo
-    const extensao = pdfResponse.ok ? 'pdf' : 'html';
-    const contentType = pdfResponse.ok ? 'application/pdf' : 'text/html';
+    const extensao = isPdf ? 'pdf' : 'html';
+    const contentType = isPdf ? 'application/pdf' : 'text/html';
     const nomeArquivo = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}_${Date.now()}.${extensao}`;
     
     const { error: uploadError } = await supabase.storage
