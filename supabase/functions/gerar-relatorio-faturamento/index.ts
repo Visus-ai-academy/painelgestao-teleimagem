@@ -77,9 +77,9 @@ serve(async (req: Request) => {
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
     console.log(`Buscando no campo 'paciente' por: ${cliente.nome}`);
 
-    // Buscar dados de faturamento com múltiplas estratégias
+    // Buscar dados de faturamento - AKCPALMAS deve estar no campo 'paciente'
     const queries = [
-      // 1. Por cliente_id
+      // 1. Por cliente_id (relacionamento direto)
       supabase
         .from('faturamento')
         .select('*')
@@ -87,21 +87,16 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por código da clínica no campo cliente
+      // 2. Por código da clínica no campo 'paciente' (correto)
       supabase
         .from('faturamento')
         .select('*')
-        .eq('cliente', cliente.nome)
+        .eq('paciente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Por código da clínica no campo cliente_nome
-      supabase
-        .from('faturamento')
-        .select('*')
-        .eq('cliente_nome', cliente.nome)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim)
+      // 3. Query vazia para manter compatibilidade
+      Promise.resolve({ data: [], error: null })
     ];
 
     const results = await Promise.all(queries);
@@ -206,7 +201,7 @@ serve(async (req: Request) => {
           }
           
           doc.text((item.data_exame || item.data_emissao || '-').substring(0, 10), 25, yPosition);
-          doc.text((item.paciente || '-').substring(0, 20), 50, yPosition); // Nome do paciente
+          doc.text((item.cliente || item.cliente_nome || '-').substring(0, 20), 50, yPosition); // Nome do paciente
           doc.text((item.medico || '-').substring(0, 15), 90, yPosition);
           doc.text((item.modalidade || '-').substring(0, 15), 120, yPosition);
           doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 160, yPosition);
