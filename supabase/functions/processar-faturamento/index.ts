@@ -163,44 +163,71 @@ serve(async (req) => {
       throw new Error('Nenhum dado válido encontrado no arquivo')
     }
 
-    // Inserir dados no banco em lotes para evitar timeout
-    console.log('10. Inserindo dados no banco...')
+    // Iniciar processamento em background e retornar resposta imediata
+    console.log('10. Iniciando processamento em background...')
     
-    const batchSize = 1000; // Processar em lotes de 1000 registros
-    let totalInseridos = 0;
-    
-    for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
-      const lote = dadosFaturamento.slice(i, i + batchSize);
-      console.log(`Inserindo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(dadosFaturamento.length/batchSize)}: ${lote.length} registros`);
-      
-      const { data: insertData, error: insertError } = await supabase
-        .from('faturamento')
-        .insert(lote)
-        .select()
+    // Função de processamento em background
+    const processarDados = async () => {
+      try {
+        const batchSize = 1000;
+        let totalInseridos = 0;
+        
+        for (let i = 0; i < dadosFaturamento.length; i += batchSize) {
+          const lote = dadosFaturamento.slice(i, i + batchSize);
+          console.log(`Inserindo lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(dadosFaturamento.length/batchSize)}: ${lote.length} registros`);
+          
+          const { data: insertData, error: insertError } = await supabase
+            .from('faturamento')
+            .insert(lote)
+            .select()
 
-      if (insertError) {
-        console.error('Erro ao inserir lote de faturamento:', insertError)
-        throw new Error('Erro ao inserir faturamento (lote): ' + insertError.message)
+          if (insertError) {
+            console.error('Erro ao inserir lote de faturamento:', insertError)
+            // Atualizar log com erro
+            await supabase
+              .from('upload_logs')
+              .update({
+                status: 'error',
+                error_message: insertError.message,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', logData.id)
+            return;
+          }
+
+          totalInseridos += insertData?.length || 0;
+          console.log(`Lote inserido: ${insertData?.length || 0} registros`);
+        }
+
+        console.log('11. Total de dados inseridos:', totalInseridos, 'registros')
+        
+        // Atualizar log de sucesso
+        await supabase
+          .from('upload_logs')
+          .update({
+            status: 'completed',
+            records_processed: totalInseridos,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', logData.id)
+        
+      } catch (error) {
+        console.error('Erro no processamento em background:', error)
+        await supabase
+          .from('upload_logs')
+          .update({
+            status: 'error',
+            error_message: error.message,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', logData.id)
       }
-
-      totalInseridos += insertData?.length || 0;
-      console.log(`Lote inserido: ${insertData?.length || 0} registros`);
     }
 
-    console.log('11. Total de dados inseridos:', totalInseridos, 'registros')
+    // Iniciar task em background
+    EdgeRuntime.waitUntil(processarDados())
 
-    // Atualizar log de sucesso
-    if (logData?.id) {
-      await supabase
-        .from('upload_logs')
-        .update({
-          status: 'completed',
-          records_processed: dadosFaturamento.length
-        })
-        .eq('id', logData.id)
-    }
-
-    console.log('12. Processamento concluído com sucesso')
+    console.log('12. Processamento iniciado em background, retornando resposta imediata')
 
     return new Response(JSON.stringify({
       success: true,
