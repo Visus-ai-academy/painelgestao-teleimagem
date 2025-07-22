@@ -611,6 +611,8 @@ export default function GerarFaturamento() {
           }
 
           console.log(`✅ Relatório gerado para ${cliente.nome}:`, responseRelatorio.data);
+          console.log('🔍 Verificando estrutura de arquivos:', responseRelatorio.data?.arquivos);
+          console.log('🔍 URL do primeiro arquivo:', responseRelatorio.data?.arquivos?.[0]?.url);
 
           // Marcar relatório como gerado com novos dados
           const linkRelatorio = responseRelatorio.data?.arquivos?.[0]?.url || `#relatorio-${cliente.id}-${PERIODO_ATUAL}`;
