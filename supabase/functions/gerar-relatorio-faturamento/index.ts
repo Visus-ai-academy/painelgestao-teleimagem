@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -38,13 +39,28 @@ serve(async (req: Request) => {
     const dataInicio = `${ano}-${mes}-01`;
     const dataFim = `${ano}-${mes}-${ultimoDia}`;
 
-    // Buscar faturamento
-    const { data: dados } = await supabase
+    console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
+
+    // Buscar faturamento - usar cliente_id se possível, senão filtrar por nome
+    let { data: dados } = await supabase
       .from('faturamento')
-      .select('data_emissao, cliente, nome_exame, medico, modalidade, especialidade, quantidade, valor_bruto, paciente')
-      .eq('cliente', cliente.nome)
+      .select('*')
+      .eq('cliente_id', cliente_id)
       .gte('data_emissao', dataInicio)
       .lte('data_emissao', dataFim);
+
+    // Se não encontrou por cliente_id, tentar por nome
+    if (!dados || dados.length === 0) {
+      const result = await supabase
+        .from('faturamento')
+        .select('*')
+        .eq('cliente', cliente.nome)
+        .gte('data_emissao', dataInicio)
+        .lte('data_emissao', dataFim);
+      dados = result.data;
+    }
+
+    console.log(`Dados encontrados: ${dados?.length || 0} registros`);
 
     if (!dados || dados.length === 0) {
       return new Response(JSON.stringify({ 
@@ -55,16 +71,16 @@ serve(async (req: Request) => {
       });
     }
 
-    // Agrupar registros únicos
-    const unicos = new Map();
+    // QUADRO 1: Agrupar para resumo financeiro
+    const agrupados = new Map();
     dados.forEach(item => {
-      const chave = `${item.data_emissao}_${item.cliente}_${item.nome_exame}_${item.medico}`;
-      if (unicos.has(chave)) {
-        const existente = unicos.get(chave);
+      const chave = `${item.data_emissao}_${item.nome_exame}_${item.medico}_${item.modalidade}_${item.especialidade}_${item.prioridade}`;
+      if (agrupados.has(chave)) {
+        const existente = agrupados.get(chave);
         existente.quantidade += Number(item.quantidade) || 1;
         existente.valor_bruto += Number(item.valor_bruto) || 0;
       } else {
-        unicos.set(chave, {
+        agrupados.set(chave, {
           ...item,
           quantidade: Number(item.quantidade) || 1,
           valor_bruto: Number(item.valor_bruto) || 0
@@ -72,10 +88,19 @@ serve(async (req: Request) => {
       }
     });
 
-    const registros = Array.from(unicos.values());
-    const totalRegistros = registros.length;
-    const totalLaudos = registros.reduce((sum, r) => sum + r.quantidade, 0);
-    const valorBruto = registros.reduce((sum, r) => sum + r.valor_bruto, 0);
+    const registrosAgrupados = Array.from(agrupados.values());
+    
+    // Cálculos do resumo baseados nos dados agrupados
+    const totalRegistrosUnicos = registrosAgrupados.length;
+    const totalLaudos = registrosAgrupados.reduce((sum, r) => sum + r.quantidade, 0);
+    const valorBruto = registrosAgrupados.reduce((sum, r) => sum + r.valor_bruto, 0);
+
+    // QUADRO 2: Todos os registros individuais (sem agrupamento)
+    const todosRegistros = dados.map(item => ({
+      ...item,
+      quantidade: Number(item.quantidade) || 1,
+      valor_bruto: Number(item.valor_bruto) || 0
+    }));
 
     // Impostos
     const irrf = valorBruto * 0.015;
@@ -84,6 +109,9 @@ serve(async (req: Request) => {
     const cofins = valorBruto * 0.03;
     const impostos = irrf + csll + pis + cofins;
     const valorLiquido = valorBruto - impostos;
+
+    console.log(`Resumo: ${totalRegistrosUnicos} únicos, ${totalLaudos} laudos, R$ ${valorBruto.toFixed(2)}`);
+    console.log(`Detalhamento: ${todosRegistros.length} registros individuais`);
 
     // Gerar HTML para PDF
     const nomesMeses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
@@ -96,20 +124,21 @@ serve(async (req: Request) => {
 <head>
     <meta charset="UTF-8">
     <style>
-        body { font-family: Arial, sans-serif; margin: 15px; font-size: 11px; }
+        body { font-family: Arial, sans-serif; margin: 15px; font-size: 10px; }
         .header { text-align: center; margin-bottom: 20px; }
         .title { font-size: 16px; font-weight: bold; color: #0066cc; margin-bottom: 5px; }
         .subtitle { font-size: 12px; color: #666; }
-        .info { margin: 15px 0; }
+        .info { margin: 15px 0; font-size: 11px; }
         .resumo { background: #f8f9fa; padding: 12px; margin: 15px 0; border: 1px solid #ddd; }
-        .resumo h3 { margin: 0 0 10px 0; font-size: 13px; }
+        .resumo h3 { margin: 0 0 10px 0; font-size: 13px; color: #0066cc; }
         .valor-destaque { font-weight: bold; color: #0066cc; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 9px; }
-        th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
-        th { background-color: #0066cc; color: white; font-weight: bold; font-size: 9px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 8px; }
+        th, td { border: 1px solid #ccc; padding: 3px; text-align: left; }
+        th { background-color: #0066cc; color: white; font-weight: bold; font-size: 8px; }
         tr:nth-child(even) { background-color: #f8f9fa; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
+        .section-title { font-size: 12px; font-weight: bold; color: #0066cc; margin: 20px 0 10px 0; }
     </style>
 </head>
 <body>
@@ -125,8 +154,8 @@ serve(async (req: Request) => {
     </div>
 
     <div class="resumo">
-        <h3>RESUMO FINANCEIRO</h3>
-        <p><strong>Total de registros únicos:</strong> ${totalRegistros}</p>
+        <h3>QUADRO 1 - RESUMO FINANCEIRO</h3>
+        <p><strong>Total de registros únicos:</strong> ${totalRegistrosUnicos}</p>
         <p><strong>Total de laudos:</strong> ${totalLaudos}</p>
         <p><strong>Valor bruto:</strong> R$ ${valorBruto.toFixed(2)}</p>
         <p><strong>IRRF (1,5%):</strong> R$ ${irrf.toFixed(2)}</p>
@@ -137,34 +166,46 @@ serve(async (req: Request) => {
         <p class="valor-destaque"><strong>Valor líquido a pagar: R$ ${valorLiquido.toFixed(2)}</strong></p>
     </div>
 
-    <h3>DETALHAMENTO DOS EXAMES (${totalRegistros} registros únicos)</h3>
+    <div class="section-title">QUADRO 2 - DETALHAMENTO COMPLETO (${todosRegistros.length} registros)</div>
     <table>
         <thead>
             <tr>
-                <th style="width: 12%">Data</th>
-                <th style="width: 20%">Paciente</th>
-                <th style="width: 18%">Exame</th>
-                <th style="width: 18%">Médico</th>
-                <th style="width: 12%">Modalidade</th>
-                <th style="width: 12%">Especialidade</th>
-                <th style="width: 6%">Qtd</th>
-                <th style="width: 10%">Valor</th>
+                <th style="width: 8%">Data</th>
+                <th style="width: 15%">Paciente</th>
+                <th style="width: 15%">Exame</th>
+                <th style="width: 15%">Médico</th>
+                <th style="width: 8%">Modal.</th>
+                <th style="width: 8%">Espec.</th>
+                <th style="width: 8%">Prior.</th>
+                <th style="width: 5%">Qtd</th>
+                <th style="width: 8%">Valor Unit.</th>
+                <th style="width: 10%">Valor Total</th>
             </tr>
         </thead>
         <tbody>
-            ${registros.map(item => `
+            ${todosRegistros.map(item => `
                 <tr>
                     <td>${new Date(item.data_emissao).toLocaleDateString('pt-BR')}</td>
-                    <td>${(item.cliente || 'N/A').substring(0, 25)}</td>
+                    <td>${(item.paciente || item.cliente || 'N/A').substring(0, 20)}</td>
                     <td>${(item.nome_exame || 'N/A').substring(0, 20)}</td>
                     <td>${(item.medico || 'N/A').substring(0, 20)}</td>
-                    <td>${(item.modalidade || 'N/A').substring(0, 12)}</td>
-                    <td>${(item.especialidade || 'N/A').substring(0, 12)}</td>
+                    <td>${(item.modalidade || 'N/A').substring(0, 8)}</td>
+                    <td>${(item.especialidade || 'N/A').substring(0, 8)}</td>
+                    <td>${(item.prioridade || 'N/A').substring(0, 8)}</td>
                     <td class="text-center">${item.quantidade}</td>
+                    <td class="text-right">R$ ${(item.valor_bruto / item.quantidade).toFixed(2)}</td>
                     <td class="text-right">R$ ${item.valor_bruto.toFixed(2)}</td>
                 </tr>
             `).join('')}
         </tbody>
+        <tfoot>
+            <tr style="background-color: #e9ecef; font-weight: bold;">
+                <td colspan="7" class="text-right"><strong>TOTAIS:</strong></td>
+                <td class="text-center"><strong>${todosRegistros.reduce((sum, r) => sum + r.quantidade, 0)}</strong></td>
+                <td></td>
+                <td class="text-right"><strong>R$ ${todosRegistros.reduce((sum, r) => sum + r.valor_bruto, 0).toFixed(2)}</strong></td>
+            </tr>
+        </tfoot>
     </table>
 </body>
 </html>`;
@@ -185,7 +226,7 @@ serve(async (req: Request) => {
           source: htmlContent,
           landscape: false,
           format: 'A4',
-          margin: '15mm',
+          margin: '10mm',
           print_background: true,
           prefer_css_page_size: false
         })
@@ -231,7 +272,8 @@ serve(async (req: Request) => {
       success: true,
       cliente: cliente.nome,
       periodo,
-      total_registros: totalRegistros,
+      total_registros_unicos: totalRegistrosUnicos,
+      total_registros_detalhados: todosRegistros.length,
       total_laudos: totalLaudos,
       valor_bruto: valorBruto.toFixed(2),
       valor_liquido: valorLiquido.toFixed(2),
@@ -240,7 +282,7 @@ serve(async (req: Request) => {
         url: publicUrl,
         nome: nomeArquivo
       }],
-      message: `Relatório gerado: ${totalRegistros} registros, ${totalLaudos} laudos, R$ ${valorBruto.toFixed(2)}`
+      message: `Relatório gerado: Resumo com ${totalRegistrosUnicos} registros únicos (${totalLaudos} laudos), Detalhamento com ${todosRegistros.length} registros individuais, R$ ${valorBruto.toFixed(2)}`
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
