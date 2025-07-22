@@ -109,64 +109,33 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento - corrigindo o mapeamento
-    // O nome da clínica está na coluna 'paciente', não 'cliente'
-    const queries = [
-      // 1. Por cliente_id (relacionamento direto)
-      supabase
-        .from('faturamento')
-        .select('*')
-        .eq('cliente_id', cliente_id)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim),
-      
-      // 2. Por nome completo do cliente na coluna 'paciente' (mapeamento correto)
-      supabase
-        .from('faturamento')
-        .select('*')
-        .eq('paciente', cliente.nome)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim),
-      
-      // 3. Por busca parcial no nome do cliente na coluna 'paciente'
-      supabase
-        .from('faturamento')
-        .select('*')
-        .ilike('paciente', `%${cliente.nome}%`)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim)
-    ];
-
-    const results = await Promise.all(queries);
+    // Buscar dados de faturamento usando uma única consulta otimizada
+    console.log('Executando consulta única otimizada para faturamento...');
     
-    console.log('Resultados das consultas:');
-    results.forEach((result, index) => {
-      console.log(`Query ${index + 1}:`, result.data?.length || 0, 'registros, erro:', result.error?.message || 'nenhum');
-      if (result.data && result.data.length > 0) {
-        console.log(`Primeiros dados da Query ${index + 1}:`, JSON.stringify(result.data.slice(0, 2)));
-      }
-    });
+    const { data: allData, error: faturamentoError } = await supabase
+      .from('faturamento')
+      .select('*')
+      .or(`cliente_id.eq.${cliente_id},paciente.eq.${cliente.nome}`)
+      .gte('data_emissao', dataInicio)
+      .lt('data_emissao', dataFim);
 
-    // Combinar todos os resultados únicos
-    const allData = [];
-    const seenIds = new Set();
-
-    for (const result of results) {
-      if (result.data) {
-        for (const item of result.data) {
-          if (!seenIds.has(item.id)) {
-            seenIds.add(item.id);
-            allData.push(item);
-          }
-        }
+    if (faturamentoError) {
+      console.error('Erro ao buscar dados de faturamento:', faturamentoError);
+    } else {
+      console.log('Dados de faturamento encontrados:', allData?.length || 0);
+      if (allData && allData.length > 0) {
+        console.log('Primeiros dados encontrados:', JSON.stringify(allData.slice(0, 2)));
       }
     }
 
-    console.log('Total de dados únicos encontrados:', allData.length);
+    // Garantir que finalData é um array
+    const finalData = allData || [];
+
+    console.log('Total de dados únicos encontrados:', finalData.length);
 
     // Calcular resumo usando valor_bruto e quantidade
-    const valorBrutoTotal = allData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
-    const totalLaudos = allData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+    const valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
+    const totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
     
     // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
     const franquia = 0;
@@ -341,7 +310,7 @@ serve(async (req: Request) => {
       
       yPosition += 10;
       
-      if (allData.length > 0) {
+      if (finalData.length > 0) {
         // Cabeçalho da tabela detalhada (mais larga para paisagem)
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
@@ -363,8 +332,8 @@ serve(async (req: Request) => {
         doc.setTextColor(0, 0, 0);
         
         // Dados da tabela detalhada
-        for (let i = 0; i < allData.length; i++) {
-          const item = allData[i];
+        for (let i = 0; i < finalData.length; i++) {
+          const item = finalData[i];
           
           if (yPosition > 190) { // Nova página se necessário (formato paisagem tem menos altura)
             doc.addPage('landscape');
@@ -463,9 +432,9 @@ serve(async (req: Request) => {
       message: "Relatório gerado com sucesso",
       cliente: cliente.nome,
       periodo: periodo,
-      totalRegistros: allData.length,
-      dadosEncontrados: allData.length > 0,
-      dados: allData,
+      totalRegistros: finalData.length,
+      dadosEncontrados: finalData.length > 0,
+      dados: finalData,
       arquivos: pdfUrl ? [{ tipo: 'pdf', url: pdfUrl, nome: `relatorio_${cliente.nome}_${periodo}.pdf` }] : [],
       resumo: {
         total_laudos: totalLaudos,
