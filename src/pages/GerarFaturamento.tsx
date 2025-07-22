@@ -453,9 +453,21 @@ export default function GerarFaturamento() {
             valor_total: 0
           };
         }
-        acc[item.cliente_nome].exames.push(item);
+        
+        // Mapear item para a estrutura esperada pelo PDF
+        const exameFormatado = {
+          paciente: item.paciente || 'Nome não informado',
+          data_exame: item.data_exame,
+          modalidade: item.modalidade || 'Não informado',
+          especialidade: item.especialidade || 'Não informado',
+          nome_exame: item.nome_exame || 'Exame não informado',
+          quantidade: item.quantidade || 1,
+          valor_bruto: item.valor_bruto || 0
+        };
+        
+        acc[item.cliente_nome].exames.push(exameFormatado);
         acc[item.cliente_nome].total_exames++;
-        acc[item.cliente_nome].valor_total += item.valor_bruto;
+        acc[item.cliente_nome].valor_total += item.valor_bruto || 0;
         return acc;
       }, {});
 
