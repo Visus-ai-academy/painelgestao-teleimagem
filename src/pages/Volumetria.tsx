@@ -148,6 +148,10 @@ export default function Volumetria() {
       const { data: volumetriaData, error } = await query;
       if (error) throw error;
 
+      console.log('Dados carregados da query:', volumetriaData?.length);
+      console.log('Período aplicado:', periodo);
+      console.log('Cliente aplicado:', cliente);
+      
       setData(volumetriaData || []);
       
       // Processar dados
