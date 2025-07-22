@@ -13,7 +13,20 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { cliente_id, periodo } = await req.json();
+    const body = await req.json();
+    console.log('Request body:', body);
+    
+    const { cliente_id, periodo } = body;
+    
+    if (!cliente_id || !periodo) {
+      console.log('Missing parameters - cliente_id:', cliente_id, 'periodo:', periodo);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Parâmetros cliente_id e periodo são obrigatórios' 
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -21,11 +34,13 @@ serve(async (req: Request) => {
     );
 
     // Buscar cliente
-    const { data: cliente } = await supabase
+    const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
       .select('nome')
       .eq('id', cliente_id)
       .single();
+
+    console.log('Cliente encontrado:', cliente, 'Erro:', clienteError);
 
     if (!cliente) {
       return new Response(JSON.stringify({ success: false, error: 'Cliente não encontrado' }), {
