@@ -93,9 +93,10 @@ serve(async (req: Request) => {
     console.log('DEBUG: Amostra de dados na tabela:', JSON.stringify(sampleData));
     if (sampleError) console.log('DEBUG: Erro ao buscar amostra:', sampleError);
     
-    console.log(`Buscando no campo 'cliente' por: ${cliente.nome}`);
-
-    // Buscar dados de faturamento - múltiplas estratégias
+    console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
+    
+    // Buscar dados de faturamento - corrigindo o mapeamento
+    // O nome da clínica está na coluna 'paciente', não 'cliente'
     const queries = [
       // 1. Por cliente_id (relacionamento direto)
       supabase
@@ -105,19 +106,19 @@ serve(async (req: Request) => {
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 2. Por nome completo do cliente na coluna 'cliente'
+      // 2. Por nome completo do cliente na coluna 'paciente' (mapeamento correto)
       supabase
         .from('faturamento')
         .select('*')
-        .eq('cliente', cliente.nome)
+        .eq('paciente', cliente.nome)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim),
       
-      // 3. Por busca parcial no nome do cliente (case-insensitive)
+      // 3. Por busca parcial no nome do cliente na coluna 'paciente'
       supabase
         .from('faturamento')
         .select('*')
-        .ilike('cliente', `%${cliente.nome}%`)
+        .ilike('paciente', `%${cliente.nome}%`)
         .gte('data_emissao', dataInicio)
         .lt('data_emissao', dataFim)
     ];
@@ -308,7 +309,7 @@ serve(async (req: Request) => {
           
           doc.setFontSize(7);
           doc.text((item.data_exame || item.data_emissao || '-').substring(0, 8), 22, yPosition + 2);
-          doc.text((item.paciente || '-').substring(0, 12), 35, yPosition + 2);
+          doc.text((item.cliente || '-').substring(0, 12), 35, yPosition + 2); // Nome do paciente na coluna cliente
           doc.text((item.medico || '-').substring(0, 12), 55, yPosition + 2);
           doc.text((item.nome_exame || '-').substring(0, 15), 72, yPosition + 2);
           doc.text((item.modalidade || '-').substring(0, 8), 95, yPosition + 2);
