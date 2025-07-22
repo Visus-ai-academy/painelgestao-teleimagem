@@ -127,9 +127,13 @@ export default function Volumetria() {
   };
 
   const loadData = async () => {
+    console.log('=== INÍCIO LOAD DATA ===');
+    console.log('Período selecionado:', periodo);
+    console.log('Cliente selecionado:', cliente);
     try {
       setLoading(true);
       const dateFilter = getDateFilter();
+      console.log('Date filter resultado:', dateFilter);
 
       let query = supabase
         .from('volumetria_mobilemed')
@@ -148,6 +152,9 @@ export default function Volumetria() {
 
       const { data: volumetriaData, error } = await query;
       if (error) throw error;
+      
+      console.log('Total de registros carregados:', volumetriaData?.length);
+      console.log('Primeiros 3 registros:', volumetriaData?.slice(0, 3));
 
       setData(volumetriaData || []);
       
@@ -162,6 +169,8 @@ export default function Volumetria() {
   };
 
   const processarDados = async (rawData: VolumetriaData[]) => {
+    console.log('=== PROCESSANDO DADOS ===');
+    console.log('Total de dados recebidos:', rawData.length);
     // Totais gerais
     const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
     const totalRegistros = rawData.length;
@@ -220,6 +229,10 @@ export default function Volumetria() {
       percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
       percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
     })).sort((a, b) => b.total_exames - a.total_exames);
+    
+    console.log('Empresas únicas encontradas:', Object.keys(porEmpresa).length);
+    console.log('Total de empresas no array final:', empresaArray.length);
+    console.log('Primeiras 10 empresas:', empresaArray.slice(0, 10).map(e => ({ nome: e.nome, exames: e.total_exames })));
     
     setEmpresaData(empresaArray);
 
