@@ -628,7 +628,7 @@ export default function GerarFaturamento() {
                   arquivos: responseRelatorio.data?.arquivos || [],
                   detalhesRelatorio: {
                     total_laudos: responseRelatorio.data?.resumo?.total_laudos || 0,
-                    valor_total: responseRelatorio.data?.resumo?.valor_bruto_total || 0,
+                    valor_total: responseRelatorio.data?.resumo?.valor_bruto_total || responseRelatorio.data?.resumo?.valor_total || 0,
                     fonte_dados: responseRelatorio.data?.fonte_dados || 'desconhecida',
                     total_exames: responseRelatorio.data?.total_exames || 0
                   },
