@@ -26,55 +26,43 @@ export function useUploadStatus(fileType: string = 'faturamento') {
 
   const fetchStatus = async () => {
     try {
-      // Buscar apenas uploads recentes (últimos 10 minutos) e não cancelados
-      const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 minutos atrás
+      // Buscar apenas uploads em processamento ativo (últimos 2 minutos)
+      const cutoffTime = new Date(Date.now() - 2 * 60 * 1000).toISOString(); // 2 minutos atrás
       
       const { data: uploads, error } = await supabase
         .from('upload_logs')
         .select('status, records_processed, updated_at, created_at')
         .eq('file_type', fileType)
-        .neq('status', 'cancelled') // Excluir uploads cancelados
-        .gte('created_at', cutoffTime); // Apenas uploads dos últimos 10 minutos
+        .in('status', ['processing']) // Apenas uploads em processamento
+        .gte('updated_at', cutoffTime); // Apenas uploads atualizados nos últimos 2 minutos
 
       if (error) {
         console.error('Erro ao buscar status dos uploads:', error);
         return;
       }
 
-      // Filtrar uploads órfãos: se está "processing" há mais de 5 minutos, ignorar
-      const recentTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const activeUploads = uploads?.filter(u => {
-        if (u.status === 'processing') {
-          return new Date(u.updated_at).toISOString() >= recentTime;
-        }
-        return true; // Manter outros status
-      }) || [];
-
+      const activeUploads = uploads || [];
       const totalUploads = activeUploads.length;
-      const completedUploads = activeUploads.filter(u => u.status === 'completed').length;
+      const completedUploads = 0; // Não há uploads completos aqui
       const processingUploads = activeUploads.filter(u => u.status === 'processing').length;
-      const errorUploads = activeUploads.filter(u => u.status === 'error').length;
+      const errorUploads = 0; // Não há uploads com erro aqui
       const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.records_processed || 0), 0);
       
       const isProcessing = processingUploads > 0;
       
-      // Melhor cálculo de progresso
+      // Cálculo de progresso apenas para uploads ativos
       let progressPercentage = 0;
-      if (totalUploads === 0) {
-        progressPercentage = 0; // Nenhum upload ativo
-      } else if (processingUploads > 0) {
-        // Se há processamento ativo, mostrar progresso baseado nos dados processados
+      if (processingUploads > 0) {
         const uploadAtual = activeUploads.find(u => u.status === 'processing');
         if (uploadAtual && uploadAtual.records_processed > 0) {
-          // Estimar progresso baseado em registros processados (assumindo ~1000 total para teste)
-          const estimatedTotal = 1000;
+          // Estimar progresso baseado em registros processados
+          const estimatedTotal = 2000; // Assumir 2000 registros como padrão
           progressPercentage = Math.min(Math.round((uploadAtual.records_processed / estimatedTotal) * 100), 99);
         } else {
           progressPercentage = 5; // Iniciando processamento
         }
       } else {
-        // Nenhum processamento ativo, mostrar baseado em uploads completos
-        progressPercentage = totalUploads > 0 ? Math.round((completedUploads / totalUploads) * 100) : 0;
+        progressPercentage = 0; // Nenhum processamento ativo = 0%
       }
       
       const lastUpdate = activeUploads.length > 0 
@@ -84,9 +72,9 @@ export function useUploadStatus(fileType: string = 'faturamento') {
       console.log('Upload Status Debug:', {
         totalUploads,
         processingUploads,
-        completedUploads,
         progressPercentage,
-        isProcessing
+        isProcessing,
+        activeUploads: activeUploads.length
       });
 
       setStatus({
