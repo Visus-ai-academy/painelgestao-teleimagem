@@ -75,6 +75,24 @@ serve(async (req: Request) => {
     const dataFim = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-01`;
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
+    
+    // DEBUG: Verificar se há dados na tabela
+    const { data: totalCount, error: countError } = await supabase
+      .from('faturamento')
+      .select('*', { count: 'exact', head: true });
+    
+    console.log(`DEBUG: Total de registros na tabela faturamento: ${totalCount?.length || 'N/A'}`);
+    if (countError) console.log('DEBUG: Erro ao contar registros:', countError);
+    
+    // DEBUG: Buscar alguns registros para ver estrutura
+    const { data: sampleData, error: sampleError } = await supabase
+      .from('faturamento')
+      .select('cliente, cliente_nome, data_emissao')
+      .limit(5);
+    
+    console.log('DEBUG: Amostra de dados na tabela:', JSON.stringify(sampleData));
+    if (sampleError) console.log('DEBUG: Erro ao buscar amostra:', sampleError);
+    
     console.log(`Buscando no campo 'cliente' por: ${cliente.nome}`);
 
     // Buscar dados de faturamento - múltiplas estratégias
