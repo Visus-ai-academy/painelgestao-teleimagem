@@ -316,6 +316,86 @@ export type Database = {
           },
         ]
       }
+      custom_metric_values: {
+        Row: {
+          dimensions: Json | null
+          id: string
+          metadata: Json | null
+          metric_id: string | null
+          timestamp: string | null
+          value: number
+        }
+        Insert: {
+          dimensions?: Json | null
+          id?: string
+          metadata?: Json | null
+          metric_id?: string | null
+          timestamp?: string | null
+          value: number
+        }
+        Update: {
+          dimensions?: Json | null
+          id?: string
+          metadata?: Json | null
+          metric_id?: string | null
+          timestamp?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_metric_values_metric_id_fkey"
+            columns: ["metric_id"]
+            isOneToOne: false
+            referencedRelation: "custom_metrics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_metrics: {
+        Row: {
+          alert_thresholds: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          enabled: boolean | null
+          id: string
+          metric_type: string
+          name: string
+          parameters: Json | null
+          query_template: string
+          update_frequency_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          alert_thresholds?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          metric_type: string
+          name: string
+          parameters?: Json | null
+          query_template: string
+          update_frequency_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          alert_thresholds?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          metric_type?: string
+          name?: string
+          parameters?: Json | null
+          query_template?: string
+          update_frequency_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       data_access_logs: {
         Row: {
           action: string
@@ -1187,6 +1267,42 @@ export type Database = {
           },
         ]
       }
+      partition_analysis: {
+        Row: {
+          analysis_timestamp: string | null
+          expected_performance_gain: string | null
+          id: string
+          metadata: Json | null
+          partition_strategy: string | null
+          recommendation: string | null
+          record_count: number | null
+          size_mb: number | null
+          table_name: string
+        }
+        Insert: {
+          analysis_timestamp?: string | null
+          expected_performance_gain?: string | null
+          id?: string
+          metadata?: Json | null
+          partition_strategy?: string | null
+          recommendation?: string | null
+          record_count?: number | null
+          size_mb?: number | null
+          table_name: string
+        }
+        Update: {
+          analysis_timestamp?: string | null
+          expected_performance_gain?: string | null
+          id?: string
+          metadata?: Json | null
+          partition_strategy?: string | null
+          recommendation?: string | null
+          record_count?: number | null
+          size_mb?: number | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       password_policies: {
         Row: {
           created_at: string | null
@@ -1943,9 +2059,17 @@ export type Database = {
       }
     }
     Functions: {
+      analyze_partitioning_need: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       archive_old_volumetria_data: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      calculate_custom_metric: {
+        Args: { metric_name: string }
+        Returns: Json
       }
       can_edit_data: {
         Args: { data_referencia: string }
@@ -2039,6 +2163,10 @@ export type Database = {
         }
         Returns: string
       }
+      prepare_partition_structure: {
+        Args: { table_name: string; partition_date: string }
+        Returns: Json
+      }
       promote_user_to_admin: {
         Args: { user_email: string }
         Returns: boolean
@@ -2046,6 +2174,10 @@ export type Database = {
       refresh_volumetria_dashboard: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      update_custom_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       user_can_access_empresa: {
         Args: { empresa_name: string }
