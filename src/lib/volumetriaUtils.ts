@@ -163,15 +163,18 @@ export function convertValues(valueStr: string | number): number | null {
   }
 }
 
-// Função para verificar se uma data está no período atual de faturamento
-export function isInCurrentBillingPeriod(dataRealizacao: Date): boolean {
-  const hoje = new Date();
-  const ano = hoje.getFullYear();
-  const mes = hoje.getMonth(); // 0-11
+// Função para verificar se uma data está no período de faturamento especificado
+export function isInBillingPeriod(dataRealizacao: Date, periodoFaturamento: { ano: number; mes: number }): boolean {
+  // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
+  const { ano, mes } = periodoFaturamento;
   
-  // Período atual: dia 8 do mês anterior até dia 7 do mês atual
-  const inicioPeriodo = new Date(ano, mes - 1, 8);
-  const fimPeriodo = new Date(ano, mes, 7);
+  // Calcular mês anterior
+  const anoAnterior = mes === 1 ? ano - 1 : ano;
+  const mesAnterior = mes === 1 ? 12 : mes - 1;
+  
+  // Período: dia 8 do mês anterior até dia 7 do mês atual
+  const inicioPeriodo = new Date(anoAnterior, mesAnterior - 1, 8); // mes - 1 porque Date usa 0-11
+  const fimPeriodo = new Date(ano, mes - 1, 7);
   
   return dataRealizacao >= inicioPeriodo && dataRealizacao <= fimPeriodo;
 }
@@ -276,7 +279,8 @@ export function processRow(
 export async function processVolumetriaFile(
   file: File, 
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo',
-  onProgress?: (processed: number, total: number, inserted: number) => void
+  onProgress?: (processed: number, total: number, inserted: number) => void,
+  periodoFaturamento?: { ano: number; mes: number }
 ): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[] }> {
   
   // Importação dinâmica do XLSX
@@ -321,10 +325,10 @@ export async function processVolumetriaFile(
           continue;
         }
 
-        // Filtrar período atual para arquivos retroativos
-        if (config.filterCurrentPeriod && record.DATA_REALIZACAO) {
-          if (isInCurrentBillingPeriod(record.DATA_REALIZACAO)) {
-            console.log(`Linha ${i + j + 2}: Excluída por estar no período atual`);
+        // Filtrar período de faturamento para arquivos retroativos
+        if (config.filterCurrentPeriod && record.DATA_REALIZACAO && periodoFaturamento) {
+          if (isInBillingPeriod(record.DATA_REALIZACAO, periodoFaturamento)) {
+            console.log(`Linha ${i + j + 2}: Excluída por estar no período de faturamento ${periodoFaturamento.mes}/${periodoFaturamento.ano}`);
             continue;
           }
         }

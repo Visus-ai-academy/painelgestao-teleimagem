@@ -3,14 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 interface VolumetriaUploadProps {
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
   onSuccess?: () => void;
+  disabled?: boolean;
+  periodoFaturamento?: { ano: number; mes: number };
 }
 
-export function VolumetriaUpload({ arquivoFonte, onSuccess }: VolumetriaUploadProps) {
+export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, periodoFaturamento }: VolumetriaUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState<{
@@ -45,7 +47,8 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess }: VolumetriaUploadPr
           const progressPercent = Math.round((processed / total) * 100);
           setProgress(progressPercent);
           setStats({ processed, total, inserted });
-        }
+        },
+        periodoFaturamento
       );
 
       if (result.success) {
@@ -78,40 +81,52 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess }: VolumetriaUploadPr
   const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="p-4 bg-muted/50 rounded-lg">
         <h3 className="font-semibold text-sm">{config.label}</h3>
         <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
       </div>
       
       <div className="flex items-center justify-center w-full">
-        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
+        <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg transition-colors cursor-pointer ${
+          disabled ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : 
+          isProcessing ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/50'
+        }`}>
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            {isProcessing ? (
-              <FileText className="w-8 h-8 mb-4 text-primary animate-pulse" />
+            {disabled ? (
+              <>
+                <Lock className="h-8 w-8 text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500">Upload bloqueado</p>
+                <p className="text-xs text-gray-400">Defina o período de faturamento primeiro</p>
+              </>
+            ) : isProcessing ? (
+              <>
+                <FileText className="w-8 h-8 mb-4 text-primary animate-pulse" />
+                <p className="mb-2 text-sm text-muted-foreground">
+                  <span>Processando arquivo...</span>
+                </p>
+              </>
             ) : (
-              <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-            )}
-            <p className="mb-2 text-sm text-muted-foreground">
-              {isProcessing ? (
-                <span>Processando arquivo...</span>
-              ) : (
-                <>
+              <>
+                <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                <p className="mb-2 text-sm text-muted-foreground">
                   <span className="font-semibold">Clique para fazer upload</span> ou arraste o arquivo
-                </>
-              )}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Arquivos Excel (.xlsx, .xls)
-            </p>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Arquivos Excel (.xlsx, .xls)
+                </p>
+              </>
+            )}
           </div>
-          <input
-            type="file"
-            className="hidden"
-            accept=".xlsx,.xls"
-            onChange={handleFileUpload}
-            disabled={isProcessing}
-          />
+          {!disabled && (
+            <input
+              type="file"
+              className="hidden"
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              disabled={isProcessing}
+            />
+          )}
         </label>
       </div>
 

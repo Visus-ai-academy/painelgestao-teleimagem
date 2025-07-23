@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
+import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
 import { Speedometer } from "@/components/Speedometer";
 import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -103,6 +104,9 @@ export default function GerarFaturamento() {
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(false);
+  
+  // Controle de período para volumetria retroativa
+  const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
   
   // Controle de período para upload
   const [periodoSelecionado, setPeriodoSelecionado] = useState(PERIODO_ATUAL);
@@ -922,7 +926,15 @@ export default function GerarFaturamento() {
                   Teste o processamento dos novos arquivos de volumetria com conversões automáticas
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
+                {/* Seletor de Período de Faturamento */}
+                <VolumetriaPeriodoSelector
+                  periodoSelecionado={periodoFaturamentoVolumetria}
+                  onPeriodoSelected={setPeriodoFaturamentoVolumetria}
+                  onClearPeriodo={() => setPeriodoFaturamentoVolumetria(null)}
+                />
+
+                {/* Uploads de Volumetria */}
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
                     <VolumetriaUpload
@@ -951,6 +963,8 @@ export default function GerarFaturamento() {
                   <div>
                     <VolumetriaUpload
                       arquivoFonte="volumetria_padrao_retroativo"
+                      disabled={!periodoFaturamentoVolumetria}
+                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
@@ -963,6 +977,8 @@ export default function GerarFaturamento() {
                   <div>
                     <VolumetriaUpload
                       arquivoFonte="volumetria_fora_padrao_retroativo"
+                      disabled={!periodoFaturamentoVolumetria}
+                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",

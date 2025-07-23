@@ -35,7 +35,10 @@ export default function Volumetria() {
   
   // Forçar refresh após mudanças no código
   useEffect(() => {
-    refreshData();
+    const timer = setTimeout(() => {
+      refreshData();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [refreshData]);
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
