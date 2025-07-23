@@ -205,14 +205,43 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('MEDICO', filters.medico);
       }
 
-      // Carregar dados diretamente sem paginação excessiva
-      const { data: allData, error } = await query
-        .limit(50000) // Limite seguro para evitar timeout
-        .order('data_referencia', { ascending: false });
+      // Carregar todos os dados em batches para evitar limite do Supabase
+      let allData: any[] = [];
+      let offset = 0;
+      const limit = 1000;
+      let hasMoreData = true;
+      
+      console.log('🔄 Carregando todos os dados disponíveis...');
+      
+      while (hasMoreData) {
+        const { data: batchData, error } = await query
+          .range(offset, offset + limit - 1)
+          .order('data_referencia', { ascending: false });
 
-      if (error) {
-        console.error('❌ Erro ao buscar dados:', error);
-        throw error;
+        if (error) {
+          console.error('❌ Erro ao buscar dados:', error);
+          throw error;
+        }
+
+        if (!batchData || batchData.length === 0) {
+          hasMoreData = false;
+          break;
+        }
+
+        allData = [...allData, ...batchData];
+        console.log(`📦 Lote ${Math.floor(offset/limit) + 1}: ${batchData.length} registros (total: ${allData.length})`);
+
+        if (batchData.length < limit) {
+          hasMoreData = false;
+        } else {
+          offset += limit;
+        }
+
+        // Limite de segurança para evitar loop infinito
+        if (allData.length > 100000) {
+          console.log('⚠️ Limite de segurança atingido (100k registros)');
+          hasMoreData = false;
+        }
       }
 
       if (!allData || allData.length === 0) {
