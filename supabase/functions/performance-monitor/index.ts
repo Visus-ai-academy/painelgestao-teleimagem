@@ -35,7 +35,23 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, ...params } = await req.json()
+    // Verificar se há corpo na requisição antes de tentar fazer parse
+    let params: any = {}
+    let action = 'check_system_health' // Ação padrão para requisições GET
+    
+    if (req.method === 'POST') {
+      const body = await req.text()
+      if (body.trim()) {
+        const parsed = JSON.parse(body)
+        action = parsed.action || action
+        params = parsed
+      }
+    } else {
+      // Para requisições GET, usar query parameters
+      const url = new URL(req.url)
+      action = url.searchParams.get('action') || action
+      params = Object.fromEntries(url.searchParams.entries())
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
