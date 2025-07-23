@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Filter, X, Calendar, Building, Stethoscope, Users, Zap, Target } from "lucide-react";
+import { Filter, X, Calendar, Building, Stethoscope, Users, FileText, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -69,42 +69,37 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           .from('volumetria_mobilemed')
           .select('data_referencia')
           .not('data_referencia', 'is', null)
-          .order('data_referencia', { ascending: false }),
+          .limit(10000),
         
         // Clientes únicos
         supabase
           .from('volumetria_mobilemed')
           .select('EMPRESA')
-          .not('EMPRESA', 'is', null)
-          .order('EMPRESA'),
+          .not('EMPRESA', 'is', null),
         
         // Modalidades únicas
         supabase
           .from('volumetria_mobilemed')
           .select('MODALIDADE')
-          .not('MODALIDADE', 'is', null)
-          .order('MODALIDADE'),
+          .not('MODALIDADE', 'is', null),
         
         // Especialidades únicas
         supabase
           .from('volumetria_mobilemed')
           .select('ESPECIALIDADE')
-          .not('ESPECIALIDADE', 'is', null)
-          .order('ESPECIALIDADE'),
+          .not('ESPECIALIDADE', 'is', null),
         
         // Prioridades únicas
         supabase
           .from('volumetria_mobilemed')
           .select('PRIORIDADE')
-          .not('PRIORIDADE', 'is', null)
-          .order('PRIORIDADE'),
+          .not('PRIORIDADE', 'is', null),
         
         // Médicos únicos
         supabase
           .from('volumetria_mobilemed')
           .select('MEDICO')
           .not('MEDICO', 'is', null)
-          .order('MEDICO')
       ]);
 
       // Processar anos únicos
@@ -220,14 +215,14 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             )}
           </div>
 
-          {/* Filtros de Tempo */}
+          {/* PERÍODO */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="h-4 w-4 text-blue-500" />
               <span className="text-sm font-medium">Período</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-              <div className="space-y-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Ano</label>
                 <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -242,7 +237,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
                 <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -258,7 +253,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Mês</label>
                 <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -273,7 +268,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Semana</label>
                 <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -288,8 +283,8 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Dia Específico</label>
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Dia</label>
                 <Select value={filters.dia} onValueChange={(value) => updateFilter('dia', value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
@@ -305,14 +300,14 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </div>
           </div>
 
-          {/* Filtros de Cliente */}
+          {/* CLIENTE */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-2">
               <Building className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">Cliente</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div className="space-y-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Empresa</label>
                 <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -327,32 +322,78 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Região</label>
+                <Select value="todos" onValueChange={() => {}}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as Regiões</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Estado</label>
+                <Select value="todos" onValueChange={() => {}}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Estados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Cidade</label>
+                <Select value="todos" onValueChange={() => {}}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as Cidades</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Classificação</label>
+                <Select value="todos" onValueChange={() => {}}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as Classificações</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Tipo</label>
                 <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todas as Categorias</SelectItem>
-                    <SelectItem value="CO">Cliente CO (Corporativo)</SelectItem>
-                    <SelectItem value="NC">Cliente NC (Nacional)</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="padrao">Padrão</SelectItem>
+                    <SelectItem value="todos">Todos os Tipos</SelectItem>
+                    <SelectItem value="CO">Cliente CO</SelectItem>
+                    <SelectItem value="NO">Cliente NO</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
 
-          {/* Filtros Médicos */}
+          {/* TIPO DE LAUDO */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-2">
-              <Stethoscope className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium">Dados Médicos</span>
+              <FileText className="h-4 w-4 text-purple-500" />
+              <span className="text-sm font-medium">Tipo de Laudo</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div className="space-y-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
                 <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -367,7 +408,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
                 <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -382,7 +423,19 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as Categorias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
                 <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -399,14 +452,29 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </div>
           </div>
 
-          {/* Filtros de Equipe */}
+          {/* EQUIPE MÉDICA */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-orange-500" />
               <span className="text-sm font-medium">Equipe Médica</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div className="space-y-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Equipe</label>
+                <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as Equipes</SelectItem>
+                    <SelectItem value="manhã">Equipe Manhã</SelectItem>
+                    <SelectItem value="tarde">Equipe Tarde</SelectItem>
+                    <SelectItem value="noite">Equipe Noite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Médico</label>
                 <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
                   <SelectTrigger className="h-8 text-xs">
@@ -421,18 +489,31 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Equipe</label>
-                <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Turno</label>
+                <Select value="todos" onValueChange={() => {}}>
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todas as Equipes</SelectItem>
-                    <SelectItem value="manhã">Equipe Manhã</SelectItem>
-                    <SelectItem value="tarde">Equipe Tarde</SelectItem>
-                    <SelectItem value="noite">Equipe Noite</SelectItem>
-                    <SelectItem value="plantao">Plantão</SelectItem>
+                    <SelectItem value="todos">Todos os Turnos</SelectItem>
+                    <SelectItem value="manha">Manhã</SelectItem>
+                    <SelectItem value="tarde">Tarde</SelectItem>
+                    <SelectItem value="noite">Noite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[120px] space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Plantão</label>
+                <Select value="todos" onValueChange={() => {}}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Plantões</SelectItem>
+                    <SelectItem value="sim">Plantão</SelectItem>
+                    <SelectItem value="nao">Sem Plantão</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -460,7 +541,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                       prioridade: 'Prioridade',
                       medico: 'Médico',
                       equipe: 'Equipe',
-                      tipoCliente: 'Categoria'
+                      tipoCliente: 'Tipo'
                     };
                     return labels[key] || key;
                   };

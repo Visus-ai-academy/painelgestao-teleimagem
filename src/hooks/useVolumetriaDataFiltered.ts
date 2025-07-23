@@ -187,13 +187,12 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('MEDICO', filters.medico);
       }
 
-      // Limitar registros baseado na complexidade da query
-      const maxRecords = hasSpecificFilters ? 100000 : 25000; // Mais registros para filtros específicos
+      // Carregar todos os registros disponíveis
       let allData: any[] = [];
       let offset = 0;
-      const limit = 2000; // Batches maiores para menos requests
+      const limit = 5000; // Batches grandes para performance
       
-      while (allData.length < maxRecords) {
+      while (true) {
         const { data: batchData, error } = await query
           .range(offset, offset + limit - 1)
           .order('data_referencia', { ascending: false });
