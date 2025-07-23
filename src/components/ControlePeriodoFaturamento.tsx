@@ -3,50 +3,59 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, FileBarChart2, Info } from "lucide-react";
+import { Calendar, FileBarChart2, Info, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { 
+  calcularPeriodoFaturamento, 
+  gerarPeriodosDisponiveis, 
+  formatarPeriodo, 
+  periodoParaString,
+  stringParaPeriodo,
+  isDadosPassado,
+  podeFaturar,
+  type PeriodoFaturamento 
+} from '@/lib/periodoUtils';
 
-// Função específica para faturamento - menos restritiva
+// Função específica para faturamento - com novas regras
 export const isPeriodoDisponivelFaturamento = (periodo: string): boolean => {
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
-  const mesAtual = hoje.getMonth() + 1;
-  
-  const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
-  
-  // Não permitir períodos muito futuros (mais de 2 meses)
-  if (anoPeriodo > anoAtual + 1 || (anoPeriodo === anoAtual && mesPeriodo > mesAtual + 2)) {
+  try {
+    const periodoObj = stringParaPeriodo(periodo);
+    const dadosPassado = isDadosPassado(periodoObj);
+    const podeSerFaturado = podeFaturar(periodoObj);
+    
+    // Dados do passado ou que podem ser faturados são sempre disponíveis
+    return dadosPassado || podeSerFaturado;
+  } catch {
     return false;
   }
-  
-  // Não permitir períodos muito antigos (mais de 24 meses)
-  const diferencaMeses = (anoAtual - anoPeriodo) * 12 + (mesAtual - mesPeriodo);
-  if (diferencaMeses > 24) {
-    return false;
-  }
-  
-  return true;
 };
 
-// Status específico para faturamento
-export const getStatusPeriodoFaturamento = (periodo: string): 'disponivel' | 'futuro' | 'muito_antigo' => {
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
-  const mesAtual = hoje.getMonth() + 1;
-  
-  const [anoPeriodo, mesPeriodo] = periodo.split('-').map(Number);
-  
-  // Muito futuro
-  if (anoPeriodo > anoAtual + 1 || (anoPeriodo === anoAtual && mesPeriodo > mesAtual + 2)) {
+// Status específico para faturamento com novas regras
+export const getStatusPeriodoFaturamento = (periodo: string): 'concluido' | 'pronto' | 'pendente' | 'futuro' => {
+  try {
+    const periodoObj = stringParaPeriodo(periodo);
+    const dadosPassado = isDadosPassado(periodoObj);
+    const podeSerFaturado = podeFaturar(periodoObj);
+
+    if (dadosPassado) {
+      return 'concluido';
+    }
+
+    if (podeSerFaturado) {
+      return 'pronto';
+    }
+
+    // Verificar se é muito futuro
+    const hoje = new Date();
+    const dataLimite = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 1); // 3 meses no futuro
+    
+    if (periodoObj.inicioPeriodo > dataLimite) {
+      return 'futuro';
+    }
+
+    return 'pendente';
+  } catch {
     return 'futuro';
   }
-  
-  // Muito antigo
-  const diferencaMeses = (anoAtual - anoPeriodo) * 12 + (mesAtual - mesPeriodo);
-  if (diferencaMeses > 24) {
-    return 'muito_antigo';
-  }
-  
-  return 'disponivel';
 };
 
 interface ControlePeriodoFaturamentoProps {
@@ -109,14 +118,16 @@ export function ControlePeriodoFaturamento({
                           <span>{periodo}</span>
                           <Badge 
                             variant={
-                              status === 'disponivel' ? 'default' :
+                              status === 'concluido' ? 'default' :
+                              status === 'pronto' ? 'default' :
                               status === 'futuro' ? 'secondary' : 'outline'
                             }
                             className="text-xs"
                           >
                             {
-                              status === 'disponivel' ? 'Disponível' :
-                              status === 'futuro' ? 'Futuro' : 'Muito Antigo'
+                              status === 'concluido' ? 'Concluído' :
+                              status === 'pronto' ? 'Pronto' :
+                              status === 'futuro' ? 'Futuro' : 'Em Andamento'
                             }
                           </Badge>
                         </div>
@@ -145,28 +156,33 @@ export function ControlePeriodoFaturamento({
                   
                   return (
                     <>
-                      <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-2">
                         <div className={`w-3 h-3 rounded-full ${
-                          status === 'disponivel' ? 'bg-green-500' :
-                          status === 'futuro' ? 'bg-yellow-500' : 'bg-red-500'
+                          status === 'concluido' ? 'bg-green-500' :
+                          status === 'pronto' ? 'bg-blue-500' :
+                          status === 'futuro' ? 'bg-yellow-500' : 'bg-orange-500'
                         }`}></div>
                         <span className="font-medium">
                           {periodoSelecionado} - {
-                            status === 'disponivel' ? 'Disponível' :
-                            status === 'futuro' ? 'Futuro' : 'Muito Antigo'
+                            status === 'concluido' ? 'Concluído' :
+                            status === 'pronto' ? 'Pronto p/ Faturar' :
+                            status === 'futuro' ? 'Futuro' : 'Em Andamento'
                           }
                         </span>
                       </div>
                       
                       <div className="text-sm text-gray-600">
-                        {status === 'disponivel' && (
-                          <p className="text-green-700">✅ Relatórios podem ser gerados normalmente</p>
+                        {status === 'concluido' && (
+                          <p className="text-green-700">✅ Dados históricos - Faturamento/Volumetria concluída</p>
+                        )}
+                        {status === 'pronto' && (
+                          <p className="text-blue-700">💰 Período pronto para faturamento - dados completos</p>
                         )}
                         {status === 'futuro' && (
                           <p className="text-yellow-700">📅 Período futuro - dados podem não estar completos</p>
                         )}
-                        {status === 'muito_antigo' && (
-                          <p className="text-red-700">⏳ Período muito antigo - verifique se os dados ainda estão disponíveis</p>
+                        {status === 'pendente' && (
+                          <p className="text-orange-700">⏳ Período em andamento - aguardando fechamento</p>
                         )}
                       </div>
                     </>

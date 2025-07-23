@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart3, TrendingUp, Activity, Users, Clock, AlertCircle, Calendar } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { ControlePeriodoVolumetria } from '@/components/ControlePeriodoVolumetria';
+import { stringParaPeriodo } from '@/lib/periodoUtils';
 
 interface VolumetriaData {
   id: string;
@@ -77,6 +79,21 @@ export default function Volumetria() {
   };
 
   const getDateFilter = () => {
+    // Verificar se é um período de faturamento específico (formato YYYY-MM)
+    if (periodo.match(/^\d{4}-\d{2}$/)) {
+      try {
+        const periodoObj = stringParaPeriodo(periodo);
+        return {
+          inicio: periodoObj.inicioPeriodo.toISOString().split('T')[0],
+          fim: periodoObj.fimPeriodo.toISOString().split('T')[0]
+        };
+      } catch (error) {
+        console.error('Erro ao processar período de faturamento:', error);
+        return null;
+      }
+    }
+
+    // Períodos tradicionais do sistema
     const hoje = new Date();
     let dataInicio, dataFim;
 
@@ -492,35 +509,36 @@ export default function Volumetria() {
         <p className="text-muted-foreground mt-1">Análise executiva completa de volumetria</p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-4 flex-wrap">
-        <Select value={periodo} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Selecione o período" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Dados</SelectItem>
-            <SelectItem value="ultimos_5_dias">Últimos 5 Dias</SelectItem>
-            <SelectItem value="hoje">Hoje</SelectItem>
-            <SelectItem value="semana_atual">Semana Atual</SelectItem>
-            <SelectItem value="mes_atual">Mês Atual</SelectItem>
-            <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
-            <SelectItem value="ano_atual">Ano Atual</SelectItem>
-            <SelectItem value="ano_anterior">Ano Anterior</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={cliente} onValueChange={setCliente}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Selecione o cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Clientes</SelectItem>
-            {clientes.map(c => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Controles */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ControlePeriodoVolumetria 
+          periodo={periodo} 
+          onPeriodoChange={setPeriodo}
+          showStatus={true}
+          showDetails={true}
+        />
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Filtro por Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={cliente} onValueChange={setCliente}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Clientes</SelectItem>
+                {clientes.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Métricas Principais */}

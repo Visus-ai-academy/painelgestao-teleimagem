@@ -248,6 +248,74 @@ export type Database = {
         }
         Relationships: []
       }
+      contratos_clientes: {
+        Row: {
+          acrescimo_percentual: number | null
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string
+          desconto_percentual: number | null
+          dia_vencimento: number | null
+          especialidades: string[] | null
+          forma_pagamento: string | null
+          id: string
+          modalidades: string[] | null
+          numero_contrato: string
+          observacoes: string | null
+          status: string
+          updated_at: string
+          valor_mensal: number
+        }
+        Insert: {
+          acrescimo_percentual?: number | null
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio: string
+          desconto_percentual?: number | null
+          dia_vencimento?: number | null
+          especialidades?: string[] | null
+          forma_pagamento?: string | null
+          id?: string
+          modalidades?: string[] | null
+          numero_contrato: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_mensal?: number
+        }
+        Update: {
+          acrescimo_percentual?: number | null
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          desconto_percentual?: number | null
+          dia_vencimento?: number | null
+          especialidades?: string[] | null
+          forma_pagamento?: string | null
+          id?: string
+          modalidades?: string[] | null
+          numero_contrato?: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          valor_mensal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_clientes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_access_logs: {
         Row: {
           action: string
@@ -1164,6 +1232,98 @@ export type Database = {
         }
         Relationships: []
       }
+      precos_servicos: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          categoria_exame_id: string | null
+          created_at: string
+          created_by: string | null
+          data_fim_vigencia: string | null
+          data_inicio_vigencia: string
+          descricao: string | null
+          especialidade: string
+          especialidade_id: string | null
+          id: string
+          modalidade: string
+          modalidade_id: string | null
+          prioridade: string
+          prioridade_id: string | null
+          updated_at: string
+          valor_base: number
+          valor_urgencia: number
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          categoria_exame_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string
+          descricao?: string | null
+          especialidade: string
+          especialidade_id?: string | null
+          id?: string
+          modalidade: string
+          modalidade_id?: string | null
+          prioridade: string
+          prioridade_id?: string | null
+          updated_at?: string
+          valor_base?: number
+          valor_urgencia?: number
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          categoria_exame_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string
+          descricao?: string | null
+          especialidade?: string
+          especialidade_id?: string | null
+          id?: string
+          modalidade?: string
+          modalidade_id?: string | null
+          prioridade?: string
+          prioridade_id?: string | null
+          updated_at?: string
+          valor_base?: number
+          valor_urgencia?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precos_servicos_categoria_exame_id_fkey"
+            columns: ["categoria_exame_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_exame"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precos_servicos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precos_servicos_modalidade_id_fkey"
+            columns: ["modalidade_id"]
+            isOneToOne: false
+            referencedRelation: "modalidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precos_servicos_prioridade_id_fkey"
+            columns: ["prioridade_id"]
+            isOneToOne: false
+            referencedRelation: "prioridades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prioridades: {
         Row: {
           ativo: boolean
@@ -1226,6 +1386,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      regras_contrato: {
+        Row: {
+          acrescimo_percentual: number | null
+          ativo: boolean
+          categoria: string
+          contrato_id: string
+          created_at: string
+          created_by: string | null
+          data_fim_vigencia: string | null
+          data_inicio_vigencia: string
+          desconto_percentual: number | null
+          especialidade: string
+          id: string
+          modalidade: string
+          prioridade: string
+          updated_at: string
+          valor_personalizado: number | null
+        }
+        Insert: {
+          acrescimo_percentual?: number | null
+          ativo?: boolean
+          categoria: string
+          contrato_id: string
+          created_at?: string
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string
+          desconto_percentual?: number | null
+          especialidade: string
+          id?: string
+          modalidade: string
+          prioridade: string
+          updated_at?: string
+          valor_personalizado?: number | null
+        }
+        Update: {
+          acrescimo_percentual?: number | null
+          ativo?: boolean
+          categoria?: string
+          contrato_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string
+          desconto_percentual?: number | null
+          especialidade?: string
+          id?: string
+          modalidade?: string
+          prioridade?: string
+          updated_at?: string
+          valor_personalizado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regras_contrato_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       regua_cobranca: {
         Row: {
@@ -1576,6 +1798,15 @@ export type Database = {
           p_metadata?: Json
         }
         Returns: string
+      }
+      get_periodo_faturamento: {
+        Args: { data_referencia: string }
+        Returns: {
+          inicio_periodo: string
+          fim_periodo: string
+          mes_referencia: string
+          ano_referencia: number
+        }[]
       }
       get_user_role: {
         Args: { user_id: string }
