@@ -8,6 +8,7 @@ export interface VolumetriaFilters {
   mes: string;
   semana: string;
   dia: string;
+  dataEspecifica?: Date | null; // Nova propriedade para data específica
   cliente: string;
   modalidade: string;
   especialidade: string;
@@ -114,7 +115,26 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     }
 
     if (filters.dia !== 'todos') {
-      startDate = endDate = filters.dia;
+      if (filters.dia === 'hoje') {
+        startDate = endDate = now.toISOString().split('T')[0];
+      } else if (filters.dia === 'ontem') {
+        const ontem = new Date(now);
+        ontem.setDate(ontem.getDate() - 1);
+        startDate = endDate = ontem.toISOString().split('T')[0];
+      } else if (filters.dia === 'anteontem') {
+        const anteontem = new Date(now);
+        anteontem.setDate(anteontem.getDate() - 2);
+        startDate = endDate = anteontem.toISOString().split('T')[0];
+      } else if (filters.dia === 'ultimos5dias') {
+        const cincodiasAtras = new Date(now);
+        cincodiasAtras.setDate(cincodiasAtras.getDate() - 5);
+        startDate = cincodiasAtras.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+      } else if (filters.dia === 'especifico' && filters.dataEspecifica) {
+        startDate = endDate = filters.dataEspecifica.toISOString().split('T')[0];
+      } else {
+        startDate = endDate = filters.dia;
+      }
     }
 
     // Filtros de período relativo

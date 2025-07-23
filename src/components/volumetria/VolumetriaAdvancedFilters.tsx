@@ -2,10 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Filter, X, Calendar, Building, Stethoscope, Users, FileText, Target } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, Users, FileText, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export interface VolumetriaFilters {
   ano: string;
@@ -13,6 +17,7 @@ export interface VolumetriaFilters {
   mes: string;
   semana: string;
   dia: string;
+  dataEspecifica?: Date | null; // Nova propriedade para data específica
   cliente: string;
   modalidade: string;
   especialidade: string;
@@ -45,6 +50,7 @@ const months = [
 export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: VolumetriaAdvancedFiltersProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [options, setOptions] = useState<FilterOptions>({
     anos: [],
     clientes: [],
@@ -149,7 +155,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     loadFilterOptions();
   }, [loadFilterOptions]);
 
-  const updateFilter = (key: keyof VolumetriaFilters, value: string) => {
+  const updateFilter = (key: keyof VolumetriaFilters, value: string | Date | null) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
@@ -160,6 +166,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       mes: 'todos',
       semana: 'todos',
       dia: 'todos',
+      dataEspecifica: null,
       cliente: 'todos',
       modalidade: 'todos',
       especialidade: 'todos',
@@ -284,7 +291,15 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
 
               <div className="min-w-[120px] space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Dia</label>
-                <Select value={filters.dia} onValueChange={(value) => updateFilter('dia', value)}>
+                <Select value={filters.dia} onValueChange={(value) => {
+                  updateFilter('dia', value);
+                  if (value !== 'especifico') {
+                    updateFilter('dataEspecifica', null);
+                    setShowDatePicker(false);
+                  } else {
+                    setShowDatePicker(true);
+                  }
+                }}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -293,9 +308,45 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                     <SelectItem value="hoje">Hoje</SelectItem>
                     <SelectItem value="ontem">Ontem</SelectItem>
                     <SelectItem value="anteontem">Anteontem</SelectItem>
+                    <SelectItem value="ultimos5dias">Últimos 5 dias</SelectItem>
+                    <SelectItem value="especifico">Data específica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Datepicker para data específica */}
+              {filters.dia === 'especifico' && (
+                <div className="min-w-[200px] space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Selecionar Data</label>
+                  <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "h-8 text-xs justify-start",
+                          !filters.dataEspecifica && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-3 w-3" />
+                        {filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : "Selecionar data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={filters.dataEspecifica || undefined}
+                        onSelect={(date) => {
+                          updateFilter('dataEspecifica', date || null);
+                          setShowDatePicker(false);
+                        }}
+                        disabled={(date) => date > new Date()}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
           </div>
 
