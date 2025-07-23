@@ -1774,7 +1774,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mv_volumetria_dashboard: {
+        Row: {
+          data_referencia: string | null
+          EMPRESA: string | null
+          ESPECIALIDADE: string | null
+          mes_referencia: string | null
+          MODALIDADE: string | null
+          PRIORIDADE: string | null
+          total_atrasados: number | null
+          total_registros: number | null
+          total_volume: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_edit_data: {
@@ -1855,6 +1868,10 @@ export type Database = {
       promote_user_to_admin: {
         Args: { user_email: string }
         Returns: boolean
+      }
+      refresh_volumetria_dashboard: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       validate_cnpj: {
         Args: { cnpj: string }
