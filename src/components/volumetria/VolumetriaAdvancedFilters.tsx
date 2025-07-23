@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, FileText, MapPin } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, FileText, MapPin, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +59,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     laudo: false,
     medico: false
   });
+
+  // Estados para controlar a abertura dos comboboxes de busca
+  const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
+  const [openMedicoCombobox, setOpenMedicoCombobox] = useState(false);
 
   const [options, setOptions] = useState<FilterOptions>({
     anos: [],
@@ -456,18 +461,68 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Cliente</label>
-                  <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {options.clientes.map(cliente => (
-                        <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    <Search className="h-3 w-3 inline mr-1" />
+                    Localizar Cliente
+                  </label>
+                  <Popover open={openClienteCombobox} onOpenChange={setOpenClienteCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openClienteCombobox}
+                        className="h-8 w-full justify-between text-xs"
+                      >
+                        {filters.cliente === 'todos'
+                          ? "Todos os clientes"
+                          : options.clientes.find((cliente) => cliente === filters.cliente) || "Selecionar..."}
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Digite para localizar cliente..." className="h-8 text-xs" />
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            <CommandItem
+                              value="todos"
+                              onSelect={() => {
+                                updateFilter('cliente', 'todos');
+                                setOpenClienteCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 w-3",
+                                  filters.cliente === 'todos' ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              Todos os clientes
+                            </CommandItem>
+                            {options.clientes.map((cliente) => (
+                              <CommandItem
+                                key={cliente}
+                                value={cliente}
+                                onSelect={() => {
+                                  updateFilter('cliente', cliente);
+                                  setOpenClienteCombobox(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-3 w-3",
+                                    filters.cliente === cliente ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {cliente}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -579,18 +634,68 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Médico</label>
-                  <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {options.medicos.map(medico => (
-                        <SelectItem key={medico} value={medico}>{medico}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    <Search className="h-3 w-3 inline mr-1" />
+                    Localizar Médico
+                  </label>
+                  <Popover open={openMedicoCombobox} onOpenChange={setOpenMedicoCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openMedicoCombobox}
+                        className="h-8 w-full justify-between text-xs"
+                      >
+                        {filters.medico === 'todos'
+                          ? "Todos os médicos"
+                          : options.medicos.find((medico) => medico === filters.medico) || "Selecionar..."}
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Digite para localizar médico..." className="h-8 text-xs" />
+                        <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            <CommandItem
+                              value="todos"
+                              onSelect={() => {
+                                updateFilter('medico', 'todos');
+                                setOpenMedicoCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 w-3",
+                                  filters.medico === 'todos' ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              Todos os médicos
+                            </CommandItem>
+                            {options.medicos.map((medico) => (
+                              <CommandItem
+                                key={medico}
+                                value={medico}
+                                onSelect={() => {
+                                  updateFilter('medico', medico);
+                                  setOpenMedicoCombobox(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-3 w-3",
+                                    filters.medico === medico ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {medico}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </CollapsibleContent>
             </Collapsible>
