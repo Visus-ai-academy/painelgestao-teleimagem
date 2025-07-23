@@ -179,18 +179,19 @@ export function useVolumetriaData(periodo: string, cliente: string) {
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('⚡ Carregando dashboard COMPLETO (sem limitações)...');
+      console.log('⚡ Carregando dashboard otimizado...');
       
       const dateFilter = getDateFilter();
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Carregar TODOS os dados usando paginação
+      // Limite máximo para evitar travamento
+      const maxRecords = 15000;
       let allData: any[] = [];
       let offset = 0;
       const limit = 1000;
       
-      while (true) {
+      while (allData.length < maxRecords) {
         let query = supabase
           .from('volumetria_mobilemed')
           .select(`
@@ -237,6 +238,12 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         }
         
         offset += limit;
+        
+        // Parar se atingir o limite máximo
+        if (allData.length >= maxRecords) {
+          console.log(`⚠️ Limite de ${maxRecords.toLocaleString()} registros atingido`);
+          break;
+        }
       }
 
       console.log(`✅ TOTAL carregado: ${allData.length} registros`);

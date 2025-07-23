@@ -1,6 +1,6 @@
 
-import Dashboard from "./Dashboard";
+import TechWelcome from "./TechWelcome";
 
 export default function Index() {
-  return <Dashboard />;
+  return <TechWelcome />;
 }
