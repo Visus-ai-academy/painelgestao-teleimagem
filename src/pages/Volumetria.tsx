@@ -22,6 +22,7 @@ interface VolumetriaData {
   HORA_PRAZO: string;
   VALORES: number;
   STATUS: string;
+  data_referencia: string;
 }
 
 interface AggregatedData {
@@ -68,17 +69,32 @@ export default function Volumetria() {
     try {
       console.log('🔍 Iniciando carregamento de clientes únicos...');
       
-      // Buscar TODOS os clientes únicos sem limitação usando aggregate
-      const { data: empresas, error, count } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA', { count: 'exact' })
-        .not('EMPRESA', 'is', null);
+      let allEmpresas: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      // Buscar todos os clientes usando paginação
+      while (hasMore) {
+        const { data: empresas, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA')
+          .not('EMPRESA', 'is', null)
+          .range(from, from + pageSize - 1);
 
-      const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
-      console.log(`📊 Total de registros na tabela: ${count}`);
-      console.log(`📊 Total de registros com empresa: ${empresas?.length}`);
+        if (error) throw error;
+
+        if (empresas && empresas.length > 0) {
+          allEmpresas = [...allEmpresas, ...empresas];
+          from += pageSize;
+          hasMore = empresas.length === pageSize; // Se retornou menos que pageSize, não há mais dados
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const empresasUnicas = [...new Set(allEmpresas.map(e => e.EMPRESA))];
+      console.log(`📊 Total de registros processados: ${allEmpresas.length}`);
       console.log(`📊 Total de clientes únicos encontrados: ${empresasUnicas.length}`);
       console.log(`📊 Primeiros 10 clientes:`, empresasUnicas.slice(0, 10));
       
@@ -162,58 +178,55 @@ export default function Volumetria() {
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Primeira consulta: buscar contagem total sem limitação
-      let countQuery = supabase
-        .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true });
+      let allData: VolumetriaData[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      // Aplicar filtros na contagem
-      if (dateFilter) {
-        countQuery = countQuery.gte('data_referencia', dateFilter.inicio)
-                              .lte('data_referencia', dateFilter.fim);
+      // Buscar todos os dados usando paginação
+      while (hasMore) {
+        let query = supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .order('data_referencia', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        // Aplicar filtros
+        if (dateFilter) {
+          query = query.gte('data_referencia', dateFilter.inicio)
+                       .lte('data_referencia', dateFilter.fim);
+        }
+
+        if (cliente !== "todos") {
+          query = query.eq('EMPRESA', cliente);
+        }
+
+        const { data: pageData, error } = await query;
+        if (error) throw error;
+
+        if (pageData && pageData.length > 0) {
+          allData = [...allData, ...pageData];
+          console.log(`📊 Página ${Math.floor(from/pageSize) + 1}: ${pageData.length} registros`);
+          from += pageSize;
+          hasMore = pageData.length === pageSize; // Se retornou menos que pageSize, não há mais dados
+        } else {
+          hasMore = false;
+        }
       }
 
-      if (cliente !== "todos") {
-        countQuery = countQuery.eq('EMPRESA', cliente);
-      }
-
-      const { count: totalCount, error: countError } = await countQuery;
-      if (countError) throw countError;
-
-      console.log(`📊 Total de registros que atendem aos filtros: ${totalCount}`);
-
-      // Segunda consulta: buscar todos os dados sem limitação
-      let dataQuery = supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .order('data_referencia', { ascending: false });
-
-      // Aplicar filtros nos dados
-      if (dateFilter) {
-        dataQuery = dataQuery.gte('data_referencia', dateFilter.inicio)
-                             .lte('data_referencia', dateFilter.fim);
-      }
-
-      if (cliente !== "todos") {
-        dataQuery = dataQuery.eq('EMPRESA', cliente);
-      }
-
-      const { data: rawData, error: dataError } = await dataQuery;
-      if (dataError) throw dataError;
-
-      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${totalCount} total (TODOS OS DADOS)`);
-      console.log('📋 Amostra dos primeiros 3 registros:', rawData?.slice(0, 3).map(r => ({ 
+      console.log(`✅ Carregados ${allData.length} registros TOTAIS (TODOS OS DADOS)`);
+      console.log('📋 Amostra dos primeiros 3 registros:', allData.slice(0, 3).map(r => ({ 
         empresa: r.EMPRESA, 
         data: r.data_referencia, 
         valores: r.VALORES 
       })));
       
-      setData(rawData || []);
+      setData(allData);
       
       // Processar dados apenas se houver dados
-      if (rawData && rawData.length > 0) {
+      if (allData.length > 0) {
         console.log('⚙️ Processando dados...');
-        await processarDados(rawData);
+        await processarDados(allData);
       } else {
         console.log('⚠️ Nenhum dado encontrado para processar');
       }
@@ -486,22 +499,37 @@ export default function Volumetria() {
           fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
       }
 
-      // Consulta sem limite para período anterior
-      let queryAnterior = supabase
-        .from('volumetria_mobilemed')
-        .select('VALORES')
-        .gte('data_referencia', inicioAnterior.toISOString().split('T')[0])
-        .lte('data_referencia', fimAnterior.toISOString().split('T')[0]);
+      // Buscar dados do período anterior usando paginação
+      let allDataAnterior: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (cliente !== "todos") {
-        queryAnterior = queryAnterior.eq('EMPRESA', cliente);
+      while (hasMore) {
+        let queryAnterior = supabase
+          .from('volumetria_mobilemed')
+          .select('VALORES')
+          .gte('data_referencia', inicioAnterior.toISOString().split('T')[0])
+          .lte('data_referencia', fimAnterior.toISOString().split('T')[0])
+          .range(from, from + pageSize - 1);
+
+        if (cliente !== "todos") {
+          queryAnterior = queryAnterior.eq('EMPRESA', cliente);
+        }
+
+        const { data: pageData, error } = await queryAnterior;
+        if (error) throw error;
+
+        if (pageData && pageData.length > 0) {
+          allDataAnterior = [...allDataAnterior, ...pageData];
+          from += pageSize;
+          hasMore = pageData.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data: dataAnterior, error } = await queryAnterior;
-      
-      if (error) throw error;
-
-      const totalAnterior = dataAnterior?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+      const totalAnterior = allDataAnterior.reduce((sum, item) => sum + (item.VALORES || 0), 0);
       const totalAtual = totalData?.total_exames || 0;
       
       const crescimento = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
