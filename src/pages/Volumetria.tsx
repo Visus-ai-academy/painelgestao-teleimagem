@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
@@ -32,6 +32,11 @@ export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>(getDefaultFilters());
   
   const { stats, clientes, modalidades, especialidades, loading, refreshData } = useVolumetriaDataFiltered(filters);
+  
+  // Forçar refresh após mudanças no código
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
   const hasNoData = stats.total_registros === 0;
