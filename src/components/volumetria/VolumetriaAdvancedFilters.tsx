@@ -4,7 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, Users, FileText, Target } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, Users, FileText, Target, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +52,15 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Estados para controlar quais blocos estão expandidos
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+    periodo: false,
+    cliente: false,
+    laudo: false,
+    medico: false
+  });
+
   const [options, setOptions] = useState<FilterOptions>({
     anos: [],
     clientes: [],
@@ -178,7 +188,50 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     });
   };
 
-  const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
+  const hasActiveFilters = Object.values(filters).some(value => 
+    value !== 'todos' && value !== null && value !== undefined
+  );
+
+  // Função para alternar seções
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Função para obter filtros ativos por seção
+  const getActiveFiltersForSection = (section: string) => {
+    switch (section) {
+      case 'periodo':
+        return [
+          filters.ano !== 'todos' ? `Ano: ${filters.ano}` : null,
+          filters.trimestre !== 'todos' ? `Trimestre: ${filters.trimestre}º` : null,
+          filters.mes !== 'todos' ? `Mês: ${months[parseInt(filters.mes) - 1]}` : null,
+          filters.semana !== 'todos' ? `Semana: ${filters.semana}` : null,
+          filters.dia !== 'todos' ? `Dia: ${filters.dia === 'especifico' && filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : filters.dia}` : null
+        ].filter(Boolean);
+      case 'cliente':
+        return [
+          filters.cliente !== 'todos' ? `Cliente: ${filters.cliente}` : null,
+          filters.tipoCliente !== 'todos' ? `Tipo: ${filters.tipoCliente}` : null
+        ].filter(Boolean);
+      case 'laudo':
+        return [
+          filters.modalidade !== 'todos' ? `Modalidade: ${filters.modalidade}` : null,
+          filters.especialidade !== 'todos' ? `Especialidade: ${filters.especialidade}` : null,
+          filters.categoria !== 'todos' ? `Categoria: ${filters.categoria}` : null,
+          filters.prioridade !== 'todos' ? `Prioridade: ${filters.prioridade}` : null
+        ].filter(Boolean);
+      case 'medico':
+        return [
+          filters.medico !== 'todos' ? `Médico: ${filters.medico}` : null,
+          filters.equipe !== 'todos' ? `Equipe: ${filters.equipe}` : null
+        ].filter(Boolean);
+      default:
+        return [];
+    }
+  };
 
   if (loading) {
     return (
@@ -204,7 +257,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               <h3 className="font-semibold">Filtros Avançados</h3>
               {hasActiveFilters && (
                 <Badge variant="secondary" className="text-xs">
-                  {Object.values(filters).filter(value => value !== 'todos').length} ativos
+                  {Object.values(filters).filter(value => value !== 'todos' && value !== null && value !== undefined).length} ativos
                 </Badge>
               )}
             </div>
@@ -221,390 +274,365 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             )}
           </div>
 
-          {/* PERÍODO */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">Período</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Ano</label>
-                <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Anos</SelectItem>
-                    {options.anos.map(ano => (
-                      <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
-                <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="1">1º Trimestre</SelectItem>
-                    <SelectItem value="2">2º Trimestre</SelectItem>
-                    <SelectItem value="3">3º Trimestre</SelectItem>
-                    <SelectItem value="4">4º Trimestre</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Mês</label>
-                <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {months.map((month, index) => (
-                      <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Semana</label>
-                <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas</SelectItem>
-                    <SelectItem value="1">Última semana</SelectItem>
-                    <SelectItem value="2">Últimas 2 semanas</SelectItem>
-                    <SelectItem value="4">Últimas 4 semanas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Dia</label>
-                <Select value={filters.dia} onValueChange={(value) => {
-                  updateFilter('dia', value);
-                  if (value !== 'especifico') {
-                    updateFilter('dataEspecifica', null);
-                    setShowDatePicker(false);
-                  } else {
-                    setShowDatePicker(true);
-                  }
-                }}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="hoje">Hoje</SelectItem>
-                    <SelectItem value="ontem">Ontem</SelectItem>
-                    <SelectItem value="anteontem">Anteontem</SelectItem>
-                    <SelectItem value="ultimos5dias">Últimos 5 dias</SelectItem>
-                    <SelectItem value="especifico">Data específica</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Datepicker para data específica */}
-              {filters.dia === 'especifico' && (
-                <div className="min-w-[200px] space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Selecionar Data</label>
-                  <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "h-8 text-xs justify-start",
-                          !filters.dataEspecifica && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-3 w-3" />
-                        {filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : "Selecionar data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={filters.dataEspecifica || undefined}
-                        onSelect={(date) => {
-                          updateFilter('dataEspecifica', date || null);
-                          setShowDatePicker(false);
-                        }}
-                        disabled={(date) => date > new Date()}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* CLIENTE */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Building className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">Cliente</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Empresa</label>
-                <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Clientes ({options.clientes.length})</SelectItem>
-                    {options.clientes.map(cliente => (
-                      <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Região</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as Regiões</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Estado</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Estados</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Cidade</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as Cidades</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Classificação</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as Classificações</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Tipo</label>
-                <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Tipos</SelectItem>
-                    <SelectItem value="CO">Cliente CO</SelectItem>
-                    <SelectItem value="NC">Cliente NC</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* TIPO DE LAUDO */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium">Tipo de Laudo</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
-                <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas ({options.modalidades.length})</SelectItem>
-                    {options.modalidades.map(modalidade => (
-                      <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
-                <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas ({options.especialidades.length})</SelectItem>
-                    {options.especialidades.map(especialidade => (
-                      <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as Categorias</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
-                <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas ({options.prioridades.length})</SelectItem>
-                    {options.prioridades.map(prioridade => (
-                      <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* EQUIPE MÉDICA */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-medium">Equipe Médica</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Equipe</label>
-                <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as Equipes</SelectItem>
-                    <SelectItem value="manhã">Equipe Manhã</SelectItem>
-                    <SelectItem value="tarde">Equipe Tarde</SelectItem>
-                    <SelectItem value="noite">Equipe Noite</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Médico</label>
-                <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Médicos ({options.medicos.length})</SelectItem>
-                    {options.medicos.map(medico => (
-                      <SelectItem key={medico} value={medico}>{medico}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Turno</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Turnos</SelectItem>
-                    <SelectItem value="manha">Manhã</SelectItem>
-                    <SelectItem value="tarde">Tarde</SelectItem>
-                    <SelectItem value="noite">Noite</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-[120px] space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Plantão</label>
-                <Select value="todos" onValueChange={() => {}}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Plantões</SelectItem>
-                    <SelectItem value="sim">Plantão</SelectItem>
-                    <SelectItem value="nao">Sem Plantão</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Resumo dos Filtros Ativos */}
+          {/* Filtros Ativos Resumidos */}
           {hasActiveFilters && (
-            <div className="pt-2 border-t">
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-muted-foreground">Filtros aplicados:</div>
               <div className="flex flex-wrap gap-1">
-                {Object.entries(filters).map(([key, value]) => {
-                  if (value === 'todos') return null;
-                  
-                  const getFilterLabel = (key: string) => {
-                    const labels: Record<string, string> = {
-                      ano: 'Ano',
-                      trimestre: 'Trimestre',
-                      mes: 'Mês',
-                      semana: 'Semana',
-                      dia: 'Dia',
-                      cliente: 'Cliente',
-                      modalidade: 'Modalidade',
-                      especialidade: 'Especialidade',
-                      categoria: 'Categoria',
-                      prioridade: 'Prioridade',
-                      medico: 'Médico',
-                      equipe: 'Equipe',
-                      tipoCliente: 'Tipo'
-                    };
-                    return labels[key] || key;
-                  };
-
-                  return (
-                    <Badge key={key} variant="secondary" className="text-xs">
-                      {getFilterLabel(key)}: {value}
-                    </Badge>
-                  );
-                })}
+                {[
+                  ...getActiveFiltersForSection('periodo'),
+                  ...getActiveFiltersForSection('cliente'),
+                  ...getActiveFiltersForSection('laudo'),
+                  ...getActiveFiltersForSection('medico')
+                ].map((filter, index) => (
+                  <Badge key={index} variant="outline" className="text-xs px-2 py-1">
+                    {filter}
+                  </Badge>
+                ))}
               </div>
             </div>
           )}
+
+          {/* PERÍODO */}
+          <Collapsible 
+            open={expandedSections.periodo} 
+            onOpenChange={() => toggleSection('periodo')}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-2 h-auto"
+              >
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">Período</span>
+                  {getActiveFiltersForSection('periodo').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-5">
+                      {getActiveFiltersForSection('periodo').length}
+                    </Badge>
+                  )}
+                </div>
+                {expandedSections.periodo ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 p-2 bg-muted/30 rounded-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Ano</label>
+                  <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {options.anos.map(ano => (
+                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
+                  <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="1">1º Trimestre</SelectItem>
+                      <SelectItem value="2">2º Trimestre</SelectItem>
+                      <SelectItem value="3">3º Trimestre</SelectItem>
+                      <SelectItem value="4">4º Trimestre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Mês</label>
+                  <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {months.map((month, index) => (
+                        <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Semana</label>
+                  <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todas</SelectItem>
+                      <SelectItem value="1">Última semana</SelectItem>
+                      <SelectItem value="2">Últimas 2 semanas</SelectItem>
+                      <SelectItem value="4">Últimas 4 semanas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Dia</label>
+                  <Select value={filters.dia} onValueChange={(value) => {
+                    updateFilter('dia', value);
+                    if (value !== 'especifico') {
+                      updateFilter('dataEspecifica', null);
+                      setShowDatePicker(false);
+                    }
+                  }}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="hoje">Hoje</SelectItem>
+                      <SelectItem value="ontem">Ontem</SelectItem>
+                      <SelectItem value="anteontem">Anteontem</SelectItem>
+                      <SelectItem value="ultimos5dias">Últimos 5 dias</SelectItem>
+                      <SelectItem value="especifico">Data específica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Datepicker para data específica - só aparece quando necessário */}
+                {filters.dia === 'especifico' && (
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Selecionar Data</label>
+                    <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "h-8 text-xs justify-start",
+                            !filters.dataEspecifica && "text-muted-foreground"
+                          )}
+                          onClick={() => setShowDatePicker(true)}
+                        >
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : "Selecionar data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-50 bg-background border" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={filters.dataEspecifica || undefined}
+                          onSelect={(date) => {
+                            updateFilter('dataEspecifica', date || null);
+                            setShowDatePicker(false);
+                          }}
+                          disabled={(date) => date > new Date()}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* CLIENTE */}
+          <Collapsible 
+            open={expandedSections.cliente} 
+            onOpenChange={() => toggleSection('cliente')}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-2 h-auto"
+              >
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium">Cliente</span>
+                  {getActiveFiltersForSection('cliente').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-5">
+                      {getActiveFiltersForSection('cliente').length}
+                    </Badge>
+                  )}
+                </div>
+                {expandedSections.cliente ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Empresa</label>
+                  <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60">
+                      <SelectItem value="todos">Todos os Clientes ({options.clientes.length})</SelectItem>
+                      {options.clientes.map(cliente => (
+                        <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Tipo</label>
+                  <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos os Tipos</SelectItem>
+                      <SelectItem value="CO">Cliente CO</SelectItem>
+                      <SelectItem value="NC">Cliente NC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* TIPO DE LAUDO */}
+          <Collapsible 
+            open={expandedSections.laudo} 
+            onOpenChange={() => toggleSection('laudo')}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-2 h-auto"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">Tipo de Laudo</span>
+                  {getActiveFiltersForSection('laudo').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-5">
+                      {getActiveFiltersForSection('laudo').length}
+                    </Badge>
+                  )}
+                </div>
+                {expandedSections.laudo ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2 bg-muted/30 rounded-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
+                  <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60">
+                      <SelectItem value="todos">Todas ({options.modalidades.length})</SelectItem>
+                      {options.modalidades.map(modalidade => (
+                        <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
+                  <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60">
+                      <SelectItem value="todos">Todas ({options.especialidades.length})</SelectItem>
+                      {options.especialidades.map(especialidade => (
+                        <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                  <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todas as Categorias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
+                  <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60">
+                      <SelectItem value="todos">Todas ({options.prioridades.length})</SelectItem>
+                      {options.prioridades.map(prioridade => (
+                        <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* MÉDICO */}
+          <Collapsible 
+            open={expandedSections.medico} 
+            onOpenChange={() => toggleSection('medico')}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-2 h-auto"
+              >
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-medium">Médico</span>
+                  {getActiveFiltersForSection('medico').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-5">
+                      {getActiveFiltersForSection('medico').length}
+                    </Badge>
+                  )}
+                </div>
+                {expandedSections.medico ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-2">
+              <div className="grid grid-cols-2 gap-2 p-2 bg-muted/30 rounded-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Médico</label>
+                  <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60">
+                      <SelectItem value="todos">Todos ({options.medicos.length})</SelectItem>
+                      {options.medicos.map(medico => (
+                        <SelectItem key={medico} value={medico}>{medico}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Equipe</label>
+                  <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todas as Equipes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </CardContent>
     </Card>
