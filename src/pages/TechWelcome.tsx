@@ -48,7 +48,7 @@ export default function TechWelcome() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Matrix Rain Background */}
       <div className="absolute inset-0 opacity-20">
-        <MatrixRain width={window.innerWidth} height={window.innerHeight} fontSize={12} speed={30} />
+        <MatrixRain width={1920} height={1080} fontSize={12} speed={30} />
       </div>
       
       {/* Animated Grid Background */}
