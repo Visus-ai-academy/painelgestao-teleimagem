@@ -2199,6 +2199,13 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: boolean
       }
+      limpar_dados_volumetria: {
+        Args: { arquivos_fonte: string[] }
+        Returns: {
+          registros_removidos: number
+          arquivos_processados: string[]
+        }[]
+      }
       log_audit_event: {
         Args: {
           p_table_name: string
