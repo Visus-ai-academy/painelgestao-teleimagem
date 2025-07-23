@@ -24,13 +24,7 @@ export interface VolumetriaFilters {
   especialidade: string;
   categoria: string;
   prioridade: string;
-  equipe: string;
   medico: string;
-  turno: string;
-  plantao: string;
-  regiao: string;
-  estado: string;
-  cidade: string;
 }
 
 interface VolumetriaAdvancedFiltersProps {
@@ -45,12 +39,6 @@ interface FilterOptions {
   especialidades: string[];
   prioridades: string[];
   medicos: string[];
-  equipes: string[];
-  turnos: string[];
-  plantoes: string[];
-  regioes: string[];
-  estados: string[];
-  cidades: string[];
 }
 
 const months = [
@@ -68,8 +56,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     periodo: false,
     cliente: false,
     laudo: false,
-    equipe: false,
-    regiao: false
+    medico: false
   });
 
   const [options, setOptions] = useState<FilterOptions>({
@@ -78,13 +65,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     modalidades: [],
     especialidades: [],
     prioridades: [],
-    medicos: [],
-    equipes: [],
-    turnos: [],
-    plantoes: [],
-    regioes: [],
-    estados: [],
-    cidades: []
+    medicos: []
   });
 
   // Carregar opções dos filtros baseado nos dados reais
@@ -154,13 +135,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         modalidades: modalidadesUnicas,
         especialidades: especialidadesUnicas,
         prioridades: prioridadesUnicas,
-        medicos: medicosUnicos,
-        equipes: [],
-        turnos: [],
-        plantoes: [],
-        regioes: [],
-        estados: [],
-        cidades: []
+        medicos: medicosUnicos
       });
 
       console.log('✅ Opções dos filtros carregadas:', {
@@ -169,13 +144,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         modalidades: modalidadesUnicas.length,
         especialidades: especialidadesUnicas.length,
         prioridades: prioridadesUnicas.length,
-        medicos: medicosUnicos.length,
-        equipes: equipesUnicas.length,
-        turnos: turnosUnicos.length,
-        plantoes: plantoesUnicos.length,
-        regioes: regioesUnicas.length,
-        estados: estadosUnicos.length,
-        cidades: cidadesUnicas.length
+        medicos: medicosUnicos.length
       });
 
     } catch (error) {
@@ -211,13 +180,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       especialidade: 'todos',
       categoria: 'todos',
       prioridade: 'todos',
-      equipe: 'todos',
-      medico: 'todos',
-      turno: 'todos',
-      plantao: 'todos',
-      regiao: 'todos',
-      estado: 'todos',
-      cidade: 'todos'
+      medico: 'todos'
     });
   };
 
@@ -255,18 +218,9 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           filters.categoria !== 'todos' ? `Categoria: ${filters.categoria}` : null,
           filters.prioridade !== 'todos' ? `Prioridade: ${filters.prioridade}` : null
         ].filter(Boolean);
-      case 'equipe':
+      case 'medico':
         return [
-          filters.equipe !== 'todos' ? `Equipe: ${filters.equipe}` : null,
-          filters.medico !== 'todos' ? `Médico: ${filters.medico}` : null,
-          filters.turno !== 'todos' ? `Turno: ${filters.turno}` : null,
-          filters.plantao !== 'todos' ? `Plantão: ${filters.plantao}` : null
-        ].filter(Boolean);
-      case 'regiao':
-        return [
-          filters.regiao !== 'todos' ? `Região: ${filters.regiao}` : null,
-          filters.estado !== 'todos' ? `Estado: ${filters.estado}` : null,
-          filters.cidade !== 'todos' ? `Cidade: ${filters.cidade}` : null
+          filters.medico !== 'todos' ? `Médico: ${filters.medico}` : null
         ].filter(Boolean);
       default:
         return [];
@@ -323,8 +277,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                   ...getActiveFiltersForSection('periodo'),
                   ...getActiveFiltersForSection('cliente'),
                   ...getActiveFiltersForSection('laudo'),
-                  ...getActiveFiltersForSection('equipe'),
-                  ...getActiveFiltersForSection('regiao')
+                  ...getActiveFiltersForSection('medico')
                 ].map((filter, index) => (
                   <Badge key={index} variant="outline" className="text-xs px-2 py-1">
                     {filter}
@@ -604,157 +557,40 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Botão EQUIPE MÉDICA */}
+            {/* Botão MÉDICO */}
             <Collapsible 
-              open={expandedSections.equipe} 
-              onOpenChange={() => toggleSection('equipe')}
+              open={expandedSections.medico} 
+              onOpenChange={() => toggleSection('medico')}
             >
               <CollapsibleTrigger asChild>
                 <Button
-                  variant={getActiveFiltersForSection('equipe').length > 0 ? "default" : "outline"}
+                  variant={getActiveFiltersForSection('medico').length > 0 ? "default" : "outline"}
                   size="sm"
                   className="gap-2"
                 >
                   <Stethoscope className="h-4 w-4" />
-                  Equipe Médica
-                  {getActiveFiltersForSection('equipe').length > 0 && (
+                  Médico
+                  {getActiveFiltersForSection('medico').length > 0 && (
                     <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('equipe').length}
+                      {getActiveFiltersForSection('medico').length}
                     </Badge>
                   )}
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Equipe</label>
-                    <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todas</SelectItem>
-                        {options.equipes.map(equipe => (
-                          <SelectItem key={equipe} value={equipe}>{equipe}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Médico</label>
-                    <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {options.medicos.map(medico => (
-                          <SelectItem key={medico} value={medico}>{medico}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Turno</label>
-                    <Select value={filters.turno} onValueChange={(value) => updateFilter('turno', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {options.turnos.map(turno => (
-                          <SelectItem key={turno} value={turno}>{turno}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Plantão</label>
-                    <Select value={filters.plantao} onValueChange={(value) => updateFilter('plantao', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {options.plantoes.map(plantao => (
-                          <SelectItem key={plantao} value={plantao}>{plantao}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Botão REGIÃO */}
-            <Collapsible 
-              open={expandedSections.regiao} 
-              onOpenChange={() => toggleSection('regiao')}
-            >
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant={getActiveFiltersForSection('regiao').length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Região
-                  {getActiveFiltersForSection('regiao').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('regiao').length}
-                    </Badge>
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Região</label>
-                    <Select value={filters.regiao} onValueChange={(value) => updateFilter('regiao', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todas</SelectItem>
-                        {options.regioes.map(regiao => (
-                          <SelectItem key={regiao} value={regiao}>{regiao}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Estado</label>
-                    <Select value={filters.estado} onValueChange={(value) => updateFilter('estado', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {options.estados.map(estado => (
-                          <SelectItem key={estado} value={estado}>{estado}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Cidade</label>
-                    <Select value={filters.cidade} onValueChange={(value) => updateFilter('cidade', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
-                        <SelectItem value="todos">Todas</SelectItem>
-                        {options.cidades.map(cidade => (
-                          <SelectItem key={cidade} value={cidade}>{cidade}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Médico</label>
+                  <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {options.medicos.map(medico => (
+                        <SelectItem key={medico} value={medico}>{medico}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CollapsibleContent>
             </Collapsible>

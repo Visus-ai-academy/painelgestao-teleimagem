@@ -24,13 +24,7 @@ const getDefaultFilters = (): VolumetriaFilters => {
     especialidade: 'todos',
     categoria: 'todos',
     prioridade: 'todos',
-    equipe: 'todos',
-    medico: 'todos',
-    turno: 'todos',
-    plantao: 'todos',
-    regiao: 'todos',
-    estado: 'todos',
-    cidade: 'todos'
+    medico: 'todos'
   };
 };
 
