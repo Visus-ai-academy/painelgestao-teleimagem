@@ -29,3 +29,12 @@ verify_jwt = false
 
 [functions.sincronizar-mapeamentos]
 verify_jwt = false
+
+[functions.volumetria-cache]
+verify_jwt = false
+
+[functions.performance-monitor]
+verify_jwt = false
+
+[functions.dashboard-api]
+verify_jwt = false

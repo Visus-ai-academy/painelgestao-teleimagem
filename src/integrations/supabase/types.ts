@@ -1232,6 +1232,39 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_logs: {
+        Row: {
+          id: string
+          metadata: Json | null
+          operation: string
+          query_time: number
+          row_count: number | null
+          table_name: string
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          operation: string
+          query_time: number
+          row_count?: number | null
+          table_name: string
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          operation?: string
+          query_time?: number
+          row_count?: number | null
+          table_name?: string
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       precos_servicos: {
         Row: {
           ativo: boolean
@@ -1925,6 +1958,10 @@ export type Database = {
       can_view_data: {
         Args: { data_referencia: string }
         Returns: boolean
+      }
+      cleanup_old_performance_logs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       create_security_alert: {
         Args: {
