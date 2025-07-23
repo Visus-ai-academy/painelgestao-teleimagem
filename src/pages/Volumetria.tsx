@@ -5,6 +5,7 @@ import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
+import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 
 // Função para obter filtros padrão para o mês atual
 const getDefaultFilters = (): VolumetriaFilters => {
@@ -65,6 +66,9 @@ export default function Volumetria() {
           {stats.total_clientes} clientes
         </p>
       </div>
+
+      {/* Estatísticas dos Uploads */}
+      <VolumetriaUploadStats />
 
       {/* Filtros Avançados */}
       <VolumetriaAdvancedFilters 
