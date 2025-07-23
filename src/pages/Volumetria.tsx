@@ -145,66 +145,31 @@ export default function Volumetria() {
 
   const loadData = async () => {
     try {
-      console.log('🔄 Iniciando carregamento dos dados...');
-      console.log('📅 Período selecionado:', periodo);
-      console.log('🏢 Cliente selecionado:', cliente);
-      
       setLoading(true);
       const dateFilter = getDateFilter();
-      console.log('📊 Filtro de data:', dateFilter);
 
-      // Carregar TODOS os dados usando paginação para evitar limite do Supabase
-      let allData: VolumetriaData[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      let query = supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .limit(10000); // Limite inicial de 10k registros para evitar travamento
 
-      console.log('🔄 Iniciando carregamento paginado...');
-
-      while (hasMore) {
-        console.log(`📄 Carregando página ${page + 1} (range: ${page * pageSize} - ${(page + 1) * pageSize - 1})...`);
-        
-        let query = supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        // Aplicar filtro de data se não for "todos"
-        if (dateFilter) {
-          console.log(`📅 Aplicando filtro de data: ${dateFilter.inicio} até ${dateFilter.fim}`);
-          query = query.gte('data_referencia', dateFilter.inicio)
-                       .lte('data_referencia', dateFilter.fim);
-        }
-
-        if (cliente !== "todos") {
-          console.log(`🏢 Aplicando filtro de cliente: ${cliente}`);
-          query = query.eq('EMPRESA', cliente);
-        }
-
-        const { data: pageData, error } = await query;
-        if (error) {
-          console.error('❌ Erro na query:', error);
-          throw error;
-        }
-
-        console.log(`📄 Página ${page + 1} retornou ${pageData?.length || 0} registros`);
-
-        if (pageData && pageData.length > 0) {
-          allData = [...allData, ...pageData];
-          hasMore = pageData.length === pageSize;
-          page++;
-          console.log(`📊 Total acumulado até agora: ${allData.length} registros`);
-        } else {
-          hasMore = false;
-          console.log('📄 Página vazia ou sem dados, finalizando carregamento');
-        }
+      // Aplicar filtro de data se não for "todos"
+      if (dateFilter) {
+        query = query.gte('data_referencia', dateFilter.inicio)
+                     .lte('data_referencia', dateFilter.fim);
       }
 
-      console.log(`✅ Carregamento finalizado! Total de ${allData.length} registros carregados em ${page} páginas`);
-      setData(allData);
+      if (cliente !== "todos") {
+        query = query.eq('EMPRESA', cliente);
+      }
+
+      const { data: rawData, error } = await query;
+      if (error) throw error;
+
+      setData(rawData || []);
       
       // Processar dados
-      await processarDados(allData);
+      await processarDados(rawData || []);
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
