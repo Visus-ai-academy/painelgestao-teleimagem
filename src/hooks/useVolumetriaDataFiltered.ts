@@ -187,46 +187,54 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('MEDICO', filters.medico);
       }
 
-      // Carregar dados com otimização inteligente
+      // Carregar todos os dados de forma otimizada em batches
       let allData: any[] = [];
+      let offset = 0;
+      const limit = 2000; // Batches otimizados
+      let hasMoreData = true;
       
-      // Para dados filtrados, usamos uma abordagem mais eficiente
-      const hasFilters = filters.cliente !== 'todos' || 
-                        filters.modalidade !== 'todos' || 
-                        filters.especialidade !== 'todos' ||
-                        filters.prioridade !== 'todos' ||
-                        filters.medico !== 'todos' ||
-                        filters.ano !== 'todos';
+      console.log('🔄 Iniciando carregamento otimizado de dados...');
+      
+      try {
+        while (hasMoreData) {
+          const { data: batchData, error } = await query
+            .range(offset, offset + limit - 1)
+            .order('data_referencia', { ascending: false });
 
-      if (hasFilters) {
-        // Com filtros: carregar dados limitados mas suficientes
-        console.log('🔄 Carregando dados filtrados...');
-        const { data: filteredData, error } = await query
-          .limit(50000) // Limite razoável para dados filtrados
-          .order('data_referencia', { ascending: false });
+          if (error) {
+            console.error('❌ Erro ao buscar dados:', error);
+            throw error;
+          }
 
-        if (error) {
-          console.error('❌ Erro ao buscar dados filtrados:', error);
-          throw error;
+          if (!batchData || batchData.length === 0) {
+            console.log('🏁 Fim dos dados - nenhum registro retornado');
+            hasMoreData = false;
+            break;
+          }
+
+          allData = [...allData, ...batchData];
+          console.log(`📦 Lote carregado: ${batchData.length} registros (total: ${allData.length})`);
+
+          // Se retornou menos que o limite, chegamos ao fim
+          if (batchData.length < limit) {
+            console.log('🏁 Último lote carregado');
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
+
+          // Timeout de segurança para evitar travamento
+          if (offset > 500000) {
+            console.log('⚠️ Limite de segurança atingido (500k registros) - finalizando...');
+            hasMoreData = false;
+          }
+
+          // Pequena pausa para evitar sobrecarga
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
-
-        allData = filteredData || [];
-        console.log(`✅ Dados filtrados carregados: ${allData.length} registros`);
-
-      } else {
-        // Sem filtros: carregar apenas amostra representativa para performance
-        console.log('🔄 Carregando amostra de dados para visão geral...');
-        const { data: sampleData, error } = await query
-          .limit(25000) // Amostra suficiente para estatísticas gerais
-          .order('data_referencia', { ascending: false });
-
-        if (error) {
-          console.error('❌ Erro ao buscar amostra de dados:', error);
-          throw error;
-        }
-
-        allData = sampleData || [];
-        console.log(`✅ Amostra de dados carregada: ${allData.length} registros`);
+      } catch (error) {
+        console.error('❌ Erro durante carregamento:', error);
+        throw error;
       }
 
       console.log(`✅ Total de registros carregados com filtros: ${allData.length}`);
