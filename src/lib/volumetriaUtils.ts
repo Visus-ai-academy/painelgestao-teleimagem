@@ -329,22 +329,8 @@ export async function processVolumetriaFile(
           }
         }
 
-        // Validar valores obrigatórios
-        if (config.validateValues) {
-          let valorFinal = record.VALORES || 0;
-          
-          // Apropriar valores se necessário
-          if (config.appropriateValues && (!record.VALORES || record.VALORES === 0)) {
-            valorFinal = appropriateExamValue(record);
-            record.VALORES = valorFinal;
-          }
-          
-          // Validar se valor não é zero
-          if (valorFinal === 0) {
-            errors.push(`Linha ${i + j + 2}: Campo "VALORES" não pode ser zero`);
-            continue;
-          }
-        }
+        // Permitir valores zerados - apropriação será feita posteriormente via configuração
+        // A validação de valores obrigatórios foi removida para permitir valores zero
 
         processedRecords.push(record);
       }
