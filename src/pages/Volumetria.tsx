@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { VolumetriaUpload } from '@/components/VolumetriaUpload';
-import { useVolumetriaData } from '@/hooks/useVolumetriaData';
+import { useVolumetriaDataFiltered } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters, VolumetriaFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
@@ -25,7 +25,7 @@ export default function Volumetria() {
     tipoCliente: 'todos'
   });
   
-  const { stats, clientes, modalidades, especialidades, listaClientes, loading, refreshData } = useVolumetriaData(filters.cliente, filters.cliente);
+  const { stats, clientes, modalidades, especialidades, loading, refreshData } = useVolumetriaDataFiltered(filters);
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
   const hasNoData = stats.total_registros === 0;
