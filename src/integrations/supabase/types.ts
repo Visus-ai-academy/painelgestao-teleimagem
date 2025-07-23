@@ -1348,6 +1348,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pendencias: {
+        Row: {
+          categoria: string
+          created_at: string | null
+          created_by: string | null
+          data_limite: string | null
+          descricao: string | null
+          id: string
+          metadata: Json | null
+          modulo: string | null
+          prioridade: string
+          resolucao: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          responsavel_id: string | null
+          status: string
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          categoria?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_limite?: string | null
+          descricao?: string | null
+          id?: string
+          metadata?: Json | null
+          modulo?: string | null
+          prioridade?: string
+          resolucao?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsavel_id?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_limite?: string | null
+          descricao?: string | null
+          id?: string
+          metadata?: Json | null
+          modulo?: string | null
+          prioridade?: string
+          resolucao?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsavel_id?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       performance_logs: {
         Row: {
           id: string

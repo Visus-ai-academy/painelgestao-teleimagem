@@ -10,7 +10,8 @@ import {
   Award,
   ChevronDown,
   FileText,
-  Network
+  Network,
+  AlertTriangle
 } from "lucide-react";
 
 import { NavLink, useLocation } from "react-router-dom";
@@ -132,6 +133,12 @@ const menuItems: MenuItem[] = [
     url: "/relatorio-implementacoes", 
     icon: FileText,
     requiredRoles: ['admin'],
+  },
+  { 
+    title: "Pendências", 
+    url: "/pendencias", 
+    icon: AlertTriangle,
+    requiredRoles: ['manager', 'admin'],
   },
 ];
 
