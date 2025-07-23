@@ -165,16 +165,17 @@ export function convertValues(valueStr: string | number): number | null {
 
 // Função para verificar se uma data está no período de faturamento especificado
 export function isInBillingPeriod(dataRealizacao: Date, periodoFaturamento: { ano: number; mes: number }): boolean {
-  // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
+  // Período de faturamento selecionado: dia 8 do mês selecionado até dia 7 do mês seguinte
+  // Exemplo: junho/2025 → período de 08/06/2025 a 07/07/2025
   const { ano, mes } = periodoFaturamento;
   
-  // Calcular mês anterior
-  const anoAnterior = mes === 1 ? ano - 1 : ano;
-  const mesAnterior = mes === 1 ? 12 : mes - 1;
+  // Calcular o mês seguinte
+  const anoSeguinte = mes === 12 ? ano + 1 : ano;
+  const mesSeguinte = mes === 12 ? 1 : mes + 1;
   
-  // Período: dia 8 do mês anterior até dia 7 do mês atual
-  const inicioPeriodo = new Date(anoAnterior, mesAnterior - 1, 8); // mes - 1 porque Date usa 0-11
-  const fimPeriodo = new Date(ano, mes - 1, 7);
+  // Período de exclusão: dia 8 do mês selecionado até dia 7 do mês seguinte
+  const inicioPeriodo = new Date(ano, mes - 1, 8); // mes - 1 porque Date usa 0-11
+  const fimPeriodo = new Date(anoSeguinte, mesSeguinte - 1, 7);
   
   return dataRealizacao >= inicioPeriodo && dataRealizacao <= fimPeriodo;
 }
