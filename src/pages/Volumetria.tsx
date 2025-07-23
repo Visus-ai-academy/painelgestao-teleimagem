@@ -66,19 +66,25 @@ export default function Volumetria() {
 
   const loadClientes = async () => {
     try {
-      // Buscar TODOS os clientes únicos sem limitação
-      const { data: empresas, error } = await supabase
+      console.log('🔍 Iniciando carregamento de clientes únicos...');
+      
+      // Buscar TODOS os clientes únicos sem limitação usando aggregate
+      const { data: empresas, error, count } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA')
+        .select('EMPRESA', { count: 'exact' })
         .not('EMPRESA', 'is', null);
 
       if (error) throw error;
 
       const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
+      console.log(`📊 Total de registros na tabela: ${count}`);
+      console.log(`📊 Total de registros com empresa: ${empresas?.length}`);
       console.log(`📊 Total de clientes únicos encontrados: ${empresasUnicas.length}`);
+      console.log(`📊 Primeiros 10 clientes:`, empresasUnicas.slice(0, 10));
+      
       setClientes(empresasUnicas.sort());
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error('❌ Erro ao carregar clientes:', error);
     }
   };
 
@@ -150,32 +156,66 @@ export default function Volumetria() {
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Iniciando carregamento de dados de volumetria...');
+      
       const dateFilter = getDateFilter();
+      console.log('📅 Filtro de data:', dateFilter);
+      console.log('👤 Cliente selecionado:', cliente);
 
-      let query = supabase
+      // Primeira consulta: buscar contagem total sem limitação
+      let countQuery = supabase
         .from('volumetria_mobilemed')
-        .select('*', { count: 'exact' })
-        .order('data_referencia', { ascending: false });
+        .select('*', { count: 'exact', head: true });
 
-      // Aplicar filtro de data se não for "todos"
+      // Aplicar filtros na contagem
       if (dateFilter) {
-        query = query.gte('data_referencia', dateFilter.inicio)
-                     .lte('data_referencia', dateFilter.fim);
+        countQuery = countQuery.gte('data_referencia', dateFilter.inicio)
+                              .lte('data_referencia', dateFilter.fim);
       }
 
       if (cliente !== "todos") {
-        query = query.eq('EMPRESA', cliente);
+        countQuery = countQuery.eq('EMPRESA', cliente);
       }
 
-      const { data: rawData, error, count } = await query;
-      if (error) throw error;
+      const { count: totalCount, error: countError } = await countQuery;
+      if (countError) throw countError;
 
-      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${count} total (SEM LIMITE)`);
+      console.log(`📊 Total de registros que atendem aos filtros: ${totalCount}`);
+
+      // Segunda consulta: buscar todos os dados sem limitação
+      let dataQuery = supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .order('data_referencia', { ascending: false });
+
+      // Aplicar filtros nos dados
+      if (dateFilter) {
+        dataQuery = dataQuery.gte('data_referencia', dateFilter.inicio)
+                             .lte('data_referencia', dateFilter.fim);
+      }
+
+      if (cliente !== "todos") {
+        dataQuery = dataQuery.eq('EMPRESA', cliente);
+      }
+
+      const { data: rawData, error: dataError } = await dataQuery;
+      if (dataError) throw dataError;
+
+      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${totalCount} total (TODOS OS DADOS)`);
+      console.log('📋 Amostra dos primeiros 3 registros:', rawData?.slice(0, 3).map(r => ({ 
+        empresa: r.EMPRESA, 
+        data: r.data_referencia, 
+        valores: r.VALORES 
+      })));
+      
       setData(rawData || []);
       
       // Processar dados apenas se houver dados
       if (rawData && rawData.length > 0) {
+        console.log('⚙️ Processando dados...');
         await processarDados(rawData);
+      } else {
+        console.log('⚠️ Nenhum dado encontrado para processar');
       }
       
     } catch (error) {
@@ -191,9 +231,15 @@ export default function Volumetria() {
   };
 
   const processarDados = async (rawData: VolumetriaData[]) => {
+    console.log('🔍 Iniciando processamento de dados...');
+    console.log(`📊 Total de registros para processar: ${rawData.length}`);
+    
     // Totais gerais
     const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
     const totalRegistros = rawData.length;
+    
+    console.log(`💰 Total de exames (soma VALORES): ${totalExames.toLocaleString()}`);
+    console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
     
     // Cálculo de atrasos (DATA_LAUDO + HORA_LAUDO > DATA_PRAZO + HORA_PRAZO)
     const atrasados = rawData.filter(item => {
