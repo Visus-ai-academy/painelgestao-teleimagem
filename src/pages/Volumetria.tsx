@@ -7,6 +7,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Toolti
 import { Badge } from "@/components/ui/badge";
 import { ControlePeriodoVolumetria } from '@/components/ControlePeriodoVolumetria';
 import { stringParaPeriodo } from '@/lib/periodoUtils';
+import { useToast } from "@/hooks/use-toast";
 
 interface VolumetriaData {
   id: string;
@@ -36,6 +37,7 @@ interface AggregatedData {
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export default function Volumetria() {
+  const { toast } = useToast();
   const [data, setData] = useState<VolumetriaData[]>([]);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState<string>("todos");
@@ -150,8 +152,9 @@ export default function Volumetria() {
 
       let query = supabase
         .from('volumetria_mobilemed')
-        .select('*')
-        .limit(10000); // Limite inicial de 10k registros para evitar travamento
+        .select('*', { count: 'exact' })
+        .limit(5000) // Limite reduzido para melhor performance
+        .order('data_referencia', { ascending: false });
 
       // Aplicar filtro de data se não for "todos"
       if (dateFilter) {
@@ -163,16 +166,24 @@ export default function Volumetria() {
         query = query.eq('EMPRESA', cliente);
       }
 
-      const { data: rawData, error } = await query;
+      const { data: rawData, error, count } = await query;
       if (error) throw error;
 
+      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${count} total`);
       setData(rawData || []);
       
-      // Processar dados
-      await processarDados(rawData || []);
+      // Processar dados apenas se houver dados
+      if (rawData && rawData.length > 0) {
+        await processarDados(rawData);
+      }
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados da volumetria",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
