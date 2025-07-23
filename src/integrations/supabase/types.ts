@@ -1772,6 +1772,126 @@ export type Database = {
         }
         Relationships: []
       }
+      volumetria_mobilemed_archive: {
+        Row: {
+          ACCESSION_NUMBER: string | null
+          arquivo_fonte: string
+          CODIGO_INTERNO: number | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
+          created_at: string
+          created_by: string | null
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
+          data_referencia: string | null
+          DATA_TRANSFERENCIA: string | null
+          data_upload: string
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
+          id: string
+          IMAGENS_CAPTURADAS: number | null
+          IMAGENS_CHAVES: number | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
+          updated_at: string
+          VALORES: number | null
+        }
+        Insert: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte: string
+          CODIGO_INTERNO?: number | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          created_by?: string | null
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          data_upload?: string
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA: string
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: number | null
+          IMAGENS_CHAVES?: number | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE: string
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Update: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte?: string
+          CODIGO_INTERNO?: number | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          created_by?: string | null
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          data_upload?: string
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: number | null
+          IMAGENS_CHAVES?: number | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       mv_volumetria_dashboard: {
@@ -1790,6 +1910,10 @@ export type Database = {
       }
     }
     Functions: {
+      archive_old_volumetria_data: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       can_edit_data: {
         Args: { data_referencia: string }
         Returns: boolean
@@ -1885,6 +2009,10 @@ export type Database = {
       refresh_volumetria_dashboard: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      user_can_access_empresa: {
+        Args: { empresa_name: string }
+        Returns: boolean
       }
       validate_cnpj: {
         Args: { cnpj: string }
