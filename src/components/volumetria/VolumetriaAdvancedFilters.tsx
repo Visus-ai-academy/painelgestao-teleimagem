@@ -34,6 +34,7 @@ interface FilterData {
   prioridades: string[];
   medicos: string[];
   equipes: string[];
+  anos: number[];
 }
 
 export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: VolumetriaAdvancedFiltersProps) {
@@ -44,7 +45,8 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     categorias: [],
     prioridades: [],
     medicos: [],
-    equipes: []
+    equipes: [],
+    anos: []
   });
 
   useEffect(() => {
@@ -53,26 +55,77 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
 
   const loadFilterData = async () => {
     try {
-      // Carregar dados únicos para filtros
-      const [clientesRes, modalidadesRes, especialidadesRes, prioridadesRes, medicosRes] = await Promise.all([
-        supabase.from('volumetria_mobilemed').select('EMPRESA').not('EMPRESA', 'is', null),
-        supabase.from('volumetria_mobilemed').select('MODALIDADE').not('MODALIDADE', 'is', null),
-        supabase.from('volumetria_mobilemed').select('ESPECIALIDADE').not('ESPECIALIDADE', 'is', null),
-        supabase.from('volumetria_mobilemed').select('PRIORIDADE').not('PRIORIDADE', 'is', null),
-        supabase.from('volumetria_mobilemed').select('MEDICO').not('MEDICO', 'is', null)
+      console.log('🔍 Carregando opções de filtros baseadas nos dados reais...');
+      
+      // Carregar dados únicos para filtros usando paginação
+      const loadUniqueValues = async (column: string) => {
+        let allValues: string[] = [];
+        let offset = 0;
+        const limit = 1000;
+        
+        while (true) {
+          const { data, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select(column)
+            .not(column, 'is', null)
+            .range(offset, offset + limit - 1);
+
+          if (error) {
+            console.error(`❌ Erro ao carregar ${column}:`, error);
+            break;
+          }
+
+          if (!data || data.length === 0) break;
+
+          const values = data.map(item => item[column]).filter(Boolean);
+          allValues = [...allValues, ...values];
+          
+          if (data.length < limit) break;
+          offset += limit;
+        }
+        
+        return [...new Set(allValues)].sort();
+      };
+
+      // Carregar todos os valores únicos em paralelo
+      const [clientes, modalidades, especialidades, prioridades, medicos] = await Promise.all([
+        loadUniqueValues('EMPRESA'),
+        loadUniqueValues('MODALIDADE'),
+        loadUniqueValues('ESPECIALIDADE'),
+        loadUniqueValues('PRIORIDADE'),
+        loadUniqueValues('MEDICO')
       ]);
 
+      // Carregar anos únicos baseados em data_referencia
+      const { data: datesData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('data_referencia')
+        .not('data_referencia', 'is', null)
+        .order('data_referencia', { ascending: false })
+        .limit(1000);
+
+      const yearsSet = new Set<number>();
+      datesData?.forEach(item => {
+        if (item.data_referencia) {
+          yearsSet.add(new Date(item.data_referencia).getFullYear());
+        }
+      });
+      const yearsArray = Array.from(yearsSet).sort((a, b) => b - a);
+
+      console.log(`✅ Filtros carregados: ${clientes.length} clientes, ${modalidades.length} modalidades, ${especialidades.length} especialidades`);
+
       setFilterData({
-        clientes: [...new Set(clientesRes.data?.map(item => item.EMPRESA) || [])].sort(),
-        modalidades: [...new Set(modalidadesRes.data?.map(item => item.MODALIDADE) || [])].sort(),
-        especialidades: [...new Set(especialidadesRes.data?.map(item => item.ESPECIALIDADE) || [])].sort(),
+        clientes,
+        modalidades,
+        especialidades,
         categorias: ['Rotina', 'Urgência', 'Emergência'], // Categorias baseadas na estrutura comum
-        prioridades: [...new Set(prioridadesRes.data?.map(item => item.PRIORIDADE) || [])].sort(),
-        medicos: [...new Set(medicosRes.data?.map(item => item.MEDICO) || [])].sort(),
-        equipes: ['Equipe A', 'Equipe B', 'Equipe C'] // Placeholder - ajustar conforme necessário
+        prioridades,
+        medicos,
+        equipes: ['Equipe A', 'Equipe B', 'Equipe C'], // Placeholder - ajustar conforme necessário
+        anos: yearsArray
       });
     } catch (error) {
-      console.error('Erro ao carregar dados dos filtros:', error);
+      console.error('❌ Erro ao carregar dados dos filtros:', error);
     }
   };
 
@@ -100,7 +153,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
   };
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
@@ -126,27 +178,27 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        <div className="flex flex-wrap gap-3 items-end">
           {/* Filtros Temporais */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Ano</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Ano</label>
             <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os Anos</SelectItem>
-                {years.map(year => (
+                {filterData.anos.map(year => (
                   <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Trimestre</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Trimestre</label>
             <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -159,10 +211,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Mês</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Mês</label>
             <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -174,10 +226,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Semana</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Semana</label>
             <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -190,10 +242,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Dia</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Dia</label>
             <Select value={filters.dia} onValueChange={(value) => updateFilter('dia', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -207,10 +259,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           </div>
 
           {/* Filtros de Dados */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Cliente</label>
+          <div className="space-y-1 min-w-[140px]">
+            <label className="text-xs font-medium">Cliente ({filterData.clientes.length})</label>
             <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-[200px]">
@@ -222,10 +274,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Modalidade</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Modalidade ({filterData.modalidades.length})</label>
             <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -237,10 +289,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Especialidade</label>
+          <div className="space-y-1 min-w-[130px]">
+            <label className="text-xs font-medium">Especialidade ({filterData.especialidades.length})</label>
             <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -252,10 +304,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Categoria</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Categoria</label>
             <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -267,10 +319,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Prioridade</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Prioridade ({filterData.prioridades.length})</label>
             <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -282,10 +334,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Médico</label>
+          <div className="space-y-1 min-w-[130px]">
+            <label className="text-xs font-medium">Médico ({filterData.medicos.length})</label>
             <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-[200px]">
@@ -297,10 +349,10 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Equipe</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Equipe</label>
             <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -312,26 +364,31 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tipo Cliente</label>
+          <div className="space-y-1 min-w-[120px]">
+            <label className="text-xs font-medium">Tipo Cliente</label>
             <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="CO">CO (Cliente Operacional)</SelectItem>
-                <SelectItem value="NC">NC (Novo Cliente)</SelectItem>
+                <SelectItem value="CO">CO (Operacional)</SelectItem>
+                <SelectItem value="NC">NC (Novo)</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Contador de filtros ativos */}
-        <div className="mt-4 pt-4 border-t">
+        {/* Contador de filtros ativos e mensagem de dados */}
+        <div className="mt-4 pt-4 border-t flex justify-between items-center">
           <div className="text-sm text-muted-foreground">
             Filtros ativos: {Object.values(filters).filter(value => value !== 'todos').length}
           </div>
+          {Object.values(filters).some(value => value !== 'todos') && (
+            <div className="text-sm text-blue-600 font-medium">
+              💡 Dados exibidos conforme filtros aplicados
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

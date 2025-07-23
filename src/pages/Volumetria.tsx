@@ -5,6 +5,7 @@ import { VolumetriaUpload } from '@/components/VolumetriaUpload';
 import { useVolumetriaData } from '@/hooks/useVolumetriaData';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters, VolumetriaFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
+import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 
 export default function Volumetria() {
@@ -25,6 +26,9 @@ export default function Volumetria() {
   });
   
   const { stats, clientes, modalidades, especialidades, listaClientes, loading, refreshData } = useVolumetriaData(filters.cliente, filters.cliente);
+  
+  const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
+  const hasNoData = stats.total_registros === 0;
 
   if (loading) {
     return (
@@ -54,15 +58,39 @@ export default function Volumetria() {
         onFiltersChange={setFilters}
       />
 
-      {/* Métricas Principais */}
-      <VolumetriaStats stats={stats} />
+      {/* Verificar se há dados */}
+      {hasNoData ? (
+        <VolumetriaNoData 
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={() => setFilters({
+            ano: 'todos',
+            trimestre: 'todos',
+            mes: 'todos',
+            semana: 'todos',
+            dia: 'todos',
+            cliente: 'todos',
+            modalidade: 'todos',
+            especialidade: 'todos',
+            categoria: 'todos',
+            prioridade: 'todos',
+            medico: 'todos',
+            equipe: 'todos',
+            tipoCliente: 'todos'
+          })}
+        />
+      ) : (
+        <>
+          {/* Métricas Principais */}
+          <VolumetriaStats stats={stats} />
 
-      {/* Gráficos */}
-      <VolumetriaCharts 
-        clientes={clientes}
-        modalidades={modalidades}
-        especialidades={especialidades}
-      />
+          {/* Gráficos */}
+          <VolumetriaCharts 
+            clientes={clientes}
+            modalidades={modalidades}
+            especialidades={especialidades}
+          />
+        </>
+      )}
 
       {/* Upload Component */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
