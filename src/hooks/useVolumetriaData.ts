@@ -185,13 +185,13 @@ export function useVolumetriaData(periodo: string, cliente: string) {
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Limite máximo para evitar travamento
-      const maxRecords = 15000;
+      // Carregar todos os dados de forma otimizada em batches
       let allData: any[] = [];
       let offset = 0;
-      const limit = 1000;
+      const limit = 2000;
+      let hasMoreData = true;
       
-      while (allData.length < maxRecords) {
+      while (hasMoreData) {
         let query = supabase
           .from('volumetria_mobilemed')
           .select(`
@@ -234,16 +234,19 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         console.log(`📦 Carregados ${batchData.length} registros no lote (offset: ${offset}), total: ${allData.length}`);
         
         if (batchData.length < limit) {
-          break;
+          hasMoreData = false;
+        } else {
+          offset += limit;
         }
-        
-        offset += limit;
-        
-        // Parar se atingir o limite máximo
-        if (allData.length >= maxRecords) {
-          console.log(`⚠️ Limite de ${maxRecords.toLocaleString()} registros atingido`);
-          break;
+
+        // Timeout de segurança para evitar travamento
+        if (offset > 500000) {
+          console.log('⚠️ Limite de segurança atingido (500k registros) - finalizando...');
+          hasMoreData = false;
         }
+
+        // Pequena pausa para evitar sobrecarga
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
 
       console.log(`✅ TOTAL carregado: ${allData.length} registros`);

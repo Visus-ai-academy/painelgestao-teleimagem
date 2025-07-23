@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { VolumetriaUpload } from '@/components/VolumetriaUpload';
 import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
@@ -92,32 +90,7 @@ export default function Volumetria() {
         </>
       )}
 
-      {/* Upload Component */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload - Data Laudo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <VolumetriaUpload 
-              arquivoFonte="data_laudo" 
-              onSuccess={refreshData} 
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload - Data Exame</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <VolumetriaUpload 
-              arquivoFonte="data_exame" 
-              onSuccess={refreshData} 
-            />
-          </CardContent>
-        </Card>
-      </div>
+    
     </div>
   );
 }

@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Volumetria from "./pages/Volumetria";
+import UploadDados from "./pages/UploadDados";
 
 import Operacional from "./pages/Operacional";
 import OperacionalProducao from "./pages/OperacionalProducao";
@@ -85,6 +86,15 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <Volumetria />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/upload-dados" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <UploadDados />
+                  </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
             } />
