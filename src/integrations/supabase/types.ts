@@ -1825,6 +1825,19 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      get_volumetria_stats: {
+        Args: {
+          p_empresa?: string
+          p_data_inicio?: string
+          p_data_fim?: string
+        }
+        Returns: {
+          total_exames: number
+          total_registros: number
+          total_atrasados: number
+          percentual_atraso: number
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string
