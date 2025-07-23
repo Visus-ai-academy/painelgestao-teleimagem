@@ -4,14 +4,27 @@ import { Loader2 } from "lucide-react";
 import { VolumetriaUpload } from '@/components/VolumetriaUpload';
 import { useVolumetriaData } from '@/hooks/useVolumetriaData';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
-import { VolumetriaFilters } from '@/components/volumetria/VolumetriaFilters';
+import { VolumetriaAdvancedFilters, VolumetriaFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 
 export default function Volumetria() {
-  const [periodo, setPeriodo] = useState<string>("todos");
-  const [cliente, setCliente] = useState<string>("todos");
+  const [filters, setFilters] = useState<VolumetriaFilters>({
+    ano: 'todos',
+    trimestre: 'todos',
+    mes: 'todos',
+    semana: 'todos',
+    dia: 'todos',
+    cliente: 'todos',
+    modalidade: 'todos',
+    especialidade: 'todos',
+    categoria: 'todos',
+    prioridade: 'todos',
+    medico: 'todos',
+    equipe: 'todos',
+    tipoCliente: 'todos'
+  });
   
-  const { stats, clientes, modalidades, especialidades, listaClientes, loading, refreshData } = useVolumetriaData(periodo, cliente);
+  const { stats, clientes, modalidades, especialidades, listaClientes, loading, refreshData } = useVolumetriaData(filters.cliente, filters.cliente);
 
   if (loading) {
     return (
@@ -35,13 +48,10 @@ export default function Volumetria() {
         </p>
       </div>
 
-      {/* Controles */}
-      <VolumetriaFilters 
-        periodo={periodo}
-        cliente={cliente}
-        listaClientes={listaClientes}
-        onPeriodoChange={setPeriodo}
-        onClienteChange={setCliente}
+      {/* Filtros Avançados */}
+      <VolumetriaAdvancedFilters 
+        filters={filters}
+        onFiltersChange={setFilters}
       />
 
       {/* Métricas Principais */}
