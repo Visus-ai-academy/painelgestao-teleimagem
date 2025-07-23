@@ -128,8 +128,13 @@ export default function Volumetria() {
 
   const loadData = async () => {
     try {
+      console.log('🔄 Iniciando carregamento dos dados...');
+      console.log('📅 Período selecionado:', periodo);
+      console.log('🏢 Cliente selecionado:', cliente);
+      
       setLoading(true);
       const dateFilter = getDateFilter();
+      console.log('📊 Filtro de data:', dateFilter);
 
       // Carregar TODOS os dados usando paginação para evitar limite do Supabase
       let allData: VolumetriaData[] = [];
@@ -137,7 +142,11 @@ export default function Volumetria() {
       const pageSize = 1000;
       let hasMore = true;
 
+      console.log('🔄 Iniciando carregamento paginado...');
+
       while (hasMore) {
+        console.log(`📄 Carregando página ${page + 1} (range: ${page * pageSize} - ${(page + 1) * pageSize - 1})...`);
+        
         let query = supabase
           .from('volumetria_mobilemed')
           .select('*')
@@ -145,33 +154,43 @@ export default function Volumetria() {
 
         // Aplicar filtro de data se não for "todos"
         if (dateFilter) {
+          console.log(`📅 Aplicando filtro de data: ${dateFilter.inicio} até ${dateFilter.fim}`);
           query = query.gte('data_referencia', dateFilter.inicio)
                        .lte('data_referencia', dateFilter.fim);
         }
 
         if (cliente !== "todos") {
+          console.log(`🏢 Aplicando filtro de cliente: ${cliente}`);
           query = query.eq('EMPRESA', cliente);
         }
 
         const { data: pageData, error } = await query;
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Erro na query:', error);
+          throw error;
+        }
+
+        console.log(`📄 Página ${page + 1} retornou ${pageData?.length || 0} registros`);
 
         if (pageData && pageData.length > 0) {
           allData = [...allData, ...pageData];
           hasMore = pageData.length === pageSize;
           page++;
+          console.log(`📊 Total acumulado até agora: ${allData.length} registros`);
         } else {
           hasMore = false;
+          console.log('📄 Página vazia ou sem dados, finalizando carregamento');
         }
       }
 
+      console.log(`✅ Carregamento finalizado! Total de ${allData.length} registros carregados em ${page} páginas`);
       setData(allData);
       
       // Processar dados
       await processarDados(allData);
       
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('❌ Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
