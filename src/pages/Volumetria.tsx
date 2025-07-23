@@ -173,7 +173,7 @@ export default function Volumetria() {
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Query base para estatísticas principais
+      // Query base para estatísticas principais - SEM LIMITAÇÃO
       let statsQuery = supabase
         .from('volumetria_mobilemed')
         .select(`
@@ -226,7 +226,7 @@ export default function Volumetria() {
       }
 
       // Calcular estatísticas principais
-      const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      const totalExames = rawData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
       const totalRegistros = rawData.length;
       const clientesUnicos = new Set(rawData.map(item => item.EMPRESA)).size;
 
@@ -276,7 +276,7 @@ export default function Volumetria() {
         }
         
         const clienteData = clientesMap.get(empresa)!;
-        clienteData.total_exames += item.VALORES || 0;
+        clienteData.total_exames += Number(item.VALORES) || 0;
         clienteData.total_registros += 1;
         
         // Verificar se está atrasado
@@ -312,7 +312,7 @@ export default function Volumetria() {
         }
         
         const modalidadeData = modalidadesMap.get(modalidade)!;
-        modalidadeData.total_exames += item.VALORES || 0;
+        modalidadeData.total_exames += Number(item.VALORES) || 0;
         modalidadeData.total_registros += 1;
       });
 
@@ -338,7 +338,7 @@ export default function Volumetria() {
         }
         
         const especialidadeData = especialidadesMap.get(especialidade)!;
-        especialidadeData.total_exames += item.VALORES || 0;
+        especialidadeData.total_exames += Number(item.VALORES) || 0;
         especialidadeData.total_registros += 1;
       });
 
