@@ -293,7 +293,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           )}
 
           {/* Seção de Botões dos Filtros */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Botão PERÍODO */}
             <Collapsible 
               open={expandedSections.periodo} 
@@ -302,16 +302,22 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               <CollapsibleTrigger asChild>
                 <Button
                   variant={getActiveFiltersForSection('periodo').length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
+                  className="w-full h-20 flex flex-col items-center justify-center gap-1 p-4"
                 >
-                  <CalendarIcon className="h-4 w-4" />
-                  Período
-                  {getActiveFiltersForSection('periodo').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('periodo').length}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span className="font-medium">Período</span>
+                    {getActiveFiltersForSection('periodo').length > 0 && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1">
+                        {getActiveFiltersForSection('periodo').length}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {getActiveFiltersForSection('periodo').length > 0 
+                      ? `${getActiveFiltersForSection('periodo').length} filtros ativos` 
+                      : 'Filtrar por data'}
+                  </span>
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
@@ -447,16 +453,20 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               <CollapsibleTrigger asChild>
                 <Button
                   variant={getActiveFiltersForSection('cliente').length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
+                  className="w-full h-20 flex flex-col items-center justify-center gap-1 p-4"
                 >
-                  <Building className="h-4 w-4" />
-                  Cliente
-                  {getActiveFiltersForSection('cliente').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('cliente').length}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4" />
+                    <span className="font-medium">Cliente</span>
+                    {getActiveFiltersForSection('cliente').length > 0 && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1">
+                        {getActiveFiltersForSection('cliente').length}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {filters.cliente !== 'todos' ? filters.cliente : 'Todos os clientes'}
+                  </span>
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
@@ -535,16 +545,22 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               <CollapsibleTrigger asChild>
                 <Button
                   variant={getActiveFiltersForSection('laudo').length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
+                  className="w-full h-20 flex flex-col items-center justify-center gap-1 p-4"
                 >
-                  <FileText className="h-4 w-4" />
-                  Tipo de Laudo
-                  {getActiveFiltersForSection('laudo').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('laudo').length}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span className="font-medium">Tipo de Laudo</span>
+                    {getActiveFiltersForSection('laudo').length > 0 && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1">
+                        {getActiveFiltersForSection('laudo').length}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {getActiveFiltersForSection('laudo').length > 0 
+                      ? `${getActiveFiltersForSection('laudo').length} filtros ativos` 
+                      : 'Modalidade, especialidade...'}
+                  </span>
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
@@ -620,16 +636,20 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
               <CollapsibleTrigger asChild>
                 <Button
                   variant={getActiveFiltersForSection('medico').length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
+                  className="w-full h-20 flex flex-col items-center justify-center gap-1 p-4"
                 >
-                  <Stethoscope className="h-4 w-4" />
-                  Médico
-                  {getActiveFiltersForSection('medico').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
-                      {getActiveFiltersForSection('medico').length}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Stethoscope className="h-4 w-4" />
+                    <span className="font-medium">Médico</span>
+                    {getActiveFiltersForSection('medico').length > 0 && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1">
+                        {getActiveFiltersForSection('medico').length}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {filters.medico !== 'todos' ? filters.medico : 'Todos os médicos'}
+                  </span>
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
