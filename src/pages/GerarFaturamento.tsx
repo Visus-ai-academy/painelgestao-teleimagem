@@ -923,28 +923,50 @@ export default function GerarFaturamento() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Arquivo 1: Data_Laudo (Faturamento)</Label>
                     <VolumetriaUpload
-                      arquivoFonte="data_laudo"
+                      arquivoFonte="volumetria_padrao"
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
-                          description: "Dados de volumetria processados com sucesso!",
+                          description: "Dados de volumetria padrão processados com sucesso!",
                         });
                       }}
                     />
                   </div>
 
-                   <div>
-                    <Label>Arquivo 2: Data_Exame (Operacional)</Label>
+                  <div>
                     <VolumetriaUpload
-                      arquivoFonte="data_exame"
+                      arquivoFonte="volumetria_fora_padrao"
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
-                          description: "Dados de volumetria processados com sucesso!",
+                          description: "Dados de volumetria fora do padrão processados com sucesso!",
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <VolumetriaUpload
+                      arquivoFonte="volumetria_padrao_retroativo"
+                      onSuccess={() => {
+                        toast({
+                          title: "Upload Concluído",
+                          description: "Dados de volumetria padrão retroativa processados com sucesso!",
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <VolumetriaUpload
+                      arquivoFonte="volumetria_fora_padrao_retroativo"
+                      onSuccess={() => {
+                        toast({
+                          title: "Upload Concluído",
+                          description: "Dados de volumetria fora do padrão retroativa processados com sucesso!",
                         });
                       }}
                     />

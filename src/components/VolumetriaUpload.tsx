@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { processVolumetriaFile } from '@/lib/volumetriaUtils';
+import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface VolumetriaUploadProps {
-  arquivoFonte: 'data_laudo' | 'data_exame';
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
   onSuccess?: () => void;
 }
 
@@ -75,8 +75,15 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess }: VolumetriaUploadPr
     }
   };
 
+  const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
+
   return (
     <div className="space-y-4">
+      <div className="p-4 bg-muted/50 rounded-lg">
+        <h3 className="font-semibold text-sm">{config.label}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+      </div>
+      
       <div className="flex items-center justify-center w-full">
         <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
           <div className="flex flex-col items-center justify-center pt-5 pb-6">

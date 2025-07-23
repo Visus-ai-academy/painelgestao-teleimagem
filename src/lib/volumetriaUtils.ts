@@ -32,8 +32,40 @@ export interface VolumetriaRecord {
   CODIGO_INTERNO?: number;
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
-  arquivo_fonte: 'data_laudo' | 'data_exame';
+  arquivo_fonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
 }
+
+// Configuração dos tipos de upload
+export const VOLUMETRIA_UPLOAD_CONFIGS = {
+  volumetria_padrao: {
+    label: 'Arquivo 1: Volumetria Padrão',
+    description: 'Upload para dados do período atual - valores obrigatórios',
+    validateValues: true,
+    filterCurrentPeriod: false,
+    appropriateValues: false
+  },
+  volumetria_fora_padrao: {
+    label: 'Arquivo 2: Volumetria Fora do Padrão',
+    description: 'Upload com apropriação de valores - valores serão calculados',
+    validateValues: true,
+    filterCurrentPeriod: false,
+    appropriateValues: true
+  },
+  volumetria_padrao_retroativo: {
+    label: 'Arquivo 3: Volumetria Padrão Retroativo',
+    description: 'Upload retroativo excluindo período atual - valores obrigatórios',
+    validateValues: true,
+    filterCurrentPeriod: true,
+    appropriateValues: false
+  },
+  volumetria_fora_padrao_retroativo: {
+    label: 'Arquivo 4: Volumetria Fora do Padrão Retroativo',
+    description: 'Upload retroativo com apropriação - valores serão calculados',
+    validateValues: true,
+    filterCurrentPeriod: true,
+    appropriateValues: true
+  }
+} as const;
 
 // Função para converter data do formato brasileiro (dd/mm/aa ou dd/mm/aaaa)
 export function convertBrazilianDate(dateStr: string): Date | null {
@@ -131,8 +163,41 @@ export function convertValues(valueStr: string | number): number | null {
   }
 }
 
+// Função para verificar se uma data está no período atual de faturamento
+export function isInCurrentBillingPeriod(dataRealizacao: Date): boolean {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth(); // 0-11
+  
+  // Período atual: dia 8 do mês anterior até dia 7 do mês atual
+  const inicioPeriodo = new Date(ano, mes - 1, 8);
+  const fimPeriodo = new Date(ano, mes, 7);
+  
+  return dataRealizacao >= inicioPeriodo && dataRealizacao <= fimPeriodo;
+}
+
+// Função para apropriar valores baseado no tipo de exame
+export function appropriateExamValue(record: VolumetriaRecord): number {
+  // Lógica de apropriação de valores - será expandida conforme necessário
+  const modalidade = record.MODALIDADE?.toLowerCase() || '';
+  const especialidade = record.ESPECIALIDADE?.toLowerCase() || '';
+  
+  // Valores padrão por tipo (será configurável no futuro)
+  if (modalidade.includes('raio')) return 1;
+  if (modalidade.includes('tomografia')) return 2;
+  if (modalidade.includes('ressonancia')) return 3;
+  if (modalidade.includes('ultrassom')) return 1;
+  if (modalidade.includes('mamografia')) return 1;
+  
+  // Valor padrão
+  return 1;
+}
+
 // Função para processar uma linha do Excel
-export function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): VolumetriaRecord | null {
+export function processRow(
+  row: any, 
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo'
+): VolumetriaRecord | null {
   try {
     // Validação robusta de entrada
     if (!row || typeof row !== 'object') {
@@ -210,7 +275,7 @@ export function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'):
 // Função para processar arquivo Excel no frontend
 export async function processVolumetriaFile(
   file: File, 
-  arquivoFonte: 'data_laudo' | 'data_exame',
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo',
   onProgress?: (processed: number, total: number, inserted: number) => void
 ): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[] }> {
   
@@ -238,7 +303,8 @@ export async function processVolumetriaFile(
 
     const errors: string[] = [];
     let totalInserted = 0;
-    const batchSize = 100; // Processar em lotes de 100 linhas
+    const batchSize = 100;
+    const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
 
     // Processar em lotes
     for (let i = 0; i < jsonData.length; i += batchSize) {
@@ -250,11 +316,37 @@ export async function processVolumetriaFile(
         const row = batch[j];
         const record = processRow(row, arquivoFonte);
         
-        if (record) {
-          processedRecords.push(record);
-        } else {
+        if (!record) {
           errors.push(`Linha ${i + j + 2}: Dados inválidos ou incompletos`);
+          continue;
         }
+
+        // Filtrar período atual para arquivos retroativos
+        if (config.filterCurrentPeriod && record.DATA_REALIZACAO) {
+          if (isInCurrentBillingPeriod(record.DATA_REALIZACAO)) {
+            console.log(`Linha ${i + j + 2}: Excluída por estar no período atual`);
+            continue;
+          }
+        }
+
+        // Validar valores obrigatórios
+        if (config.validateValues) {
+          let valorFinal = record.VALORES || 0;
+          
+          // Apropriar valores se necessário
+          if (config.appropriateValues && (!record.VALORES || record.VALORES === 0)) {
+            valorFinal = appropriateExamValue(record);
+            record.VALORES = valorFinal;
+          }
+          
+          // Validar se valor não é zero
+          if (valorFinal === 0) {
+            errors.push(`Linha ${i + j + 2}: Campo "VALORES" não pode ser zero`);
+            continue;
+          }
+        }
+
+        processedRecords.push(record);
       }
 
       // Inserir lote no banco

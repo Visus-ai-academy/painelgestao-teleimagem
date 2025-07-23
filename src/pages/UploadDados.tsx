@@ -32,11 +32,11 @@ export default function UploadDados() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Upload - Data Laudo</CardTitle>
+              <CardTitle>Upload - Volumetria Padrão</CardTitle>
             </CardHeader>
             <CardContent>
               <VolumetriaUpload 
-                arquivoFonte="data_laudo" 
+                arquivoFonte="volumetria_padrao" 
                 onSuccess={handleUploadSuccess} 
               />
             </CardContent>
@@ -44,11 +44,11 @@ export default function UploadDados() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Upload - Data Exame</CardTitle>
+              <CardTitle>Upload - Volumetria Fora do Padrão</CardTitle>
             </CardHeader>
             <CardContent>
               <VolumetriaUpload 
-                arquivoFonte="data_exame" 
+                arquivoFonte="volumetria_fora_padrao" 
                 onSuccess={handleUploadSuccess} 
               />
             </CardContent>
