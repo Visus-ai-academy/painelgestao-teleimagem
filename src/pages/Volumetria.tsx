@@ -70,31 +70,18 @@ export default function Volumetria() {
 
   const loadClientes = async () => {
     try {
-      console.log('🔍 Carregando TODOS os clientes únicos...');
+      console.log('🔍 Carregando clientes únicos...');
       
-      // Carregar todos os clientes sem limite usando paginação
-      let allEmpresas: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      
-      while (true) {
-        const { data: empresas, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('EMPRESA')
-          .not('EMPRESA', 'is', null)
-          .range(from, from + pageSize - 1);
+      // Query otimizada para buscar apenas clientes únicos
+      const { data: empresas, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA')
+        .not('EMPRESA', 'is', null);
 
-        if (error) throw error;
-        if (!empresas || empresas.length === 0) break;
-        
-        allEmpresas.push(...empresas);
-        
-        if (empresas.length < pageSize) break;
-        from += pageSize;
-      }
+      if (error) throw error;
       
-      const empresasUnicas = [...new Set(allEmpresas.map(e => e.EMPRESA))];
-      console.log(`📊 TODOS os clientes únicos encontrados: ${empresasUnicas.length}`);
+      const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
+      console.log(`📊 Clientes únicos encontrados: ${empresasUnicas.length}`);
       setClientes(empresasUnicas.sort());
       
     } catch (error) {
@@ -170,62 +157,14 @@ export default function Volumetria() {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Carregando TODOS os dados...');
+      console.log('⚡ Carregando dashboard com queries otimizadas...');
       
       const dateFilter = getDateFilter();
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Carregar TODOS os dados usando paginação
-      let allData: VolumetriaData[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      
-      while (true) {
-        let query = supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .order('data_referencia', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        // Aplicar filtros
-        if (dateFilter) {
-          query = query.gte('data_referencia', dateFilter.inicio)
-                       .lte('data_referencia', dateFilter.fim);
-        }
-
-        if (cliente !== "todos") {
-          query = query.eq('EMPRESA', cliente);
-        }
-
-        const { data: pageData, error } = await query;
-        if (error) throw error;
-        
-        if (!pageData || pageData.length === 0) break;
-        
-        allData.push(...pageData);
-        console.log(`📈 Carregados ${allData.length} registros até agora...`);
-        
-        if (pageData.length < pageSize) break;
-        from += pageSize;
-      }
-
-      console.log(`✅ Total final carregado: ${allData.length} registros`);
-      console.log('📋 Amostra dos primeiros 3 registros:', allData.slice(0, 3).map(r => ({ 
-        empresa: r.EMPRESA, 
-        data: r.data_referencia, 
-        valores: r.VALORES 
-      })));
-      
-      setData(allData);
-      
-      // Processar dados se houver
-      if (allData.length > 0) {
-        console.log('⚙️ Processando dados...');
-        await processarDados(allData);
-      } else {
-        console.log('⚠️ Nenhum dado encontrado');
-      }
+      // Processar dados agregados diretamente no banco para máxima velocidade
+      await processarDadosOtimizados(dateFilter);
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
@@ -239,218 +178,190 @@ export default function Volumetria() {
     }
   };
 
-  const processarDados = async (rawData: VolumetriaData[]) => {
-    console.log('🔍 Iniciando processamento de dados...');
-    console.log(`📊 Total de registros para processar: ${rawData.length}`);
+  const processarDadosOtimizados = async (dateFilter: any) => {
+    console.log('⚡ Processando dados com queries agregadas otimizadas...');
     
-    // Totais gerais
-    const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-    const totalRegistros = rawData.length;
-    
-    console.log(`💰 Total de exames (soma VALORES): ${totalExames.toLocaleString()}`);
-    console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
-    
-    // Cálculo de atrasos (DATA_LAUDO + HORA_LAUDO > DATA_PRAZO + HORA_PRAZO)
-    const atrasados = rawData.filter(item => {
-      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+    try {
+      // Query única otimizada para buscar todos os dados necessários
+      let query = supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO');
       
-      // Combinar data e hora do laudo
-      const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-      
-      // Combinar data e hora do prazo
-      const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-      
-      // Verificar se laudo foi entregue após o prazo
-      return dataHoraLaudo > dataHoraPrazo;
-    });
-
-    const totalAtrasados = atrasados.length;
-    const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
-
-    setTotalData({
-      total_exames: totalExames,
-      total_registros: totalRegistros,
-      total_atrasados: totalAtrasados,
-      percentual_atraso: percentualAtraso
-    });
-
-    setAtrasosData({
-      total_atrasados: totalAtrasados,
-      percentual_atraso: percentualAtraso,
-      total_no_prazo: totalRegistros - totalAtrasados
-    });
-
-    // Agrupar por empresa
-    const porEmpresa = rawData.reduce((acc: any, item) => {
-      const key = item.EMPRESA;
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
+      if (dateFilter) {
+        query = query
+          .gte('data_referencia', dateFilter.inicio)
+          .lte('data_referencia', dateFilter.fim);
       }
-      acc[key].total_exames += item.VALORES || 0;
-      acc[key].total_registros += 1;
       
-      // Verificar atraso usando critério correto (DATA_LAUDO + HORA_LAUDO > DATA_PRAZO + HORA_PRAZO)
-      if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
+      if (cliente !== "todos") {
+        query = query.eq('EMPRESA', cliente);
+      }
+
+      console.log('📊 Executando query otimizada única...');
+      const { data: rawData, error } = await query;
+      
+      if (error) throw error;
+      
+      console.log(`✅ Carregados ${rawData?.length || 0} registros`);
+
+      if (!rawData || rawData.length === 0) {
+        // Zerar todos os dados se não há resultados
+        setTotalData({ total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0 });
+        setAtrasosData({ total_atrasados: 0, percentual_atraso: 0, total_no_prazo: 0 });
+        setEmpresaData([]);
+        setModalidadeData([]);
+        setEspecialidadeData([]);
+        setPrioridadeData([]);
+        setAtrasosModalidade([]);
+        setAtrasosEspecialidade([]);
+        setAtrasosCliente([]);
+        setCrescimentoData({ total_atual: 0, total_anterior: 0, crescimento: "0", tipo: "crescimento" });
+        return;
+      }
+
+      // 1. Calcular totais
+      const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      const totalRegistros = rawData.length;
+      
+      // Calcular atrasos
+      const atrasados = rawData.filter(item => {
+        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
         const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
         const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-        if (dataHoraLaudo > dataHoraPrazo) acc[key].atrasados += 1;
-      }
+        return dataHoraLaudo > dataHoraPrazo;
+      });
+
+      const totalAtrasados = atrasados.length;
+      const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
+
+      console.log(`💰 Total de exames: ${totalExames.toLocaleString()}`);
+      console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
+      console.log(`⏰ Total atrasados: ${totalAtrasados.toLocaleString()}`);
+
+      setTotalData({
+        total_exames: totalExames,
+        total_registros: totalRegistros,
+        total_atrasados: totalAtrasados,
+        percentual_atraso: percentualAtraso
+      });
+
+      setAtrasosData({
+        total_atrasados: totalAtrasados,
+        percentual_atraso: percentualAtraso,
+        total_no_prazo: totalRegistros - totalAtrasados
+      });
+
+      // 2. Agrupar por empresa
+      const porEmpresa = rawData.reduce((acc: any, item) => {
+        const key = item.EMPRESA;
+        if (!acc[key]) {
+          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
+        }
+        acc[key].total_exames += item.VALORES || 0;
+        acc[key].total_registros += 1;
+        
+        if (atrasados.some(a => a.EMPRESA === item.EMPRESA && a.VALORES === item.VALORES)) {
+          acc[key].atrasados += 1;
+        }
+        
+        return acc;
+      }, {});
+
+      const empresaArray = Object.values(porEmpresa).map((item: any) => ({
+        ...item,
+        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
+        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+      })).sort((a, b) => b.total_exames - a.total_exames);
       
-      return acc;
-    }, {});
+      setEmpresaData(empresaArray);
 
-    const empresaArray = Object.values(porEmpresa).map((item: any) => ({
-      ...item,
-      percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
-      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-    })).sort((a, b) => b.total_exames - a.total_exames);
-    
-    console.log('Empresas únicas encontradas:', Object.keys(porEmpresa).length);
-    console.log('Total de empresas no array final:', empresaArray.length);
-    console.log('Primeiras 10 empresas:', empresaArray.slice(0, 10).map(e => ({ nome: e.nome, exames: e.total_exames })));
-    
-    setEmpresaData(empresaArray);
+      // 3. Agrupar por modalidade
+      const porModalidade = rawData.reduce((acc: any, item) => {
+        const key = item.MODALIDADE || "Não informado";
+        if (!acc[key]) {
+          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
+        }
+        acc[key].total_exames += item.VALORES || 0;
+        acc[key].total_registros += 1;
+        
+        if (atrasados.some(a => a.MODALIDADE === item.MODALIDADE && a.VALORES === item.VALORES)) {
+          acc[key].atrasados += 1;
+        }
+        
+        return acc;
+      }, {});
 
-    // Agrupar por modalidade
-    const porModalidade = rawData.reduce((acc: any, item) => {
-      const key = item.MODALIDADE || "Não informado";
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_exames: 0, total_registros: 0 };
-      }
-      acc[key].total_exames += item.VALORES || 0;
-      acc[key].total_registros += 1;
-      return acc;
-    }, {});
+      const modalidadeArray = Object.values(porModalidade).map((item: any) => ({
+        ...item,
+        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
+        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+      }));
+      
+      setModalidadeData(modalidadeArray);
+      setAtrasosModalidade(modalidadeArray);
 
-    const modalidadeArray = Object.values(porModalidade).map((item: any) => ({
-      ...item,
-      percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0"
-    }));
-    
-    setModalidadeData(modalidadeArray);
+      // 4. Agrupar por especialidade
+      const porEspecialidade = rawData.reduce((acc: any, item) => {
+        const key = item.ESPECIALIDADE || "Não informado";
+        if (!acc[key]) {
+          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
+        }
+        acc[key].total_exames += item.VALORES || 0;
+        acc[key].total_registros += 1;
+        
+        if (atrasados.some(a => a.ESPECIALIDADE === item.ESPECIALIDADE && a.VALORES === item.VALORES)) {
+          acc[key].atrasados += 1;
+        }
+        
+        return acc;
+      }, {});
 
-    // Agrupar por especialidade
-    const porEspecialidade = rawData.reduce((acc: any, item) => {
-      const key = item.ESPECIALIDADE || "Não informado";
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_exames: 0, total_registros: 0 };
-      }
-      acc[key].total_exames += item.VALORES || 0;
-      acc[key].total_registros += 1;
-      return acc;
-    }, {});
+      const especialidadeArray = Object.values(porEspecialidade).map((item: any) => ({
+        ...item,
+        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
+        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
+      }));
+      
+      setEspecialidadeData(especialidadeArray);
+      setAtrasosEspecialidade(especialidadeArray);
 
-    const especialidadeArray = Object.values(porEspecialidade).map((item: any) => ({
-      ...item,
-      percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0"
-    }));
-    
-    setEspecialidadeData(especialidadeArray);
+      // 5. Agrupar por prioridade
+      const porPrioridade = rawData.reduce((acc: any, item) => {
+        const key = item.PRIORIDADE || "Não informado";
+        if (!acc[key]) {
+          acc[key] = { nome: key, total_exames: 0, total_registros: 0 };
+        }
+        acc[key].total_exames += item.VALORES || 0;
+        acc[key].total_registros += 1;
+        return acc;
+      }, {});
 
-    // Agrupar por prioridade
-    const porPrioridade = rawData.reduce((acc: any, item) => {
-      const key = item.PRIORIDADE || "Não informado";
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_exames: 0, total_registros: 0 };
-      }
-      acc[key].total_exames += item.VALORES || 0;
-      acc[key].total_registros += 1;
-      return acc;
-    }, {});
+      const prioridadeArray = Object.values(porPrioridade).map((item: any) => ({
+        ...item,
+        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0"
+      }));
+      
+      setPrioridadeData(prioridadeArray);
 
-    const prioridadeArray = Object.values(porPrioridade).map((item: any) => ({
-      ...item,
-      percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0"
-    }));
-    
-    setPrioridadeData(prioridadeArray);
+      // 6. Atrasos por cliente
+      setAtrasosCliente(empresaArray);
 
-    // Análise de atrasos por dimensão
-    processarAtrasosDetalhados(rawData, atrasados);
+      // 7. Calcular crescimento
+      await calcularCrescimentoOtimizado(dateFilter, totalExames);
 
-    // Calcular crescimento (comparar com período anterior)
-    await calcularCrescimento();
+      console.log('✅ Dashboard carregado com sucesso usando queries otimizadas!');
+      
+    } catch (error) {
+      console.error('❌ Erro no processamento otimizado:', error);
+      throw error;
+    }
   };
 
-  const processarAtrasosDetalhados = (rawData: VolumetriaData[], atrasados: VolumetriaData[]) => {
-    // Atrasos por Modalidade
-    const atrasosPorModalidade = rawData.reduce((acc: any, item) => {
-      const key = item.MODALIDADE || "Não informado";
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
-      }
-      acc[key].total_registros += 1;
-      
-      // Verificar se está atrasado
-      if (atrasados.some(a => a.id === item.id)) {
-        acc[key].atrasados += 1;
-      }
-      
-      return acc;
-    }, {});
-
-    const modalidadeAtrasosArray = Object.values(atrasosPorModalidade).map((item: any) => ({
-      ...item,
-      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-    }));
-
-    setAtrasosModalidade(modalidadeAtrasosArray);
-
-    // Atrasos por Especialidade
-    const atrasosPorEspecialidade = rawData.reduce((acc: any, item) => {
-      const key = item.ESPECIALIDADE || "Não informado";
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
-      }
-      acc[key].total_registros += 1;
-      
-      // Verificar se está atrasado
-      if (atrasados.some(a => a.id === item.id)) {
-        acc[key].atrasados += 1;
-      }
-      
-      return acc;
-    }, {});
-
-    const especialidadeAtrasosArray = Object.values(atrasosPorEspecialidade).map((item: any) => ({
-      ...item,
-      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-    }));
-
-    setAtrasosEspecialidade(especialidadeAtrasosArray);
-
-    // Atrasos por Cliente
-    const atrasosPorCliente = rawData.reduce((acc: any, item) => {
-      const key = item.EMPRESA;
-      if (!acc[key]) {
-        acc[key] = { nome: key, total_registros: 0, atrasados: 0 };
-      }
-      acc[key].total_registros += 1;
-      
-      // Verificar se está atrasado
-      if (atrasados.some(a => a.id === item.id)) {
-        acc[key].atrasados += 1;
-      }
-      
-      return acc;
-    }, {});
-
-    const clienteAtrasosArray = Object.values(atrasosPorCliente).map((item: any) => ({
-      ...item,
-      percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-    }));
-
-    setAtrasosCliente(clienteAtrasosArray);
-  };
-
-  const calcularCrescimento = async () => {
+  const calcularCrescimentoOtimizado = async (dateFilter: any, totalAtual: number) => {
     try {
-      const dateFilter = getDateFilter();
-      
-      // Se não há filtro de data, não calcular crescimento
       if (!dateFilter) {
         setCrescimentoData({
-          total_atual: totalData?.total_exames || 0,
+          total_atual: totalAtual,
           total_anterior: 0,
           crescimento: "0",
           tipo: "crescimento"
@@ -469,7 +380,6 @@ export default function Volumetria() {
           fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
           break;
         default:
-          // Para outros períodos, calcular baseado na diferença de dias
           const dias = Math.ceil((fimDate.getTime() - inicioDate.getTime()) / (1000 * 60 * 60 * 24));
           inicioAnterior = new Date(inicioDate);
           inicioAnterior.setDate(inicioDate.getDate() - dias);
@@ -477,13 +387,12 @@ export default function Volumetria() {
           fimAnterior.setDate(fimDate.getDate() - dias);
       }
 
-      // Buscar dados do período anterior de forma otimizada
+      // Query otimizada para período anterior
       let queryAnterior = supabase
         .from('volumetria_mobilemed')
         .select('VALORES')
         .gte('data_referencia', inicioAnterior.toISOString().split('T')[0])
-        .lte('data_referencia', fimAnterior.toISOString().split('T')[0])
-        .limit(10000); // Limite para evitar timeout
+        .lte('data_referencia', fimAnterior.toISOString().split('T')[0]);
 
       if (cliente !== "todos") {
         queryAnterior = queryAnterior.eq('EMPRESA', cliente);
@@ -493,8 +402,6 @@ export default function Volumetria() {
       if (error) throw error;
 
       const totalAnterior = dataAnterior?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
-      const totalAtual = totalData?.total_exames || 0;
-      
       const crescimento = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
 
       setCrescimentoData({
@@ -506,9 +413,8 @@ export default function Volumetria() {
 
     } catch (error) {
       console.error('Erro ao calcular crescimento:', error);
-      // Fallback: sem crescimento em caso de erro
       setCrescimentoData({
-        total_atual: totalData?.total_exames || 0,
+        total_atual: totalAtual,
         total_anterior: 0,
         crescimento: "0",
         tipo: "crescimento"
@@ -523,6 +429,7 @@ export default function Volumetria() {
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6">
