@@ -28,7 +28,7 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
             {stats.total_exames.toLocaleString()}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Total de exames processados
+            Total de Laudos
           </p>
         </CardContent>
       </Card>

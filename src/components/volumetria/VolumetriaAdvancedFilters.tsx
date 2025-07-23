@@ -64,14 +64,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
 
       // Buscar todos os dados únicos em paralelo
       const [anosRes, clientesRes, modalidadesRes, especialidadesRes, prioridadesRes, medicosRes] = await Promise.all([
-        // Anos únicos baseados em data_referencia
+        // Anos únicos baseados em data_referencia - sem limite
         supabase
           .from('volumetria_mobilemed')
           .select('data_referencia')
-          .not('data_referencia', 'is', null)
-          .limit(10000),
+          .not('data_referencia', 'is', null),
         
-        // Clientes únicos
+        // Clientes únicos - sem limite
         supabase
           .from('volumetria_mobilemed')
           .select('EMPRESA')
