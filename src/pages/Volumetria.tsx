@@ -62,34 +62,43 @@ export default function Volumetria() {
 
   useEffect(() => {
     loadData();
-    loadClientes();
   }, [periodo, cliente]);
+
+  useEffect(() => {
+    loadClientes();
+  }, []);
 
   const loadClientes = async () => {
     try {
-      console.log('🔍 Carregando clientes únicos de forma otimizada...');
+      console.log('🔍 Carregando TODOS os clientes únicos...');
       
-      // Consulta simples com limite controlado para evitar timeout
-      const { data: empresas, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA')
-        .not('EMPRESA', 'is', null)
-        .limit(10000); // Limite para evitar timeout
+      // Carregar todos os clientes sem limite usando paginação
+      let allEmpresas: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data: empresas, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA')
+          .not('EMPRESA', 'is', null)
+          .range(from, from + pageSize - 1);
 
-      if (error) throw error;
+        if (error) throw error;
+        if (!empresas || empresas.length === 0) break;
+        
+        allEmpresas.push(...empresas);
+        
+        if (empresas.length < pageSize) break;
+        from += pageSize;
+      }
       
-      const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
-      console.log(`📊 Clientes únicos encontrados: ${empresasUnicas.length}`);
+      const empresasUnicas = [...new Set(allEmpresas.map(e => e.EMPRESA))];
+      console.log(`📊 TODOS os clientes únicos encontrados: ${empresasUnicas.length}`);
       setClientes(empresasUnicas.sort());
       
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
-      // Fallback de emergência - usar dados já carregados
-      if (data.length > 0) {
-        const empresasFromData = [...new Set(data.map(d => d.EMPRESA))];
-        console.log('🚨 Usando clientes dos dados já carregados:', empresasFromData.length);
-        setClientes(empresasFromData.sort());
-      }
     }
   };
 
@@ -161,52 +170,59 @@ export default function Volumetria() {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Carregando dados de forma otimizada...');
+      console.log('🔄 Carregando TODOS os dados...');
       
       const dateFilter = getDateFilter();
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Estratégia otimizada: usar limite controlado para evitar timeout
-      let query = supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .order('data_referencia', { ascending: false })
-        .limit(25000); // Limite seguro para evitar timeout
+      // Carregar TODOS os dados usando paginação
+      let allData: VolumetriaData[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        let query = supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .order('data_referencia', { ascending: false })
+          .range(from, from + pageSize - 1);
 
-      // Aplicar filtros
-      if (dateFilter) {
-        query = query.gte('data_referencia', dateFilter.inicio)
-                     .lte('data_referencia', dateFilter.fim);
+        // Aplicar filtros
+        if (dateFilter) {
+          query = query.gte('data_referencia', dateFilter.inicio)
+                       .lte('data_referencia', dateFilter.fim);
+        }
+
+        if (cliente !== "todos") {
+          query = query.eq('EMPRESA', cliente);
+        }
+
+        const { data: pageData, error } = await query;
+        if (error) throw error;
+        
+        if (!pageData || pageData.length === 0) break;
+        
+        allData.push(...pageData);
+        console.log(`📈 Carregados ${allData.length} registros até agora...`);
+        
+        if (pageData.length < pageSize) break;
+        from += pageSize;
       }
 
-      if (cliente !== "todos") {
-        query = query.eq('EMPRESA', cliente);
-      }
-
-      const { data: rawData, error } = await query;
-      if (error) throw error;
-
-      console.log(`✅ Carregados ${rawData?.length || 0} registros (limite otimizado)`);
-      console.log('📋 Amostra dos primeiros 3 registros:', rawData?.slice(0, 3).map(r => ({ 
+      console.log(`✅ Total final carregado: ${allData.length} registros`);
+      console.log('📋 Amostra dos primeiros 3 registros:', allData.slice(0, 3).map(r => ({ 
         empresa: r.EMPRESA, 
         data: r.data_referencia, 
         valores: r.VALORES 
       })));
       
-      setData(rawData || []);
+      setData(allData);
       
       // Processar dados se houver
-      if (rawData && rawData.length > 0) {
+      if (allData.length > 0) {
         console.log('⚙️ Processando dados...');
-        await processarDados(rawData);
-        
-        // Extrair clientes únicos dos dados carregados se não foram carregados ainda
-        if (clientes.length === 0) {
-          const empresasFromData = [...new Set(rawData.map(d => d.EMPRESA))];
-          console.log('🔄 Extraindo clientes dos dados carregados:', empresasFromData.length);
-          setClientes(empresasFromData.sort());
-        }
+        await processarDados(allData);
       } else {
         console.log('⚠️ Nenhum dado encontrado');
       }
@@ -215,7 +231,7 @@ export default function Volumetria() {
       console.error('❌ Erro ao carregar dados:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados da volumetria. Tente filtrar por período.",
+        description: "Erro ao carregar dados da volumetria.",
         variant: "destructive",
       });
     } finally {
@@ -534,7 +550,9 @@ export default function Volumetria() {
           <CardContent>
             <Select value={cliente} onValueChange={setCliente}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o cliente" />
+                <SelectValue>
+                  {cliente === "todos" ? "Todos os Clientes" : cliente}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os Clientes</SelectItem>
@@ -543,6 +561,9 @@ export default function Volumetria() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="text-sm text-muted-foreground mt-2">
+              {clientes.length} clientes disponíveis
+            </div>
           </CardContent>
         </Card>
       </div>
