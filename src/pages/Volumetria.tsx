@@ -2,66 +2,68 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, TrendingUp, Activity, Users, Clock, AlertCircle, Calendar } from "lucide-react";
+import { BarChart3, TrendingUp, Activity, Users, Clock, AlertCircle, Calendar, Loader2 } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { ControlePeriodoVolumetria } from '@/components/ControlePeriodoVolumetria';
 import { stringParaPeriodo } from '@/lib/periodoUtils';
 import { useToast } from "@/hooks/use-toast";
+import { VolumetriaUpload } from '@/components/VolumetriaUpload';
 
-interface VolumetriaData {
-  id: string;
-  EMPRESA: string;
-  ESPECIALIDADE: string;
-  MODALIDADE: string;
-  PRIORIDADE: string;
-  DATA_REALIZACAO: string;
-  DATA_LAUDO: string;
-  HORA_LAUDO: string;
-  DATA_PRAZO: string;
-  HORA_PRAZO: string;
-  VALORES: number;
-  STATUS: string;
-  data_referencia: string;
+interface DashboardStats {
+  total_exames: number;
+  total_registros: number;
+  total_atrasados: number;
+  percentual_atraso: number;
+  total_clientes: number;
 }
 
-interface AggregatedData {
-  empresa: string;
-  modalidade: string;
-  especialidade: string;
-  prioridade: string;
+interface ClienteData {
+  nome: string;
   total_exames: number;
+  total_registros: number;
   atrasados: number;
   percentual_atraso: number;
+}
+
+interface ModalidadeData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  percentual: number;
+}
+
+interface EspecialidadeData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  percentual: number;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export default function Volumetria() {
   const { toast } = useToast();
-  const [data, setData] = useState<VolumetriaData[]>([]);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState<string>("todos");
   const [cliente, setCliente] = useState<string>("todos");
   
-  // Estados para dados agregados
-  const [totalData, setTotalData] = useState<any>(null);
-  const [empresaData, setEmpresaData] = useState<any[]>([]);
-  const [modalidadeData, setModalidadeData] = useState<any[]>([]);
-  const [especialidadeData, setEspecialidadeData] = useState<any[]>([]);
-  const [prioridadeData, setPrioridadeData] = useState<any[]>([]);
-  const [atrasosData, setAtrasosData] = useState<any>(null);
-  const [crescimentoData, setCrescimentoData] = useState<any>(null);
+  // Estados principais
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    total_exames: 0,
+    total_registros: 0,
+    total_atrasados: 0,
+    percentual_atraso: 0,
+    total_clientes: 0
+  });
   
-  // Estados para análise de atrasos por dimensão
-  const [atrasosModalidade, setAtrasosModalidade] = useState<any[]>([]);
-  const [atrasosEspecialidade, setAtrasosEspecialidade] = useState<any[]>([]);
-  const [atrasosCliente, setAtrasosCliente] = useState<any[]>([]);
-
-  const [clientes, setClientes] = useState<string[]>([]);
+  const [clientesData, setClientesData] = useState<ClienteData[]>([]);
+  const [modalidadesData, setModalidadesData] = useState<ModalidadeData[]>([]);
+  const [especialidadesData, setEspecialidadesData] = useState<EspecialidadeData[]>([]);
+  const [listaClientes, setListaClientes] = useState<string[]>([]);
 
   useEffect(() => {
-    loadData();
+    loadDashboard();
   }, [periodo, cliente]);
 
   useEffect(() => {
@@ -70,22 +72,31 @@ export default function Volumetria() {
 
   const loadClientes = async () => {
     try {
-      console.log('🔍 Carregando clientes únicos...');
+      console.log('🔍 Carregando lista completa de clientes...');
       
-      // Query otimizada para buscar apenas clientes únicos
-      const { data: empresas, error } = await supabase
+      const { data, error } = await supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA')
         .not('EMPRESA', 'is', null);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao carregar clientes:', error);
+        return;
+      }
+
+      // Extrair clientes únicos
+      const clientesUnicos = [...new Set(data.map(item => item.EMPRESA))].sort();
+      console.log(`✅ ${clientesUnicos.length} clientes únicos carregados`);
       
-      const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
-      console.log(`📊 Clientes únicos encontrados: ${empresasUnicas.length}`);
-      setClientes(empresasUnicas.sort());
+      setListaClientes(clientesUnicos);
       
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar lista de clientes",
+        variant: "destructive",
+      });
     }
   };
 
@@ -104,20 +115,19 @@ export default function Volumetria() {
       }
     }
 
-    // Períodos tradicionais do sistema
     const hoje = new Date();
     let dataInicio, dataFim;
 
     switch (periodo) {
       case "todos":
-        return null; // Sem filtro de data
+        return null;
+      case "hoje":
+        dataInicio = new Date(hoje);
+        dataFim = new Date(hoje);
+        break;
       case "ultimos_5_dias":
         dataInicio = new Date(hoje);
         dataInicio.setDate(hoje.getDate() - 4);
-        dataFim = new Date(hoje);
-        break;
-      case "hoje":
-        dataInicio = new Date(hoje);
         dataFim = new Date(hoje);
         break;
       case "semana_atual":
@@ -145,7 +155,7 @@ export default function Volumetria() {
         dataFim = new Date(hoje.getFullYear() - 1, 11, 31);
         break;
       default:
-        return null; // Sem filtro de data
+        return null;
     }
 
     return {
@@ -154,20 +164,195 @@ export default function Volumetria() {
     };
   };
 
-  const loadData = async () => {
+  const loadDashboard = async () => {
     try {
       setLoading(true);
-      console.log('⚡ Carregando dashboard com queries otimizadas...');
+      console.log('⚡ Carregando dashboard completo...');
       
       const dateFilter = getDateFilter();
       console.log('📅 Filtro de data:', dateFilter);
       console.log('👤 Cliente selecionado:', cliente);
 
-      // Processar dados agregados diretamente no banco para máxima velocidade
-      await processarDadosOtimizados(dateFilter);
+      // Query base para estatísticas principais
+      let statsQuery = supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          EMPRESA, 
+          MODALIDADE, 
+          ESPECIALIDADE, 
+          PRIORIDADE, 
+          VALORES, 
+          DATA_LAUDO, 
+          HORA_LAUDO, 
+          DATA_PRAZO, 
+          HORA_PRAZO,
+          data_referencia
+        `);
+
+      // Aplicar filtros
+      if (dateFilter) {
+        statsQuery = statsQuery
+          .gte('data_referencia', dateFilter.inicio)
+          .lte('data_referencia', dateFilter.fim);
+      }
+
+      if (cliente !== "todos") {
+        statsQuery = statsQuery.eq('EMPRESA', cliente);
+      }
+
+      console.log('📊 Executando query principal...');
+      const { data: rawData, error } = await statsQuery;
+
+      if (error) {
+        console.error('❌ Erro na query principal:', error);
+        throw error;
+      }
+
+      console.log(`✅ Carregados ${rawData?.length || 0} registros`);
+
+      if (!rawData || rawData.length === 0) {
+        // Resetar dados quando não há resultados
+        setDashboardStats({
+          total_exames: 0,
+          total_registros: 0,
+          total_atrasados: 0,
+          percentual_atraso: 0,
+          total_clientes: 0
+        });
+        setClientesData([]);
+        setModalidadesData([]);
+        setEspecialidadesData([]);
+        return;
+      }
+
+      // Calcular estatísticas principais
+      const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      const totalRegistros = rawData.length;
+      const clientesUnicos = new Set(rawData.map(item => item.EMPRESA)).size;
+
+      // Calcular atrasos
+      const atrasados = rawData.filter(item => {
+        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) {
+          return false;
+        }
+        try {
+          const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+          const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+          return dataHoraLaudo > dataHoraPrazo;
+        } catch {
+          return false;
+        }
+      });
+
+      const totalAtrasados = atrasados.length;
+      const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
+
+      console.log(`💰 Total de exames: ${totalExames.toLocaleString()}`);
+      console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
+      console.log(`👥 Total de clientes: ${clientesUnicos}`);
+      console.log(`⏰ Total atrasados: ${totalAtrasados.toLocaleString()}`);
+
+      setDashboardStats({
+        total_exames: totalExames,
+        total_registros: totalRegistros,
+        total_atrasados: totalAtrasados,
+        percentual_atraso: percentualAtraso,
+        total_clientes: clientesUnicos
+      });
+
+      // Processar dados por cliente
+      const clientesMap = new Map<string, ClienteData>();
+      
+      rawData.forEach(item => {
+        const empresa = item.EMPRESA || "Não informado";
+        if (!clientesMap.has(empresa)) {
+          clientesMap.set(empresa, {
+            nome: empresa,
+            total_exames: 0,
+            total_registros: 0,
+            atrasados: 0,
+            percentual_atraso: 0
+          });
+        }
+        
+        const clienteData = clientesMap.get(empresa)!;
+        clienteData.total_exames += item.VALORES || 0;
+        clienteData.total_registros += 1;
+        
+        // Verificar se está atrasado
+        if (atrasados.some(a => 
+          a.EMPRESA === item.EMPRESA && 
+          a.DATA_LAUDO === item.DATA_LAUDO && 
+          a.HORA_LAUDO === item.HORA_LAUDO
+        )) {
+          clienteData.atrasados += 1;
+        }
+      });
+
+      // Calcular percentual de atraso para cada cliente
+      const clientesArray = Array.from(clientesMap.values()).map(cliente => ({
+        ...cliente,
+        percentual_atraso: cliente.total_registros > 0 ? (cliente.atrasados / cliente.total_registros) * 100 : 0
+      })).sort((a, b) => b.total_exames - a.total_exames);
+
+      setClientesData(clientesArray);
+
+      // Processar dados por modalidade
+      const modalidadesMap = new Map<string, ModalidadeData>();
+      
+      rawData.forEach(item => {
+        const modalidade = item.MODALIDADE || "Não informado";
+        if (!modalidadesMap.has(modalidade)) {
+          modalidadesMap.set(modalidade, {
+            nome: modalidade,
+            total_exames: 0,
+            total_registros: 0,
+            percentual: 0
+          });
+        }
+        
+        const modalidadeData = modalidadesMap.get(modalidade)!;
+        modalidadeData.total_exames += item.VALORES || 0;
+        modalidadeData.total_registros += 1;
+      });
+
+      const modalidadesArray = Array.from(modalidadesMap.values()).map(modalidade => ({
+        ...modalidade,
+        percentual: totalExames > 0 ? (modalidade.total_exames / totalExames) * 100 : 0
+      })).sort((a, b) => b.total_exames - a.total_exames);
+
+      setModalidadesData(modalidadesArray);
+
+      // Processar dados por especialidade
+      const especialidadesMap = new Map<string, EspecialidadeData>();
+      
+      rawData.forEach(item => {
+        const especialidade = item.ESPECIALIDADE || "Não informado";
+        if (!especialidadesMap.has(especialidade)) {
+          especialidadesMap.set(especialidade, {
+            nome: especialidade,
+            total_exames: 0,
+            total_registros: 0,
+            percentual: 0
+          });
+        }
+        
+        const especialidadeData = especialidadesMap.get(especialidade)!;
+        especialidadeData.total_exames += item.VALORES || 0;
+        especialidadeData.total_registros += 1;
+      });
+
+      const especialidadesArray = Array.from(especialidadesMap.values()).map(especialidade => ({
+        ...especialidade,
+        percentual: totalExames > 0 ? (especialidade.total_exames / totalExames) * 100 : 0
+      })).sort((a, b) => b.total_exames - a.total_exames);
+
+      setEspecialidadesData(especialidadesArray);
+
+      console.log('✅ Dashboard carregado com sucesso!');
       
     } catch (error) {
-      console.error('❌ Erro ao carregar dados:', error);
+      console.error('❌ Erro ao carregar dashboard:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar dados da volumetria.",
@@ -178,264 +363,26 @@ export default function Volumetria() {
     }
   };
 
-  const processarDadosOtimizados = async (dateFilter: any) => {
-    console.log('⚡ Processando dados com queries agregadas otimizadas...');
-    
-    try {
-      // Query única otimizada para buscar todos os dados necessários
-      let query = supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO');
-      
-      if (dateFilter) {
-        query = query
-          .gte('data_referencia', dateFilter.inicio)
-          .lte('data_referencia', dateFilter.fim);
-      }
-      
-      if (cliente !== "todos") {
-        query = query.eq('EMPRESA', cliente);
-      }
-
-      console.log('📊 Executando query otimizada única...');
-      const { data: rawData, error } = await query;
-      
-      if (error) throw error;
-      
-      console.log(`✅ Carregados ${rawData?.length || 0} registros`);
-
-      if (!rawData || rawData.length === 0) {
-        // Zerar todos os dados se não há resultados
-        setTotalData({ total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0 });
-        setAtrasosData({ total_atrasados: 0, percentual_atraso: 0, total_no_prazo: 0 });
-        setEmpresaData([]);
-        setModalidadeData([]);
-        setEspecialidadeData([]);
-        setPrioridadeData([]);
-        setAtrasosModalidade([]);
-        setAtrasosEspecialidade([]);
-        setAtrasosCliente([]);
-        setCrescimentoData({ total_atual: 0, total_anterior: 0, crescimento: "0", tipo: "crescimento" });
-        return;
-      }
-
-      // 1. Calcular totais
-      const totalExames = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-      const totalRegistros = rawData.length;
-      
-      // Calcular atrasos
-      const atrasados = rawData.filter(item => {
-        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
-        const dataHoraLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-        const dataHoraPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-        return dataHoraLaudo > dataHoraPrazo;
-      });
-
-      const totalAtrasados = atrasados.length;
-      const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
-
-      console.log(`💰 Total de exames: ${totalExames.toLocaleString()}`);
-      console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
-      console.log(`⏰ Total atrasados: ${totalAtrasados.toLocaleString()}`);
-
-      setTotalData({
-        total_exames: totalExames,
-        total_registros: totalRegistros,
-        total_atrasados: totalAtrasados,
-        percentual_atraso: percentualAtraso
-      });
-
-      setAtrasosData({
-        total_atrasados: totalAtrasados,
-        percentual_atraso: percentualAtraso,
-        total_no_prazo: totalRegistros - totalAtrasados
-      });
-
-      // 2. Agrupar por empresa
-      const porEmpresa = rawData.reduce((acc: any, item) => {
-        const key = item.EMPRESA;
-        if (!acc[key]) {
-          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
-        }
-        acc[key].total_exames += item.VALORES || 0;
-        acc[key].total_registros += 1;
-        
-        if (atrasados.some(a => a.EMPRESA === item.EMPRESA && a.VALORES === item.VALORES)) {
-          acc[key].atrasados += 1;
-        }
-        
-        return acc;
-      }, {});
-
-      const empresaArray = Object.values(porEmpresa).map((item: any) => ({
-        ...item,
-        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
-        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-      })).sort((a, b) => b.total_exames - a.total_exames);
-      
-      setEmpresaData(empresaArray);
-
-      // 3. Agrupar por modalidade
-      const porModalidade = rawData.reduce((acc: any, item) => {
-        const key = item.MODALIDADE || "Não informado";
-        if (!acc[key]) {
-          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
-        }
-        acc[key].total_exames += item.VALORES || 0;
-        acc[key].total_registros += 1;
-        
-        if (atrasados.some(a => a.MODALIDADE === item.MODALIDADE && a.VALORES === item.VALORES)) {
-          acc[key].atrasados += 1;
-        }
-        
-        return acc;
-      }, {});
-
-      const modalidadeArray = Object.values(porModalidade).map((item: any) => ({
-        ...item,
-        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
-        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-      }));
-      
-      setModalidadeData(modalidadeArray);
-      setAtrasosModalidade(modalidadeArray);
-
-      // 4. Agrupar por especialidade
-      const porEspecialidade = rawData.reduce((acc: any, item) => {
-        const key = item.ESPECIALIDADE || "Não informado";
-        if (!acc[key]) {
-          acc[key] = { nome: key, total_exames: 0, total_registros: 0, atrasados: 0 };
-        }
-        acc[key].total_exames += item.VALORES || 0;
-        acc[key].total_registros += 1;
-        
-        if (atrasados.some(a => a.ESPECIALIDADE === item.ESPECIALIDADE && a.VALORES === item.VALORES)) {
-          acc[key].atrasados += 1;
-        }
-        
-        return acc;
-      }, {});
-
-      const especialidadeArray = Object.values(porEspecialidade).map((item: any) => ({
-        ...item,
-        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0",
-        percentual_atraso: item.total_registros > 0 ? ((item.atrasados / item.total_registros) * 100).toFixed(1) : "0"
-      }));
-      
-      setEspecialidadeData(especialidadeArray);
-      setAtrasosEspecialidade(especialidadeArray);
-
-      // 5. Agrupar por prioridade
-      const porPrioridade = rawData.reduce((acc: any, item) => {
-        const key = item.PRIORIDADE || "Não informado";
-        if (!acc[key]) {
-          acc[key] = { nome: key, total_exames: 0, total_registros: 0 };
-        }
-        acc[key].total_exames += item.VALORES || 0;
-        acc[key].total_registros += 1;
-        return acc;
-      }, {});
-
-      const prioridadeArray = Object.values(porPrioridade).map((item: any) => ({
-        ...item,
-        percentual: totalExames > 0 ? ((item.total_exames / totalExames) * 100).toFixed(1) : "0"
-      }));
-      
-      setPrioridadeData(prioridadeArray);
-
-      // 6. Atrasos por cliente
-      setAtrasosCliente(empresaArray);
-
-      // 7. Calcular crescimento
-      await calcularCrescimentoOtimizado(dateFilter, totalExames);
-
-      console.log('✅ Dashboard carregado com sucesso usando queries otimizadas!');
-      
-    } catch (error) {
-      console.error('❌ Erro no processamento otimizado:', error);
-      throw error;
-    }
-  };
-
-  const calcularCrescimentoOtimizado = async (dateFilter: any, totalAtual: number) => {
-    try {
-      if (!dateFilter) {
-        setCrescimentoData({
-          total_atual: totalAtual,
-          total_anterior: 0,
-          crescimento: "0",
-          tipo: "crescimento"
-        });
-        return;
-      }
-
-      // Calcular período anterior
-      let inicioAnterior, fimAnterior;
-      const inicioDate = new Date(dateFilter.inicio);
-      const fimDate = new Date(dateFilter.fim);
-      
-      switch (periodo) {
-        case "mes_atual":
-          inicioAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth() - 1, 1);
-          fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
-          break;
-        default:
-          const dias = Math.ceil((fimDate.getTime() - inicioDate.getTime()) / (1000 * 60 * 60 * 24));
-          inicioAnterior = new Date(inicioDate);
-          inicioAnterior.setDate(inicioDate.getDate() - dias);
-          fimAnterior = new Date(fimDate);
-          fimAnterior.setDate(fimDate.getDate() - dias);
-      }
-
-      // Query otimizada para período anterior
-      let queryAnterior = supabase
-        .from('volumetria_mobilemed')
-        .select('VALORES')
-        .gte('data_referencia', inicioAnterior.toISOString().split('T')[0])
-        .lte('data_referencia', fimAnterior.toISOString().split('T')[0]);
-
-      if (cliente !== "todos") {
-        queryAnterior = queryAnterior.eq('EMPRESA', cliente);
-      }
-
-      const { data: dataAnterior, error } = await queryAnterior;
-      if (error) throw error;
-
-      const totalAnterior = dataAnterior?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
-      const crescimento = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
-
-      setCrescimentoData({
-        total_atual: totalAtual,
-        total_anterior: totalAnterior,
-        crescimento: crescimento.toFixed(1),
-        tipo: crescimento >= 0 ? "crescimento" : "queda"
-      });
-
-    } catch (error) {
-      console.error('Erro ao calcular crescimento:', error);
-      setCrescimentoData({
-        total_atual: totalAtual,
-        total_anterior: 0,
-        crescimento: "0",
-        tipo: "crescimento"
-      });
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando dashboard...</p>
+        </div>
       </div>
     );
   }
-
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
-        <p className="text-muted-foreground mt-1">Análise executiva completa de volumetria</p>
+        <p className="text-muted-foreground mt-1">
+          Análise executiva completa de volumetria - 
+          {dashboardStats.total_registros.toLocaleString()} registros | 
+          {dashboardStats.total_clientes} clientes
+        </p>
       </div>
 
       {/* Controles */}
@@ -461,15 +408,15 @@ export default function Volumetria() {
                   {cliente === "todos" ? "Todos os Clientes" : cliente}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[300px] overflow-auto">
                 <SelectItem value="todos">Todos os Clientes</SelectItem>
-                {clientes.map(c => (
+                {listaClientes.map(c => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <div className="text-sm text-muted-foreground mt-2">
-              {clientes.length} clientes disponíveis
+              {listaClientes.length} clientes disponíveis
             </div>
           </CardContent>
         </Card>
@@ -485,27 +432,46 @@ export default function Volumetria() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalData?.total_exames.toLocaleString() || 0}</div>
-            <div className="text-sm text-muted-foreground">
-              {totalData?.total_registros.toLocaleString() || 0} registros
+            <div className="text-2xl font-bold text-primary">
+              {dashboardStats.total_exames.toLocaleString()}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Total de exames processados
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Taxa de Crescimento</span>
-              <TrendingUp className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-muted-foreground">Registros</span>
+              <Activity className="h-4 w-4 text-blue-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {crescimentoData?.crescimento || "0"}%
+            <div className="text-2xl font-bold text-blue-600">
+              {dashboardStats.total_registros.toLocaleString()}
             </div>
-            <div className="text-sm text-muted-foreground">
-              vs período anterior
+            <p className="text-xs text-muted-foreground mt-1">
+              Total de registros na base
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Clientes</span>
+              <Users className="h-4 w-4 text-green-500" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {dashboardStats.total_clientes}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Clientes únicos ativos
+            </p>
           </CardContent>
         </Card>
 
@@ -513,325 +479,146 @@ export default function Volumetria() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Atrasos</span>
-              <Clock className="h-4 w-4 text-orange-600" />
+              <Clock className="h-4 w-4 text-red-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {atrasosData?.percentual_atraso.toFixed(1) || 0}%
+            <div className="text-2xl font-bold text-red-600">
+              {dashboardStats.percentual_atraso.toFixed(1)}%
             </div>
-            <div className="text-sm text-muted-foreground">
-              {atrasosData?.total_atrasados || 0} exames
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Empresas Ativas</span>
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{empresaData.length}</div>
-            <div className="text-sm text-muted-foreground">
-              clientes ativos
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardStats.total_atrasados.toLocaleString()} registros atrasados
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráficos de Distribuição */}
+      {/* Gráficos Principais */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Atrasos */}
+        {/* Top 10 Clientes */}
         <Card>
           <CardHeader>
-            <CardTitle>Análise de Atrasos</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Top 10 Clientes por Volume
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'No Prazo', value: atrasosData?.total_no_prazo || 0, color: '#10b981' },
-                    { name: 'Atrasados', value: atrasosData?.total_atrasados || 0, color: '#ef4444' }
+              <BarChart data={clientesData.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="nome" 
+                  tick={{fontSize: 10}}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value, name) => [
+                    typeof value === 'number' ? value.toLocaleString() : value,
+                    name === 'total_exames' ? 'Exames' : 'Registros'
                   ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  <Cell fill="#10b981" />
-                  <Cell fill="#ef4444" />
-                </Pie>
-                <Tooltip />
-              </PieChart>
+                />
+                <Legend />
+                <Bar dataKey="total_exames" fill="#3b82f6" name="Exames" />
+                <Bar dataKey="total_registros" fill="#10b981" name="Registros" />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Volume por Modalidade */}
+        {/* Top Modalidades */}
         <Card>
           <CardHeader>
-            <CardTitle>Volume por Modalidade</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Distribuição por Modalidade
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={modalidadeData}
+                  data={modalidadesData.slice(0, 8)}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ nome, percentual }) => `${nome} ${percentual}%`}
+                  label={({nome, percentual}) => `${nome}: ${percentual.toFixed(1)}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="total_exames"
                 >
-                  {modalidadeData.map((entry, index) => (
+                  {modalidadesData.slice(0, 8).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabelas de Análise */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Volume por Empresa */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Volume por Cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {empresaData.map((item, index) => (
-                <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{item.nome}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.total_registros} registros
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">{item.total_exames.toLocaleString()}</div>
-                    <Badge variant="secondary">{item.percentual}%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Volume por Especialidade */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Volume por Especialidade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {especialidadeData.map((item, index) => (
-                <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{item.nome}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.total_registros} registros
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">{item.total_exames.toLocaleString()}</div>
-                    <Badge variant="secondary">{item.percentual}%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Volume por Prioridade */}
+      {/* Top Especialidades */}
       <Card>
         <CardHeader>
-          <CardTitle>Volume e Percentual por Prioridade</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Top 15 Especialidades
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={prioridadeData}>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={especialidadesData.slice(0, 15)}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
+              <XAxis 
+                dataKey="nome" 
+                tick={{fontSize: 10}}
+                angle={-45}
+                textAnchor="end"
+                height={100}
+              />
               <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="total_exames" fill="#3b82f6" name="Total Exames" />
+              <Tooltip 
+                formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
+              />
+              <Bar dataKey="total_exames" fill="#8b5cf6" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {/* Análise Detalhada de Atrasos */}
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <AlertCircle className="h-6 w-6 text-red-500" />
-            Análise Detalhada de Atrasos
-          </h2>
-          <p className="text-muted-foreground">Desdobramento dos atrasos por dimensão</p>
-        </div>
-
-        {/* Atrasos por Modalidade */}
+      {/* Upload Component */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-orange-600" />
-              Atrasos por Modalidade
-            </CardTitle>
+            <CardTitle>Upload - Data Laudo</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Gráfico */}
-              <div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={atrasosModalidade}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="nome" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
-                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Tabela */}
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {atrasosModalidade.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{item.nome}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.atrasados} de {item.total_registros} exames
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge 
-                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
-                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
-                      >
-                        {item.percentual_atraso}%
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <VolumetriaUpload 
+              arquivoFonte="data_laudo" 
+              onSuccess={() => {
+                loadDashboard();
+                loadClientes();
+              }} 
+            />
           </CardContent>
         </Card>
 
-        {/* Atrasos por Especialidade */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-blue-600" />
-              Atrasos por Especialidade
-            </CardTitle>
+            <CardTitle>Upload - Data Exame</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Gráfico */}
-              <div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={atrasosEspecialidade}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="nome" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
-                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Tabela */}
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {atrasosEspecialidade.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{item.nome}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.atrasados} de {item.total_registros} exames
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge 
-                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
-                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
-                      >
-                        {item.percentual_atraso}%
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Atrasos por Cliente */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-green-600" />
-              Atrasos por Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Gráfico */}
-              <div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={atrasosCliente}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="nome" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="atrasados" fill="#ef4444" name="Atrasados" />
-                    <Bar dataKey="total_registros" fill="#3b82f6" name="Total" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Tabela */}
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {atrasosCliente.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{item.nome}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.atrasados} de {item.total_registros} exames
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge 
-                        variant={parseFloat(item.percentual_atraso) > 20 ? "destructive" : 
-                                parseFloat(item.percentual_atraso) > 10 ? "default" : "secondary"}
-                      >
-                        {item.percentual_atraso}%
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <VolumetriaUpload 
+              arquivoFonte="data_exame" 
+              onSuccess={() => {
+                loadDashboard();
+                loadClientes();
+              }} 
+            />
           </CardContent>
         </Card>
       </div>
