@@ -15,32 +15,32 @@ export default function TechWelcome() {
 
   const quickActions = [
     {
-      title: "Dashboard Executivo",
+      title: "Dashboard Executivo", 
       description: "Visão geral dos indicadores",
       icon: BarChart3,
       path: "/dashboard",
-      color: "text-blue-500"
+      color: "text-blue-400"
     },
     {
       title: "Volumetria",
-      description: "Análise de dados volumétricos",
+      description: "Análise de dados volumétricos", 
       icon: Zap,
       path: "/volumetria",
-      color: "text-green-500"
+      color: "text-green-400"
     },
     {
       title: "Gestão de Pessoas",
       description: "Médicos e colaboradores",
       icon: Users,
-      path: "/people",
-      color: "text-purple-500"
+      path: "/people", 
+      color: "text-purple-400"
     },
     {
       title: "Configurações",
       description: "Ajustes do sistema",
       icon: Settings,
       path: "/configuracao/usuarios",
-      color: "text-orange-500"
+      color: "text-orange-400"
     }
   ];
 
@@ -55,7 +55,7 @@ export default function TechWelcome() {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
       
       {/* Content */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-6 animate-fade-in">
         <div className={`max-w-4xl mx-auto text-center transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           
           {/* Logo/Title Area */}

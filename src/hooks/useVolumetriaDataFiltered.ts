@@ -137,8 +137,28 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     try {
       console.log('🔄 Carregando dados com filtros aplicados no banco...', filters);
       
-      // Construir query base com filtros
-      let query = supabase.from('volumetria_mobilemed').select('*');
+      // Otimização: Se não há filtros específicos, usar uma query mais simples
+      const hasSpecificFilters = filters.cliente !== 'todos' || 
+                                filters.modalidade !== 'todos' || 
+                                filters.especialidade !== 'todos' ||
+                                filters.prioridade !== 'todos' ||
+                                filters.medico !== 'todos' ||
+                                filters.ano !== 'todos';
+
+      // Construir query base com apenas os campos necessários para performance
+      let query = supabase.from('volumetria_mobilemed').select(`
+        EMPRESA, 
+        MODALIDADE, 
+        ESPECIALIDADE, 
+        PRIORIDADE, 
+        MEDICO,
+        VALORES,
+        DATA_LAUDO,
+        HORA_LAUDO,
+        DATA_PRAZO,
+        HORA_PRAZO,
+        data_referencia
+      `);
       
       // Aplicar filtros de data
       const { startDate, endDate } = buildDateFilter();
@@ -167,12 +187,13 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('MEDICO', filters.medico);
       }
 
-      // Executar query com paginação para dados grandes
+      // Limitar registros baseado na complexidade da query
+      const maxRecords = hasSpecificFilters ? 100000 : 25000; // Mais registros para filtros específicos
       let allData: any[] = [];
       let offset = 0;
-      const limit = 1000;
+      const limit = 2000; // Batches maiores para menos requests
       
-      while (true) {
+      while (allData.length < maxRecords) {
         const { data: batchData, error } = await query
           .range(offset, offset + limit - 1)
           .order('data_referencia', { ascending: false });
@@ -185,16 +206,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         if (!batchData || batchData.length === 0) break;
 
         allData = [...allData, ...batchData];
-        console.log(`📦 Carregados ${batchData.length} registros (offset: ${offset}), total: ${allData.length}`);
+        console.log(`📦 Lote carregado: ${batchData.length} registros (total: ${allData.length})`);
 
         if (batchData.length < limit) break;
         offset += limit;
-
-        // Limite de segurança para evitar travamento
-        if (allData.length >= 50000) {
-          console.log('⚠️ Limite de 50k registros atingido');
-          break;
-        }
       }
 
       console.log(`✅ Total de registros carregados com filtros: ${allData.length}`);

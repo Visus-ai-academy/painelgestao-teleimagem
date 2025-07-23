@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { VolumetriaUpload } from '@/components/VolumetriaUpload';
-import { useVolumetriaDataFiltered } from '@/hooks/useVolumetriaDataFiltered';
+import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
-import { VolumetriaAdvancedFilters, VolumetriaFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
+import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 
@@ -35,7 +35,7 @@ export default function Volumetria() {
       <div className="flex justify-center items-center h-64">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Carregando dashboard completo...</p>
+          <p className="text-muted-foreground">Carregando dados de volumetria...</p>
         </div>
       </div>
     );
