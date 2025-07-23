@@ -379,7 +379,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                   <SelectContent>
                     <SelectItem value="todos">Todos os Tipos</SelectItem>
                     <SelectItem value="CO">Cliente CO</SelectItem>
-                    <SelectItem value="NO">Cliente NO</SelectItem>
+                    <SelectItem value="NC">Cliente NC</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
