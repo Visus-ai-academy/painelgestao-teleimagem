@@ -66,6 +66,7 @@ export default function Volumetria() {
 
   const loadClientes = async () => {
     try {
+      // Buscar TODOS os clientes únicos sem limitação
       const { data: empresas, error } = await supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA')
@@ -74,6 +75,7 @@ export default function Volumetria() {
       if (error) throw error;
 
       const empresasUnicas = [...new Set(empresas?.map(e => e.EMPRESA) || [])];
+      console.log(`📊 Total de clientes únicos encontrados: ${empresasUnicas.length}`);
       setClientes(empresasUnicas.sort());
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -153,7 +155,6 @@ export default function Volumetria() {
       let query = supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact' })
-        .limit(5000) // Limite reduzido para melhor performance
         .order('data_referencia', { ascending: false });
 
       // Aplicar filtro de data se não for "todos"
@@ -169,7 +170,7 @@ export default function Volumetria() {
       const { data: rawData, error, count } = await query;
       if (error) throw error;
 
-      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${count} total`);
+      console.log(`✅ Carregados ${rawData?.length || 0} registros de ${count} total (SEM LIMITE)`);
       setData(rawData || []);
       
       // Processar dados apenas se houver dados
@@ -439,6 +440,7 @@ export default function Volumetria() {
           fimAnterior = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 0);
       }
 
+      // Consulta sem limite para período anterior
       let queryAnterior = supabase
         .from('volumetria_mobilemed')
         .select('VALORES')
