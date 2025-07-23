@@ -205,54 +205,38 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('MEDICO', filters.medico);
       }
 
-      // Carregar todos os dados de forma otimizada em batches
-      let allData: any[] = [];
-      let offset = 0;
-      const limit = 2000; // Batches otimizados
-      let hasMoreData = true;
-      
-      console.log('🔄 Iniciando carregamento otimizado de dados...');
-      
-      try {
-        while (hasMoreData) {
-          const { data: batchData, error } = await query
-            .range(offset, offset + limit - 1)
-            .order('data_referencia', { ascending: false });
+      // Carregar dados diretamente sem paginação excessiva
+      const { data: allData, error } = await query
+        .limit(50000) // Limite seguro para evitar timeout
+        .order('data_referencia', { ascending: false });
 
-          if (error) {
-            console.error('❌ Erro ao buscar dados:', error);
-            throw error;
-          }
-
-          if (!batchData || batchData.length === 0) {
-            console.log('🏁 Fim dos dados - nenhum registro retornado');
-            hasMoreData = false;
-            break;
-          }
-
-          allData = [...allData, ...batchData];
-          console.log(`📦 Lote carregado: ${batchData.length} registros (total: ${allData.length})`);
-
-          // Se retornou menos que o limite, chegamos ao fim
-          if (batchData.length < limit) {
-            console.log('🏁 Último lote carregado');
-            hasMoreData = false;
-          } else {
-            offset += limit;
-          }
-
-          // Timeout de segurança para evitar travamento
-          if (offset > 500000) {
-            console.log('⚠️ Limite de segurança atingido (500k registros) - finalizando...');
-            hasMoreData = false;
-          }
-
-          // Pequena pausa para evitar sobrecarga
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-      } catch (error) {
-        console.error('❌ Erro durante carregamento:', error);
+      if (error) {
+        console.error('❌ Erro ao buscar dados:', error);
         throw error;
+      }
+
+      if (!allData || allData.length === 0) {
+        console.log('🏁 Nenhum registro encontrado');
+        setData({
+          stats: {
+            total_exames: 0,
+            total_registros: 0,
+            total_atrasados: 0,
+            percentual_atraso: 0,
+            total_clientes: 0,
+            total_modalidades: 0,
+            total_especialidades: 0,
+            total_medicos: 0,
+            registros_30_dias: 0,
+            registros_7_dias: 0,
+            registros_ontem: 0,
+            registros_hoje: 0
+          },
+          clientes: [],
+          modalidades: [],
+          especialidades: []
+        });
+        return;
       }
 
       console.log(`✅ Total de registros carregados com filtros: ${allData.length}`);
