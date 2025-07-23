@@ -8,15 +8,19 @@ export interface VolumetriaFilters {
   mes: string;
   semana: string;
   dia: string;
-  dataEspecifica?: Date | null; // Nova propriedade para data específica
+  dataEspecifica?: Date | null;
   cliente: string;
   modalidade: string;
   especialidade: string;
   categoria: string;
   prioridade: string;
-  medico: string;
   equipe: string;
-  tipoCliente: string;
+  medico: string;
+  turno: string;
+  plantao: string;
+  regiao: string;
+  estado: string;
+  cidade: string;
 }
 
 interface DashboardStats {
@@ -203,8 +207,32 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         query = query.eq('PRIORIDADE', filters.prioridade);
       }
       
+      if (filters.equipe !== 'todos') {
+        query = query.eq('EQUIPE', filters.equipe);
+      }
+      
       if (filters.medico !== 'todos') {
         query = query.eq('MEDICO', filters.medico);
+      }
+      
+      if (filters.turno !== 'todos') {
+        query = query.eq('TURNO', filters.turno);
+      }
+      
+      if (filters.plantao !== 'todos') {
+        query = query.eq('PLANTAO', filters.plantao);
+      }
+      
+      if (filters.regiao !== 'todos') {
+        query = query.eq('REGIAO', filters.regiao);
+      }
+      
+      if (filters.estado !== 'todos') {
+        query = query.eq('ESTADO', filters.estado);
+      }
+      
+      if (filters.cidade !== 'todos') {
+        query = query.eq('CIDADE', filters.cidade);
       }
 
       // Carregar todos os dados de forma otimizada em batches

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, Users, FileText, Target, ChevronDown, ChevronRight } from "lucide-react";
+import { Filter, X, Calendar as CalendarIcon, Building, Stethoscope, FileText, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -18,15 +18,19 @@ export interface VolumetriaFilters {
   mes: string;
   semana: string;
   dia: string;
-  dataEspecifica?: Date | null; // Nova propriedade para data específica
+  dataEspecifica?: Date | null;
   cliente: string;
   modalidade: string;
   especialidade: string;
   categoria: string;
   prioridade: string;
-  medico: string;
   equipe: string;
-  tipoCliente: string;
+  medico: string;
+  turno: string;
+  plantao: string;
+  regiao: string;
+  estado: string;
+  cidade: string;
 }
 
 interface VolumetriaAdvancedFiltersProps {
@@ -41,6 +45,12 @@ interface FilterOptions {
   especialidades: string[];
   prioridades: string[];
   medicos: string[];
+  equipes: string[];
+  turnos: string[];
+  plantoes: string[];
+  regioes: string[];
+  estados: string[];
+  cidades: string[];
 }
 
 const months = [
@@ -58,7 +68,8 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     periodo: false,
     cliente: false,
     laudo: false,
-    medico: false
+    equipe: false,
+    regiao: false
   });
 
   const [options, setOptions] = useState<FilterOptions>({
@@ -67,7 +78,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     modalidades: [],
     especialidades: [],
     prioridades: [],
-    medicos: []
+    medicos: [],
+    equipes: [],
+    turnos: [],
+    plantoes: [],
+    regioes: [],
+    estados: [],
+    cidades: []
   });
 
   // Carregar opções dos filtros baseado nos dados reais
@@ -80,13 +97,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
 
       // Buscar todos os dados únicos em paralelo
       const [anosRes, clientesRes, modalidadesRes, especialidadesRes, prioridadesRes, medicosRes] = await Promise.all([
-        // Anos únicos baseados em data_referencia - sem limite
+        // Anos únicos baseados em data_referencia
         supabase
           .from('volumetria_mobilemed')
           .select('data_referencia')
           .not('data_referencia', 'is', null),
         
-        // Clientes únicos - sem limite
+        // Clientes únicos
         supabase
           .from('volumetria_mobilemed')
           .select('EMPRESA')
@@ -125,11 +142,11 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       )].sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
 
       // Processar outros dados únicos
-      const clientesUnicos = [...new Set((clientesRes.data || []).map(item => item.EMPRESA).filter(Boolean))];
-      const modalidadesUnicas = [...new Set((modalidadesRes.data || []).map(item => item.MODALIDADE).filter(Boolean))];
-      const especialidadesUnicas = [...new Set((especialidadesRes.data || []).map(item => item.ESPECIALIDADE).filter(Boolean))];
-      const prioridadesUnicas = [...new Set((prioridadesRes.data || []).map(item => item.PRIORIDADE).filter(Boolean))];
-      const medicosUnicos = [...new Set((medicosRes.data || []).map(item => item.MEDICO).filter(Boolean))];
+      const clientesUnicos = [...new Set((clientesRes.data || []).map(item => item.EMPRESA).filter(Boolean))].sort();
+      const modalidadesUnicas = [...new Set((modalidadesRes.data || []).map(item => item.MODALIDADE).filter(Boolean))].sort();
+      const especialidadesUnicas = [...new Set((especialidadesRes.data || []).map(item => item.ESPECIALIDADE).filter(Boolean))].sort();
+      const prioridadesUnicas = [...new Set((prioridadesRes.data || []).map(item => item.PRIORIDADE).filter(Boolean))].sort();
+      const medicosUnicos = [...new Set((medicosRes.data || []).map(item => item.MEDICO).filter(Boolean))].sort();
 
       setOptions({
         anos: anosUnicos,
@@ -137,7 +154,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         modalidades: modalidadesUnicas,
         especialidades: especialidadesUnicas,
         prioridades: prioridadesUnicas,
-        medicos: medicosUnicos
+        medicos: medicosUnicos,
+        equipes: [],
+        turnos: [],
+        plantoes: [],
+        regioes: [],
+        estados: [],
+        cidades: []
       });
 
       console.log('✅ Opções dos filtros carregadas:', {
@@ -146,7 +169,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         modalidades: modalidadesUnicas.length,
         especialidades: especialidadesUnicas.length,
         prioridades: prioridadesUnicas.length,
-        medicos: medicosUnicos.length
+        medicos: medicosUnicos.length,
+        equipes: equipesUnicas.length,
+        turnos: turnosUnicos.length,
+        plantoes: plantoesUnicos.length,
+        regioes: regioesUnicas.length,
+        estados: estadosUnicos.length,
+        cidades: cidadesUnicas.length
       });
 
     } catch (error) {
@@ -182,9 +211,13 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       especialidade: 'todos',
       categoria: 'todos',
       prioridade: 'todos',
-      medico: 'todos',
       equipe: 'todos',
-      tipoCliente: 'todos'
+      medico: 'todos',
+      turno: 'todos',
+      plantao: 'todos',
+      regiao: 'todos',
+      estado: 'todos',
+      cidade: 'todos'
     });
   };
 
@@ -213,8 +246,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         ].filter(Boolean);
       case 'cliente':
         return [
-          filters.cliente !== 'todos' ? `Cliente: ${filters.cliente}` : null,
-          filters.tipoCliente !== 'todos' ? `Tipo: ${filters.tipoCliente}` : null
+          filters.cliente !== 'todos' ? `Cliente: ${filters.cliente}` : null
         ].filter(Boolean);
       case 'laudo':
         return [
@@ -223,10 +255,18 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           filters.categoria !== 'todos' ? `Categoria: ${filters.categoria}` : null,
           filters.prioridade !== 'todos' ? `Prioridade: ${filters.prioridade}` : null
         ].filter(Boolean);
-      case 'medico':
+      case 'equipe':
         return [
+          filters.equipe !== 'todos' ? `Equipe: ${filters.equipe}` : null,
           filters.medico !== 'todos' ? `Médico: ${filters.medico}` : null,
-          filters.equipe !== 'todos' ? `Equipe: ${filters.equipe}` : null
+          filters.turno !== 'todos' ? `Turno: ${filters.turno}` : null,
+          filters.plantao !== 'todos' ? `Plantão: ${filters.plantao}` : null
+        ].filter(Boolean);
+      case 'regiao':
+        return [
+          filters.regiao !== 'todos' ? `Região: ${filters.regiao}` : null,
+          filters.estado !== 'todos' ? `Estado: ${filters.estado}` : null,
+          filters.cidade !== 'todos' ? `Cidade: ${filters.cidade}` : null
         ].filter(Boolean);
       default:
         return [];
@@ -283,7 +323,8 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                   ...getActiveFiltersForSection('periodo'),
                   ...getActiveFiltersForSection('cliente'),
                   ...getActiveFiltersForSection('laudo'),
-                  ...getActiveFiltersForSection('medico')
+                  ...getActiveFiltersForSection('equipe'),
+                  ...getActiveFiltersForSection('regiao')
                 ].map((filter, index) => (
                   <Badge key={index} variant="outline" className="text-xs px-2 py-1">
                     {filter}
@@ -293,346 +334,431 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
             </div>
           )}
 
-          {/* PERÍODO */}
-          <Collapsible 
-            open={expandedSections.periodo} 
-            onOpenChange={() => toggleSection('periodo')}
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-2 h-auto"
-              >
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm font-medium">Período</span>
+          {/* Seção de Botões dos Filtros */}
+          <div className="flex flex-wrap gap-2">
+            {/* Botão PERÍODO */}
+            <Collapsible 
+              open={expandedSections.periodo} 
+              onOpenChange={() => toggleSection('periodo')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('periodo').length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  Período
                   {getActiveFiltersForSection('periodo').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-5">
+                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
                       {getActiveFiltersForSection('periodo').length}
                     </Badge>
                   )}
-                </div>
-                {expandedSections.periodo ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-2">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 p-2 bg-muted/30 rounded-md">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Ano</label>
-                  <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {options.anos.map(ano => (
-                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
-                  <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="1">1º Trimestre</SelectItem>
-                      <SelectItem value="2">2º Trimestre</SelectItem>
-                      <SelectItem value="3">3º Trimestre</SelectItem>
-                      <SelectItem value="4">4º Trimestre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Mês</label>
-                  <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {months.map((month, index) => (
-                        <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Semana</label>
-                  <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todas</SelectItem>
-                      <SelectItem value="1">Última semana</SelectItem>
-                      <SelectItem value="2">Últimas 2 semanas</SelectItem>
-                      <SelectItem value="4">Últimas 4 semanas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Dia</label>
-                  <Select value={filters.dia} onValueChange={(value) => {
-                    updateFilter('dia', value);
-                    if (value !== 'especifico') {
-                      updateFilter('dataEspecifica', null);
-                      setShowDatePicker(false);
-                    }
-                  }}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="hoje">Hoje</SelectItem>
-                      <SelectItem value="ontem">Ontem</SelectItem>
-                      <SelectItem value="anteontem">Anteontem</SelectItem>
-                      <SelectItem value="ultimos5dias">Últimos 5 dias</SelectItem>
-                      <SelectItem value="especifico">Data específica</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Datepicker para data específica - só aparece quando necessário */}
-                {filters.dia === 'especifico' && (
-                  <div className="col-span-2 space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Selecionar Data</label>
-                    <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "h-8 text-xs justify-start",
-                            !filters.dataEspecifica && "text-muted-foreground"
-                          )}
-                          onClick={() => setShowDatePicker(true)}
-                        >
-                          <CalendarIcon className="mr-2 h-3 w-3" />
-                          {filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : "Selecionar data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-50 bg-background border" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={filters.dataEspecifica || undefined}
-                          onSelect={(date) => {
-                            updateFilter('dataEspecifica', date || null);
-                            setShowDatePicker(false);
-                          }}
-                          disabled={(date) => date > new Date()}
-                          initialFocus
-                          className="p-3 pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Ano</label>
+                    <Select value={filters.ano} onValueChange={(value) => updateFilter('ano', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {options.anos.map(ano => (
+                          <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
 
-          {/* CLIENTE */}
-          <Collapsible 
-            open={expandedSections.cliente} 
-            onOpenChange={() => toggleSection('cliente')}
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-2 h-auto"
-              >
-                <div className="flex items-center gap-2">
-                  <Building className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium">Cliente</span>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
+                    <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="1">1º Trimestre</SelectItem>
+                        <SelectItem value="2">2º Trimestre</SelectItem>
+                        <SelectItem value="3">3º Trimestre</SelectItem>
+                        <SelectItem value="4">4º Trimestre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Mês</label>
+                    <Select value={filters.mes} onValueChange={(value) => updateFilter('mes', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {months.map((month, index) => (
+                          <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Semana</label>
+                    <Select value={filters.semana} onValueChange={(value) => updateFilter('semana', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        <SelectItem value="1">Última semana</SelectItem>
+                        <SelectItem value="2">Últimas 2 semanas</SelectItem>
+                        <SelectItem value="4">Últimas 4 semanas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Dia</label>
+                    <Select value={filters.dia} onValueChange={(value) => {
+                      updateFilter('dia', value);
+                      if (value !== 'especifico') {
+                        updateFilter('dataEspecifica', null);
+                        setShowDatePicker(false);
+                      }
+                    }}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="hoje">Hoje</SelectItem>
+                        <SelectItem value="ontem">Ontem</SelectItem>
+                        <SelectItem value="anteontem">Anteontem</SelectItem>
+                        <SelectItem value="ultimos5dias">Últimos 5 dias</SelectItem>
+                        <SelectItem value="especifico">Data específica</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Datepicker para data específica - só aparece quando necessário */}
+                  {filters.dia === 'especifico' && (
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Selecionar Data</label>
+                      <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs justify-start",
+                              !filters.dataEspecifica && "text-muted-foreground"
+                            )}
+                            onClick={() => setShowDatePicker(true)}
+                          >
+                            <CalendarIcon className="mr-2 h-3 w-3" />
+                            {filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : "Selecionar data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-50 bg-background border" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={filters.dataEspecifica || undefined}
+                            onSelect={(date) => {
+                              updateFilter('dataEspecifica', date || null);
+                              setShowDatePicker(false);
+                            }}
+                            disabled={(date) => date > new Date()}
+                            initialFocus
+                            className="p-3 pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Botão CLIENTE */}
+            <Collapsible 
+              open={expandedSections.cliente} 
+              onOpenChange={() => toggleSection('cliente')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('cliente').length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Building className="h-4 w-4" />
+                  Cliente
                   {getActiveFiltersForSection('cliente').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-5">
+                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
                       {getActiveFiltersForSection('cliente').length}
                     </Badge>
                   )}
-                </div>
-                {expandedSections.cliente ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-2">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md">
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Empresa</label>
+                  <label className="text-xs font-medium text-muted-foreground">Cliente</label>
                   <Select value={filters.cliente} onValueChange={(value) => updateFilter('cliente', value)}>
                     <SelectTrigger className="h-8 text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60">
-                      <SelectItem value="todos">Todos os Clientes ({options.clientes.length})</SelectItem>
+                    <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                      <SelectItem value="todos">Todos</SelectItem>
                       {options.clientes.map(cliente => (
                         <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Tipo</label>
-                  <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todos os Tipos</SelectItem>
-                      <SelectItem value="CO">Cliente CO</SelectItem>
-                      <SelectItem value="NC">Cliente NC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* TIPO DE LAUDO */}
-          <Collapsible 
-            open={expandedSections.laudo} 
-            onOpenChange={() => toggleSection('laudo')}
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-2 h-auto"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm font-medium">Tipo de Laudo</span>
+            {/* Botão TIPO DE LAUDO */}
+            <Collapsible 
+              open={expandedSections.laudo} 
+              onOpenChange={() => toggleSection('laudo')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('laudo').length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Tipo de Laudo
                   {getActiveFiltersForSection('laudo').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-5">
+                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
                       {getActiveFiltersForSection('laudo').length}
                     </Badge>
                   )}
-                </div>
-                {expandedSections.laudo ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-2">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2 bg-muted/30 rounded-md">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
-                  <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60">
-                      <SelectItem value="todos">Todas ({options.modalidades.length})</SelectItem>
-                      {options.modalidades.map(modalidade => (
-                        <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
+                    <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.modalidades.map(modalidade => (
+                          <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
-                  <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60">
-                      <SelectItem value="todos">Todas ({options.especialidades.length})</SelectItem>
-                      {options.especialidades.map(especialidade => (
-                        <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
+                    <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.especialidades.map(especialidade => (
+                          <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                  <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todas as Categorias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                    <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        <SelectItem value="Normal">Normal</SelectItem>
+                        <SelectItem value="Urgente">Urgente</SelectItem>
+                        <SelectItem value="Emergência">Emergência</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
-                  <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60">
-                      <SelectItem value="todos">Todas ({options.prioridades.length})</SelectItem>
-                      {options.prioridades.map(prioridade => (
-                        <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
+                    <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.prioridades.map(prioridade => (
+                          <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+              </CollapsibleContent>
+            </Collapsible>
 
-          {/* MÉDICO */}
-          <Collapsible 
-            open={expandedSections.medico} 
-            onOpenChange={() => toggleSection('medico')}
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-2 h-auto"
-              >
-                <div className="flex items-center gap-2">
-                  <Stethoscope className="h-4 w-4 text-red-500" />
-                  <span className="text-sm font-medium">Médico</span>
-                  {getActiveFiltersForSection('medico').length > 0 && (
-                    <Badge variant="secondary" className="text-xs h-5">
-                      {getActiveFiltersForSection('medico').length}
+            {/* Botão EQUIPE MÉDICA */}
+            <Collapsible 
+              open={expandedSections.equipe} 
+              onOpenChange={() => toggleSection('equipe')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('equipe').length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Stethoscope className="h-4 w-4" />
+                  Equipe Médica
+                  {getActiveFiltersForSection('equipe').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
+                      {getActiveFiltersForSection('equipe').length}
                     </Badge>
                   )}
-                </div>
-                {expandedSections.medico ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-2">
-              <div className="grid grid-cols-2 gap-2 p-2 bg-muted/30 rounded-md">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Médico</label>
-                  <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border max-h-60">
-                      <SelectItem value="todos">Todos ({options.medicos.length})</SelectItem>
-                      {options.medicos.map(medico => (
-                        <SelectItem key={medico} value={medico}>{medico}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Equipe</label>
+                    <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.equipes.map(equipe => (
+                          <SelectItem key={equipe} value={equipe}>{equipe}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Equipe</label>
-                  <Select value={filters.equipe} onValueChange={(value) => updateFilter('equipe', value)}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-50 bg-background border">
-                      <SelectItem value="todos">Todas as Equipes</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Médico</label>
+                    <Select value={filters.medico} onValueChange={(value) => updateFilter('medico', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {options.medicos.map(medico => (
+                          <SelectItem key={medico} value={medico}>{medico}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Turno</label>
+                    <Select value={filters.turno} onValueChange={(value) => updateFilter('turno', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {options.turnos.map(turno => (
+                          <SelectItem key={turno} value={turno}>{turno}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Plantão</label>
+                    <Select value={filters.plantao} onValueChange={(value) => updateFilter('plantao', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {options.plantoes.map(plantao => (
+                          <SelectItem key={plantao} value={plantao}>{plantao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Botão REGIÃO */}
+            <Collapsible 
+              open={expandedSections.regiao} 
+              onOpenChange={() => toggleSection('regiao')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('regiao').length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Região
+                  {getActiveFiltersForSection('regiao').length > 0 && (
+                    <Badge variant="secondary" className="text-xs h-4 px-1 ml-1">
+                      {getActiveFiltersForSection('regiao').length}
+                    </Badge>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Região</label>
+                    <Select value={filters.regiao} onValueChange={(value) => updateFilter('regiao', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.regioes.map(regiao => (
+                          <SelectItem key={regiao} value={regiao}>{regiao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Estado</label>
+                    <Select value={filters.estado} onValueChange={(value) => updateFilter('estado', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {options.estados.map(estado => (
+                          <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Cidade</label>
+                    <Select value={filters.cidade} onValueChange={(value) => updateFilter('cidade', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.cidades.map(cidade => (
+                          <SelectItem key={cidade} value={cidade}>{cidade}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </div>
       </CardContent>
     </Card>

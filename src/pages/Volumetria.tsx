@@ -6,11 +6,16 @@ import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdv
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 
-export default function Volumetria() {
-  const [filters, setFilters] = useState<VolumetriaFilters>({
-    ano: 'todos',
+// Função para obter filtros padrão para o mês atual
+const getDefaultFilters = (): VolumetriaFilters => {
+  const now = new Date();
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = (now.getMonth() + 1).toString();
+  
+  return {
+    ano: currentYear,
     trimestre: 'todos',
-    mes: 'todos',
+    mes: currentMonth,
     semana: 'todos',
     dia: 'todos',
     dataEspecifica: null,
@@ -19,10 +24,18 @@ export default function Volumetria() {
     especialidade: 'todos',
     categoria: 'todos',
     prioridade: 'todos',
-    medico: 'todos',
     equipe: 'todos',
-    tipoCliente: 'todos'
-  });
+    medico: 'todos',
+    turno: 'todos',
+    plantao: 'todos',
+    regiao: 'todos',
+    estado: 'todos',
+    cidade: 'todos'
+  };
+};
+
+export default function Volumetria() {
+  const [filters, setFilters] = useState<VolumetriaFilters>(getDefaultFilters());
   
   const { stats, clientes, modalidades, especialidades, loading, refreshData } = useVolumetriaDataFiltered(filters);
   
@@ -61,22 +74,7 @@ export default function Volumetria() {
       {hasNoData ? (
         <VolumetriaNoData 
           hasActiveFilters={hasActiveFilters}
-          onClearFilters={() => setFilters({
-            ano: 'todos',
-            trimestre: 'todos',
-            mes: 'todos',
-            semana: 'todos',
-            dia: 'todos',
-            dataEspecifica: null,
-            cliente: 'todos',
-            modalidade: 'todos',
-            especialidade: 'todos',
-            categoria: 'todos',
-            prioridade: 'todos',
-            medico: 'todos',
-            equipe: 'todos',
-            tipoCliente: 'todos'
-          })}
+          onClearFilters={() => setFilters(getDefaultFilters())}
         />
       ) : (
         <>
