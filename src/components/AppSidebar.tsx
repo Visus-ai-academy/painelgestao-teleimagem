@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/collapsible";
 import { useUserPermissions, useHasMenuPermission, UserRole } from "@/hooks/useUserPermissions";
 import { useLogomarca } from "@/hooks/useLogomarca";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 interface MenuItem {
   title: string;
@@ -170,6 +172,15 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const permissions = useUserPermissions();
   const { logoUrl } = useLogomarca();
+  const { signOut, user } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
 
   const isActiveRoute = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -241,7 +252,7 @@ export function AppSidebar() {
                 return (
                   <div key={item.title} className="px-3 py-2">
                     <Collapsible defaultOpen={isActiveRoute(item.url)}>
-                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-left text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md btn-3d transition-all duration-300 ease-smooth">
+                      <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-left text-sm font-medium text-sidebar-foreground hover:bg-gradient-to-r hover:from-cyan-600/10 hover:to-slate-600/10 hover:text-cyan-600 rounded-md transition-all duration-300 ease-smooth">
                         <div className="flex items-center gap-2">
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
@@ -254,10 +265,10 @@ export function AppSidebar() {
                             key={subItem.title}
                             to={subItem.url}
                             className={({ isActive }) =>
-                              `block py-2 px-4 ml-6 text-sm rounded-md transition-all duration-300 ease-smooth btn-3d ${
+                              `block py-2 px-4 ml-6 text-sm rounded-md transition-all duration-300 ease-smooth ${
                                 isActive
-                                  ? "bg-gradient-primary text-primary-foreground font-medium shadow-3d-hover scale-105"
-                                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:scale-105"
+                                  ? "bg-gradient-to-r from-cyan-600 to-slate-600 text-white font-medium shadow-lg"
+                                  : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-cyan-600/10 hover:to-slate-600/10 hover:text-cyan-600"
                               }`
                             }
                           >
@@ -275,10 +286,10 @@ export function AppSidebar() {
                   <NavLink
                     to={item.url}
                     className={({ isActive }) =>
-                      `flex items-center gap-2 p-2 text-sm rounded-md transition-all duration-300 ease-smooth btn-3d ${
+                      `flex items-center gap-2 p-2 text-sm rounded-md transition-all duration-300 ease-smooth ${
                         isActive
-                          ? "bg-gradient-primary text-primary-foreground font-medium shadow-3d-hover scale-105"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:scale-105"
+                          ? "bg-gradient-to-r from-cyan-600 to-slate-600 text-white font-medium shadow-lg"
+                          : "text-sidebar-foreground hover:bg-gradient-to-r hover:from-cyan-600/10 hover:to-slate-600/10 hover:text-cyan-600"
                       }`
                     }
                   >
@@ -289,6 +300,32 @@ export function AppSidebar() {
               );
             })
           )}
+        </div>
+
+        {/* Footer com informações do usuário e logout */}
+        <div className="p-3 border-t border-border bg-gradient-to-r from-slate-50 to-cyan-50 dark:from-slate-900 dark:to-cyan-950">
+          {!collapsed && user && (
+            <div className="mb-3 p-2 rounded-md bg-white/50 dark:bg-slate-800/50 border border-cyan-200/50 dark:border-cyan-700/50">
+              <div className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
+                {user.email}
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Sistema Ativo
+              </div>
+            </div>
+          )}
+          
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            size={collapsed ? "icon" : "sm"}
+            className={`w-full bg-gradient-to-r from-cyan-600 to-slate-600 hover:from-cyan-700 hover:to-slate-700 text-white border-cyan-400/20 shadow-lg hover:shadow-xl transition-all duration-300 ${
+              collapsed ? "h-10 w-10" : ""
+            }`}
+          >
+            <LogOut className={`h-4 w-4 ${collapsed ? "" : "mr-2"}`} />
+            {!collapsed && "Sair do Sistema"}
+          </Button>
         </div>
       </SidebarContent>
     </Sidebar>
