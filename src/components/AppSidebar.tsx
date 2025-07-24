@@ -11,7 +11,8 @@ import {
   ChevronDown,
   FileText,
   Network,
-  AlertTriangle
+  AlertTriangle,
+  Upload
 } from "lucide-react";
 
 import { NavLink, useLocation } from "react-router-dom";
@@ -144,6 +145,12 @@ const menuItems: MenuItem[] = [
     title: "Pendências", 
     url: "/pendencias", 
     icon: AlertTriangle,
+    requiredRoles: ['manager', 'admin'],
+  },
+  { 
+    title: "Upload de Dados", 
+    url: "/upload-dados", 
+    icon: Upload,
     requiredRoles: ['manager', 'admin'],
   },
 ];
