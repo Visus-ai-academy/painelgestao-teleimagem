@@ -1,7 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { VolumetriaUpload } from '@/components/VolumetriaUpload';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FileUpload } from '@/components/FileUpload';
-import { Upload, Database, FileSpreadsheet } from "lucide-react";
+import { FileText } from "lucide-react";
 
 export default function UploadDados() {
 
@@ -11,163 +10,39 @@ export default function UploadDados() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Upload className="h-8 w-8" />
-          Upload de Dados
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Centralize todos os uploads de dados do sistema
+        <h1 className="text-3xl font-bold tracking-tight">Upload de Dados</h1>
+        <p className="text-muted-foreground mt-2">
+          Upload do arquivo de referência para preenchimento automático de valores
         </p>
       </div>
 
-      {/* Volumetria Uploads */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Volumetria</h2>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Volumetria Padrão</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VolumetriaUpload 
-                arquivoFonte="volumetria_padrao" 
-                onSuccess={handleUploadSuccess} 
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Volumetria Fora do Padrão</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VolumetriaUpload 
-                arquivoFonte="volumetria_fora_padrao" 
-                onSuccess={handleUploadSuccess} 
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Arquivo de Referência - De Para */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Arquivo de Referência - De Para</h2>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload - Tabela De Para (ESTUDO_DESCRICAO x VALORES)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FileUpload
-              title="Upload de Arquivo de Referência"
-              description="Arquivo com 2 colunas: ESTUDO_DESCRICAO e VALORES para preenchimento automático de valores zerados"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={5}
-              expectedFormat={["ESTUDO_DESCRICAO", "VALORES"]}
-              onUpload={async (file) => {
-                console.log('Upload de arquivo de referência:', file.name);
-                handleUploadSuccess();
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Faturamento Uploads */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Faturamento</h2>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Clientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FileUpload
-                title="Upload de Clientes"
-                description="Upload de arquivo de clientes no formato CSV"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={["nome", "email", "telefone", "cnpj"]}
-                onUpload={async (file) => {
-                  console.log('Upload de clientes:', file.name);
-                  handleUploadSuccess();
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Contratos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FileUpload
-                title="Upload de Contratos"
-                description="Upload de arquivo de contratos no formato CSV"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={["cliente", "numero_contrato", "valor"]}
-                onUpload={async (file) => {
-                  console.log('Upload de contratos:', file.name);
-                  handleUploadSuccess();
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Exames</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FileUpload
-                title="Upload de Exames"
-                description="Upload de arquivo de exames no formato CSV"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={25}
-                expectedFormat={["paciente", "medico", "modalidade", "especialidade"]}
-                onUpload={async (file) => {
-                  console.log('Upload de exames:', file.name);
-                  handleUploadSuccess();
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload - Faturas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FileUpload
-                title="Upload de Faturas"
-                description="Upload de arquivo de faturas no formato CSV"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={25}
-                expectedFormat={["numero_fatura", "cliente", "valor", "data_vencimento"]}
-                onUpload={async (file) => {
-                  console.log('Upload de faturas:', file.name);
-                  handleUploadSuccess();
-                }}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Seção Arquivo de Referência - De Para */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Arquivo de Referência - De Para
+          </CardTitle>
+          <CardDescription>
+            Upload do arquivo de referência com valores para preenchimento automático dos arquivos fora do padrão
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FileUpload
+            title="Tabela De Para (ESTUDO_DESCRICAO x VALORES)"
+            description="Arquivo com as colunas ESTUDO_DESCRICAO e VALORES para preenchimento automático dos valores zerados nos arquivos 1, 2, 3 e 4"
+            acceptedTypes={['.csv', '.xlsx', '.xls']}
+            maxSizeInMB={50}
+            expectedFormat={["ESTUDO_DESCRICAO", "VALORES"]}
+            onUpload={async (file) => {
+              console.log('Upload de arquivo de referência:', file.name);
+              handleUploadSuccess();
+            }}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
