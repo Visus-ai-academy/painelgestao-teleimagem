@@ -85,7 +85,7 @@ export default function TechWelcome() {
               Sistema de Gestão
             </p>
             <p className="text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
-              Bem-vindo ao seu centro de comando digital
+              Bem-vindo ao centro de comando
             </p>
           </div>
         </div>
