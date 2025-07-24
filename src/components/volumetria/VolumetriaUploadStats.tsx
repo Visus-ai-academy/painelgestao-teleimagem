@@ -29,17 +29,9 @@ export function VolumetriaUploadStats() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // Buscar dados reais do banco
-        const { data: volumetriaData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('arquivo_fonte, VALORES')
-
-        if (error) {
-          console.error('Erro ao buscar dados volumetria:', error);
-          return;
-        }
-
-        // Agrupar dados por arquivo_fonte
+        // Buscar estatísticas por arquivo_fonte usando queries separadas
+        const fontes = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+        
         const statsMap = new Map<string, {
           totalRecords: number;
           recordsWithValue: number;
@@ -47,30 +39,53 @@ export function VolumetriaUploadStats() {
           totalValue: number;
         }>();
 
-        // Inicializar contadores
-        const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-        statsMap.set('volumetria_padrao', { ...initStats });
-        statsMap.set('volumetria_fora_padrao', { ...initStats });
-        statsMap.set('volumetria_padrao_retroativo', { ...initStats });
-        statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
+        // Buscar estatísticas para cada fonte
+        for (const fonte of fontes) {
+          // Total de registros
+          const { count: totalRecords, error: countError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', fonte);
 
-        // Processar dados
-        volumetriaData?.forEach(record => {
-          const fonte = record.arquivo_fonte;
-          const valor = record.VALORES || 0;
-          
-          if (statsMap.has(fonte)) {
-            const stats = statsMap.get(fonte)!;
-            stats.totalRecords++;
-            
-            if (valor > 0) {
-              stats.recordsWithValue++;
-              stats.totalValue += valor;
-            } else {
-              stats.recordsZeroed++;
-            }
+          if (countError) {
+            console.error(`Erro ao contar registros para ${fonte}:`, countError);
+            continue;
           }
-        });
+
+          // Registros com valor > 0
+          const { count: recordsWithValue, error: valueCountError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', fonte)
+            .gt('VALORES', 0);
+
+          if (valueCountError) {
+            console.error(`Erro ao contar registros com valor para ${fonte}:`, valueCountError);
+            continue;
+          }
+
+          // Soma total dos valores
+          const { data: sumData, error: sumError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('VALORES')
+            .eq('arquivo_fonte', fonte)
+            .gt('VALORES', 0);
+
+          if (sumError) {
+            console.error(`Erro ao somar valores para ${fonte}:`, sumError);
+            continue;
+          }
+
+          const totalValue = sumData?.reduce((sum, record) => sum + (record.VALORES || 0), 0) || 0;
+          const recordsZeroed = (totalRecords || 0) - (recordsWithValue || 0);
+
+          statsMap.set(fonte, {
+            totalRecords: totalRecords || 0,
+            recordsWithValue: recordsWithValue || 0,
+            recordsZeroed: recordsZeroed,
+            totalValue: totalValue
+          });
+        }
 
         // Converter para formato do componente
         const realStats: UploadStats[] = [
