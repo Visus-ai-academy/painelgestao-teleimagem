@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MatrixRain } from "@/components/MatrixRain";
+import { CityLightBeams } from "@/components/CityLightBeams";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Zap, BarChart3, Users, Settings } from "lucide-react";
@@ -46,9 +46,9 @@ export default function TechWelcome() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
-      {/* Matrix Rain Background */}
-      <div className="absolute inset-0 opacity-20">
-        <MatrixRain width={1920} height={1080} fontSize={12} speed={30} />
+      {/* City Light Beams Background */}
+      <div className="absolute inset-0 opacity-30">
+        <CityLightBeams width={1920} height={1080} beamCount={60} speed={3} />
       </div>
       
       {/* Animated Grid Background */}
