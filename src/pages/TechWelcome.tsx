@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { CityLightBeams } from "@/components/CityLightBeams";
 import { CircularLight } from "@/components/CircularLight";
-import { HandMovement } from "@/components/HandMovement";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Zap, BarChart3, Users, Settings } from "lucide-react";
@@ -73,10 +72,6 @@ export default function TechWelcome() {
       
       {/* Circular Light Animation over the circle */}
       <CircularLight size={350} />
-      
-      {/* Hand Movement Animation */}
-      <HandMovement width={300} height={200} />
-      
       
       {/* Content */}
       <div className="relative z-10 min-h-screen p-6 animate-fade-in">
