@@ -29,21 +29,47 @@ export function VolumetriaUploadStats() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // Buscar todas as estatísticas usando uma query SQL agregada
-        const { data: statsData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select(`
-            arquivo_fonte,
-            VALORES
-          `)
-          .limit(50000); // Aumentar o limite para pegar todos os dados
+        // Buscar dados usando o mesmo padrão do sistema (batches com ranges)
+        let allData: any[] = [];
+        let offset = 0;
+        const limit = 1000;
+        let hasMoreData = true;
 
-        if (error) {
-          console.error('Erro ao buscar dados volumetria:', error);
-          return;
+        console.log('📊 Carregando todos os dados de volumetria...');
+
+        while (hasMoreData) {
+          const { data: batchData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('arquivo_fonte, VALORES')
+            .range(offset, offset + limit - 1);
+
+          if (error) {
+            console.error('❌ Erro ao buscar dados:', error);
+            throw error;
+          }
+
+          if (!batchData || batchData.length === 0) {
+            hasMoreData = false;
+            break;
+          }
+
+          allData = [...allData, ...batchData];
+          console.log(`📦 Lote ${Math.floor(offset/limit) + 1}: ${batchData.length} registros (total: ${allData.length})`);
+
+          if (batchData.length < limit) {
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
+
+          // Limite de segurança para evitar loop infinito
+          if (allData.length > 100000) {
+            console.log('⚠️ Limite de segurança atingido (100k registros)');
+            hasMoreData = false;
+          }
         }
 
-        console.log('📊 Dados brutos carregados:', statsData?.length, 'registros');
+        console.log('📊 Total de dados carregados:', allData.length, 'registros');
 
         // Processar dados por arquivo_fonte
         const statsMap = new Map<string, {
@@ -61,7 +87,7 @@ export function VolumetriaUploadStats() {
         statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
 
         // Processar dados
-        statsData?.forEach(record => {
+        allData.forEach(record => {
           const fonte = record.arquivo_fonte;
           const valor = record.VALORES || 0;
           
