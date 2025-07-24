@@ -4,7 +4,7 @@ interface CircularLightProps {
   size?: number;
 }
 
-export function CircularLight({ size = 520 }: CircularLightProps) { // Aumentado 30% (400 -> 520)
+export function CircularLight({ size = 442 }: CircularLightProps) { // Reduzido 15% (520 -> 442)
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function CircularLight({ size = 520 }: CircularLightProps) { // Aumentado
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const globeRadius = 143; // Aumentado 30% (110 -> 143)
+    const globeRadius = 122; // Reduzido 15% (143 -> 122)
 
     // Convert lat/lon to 3D coordinates - corrigido para hemisfério sul
     function latLonTo3D(lat: number, lon: number, radius: number) {
@@ -355,7 +355,7 @@ export function CircularLight({ size = 520 }: CircularLightProps) { // Aumentado
   }, [size]);
 
   return (
-    <div className="absolute left-[45%] top-[45%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+    <div className="absolute left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
       <canvas
         ref={canvasRef}
         className="block"
