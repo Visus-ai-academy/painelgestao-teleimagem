@@ -74,17 +74,17 @@ export default function TechWelcome() {
       <CircularLight size={350} />
       
       {/* Content */}
-      <div className="relative z-10 min-h-screen p-6 animate-fade-in flex items-center justify-center">
-        {/* Logo/Title Area - Centered in the circle */}
-        <div className="text-center">
+      <div className="relative z-10 min-h-screen p-6 animate-fade-in">
+        {/* Logo/Title Area - Positioned specifically in the circle above the hand */}
+        <div className="absolute left-1/2 top-[30%] transform -translate-x-1/2 -translate-y-1/2 text-center">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h1 className="text-6xl font-bold text-slate-600 mb-6 font-orbitron tracking-wider">
+            <h1 className="text-6xl font-bold text-white mb-6 font-orbitron tracking-wider drop-shadow-2xl">
               TeleImagem
             </h1>
-            <p className="text-2xl text-slate-500 mb-4 font-orbitron font-light tracking-wide">
+            <p className="text-2xl text-cyan-100 mb-4 font-orbitron font-light tracking-wide drop-shadow-lg">
               Sistema de Gestão
             </p>
-            <p className="text-lg text-slate-500 font-orbitron font-light">
+            <p className="text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
               Bem-vindo ao seu centro de comando digital
             </p>
           </div>
