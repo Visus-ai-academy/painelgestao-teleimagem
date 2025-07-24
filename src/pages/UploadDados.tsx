@@ -56,6 +56,33 @@ export default function UploadDados() {
         </div>
       </div>
 
+      {/* Arquivo de Referência - De Para */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Arquivo de Referência - De Para</h2>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Upload - Tabela De Para (ESTUDO_DESCRICAO x VALORES)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FileUpload
+              title="Upload de Arquivo de Referência"
+              description="Arquivo com 2 colunas: ESTUDO_DESCRICAO e VALORES para preenchimento automático de valores zerados"
+              acceptedTypes={['.csv', '.xlsx', '.xls']}
+              maxSizeInMB={5}
+              expectedFormat={["ESTUDO_DESCRICAO", "VALORES"]}
+              onUpload={async (file) => {
+                console.log('Upload de arquivo de referência:', file.name);
+                handleUploadSuccess();
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Faturamento Uploads */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">

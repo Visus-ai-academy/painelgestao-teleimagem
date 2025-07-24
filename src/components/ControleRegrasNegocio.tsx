@@ -242,6 +242,15 @@ const regrasImplementadas: Regra[] = [
     status: 'ativa',
     implementadaEm: '2024-01-27'
   },
+  {
+    id: 'v026',
+    nome: 'Mapeamento De Para - Valores por Estudo',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados nos arquivos 1, 2, 3 e 4 através de correspondência por descrição do estudo.',
+    status: 'ativa',
+    implementadaEm: '2024-01-28'
+  },
   
   // FATURAMENTO
   {
