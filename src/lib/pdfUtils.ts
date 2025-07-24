@@ -31,58 +31,162 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   reportElement.style.fontFamily = 'Arial, sans-serif';
   reportElement.style.backgroundColor = 'white';
   
-  reportElement.innerHTML = `
-    <div style="text-align: center; margin-bottom: 30px;">
-      <h1 style="color: #1e40af; margin-bottom: 10px;">Relatório de Faturamento</h1>
-      <p style="color: #666; font-size: 14px;">Período: ${data.periodo}</p>
-    </div>
+  // Função para sanitizar strings e prevenir XSS
+  const sanitizeHtml = (str: string): string => {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, (match) => {
+      const entityMap: { [key: string]: string } = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      };
+      return entityMap[match];
+    });
+  };
+
+  // Criar elementos DOM de forma segura
+  const createHeader = () => {
+    const headerDiv = document.createElement('div');
+    headerDiv.style.textAlign = 'center';
+    headerDiv.style.marginBottom = '30px';
     
-    <div style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-      <h2 style="color: #374151; margin-bottom: 15px;">Cliente: ${data.cliente_nome}</h2>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <div>
-          <p><strong>Total de Exames:</strong> ${data.total_exames}</p>
-        </div>
-        <div>
-          <p><strong>Valor Total:</strong> R$ ${data.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-        </div>
-      </div>
-    </div>
+    const title = document.createElement('h1');
+    title.style.color = '#1e40af';
+    title.style.marginBottom = '10px';
+    title.textContent = 'Relatório de Faturamento';
     
-    <div>
-      <h3 style="color: #374151; margin-bottom: 15px;">Detalhamento dos Exames</h3>
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Paciente</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Data</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Modalidade</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Especialidade</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Exame</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Qtd</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Valor</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.exames.map(exame => `
-            <tr>
-              <td style="border: 1px solid #ddd; padding: 6px;">${exame.paciente}</td>
-              <td style="border: 1px solid #ddd; padding: 6px;">${new Date(exame.data_exame).toLocaleDateString('pt-BR')}</td>
-              <td style="border: 1px solid #ddd; padding: 6px;">${exame.modalidade}</td>
-              <td style="border: 1px solid #ddd; padding: 6px;">${exame.especialidade}</td>
-              <td style="border: 1px solid #ddd; padding: 6px;">${exame.nome_exame}</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${exame.quantidade}</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">R$ ${exame.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
+    const periodo = document.createElement('p');
+    periodo.style.color = '#666';
+    periodo.style.fontSize = '14px';
+    periodo.textContent = `Período: ${sanitizeHtml(data.periodo)}`;
     
-    <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
-      <p>Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}</p>
-    </div>
-  `;
+    headerDiv.appendChild(title);
+    headerDiv.appendChild(periodo);
+    return headerDiv;
+  };
+
+  const createClienteInfo = () => {
+    const clienteDiv = document.createElement('div');
+    clienteDiv.style.marginBottom = '30px';
+    clienteDiv.style.padding = '20px';
+    clienteDiv.style.border = '1px solid #ddd';
+    clienteDiv.style.borderRadius = '8px';
+    
+    const clienteTitle = document.createElement('h2');
+    clienteTitle.style.color = '#374151';
+    clienteTitle.style.marginBottom = '15px';
+    clienteTitle.textContent = `Cliente: ${sanitizeHtml(data.cliente_nome)}`;
+    
+    const gridDiv = document.createElement('div');
+    gridDiv.style.display = 'grid';
+    gridDiv.style.gridTemplateColumns = '1fr 1fr';
+    gridDiv.style.gap = '20px';
+    
+    const totalExamesDiv = document.createElement('div');
+    const totalExamesP = document.createElement('p');
+    totalExamesP.innerHTML = `<strong>Total de Exames:</strong> ${data.total_exames}`;
+    totalExamesDiv.appendChild(totalExamesP);
+    
+    const valorTotalDiv = document.createElement('div');
+    const valorTotalP = document.createElement('p');
+    valorTotalP.innerHTML = `<strong>Valor Total:</strong> R$ ${data.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    valorTotalDiv.appendChild(valorTotalP);
+    
+    gridDiv.appendChild(totalExamesDiv);
+    gridDiv.appendChild(valorTotalDiv);
+    clienteDiv.appendChild(clienteTitle);
+    clienteDiv.appendChild(gridDiv);
+    
+    return clienteDiv;
+  };
+
+  const createExamesTable = () => {
+    const containerDiv = document.createElement('div');
+    
+    const title = document.createElement('h3');
+    title.style.color = '#374151';
+    title.style.marginBottom = '15px';
+    title.textContent = 'Detalhamento dos Exames';
+    
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '12px';
+    
+    // Criar cabeçalho
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.style.backgroundColor = '#f3f4f6';
+    
+    const headers = ['Paciente', 'Data', 'Modalidade', 'Especialidade', 'Exame', 'Qtd', 'Valor'];
+    headers.forEach(headerText => {
+      const th = document.createElement('th');
+      th.style.border = '1px solid #ddd';
+      th.style.padding = '8px';
+      th.style.textAlign = headerText === 'Qtd' ? 'center' : headerText === 'Valor' ? 'right' : 'left';
+      th.textContent = headerText;
+      headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Criar corpo da tabela
+    const tbody = document.createElement('tbody');
+    data.exames.forEach(exame => {
+      const row = document.createElement('tr');
+      
+      const cells = [
+        sanitizeHtml(exame.paciente),
+        new Date(exame.data_exame).toLocaleDateString('pt-BR'),
+        sanitizeHtml(exame.modalidade),
+        sanitizeHtml(exame.especialidade),
+        sanitizeHtml(exame.nome_exame),
+        exame.quantidade.toString(),
+        `R$ ${exame.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ];
+      
+      cells.forEach((cellText, index) => {
+        const td = document.createElement('td');
+        td.style.border = '1px solid #ddd';
+        td.style.padding = '6px';
+        if (index === 5) td.style.textAlign = 'center'; // Qtd
+        if (index === 6) td.style.textAlign = 'right';  // Valor
+        td.textContent = cellText;
+        row.appendChild(td);
+      });
+      
+      tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    containerDiv.appendChild(title);
+    containerDiv.appendChild(table);
+    
+    return containerDiv;
+  };
+
+  const createFooter = () => {
+    const footerDiv = document.createElement('div');
+    footerDiv.style.marginTop = '30px';
+    footerDiv.style.textAlign = 'center';
+    footerDiv.style.color = '#666';
+    footerDiv.style.fontSize = '12px';
+    
+    const footerP = document.createElement('p');
+    footerP.textContent = `Relatório gerado automaticamente em ${new Date().toLocaleString('pt-BR')}`;
+    footerDiv.appendChild(footerP);
+    
+    return footerDiv;
+  };
+
+  // Montar elemento do relatório de forma segura
+  reportElement.appendChild(createHeader());
+  reportElement.appendChild(createClienteInfo());
+  reportElement.appendChild(createExamesTable());
+  reportElement.appendChild(createFooter());
   
   document.body.appendChild(reportElement);
   

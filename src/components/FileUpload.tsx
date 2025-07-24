@@ -59,15 +59,36 @@ export function FileUpload({
   }, []);
 
   const handleFileSelect = useCallback((file: File) => {
-    // Validar tipo de arquivo
-    const isValidType = acceptedTypes.some(type => 
-      file.type.includes(type) || file.name.toLowerCase().endsWith(type)
-    );
+    // Validação rigorosa de tipo de arquivo
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv', // .csv
+      'application/pdf' // .pdf
+    ];
     
-    if (!isValidType) {
+    const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf'];
+    
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidMimeType = allowedMimeTypes.includes(file.type);
+    const isValidExtension = allowedExtensions.includes(fileExtension);
+    
+    // Verificar tanto MIME type quanto extensão para prevenir bypass
+    if (!isValidMimeType && !isValidExtension) {
       toast({
         title: "Tipo de arquivo inválido",
-        description: `Tipos aceitos: ${acceptedTypes.join(', ')}`,
+        description: `Tipos aceitos: ${acceptedTypes.join(', ')}. Tipo detectado: ${file.type}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar nome do arquivo (prevenir caracteres perigosos)
+    const dangerousChars = /[<>:"/\\|?*\x00-\x1f]/;
+    if (dangerousChars.test(file.name)) {
+      toast({
+        title: "Nome de arquivo inválido",
+        description: "O nome do arquivo contém caracteres não permitidos",
         variant: "destructive"
       });
       return;
@@ -79,6 +100,16 @@ export function FileUpload({
       toast({
         title: "Arquivo muito grande",
         description: `Tamanho máximo: ${maxSizeInMB}MB`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar tamanho mínimo (prevenir arquivos vazios ou muito pequenos)
+    if (file.size < 100) { // 100 bytes mínimo
+      toast({
+        title: "Arquivo muito pequeno",
+        description: "O arquivo parece estar vazio ou corrompido",
         variant: "destructive"
       });
       return;

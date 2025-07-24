@@ -1,43 +1,56 @@
 project_id = "atbvikgxdcohnznkmaus"
 
+# Secure functions - JWT verification enabled by default
+# Only disable JWT for truly public endpoints that validate their own authentication
+
 [functions.processar-exames]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-clientes]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-contratos]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-escalas]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-financeiro]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-faturamento]
-verify_jwt = false
+verify_jwt = true
 
 [functions.processar-faturamento-pdf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.gerar-relatorio-faturamento]
-verify_jwt = false
+verify_jwt = true
 
 [functions.enviar-relatorio-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.sincronizar-mapeamentos]
-verify_jwt = false
+verify_jwt = true
 
 [functions.volumetria-cache]
-verify_jwt = false
+verify_jwt = true
 
 [functions.performance-monitor]
-verify_jwt = false
+verify_jwt = true
 
 [functions.dashboard-api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.custom-metrics]
-verify_jwt = false
+verify_jwt = true
+
+[functions.secure-file-upload]
+verify_jwt = true
+
+# Public endpoints (use with extreme caution)
+[functions.webhook-clicksign]
+verify_jwt = false  # External webhook needs to validate signature
+
+[functions.ativar-regua-cobranca]
+verify_jwt = false  # Legacy - should be secured in future update
