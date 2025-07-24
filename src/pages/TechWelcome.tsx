@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { CityLightBeams } from "@/components/CityLightBeams";
 import { CircularLight } from "@/components/CircularLight";
-import smartCityBg from "@/assets/smart-city-background.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Zap, BarChart3, Users, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import smartCityBg from "@/assets/smart-city-background.png";
 
 export default function TechWelcome() {
   const [isVisible, setIsVisible] = useState(false);
+  const [fallingButton, setFallingButton] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,6 +47,16 @@ export default function TechWelcome() {
     }
   ];
 
+  const handleButtonClick = (action: typeof quickActions[0]) => {
+    setFallingButton(action.path);
+    
+    // Animate for 1.5 seconds then navigate
+    setTimeout(() => {
+      setFallingButton(null);
+      navigate(action.path);
+    }, 1500);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Background Image */}
@@ -80,40 +91,48 @@ export default function TechWelcome() {
         </div>
       </div>
 
-      {/* Quick Actions Grid - Positioned within image area */}
-      <div className="absolute bottom-32 left-0 right-0 z-20 px-6">
-        <div className={`max-w-5xl mx-auto transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <Card 
-                  key={action.path}
-                  className={`bg-slate-800/60 border-slate-600 hover:bg-slate-700/60 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-xl backdrop-blur-md ${isVisible ? 'animate-fade-in' : ''}`}
-                  style={{ animationDelay: `${index * 200}ms` }}
-                  onClick={() => navigate(action.path)}
-                >
-                  <CardContent className="p-3 text-center">
-                    <Icon className={`w-5 h-5 mx-auto mb-2 ${action.color}`} />
-                    <h3 className="text-white font-semibold mb-1 text-xs font-orbitron">{action.title}</h3>
-                    <p className="text-slate-400 text-xs">{action.description}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* CTA Button */}
-          <div className="text-center">
-            <Button 
-              onClick={() => navigate("/dashboard")}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
-            >
-              Entrar no Sistema
-              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
+      {/* Quick Actions - Aligned to right */}
+      <div className="absolute right-8 top-1/2 transform -translate-y-1/2 z-20">
+        <div className={`space-y-4 transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'}`}>
+          {quickActions.map((action, index) => {
+            const Icon = action.icon;
+            const isFalling = fallingButton === action.path;
+            
+            return (
+              <Card 
+                key={action.path}
+                className={`w-48 bg-slate-800/60 border-slate-600 hover:bg-slate-700/60 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-xl backdrop-blur-md ${isVisible ? 'animate-fade-in' : ''} ${
+                  isFalling 
+                    ? 'animate-[fall_1.5s_ease-in_forwards]' 
+                    : ''
+                }`}
+                style={{ 
+                  animationDelay: `${index * 200}ms`,
+                  '--fall-end-x': '45vw',
+                  '--fall-end-y': '85vh'
+                } as React.CSSProperties}
+                onClick={() => handleButtonClick(action)}
+              >
+                <CardContent className="p-4 text-center">
+                  <Icon className={`w-6 h-6 mx-auto mb-3 ${action.color}`} />
+                  <h3 className="text-white font-semibold mb-2 text-sm font-orbitron">{action.title}</h3>
+                  <p className="text-slate-400 text-xs">{action.description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
+      </div>
+
+      {/* CTA Button - Bottom center */}
+      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-20">
+        <Button 
+          onClick={() => navigate("/dashboard")}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
+        >
+          Entrar no Sistema
+          <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        </Button>
       </div>
 
       {/* Floating Elements */}

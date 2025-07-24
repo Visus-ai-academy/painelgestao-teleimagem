@@ -181,4 +181,28 @@ All colors MUST be HSL.
   .animate-bounce-in {
     transition: var(--transition-bounce);
   }
+
+  /* Fall animation for buttons dropping to hand */
+  @keyframes fall {
+    0% {
+      transform: translateX(0) translateY(0) scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    25% {
+      transform: translateX(-10vw) translateY(5vh) scale(0.9) rotate(-5deg);
+      opacity: 0.9;
+    }
+    50% {
+      transform: translateX(-20vw) translateY(15vh) scale(0.8) rotate(-10deg);
+      opacity: 0.8;
+    }
+    75% {
+      transform: translateX(-35vw) translateY(50vh) scale(0.6) rotate(-15deg);
+      opacity: 0.6;
+    }
+    100% {
+      transform: translateX(var(--fall-end-x, -45vw)) translateY(var(--fall-end-y, 85vh)) scale(0.3) rotate(-20deg);
+      opacity: 0.2;
+    }
+  }
 }
