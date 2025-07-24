@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -203,6 +204,16 @@ All colors MUST be HSL.
     100% {
       transform: translateX(var(--fall-end-x, -45vw)) translateY(var(--fall-end-y, 85vh)) scale(0.3) rotate(-20deg);
       opacity: 0.2;
+    }
+  }
+
+  /* Animação de rotação para o globo do sidebar */
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
     }
   }
 }

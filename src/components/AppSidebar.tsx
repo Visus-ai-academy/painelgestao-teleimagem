@@ -42,6 +42,7 @@ import { useUserPermissions, useHasMenuPermission, UserRole } from "@/hooks/useU
 import { useLogomarca } from "@/hooks/useLogomarca";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { CircularLight } from "@/components/CircularLight";
 
 interface MenuItem {
   title: string;
@@ -226,16 +227,54 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
-        <div className="p-6 border-b bg-gradient-subtle">
-          <div className="flex items-center gap-2">
-            <img 
-              src={logoUrl} 
-              alt="Teleimagem Logo" 
-              className="h-8 w-auto object-contain"
-            />
+        <div className="relative p-6 border-b bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden min-h-[100px]">
+          {/* Efeito de globo animado para o sidebar */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-30">
+            {/* Círculo principal do globo */}
+            <div 
+              className="w-20 h-20 rounded-full border-2 border-cyan-400/40 relative"
+              style={{
+                background: `
+                  radial-gradient(circle at 30% 30%, 
+                    rgba(100, 200, 255, 0.2) 0%,
+                    rgba(0, 150, 255, 0.1) 40%,
+                    rgba(0, 100, 200, 0.05) 70%,
+                    transparent 100%
+                  )
+                `,
+                animation: 'spin 20s linear infinite'
+              }}
+            >
+              {/* Pontos de conexão simulando o globo */}
+              <div className="absolute top-2 left-3 w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
+              <div className="absolute top-4 right-4 w-1 h-1 bg-blue-300 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+              <div className="absolute bottom-3 left-4 w-1 h-1 bg-cyan-300 rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
+              <div className="absolute bottom-4 right-3 w-1 h-1 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+              <div className="absolute top-6 left-6 w-1 h-1 bg-cyan-500 rounded-full animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+              
+              {/* Linhas de conexão */}
+              <div className="absolute top-3 left-4 w-8 h-px bg-gradient-to-r from-cyan-400/60 to-transparent transform rotate-45"></div>
+              <div className="absolute bottom-5 right-5 w-6 h-px bg-gradient-to-l from-blue-400/60 to-transparent transform -rotate-45"></div>
+            </div>
+          </div>
+          
+          {/* Texto sobre o globo */}
+          <div className="relative z-10 flex items-center justify-center">
             {!collapsed && (
-              <div>
-                <h2 className="font-bold text-lg text-foreground">Painel de Gestão</h2>
+              <div className="text-center">
+                <h2 className="font-bold text-lg text-white font-orbitron tracking-wider drop-shadow-lg">
+                  Teleimagem
+                </h2>
+                <p className="text-sm text-cyan-100 font-orbitron font-light tracking-wide">
+                  Sistema de Gestão
+                </p>
+              </div>
+            )}
+            {collapsed && (
+              <div className="text-center">
+                <h2 className="font-bold text-sm text-white font-orbitron tracking-wider drop-shadow-lg">
+                  TI
+                </h2>
               </div>
             )}
           </div>
