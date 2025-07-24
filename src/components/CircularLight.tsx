@@ -38,13 +38,13 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
 
     // Global connection points
     const connections = [
-      // Brasil
-      { name: 'São Paulo', lat: -23.5505, lon: -46.6333, isHub: false },
-      { name: 'Rio de Janeiro', lat: -22.9068, lon: -43.1729, isHub: false },
-      { name: 'Brasília', lat: -15.8267, lon: -47.9218, isHub: false },
-      { name: 'Salvador', lat: -12.9714, lon: -38.5014, isHub: false },
-      { name: 'Recife', lat: -8.0476, lon: -34.8770, isHub: false },
+      // Brasil - organizados do norte ao sul
       { name: 'Manaus', lat: -3.1190, lon: -60.0217, isHub: false },
+      { name: 'Recife', lat: -8.0476, lon: -34.8770, isHub: false },
+      { name: 'Salvador', lat: -12.9714, lon: -38.5014, isHub: false },
+      { name: 'Brasília', lat: -15.8267, lon: -47.9218, isHub: false },
+      { name: 'Rio de Janeiro', lat: -22.9068, lon: -43.1729, isHub: false },
+      { name: 'São Paulo', lat: -23.5505, lon: -46.6333, isHub: false },
       { name: 'Porto Alegre', lat: -30.0346, lon: -51.2177, isHub: false },
       
       // Mundo
@@ -58,8 +58,10 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
       { name: 'Frankfurt', lat: 50.1109, lon: 8.6821, isHub: false },
       { name: 'Singapura', lat: 1.3521, lon: 103.8198, isHub: false },
       { name: 'Toronto', lat: 43.6532, lon: -79.3832, isHub: false },
+      { name: 'Buenos Aires', lat: -34.6118, lon: -58.3960, isHub: false },
+      { name: 'Santiago', lat: -33.4489, lon: -70.6693, isHub: false },
       
-      // Curitiba - Centro das conexões
+      // Curitiba - Centro das conexões (região sul do Brasil)
       { name: 'Curitiba', lat: -25.4284, lon: -49.2733, isHub: true }
     ];
 
@@ -83,9 +85,9 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, size, size);
 
-      // Rotation
-      const rotationY = time * 0.003;
-      const rotationX = Math.sin(time * 0.001) * 0.2;
+      // Rotation - ajustado para mostrar melhor a América do Sul
+      const rotationY = time * 0.003 + Math.PI * 0.3; // Offset para focar nas Américas
+      const rotationX = Math.sin(time * 0.001) * 0.15 - 0.2; // Inclinação para mostrar sul
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
