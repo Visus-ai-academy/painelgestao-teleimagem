@@ -15,8 +15,19 @@ export default function UploadDados() {
     console.log('🔄 Iniciando upload do arquivo De Para:', file.name);
     
     try {
-      // Upload do arquivo para storage
-      const nomeArquivo = `valores_de_para_${Date.now()}_${file.name}`;
+      // Sanitizar nome do arquivo (remover espaços e caracteres especiais)
+      const sanitizedFileName = file.name
+        .replace(/\s+/g, '_')  // substituir espaços por underscore
+        .replace(/[àáâãäå]/g, 'a')
+        .replace(/[èéêë]/g, 'e')
+        .replace(/[ìíîï]/g, 'i')
+        .replace(/[òóôõö]/g, 'o')
+        .replace(/[ùúûü]/g, 'u')
+        .replace(/[ç]/g, 'c')
+        .replace(/[ñ]/g, 'n')
+        .replace(/[^a-zA-Z0-9._-]/g, ''); // remover outros caracteres especiais
+      
+      const nomeArquivo = `valores_de_para_${Date.now()}_${sanitizedFileName}`;
       console.log('📁 Nome do arquivo gerado:', nomeArquivo);
       
       const { data: uploadData, error: uploadError } = await supabase.storage
