@@ -355,7 +355,7 @@ export function CircularLight({ size = 520 }: CircularLightProps) { // Aumentado
   }, [size]);
 
   return (
-    <div className="absolute left-[45%] top-[75%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+    <div className="absolute left-[45%] top-[45%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
       <canvas
         ref={canvasRef}
         className="block"
