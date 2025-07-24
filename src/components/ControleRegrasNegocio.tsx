@@ -89,6 +89,87 @@ const regrasImplementadas: Regra[] = [
     status: 'ativa',
     implementadaEm: '2024-01-12'
   },
+  {
+    id: 'v009',
+    nome: 'Tratamento de Arquivo 1 - Data de Exame',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Processa dados do primeiro arquivo de upload, extrai DATA_REALIZACAO e converte para formato padrão.',
+    status: 'ativa',
+    implementadaEm: '2024-01-25'
+  },
+  {
+    id: 'v010',
+    nome: 'Tratamento de Arquivo 2 - Data de Laudo',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Processa dados do segundo arquivo de upload, extrai DATA_LAUDO e DATA_PRAZO para análise de prazo.',
+    status: 'ativa',
+    implementadaEm: '2024-01-25'
+  },
+  {
+    id: 'v011',
+    nome: 'Tratamento de Arquivo 3 - Valores e Prioridades',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Processa dados do terceiro arquivo, extrai VALORES e PRIORIDADE para cálculos financeiros.',
+    status: 'ativa',
+    implementadaEm: '2024-01-25'
+  },
+  {
+    id: 'v012',
+    nome: 'Tratamento de Arquivo 4 - Dados Complementares',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Processa dados do quarto arquivo, extrai informações complementares como MEDICO, ESPECIALIDADE e STATUS.',
+    status: 'ativa',
+    implementadaEm: '2024-01-25'
+  },
+  {
+    id: 'v013',
+    nome: 'Validação de Formato Excel',
+    modulo: 'volumetria',
+    categoria: 'validacao',
+    criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.',
+    status: 'ativa',
+    implementadaEm: '2024-01-20'
+  },
+  {
+    id: 'v014',
+    nome: 'Mapeamento Dinâmico de Campos',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
+    status: 'ativa',
+    implementadaEm: '2024-01-18'
+  },
+  {
+    id: 'v015',
+    nome: 'Limpeza de Dados Duplicados',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.',
+    status: 'ativa',
+    implementadaEm: '2024-01-22'
+  },
+  {
+    id: 'v016',
+    nome: 'Processamento em Lotes',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance e evitar timeouts.',
+    status: 'ativa',
+    implementadaEm: '2024-01-15'
+  },
+  {
+    id: 'v017',
+    nome: 'Log de Upload e Auditoria',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Registra todos os uploads na tabela upload_logs com status, erros e estatísticas de processamento.',
+    status: 'ativa',
+    implementadaEm: '2024-01-10'
+  },
   
   // FATURAMENTO
   {
