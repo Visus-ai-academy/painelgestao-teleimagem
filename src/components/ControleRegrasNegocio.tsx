@@ -170,6 +170,78 @@ const regrasImplementadas: Regra[] = [
     status: 'ativa',
     implementadaEm: '2024-01-10'
   },
+  {
+    id: 'v018',
+    nome: 'Transformação de Valores Numéricos',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Converte colunas de valores para formato numérico, remove caracteres não numéricos e ajusta casas decimais.',
+    status: 'ativa',
+    implementadaEm: '2024-01-28'
+  },
+  {
+    id: 'v019',
+    nome: 'Remoção de Decimais Desnecessários',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Remove ".00" de valores monetários quando não há centavos, mantendo apenas valores inteiros limpos.',
+    status: 'ativa',
+    implementadaEm: '2024-01-28'
+  },
+  {
+    id: 'v020',
+    nome: 'Formatação Padrão CNPJ Brasil',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Aplica máscara padrão brasileira XX.XXX.XXX/XXXX-XX em colunas de CNPJ, validando formato e dígitos.',
+    status: 'ativa',
+    implementadaEm: '2024-01-28'
+  },
+  {
+    id: 'v021',
+    nome: 'Padronização de Formato de Data',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Converte todas as datas para formato padrão DD/MM/YYYY, detectando automaticamente formatos de entrada.',
+    status: 'ativa',
+    implementadaEm: '2024-01-28'
+  },
+  {
+    id: 'v022',
+    nome: 'Validação e Limpeza de Caracteres Especiais',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).',
+    status: 'ativa',
+    implementadaEm: '2024-01-26'
+  },
+  {
+    id: 'v023',
+    nome: 'Tratamento de Campos Vazios e Nulos',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Define valores padrão para campos obrigatórios vazios e converte strings vazias em NULL apropriadamente.',
+    status: 'ativa',
+    implementadaEm: '2024-01-26'
+  },
+  {
+    id: 'v024',
+    nome: 'Normalização de Nomes e Textos',
+    modulo: 'volumetria',
+    categoria: 'dados',
+    criterio: 'Padroniza capitalização de nomes (Title Case), remove acentos desnecessários e corrige encoding.',
+    status: 'ativa',
+    implementadaEm: '2024-01-27'
+  },
+  {
+    id: 'v025',
+    nome: 'Validação de Integridade Referencial',
+    modulo: 'volumetria',
+    categoria: 'validacao',
+    criterio: 'Verifica se códigos de cliente, médico e especialidade existem nas tabelas de referência antes da inserção.',
+    status: 'ativa',
+    implementadaEm: '2024-01-27'
+  },
   
   // FATURAMENTO
   {
