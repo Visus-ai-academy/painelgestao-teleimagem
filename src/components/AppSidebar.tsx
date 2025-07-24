@@ -263,7 +263,7 @@ export function AppSidebar() {
           {/* Texto sobre o globo */}
           <div className="relative z-20 flex items-center justify-center">
             {!collapsed && (
-              <div className="text-center bg-gradient-to-r from-slate-900/60 to-cyan-900/60 backdrop-blur-sm rounded-lg p-3 border border-cyan-400/20">
+              <div className="text-center">
                 <h2 className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-slate-300 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
                   Teleimagem
                 </h2>
@@ -273,7 +273,7 @@ export function AppSidebar() {
               </div>
             )}
             {collapsed && (
-              <div className="text-center bg-gradient-to-r from-slate-900/60 to-cyan-900/60 backdrop-blur-sm rounded-lg p-2 border border-cyan-400/20">
+              <div className="text-center">
                 <h2 className="font-bold text-sm bg-gradient-to-r from-cyan-400 to-slate-300 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
                   TI
                 </h2>
