@@ -4,7 +4,7 @@ interface CircularLightProps {
   size?: number;
 }
 
-export function CircularLight({ size = 400 }: CircularLightProps) {
+export function CircularLight({ size = 350 }: CircularLightProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -17,121 +17,96 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
     canvas.width = size;
     canvas.height = size;
 
-    let rotation = 0;
-    let pulseTime = 0;
+    let time = 0;
     let animationId: number;
 
     const centerX = size / 2;
     const centerY = size / 2;
 
-    function draw3DCircle() {
+    function drawElegantPortal() {
       // Clear canvas
       ctx.clearRect(0, 0, size, size);
 
-      // Pulse effect
-      const pulse = Math.sin(pulseTime * 0.03) * 0.3 + 1;
-      const innerPulse = Math.sin(pulseTime * 0.05) * 0.2 + 1;
-
-      // Draw multiple layered circles for 3D depth effect
-      
-      // Outer glow ring
-      const outerGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 120 * pulse);
-      outerGlow.addColorStop(0, 'rgba(0, 255, 255, 0)');
-      outerGlow.addColorStop(0.7, 'rgba(0, 200, 255, 0.1)');
-      outerGlow.addColorStop(0.9, 'rgba(0, 150, 255, 0.3)');
-      outerGlow.addColorStop(1, 'rgba(0, 100, 255, 0)');
-      
-      ctx.fillStyle = outerGlow;
-      ctx.fillRect(0, 0, size, size);
-
-      // Main 3D ring structure
-      for (let i = 0; i < 4; i++) {
-        const ringRadius = 80 - (i * 15);
-        const ringOpacity = 0.8 - (i * 0.15);
+      // Subtle pulsing waves
+      for (let wave = 0; wave < 8; wave++) {
+        const waveRadius = 30 + (wave * 15) + Math.sin(time * 0.02 + wave * 0.5) * 8;
+        const waveOpacity = Math.max(0, 0.6 - wave * 0.08) * (0.8 + Math.sin(time * 0.03) * 0.2);
         
-        // Ring gradient for 3D effect
-        const ringGradient = ctx.createRadialGradient(
-          centerX, centerY, ringRadius - 8,
-          centerX, centerY, ringRadius + 8
+        // Soft gradient ring
+        const gradient = ctx.createRadialGradient(
+          centerX, centerY, waveRadius - 2,
+          centerX, centerY, waveRadius + 2
         );
-        ringGradient.addColorStop(0, `rgba(0, 255, 255, 0)`);
-        ringGradient.addColorStop(0.3, `rgba(0, 220, 255, ${ringOpacity * pulse})`);
-        ringGradient.addColorStop(0.7, `rgba(0, 180, 255, ${ringOpacity * 0.8})`);
-        ringGradient.addColorStop(1, `rgba(0, 255, 255, 0)`);
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0)');
+        gradient.addColorStop(0.5, `rgba(0, 150, 255, ${waveOpacity})`);
+        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
         
-        ctx.strokeStyle = ringGradient;
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, ringRadius * pulse, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, waveRadius, 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      // Rotating energy particles in 3D orbit
-      for (let orbit = 0; orbit < 3; orbit++) {
-        const orbitRadius = 60 + (orbit * 25);
-        const particleCount = 12 + (orbit * 8);
-        const orbitSpeed = (orbit + 1) * 0.02;
+      // Flowing particles in elegant spiral
+      const particleCount = 40;
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 4 + time * 0.01;
+        const radius = 50 + Math.sin(angle * 0.5 + time * 0.02) * 30;
         
-        for (let i = 0; i < particleCount; i++) {
-          const angle = (i / particleCount) * Math.PI * 2 + (rotation * orbitSpeed);
-          
-          // 3D perspective effect
-          const zOffset = Math.sin(angle + (orbit * 0.5)) * 0.3;
-          const perspectiveScale = 0.7 + zOffset * 0.3;
-          const currentRadius = orbitRadius * perspectiveScale * pulse;
-          
-          const x = centerX + Math.cos(angle) * currentRadius;
-          const y = centerY + Math.sin(angle) * currentRadius * 0.8; // Elliptical for 3D effect
-          
-          // Particle size based on z-depth
-          const particleSize = (2 + orbit) * perspectiveScale;
-          const alpha = (0.8 + zOffset * 0.4) * perspectiveScale;
-          
-          // Particle glow
-          const particleGlow = ctx.createRadialGradient(x, y, 0, x, y, particleSize * 3);
-          particleGlow.addColorStop(0, `rgba(0, 255, 255, ${alpha})`);
-          particleGlow.addColorStop(0.5, `rgba(0, 200, 255, ${alpha * 0.6})`);
-          particleGlow.addColorStop(1, 'rgba(0, 150, 255, 0)');
-          
-          ctx.fillStyle = particleGlow;
-          ctx.beginPath();
-          ctx.arc(x, y, particleSize * 3, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Bright particle core
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
-          ctx.beginPath();
-          ctx.arc(x, y, particleSize * 0.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        
+        const particleOpacity = 0.7 + Math.sin(time * 0.03 + i * 0.1) * 0.3;
+        const particleSize = 1.5 + Math.sin(time * 0.025 + i * 0.2) * 0.8;
+        
+        // Soft particle glow
+        const particleGlow = ctx.createRadialGradient(x, y, 0, x, y, particleSize * 6);
+        particleGlow.addColorStop(0, `rgba(200, 240, 255, ${particleOpacity})`);
+        particleGlow.addColorStop(0.4, `rgba(100, 200, 255, ${particleOpacity * 0.6})`);
+        particleGlow.addColorStop(1, 'rgba(50, 150, 255, 0)');
+        
+        ctx.fillStyle = particleGlow;
+        ctx.beginPath();
+        ctx.arc(x, y, particleSize * 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright core
+        ctx.fillStyle = `rgba(255, 255, 255, ${particleOpacity * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(x, y, particleSize, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Central core with 3D depth
-      const coreGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 30 * innerPulse);
-      coreGradient.addColorStop(0, `rgba(255, 255, 255, 0.9)`);
-      coreGradient.addColorStop(0.2, `rgba(0, 255, 255, 0.8)`);
-      coreGradient.addColorStop(0.6, `rgba(0, 200, 255, 0.4)`);
-      coreGradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
+      // Central energy core
+      const coreSize = 15 + Math.sin(time * 0.04) * 5;
+      const coreGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreSize * 2);
+      coreGlow.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      coreGlow.addColorStop(0.3, 'rgba(150, 220, 255, 0.7)');
+      coreGlow.addColorStop(0.7, 'rgba(50, 150, 255, 0.3)');
+      coreGlow.addColorStop(1, 'rgba(0, 100, 200, 0)');
       
-      ctx.fillStyle = coreGradient;
+      ctx.fillStyle = coreGlow;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 30 * innerPulse, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, coreSize * 2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Energy trails
-      for (let i = 0; i < 6; i++) {
-        const trailAngle = (rotation * 0.5) + (i * Math.PI / 3);
-        const trailLength = 40;
-        const startX = centerX + Math.cos(trailAngle) * 20;
-        const startY = centerY + Math.sin(trailAngle) * 20;
-        const endX = centerX + Math.cos(trailAngle) * (20 + trailLength);
-        const endY = centerY + Math.sin(trailAngle) * (20 + trailLength);
+      // Elegant energy tendrils
+      for (let i = 0; i < 12; i++) {
+        const tendrilAngle = (i / 12) * Math.PI * 2 + time * 0.008;
+        const tendrilLength = 25 + Math.sin(time * 0.03 + i * 0.5) * 15;
         
-        const trailGradient = ctx.createLinearGradient(startX, startY, endX, endY);
-        trailGradient.addColorStop(0, 'rgba(0, 255, 255, 0.6)');
-        trailGradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        const startX = centerX + Math.cos(tendrilAngle) * 8;
+        const startY = centerY + Math.sin(tendrilAngle) * 8;
+        const endX = centerX + Math.cos(tendrilAngle) * tendrilLength;
+        const endY = centerY + Math.sin(tendrilAngle) * tendrilLength;
         
-        ctx.strokeStyle = trailGradient;
+        const tendrilGradient = ctx.createLinearGradient(startX, startY, endX, endY);
+        tendrilGradient.addColorStop(0, 'rgba(180, 230, 255, 0.6)');
+        tendrilGradient.addColorStop(0.7, 'rgba(100, 180, 255, 0.3)');
+        tendrilGradient.addColorStop(1, 'rgba(50, 120, 200, 0)');
+        
+        ctx.strokeStyle = tendrilGradient;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(startX, startY);
@@ -139,12 +114,11 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
         ctx.stroke();
       }
 
-      rotation += 0.02;
-      pulseTime += 1;
-      animationId = requestAnimationFrame(draw3DCircle);
+      time += 1;
+      animationId = requestAnimationFrame(drawElegantPortal);
     }
 
-    draw3DCircle();
+    drawElegantPortal();
 
     return () => {
       if (animationId) {
@@ -159,8 +133,8 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
         ref={canvasRef}
         className="block"
         style={{ 
-          filter: 'drop-shadow(0 0 20px rgba(0, 255, 255, 0.6)) drop-shadow(0 0 40px rgba(0, 200, 255, 0.4))',
-          opacity: 0.9
+          filter: 'drop-shadow(0 0 15px rgba(100, 200, 255, 0.5))',
+          opacity: 0.8
         }}
       />
     </div>
