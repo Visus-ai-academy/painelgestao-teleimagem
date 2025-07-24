@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CityLightBeams } from "@/components/CityLightBeams";
+import { CircularLight } from "@/components/CircularLight";
 import smartCityBg from "@/assets/smart-city-background.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,40 +59,43 @@ export default function TechWelcome() {
       {/* Animated Grid Background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
       
+      {/* Circular Light Animation over the circle */}
+      <CircularLight size={350} />
+      
       {/* Content */}
       <div className="relative z-10 min-h-screen p-6 animate-fade-in flex items-center justify-center">
         {/* Logo/Title Area - Centered in the circle */}
         <div className="text-center">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h1 className="text-6xl font-bold text-white mb-6 font-orbitron tracking-wider">
+            <h1 className="text-6xl font-bold text-slate-600 mb-6 font-orbitron tracking-wider">
               TeleImagem
             </h1>
-            <p className="text-2xl text-slate-200 mb-4 font-orbitron font-light tracking-wide">
+            <p className="text-2xl text-slate-500 mb-4 font-orbitron font-light tracking-wide">
               Sistema de Gestão
             </p>
-            <p className="text-lg text-slate-300 font-orbitron font-light">
+            <p className="text-lg text-slate-500 font-orbitron font-light">
               Bem-vindo ao seu centro de comando digital
             </p>
           </div>
         </div>
       </div>
 
-      {/* Quick Actions Grid - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 pb-8 px-6">
-        <div className={`max-w-6xl mx-auto transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+      {/* Quick Actions Grid - Positioned within image area */}
+      <div className="absolute bottom-32 left-0 right-0 z-20 px-6">
+        <div className={`max-w-5xl mx-auto transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (
                 <Card 
                   key={action.path}
-                  className={`bg-slate-800/70 border-slate-600 hover:bg-slate-700/70 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-xl backdrop-blur-md ${isVisible ? 'animate-fade-in' : ''}`}
+                  className={`bg-slate-800/60 border-slate-600 hover:bg-slate-700/60 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-xl backdrop-blur-md ${isVisible ? 'animate-fade-in' : ''}`}
                   style={{ animationDelay: `${index * 200}ms` }}
                   onClick={() => navigate(action.path)}
                 >
-                  <CardContent className="p-4 text-center">
-                    <Icon className={`w-6 h-6 mx-auto mb-3 ${action.color}`} />
-                    <h3 className="text-white font-semibold mb-1 text-sm font-orbitron">{action.title}</h3>
+                  <CardContent className="p-3 text-center">
+                    <Icon className={`w-5 h-5 mx-auto mb-2 ${action.color}`} />
+                    <h3 className="text-white font-semibold mb-1 text-xs font-orbitron">{action.title}</h3>
                     <p className="text-slate-400 text-xs">{action.description}</p>
                   </CardContent>
                 </Card>
@@ -103,11 +107,10 @@ export default function TechWelcome() {
           <div className="text-center">
             <Button 
               onClick={() => navigate("/dashboard")}
-              size="lg"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
             >
               Entrar no Sistema
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>
         </div>
