@@ -91,38 +91,6 @@ export default function TechWelcome() {
         </div>
       </div>
 
-      {/* Quick Actions - Aligned to right */}
-      <div className="absolute right-8 top-1/2 transform -translate-y-1/2 z-20">
-        <div className={`space-y-4 transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'}`}>
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            const isFalling = fallingButton === action.path;
-            
-            return (
-              <Card 
-                key={action.path}
-                className={`w-48 bg-slate-800/60 border-slate-600 hover:bg-slate-700/60 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-xl backdrop-blur-md ${isVisible ? 'animate-fade-in' : ''} ${
-                  isFalling 
-                    ? 'animate-[fall_1.5s_ease-in_forwards]' 
-                    : ''
-                }`}
-                style={{ 
-                  animationDelay: `${index * 200}ms`,
-                  '--fall-end-x': '45vw',
-                  '--fall-end-y': '85vh'
-                } as React.CSSProperties}
-                onClick={() => handleButtonClick(action)}
-              >
-                <CardContent className="p-4 text-center">
-                  <Icon className={`w-6 h-6 mx-auto mb-3 ${action.color}`} />
-                  <h3 className="text-white font-semibold mb-2 text-sm font-orbitron">{action.title}</h3>
-                  <p className="text-slate-400 text-xs">{action.description}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
 
       {/* CTA Button - Bottom center */}
       <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-20">
