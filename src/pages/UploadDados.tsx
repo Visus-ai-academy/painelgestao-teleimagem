@@ -12,27 +12,39 @@ export default function UploadDados() {
   };
 
   const handleUploadDePara = async (file: File) => {
+    console.log('🔄 Iniciando upload do arquivo De Para:', file.name);
+    
     try {
       // Upload do arquivo para storage
       const nomeArquivo = `valores_de_para_${Date.now()}_${file.name}`;
+      console.log('📁 Nome do arquivo gerado:', nomeArquivo);
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('uploads')
         .upload(nomeArquivo, file);
 
+      console.log('📤 Resultado do upload:', { uploadData, uploadError });
+
       if (uploadError) {
+        console.error('❌ Erro no upload:', uploadError);
         throw new Error(`Erro no upload: ${uploadError.message}`);
       }
+
+      console.log('✅ Upload realizado com sucesso. Iniciando processamento...');
 
       // Processar arquivo via edge function
       const { data: processData, error: processError } = await supabase.functions.invoke('processar-valores-de-para', {
         body: { fileName: nomeArquivo }
       });
 
+      console.log('🔧 Resultado do processamento:', { processData, processError });
+
       if (processError) {
+        console.error('❌ Erro no processamento:', processError);
         throw new Error(`Erro ao processar: ${processError.message}`);
       }
 
-      console.log('Resultado do processamento:', processData);
+      console.log('✅ Processamento concluído:', processData);
       
       toast({
         title: "Sucesso!",
@@ -41,7 +53,7 @@ export default function UploadDados() {
 
       handleUploadSuccess();
     } catch (error) {
-      console.error('Erro no upload De Para:', error);
+      console.error('💥 Erro geral no upload De Para:', error);
       throw error;
     }
   };
