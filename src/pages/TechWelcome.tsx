@@ -64,12 +64,11 @@ export default function TechWelcome() {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
       
       {/* Content */}
-      <div className="relative z-10 min-h-screen p-6 animate-fade-in">
-        <div className={`max-w-4xl mx-auto transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          
-          {/* Logo/Title Area - Top Section */}
-          <div className="text-center pt-20 mb-20">
-            <h1 className="text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="relative z-10 min-h-screen p-6 animate-fade-in flex flex-col">
+        {/* Logo/Title Area - Top Section */}
+        <div className="text-center pt-20">
+          <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <h1 className="text-5xl font-bold text-white mb-4">
               TeleImagem
             </h1>
             <p className="text-xl text-slate-300 mb-2">
@@ -79,9 +78,14 @@ export default function TechWelcome() {
               Bem-vindo ao seu centro de comando digital
             </p>
           </div>
+        </div>
 
-          {/* Quick Actions Grid - Bottom Section */}
-          <div className="mt-40 text-center">
+        {/* Spacer to push content to bottom */}
+        <div className="flex-1"></div>
+
+        {/* Quick Actions Grid - Bottom Section */}
+        <div className="pb-20">
+          <div className={`max-w-4xl mx-auto text-center transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
@@ -118,7 +122,7 @@ export default function TechWelcome() {
             </div>
 
             {/* Tech Animation Indicators */}
-            <div className="mt-12 flex justify-center space-x-2">
+            <div className="mt-8 flex justify-center space-x-2">
               {[...Array(5)].map((_, i) => (
                 <div 
                   key={i}
