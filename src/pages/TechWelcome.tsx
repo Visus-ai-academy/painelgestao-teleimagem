@@ -46,9 +46,17 @@ export default function TechWelcome() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
-      {/* City Light Beams Background */}
-      <div className="absolute inset-0 opacity-30">
-        <CityLightBeams width={1920} height={1080} beamCount={60} speed={3} />
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
+        style={{
+          backgroundImage: `url(/lovable-uploads/f7dc7a0b-97dd-4565-b30f-5c2e8b744543.png)`
+        }}
+      />
+      
+      {/* City Light Beams Animation Overlay */}
+      <div className="absolute inset-0 opacity-20">
+        <CityLightBeams width={1920} height={1080} beamCount={30} speed={2} />
       </div>
       
       {/* Animated Grid Background */}
