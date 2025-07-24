@@ -24,13 +24,14 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
     const centerY = size / 2;
     const globeRadius = 110; // Globo um pouco maior para melhor visualização
 
-    // Convert lat/lon to 3D coordinates
+    // Convert lat/lon to 3D coordinates - corrigido para hemisfério sul
     function latLonTo3D(lat: number, lon: number, radius: number) {
       const latRad = (lat * Math.PI) / 180;
       const lonRad = (lon * Math.PI) / 180;
       
+      // Coordenadas 3D padrão
       const x = radius * Math.cos(latRad) * Math.cos(lonRad);
-      const y = radius * Math.sin(latRad);
+      const y = -radius * Math.sin(latRad); // Y negativo para latitude negativa ficar embaixo
       const z = radius * Math.cos(latRad) * Math.sin(lonRad);
       
       return { x, y, z };
@@ -95,10 +96,10 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, size, size);
 
-      // Rotation - ajustado para mostrar Brasil e Curitiba no hemisfério sul
-      const baseRotationY = Math.PI * 0.15; // Rotação para focar nas Américas
+      // Rotation - ajustado para mostrar Curitiba no hemisfério sul (parte inferior)
+      const baseRotationY = -Math.PI * 0.2; // Rotação para focar no Brasil
       const rotationY = baseRotationY + time * 0.002; 
-      const rotationX = -Math.PI * 0.1 + Math.sin(time * 0.0008) * 0.05; // Leve inclinação para mostrar o sul
+      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0008) * 0.1; // Rotação positiva para mostrar sul embaixo
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
