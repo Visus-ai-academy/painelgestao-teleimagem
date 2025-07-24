@@ -3,18 +3,54 @@ import { CityLightBeams } from "@/components/CityLightBeams";
 import { CircularLight } from "@/components/CircularLight";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Zap, BarChart3, Users, Settings } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowRight, Zap, BarChart3, Users, Settings, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import smartCityBg from "@/assets/smart-city-background.png";
 
 export default function TechWelcome() {
   const [isVisible, setIsVisible] = useState(false);
   const [fallingButton, setFallingButton] = useState<string | null>(null);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn, user } = useAuth();
 
   useEffect(() => {
     setIsVisible(true);
-  }, []);
+    // If user is already logged in, redirect to dashboard
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
+
+  const handleAccessCommand = () => {
+    setShowLoginForm(!showLoginForm);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast.error("Erro ao fazer login: " + error.message);
+      } else {
+        toast.success("Login realizado com sucesso!");
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      toast.error("Erro inesperado ao fazer login");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const quickActions = [
     {
@@ -75,16 +111,74 @@ export default function TechWelcome() {
       
       {/* Content */}
       <div className="relative z-10 min-h-screen p-6 animate-fade-in">
-        {/* Header with login button */}
+        {/* Header with access button */}
         <div className="absolute top-6 right-6 z-30">
           <Button 
-            onClick={() => navigate("/dashboard")}
+            onClick={handleAccessCommand}
             className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
           >
-            Entrar no Sistema
-            <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            Acessar Centro de Comando
+            <Lock className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
           </Button>
         </div>
+
+        {/* Login Form */}
+        {showLoginForm && (
+          <div className="absolute top-20 right-6 z-30 animate-fade-in">
+            <Card className="w-80 bg-slate-900/95 backdrop-blur-sm border-cyan-500/20 shadow-2xl">
+              <CardContent className="p-6">
+                <div className="text-center mb-6">
+                  <Lock className="h-8 w-8 mx-auto mb-2 text-cyan-400" />
+                  <h3 className="text-lg font-semibold text-white font-orbitron">Acesso Seguro</h3>
+                  <p className="text-sm text-cyan-100/80">Entre com suas credenciais</p>
+                </div>
+                
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-cyan-100 font-orbitron">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-cyan-400" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-cyan-500/30 text-white placeholder:text-cyan-100/50 focus:border-cyan-400"
+                        placeholder="seu@email.com"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-cyan-100 font-orbitron">Senha</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-cyan-400" />
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-cyan-500/30 text-white placeholder:text-cyan-100/50 focus:border-cyan-400"
+                        placeholder="••••••••"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold py-2 font-orbitron disabled:opacity-50"
+                  >
+                    {isLoading ? "Autenticando..." : "Acessar Sistema"}
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Logo/Title Area - Positioned specifically in the circle above the hand */}
         <div className="absolute left-[36%] top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center">
