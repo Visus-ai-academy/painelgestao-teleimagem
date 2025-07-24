@@ -24,11 +24,6 @@ export function Header() {
     <header className="h-16 border-b bg-white px-6 flex items-center justify-between">
       <div className="flex items-center gap-4">
         <SidebarTrigger />
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <h1 className="text-lg font-semibold text-gray-800 leading-tight">Painel de Gestão</h1>
-          </div>
-        </div>
       </div>
       
       <div className="flex items-center gap-4">
