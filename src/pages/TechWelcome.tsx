@@ -76,7 +76,7 @@ export default function TechWelcome() {
       {/* Content */}
       <div className="relative z-10 min-h-screen p-6 animate-fade-in">
         {/* Logo/Title Area - Positioned specifically in the circle above the hand */}
-        <div className="absolute left-[34%] top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center">
+        <div className="absolute left-[36%] top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <h1 className="text-6xl font-bold text-white mb-6 font-orbitron tracking-wider drop-shadow-2xl">
               TeleImagem
