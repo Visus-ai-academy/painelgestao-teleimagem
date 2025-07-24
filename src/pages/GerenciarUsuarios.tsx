@@ -28,6 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { 
   Users, 
   UserPlus, 
@@ -97,6 +98,9 @@ export default function GerenciarUsuarios() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editNewPassword, setEditNewPassword] = useState("");
+  const [editConfirmPassword, setEditConfirmPassword] = useState("");
+  const [changePasswordInEdit, setChangePasswordInEdit] = useState(false);
   
   const { toast } = useToast();
 
@@ -228,23 +232,75 @@ export default function GerenciarUsuarios() {
   const updateUserProfile = async () => {
     if (!editUserDialog.user) return;
 
+    // Validação de senha se estiver alterando
+    if (changePasswordInEdit) {
+      if (editNewPassword !== editConfirmPassword) {
+        toast({
+          title: "Erro",
+          description: "As senhas não coincidem",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (editNewPassword.length < 6) {
+        toast({
+          title: "Erro",
+          description: "A senha deve ter pelo menos 6 caracteres",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     try {
-      const { error } = await supabase
+      // Atualizar perfil
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ display_name: editDisplayName })
         .eq('user_id', editUserDialog.user.id);
 
-      if (error) {
-        throw error;
+      if (profileError) {
+        throw profileError;
       }
 
-      toast({
-        title: "Sucesso",
-        description: "Perfil do usuário atualizado com sucesso",
-      });
+      // Se estiver alterando senha, usar a Admin API
+      if (changePasswordInEdit && editNewPassword) {
+        // Vamos criar uma edge function para alterar senha como admin
+        const { data, error: passwordError } = await supabase.functions.invoke('admin-update-password', {
+          body: {
+            userId: editUserDialog.user.id,
+            newPassword: editNewPassword
+          }
+        });
 
+        if (passwordError) {
+          console.error('Erro ao alterar senha:', passwordError);
+          // Se a edge function não existir ainda, enviamos email de reset como fallback
+          await sendPasswordReset(editUserDialog.user.email);
+          toast({
+            title: "Sucesso Parcial",
+            description: "Perfil atualizado. Email de redefinição de senha enviado para o usuário.",
+          });
+        } else {
+          toast({
+            title: "Sucesso",
+            description: "Perfil e senha atualizados com sucesso",
+          });
+        }
+      } else {
+        toast({
+          title: "Sucesso",
+          description: "Perfil do usuário atualizado com sucesso",
+        });
+      }
+
+      // Limpar estados e fechar dialog
       setEditUserDialog({ isOpen: false, user: null });
       setEditDisplayName("");
+      setEditNewPassword("");
+      setEditConfirmPassword("");
+      setChangePasswordInEdit(false);
       fetchUsers();
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
@@ -469,10 +525,13 @@ export default function GerenciarUsuarios() {
                             onClick={() => {
                               setEditUserDialog({ isOpen: true, user });
                               setEditDisplayName(user.display_name);
+                              setChangePasswordInEdit(false);
+                              setEditNewPassword("");
+                              setEditConfirmPassword("");
                             }}
                           >
                             <Edit className="mr-2 h-4 w-4" />
-                            Editar Usuário
+                            Editar Usuário & Senha
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setResetPasswordDialog({
@@ -577,11 +636,54 @@ export default function GerenciarUsuarios() {
                 placeholder="Nome de exibição"
               />
             </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="changePassword"
+                checked={changePasswordInEdit}
+                onCheckedChange={setChangePasswordInEdit}
+              />
+              <Label htmlFor="changePassword">Alterar senha do usuário</Label>
+            </div>
+
+            {changePasswordInEdit && (
+              <div className="space-y-3 p-4 border rounded-md bg-muted/30">
+                <div>
+                  <Label htmlFor="editNewPassword">Nova Senha</Label>
+                  <Input
+                    id="editNewPassword"
+                    type="password"
+                    value={editNewPassword}
+                    onChange={(e) => setEditNewPassword(e.target.value)}
+                    placeholder="Digite a nova senha"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editConfirmPassword">Confirmar Nova Senha</Label>
+                  <Input
+                    id="editConfirmPassword"
+                    type="password"
+                    value={editConfirmPassword}
+                    onChange={(e) => setEditConfirmPassword(e.target.value)}
+                    placeholder="Confirme a nova senha"
+                  />
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  <p>• A senha deve ter pelo menos 6 caracteres</p>
+                  <p>• A nova senha será definida diretamente pelo administrador</p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setEditUserDialog({ isOpen: false, user: null });
               setEditDisplayName("");
+              setEditNewPassword("");
+              setEditConfirmPassword("");
+              setChangePasswordInEdit(false);
             }}>
               Cancelar
             </Button>
