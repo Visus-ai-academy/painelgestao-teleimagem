@@ -75,6 +75,17 @@ export default function TechWelcome() {
       
       {/* Content */}
       <div className="relative z-10 min-h-screen p-6 animate-fade-in">
+        {/* Header with login button */}
+        <div className="absolute top-6 right-6 z-30">
+          <Button 
+            onClick={() => navigate("/dashboard")}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
+          >
+            Entrar no Sistema
+            <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Button>
+        </div>
+
         {/* Logo/Title Area - Positioned specifically in the circle above the hand */}
         <div className="absolute left-[36%] top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -89,18 +100,6 @@ export default function TechWelcome() {
             </p>
           </div>
         </div>
-      </div>
-
-
-      {/* CTA Button - Bottom center */}
-      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-20">
-        <Button 
-          onClick={() => navigate("/dashboard")}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
-        >
-          Entrar no Sistema
-          <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-        </Button>
       </div>
 
       {/* Floating Elements */}
