@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Table, 
   TableBody, 
@@ -29,47 +29,91 @@ export function VolumetriaUploadStats() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // Simulando os dados dos uploads recentes
-        const mockStats: UploadStats[] = [
+        // Buscar dados reais do banco
+        const { data: volumetriaData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('arquivo_fonte, VALORES')
+
+        if (error) {
+          console.error('Erro ao buscar dados volumetria:', error);
+          return;
+        }
+
+        // Agrupar dados por arquivo_fonte
+        const statsMap = new Map<string, {
+          totalRecords: number;
+          recordsWithValue: number;
+          recordsZeroed: number;
+          totalValue: number;
+        }>();
+
+        // Inicializar contadores
+        const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
+        statsMap.set('volumetria_padrao', { ...initStats });
+        statsMap.set('volumetria_fora_padrao', { ...initStats });
+        statsMap.set('volumetria_padrao_retroativo', { ...initStats });
+        statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
+
+        // Processar dados
+        volumetriaData?.forEach(record => {
+          const fonte = record.arquivo_fonte;
+          const valor = record.VALORES || 0;
+          
+          if (statsMap.has(fonte)) {
+            const stats = statsMap.get(fonte)!;
+            stats.totalRecords++;
+            
+            if (valor > 0) {
+              stats.recordsWithValue++;
+              stats.totalValue += valor;
+            } else {
+              stats.recordsZeroed++;
+            }
+          }
+        });
+
+        // Converter para formato do componente
+        const realStats: UploadStats[] = [
           {
             fileName: "Volumetria Padrão",
-            totalRecords: 34436,
-            recordsWithValue: 34434,
-            recordsZeroed: 2,
-            totalValue: 38659,
-            period: "01/06 - 30/06/2025",
+            totalRecords: statsMap.get('volumetria_padrao')?.totalRecords || 0,
+            recordsWithValue: statsMap.get('volumetria_padrao')?.recordsWithValue || 0,
+            recordsZeroed: statsMap.get('volumetria_padrao')?.recordsZeroed || 0,
+            totalValue: statsMap.get('volumetria_padrao')?.totalValue || 0,
+            period: "Período Atual",
             category: 'padrão'
           },
           {
             fileName: "Volumetria Fora Padrão", 
-            totalRecords: 3305,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0,
-            period: "01/06 - 30/06/2025",
+            totalRecords: statsMap.get('volumetria_fora_padrao')?.totalRecords || 0,
+            recordsWithValue: statsMap.get('volumetria_fora_padrao')?.recordsWithValue || 0,
+            recordsZeroed: statsMap.get('volumetria_fora_padrao')?.recordsZeroed || 0,
+            totalValue: statsMap.get('volumetria_fora_padrao')?.totalValue || 0,
+            period: "Período Atual",
             category: 'fora-padrão'
           },
           {
             fileName: "Volumetria Padrão Retroativo",
-            totalRecords: 3196,
-            recordsWithValue: 3196,
-            recordsZeroed: 0,
-            totalValue: 3547,
-            period: "04/07/2022 - 31/07/2025",
+            totalRecords: statsMap.get('volumetria_padrao_retroativo')?.totalRecords || 0,
+            recordsWithValue: statsMap.get('volumetria_padrao_retroativo')?.recordsWithValue || 0,
+            recordsZeroed: statsMap.get('volumetria_padrao_retroativo')?.recordsZeroed || 0,
+            totalValue: statsMap.get('volumetria_padrao_retroativo')?.totalValue || 0,
+            period: "Período Retroativo",
             category: 'retroativo'
           },
           {
             fileName: "Volumetria Fora Padrão Retroativo",
-            totalRecords: 1,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0,
-            period: "29/05/2025",
+            totalRecords: statsMap.get('volumetria_fora_padrao_retroativo')?.totalRecords || 0,
+            recordsWithValue: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsWithValue || 0,
+            recordsZeroed: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsZeroed || 0,
+            totalValue: statsMap.get('volumetria_fora_padrao_retroativo')?.totalValue || 0,
+            period: "Período Retroativo",
             category: 'fora-padrão'
           }
         ];
 
-        setStats(mockStats);
+        console.log('📊 Estatísticas reais carregadas:', realStats);
+        setStats(realStats);
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
       } finally {
