@@ -115,9 +115,9 @@ export default function TechWelcome() {
         <div className="absolute top-6 right-6 z-30">
           <Button 
             onClick={handleAccessCommand}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron"
+            className="bg-gradient-to-r from-cyan-600 to-slate-600 hover:from-cyan-700 hover:to-slate-700 text-white px-6 py-2 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 group font-orbitron border border-cyan-400/20"
           >
-            Acessar Centro de Comando
+            Acessar Sistema de Gestão
             <Lock className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
           </Button>
         </div>
