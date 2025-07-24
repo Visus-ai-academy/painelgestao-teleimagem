@@ -22,103 +22,153 @@ export function CircularLight({ size = 350 }: CircularLightProps) {
 
     const centerX = size / 2;
     const centerY = size / 2;
+    const sphereRadius = 80;
 
-    function drawElegantPortal() {
-      // Clear canvas
+    // Create particles for the digital sphere
+    const particles: Array<{
+      x: number;
+      y: number;
+      z: number;
+      originalX: number;
+      originalY: number;
+      originalZ: number;
+      alpha: number;
+    }> = [];
+
+    // Generate particles on sphere surface
+    for (let i = 0; i < 150; i++) {
+      const phi = Math.acos(-1 + (2 * i) / 150);
+      const theta = Math.sqrt(150 * Math.PI) * phi;
+      
+      const x = sphereRadius * Math.cos(theta) * Math.sin(phi);
+      const y = sphereRadius * Math.sin(theta) * Math.sin(phi);
+      const z = sphereRadius * Math.cos(phi);
+      
+      particles.push({
+        x, y, z,
+        originalX: x, originalY: y, originalZ: z,
+        alpha: Math.random() * 0.8 + 0.2
+      });
+    }
+
+    function drawDigitalSphere() {
       ctx.clearRect(0, 0, size, size);
 
-      // Subtle pulsing waves
-      for (let wave = 0; wave < 8; wave++) {
-        const waveRadius = 30 + (wave * 15) + Math.sin(time * 0.02 + wave * 0.5) * 8;
-        const waveOpacity = Math.max(0, 0.6 - wave * 0.08) * (0.8 + Math.sin(time * 0.03) * 0.2);
+      // Rotate sphere
+      const rotationY = time * 0.008;
+      const rotationX = time * 0.005;
+
+      // Transform particles
+      const transformedParticles = particles.map(particle => {
+        // Apply rotation
+        let x = particle.originalX;
+        let y = particle.originalY;
+        let z = particle.originalZ;
+
+        // Rotate around Y axis
+        const cosY = Math.cos(rotationY);
+        const sinY = Math.sin(rotationY);
+        const tempX = x * cosY - z * sinY;
+        z = x * sinY + z * cosY;
+        x = tempX;
+
+        // Rotate around X axis
+        const cosX = Math.cos(rotationX);
+        const sinX = Math.sin(rotationX);
+        const tempY = y * cosX - z * sinX;
+        z = y * sinX + z * cosX;
+        y = tempY;
+
+        // Project to 2D with perspective
+        const perspective = 300;
+        const projectedX = centerX + (x * perspective) / (perspective + z);
+        const projectedY = centerY + (y * perspective) / (perspective + z);
+        const scale = perspective / (perspective + z);
+
+        return {
+          x: projectedX,
+          y: projectedY,
+          z: z,
+          scale: scale,
+          alpha: particle.alpha * (0.6 + scale * 0.4)
+        };
+      });
+
+      // Sort particles by z-depth
+      transformedParticles.sort((a, b) => a.z - b.z);
+
+      // Draw connections between nearby particles
+      ctx.strokeStyle = 'rgba(100, 200, 255, 0.3)';
+      ctx.lineWidth = 0.8;
+      
+      for (let i = 0; i < transformedParticles.length; i++) {
+        const particle1 = transformedParticles[i];
+        if (particle1.z < -20) continue; // Don't draw back-facing connections
         
-        // Soft gradient ring
-        const gradient = ctx.createRadialGradient(
-          centerX, centerY, waveRadius - 2,
-          centerX, centerY, waveRadius + 2
-        );
-        gradient.addColorStop(0, 'rgba(100, 200, 255, 0)');
-        gradient.addColorStop(0.5, `rgba(0, 150, 255, ${waveOpacity})`);
-        gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
-        
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, waveRadius, 0, Math.PI * 2);
-        ctx.stroke();
+        for (let j = i + 1; j < transformedParticles.length; j++) {
+          const particle2 = transformedParticles[j];
+          if (particle2.z < -20) continue;
+          
+          const distance = Math.sqrt(
+            Math.pow(particle1.x - particle2.x, 2) + 
+            Math.pow(particle1.y - particle2.y, 2)
+          );
+          
+          if (distance < 40) {
+            const lineAlpha = (1 - distance / 40) * 0.4;
+            ctx.strokeStyle = `rgba(100, 200, 255, ${lineAlpha})`;
+            
+            ctx.beginPath();
+            ctx.moveTo(particle1.x, particle1.y);
+            ctx.lineTo(particle2.x, particle2.y);
+            ctx.stroke();
+          }
+        }
       }
 
-      // Flowing particles in elegant spiral
-      const particleCount = 40;
-      for (let i = 0; i < particleCount; i++) {
-        const angle = (i / particleCount) * Math.PI * 4 + time * 0.01;
-        const radius = 50 + Math.sin(angle * 0.5 + time * 0.02) * 30;
+      // Draw particles
+      transformedParticles.forEach(particle => {
+        if (particle.z < -50) return; // Don't draw particles too far back
         
-        const x = centerX + Math.cos(angle) * radius;
-        const y = centerY + Math.sin(angle) * radius;
+        const particleSize = 1.5 * particle.scale;
+        const glowSize = 4 * particle.scale;
         
-        const particleOpacity = 0.7 + Math.sin(time * 0.03 + i * 0.1) * 0.3;
-        const particleSize = 1.5 + Math.sin(time * 0.025 + i * 0.2) * 0.8;
+        // Glow effect
+        const gradient = ctx.createRadialGradient(
+          particle.x, particle.y, 0,
+          particle.x, particle.y, glowSize
+        );
+        gradient.addColorStop(0, `rgba(150, 220, 255, ${particle.alpha})`);
+        gradient.addColorStop(0.4, `rgba(100, 180, 255, ${particle.alpha * 0.6})`);
+        gradient.addColorStop(1, 'rgba(50, 150, 255, 0)');
         
-        // Soft particle glow
-        const particleGlow = ctx.createRadialGradient(x, y, 0, x, y, particleSize * 6);
-        particleGlow.addColorStop(0, `rgba(200, 240, 255, ${particleOpacity})`);
-        particleGlow.addColorStop(0.4, `rgba(100, 200, 255, ${particleOpacity * 0.6})`);
-        particleGlow.addColorStop(1, 'rgba(50, 150, 255, 0)');
-        
-        ctx.fillStyle = particleGlow;
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(x, y, particleSize * 6, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, glowSize, 0, Math.PI * 2);
         ctx.fill();
         
         // Bright core
-        ctx.fillStyle = `rgba(255, 255, 255, ${particleOpacity * 0.8})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${particle.alpha * 0.9})`;
         ctx.beginPath();
-        ctx.arc(x, y, particleSize, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, particleSize, 0, Math.PI * 2);
         ctx.fill();
-      }
+      });
 
-      // Central energy core
-      const coreSize = 15 + Math.sin(time * 0.04) * 5;
-      const coreGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreSize * 2);
-      coreGlow.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-      coreGlow.addColorStop(0.3, 'rgba(150, 220, 255, 0.7)');
-      coreGlow.addColorStop(0.7, 'rgba(50, 150, 255, 0.3)');
-      coreGlow.addColorStop(1, 'rgba(0, 100, 200, 0)');
+      // Add scanning lines effect
+      const scanlineY = (Math.sin(time * 0.02) + 1) * 0.5 * size;
+      const scanGradient = ctx.createLinearGradient(0, scanlineY - 20, 0, scanlineY + 20);
+      scanGradient.addColorStop(0, 'rgba(100, 200, 255, 0)');
+      scanGradient.addColorStop(0.5, 'rgba(150, 220, 255, 0.3)');
+      scanGradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
       
-      ctx.fillStyle = coreGlow;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, coreSize * 2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Elegant energy tendrils
-      for (let i = 0; i < 12; i++) {
-        const tendrilAngle = (i / 12) * Math.PI * 2 + time * 0.008;
-        const tendrilLength = 25 + Math.sin(time * 0.03 + i * 0.5) * 15;
-        
-        const startX = centerX + Math.cos(tendrilAngle) * 8;
-        const startY = centerY + Math.sin(tendrilAngle) * 8;
-        const endX = centerX + Math.cos(tendrilAngle) * tendrilLength;
-        const endY = centerY + Math.sin(tendrilAngle) * tendrilLength;
-        
-        const tendrilGradient = ctx.createLinearGradient(startX, startY, endX, endY);
-        tendrilGradient.addColorStop(0, 'rgba(180, 230, 255, 0.6)');
-        tendrilGradient.addColorStop(0.7, 'rgba(100, 180, 255, 0.3)');
-        tendrilGradient.addColorStop(1, 'rgba(50, 120, 200, 0)');
-        
-        ctx.strokeStyle = tendrilGradient;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-      }
+      ctx.fillStyle = scanGradient;
+      ctx.fillRect(0, scanlineY - 20, size, 40);
 
       time += 1;
-      animationId = requestAnimationFrame(drawElegantPortal);
+      animationId = requestAnimationFrame(drawDigitalSphere);
     }
 
-    drawElegantPortal();
+    drawDigitalSphere();
 
     return () => {
       if (animationId) {
