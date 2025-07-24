@@ -51,7 +51,7 @@ export default function TechWelcome() {
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
         style={{
-          backgroundImage: `url(${smartCityBg})`
+          backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`
         }}
       />
       
