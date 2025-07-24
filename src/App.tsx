@@ -44,6 +44,7 @@ import ConfiguracaoImportacao from "./pages/ConfiguracaoImportacao";
 import MapeamentoVisual from "./pages/MapeamentoVisual";
 import Seguranca from "./pages/Seguranca";
 import Pendencias from "./pages/Pendencias";
+import ControleRegras from "./pages/ControleRegras";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -346,6 +347,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <Pendencias />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/controle-regras" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['admin']}>
+                    <ControleRegras />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

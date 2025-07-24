@@ -129,6 +129,12 @@ const menuItems: MenuItem[] = [
     ]
   },
   { 
+    title: "Controle de Regras", 
+    url: "/controle-regras", 
+    icon: Target,
+    requiredRoles: ['admin'],
+  },
+  { 
     title: "Relatório de Implementações", 
     url: "/relatorio-implementacoes", 
     icon: FileText,
