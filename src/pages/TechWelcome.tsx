@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CityLightBeams } from "@/components/CityLightBeams";
+import smartCityBg from "@/assets/smart-city-background.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Zap, BarChart3, Users, Settings } from "lucide-react";
@@ -50,7 +51,7 @@ export default function TechWelcome() {
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
         style={{
-          backgroundImage: `url(/lovable-uploads/f7dc7a0b-97dd-4565-b30f-5c2e8b744543.png)`
+          backgroundImage: `url(${smartCityBg})`
         }}
       />
       
