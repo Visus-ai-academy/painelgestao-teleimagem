@@ -154,93 +154,170 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
       // Sort by z-depth
       transformedEarth.sort((a, b) => a.z - b.z);
 
-      // Draw Earth surface points
+      // Draw Earth surface points with enhanced 3D effect
       transformedEarth.forEach(point => {
-        if (point.z < -50) return;
+        if (point.z < -80) return;
         
         const pointSize = 0.8 * point.scale;
-        const alpha = point.alpha;
+        const alpha = point.alpha * Math.max(0.3, point.scale);
+        const depthShading = Math.max(0.2, 1 - Math.abs(point.z) / 120);
         
-        ctx.fillStyle = `rgba(100, 150, 200, ${alpha})`;
+        // Add depth-based color variation
+        const colorIntensity = 100 + depthShading * 100;
+        ctx.fillStyle = `rgba(${colorIntensity}, ${Math.min(255, colorIntensity + 50)}, ${Math.min(255, colorIntensity + 100)}, ${alpha})`;
+        
+        // Add subtle glow for 3D effect
+        if (pointSize > 0.5) {
+          ctx.shadowColor = `rgba(100, 200, 255, ${alpha * 0.5})`;
+          ctx.shadowBlur = 2;
+        }
+        
         ctx.beginPath();
         ctx.arc(point.x, point.y, pointSize, 0, Math.PI * 2);
         ctx.fill();
+        
+        ctx.shadowBlur = 0; // Reset shadow
       });
 
       // Draw connection lines to Curitiba
       const curitiba = transformedConnections.find(c => c.isHub);
-      if (curitiba && curitiba.z > -50) {
+      if (curitiba) {
         transformedConnections.forEach(conn => {
-          if (conn.isHub || conn.z < -30) return;
+          if (conn.isHub) return;
           
-          // Animated connection lines
-          const connectionProgress = (Math.sin(time * 0.02 + conn.lat * 0.1) + 1) * 0.5;
-          const lineAlpha = 0.6 * connectionProgress * Math.max(0, (conn.scale + curitiba.scale) * 0.5);
+          // Calculate 3D distance and visibility
+          const distance3D = Math.sqrt(
+            Math.pow(curitiba.x - conn.x, 2) + 
+            Math.pow(curitiba.y - conn.y, 2) + 
+            Math.pow(curitiba.z - conn.z, 2)
+          );
           
-          if (lineAlpha > 0.1) {
-            // Create curved connection line
-            const midX = (conn.x + curitiba.x) / 2;
-            const midY = (conn.y + curitiba.y) / 2 - 30; // Arc upward
+          // Show connections even when Curitiba is behind the globe
+          const isVisible = conn.z > -80 && distance3D < 300;
+          
+          if (isVisible) {
+            // Animated connection lines with 3D depth effect
+            const connectionProgress = (Math.sin(time * 0.02 + conn.lat * 0.1) + 1) * 0.5;
+            const depthFactor = Math.max(0.2, 1 - Math.abs(curitiba.z) / 150);
+            const lineAlpha = 0.8 * connectionProgress * depthFactor * Math.max(0.3, (conn.scale + curitiba.scale) * 0.5);
             
+            // Create 3D curved connection line
+            const dx = curitiba.x - conn.x;
+            const dy = curitiba.y - conn.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Arc height based on 3D distance and visibility
+            const arcHeight = Math.min(60, distance * 0.2 + Math.abs(curitiba.z) * 0.1);
+            const midX = conn.x + dx * 0.5;
+            const midY = conn.y + dy * 0.5 - arcHeight;
+            
+            // Enhanced gradient with 3D depth
             const gradient = ctx.createLinearGradient(conn.x, conn.y, curitiba.x, curitiba.y);
-            gradient.addColorStop(0, `rgba(0, 200, 255, ${lineAlpha * 0.5})`);
-            gradient.addColorStop(0.5, `rgba(100, 255, 200, ${lineAlpha})`);
+            gradient.addColorStop(0, `rgba(0, 200, 255, ${lineAlpha * 0.4})`);
+            gradient.addColorStop(0.3, `rgba(100, 255, 200, ${lineAlpha * 0.8})`);
+            gradient.addColorStop(0.7, `rgba(200, 255, 150, ${lineAlpha})`);
             gradient.addColorStop(1, `rgba(255, 255, 100, ${lineAlpha})`);
             
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 1.5 * Math.max(conn.scale, curitiba.scale);
+            ctx.lineWidth = 2 * Math.max(0.5, Math.max(conn.scale, curitiba.scale)) * depthFactor;
+            
+            // Add glow effect for 3D depth
+            ctx.shadowColor = 'rgba(100, 255, 200, 0.6)';
+            ctx.shadowBlur = 8 * depthFactor;
             
             ctx.beginPath();
             ctx.moveTo(conn.x, conn.y);
             ctx.quadraticCurveTo(midX, midY, curitiba.x, curitiba.y);
             ctx.stroke();
             
-            // Animated particles along the line
-            const particlePos = connectionProgress;
-            const particleX = conn.x + (curitiba.x - conn.x) * particlePos;
-            const particleY = conn.y + (curitiba.y - conn.y) * particlePos;
+            ctx.shadowBlur = 0; // Reset shadow
             
-            ctx.fillStyle = `rgba(255, 255, 255, ${lineAlpha})`;
-            ctx.beginPath();
-            ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
-            ctx.fill();
+            // Enhanced animated particles with 3D effect
+            const numParticles = 3;
+            for (let i = 0; i < numParticles; i++) {
+              const particleOffset = (connectionProgress + i * 0.3) % 1;
+              const t = particleOffset;
+              
+              // Quadratic bezier curve calculation
+              const particleX = (1 - t) * (1 - t) * conn.x + 2 * (1 - t) * t * midX + t * t * curitiba.x;
+              const particleY = (1 - t) * (1 - t) * conn.y + 2 * (1 - t) * t * midY + t * t * curitiba.y;
+              
+              const particleAlpha = lineAlpha * (1 - Math.abs(t - 0.5) * 0.5);
+              const particleSize = 2 + Math.sin(time * 0.1 + i) * 0.5;
+              
+              // Particle glow
+              const particleGradient = ctx.createRadialGradient(
+                particleX, particleY, 0,
+                particleX, particleY, particleSize * 3
+              );
+              particleGradient.addColorStop(0, `rgba(255, 255, 255, ${particleAlpha})`);
+              particleGradient.addColorStop(0.5, `rgba(200, 255, 200, ${particleAlpha * 0.7})`);
+              particleGradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
+              
+              ctx.fillStyle = particleGradient;
+              ctx.beginPath();
+              ctx.arc(particleX, particleY, particleSize * 3, 0, Math.PI * 2);
+              ctx.fill();
+              
+              // Particle core
+              ctx.fillStyle = `rgba(255, 255, 255, ${particleAlpha})`;
+              ctx.beginPath();
+              ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
         });
       }
 
-      // Draw connection points
+      // Draw connection points with enhanced 3D visibility
       transformedConnections.forEach(conn => {
-        if (conn.z < -50) return;
+        if (conn.z < -120) return;
         
-        const pointSize = conn.isHub ? 8 * conn.scale : 4 * conn.scale;
-        const pulseSize = conn.isHub ? pointSize + Math.sin(time * 0.05) * 3 : pointSize;
+        const depthFactor = Math.max(0.2, 1 - Math.abs(conn.z) / 150);
+        const pointSize = conn.isHub ? 8 * conn.scale * depthFactor : 4 * conn.scale * depthFactor;
+        const pulseSize = conn.isHub ? pointSize + Math.sin(time * 0.05) * 3 * depthFactor : pointSize;
         
-        // Glow effect
+        // Enhanced glow effect with 3D depth
         const glowGradient = ctx.createRadialGradient(
           conn.x, conn.y, 0,
-          conn.x, conn.y, pulseSize * 2
+          conn.x, conn.y, pulseSize * 3
         );
         
         if (conn.isHub) {
-          glowGradient.addColorStop(0, 'rgba(255, 255, 100, 0.9)');
-          glowGradient.addColorStop(0.3, 'rgba(255, 200, 0, 0.7)');
+          const hubAlpha = Math.max(0.4, depthFactor);
+          glowGradient.addColorStop(0, `rgba(255, 255, 100, ${hubAlpha})`);
+          glowGradient.addColorStop(0.3, `rgba(255, 200, 0, ${hubAlpha * 0.8})`);
+          glowGradient.addColorStop(0.6, `rgba(255, 150, 0, ${hubAlpha * 0.5})`);
           glowGradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
         } else {
-          glowGradient.addColorStop(0, 'rgba(100, 200, 255, 0.8)');
-          glowGradient.addColorStop(0.5, 'rgba(0, 150, 255, 0.5)');
+          const connAlpha = Math.max(0.3, depthFactor * 0.8);
+          glowGradient.addColorStop(0, `rgba(100, 200, 255, ${connAlpha})`);
+          glowGradient.addColorStop(0.5, `rgba(0, 150, 255, ${connAlpha * 0.6})`);
           glowGradient.addColorStop(1, 'rgba(0, 100, 200, 0)');
         }
         
         ctx.fillStyle = glowGradient;
         ctx.beginPath();
-        ctx.arc(conn.x, conn.y, pulseSize * 2, 0, Math.PI * 2);
+        ctx.arc(conn.x, conn.y, pulseSize * 3, 0, Math.PI * 2);
         ctx.fill();
         
-        // Core point
-        ctx.fillStyle = conn.isHub ? 'rgba(255, 255, 255, 1)' : 'rgba(200, 240, 255, 0.9)';
+        // Core point with 3D effect
+        const coreAlpha = Math.max(0.5, depthFactor);
+        ctx.fillStyle = conn.isHub ? 
+          `rgba(255, 255, 255, ${coreAlpha})` : 
+          `rgba(200, 240, 255, ${coreAlpha * 0.9})`;
+        
+        // Add subtle shadow for depth
+        if (conn.isHub) {
+          ctx.shadowColor = 'rgba(255, 200, 0, 0.8)';
+          ctx.shadowBlur = 10;
+        }
+        
         ctx.beginPath();
-        ctx.arc(conn.x, conn.y, pulseSize * 0.3, 0, Math.PI * 2);
+        ctx.arc(conn.x, conn.y, pulseSize * 0.4, 0, Math.PI * 2);
         ctx.fill();
+        
+        ctx.shadowBlur = 0; // Reset shadow
       });
 
       // Draw globe outline
