@@ -1,12 +1,49 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FileUpload } from '@/components/FileUpload';
 import { FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function UploadDados() {
+  const { toast } = useToast();
 
   const handleUploadSuccess = () => {
-    // Callback para sucesso no upload
     console.log('Upload realizado com sucesso');
+  };
+
+  const handleUploadDePara = async (file: File) => {
+    try {
+      // Upload do arquivo para storage
+      const nomeArquivo = `valores_de_para_${Date.now()}_${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(nomeArquivo, file);
+
+      if (uploadError) {
+        throw new Error(`Erro no upload: ${uploadError.message}`);
+      }
+
+      // Processar arquivo via edge function
+      const { data: processData, error: processError } = await supabase.functions.invoke('processar-valores-de-para', {
+        body: { fileName: nomeArquivo }
+      });
+
+      if (processError) {
+        throw new Error(`Erro ao processar: ${processError.message}`);
+      }
+
+      console.log('Resultado do processamento:', processData);
+      
+      toast({
+        title: "Sucesso!",
+        description: `Arquivo processado: ${processData.valores_inseridos} valores inseridos, ${processData.aplicacao_resultado?.registros_atualizados || 0} registros atualizados`,
+      });
+
+      handleUploadSuccess();
+    } catch (error) {
+      console.error('Erro no upload De Para:', error);
+      throw error;
+    }
   };
 
   return (
@@ -36,10 +73,7 @@ export default function UploadDados() {
             acceptedTypes={['.csv', '.xlsx', '.xls']}
             maxSizeInMB={50}
             expectedFormat={["ESTUDO_DESCRICAO", "VALORES"]}
-            onUpload={async (file) => {
-              console.log('Upload de arquivo de referência:', file.name);
-              handleUploadSuccess();
-            }}
+            onUpload={handleUploadDePara}
           />
         </CardContent>
       </Card>

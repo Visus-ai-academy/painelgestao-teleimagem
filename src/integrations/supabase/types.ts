@@ -1858,6 +1858,36 @@ export type Database = {
         }
         Relationships: []
       }
+      valores_referencia_de_para: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          estudo_descricao: string
+          id: string
+          updated_at: string
+          valores: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          estudo_descricao: string
+          id?: string
+          updated_at?: string
+          valores?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          estudo_descricao?: string
+          id?: string
+          updated_at?: string
+          valores?: number
+        }
+        Relationships: []
+      }
       volumetria_mobilemed: {
         Row: {
           ACCESSION_NUMBER: string | null
@@ -2117,6 +2147,10 @@ export type Database = {
     }
     Functions: {
       analyze_partitioning_need: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      aplicar_valores_de_para: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
