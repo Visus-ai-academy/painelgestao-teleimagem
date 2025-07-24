@@ -20,6 +20,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { 
   Users, 
   UserPlus, 
   Shield, 
@@ -29,7 +38,10 @@ import {
   Crown,
   UserCheck,
   MoreHorizontal,
-  Settings
+  Settings,
+  Key,
+  Mail,
+  KeyRound
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -65,6 +77,27 @@ export default function GerenciarUsuarios() {
     userId: string;
     userEmail: string;
   }>({ isOpen: false, userId: '', userEmail: '' });
+  
+  // Estados para dialogs
+  const [resetPasswordDialog, setResetPasswordDialog] = useState<{
+    isOpen: boolean;
+    userEmail: string;
+  }>({ isOpen: false, userEmail: '' });
+  
+  const [editUserDialog, setEditUserDialog] = useState<{
+    isOpen: boolean;
+    user: User | null;
+  }>({ isOpen: false, user: null });
+  
+  const [changePasswordDialog, setChangePasswordDialog] = useState<{
+    isOpen: boolean;
+    userEmail: string;
+  }>({ isOpen: false, userEmail: '' });
+  
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -162,6 +195,92 @@ export default function GerenciarUsuarios() {
         variant: "destructive"
       });
     }
+  };
+
+  // Função para enviar email de redefinição de senha
+  const sendPasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `Email de redefinição de senha enviado para ${email}`,
+      });
+
+      setResetPasswordDialog({ isOpen: false, userEmail: '' });
+    } catch (error) {
+      console.error('Erro ao enviar email de redefinição:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar email de redefinição de senha",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Função para editar usuário
+  const updateUserProfile = async () => {
+    if (!editUserDialog.user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: editDisplayName })
+        .eq('user_id', editUserDialog.user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Perfil do usuário atualizado com sucesso",
+      });
+
+      setEditUserDialog({ isOpen: false, user: null });
+      setEditDisplayName("");
+      fetchUsers();
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar perfil do usuário",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Função para alterar senha (através de admin reset)
+  const changeUserPassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Como não podemos alterar senha diretamente, enviamos um reset
+    await sendPasswordReset(changePasswordDialog.userEmail);
+    setChangePasswordDialog({ isOpen: false, userEmail: '' });
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -347,6 +466,33 @@ export default function GerenciarUsuarios() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
+                            onClick={() => {
+                              setEditUserDialog({ isOpen: true, user });
+                              setEditDisplayName(user.display_name);
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar Usuário
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setResetPasswordDialog({
+                              isOpen: true,
+                              userEmail: user.email
+                            })}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            Esqueci Senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setChangePasswordDialog({
+                              isOpen: true,
+                              userEmail: user.email
+                            })}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Alterar Senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => setMenuPermissionsDialog({
                               isOpen: true,
                               userId: user.id,
@@ -387,6 +533,90 @@ export default function GerenciarUsuarios() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog para redefinir senha */}
+      <Dialog open={resetPasswordDialog.isOpen} onOpenChange={(isOpen) => 
+        setResetPasswordDialog({ ...resetPasswordDialog, isOpen })
+      }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redefinir Senha</DialogTitle>
+            <DialogDescription>
+              Será enviado um email de redefinição de senha para {resetPasswordDialog.userEmail}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordDialog({ isOpen: false, userEmail: '' })}>
+              Cancelar
+            </Button>
+            <Button onClick={() => sendPasswordReset(resetPasswordDialog.userEmail)}>
+              Enviar Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar usuário */}
+      <Dialog open={editUserDialog.isOpen} onOpenChange={(isOpen) => 
+        setEditUserDialog({ ...editUserDialog, isOpen })
+      }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription>
+              Edite as informações do usuário {editUserDialog.user?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="displayName">Nome de Exibição</Label>
+              <Input
+                id="displayName"
+                value={editDisplayName}
+                onChange={(e) => setEditDisplayName(e.target.value)}
+                placeholder="Nome de exibição"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setEditUserDialog({ isOpen: false, user: null });
+              setEditDisplayName("");
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={updateUserProfile}>
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para alterar senha */}
+      <Dialog open={changePasswordDialog.isOpen} onOpenChange={(isOpen) => 
+        setChangePasswordDialog({ ...changePasswordDialog, isOpen })
+      }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogDescription>
+              Será enviado um email de redefinição para {changePasswordDialog.userEmail}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setChangePasswordDialog({ isOpen: false, userEmail: '' });
+              setNewPassword("");
+              setConfirmPassword("");
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={changeUserPassword}>
+              Enviar Email de Redefinição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MenuPermissionsDialog
         isOpen={menuPermissionsDialog.isOpen}

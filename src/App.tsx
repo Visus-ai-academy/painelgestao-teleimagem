@@ -28,6 +28,7 @@ import ConfiguracaoLogomarca from "./pages/ConfiguracaoLogomarca";
 import ArquiteturaProjeto from "./pages/ArquiteturaProjeto";
 import RelatorioImplementacoes from "./pages/RelatorioImplementacoes";
 import GerenciarUsuarios from "./pages/GerenciarUsuarios";
+import MeuPerfil from "./pages/MeuPerfil";
 import People from "./pages/People";
 import MedicosAtivos from "./pages/MedicosAtivos";
 import Desenvolvimento from "./pages/Desenvolvimento";
@@ -263,6 +264,13 @@ const App = () => {
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <GerenciarUsuarios />
                   </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/meu-perfil" element={
+              <ProtectedRoute>
+                <Layout>
+                  <MeuPerfil />
                 </Layout>
               </ProtectedRoute>
             } />

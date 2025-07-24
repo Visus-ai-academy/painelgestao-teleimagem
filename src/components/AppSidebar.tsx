@@ -12,7 +12,10 @@ import {
   FileText,
   Network,
   AlertTriangle,
-  Upload
+  Upload,
+  User,
+  KeyRound,
+  LogOut
 } from "lucide-react";
 
 import { NavLink, useLocation } from "react-router-dom";
@@ -153,6 +156,12 @@ const menuItems: MenuItem[] = [
     icon: Upload,
     requiredRoles: ['manager', 'admin'],
   },
+  { 
+    title: "Meu Perfil", 
+    url: "/meu-perfil", 
+    icon: User,
+    requiredRoles: ['user', 'manager', 'admin'],
+  },
 ];
 
 export function AppSidebar() {
@@ -191,6 +200,7 @@ export function AppSidebar() {
       'contratos-fornecedores': ['admin'],
       'configuracao': ['admin'],
       'volumetria': ['admin', 'manager', 'user'],
+      'meu-perfil': ['admin', 'manager', 'user'],
     };
     
     const allowedRoles = defaultPermissions[menuKey] || [];
