@@ -22,7 +22,7 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const globeRadius = 100;
+    const globeRadius = 110; // Globo um pouco maior para melhor visualização
 
     // Convert lat/lon to 3D coordinates
     function latLonTo3D(lat: number, lon: number, radius: number) {
@@ -65,19 +65,29 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
       { name: 'Curitiba', lat: -25.4284, lon: -49.2733, isHub: true }
     ];
 
-    // Generate continental grid points for Earth representation
+    // Generate continental grid points for Earth representation - focado nas Américas
     const earthPoints: Array<{x: number, y: number, z: number, alpha: number}> = [];
-    for (let lat = -80; lat <= 80; lat += 10) {
-      for (let lon = -180; lon <= 180; lon += 10) {
+    for (let lat = -80; lat <= 80; lat += 8) {
+      for (let lon = -180; lon <= 180; lon += 8) {
         const point3D = latLonTo3D(lat, lon, globeRadius);
-        // Simulate continents with some randomness
-        const isLand = Math.random() > 0.7 || 
-                      (lat > -60 && lat < 70 && ((lon > -130 && lon < -30) || // Americas
-                                                 (lon > -10 && lon < 60) ||   // Europe/Africa
-                                                 (lon > 80 && lon < 150)));   // Asia
+        // Enfatizar continentes americanos e regiões importantes
+        const isLand = Math.random() > 0.65 || 
+                      // América do Sul (especialmente Brasil)
+                      (lat > -60 && lat < 15 && lon > -85 && lon < -30) ||
+                      // América do Norte
+                      (lat > 10 && lat < 75 && lon > -140 && lon < -50) ||
+                      // Europa/África
+                      (lat > -40 && lat < 75 && lon > -15 && lon < 60) ||
+                      // Ásia
+                      (lat > -10 && lat < 75 && lon > 60 && lon < 150);
+        
+        // Maior densidade de pontos na América do Sul
+        const isAmerica = (lat > -60 && lat < 15 && lon > -85 && lon < -30);
+        const alpha = isLand ? (isAmerica ? 0.4 + Math.random() * 0.5 : 0.3 + Math.random() * 0.4) : 0.05;
+        
         earthPoints.push({
           ...point3D,
-          alpha: isLand ? 0.3 + Math.random() * 0.4 : 0.1
+          alpha: alpha
         });
       }
     }
@@ -85,9 +95,10 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, size, size);
 
-      // Rotation - ajustado para mostrar melhor a América do Sul
-      const rotationY = time * 0.003 + Math.PI * 0.3; // Offset para focar nas Américas
-      const rotationX = Math.sin(time * 0.001) * 0.15 - 0.2; // Inclinação para mostrar sul
+      // Rotation - ajustado para focar nas Américas e evidenciar o sul do Brasil
+      const baseRotationY = Math.PI * 0.8; // Rotação inicial para focar nas Américas
+      const rotationY = baseRotationY + time * 0.002; // Rotação mais lenta
+      const rotationX = -Math.PI * 0.15 + Math.sin(time * 0.0008) * 0.1; // Inclinação para sul
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
@@ -343,7 +354,7 @@ export function CircularLight({ size = 400 }: CircularLightProps) {
   }, [size]);
 
   return (
-    <div className="absolute left-[40%] top-[60%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+    <div className="absolute left-[45%] top-[55%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
       <canvas
         ref={canvasRef}
         className="block"
