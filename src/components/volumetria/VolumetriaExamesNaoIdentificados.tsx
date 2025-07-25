@@ -60,7 +60,8 @@ export function VolumetriaExamesNaoIdentificados() {
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
-        const estudo = item.ESTUDO_DESCRICAO?.trim() || '(Sem descrição do estudo)';
+        // Mostrar exatamente o que está na coluna ESTUDO_DESCRICAO
+        const estudo = item.ESTUDO_DESCRICAO === null ? '(NULL)' : (item.ESTUDO_DESCRICAO?.trim() || '(Vazio)');
         const key = `${estudo}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
