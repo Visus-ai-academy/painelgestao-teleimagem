@@ -345,35 +345,67 @@ export default function MapaDistribuicaoClientes() {
     }
   };
 
-  // Processar clientes e geocodificar endereços
+  // Processar clientes e geocodificar endereços com otimizações de performance
   const processarClientesComGeocodificacao = async (clientesData: Cliente[]) => {
     setGeocodificando(true);
+    
+    // Cache local para evitar geocodificação repetida
+    const coordenadasCache = new Map<string, { lat: number; lng: number } | null>();
+    
     const clientesComCoordenadas: ClienteComCoordenadas[] = [];
     
-    for (const cliente of clientesData) {
-      const { cidade, estado } = parseEndereco(cliente.endereco || '');
-      let coordenadas: { lat: number; lng: number } | null = null;
-      
-      // Tentar geocodificar endereço completo
-      if (cliente.endereco) {
-        coordenadas = await geocodeAddress(cliente.endereco);
+    // Processar em lotes para não sobrecarregar a API
+    const BATCH_SIZE = 5;
+    const batches = [];
+    for (let i = 0; i < clientesData.length; i += BATCH_SIZE) {
+      batches.push(clientesData.slice(i, i + BATCH_SIZE));
+    }
+    
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (cliente) => {
+        const { cidade, estado } = parseEndereco(cliente.endereco || '');
+        let coordenadas: { lat: number; lng: number } | null = null;
         
-        // Aguardar 1 segundo entre requisições para respeitar rate limit
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Se não conseguiu geocodificar, usar coordenadas do estado como fallback
-      if (!coordenadas && estado && coordenadasEstados[estado]) {
-        coordenadas = coordenadasEstados[estado];
-      }
-      
-      clientesComCoordenadas.push({
-        ...cliente,
-        lat: coordenadas?.lat,
-        lng: coordenadas?.lng,
-        cidade,
-        estado
+        // Criar chave única para cache
+        const cacheKey = `${cliente.endereco || ''}-${cidade || ''}-${estado || ''}`;
+        
+        // Verificar cache primeiro
+        if (coordenadasCache.has(cacheKey)) {
+          coordenadas = coordenadasCache.get(cacheKey);
+        } else if (cliente.endereco && cliente.endereco.trim() !== '') {
+          try {
+            // Geocodificar apenas se temos endereço válido
+            coordenadas = await geocodeAddress(cliente.endereco);
+            // Salvar no cache
+            coordenadasCache.set(cacheKey, coordenadas);
+          } catch (error) {
+            console.warn(`Erro na geocodificação para ${cliente.nome}:`, error);
+            coordenadasCache.set(cacheKey, null);
+          }
+        }
+        
+        // Fallback para coordenadas do estado
+        if (!coordenadas && estado && coordenadasEstados[estado]) {
+          coordenadas = coordenadasEstados[estado];
+        }
+        
+        return {
+          ...cliente,
+          lat: coordenadas?.lat,
+          lng: coordenadas?.lng,
+          cidade,
+          estado
+        };
       });
+      
+      // Processar lote e aguardar conclusão
+      const batchResults = await Promise.all(batchPromises);
+      clientesComCoordenadas.push(...batchResults);
+      
+      // Pequena pausa entre lotes para não sobrecarregar
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
     }
     
     setClientes(clientesComCoordenadas);
