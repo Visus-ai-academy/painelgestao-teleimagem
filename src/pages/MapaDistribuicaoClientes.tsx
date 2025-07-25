@@ -12,6 +12,8 @@ interface Cliente {
   id: string;
   nome: string;
   endereco?: string;
+  cidade?: string;
+  estado?: string;
   status: string;
   ativo: boolean;
   contato?: string;
@@ -25,8 +27,6 @@ interface Cliente {
 interface ClienteComCoordenadas extends Cliente {
   lat?: number;
   lng?: number;
-  cidade?: string;
-  estado?: string;
 }
 
 interface EstadoEstatistica {
@@ -74,7 +74,7 @@ const geocodeAddress = async (endereco: string): Promise<{ lat: number; lng: num
   }
 };
 
-// Coordenadas aproximadas dos estados brasileiros para fallback
+// Coordenadas aproximadas dos estados brasileiros para fallback (apenas quando há clientes)
 const coordenadasEstados: Record<string, { lat: number; lng: number }> = {
   'AC': { lat: -8.77, lng: -70.55 },
   'AL': { lat: -9.71, lng: -35.73 },
@@ -103,55 +103,6 @@ const coordenadasEstados: Record<string, { lat: number; lng: number }> = {
   'SP': { lat: -23.55, lng: -46.64 },
   'SE': { lat: -10.90, lng: -37.07 },
   'TO': { lat: -10.25, lng: -48.25 },
-};
-
-// Extrair cidade e estado do endereço
-const parseEndereco = (endereco: string): { cidade?: string; estado?: string } => {
-  if (!endereco) return {};
-  
-  const partes = endereco.split(',').map(p => p.trim());
-  const ultimaParte = partes[partes.length - 1];
-  
-  // Procurar por padrões como "SP", "São Paulo", "São Paulo - SP", etc.
-  const estadoMatch = ultimaParte.match(/\b([A-Z]{2})\b/);
-  let estado = estadoMatch ? estadoMatch[1] : undefined;
-  
-  // Se não encontrou sigla, tentar nomes completos de estados
-  if (!estado) {
-    const estadosNomes: Record<string, string> = {
-      'são paulo': 'SP', 'rio de janeiro': 'RJ', 'minas gerais': 'MG',
-      'bahia': 'BA', 'paraná': 'PR', 'rio grande do sul': 'RS',
-      'pernambuco': 'PE', 'ceará': 'CE', 'pará': 'PA', 'santa catarina': 'SC',
-      'goiás': 'GO', 'maranhão': 'MA', 'paraíba': 'PB', 'mato grosso': 'MT',
-      'espírito santo': 'ES', 'piauí': 'PI', 'alagoas': 'AL', 'distrito federal': 'DF'
-    };
-    
-    for (const [nome, sigla] of Object.entries(estadosNomes)) {
-      if (ultimaParte.toLowerCase().includes(nome)) {
-        estado = sigla;
-        break;
-      }
-    }
-  }
-  
-  // Tentar extrair cidade
-  let cidade: string | undefined;
-  if (partes.length >= 2) {
-    cidade = partes[partes.length - 2];
-  } else if (partes.length === 1 && !estado) {
-    cidade = partes[0];
-  }
-  
-  return { cidade, estado };
-};
-
-// Função para determinar tamanho do marcador baseado no volume
-const getMarkerSize = (volume: number, maxVolume: number): string => {
-  if (maxVolume === 0) return 's';
-  const ratio = volume / maxVolume;
-  if (ratio >= 0.7) return 'l'; // Grande
-  if (ratio >= 0.3) return 'm'; // Médio
-  return 's'; // Pequeno
 };
 
 // Função para determinar intensidade da cor baseada no volume e quantidade
@@ -183,8 +134,9 @@ const getHeatmapSize = (volume: number, clientCount: number, maxVolume: number, 
 
 // Componente de Mapa com visualização por volumetria
 function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
-  const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
-  const clientesSemCoordenadas = clientes.filter(c => !c.lat || !c.lng);
+  // Filtrar apenas clientes com coordenadas válidas
+  const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng && c.cidade && c.estado);
+  const clientesSemCoordenadas = clientes.filter(c => !c.lat || !c.lng || !c.cidade || !c.estado);
   
   // Agrupar clientes por cidade para criar o mapa de calor
   const cidadesMap = new Map<string, {
@@ -198,7 +150,7 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   }>();
   
   clientesComCoordenadas.forEach(cliente => {
-    const key = `${cliente.cidade || 'Indefinida'}-${cliente.estado || 'XX'}`;
+    const key = `${cliente.cidade}-${cliente.estado}`;
     
     if (!cidadesMap.has(key)) {
       cidadesMap.set(key, {
@@ -207,8 +159,8 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
         clientCount: 0,
         lat: cliente.lat!,
         lng: cliente.lng!,
-        cidade: cliente.cidade || 'Indefinida',
-        estado: cliente.estado || 'XX'
+        cidade: cliente.cidade!,
+        estado: cliente.estado!
       });
     }
     
@@ -219,8 +171,8 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   });
   
   const cidadesArray = Array.from(cidadesMap.values());
-  const maxVolume = Math.max(...cidadesArray.map(c => c.totalVolume));
-  const maxClientCount = Math.max(...cidadesArray.map(c => c.clientCount));
+  const maxVolume = Math.max(...cidadesArray.map(c => c.totalVolume), 1);
+  const maxClientCount = Math.max(...cidadesArray.map(c => c.clientCount), 1);
   
   if (clientesComCoordenadas.length === 0) {
     return (
@@ -257,17 +209,17 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
     );
   }
 
-  // Encontrar centro do mapa baseado nas coordenadas das cidades
+  // Encontrar centro do mapa baseado nas coordenadas das cidades reais
   const center = cidadesArray.reduce(
-    (acc, cliente) => ({
-      lat: acc.lat + cliente.lat!,
-      lng: acc.lng + cliente.lng!
+    (acc, cidade) => ({
+      lat: acc.lat + cidade.lat,
+      lng: acc.lng + cidade.lng
     }),
     { lat: 0, lng: 0 }
   );
   
-  center.lat = center.lat / clientesComCoordenadas.length;
-  center.lng = center.lng / clientesComCoordenadas.length;
+  center.lat = center.lat / cidadesArray.length;
+  center.lng = center.lng / cidadesArray.length;
 
   return (
     <div className="space-y-4">
@@ -345,7 +297,7 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
           })}
       </div>
 
-      {/* Mapa de Calor Interativo */}
+      {/* Mapa estático mostrando apenas as cidades com clientes */}
       <div className="h-96 rounded-lg overflow-hidden border relative">
         <div className="absolute top-2 left-2 bg-white/90 rounded px-2 py-1 text-xs font-medium z-10">
           Mapa de Calor: {cidadesArray.length} cidades • {clientesComCoordenadas.length} clientes
@@ -372,8 +324,6 @@ export default function MapaDistribuicaoClientes() {
   const [error, setError] = useState<string | null>(null);
   const [estatisticas, setEstatisticas] = useState<EstadoEstatistica[]>([]);
   const [geocodificando, setGeocodificando] = useState(false);
-  const [clientesGeocodificados, setClientesGeocodificados] = useState<ClienteComCoordenadas[]>([]);
-  const [geocodificacaoCompleta, setGeocodificacaoCompleta] = useState(false);
 
   // Buscar clientes do banco de dados com volumetria
   const buscarClientes = async () => {
@@ -381,7 +331,7 @@ export default function MapaDistribuicaoClientes() {
       setLoading(true);
       setError(null);
       
-      // Buscar clientes ativos com dados de volumetria usando query manual
+      // Buscar clientes ativos com dados de volumetria
       const { data, error: supabaseError } = await supabase
         .from('clientes')
         .select(`
@@ -433,14 +383,7 @@ export default function MapaDistribuicaoClientes() {
         }));
         
         setClientes(clientesComVolumetria);
-        
-        // Só geocodificar se ainda não foi feito
-        if (!geocodificacaoCompleta) {
-          processarClientesComGeocodificacao(clientesComVolumetria);
-        } else {
-          // Use dados já geocodificados se disponíveis
-          calcularEstatisticas(clientesGeocodificados.length > 0 ? clientesGeocodificados : clientesComVolumetria);
-        }
+        processarClientesComGeocodificacao(clientesComVolumetria);
       }
     } catch (err) {
       console.error('Erro ao buscar clientes:', err);
@@ -451,160 +394,163 @@ export default function MapaDistribuicaoClientes() {
     }
   };
 
-  // Processar clientes e geocodificar por cidade/estado
+  // Processar clientes e geocodificar por cidade/estado (apenas para clientes com dados de localização)
   const processarClientesComGeocodificacao = async (clientesData: Cliente[]) => {
     setGeocodificando(true);
     
+    // Filtrar apenas clientes que têm cidade e estado cadastrados
+    const clientesComLocalizacao = clientesData.filter(cliente => 
+      cliente.cidade && cliente.estado
+    );
+    
+    if (clientesComLocalizacao.length === 0) {
+      calcularEstatisticas(clientesData);
+      setGeocodificando(false);
+      return;
+    }
+    
     // Cache local para evitar geocodificação repetida
     const coordenadasCache = new Map<string, { lat: number; lng: number } | null>();
-    
     const clientesComCoordenadas: ClienteComCoordenadas[] = [];
     
     // Processar em lotes para não sobrecarregar a API
     const BATCH_SIZE = 5;
     const batches = [];
-    for (let i = 0; i < clientesData.length; i += BATCH_SIZE) {
-      batches.push(clientesData.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < clientesComLocalizacao.length; i += BATCH_SIZE) {
+      batches.push(clientesComLocalizacao.slice(i, i + BATCH_SIZE));
     }
     
-    for (const batch of batches) {
-      const batchPromises = batch.map(async (cliente) => {
-        const { cidade, estado } = parseEndereco(cliente.endereco || '');
-        let coordenadas: { lat: number; lng: number } | null = null;
-        
-        // Priorizar cidade/estado diretamente dos campos se disponíveis
-        const cidadeReal = cliente.cidade || cidade;
-        const estadoReal = cliente.estado || estado;
-        
-        // Criar chave única para cache baseada em cidade/estado
-        const cacheKey = `${cidadeReal || ''}-${estadoReal || ''}`;
-        
-        // Verificar cache primeiro
-        if (coordenadasCache.has(cacheKey)) {
-          coordenadas = coordenadasCache.get(cacheKey);
-        } else {
-          // Tentar geocodificar por cidade/estado
-          if (cidadeReal && estadoReal) {
-            try {
-              const enderecoParaGeocode = `${cidadeReal}, ${estadoReal}, Brazil`;
-              coordenadas = await geocodeAddress(enderecoParaGeocode);
+    try {
+      for (const batch of batches) {
+        const promises = batch.map(async (cliente) => {
+          try {
+            let coordenadas: { lat: number; lng: number } | null = null;
+            
+            // Usar cidade e estado diretamente
+            const cacheKey = `${cliente.cidade}-${cliente.estado}`;
+            
+            if (coordenadasCache.has(cacheKey)) {
+              coordenadas = coordenadasCache.get(cacheKey);
+            } else {
+              // Tentar geocodificar por cidade e estado
+              coordenadas = await geocodeAddress(`${cliente.cidade}, ${cliente.estado}, Brazil`);
+              
+              // Se não conseguir geocodificar a cidade, usar coordenadas do estado
+              if (!coordenadas && cliente.estado && coordenadasEstados[cliente.estado]) {
+                coordenadas = coordenadasEstados[cliente.estado];
+              }
+              
               coordenadasCache.set(cacheKey, coordenadas);
-            } catch (error) {
-              console.warn(`Erro na geocodificação para ${cliente.nome} (${cidadeReal}/${estadoReal}):`, error);
-              coordenadasCache.set(cacheKey, null);
             }
-          } else if (cliente.endereco && cliente.endereco.trim() !== '') {
-            // Fallback: tentar com endereço completo se cidade/estado não disponíveis
-            try {
-              coordenadas = await geocodeAddress(cliente.endereco);
-              coordenadasCache.set(cacheKey, coordenadas);
-            } catch (error) {
-              console.warn(`Erro na geocodificação para ${cliente.nome}:`, error);
-              coordenadasCache.set(cacheKey, null);
-            }
+            
+            const clienteComCoordenadas: ClienteComCoordenadas = {
+              ...cliente,
+              lat: coordenadas?.lat,
+              lng: coordenadas?.lng
+            };
+            
+            return clienteComCoordenadas;
+          } catch (error) {
+            console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
+            return { ...cliente } as ClienteComCoordenadas;
           }
-        }
+        });
         
-        // Fallback final para coordenadas do estado
-        if (!coordenadas && estadoReal && coordenadasEstados[estadoReal]) {
-          coordenadas = coordenadasEstados[estadoReal];
-        }
+        const resultados = await Promise.all(promises);
+        clientesComCoordenadas.push(...resultados);
         
-        return {
-          ...cliente,
-          lat: coordenadas?.lat,
-          lng: coordenadas?.lng,
-          cidade: cidadeReal,
-          estado: estadoReal
-        };
-      });
-      
-      // Processar lote e aguardar conclusão
-      const batchResults = await Promise.all(batchPromises);
-      clientesComCoordenadas.push(...batchResults);
-      
-      // Pequena pausa entre lotes para não sobrecarregar
-      if (batches.indexOf(batch) < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Pequena pausa entre lotes para não sobrecarregar a API
+        if (batches.indexOf(batch) < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
+      
+      // Adicionar clientes sem localização
+      const clientesSemLocalizacao = clientesData.filter(cliente => 
+        !cliente.cidade || !cliente.estado
+      );
+      
+      const todosClientes = [...clientesComCoordenadas, ...clientesSemLocalizacao];
+      
+      setClientes(todosClientes);
+      calcularEstatisticas(todosClientes);
+      
+      const clientesLocalizados = clientesComCoordenadas.filter(c => c.lat && c.lng).length;
+      
+      toast.success(`Mapa atualizado! ${clientesLocalizados} de ${clientesComLocalizacao.length} clientes localizados.`);
+    } catch (error) {
+      console.error('Erro na geocodificação:', error);
+      toast.error('Erro durante a geocodificação');
+      calcularEstatisticas(clientesData);
+    } finally {
+      setGeocodificando(false);
     }
-    
-    setClientes(clientesComCoordenadas);
-    setClientesGeocodificados(clientesComCoordenadas);
-    setGeocodificacaoCompleta(true);
-    calcularEstatisticas(clientesComCoordenadas);
-    setGeocodificando(false);
-    
-    toast.success(`Geocodificação concluída! ${clientesComCoordenadas.filter(c => c.lat && c.lng).length} clientes localizados.`);
   };
 
   // Calcular estatísticas por estado
   const calcularEstatisticas = (clientesData: ClienteComCoordenadas[]) => {
-    const estadosMap = new Map<string, ClienteComCoordenadas[]>();
-    
+    const estadosMap = new Map<string, {
+      total: number;
+      volume_total: number;
+      clientes: ClienteComCoordenadas[];
+    }>();
+
     clientesData.forEach(cliente => {
-      if (cliente.estado) {
-        if (!estadosMap.has(cliente.estado)) {
-          estadosMap.set(cliente.estado, []);
-        }
-        estadosMap.get(cliente.estado)!.push(cliente);
+      const estado = cliente.estado || 'Indefinido';
+      
+      if (!estadosMap.has(estado)) {
+        estadosMap.set(estado, {
+          total: 0,
+          volume_total: 0,
+          clientes: []
+        });
       }
+
+      const estadoData = estadosMap.get(estado)!;
+      estadoData.total += 1;
+      estadoData.volume_total += cliente.volume_exames || 0;
+      estadoData.clientes.push(cliente);
     });
-    
-    const stats: EstadoEstatistica[] = Array.from(estadosMap.entries())
-      .map(([estado, clientes]) => ({
+
+    const estatisticasArray = Array.from(estadosMap.entries())
+      .map(([estado, data]) => ({
         estado,
-        total: clientes.length,
-        volume_total: clientes.reduce((acc, c) => acc + (c.volume_exames || 0), 0),
-        clientes
+        total: data.total,
+        volume_total: data.volume_total,
+        clientes: data.clientes
       }))
       .sort((a, b) => b.volume_total - a.volume_total);
-    
-    setEstatisticas(stats);
+
+    setEstatisticas(estatisticasArray);
   };
 
-  // Abrir cliente no Google Maps
-  const abrirNoGoogleMaps = (cliente: ClienteComCoordenadas) => {
-    if (cliente.lat && cliente.lng) {
-      const url = `https://www.google.com/maps/search/?api=1&query=${cliente.lat},${cliente.lng}`;
-      window.open(url, '_blank');
-    } else if (cliente.endereco) {
-      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cliente.endereco)}`;
-      window.open(url, '_blank');
-    }
-  };
-
-  // Forçar atualização manual
-  const forcarAtualizacao = () => {
-    setGeocodificacaoCompleta(false);
-    setClientesGeocodificados([]);
-    buscarClientes();
-  };
-
-  // Carregamento inicial apenas
   useEffect(() => {
     buscarClientes();
   }, []);
 
-  const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
-  const clientesSemCoordenadas = clientes.filter(c => !c.lat || !c.lng);
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mapa de Distribuição de Clientes</h1>
-          <p className="text-gray-600 mt-1">Visualização geográfica dos clientes ativos</p>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Mapa de Distribuição de Clientes</h1>
+            <p className="text-muted-foreground">Visualização geográfica da distribuição dos clientes por volumetria de exames</p>
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Carregando Mapa...</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Mapa de Calor
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-96 w-full" />
+                <div className="h-96 flex items-center justify-center">
+                  <Skeleton className="w-full h-full" />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -612,10 +558,20 @@ export default function MapaDistribuicaoClientes() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Estatísticas</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Estatísticas por Estado
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-48 w-full" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -626,13 +582,8 @@ export default function MapaDistribuicaoClientes() {
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mapa de Distribuição de Clientes</h1>
-          <p className="text-gray-600 mt-1">Visualização geográfica dos clientes ativos</p>
-        </div>
-        
-        <Alert variant="destructive">
+      <div className="container mx-auto p-6">
+        <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -641,213 +592,104 @@ export default function MapaDistribuicaoClientes() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex justify-between items-start">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mapa de Distribuição de Clientes</h1>
-          <p className="text-gray-600 mt-1">Visualização geográfica dos clientes ativos</p>
+          <h1 className="text-3xl font-bold tracking-tight">Mapa de Distribuição de Clientes</h1>
+          <p className="text-muted-foreground">
+            Visualização geográfica da distribuição dos clientes por volumetria de exames
+          </p>
         </div>
         
-        <div className="flex items-center gap-4">
-          <Button 
-            onClick={forcarAtualizacao}
-            disabled={loading || geocodificando}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading || geocodificando ? 'animate-spin' : ''}`} />
-            Atualizar Localização
-          </Button>
-          
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            {geocodificando && (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Processando endereços...</span>
-              </>
-            )}
-          </div>
-        </div>
+        <Button 
+          onClick={buscarClientes} 
+          disabled={loading || geocodificando}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading || geocodificando ? 'animate-spin' : ''}`} />
+          {geocodificando ? 'Atualizando...' : 'Atualizar'}
+        </Button>
       </div>
 
-      {/* Alertas */}
-      {clientesSemCoordenadas.length > 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {clientesSemCoordenadas.length} cliente(s) não puderam ser localizados no mapa devido a endereços incompletos ou inválidos.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Conteúdo Principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Mapa */}
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                Mapa por Volumetria de Exames
+                <MapPin className="h-5 w-5" />
+                Mapa de Calor
+                {geocodificando && (
+                  <Badge variant="secondary" className="ml-2">
+                    Processando...
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {clientesComCoordenadas.length > 0 ? (
-                <>
-                  <MapaVolumetria clientes={clientesComCoordenadas} />
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">
-                      💡 Para visualização interativa completa, clique nos clientes abaixo para abrir no Google Maps
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-96 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                  <MapPin className="h-16 w-16 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                    Nenhum cliente localizado no mapa
-                  </h3>
-                  <p className="text-gray-500 mb-4 max-w-md">
-                    Para visualizar os clientes no mapa, é necessário cadastrar os endereços, cidades e estados no formulário de clientes.
-                  </p>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-700">
-                      <strong>Dica:</strong> Vá para "Clientes → Cadastro" e preencha os campos de endereço, cidade e estado para que os clientes apareçam no mapa.
-                    </p>
-                  </div>
-                </div>
-              )}
+              <MapaVolumetria clientes={clientes} />
             </CardContent>
           </Card>
         </div>
 
-        {/* Estatísticas */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-600" />
-                Resumo Geral
+                <Building2 className="h-5 w-5" />
+                Estatísticas por Estado
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{clientes.length}</div>
-                  <div className="text-sm text-gray-600">Total de Clientes Ativos</div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{clientesComCoordenadas.length}</div>
-                  <div className="text-sm text-gray-600">Localizados no Mapa</div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{estatisticas.length}</div>
-                  <div className="text-sm text-gray-600">Estados com Clientes</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-purple-600" />
-                Por Estado
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {estatisticas.map((estado) => (
-                  <div key={estado.estado} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <div>
-                      <span className="font-medium">{estado.estado}</span>
-                      <div className="text-xs text-gray-600">
-                        {estado.volume_total.toLocaleString()} exames
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {estatisticas.map((estado, index) => (
+                  <div key={estado.estado} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline">{estado.estado}</Badge>
+                      <div>
+                        <p className="font-medium text-sm">{estado.total} cliente(s)</p>
+                        <p className="text-xs text-gray-500">{estado.volume_total.toLocaleString()} exames</p>
                       </div>
                     </div>
-                    <Badge variant="secondary">{estado.total}</Badge>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">#{index + 1}</p>
+                    </div>
                   </div>
                 ))}
+                
+                {estatisticas.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhum cliente encontrado</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Legenda</CardTitle>
+              <CardTitle className="text-sm">Resumo</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                  <span className="text-sm">Clientes Ativos</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                  <span className="text-sm">Clientes Inativos</span>
-                </div>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Total de Clientes:</span>
+                <span className="font-medium">{clientes.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Estados Ativos:</span>
+                <span className="font-medium">{estatisticas.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Volume Total:</span>
+                <span className="font-medium">
+                  {estatisticas.reduce((acc, est) => acc + est.volume_total, 0).toLocaleString()}
+                </span>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Lista de Clientes com Links para Maps */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-blue-600" />
-            Clientes Localizados
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clientesComCoordenadas.map((cliente) => (
-              <div key={cliente.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-lg">{cliente.nome}</h3>
-                  <Badge variant={cliente.ativo ? "default" : "secondary"} className="text-xs">
-                    {cliente.ativo ? 'Ativo' : 'Inativo'}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-1 text-sm text-gray-600 mb-3">
-                  {cliente.endereco && (
-                    <p><strong>Endereço:</strong> {cliente.endereco}</p>
-                  )}
-                  {cliente.estado && (
-                    <p><strong>Estado:</strong> {cliente.estado}</p>
-                  )}
-                  {cliente.telefone && (
-                    <p><strong>Telefone:</strong> {cliente.telefone}</p>
-                  )}
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => abrirNoGoogleMaps(cliente)}
-                  className="w-full"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Ver no Google Maps
-                </Button>
-              </div>
-            ))}
-          </div>
-          
-          {clientesComCoordenadas.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum cliente foi localizado ainda.</p>
-              <p className="text-sm">Verifique se os endereços estão completos no cadastro.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
