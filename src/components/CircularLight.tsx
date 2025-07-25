@@ -216,7 +216,7 @@ export function CircularLight({ size }: CircularLightProps) {
           
           if (isVisible) {
             // Animated connection lines with 3D depth effect
-            const connectionProgress = (Math.sin(time * 0.02 + conn.lat * 0.1) + 1) * 0.5;
+            const connectionProgress = (Math.sin(time * 0.08 + conn.lat * 0.1) + 1) * 0.5; // Dobrado de 0.04 para 0.08
             const depthFactor = Math.max(0.2, 1 - Math.abs(curitiba.z) / 150);
             const lineAlpha = 0.8 * connectionProgress * depthFactor * Math.max(0.3, (conn.scale + curitiba.scale) * 0.5);
             
@@ -238,7 +238,7 @@ export function CircularLight({ size }: CircularLightProps) {
             gradient.addColorStop(1, `rgba(255, 255, 100, ${lineAlpha})`);
             
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 2 * Math.max(0.5, Math.max(conn.scale, curitiba.scale)) * depthFactor;
+            ctx.lineWidth = 1 * Math.max(0.5, Math.max(conn.scale, curitiba.scale)) * depthFactor; // Reduzido de 2 para 1
             
             // Add glow effect for 3D depth
             ctx.shadowColor = 'rgba(100, 255, 200, 0.6)';
@@ -262,7 +262,7 @@ export function CircularLight({ size }: CircularLightProps) {
               const particleY = (1 - t) * (1 - t) * conn.y + 2 * (1 - t) * t * midY + t * t * curitiba.y;
               
               const particleAlpha = lineAlpha * (1 - Math.abs(t - 0.5) * 0.5);
-              const particleSize = 2 + Math.sin(time * 0.1 + i) * 0.5;
+              const particleSize = 2 + Math.sin(time * 0.2 + i) * 0.5; // Dobrado de 0.1 para 0.2
               
               // Particle glow
               const particleGradient = ctx.createRadialGradient(
