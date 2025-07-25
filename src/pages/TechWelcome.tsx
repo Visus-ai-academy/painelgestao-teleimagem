@@ -94,7 +94,7 @@ export default function TechWelcome() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a2332] via-[#242b3d] to-[#1e293b] relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0c1829] via-[#1a2842] to-[#0f1e2d] relative overflow-hidden">
       {/* Background Image - Responsive */}
       <div className="absolute inset-0 opacity-60 md:opacity-80 bg-no-repeat bg-center bg-contain md:bg-cover" 
            style={{
