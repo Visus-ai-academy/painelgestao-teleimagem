@@ -29,8 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Redirecionar para /auth apenas se estiver em uma rota protegida e não logado
-        if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
+        // Redirecionar adequadamente baseado no estado da autenticação
+        if (event === 'SIGNED_OUT') {
+          // Após logout, redirecionar para a página principal
+          navigate('/');
+        } else if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
+          // Se não está logado e está em rota protegida, redirecionar para auth
           navigate('/auth');
         }
       }
