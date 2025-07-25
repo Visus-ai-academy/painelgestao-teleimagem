@@ -21,10 +21,10 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar TODOS os exames zerados
+      // Buscar TODOS os exames zerados com campos que podem conter o nome do exame
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
-        .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
+        .select('ESTUDO_DESCRICAO, ACCESSION_NUMBER, MODALIDADE, EMPRESA')
         .or('VALORES.eq.0,VALORES.is.null');
 
       if (volumetriaError) throw volumetriaError;
@@ -60,15 +60,23 @@ export function VolumetriaExamesNaoIdentificados() {
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
-        // Mostrar exatamente o que está na coluna ESTUDO_DESCRICAO
-        const estudo = item.ESTUDO_DESCRICAO === null ? '(NULL)' : (item.ESTUDO_DESCRICAO?.trim() || '(Vazio)');
-        const key = `${estudo}_${item.MODALIDADE}_${item.EMPRESA}`;
+        // Usar ESTUDO_DESCRICAO quando disponível, senão usar ACCESSION_NUMBER
+        let nomeExame = '';
+        if (item.ESTUDO_DESCRICAO && item.ESTUDO_DESCRICAO.trim() !== '') {
+          nomeExame = item.ESTUDO_DESCRICAO.trim();
+        } else if (item.ACCESSION_NUMBER && item.ACCESSION_NUMBER.trim() !== '') {
+          nomeExame = `Exame ${item.ACCESSION_NUMBER.trim()}`;
+        } else {
+          nomeExame = '(Sem identificação do exame)';
+        }
+        
+        const key = `${nomeExame}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
           agrupados[key].quantidade += 1;
         } else {
           agrupados[key] = {
-            estudo_descricao: estudo,
+            estudo_descricao: nomeExame,
             modalidade: item.MODALIDADE || '',
             empresa: item.EMPRESA || '',
             quantidade: 1
