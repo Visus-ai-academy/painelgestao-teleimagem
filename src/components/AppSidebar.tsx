@@ -232,17 +232,17 @@ export function AppSidebar() {
           <div className="flex items-center justify-center h-full">
             {!collapsed && (
               <div className="text-center">
-                <h2 className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-slate-300 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
+                <h2 className="font-bold text-lg bg-gradient-to-r from-cyan-300 to-white bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
                   Teleimagem
                 </h2>
-                <p className="text-sm bg-gradient-to-r from-cyan-300 to-slate-400 bg-clip-text text-transparent font-orbitron font-light tracking-wide">
+                <p className="text-sm bg-gradient-to-r from-cyan-200 to-slate-100 bg-clip-text text-transparent font-orbitron font-light tracking-wide">
                   Sistema de Gestão
                 </p>
               </div>
             )}
             {collapsed && (
               <div className="text-center">
-                <h2 className="font-bold text-sm bg-gradient-to-r from-cyan-400 to-slate-300 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
+                <h2 className="font-bold text-sm bg-gradient-to-r from-cyan-300 to-white bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
                   TI
                 </h2>
               </div>
