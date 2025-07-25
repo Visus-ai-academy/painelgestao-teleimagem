@@ -192,9 +192,6 @@ export default function TechWelcome() {
             <p className="text-base sm:text-xl md:text-2xl text-cyan-100 mb-1 md:mb-4 font-orbitron font-light tracking-wide drop-shadow-lg">
               Sistema de Gestão
             </p>
-            <p className="text-xs sm:text-base md:text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
-              Bem-vindo ao centro de comando
-            </p>
           </div>
         </div>
       </div>
