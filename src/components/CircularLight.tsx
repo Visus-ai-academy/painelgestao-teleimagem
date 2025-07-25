@@ -101,10 +101,10 @@ export function CircularLight({ size }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, adaptiveSize, adaptiveSize);
 
-      // Rotation - ajustado para rotação mais rápida (10 segundos)
+      // Rotation - ajustado para rotação ainda mais rápida (30% mais rápido)
       const baseRotationY = -Math.PI * 0.2; // Rotação para focar no Brasil
-      const rotationY = baseRotationY + time * 0.004; // Aumentado de 0.002 para 0.004 (10 segundos)
-      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0016) * 0.1; // Aumentado de 0.0008 para 0.0016
+      const rotationY = baseRotationY + time * 0.0052; // Aumentado em 30%: 0.004 * 1.3 = 0.0052
+      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0021) * 0.1; // Aumentado em 30%: 0.0016 * 1.3 = 0.0021
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
@@ -362,7 +362,7 @@ export function CircularLight({ size }: CircularLightProps) {
   return (
     <div className={`absolute pointer-events-none ${
       isMobile 
-        ? 'left-[46%] top-[51%] transform -translate-x-1/2 -translate-y-1/2' 
+        ? 'left-[36%] top-[41%] transform -translate-x-1/2 -translate-y-1/2' 
         : 'left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2'
     }`}>
       <canvas
