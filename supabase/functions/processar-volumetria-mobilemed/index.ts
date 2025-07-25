@@ -39,7 +39,7 @@ interface VolumetriaRecord {
   CODIGO_INTERNO?: number;
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
-  arquivo_fonte: 'data_laudo' | 'data_exame';
+  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
 }
 
 // Função para converter data do formato brasileiro (dd/mm/aa ou dd/mm/aaaa)
@@ -139,7 +139,7 @@ function convertValues(valueStr: string | number): number | null {
 }
 
 // Função para processar uma linha do Excel
-function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao'): VolumetriaRecord | null {
   try {
     // Validação robusta de entrada
     if (!row || typeof row !== 'object') {
@@ -218,7 +218,7 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): Volume
 async function processFileInBackground(
   supabaseClient: any,
   file_path: string,
-  arquivo_fonte: 'data_laudo' | 'data_exame',
+  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao',
   uploadLogId: string
 ) {
   try {
@@ -375,8 +375,8 @@ serve(async (req) => {
       throw new Error('file_path e arquivo_fonte são obrigatórios');
     }
 
-    if (!['data_laudo', 'data_exame'].includes(arquivo_fonte)) {
-      throw new Error('arquivo_fonte deve ser "data_laudo" ou "data_exame"');
+    if (!['data_laudo', 'data_exame', 'volumetria_fora_padrao'].includes(arquivo_fonte)) {
+      throw new Error('arquivo_fonte deve ser "data_laudo", "data_exame" ou "volumetria_fora_padrao"');
     }
 
     const supabaseClient = createClient(
@@ -406,7 +406,7 @@ serve(async (req) => {
     const backgroundTask = processFileInBackground(
       supabaseClient,
       file_path,
-      arquivo_fonte as 'data_laudo' | 'data_exame',
+      arquivo_fonte as 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao',
       uploadLog.id
     );
 
