@@ -1,11 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CircularLightProps {
   size?: number;
 }
 
-export function CircularLight({ size = 442 }: CircularLightProps) { // Reduzido 15% (520 -> 442)
+export function CircularLight({ size }: CircularLightProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isMobile = useIsMobile();
+  
+  // Ajustar tamanho baseado no dispositivo
+  const adaptiveSize = size || (isMobile ? 280 : 442);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -14,15 +19,15 @@ export function CircularLight({ size = 442 }: CircularLightProps) { // Reduzido 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = adaptiveSize;
+    canvas.height = adaptiveSize;
 
     let time = 0;
     let animationId: number;
 
-    const centerX = size / 2;
-    const centerY = size / 2;
-    const globeRadius = 122; // Reduzido 15% (143 -> 122)
+    const centerX = adaptiveSize / 2;
+    const centerY = adaptiveSize / 2;
+    const globeRadius = isMobile ? 80 : 122;
 
     // Convert lat/lon to 3D coordinates - corrigido para hemisfério sul
     function latLonTo3D(lat: number, lon: number, radius: number) {
@@ -94,7 +99,7 @@ export function CircularLight({ size = 442 }: CircularLightProps) { // Reduzido 
     }
 
     function drawFuturisticGlobe() {
-      ctx.clearRect(0, 0, size, size);
+      ctx.clearRect(0, 0, adaptiveSize, adaptiveSize);
 
       // Rotation - ajustado para mostrar Curitiba no hemisfério sul (parte inferior)
       const baseRotationY = -Math.PI * 0.2; // Rotação para focar no Brasil
@@ -352,16 +357,18 @@ export function CircularLight({ size = 442 }: CircularLightProps) { // Reduzido 
         cancelAnimationFrame(animationId);
       }
     };
-  }, [size]);
+  }, [adaptiveSize, isMobile]);
 
   return (
     <div className="absolute left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
       <canvas
         ref={canvasRef}
-        className="block"
+        className="block max-w-full h-auto"
         style={{ 
           filter: 'drop-shadow(0 0 15px rgba(100, 200, 255, 0.5))',
-          opacity: 0.8
+          opacity: isMobile ? 0.6 : 0.8,
+          maxWidth: isMobile ? '280px' : '442px',
+          maxHeight: isMobile ? '280px' : '442px'
         }}
       />
     </div>
