@@ -21,13 +21,11 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // 1. Buscar exames zerados que têm ESTUDO_DESCRICAO válido
+      // Buscar TODOS os exames zerados (com e sem ESTUDO_DESCRICAO)
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
-        .or('VALORES.eq.0,VALORES.is.null')
-        .not('ESTUDO_DESCRICAO', 'is', null)
-        .neq('ESTUDO_DESCRICAO', '');
+        .or('VALORES.eq.0,VALORES.is.null');
 
       if (volumetriaError) throw volumetriaError;
 
@@ -41,25 +39,32 @@ export function VolumetriaExamesNaoIdentificados() {
 
       const estudosNoDePara = new Set(deParaData?.map(item => item.estudo_descricao) || []);
 
-      // 3. Filtrar apenas os NÃO encontrados no De Para
-      const estudosNaoEncontrados = volumetriaData?.filter(item => 
-        !estudosNoDePara.has(item.ESTUDO_DESCRICAO)
-      ) || [];
+      // 3. Filtrar TODOS os registros zerados (incluindo NULL e não encontrados no De Para)
+      const estudosNaoEncontrados = volumetriaData?.filter(item => {
+        // Se ESTUDO_DESCRICAO é NULL, incluir sempre
+        if (!item.ESTUDO_DESCRICAO) {
+          return true;
+        }
+        // Se tem ESTUDO_DESCRICAO mas não está no De Para, incluir
+        return !estudosNoDePara.has(item.ESTUDO_DESCRICAO);
+      }) || [];
 
-      console.log('🔍 Exames zerados com ESTUDO_DESCRICAO válido:', volumetriaData?.length);
+      console.log('🔍 Total de exames zerados:', volumetriaData?.length);
       console.log('🔍 Exames não encontrados no De Para:', estudosNaoEncontrados.length);
 
-      // 4. Agrupar por ESTUDO_DESCRICAO, MODALIDADE e EMPRESA
+      // 4. Agrupar por nome do estudo, MODALIDADE e EMPRESA
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
-        const key = `${item.ESTUDO_DESCRICAO}_${item.MODALIDADE}_${item.EMPRESA}`;
+        // Usar ESTUDO_DESCRICAO quando disponível, senão mostrar como "arquivo sem nome"
+        const nomeEstudo = item.ESTUDO_DESCRICAO || "(Arquivo sem nome do estudo)";
+        const key = `${nomeEstudo}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
           agrupados[key].quantidade += 1;
         } else {
           agrupados[key] = {
-            estudo_descricao: item.ESTUDO_DESCRICAO,
+            estudo_descricao: nomeEstudo,
             modalidade: item.MODALIDADE || '',
             empresa: item.EMPRESA || '',
             quantidade: 1
