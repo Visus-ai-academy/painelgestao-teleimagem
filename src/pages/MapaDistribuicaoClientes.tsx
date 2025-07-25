@@ -552,12 +552,31 @@ export default function MapaDistribuicaoClientes() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <MapaVolumetria clientes={clientesComCoordenadas} />
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  💡 Para visualização interativa completa, clique nos clientes abaixo para abrir no Google Maps
-                </p>
-              </div>
+              {clientesComCoordenadas.length > 0 ? (
+                <>
+                  <MapaVolumetria clientes={clientesComCoordenadas} />
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                      💡 Para visualização interativa completa, clique nos clientes abaixo para abrir no Google Maps
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-96 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                  <MapPin className="h-16 w-16 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                    Nenhum cliente localizado no mapa
+                  </h3>
+                  <p className="text-gray-500 mb-4 max-w-md">
+                    Para visualizar os clientes no mapa, é necessário cadastrar os endereços, cidades e estados no formulário de clientes.
+                  </p>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-700">
+                      <strong>Dica:</strong> Vá para "Clientes → Cadastro" e preencha os campos de endereço, cidade e estado para que os clientes apareçam no mapa.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
