@@ -209,6 +209,9 @@ export function processRow(
       return null;
     }
 
+    // Obter configuração do arquivo
+    const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
+
     // Campos obrigatórios com validação null-safe
     const empresa = row['EMPRESA'];
     const nomePaciente = row['NOME_PACIENTE'];
@@ -248,8 +251,14 @@ export function processRow(
       DIGITADOR: safeString(row['DIGITADOR']),
       COMPLEMENTAR: safeString(row['COMPLEMENTAR']),
       
-      // Campos numéricos - conversão null-safe
-      VALORES: row['VALORES'] ? convertValues(row['VALORES']) : undefined,
+      // Campos numéricos - conversão null-safe com apropriação para arquivos fora padrão
+      VALORES: row['VALORES'] ? (config.appropriateValues ? appropriateExamValue({
+        MODALIDADE: safeString(row['MODALIDADE']),
+        ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
+        EMPRESA: String(empresa).trim(),
+        NOME_PACIENTE: String(nomePaciente).trim(),
+        arquivo_fonte: arquivoFonte
+      } as VolumetriaRecord) : convertValues(row['VALORES'])) : undefined,
       IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : undefined,
       IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
       CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
