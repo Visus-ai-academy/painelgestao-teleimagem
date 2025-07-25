@@ -94,7 +94,7 @@ export default function TechWelcome() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 relative overflow-hidden">
       {/* Background Image - Responsive */}
       <div className="absolute inset-0 opacity-60 md:opacity-80 bg-no-repeat bg-center bg-contain md:bg-cover" 
            style={{
@@ -103,7 +103,7 @@ export default function TechWelcome() {
       />
       
       {/* Overlay para harmonizar cores com o fundo */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/60 via-blue-900/50 to-slate-900/60 mix-blend-multiply"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/30 via-slate-700/20 to-slate-900/30 mix-blend-overlay"></div>
       
       {/* Animated Grid Background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
