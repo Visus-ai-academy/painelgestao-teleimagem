@@ -21,6 +21,8 @@ interface Cliente {
   email: string;
   cnpj?: string;
   endereco?: string;
+  cidade?: string;
+  estado?: string;
   contato?: string;
   cod_cliente?: string;
   data_inicio_contrato?: string;
@@ -49,6 +51,8 @@ export default function CadastroClientes() {
     email: "",
     cnpj: "",
     endereco: "",
+    cidade: "",
+    estado: "",
     contato: "",
     cod_cliente: "",
     data_inicio_contrato: "",
@@ -120,6 +124,8 @@ export default function CadastroClientes() {
         email: "",
         cnpj: "",
         endereco: "",
+        cidade: "",
+        estado: "",
         contato: "",
         cod_cliente: "",
         data_inicio_contrato: "",
@@ -145,6 +151,8 @@ export default function CadastroClientes() {
       email: cliente.email,
       cnpj: cliente.cnpj || "",
       endereco: cliente.endereco || "",
+      cidade: cliente.cidade || "",
+      estado: cliente.estado || "",
       contato: cliente.contato || "",
       cod_cliente: cliente.cod_cliente || "",
       data_inicio_contrato: cliente.data_inicio_contrato || "",
@@ -410,6 +418,27 @@ export default function CadastroClientes() {
                   value={clienteData.cod_cliente}
                   onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
                   placeholder="CLI001"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cidade" className="text-sm font-semibold text-foreground">Cidade</Label>
+                <Input
+                  id="cidade"
+                  value={clienteData.cidade}
+                  onChange={(e) => handleInputChange("cidade", e.target.value)}
+                  placeholder="São Paulo"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="estado" className="text-sm font-semibold text-foreground">Estado</Label>
+                <Input
+                  id="estado"
+                  value={clienteData.estado}
+                  onChange={(e) => handleInputChange("estado", e.target.value)}
+                  placeholder="SP"
+                  maxLength={2}
                 />
               </div>
               
@@ -732,6 +761,48 @@ export default function CadastroClientes() {
                     value={clienteData.cod_cliente}
                     onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
                     placeholder="CLI001"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cidade" className="text-sm font-semibold text-foreground">Cidade</Label>
+                  <Input
+                    id="edit-cidade"
+                    value={clienteData.cidade}
+                    onChange={(e) => handleInputChange("cidade", e.target.value)}
+                    placeholder="São Paulo"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-estado" className="text-sm font-semibold text-foreground">Estado</Label>
+                  <Input
+                    id="edit-estado"
+                    value={clienteData.estado}
+                    onChange={(e) => handleInputChange("estado", e.target.value)}
+                    placeholder="SP"
+                    maxLength={2}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-contato" className="text-sm font-semibold text-foreground">Contato</Label>
+                  <Input
+                    id="edit-contato"
+                    value={clienteData.contato}
+                    onChange={(e) => handleInputChange("contato", e.target.value)}
+                    placeholder="Nome do contato"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
+                  <Textarea
+                    id="edit-endereco"
+                    value={clienteData.endereco}
+                    onChange={(e) => handleInputChange("endereco", e.target.value)}
+                    placeholder="Endereço completo do cliente"
+                    rows={3}
                   />
                 </div>
                 

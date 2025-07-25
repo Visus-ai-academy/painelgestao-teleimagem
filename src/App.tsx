@@ -223,20 +223,20 @@ const App = () => {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/clientes/cadastro" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
-                    <CadastroClientes />
-                  </RoleProtectedRoute>
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/clientes/mapa" element={
+          <Route path="/dashboard/mapa-distribuicao" element={
               <ProtectedRoute>
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <MapaDistribuicaoClientes />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+          <Route path="/clientes/cadastro" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <CadastroClientes />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

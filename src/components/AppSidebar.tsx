@@ -68,6 +68,7 @@ const menuItems: MenuItem[] = [
       { title: "Faturamento", url: "/financeiro/faturamento", requiredRoles: ['manager', 'admin'] },
       { title: "Volumetria", url: "/volumetria", requiredRoles: ['user', 'manager', 'admin'] },
       { title: "Qualidade", url: "/operacional/qualidade", requiredRoles: ['manager', 'admin'] },
+      { title: "Mapa Distribuição", url: "/dashboard/mapa-distribuicao", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 
@@ -112,7 +113,6 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Cadastro de Clientes", url: "/clientes/cadastro", requiredRoles: ['manager', 'admin'] },
       { title: "Contratos Clientes", url: "/contratos/clientes", requiredRoles: ['manager', 'admin'] },
-      { title: "Mapa de Distribuição", url: "/clientes/mapa", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 

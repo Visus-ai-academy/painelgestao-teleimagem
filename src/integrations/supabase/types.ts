@@ -167,6 +167,7 @@ export type Database = {
       clientes: {
         Row: {
           ativo: boolean | null
+          cidade: string | null
           cnpj: string | null
           cod_cliente: string | null
           contato: string | null
@@ -176,6 +177,7 @@ export type Database = {
           data_termino_vigencia: string | null
           email: string | null
           endereco: string | null
+          estado: string | null
           id: string
           nome: string
           status: string
@@ -184,6 +186,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          cidade?: string | null
           cnpj?: string | null
           cod_cliente?: string | null
           contato?: string | null
@@ -193,6 +196,7 @@ export type Database = {
           data_termino_vigencia?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           id?: string
           nome: string
           status?: string
@@ -201,6 +205,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          cidade?: string | null
           cnpj?: string | null
           cod_cliente?: string | null
           contato?: string | null
@@ -210,6 +215,7 @@ export type Database = {
           data_termino_vigencia?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           id?: string
           nome?: string
           status?: string
