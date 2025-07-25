@@ -97,7 +97,14 @@ export function VolumetriaUploadStats() {
             
             if (valor > 0) {
               stats.recordsWithValue++;
-              stats.totalValue += valor;
+              
+              // Para arquivos "fora padrão", cada registro = 1 exame
+              // Para arquivos "padrão", usa o valor do campo VALORES
+              if (fonte.includes('fora_padrao')) {
+                stats.totalValue += 1; // Conta 1 exame por registro
+              } else {
+                stats.totalValue += valor; // Usa o valor real do campo
+              }
             } else {
               stats.recordsZeroed++;
             }

@@ -272,7 +272,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
 
       // Processar estatísticas
       const totalRegistros = allData.length;
-      const totalExames = allData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+      const totalExames = allData.reduce((sum, item) => {
+        const valor = Number(item.VALORES) || 0;
+        // Para arquivos "fora padrão", cada registro = 1 exame
+        // Para arquivos "padrão", usa o valor do campo VALORES
+        if (item.arquivo_fonte && item.arquivo_fonte.includes('fora_padrao') && valor > 0) {
+          return sum + 1;
+        }
+        return sum + valor;
+      }, 0);
       const clientesUnicos = new Set(allData.map(item => item.EMPRESA)).size;
       const modalidadesUnicas = new Set(allData.map(item => item.MODALIDADE).filter(Boolean)).size;
       const especialidadesUnicas = new Set(allData.map(item => item.ESPECIALIDADE).filter(Boolean)).size;
@@ -337,7 +345,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const clienteMap = new Map<string, { total_exames: number; total_registros: number; atrasados: number }>();
       allData.forEach(item => {
         const cliente = item.EMPRESA || 'Não Informado';
-        const exames = Number(item.VALORES) || 0;
+        const valor = Number(item.VALORES) || 0;
+        // Para arquivos "fora padrão", cada registro = 1 exame
+        const exames = (item.arquivo_fonte && item.arquivo_fonte.includes('fora_padrao') && valor > 0) ? 1 : valor;
         const isAtrasado = atrasados.some(atrasado => atrasado === item);
         
         if (!clienteMap.has(cliente)) {
@@ -365,7 +375,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const modalidadeMap = new Map<string, { total_exames: number; total_registros: number }>();
       allData.forEach(item => {
         const modalidade = item.MODALIDADE || 'Não Informado';
-        const exames = Number(item.VALORES) || 0;
+        const valor = Number(item.VALORES) || 0;
+        // Para arquivos "fora padrão", cada registro = 1 exame
+        const exames = (item.arquivo_fonte && item.arquivo_fonte.includes('fora_padrao') && valor > 0) ? 1 : valor;
         
         if (!modalidadeMap.has(modalidade)) {
           modalidadeMap.set(modalidade, { total_exames: 0, total_registros: 0 });
@@ -389,7 +401,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const especialidadeMap = new Map<string, { total_exames: number; total_registros: number }>();
       allData.forEach(item => {
         const especialidade = item.ESPECIALIDADE || 'Não Informado';
-        const exames = Number(item.VALORES) || 0;
+        const valor = Number(item.VALORES) || 0;
+        // Para arquivos "fora padrão", cada registro = 1 exame
+        const exames = (item.arquivo_fonte && item.arquivo_fonte.includes('fora_padrao') && valor > 0) ? 1 : valor;
         
         if (!especialidadeMap.has(especialidade)) {
           especialidadeMap.set(especialidade, { total_exames: 0, total_registros: 0 });
