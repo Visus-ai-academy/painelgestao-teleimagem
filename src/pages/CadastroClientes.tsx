@@ -639,6 +639,26 @@ export default function CadastroClientes() {
                   <TableHead>
                     <Button
                       variant="ghost"
+                      onClick={() => handleOrdenacao('cidade')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Cidade
+                      {renderIconeOrdenacao('cidade')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleOrdenacao('estado')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Estado
+                      {renderIconeOrdenacao('estado')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
                       onClick={() => handleOrdenacao('status')}
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                     >
@@ -656,6 +676,8 @@ export default function CadastroClientes() {
                     <TableCell>{cliente.cnpj}</TableCell>
                     <TableCell>{cliente.email}</TableCell>
                     <TableCell>{cliente.cod_cliente}</TableCell>
+                    <TableCell>{cliente.cidade || "-"}</TableCell>
+                    <TableCell>{cliente.estado || "-"}</TableCell>
                     <TableCell>
                       <Badge 
                         variant={cliente.ativo ? "default" : "destructive"}

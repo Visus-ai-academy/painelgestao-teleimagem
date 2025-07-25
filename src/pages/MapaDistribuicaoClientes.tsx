@@ -289,6 +289,8 @@ export default function MapaDistribuicaoClientes() {
           id,
           nome,
           endereco,
+          cidade,
+          estado,
           status,
           ativo,
           contato,

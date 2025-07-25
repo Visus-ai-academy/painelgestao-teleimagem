@@ -2200,6 +2200,8 @@ export type Database = {
           id: string
           nome: string
           endereco: string
+          cidade: string
+          estado: string
           status: string
           ativo: boolean
           contato: string
