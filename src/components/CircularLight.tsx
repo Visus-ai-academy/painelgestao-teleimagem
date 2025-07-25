@@ -101,10 +101,10 @@ export function CircularLight({ size }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, adaptiveSize, adaptiveSize);
 
-      // Rotation - ajustado para rotação ainda mais rápida (50% mais rápido)
+      // Rotation - ajustado para rotação muito rápida (75% mais rápido)
       const baseRotationY = -Math.PI * 0.2; // Rotação para focar no Brasil
-      const rotationY = baseRotationY + time * 0.0078; // Aumentado em 50%: 0.0052 * 1.5 = 0.0078
-      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.00315) * 0.1; // Aumentado em 50%: 0.0021 * 1.5 = 0.00315
+      const rotationY = baseRotationY + time * 0.01365; // Aumentado em 75%: 0.0078 * 1.75 = 0.01365
+      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0055125) * 0.1; // Aumentado em 75%: 0.00315 * 1.75 = 0.0055125
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
