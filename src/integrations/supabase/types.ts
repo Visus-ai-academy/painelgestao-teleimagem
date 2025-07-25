@@ -2188,6 +2188,22 @@ export type Database = {
         }
         Returns: string
       }
+      get_clientes_com_volumetria: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          nome: string
+          endereco: string
+          status: string
+          ativo: boolean
+          contato: string
+          telefone: string
+          email: string
+          cnpj: string
+          volume_exames: number
+          total_registros: number
+        }[]
+      }
       get_periodo_faturamento: {
         Args: { data_referencia: string }
         Returns: {

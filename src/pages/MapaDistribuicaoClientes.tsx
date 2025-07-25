@@ -282,31 +282,57 @@ export default function MapaDistribuicaoClientes() {
       setLoading(true);
       setError(null);
       
-      // Buscar clientes ativos com dados de volumetria
-      const { data, error: supabaseError } = await supabase.rpc('get_clientes_com_volumetria');
+      // Buscar clientes ativos com dados de volumetria usando query manual
+      const { data, error: supabaseError } = await supabase
+        .from('clientes')
+        .select(`
+          id,
+          nome,
+          endereco,
+          status,
+          ativo,
+          contato,
+          telefone,
+          email,
+          cnpj
+        `)
+        .eq('ativo', true);
       
       if (supabaseError) {
-        console.error('Erro RPC:', supabaseError);
-        // Fallback: buscar apenas clientes
-        const { data: clientesData, error: clientesError } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('ativo', true);
-        
-        if (clientesError) {
-          throw clientesError;
-        }
-        
-        if (clientesData) {
-          setClientes(clientesData);
-          processarClientesComGeocodificacao(clientesData);
-        }
-        return;
+        throw supabaseError;
       }
       
       if (data) {
-        setClientes(data);
-        processarClientesComGeocodificacao(data);
+        // Buscar dados de volumetria separadamente
+        const { data: volumetriaData } = await supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA, VALORES')
+          .not('EMPRESA', 'is', null);
+        
+        // Processar dados de volumetria por empresa
+        const volumetriaMap = new Map<string, { volume: number; registros: number }>();
+        volumetriaData?.forEach(item => {
+          const empresa = item.EMPRESA as string;
+          const valor = (item.VALORES as number) || 0;
+          
+          if (!volumetriaMap.has(empresa)) {
+            volumetriaMap.set(empresa, { volume: 0, registros: 0 });
+          }
+          
+          const current = volumetriaMap.get(empresa)!;
+          current.volume += valor;
+          current.registros += 1;
+        });
+        
+        // Combinar dados de clientes com volumetria
+        const clientesComVolumetria = data.map(cliente => ({
+          ...cliente,
+          volume_exames: volumetriaMap.get(cliente.nome)?.volume || 0,
+          total_registros: volumetriaMap.get(cliente.nome)?.registros || 0
+        }));
+        
+        setClientes(clientesComVolumetria);
+        processarClientesComGeocodificacao(clientesComVolumetria);
       }
     } catch (err) {
       console.error('Erro ao buscar clientes:', err);
@@ -508,11 +534,11 @@ export default function MapaDistribuicaoClientes() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-blue-600" />
-                Mapa do Brasil - Clientes Ativos
+                Mapa por Volumetria de Exames
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <MapaInterativo clientes={clientesComCoordenadas} />
+              <MapaVolumetria clientes={clientesComCoordenadas} />
               <div className="mt-4">
                 <p className="text-sm text-gray-600 mb-2">
                   💡 Para visualização interativa completa, clique nos clientes abaixo para abrir no Google Maps
@@ -562,7 +588,12 @@ export default function MapaDistribuicaoClientes() {
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {estatisticas.map((estado) => (
                   <div key={estado.estado} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="font-medium">{estado.estado}</span>
+                    <div>
+                      <span className="font-medium">{estado.estado}</span>
+                      <div className="text-xs text-gray-600">
+                        {estado.volume_total.toLocaleString()} exames
+                      </div>
+                    </div>
                     <Badge variant="secondary">{estado.total}</Badge>
                   </div>
                 ))}
