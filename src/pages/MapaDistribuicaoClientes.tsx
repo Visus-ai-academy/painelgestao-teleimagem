@@ -166,14 +166,39 @@ const getMarkerColor = (volume: number, maxVolume: number): string => {
 // Componente de Mapa com visualização por volumetria
 function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
+  const clientesSemCoordenadas = clientes.filter(c => !c.lat || !c.lng);
   
   if (clientesComCoordenadas.length === 0) {
     return (
-      <div className="h-96 flex items-center justify-center bg-gray-100 rounded-lg">
-        <div className="text-center">
-          <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-600">Nenhum cliente localizado para exibir no mapa</p>
+      <div className="space-y-4">
+        <div className="h-96 flex items-center justify-center bg-gray-100 rounded-lg">
+          <div className="text-center">
+            <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-600">Nenhum cliente localizado para exibir no mapa</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {clientesSemCoordenadas.length} cliente(s) sem endereço cadastrado
+            </p>
+          </div>
         </div>
+        
+        {/* Lista de clientes sem localização */}
+        {clientesSemCoordenadas.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-medium text-yellow-800 mb-2">Clientes sem localização:</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {clientesSemCoordenadas.slice(0, 10).map(cliente => (
+                <div key={cliente.id} className="text-sm text-yellow-700">
+                  • {cliente.nome}
+                </div>
+              ))}
+              {clientesSemCoordenadas.length > 10 && (
+                <div className="text-sm text-yellow-600 col-span-full">
+                  ... e mais {clientesSemCoordenadas.length - 10} clientes
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
