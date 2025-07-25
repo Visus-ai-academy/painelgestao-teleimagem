@@ -362,7 +362,7 @@ export function CircularLight({ size }: CircularLightProps) {
   return (
     <div className={`absolute pointer-events-none ${
       isMobile 
-        ? 'left-1/2 top-[45%] transform -translate-x-1/2 -translate-y-1/2' 
+        ? 'left-1/2 top-[65%] transform -translate-x-1/2 -translate-y-1/2' 
         : 'left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2'
     }`}>
       <canvas
@@ -370,9 +370,9 @@ export function CircularLight({ size }: CircularLightProps) {
         className="block max-w-full h-auto"
         style={{ 
           filter: 'drop-shadow(0 0 15px rgba(100, 200, 255, 0.5))',
-          opacity: isMobile ? 0.4 : 0.8,
-          maxWidth: isMobile ? '280px' : '442px',
-          maxHeight: isMobile ? '280px' : '442px'
+          opacity: isMobile ? 0.3 : 0.8,
+          maxWidth: isMobile ? '200px' : '442px',
+          maxHeight: isMobile ? '200px' : '442px'
         }}
       />
     </div>

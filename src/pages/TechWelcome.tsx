@@ -97,11 +97,12 @@ export default function TechWelcome() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Background Image - Responsive */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-60 md:opacity-80"
+        className="absolute inset-0 opacity-60 md:opacity-80"
         style={{
           backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center center'
+          backgroundPosition: 'center top',
+          backgroundRepeat: 'no-repeat'
         }}
       />
       
@@ -184,7 +185,7 @@ export default function TechWelcome() {
         )}
 
         {/* Logo/Title Area - Responsive positioning and sizing */}
-        <div className="absolute left-1/2 top-1/2 md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none">
+        <div className="absolute left-1/2 top-[30%] md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none z-20">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl leading-tight">
               TeleImagem
