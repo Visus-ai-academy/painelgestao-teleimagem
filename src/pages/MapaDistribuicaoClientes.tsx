@@ -176,7 +176,7 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
             <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
             <p className="text-gray-600">Nenhum cliente localizado para exibir no mapa</p>
             <p className="text-sm text-gray-500 mt-2">
-              {clientesSemCoordenadas.length} cliente(s) sem endereço cadastrado
+              {clientesSemCoordenadas.length} cliente(s) sem cidade/estado cadastrado
             </p>
           </div>
         </div>
@@ -184,7 +184,7 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
         {/* Lista de clientes sem localização */}
         {clientesSemCoordenadas.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h4 className="font-medium text-yellow-800 mb-2">Clientes sem localização:</h4>
+            <h4 className="font-medium text-yellow-800 mb-2">Clientes sem cidade/estado cadastrado:</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {clientesSemCoordenadas.slice(0, 10).map(cliente => (
                 <div key={cliente.id} className="text-sm text-yellow-700">
@@ -379,7 +379,7 @@ export default function MapaDistribuicaoClientes() {
     }
   };
 
-  // Processar clientes e geocodificar endereços com otimizações de performance
+  // Processar clientes e geocodificar por cidade/estado
   const processarClientesComGeocodificacao = async (clientesData: Cliente[]) => {
     setGeocodificando(true);
     
@@ -400,35 +400,50 @@ export default function MapaDistribuicaoClientes() {
         const { cidade, estado } = parseEndereco(cliente.endereco || '');
         let coordenadas: { lat: number; lng: number } | null = null;
         
-        // Criar chave única para cache
-        const cacheKey = `${cliente.endereco || ''}-${cidade || ''}-${estado || ''}`;
+        // Priorizar cidade/estado diretamente dos campos se disponíveis
+        const cidadeReal = cliente.cidade || cidade;
+        const estadoReal = cliente.estado || estado;
+        
+        // Criar chave única para cache baseada em cidade/estado
+        const cacheKey = `${cidadeReal || ''}-${estadoReal || ''}`;
         
         // Verificar cache primeiro
         if (coordenadasCache.has(cacheKey)) {
           coordenadas = coordenadasCache.get(cacheKey);
-        } else if (cliente.endereco && cliente.endereco.trim() !== '') {
-          try {
-            // Geocodificar apenas se temos endereço válido
-            coordenadas = await geocodeAddress(cliente.endereco);
-            // Salvar no cache
-            coordenadasCache.set(cacheKey, coordenadas);
-          } catch (error) {
-            console.warn(`Erro na geocodificação para ${cliente.nome}:`, error);
-            coordenadasCache.set(cacheKey, null);
+        } else {
+          // Tentar geocodificar por cidade/estado
+          if (cidadeReal && estadoReal) {
+            try {
+              const enderecoParaGeocode = `${cidadeReal}, ${estadoReal}, Brazil`;
+              coordenadas = await geocodeAddress(enderecoParaGeocode);
+              coordenadasCache.set(cacheKey, coordenadas);
+            } catch (error) {
+              console.warn(`Erro na geocodificação para ${cliente.nome} (${cidadeReal}/${estadoReal}):`, error);
+              coordenadasCache.set(cacheKey, null);
+            }
+          } else if (cliente.endereco && cliente.endereco.trim() !== '') {
+            // Fallback: tentar com endereço completo se cidade/estado não disponíveis
+            try {
+              coordenadas = await geocodeAddress(cliente.endereco);
+              coordenadasCache.set(cacheKey, coordenadas);
+            } catch (error) {
+              console.warn(`Erro na geocodificação para ${cliente.nome}:`, error);
+              coordenadasCache.set(cacheKey, null);
+            }
           }
         }
         
-        // Fallback para coordenadas do estado
-        if (!coordenadas && estado && coordenadasEstados[estado]) {
-          coordenadas = coordenadasEstados[estado];
+        // Fallback final para coordenadas do estado
+        if (!coordenadas && estadoReal && coordenadasEstados[estadoReal]) {
+          coordenadas = coordenadasEstados[estadoReal];
         }
         
         return {
           ...cliente,
           lat: coordenadas?.lat,
           lng: coordenadas?.lng,
-          cidade,
-          estado
+          cidade: cidadeReal,
+          estado: estadoReal
         };
       });
       
