@@ -96,14 +96,10 @@ export default function TechWelcome() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Background Image - Responsive */}
-      <div 
-        className="absolute inset-0 opacity-60 md:opacity-80"
-        style={{
-          backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat'
-        }}
+      <div className="absolute inset-0 opacity-60 md:opacity-80 bg-no-repeat bg-center bg-contain md:bg-cover" 
+           style={{
+             backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`
+           }}
       />
       
       {/* Animated Grid Background */}
