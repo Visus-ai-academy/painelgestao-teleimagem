@@ -227,7 +227,7 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
-        <div className="relative p-6 border-b bg-gradient-to-br from-sidebar-primary via-sidebar-accent to-sidebar-primary/80 overflow-hidden min-h-[80px]">
+        <div className="relative p-6 border-b border-sidebar-border overflow-hidden min-h-[80px]">
           {/* Texto principal */}
           <div className="flex items-center justify-center h-full">
             {!collapsed && (
