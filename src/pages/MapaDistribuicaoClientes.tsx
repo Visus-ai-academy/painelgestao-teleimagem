@@ -275,6 +275,8 @@ export default function MapaDistribuicaoClientes() {
   const [error, setError] = useState<string | null>(null);
   const [estatisticas, setEstatisticas] = useState<EstadoEstatistica[]>([]);
   const [geocodificando, setGeocodificando] = useState(false);
+  const [clientesGeocodificados, setClientesGeocodificados] = useState<ClienteComCoordenadas[]>([]);
+  const [geocodificacaoCompleta, setGeocodificacaoCompleta] = useState(false);
 
   // Buscar clientes do banco de dados com volumetria
   const buscarClientes = async () => {
@@ -334,7 +336,14 @@ export default function MapaDistribuicaoClientes() {
         }));
         
         setClientes(clientesComVolumetria);
-        processarClientesComGeocodificacao(clientesComVolumetria);
+        
+        // Só geocodificar se ainda não foi feito
+        if (!geocodificacaoCompleta) {
+          processarClientesComGeocodificacao(clientesComVolumetria);
+        } else {
+          // Use dados já geocodificados se disponíveis
+          calcularEstatisticas(clientesGeocodificados.length > 0 ? clientesGeocodificados : clientesComVolumetria);
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar clientes:', err);
@@ -409,8 +418,12 @@ export default function MapaDistribuicaoClientes() {
     }
     
     setClientes(clientesComCoordenadas);
+    setClientesGeocodificados(clientesComCoordenadas);
+    setGeocodificacaoCompleta(true);
     calcularEstatisticas(clientesComCoordenadas);
     setGeocodificando(false);
+    
+    toast.success(`Geocodificação concluída! ${clientesComCoordenadas.filter(c => c.lat && c.lng).length} clientes localizados.`);
   };
 
   // Calcular estatísticas por estado
@@ -449,32 +462,16 @@ export default function MapaDistribuicaoClientes() {
     }
   };
 
-  // Configurar realtime para atualizações automáticas
+  // Forçar atualização manual
+  const forcarAtualizacao = () => {
+    setGeocodificacaoCompleta(false);
+    setClientesGeocodificados([]);
+    buscarClientes();
+  };
+
+  // Carregamento inicial apenas
   useEffect(() => {
     buscarClientes();
-    
-    // Configurar subscription para mudanças em tempo real
-    const channel = supabase
-      .channel('clientes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'clientes'
-        },
-        (payload) => {
-          console.log('Mudança detectada na tabela clientes:', payload);
-          // Recarregar dados quando houver mudanças
-          buscarClientes();
-          toast.info('Dados do mapa atualizados automaticamente');
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
@@ -542,13 +539,13 @@ export default function MapaDistribuicaoClientes() {
         
         <div className="flex items-center gap-4">
           <Button 
-            onClick={buscarClientes}
+            onClick={forcarAtualizacao}
             disabled={loading || geocodificando}
             variant="outline"
             size="sm"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading || geocodificando ? 'animate-spin' : ''}`} />
-            Atualizar Mapa
+            Atualizar Localização
           </Button>
           
           <div className="flex items-center gap-2 text-sm text-gray-600">
