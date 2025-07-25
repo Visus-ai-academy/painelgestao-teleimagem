@@ -101,10 +101,10 @@ export function CircularLight({ size }: CircularLightProps) {
     function drawFuturisticGlobe() {
       ctx.clearRect(0, 0, adaptiveSize, adaptiveSize);
 
-      // Rotation - ajustado para mostrar Curitiba no hemisfério sul (parte inferior)
+      // Rotation - ajustado para rotação mais rápida (10 segundos)
       const baseRotationY = -Math.PI * 0.2; // Rotação para focar no Brasil
-      const rotationY = baseRotationY + time * 0.002; 
-      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0008) * 0.1; // Rotação positiva para mostrar sul embaixo
+      const rotationY = baseRotationY + time * 0.004; // Aumentado de 0.002 para 0.004 (10 segundos)
+      const rotationX = Math.PI * 0.25 + Math.sin(time * 0.0016) * 0.1; // Aumentado de 0.0008 para 0.0016
 
       // Transform all points
       const transformedEarth = earthPoints.map(point => {
@@ -362,7 +362,7 @@ export function CircularLight({ size }: CircularLightProps) {
   return (
     <div className={`absolute pointer-events-none ${
       isMobile 
-        ? 'left-[21%] top-[51%] transform -translate-x-1/2 -translate-y-1/2' 
+        ? 'left-[46%] top-[51%] transform -translate-x-1/2 -translate-y-1/2' 
         : 'left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2'
     }`}>
       <canvas
@@ -370,7 +370,7 @@ export function CircularLight({ size }: CircularLightProps) {
         className="block max-w-full h-auto"
         style={{ 
           filter: 'drop-shadow(0 0 15px rgba(100, 200, 255, 0.5))',
-          opacity: isMobile ? 0.4 : 0.8,
+          opacity: isMobile ? 0.5 : 0.8,
           maxWidth: isMobile ? '176px' : '442px',
           maxHeight: isMobile ? '176px' : '442px'
         }}
