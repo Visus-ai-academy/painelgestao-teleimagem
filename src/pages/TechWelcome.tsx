@@ -95,21 +95,21 @@ export default function TechWelcome() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
-      {/* Background Image */}
+      {/* Background Image - Responsive */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80 md:opacity-80"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-60 md:opacity-80"
         style={{
-          backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`
+          backgroundImage: `url(/lovable-uploads/f85b584a-daae-4d31-843b-9be596609285.png)`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center'
         }}
       />
       
       {/* Animated Grid Background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
       
-      {/* Circular Light Animation - Hidden on mobile */}
-      <div className="hidden md:block">
-        <CircularLight size={350} />
-      </div>
+      {/* Circular Light Animation - Responsive size */}
+      <CircularLight />
       
       {/* Content */}
       <div className="relative z-10 min-h-screen p-4 md:p-6 animate-fade-in">
@@ -184,15 +184,15 @@ export default function TechWelcome() {
         )}
 
         {/* Logo/Title Area - Responsive positioning and sizing */}
-        <div className="absolute left-1/2 top-1/2 md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4">
+        <div className="absolute left-1/2 top-1/2 md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h1 className="text-3xl md:text-6xl font-bold text-white mb-4 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl">
+            <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl leading-tight">
               TeleImagem
             </h1>
-            <p className="text-lg md:text-2xl text-cyan-100 mb-2 md:mb-4 font-orbitron font-light tracking-wide drop-shadow-lg">
+            <p className="text-base sm:text-xl md:text-2xl text-cyan-100 mb-1 md:mb-4 font-orbitron font-light tracking-wide drop-shadow-lg">
               Sistema de Gestão
             </p>
-            <p className="text-sm md:text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
+            <p className="text-xs sm:text-base md:text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
               Bem-vindo ao centro de comando
             </p>
           </div>
@@ -200,9 +200,9 @@ export default function TechWelcome() {
       </div>
 
       {/* Floating Elements - Responsive sizing and positioning */}
-      <div className="absolute top-10 left-10 md:top-20 md:left-20 w-16 h-16 md:w-32 md:h-32 border border-cyan-400/20 rounded-full animate-pulse" />
-      <div className="absolute bottom-10 right-10 md:bottom-20 md:right-20 w-12 h-12 md:w-24 md:h-24 border border-purple-400/20 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-4 md:left-10 w-8 h-8 md:w-16 md:h-16 border border-blue-400/20 rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-6 left-6 md:top-20 md:left-20 w-12 h-12 md:w-32 md:h-32 border border-cyan-400/20 rounded-full animate-pulse" />
+      <div className="absolute bottom-6 right-6 md:bottom-20 md:right-20 w-8 h-8 md:w-24 md:h-24 border border-purple-400/20 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/2 left-2 md:left-10 w-6 h-6 md:w-16 md:h-16 border border-blue-400/20 rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
     </div>
   );
 }
