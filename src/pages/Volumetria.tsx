@@ -7,6 +7,7 @@ import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
+import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 
 
 // Função para obter filtros padrão para o mês atual
@@ -71,6 +72,9 @@ export default function Volumetria() {
 
       {/* Estatísticas dos Uploads */}
       <VolumetriaUploadStats />
+
+      {/* Exames Não Identificados no De Para */}
+      <VolumetriaExamesNaoIdentificados />
 
       {/* Comparação de Clientes */}
       <VolumetriaClientesComparison />
