@@ -227,41 +227,9 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"}>
       <SidebarContent>
-        <div className="relative p-6 border-b bg-gradient-to-br from-sidebar-primary via-sidebar-accent to-sidebar-primary/80 overflow-hidden min-h-[100px]">
-          {/* Efeito de globo animado para o sidebar */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-60">
-            {/* Círculo principal do globo */}
-            <div 
-              className="w-24 h-24 rounded-full border-2 border-cyan-400/60 relative"
-              style={{
-                background: `
-                  radial-gradient(circle at 30% 30%, 
-                    rgba(6, 182, 212, 0.3) 0%,
-                    rgba(71, 85, 105, 0.2) 40%,
-                    rgba(30, 41, 59, 0.1) 70%,
-                    transparent 100%
-                  )
-                `,
-                animation: 'spin 20s linear infinite',
-                boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)'
-              }}
-            >
-              {/* Pontos de conexão simulando o globo */}
-              <div className="absolute top-2 left-3 w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse shadow-lg shadow-cyan-400/50"></div>
-              <div className="absolute top-4 right-4 w-1.5 h-1.5 bg-slate-300 rounded-full animate-pulse shadow-lg shadow-slate-300/50" style={{ animationDelay: '1s' }}></div>
-              <div className="absolute bottom-3 left-4 w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse shadow-lg shadow-cyan-300/50" style={{ animationDelay: '2s' }}></div>
-              <div className="absolute bottom-4 right-3 w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse shadow-lg shadow-slate-400/50" style={{ animationDelay: '0.5s' }}></div>
-              <div className="absolute top-6 left-6 w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse shadow-lg shadow-cyan-500/50" style={{ animationDelay: '1.5s' }}></div>
-              
-              {/* Linhas de conexão */}
-              <div className="absolute top-3 left-4 w-10 h-px bg-gradient-to-r from-cyan-400/80 to-transparent transform rotate-45 shadow-lg"></div>
-              <div className="absolute bottom-5 right-5 w-8 h-px bg-gradient-to-l from-slate-400/80 to-transparent transform -rotate-45 shadow-lg"></div>
-              <div className="absolute top-5 right-2 w-6 h-px bg-gradient-to-r from-cyan-300/70 to-transparent transform rotate-12 shadow-md"></div>
-            </div>
-          </div>
-          
-          {/* Texto sobre o globo */}
-          <div className="relative z-20 flex items-center justify-center">
+        <div className="relative p-6 border-b bg-gradient-to-br from-sidebar-primary via-sidebar-accent to-sidebar-primary/80 overflow-hidden min-h-[80px]">
+          {/* Texto principal */}
+          <div className="flex items-center justify-center h-full">
             {!collapsed && (
               <div className="text-center">
                 <h2 className="font-bold text-lg bg-gradient-to-r from-cyan-400 to-slate-300 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
