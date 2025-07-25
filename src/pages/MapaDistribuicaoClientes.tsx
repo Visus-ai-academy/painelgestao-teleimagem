@@ -508,13 +508,25 @@ export default function MapaDistribuicaoClientes() {
           <p className="text-gray-600 mt-1">Visualização geográfica dos clientes ativos</p>
         </div>
         
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          {geocodificando && (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Processando endereços...</span>
-            </>
-          )}
+        <div className="flex items-center gap-4">
+          <Button 
+            onClick={buscarClientes}
+            disabled={loading || geocodificando}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading || geocodificando ? 'animate-spin' : ''}`} />
+            Atualizar Mapa
+          </Button>
+          
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {geocodificando && (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Processando endereços...</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
