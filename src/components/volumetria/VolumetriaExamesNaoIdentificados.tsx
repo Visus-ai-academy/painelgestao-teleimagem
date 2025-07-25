@@ -26,7 +26,7 @@ export function VolumetriaExamesNaoIdentificados() {
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
         .or('VALORES.eq.0,VALORES.is.null')
-        .in('arquivo_fonte', ['volumetria_fora_padrao', 'volumetria_fora_padrao_retroativo'])
+        // Buscar em todos os tipos de arquivo, não apenas fora padrão
         .not('ESTUDO_DESCRICAO', 'is', null)
         .neq('ESTUDO_DESCRICAO', '');
 
