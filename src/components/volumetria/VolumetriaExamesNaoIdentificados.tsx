@@ -21,19 +21,37 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar exames zerados (incluindo os que têm ESTUDO_DESCRICAO null)
-      const { data, error } = await supabase
+      // Buscar exames zerados que têm ESTUDO_DESCRICAO mas não foram encontrados no "De Para"
+      const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
         .or('VALORES.eq.0,VALORES.is.null')
-        .in('arquivo_fonte', ['volumetria_fora_padrao', 'volumetria_fora_padrao_retroativo']);
+        .in('arquivo_fonte', ['volumetria_fora_padrao', 'volumetria_fora_padrao_retroativo'])
+        .not('ESTUDO_DESCRICAO', 'is', null)
+        .neq('ESTUDO_DESCRICAO', '');
 
-      if (error) throw error;
+      if (volumetriaError) throw volumetriaError;
+
+      // Buscar todos os estudos que existem na tabela "De Para"
+      const { data: deParaData, error: deParaError } = await supabase
+        .from('valores_referencia_de_para')
+        .select('estudo_descricao')
+        .eq('ativo', true);
+
+      if (deParaError) throw deParaError;
+
+      // Criar set dos estudos que existem no "De Para"
+      const estudosNoDePara = new Set(deParaData?.map(item => item.estudo_descricao) || []);
+
+      // Filtrar apenas os estudos que NÃO estão no "De Para"
+      const estudosNaoEncontrados = volumetriaData?.filter(item => 
+        item.ESTUDO_DESCRICAO && !estudosNoDePara.has(item.ESTUDO_DESCRICAO)
+      ) || [];
 
       // Agrupar por ESTUDO_DESCRICAO, MODALIDADE e EMPRESA
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
-      data?.forEach((item) => {
+      estudosNaoEncontrados.forEach((item) => {
         const key = `${item.ESTUDO_DESCRICAO}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
