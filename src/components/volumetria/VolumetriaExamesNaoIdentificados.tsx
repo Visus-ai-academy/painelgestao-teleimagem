@@ -21,29 +21,15 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Primeiro, contar todos os registros zerados para debug
-      const { data: todosZerados, error: errorTodos } = await supabase
-        .from('volumetria_mobilemed')
-        .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA, arquivo_fonte')
-        .or('VALORES.eq.0,VALORES.is.null');
-
-      if (errorTodos) throw errorTodos;
-      
-      console.log('🔍 Total de registros zerados encontrados:', todosZerados?.length);
-      console.log('🔍 Tipos de arquivo encontrados:', [...new Set(todosZerados?.map(r => r.arquivo_fonte))]);
-      console.log('🔍 Registros com ESTUDO_DESCRICAO não nulo:', todosZerados?.filter(r => r.ESTUDO_DESCRICAO).length);
-
-      // Buscar exames zerados que têm ESTUDO_DESCRICAO mas não foram encontrados no "De Para"
+      // Buscar TODOS os exames zerados
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
-        .or('VALORES.eq.0,VALORES.is.null')
-        .not('ESTUDO_DESCRICAO', 'is', null)
-        .neq('ESTUDO_DESCRICAO', '');
+        .or('VALORES.eq.0,VALORES.is.null');
 
       if (volumetriaError) throw volumetriaError;
-      
-      console.log('🔍 Registros zerados com ESTUDO_DESCRICAO válido:', volumetriaData?.length);
+
+      console.log('🔍 Total de registros zerados encontrados:', volumetriaData?.length);
 
       // Buscar todos os estudos que existem na tabela "De Para"
       const { data: deParaData, error: deParaError } = await supabase
@@ -56,22 +42,32 @@ export function VolumetriaExamesNaoIdentificados() {
       // Criar set dos estudos que existem no "De Para"
       const estudosNoDePara = new Set(deParaData?.map(item => item.estudo_descricao) || []);
 
-      // Filtrar apenas os estudos que NÃO estão no "De Para"
-      const estudosNaoEncontrados = volumetriaData?.filter(item => 
-        item.ESTUDO_DESCRICAO && !estudosNoDePara.has(item.ESTUDO_DESCRICAO)
-      ) || [];
+      // Filtrar registros zerados em duas categorias:
+      // 1. Com ESTUDO_DESCRICAO válido mas não encontrado no "De Para"
+      // 2. Sem ESTUDO_DESCRICAO (nulos ou vazios)
+      const estudosNaoEncontrados = volumetriaData?.filter(item => {
+        // Se não tem ESTUDO_DESCRICAO, incluir
+        if (!item.ESTUDO_DESCRICAO || item.ESTUDO_DESCRICAO.trim() === '') {
+          return true;
+        }
+        // Se tem ESTUDO_DESCRICAO mas não está no "De Para", incluir
+        return !estudosNoDePara.has(item.ESTUDO_DESCRICAO);
+      }) || [];
+
+      console.log('🔍 Registros zerados não identificados:', estudosNaoEncontrados.length);
 
       // Agrupar por ESTUDO_DESCRICAO, MODALIDADE e EMPRESA
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
-        const key = `${item.ESTUDO_DESCRICAO}_${item.MODALIDADE}_${item.EMPRESA}`;
+        const estudo = item.ESTUDO_DESCRICAO?.trim() || '(Sem descrição do estudo)';
+        const key = `${estudo}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
           agrupados[key].quantidade += 1;
         } else {
           agrupados[key] = {
-            estudo_descricao: item.ESTUDO_DESCRICAO || '',
+            estudo_descricao: estudo,
             modalidade: item.MODALIDADE || '',
             empresa: item.EMPRESA || '',
             quantidade: 1
