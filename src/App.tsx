@@ -46,6 +46,7 @@ import MapeamentoVisual from "./pages/MapeamentoVisual";
 import Seguranca from "./pages/Seguranca";
 import Pendencias from "./pages/Pendencias";
 import ControleRegras from "./pages/ControleRegras";
+import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -227,6 +228,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <CadastroClientes />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/clientes/mapa" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <MapaDistribuicaoClientes />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

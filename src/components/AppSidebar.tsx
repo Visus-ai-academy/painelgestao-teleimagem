@@ -112,6 +112,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Cadastro de Clientes", url: "/clientes/cadastro", requiredRoles: ['manager', 'admin'] },
       { title: "Contratos Clientes", url: "/contratos/clientes", requiredRoles: ['manager', 'admin'] },
+      { title: "Mapa de Distribuição", url: "/clientes/mapa", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 
