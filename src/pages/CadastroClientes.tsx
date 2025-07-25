@@ -107,9 +107,16 @@ export default function CadastroClientes() {
     }
 
     try {
+      const dadosParaSalvar = {
+        ...clienteData,
+        status: clienteData.ativo ? 'Ativo' : 'Inativo',
+        data_inicio_contrato: clienteData.data_inicio_contrato || null,
+        data_termino_vigencia: clienteData.data_termino_vigencia || null
+      };
+      
       const { error } = await supabase
         .from('clientes')
-        .insert([{...clienteData, status: clienteData.ativo ? 'Ativo' : 'Inativo'}]);
+        .insert([dadosParaSalvar]);
 
       if (error) throw error;
 
@@ -167,12 +174,16 @@ export default function CadastroClientes() {
     if (!clienteEditando) return;
 
     try {
+      const dadosParaAtualizar = {
+        ...clienteData,
+        status: clienteData.ativo ? 'Ativo' : 'Inativo',
+        data_inicio_contrato: clienteData.data_inicio_contrato || null,
+        data_termino_vigencia: clienteData.data_termino_vigencia || null
+      };
+      
       const { error } = await supabase
         .from('clientes')
-        .update({
-          ...clienteData,
-          status: clienteData.ativo ? 'Ativo' : 'Inativo'
-        })
+        .update(dadosParaAtualizar)
         .eq('id', clienteEditando.id);
 
       if (error) throw error;
