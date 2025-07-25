@@ -18,6 +18,8 @@ interface Cliente {
   telefone?: string;
   email?: string;
   cnpj?: string;
+  volume_exames?: number;
+  total_registros?: number;
 }
 
 interface ClienteComCoordenadas extends Cliente {
@@ -30,6 +32,7 @@ interface ClienteComCoordenadas extends Cliente {
 interface EstadoEstatistica {
   estado: string;
   total: number;
+  volume_total: number;
   clientes: ClienteComCoordenadas[];
 }
 
@@ -142,8 +145,26 @@ const parseEndereco = (endereco: string): { cidade?: string; estado?: string } =
   return { cidade, estado };
 };
 
-// Componente de Mapa Interativo usando iframe (como fallback)
-function MapaInterativo({ clientes }: { clientes: ClienteComCoordenadas[] }) {
+// Função para determinar tamanho do marcador baseado no volume
+const getMarkerSize = (volume: number, maxVolume: number): string => {
+  if (maxVolume === 0) return 's';
+  const ratio = volume / maxVolume;
+  if (ratio >= 0.7) return 'l'; // Grande
+  if (ratio >= 0.3) return 'm'; // Médio
+  return 's'; // Pequeno
+};
+
+// Função para determinar cor baseada no volume
+const getMarkerColor = (volume: number, maxVolume: number): string => {
+  if (maxVolume === 0) return 'blue';
+  const ratio = volume / maxVolume;
+  if (ratio >= 0.7) return 'red'; // Alto volume - vermelho
+  if (ratio >= 0.3) return 'orange'; // Médio volume - laranja
+  return 'green'; // Baixo volume - verde
+};
+
+// Componente de Mapa com visualização por volumetria
+function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
   
   if (clientesComCoordenadas.length === 0) {
@@ -157,10 +178,8 @@ function MapaInterativo({ clientes }: { clientes: ClienteComCoordenadas[] }) {
     );
   }
 
-  // Criar URL do OpenStreetMap com marcadores
-  const markers = clientesComCoordenadas.map((cliente, index) => 
-    `pin-l-${cliente.ativo ? 'g' : 'r'}+${index}(${cliente.lng},${cliente.lat})`
-  ).join(',');
+  // Encontrar volume máximo para escalar os marcadores
+  const maxVolume = Math.max(...clientesComCoordenadas.map(c => c.volume_exames || 0));
   
   const center = clientesComCoordenadas.reduce(
     (acc, cliente) => ({
@@ -174,18 +193,78 @@ function MapaInterativo({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   center.lng = center.lng / clientesComCoordenadas.length;
 
   return (
-    <div className="h-96 rounded-lg overflow-hidden border">
-      <iframe
-        width="100%"
-        height="100%"
-        frameBorder="0"
-        scrolling="no"
-        marginHeight={0}
-        marginWidth={0}
-        src={`https://www.openstreetmap.org/export/embed.html?bbox=${center.lng-5},${center.lat-5},${center.lng+5},${center.lat+5}&layer=mapnik&marker=${center.lat},${center.lng}`}
-        style={{ border: 0 }}
-        title="Mapa de Clientes"
-      />
+    <div className="space-y-4">
+      {/* Legenda de Volumetria */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h4 className="font-medium mb-3">Volumetria de Exames - Escala Visual</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 bg-red-600 rounded-full"></div>
+            </div>
+            <span>Alto Volume (≥70% do máximo)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 bg-orange-500 rounded-full"></div>
+            <span>Médio Volume (30-70%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+            <span>Baixo Volume (&lt;30%)</span>
+          </div>
+        </div>
+        <p className="text-xs text-gray-600 mt-2">
+          Volume máximo atual: {maxVolume.toLocaleString()} exames
+        </p>
+      </div>
+
+      {/* Grid de clientes por volume */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+        {clientesComCoordenadas
+          .sort((a, b) => (b.volume_exames || 0) - (a.volume_exames || 0))
+          .map((cliente) => {
+            const volume = cliente.volume_exames || 0;
+            const color = getMarkerColor(volume, maxVolume);
+            const size = getMarkerSize(volume, maxVolume);
+            
+            return (
+              <div 
+                key={cliente.id} 
+                className="flex items-center justify-between p-2 bg-white border rounded hover:shadow-sm transition-shadow"
+              >
+                <div className="flex items-center gap-2">
+                  <div 
+                    className={`w-${size === 'l' ? '6' : size === 'm' ? '5' : '4'} h-${size === 'l' ? '6' : size === 'm' ? '5' : '4'} rounded-full`}
+                    style={{ backgroundColor: color === 'red' ? '#ef4444' : color === 'orange' ? '#f97316' : '#22c55e' }}
+                  />
+                  <div>
+                    <p className="font-medium text-sm">{cliente.nome}</p>
+                    <p className="text-xs text-gray-500">{cliente.estado}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm">{volume.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">exames</p>
+                </div>
+              </div>
+            );
+          })}
+      </div>
+
+      {/* Mapa simplificado */}
+      <div className="h-96 rounded-lg overflow-hidden border">
+        <iframe
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          scrolling="no"
+          marginHeight={0}
+          marginWidth={0}
+          src={`https://www.openstreetmap.org/export/embed.html?bbox=${center.lng-8},${center.lat-8},${center.lng+8},${center.lat+8}&layer=mapnik&marker=${center.lat},${center.lng}`}
+          style={{ border: 0 }}
+          title="Mapa de Clientes por Volumetria"
+        />
+      </div>
     </div>
   );
 }
@@ -197,19 +276,32 @@ export default function MapaDistribuicaoClientes() {
   const [estatisticas, setEstatisticas] = useState<EstadoEstatistica[]>([]);
   const [geocodificando, setGeocodificando] = useState(false);
 
-  // Buscar clientes do banco de dados
+  // Buscar clientes do banco de dados com volumetria
   const buscarClientes = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const { data, error: supabaseError } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('ativo', true);
+      // Buscar clientes ativos com dados de volumetria
+      const { data, error: supabaseError } = await supabase.rpc('get_clientes_com_volumetria');
       
       if (supabaseError) {
-        throw supabaseError;
+        console.error('Erro RPC:', supabaseError);
+        // Fallback: buscar apenas clientes
+        const { data: clientesData, error: clientesError } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('ativo', true);
+        
+        if (clientesError) {
+          throw clientesError;
+        }
+        
+        if (clientesData) {
+          setClientes(clientesData);
+          processarClientesComGeocodificacao(clientesData);
+        }
+        return;
       }
       
       if (data) {
@@ -278,9 +370,10 @@ export default function MapaDistribuicaoClientes() {
       .map(([estado, clientes]) => ({
         estado,
         total: clientes.length,
+        volume_total: clientes.reduce((acc, c) => acc + (c.volume_exames || 0), 0),
         clientes
       }))
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => b.volume_total - a.volume_total);
     
     setEstatisticas(stats);
   };
