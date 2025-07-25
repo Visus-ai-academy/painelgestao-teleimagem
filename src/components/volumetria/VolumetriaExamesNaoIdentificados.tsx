@@ -21,16 +21,29 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
+      // Primeiro, contar todos os registros zerados para debug
+      const { data: todosZerados, error: errorTodos } = await supabase
+        .from('volumetria_mobilemed')
+        .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA, arquivo_fonte')
+        .or('VALORES.eq.0,VALORES.is.null');
+
+      if (errorTodos) throw errorTodos;
+      
+      console.log('🔍 Total de registros zerados encontrados:', todosZerados?.length);
+      console.log('🔍 Tipos de arquivo encontrados:', [...new Set(todosZerados?.map(r => r.arquivo_fonte))]);
+      console.log('🔍 Registros com ESTUDO_DESCRICAO não nulo:', todosZerados?.filter(r => r.ESTUDO_DESCRICAO).length);
+
       // Buscar exames zerados que têm ESTUDO_DESCRICAO mas não foram encontrados no "De Para"
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
         .or('VALORES.eq.0,VALORES.is.null')
-        // Buscar em todos os tipos de arquivo, não apenas fora padrão
         .not('ESTUDO_DESCRICAO', 'is', null)
         .neq('ESTUDO_DESCRICAO', '');
 
       if (volumetriaError) throw volumetriaError;
+      
+      console.log('🔍 Registros zerados com ESTUDO_DESCRICAO válido:', volumetriaData?.length);
 
       // Buscar todos os estudos que existem na tabela "De Para"
       const { data: deParaData, error: deParaError } = await supabase
