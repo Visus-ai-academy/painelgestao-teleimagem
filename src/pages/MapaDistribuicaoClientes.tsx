@@ -154,19 +154,73 @@ const getMarkerSize = (volume: number, maxVolume: number): string => {
   return 's'; // Pequeno
 };
 
-// Função para determinar cor baseada no volume
-const getMarkerColor = (volume: number, maxVolume: number): string => {
-  if (maxVolume === 0) return 'blue';
-  const ratio = volume / maxVolume;
-  if (ratio >= 0.7) return 'red'; // Alto volume - vermelho
-  if (ratio >= 0.3) return 'orange'; // Médio volume - laranja
-  return 'green'; // Baixo volume - verde
+// Função para determinar intensidade da cor baseada no volume e quantidade
+const getHeatmapColor = (volume: number, clientCount: number, maxVolume: number, maxClientCount: number): string => {
+  // Normalizar valores entre 0 e 1
+  const volumeRatio = maxVolume > 0 ? volume / maxVolume : 0;
+  const clientRatio = maxClientCount > 0 ? clientCount / maxClientCount : 0;
+  
+  // Combinar métricas para intensidade final (peso maior para volume)
+  const intensity = (volumeRatio * 0.7 + clientRatio * 0.3);
+  
+  if (intensity >= 0.8) return '#8B0000'; // Vermelho escuro - altíssimo
+  if (intensity >= 0.6) return '#DC143C'; // Vermelho - alto
+  if (intensity >= 0.4) return '#FF6347'; // Vermelho claro - médio-alto
+  if (intensity >= 0.2) return '#FFA500'; // Laranja - médio
+  if (intensity > 0) return '#FFD700';    // Amarelo - baixo
+  return '#90EE90'; // Verde claro - muito baixo
+};
+
+// Função para determinar tamanho baseado na densidade
+const getHeatmapSize = (volume: number, clientCount: number, maxVolume: number, maxClientCount: number): number => {
+  const volumeRatio = maxVolume > 0 ? volume / maxVolume : 0;
+  const clientRatio = maxClientCount > 0 ? clientCount / maxClientCount : 0;
+  const intensity = (volumeRatio * 0.7 + clientRatio * 0.3);
+  
+  // Tamanhos de 20px a 60px baseados na intensidade
+  return Math.max(20, Math.min(60, 20 + (intensity * 40)));
 };
 
 // Componente de Mapa com visualização por volumetria
 function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
   const clientesComCoordenadas = clientes.filter(c => c.lat && c.lng);
   const clientesSemCoordenadas = clientes.filter(c => !c.lat || !c.lng);
+  
+  // Agrupar clientes por cidade para criar o mapa de calor
+  const cidadesMap = new Map<string, {
+    clientes: ClienteComCoordenadas[];
+    totalVolume: number;
+    clientCount: number;
+    lat: number;
+    lng: number;
+    cidade: string;
+    estado: string;
+  }>();
+  
+  clientesComCoordenadas.forEach(cliente => {
+    const key = `${cliente.cidade || 'Indefinida'}-${cliente.estado || 'XX'}`;
+    
+    if (!cidadesMap.has(key)) {
+      cidadesMap.set(key, {
+        clientes: [],
+        totalVolume: 0,
+        clientCount: 0,
+        lat: cliente.lat!,
+        lng: cliente.lng!,
+        cidade: cliente.cidade || 'Indefinida',
+        estado: cliente.estado || 'XX'
+      });
+    }
+    
+    const cidadeData = cidadesMap.get(key)!;
+    cidadeData.clientes.push(cliente);
+    cidadeData.totalVolume += cliente.volume_exames || 0;
+    cidadeData.clientCount += 1;
+  });
+  
+  const cidadesArray = Array.from(cidadesMap.values());
+  const maxVolume = Math.max(...cidadesArray.map(c => c.totalVolume));
+  const maxClientCount = Math.max(...cidadesArray.map(c => c.clientCount));
   
   if (clientesComCoordenadas.length === 0) {
     return (
@@ -203,10 +257,8 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
     );
   }
 
-  // Encontrar volume máximo para escalar os marcadores
-  const maxVolume = Math.max(...clientesComCoordenadas.map(c => c.volume_exames || 0));
-  
-  const center = clientesComCoordenadas.reduce(
+  // Encontrar centro do mapa baseado nas coordenadas das cidades
+  const center = cidadesArray.reduce(
     (acc, cliente) => ({
       lat: acc.lat + cliente.lat!,
       lng: acc.lng + cliente.lng!
@@ -219,56 +271,73 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Legenda de Volumetria */}
+      {/* Legenda do Mapa de Calor */}
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h4 className="font-medium mb-3">Volumetria de Exames - Escala Visual</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-              <div className="w-4 h-4 bg-red-600 rounded-full"></div>
+        <h4 className="font-medium mb-3">Mapa de Calor - Densidade e Volume de Exames</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="space-y-2">
+            <p className="font-medium">Intensidade da Cor:</p>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#8B0000' }}></div>
+              <span>Altíssimo volume (≥80%)</span>
             </div>
-            <span>Alto Volume (≥70% do máximo)</span>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#DC143C' }}></div>
+              <span>Alto volume (60-80%)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#FF6347' }}></div>
+              <span>Médio-alto (40-60%)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#FFA500' }}></div>
+              <span>Médio (20-40%)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#FFD700' }}></div>
+              <span>Baixo (1-20%)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-orange-500 rounded-full"></div>
-            <span>Médio Volume (30-70%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-            <span>Baixo Volume (&lt;30%)</span>
+          <div className="space-y-2">
+            <p className="font-medium">Tamanho do Círculo:</p>
+            <p className="text-gray-600">Representa a densidade combinada de clientes e volume de exames na cidade</p>
+            <p className="text-xs text-gray-500 mt-2">
+              Volume máximo: {maxVolume.toLocaleString()} exames<br/>
+              Máximo de clientes por cidade: {maxClientCount}
+            </p>
           </div>
         </div>
-        <p className="text-xs text-gray-600 mt-2">
-          Volume máximo atual: {maxVolume.toLocaleString()} exames
-        </p>
       </div>
 
-      {/* Grid de clientes por volume */}
+      {/* Grid de cidades por intensidade */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
-        {clientesComCoordenadas
-          .sort((a, b) => (b.volume_exames || 0) - (a.volume_exames || 0))
-          .map((cliente) => {
-            const volume = cliente.volume_exames || 0;
-            const color = getMarkerColor(volume, maxVolume);
-            const size = getMarkerSize(volume, maxVolume);
+        {cidadesArray
+          .sort((a, b) => (b.totalVolume + b.clientCount * 100) - (a.totalVolume + a.clientCount * 100))
+          .map((cidade, index) => {
+            const color = getHeatmapColor(cidade.totalVolume, cidade.clientCount, maxVolume, maxClientCount);
+            const size = getHeatmapSize(cidade.totalVolume, cidade.clientCount, maxVolume, maxClientCount);
             
             return (
               <div 
-                key={cliente.id} 
-                className="flex items-center justify-between p-2 bg-white border rounded hover:shadow-sm transition-shadow"
+                key={`${cidade.cidade}-${cidade.estado}`} 
+                className="flex items-center justify-between p-3 bg-white border rounded-lg hover:shadow-sm transition-shadow"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <div 
-                    className={`w-${size === 'l' ? '6' : size === 'm' ? '5' : '4'} h-${size === 'l' ? '6' : size === 'm' ? '5' : '4'} rounded-full`}
-                    style={{ backgroundColor: color === 'red' ? '#ef4444' : color === 'orange' ? '#f97316' : '#22c55e' }}
+                    className="rounded-full border-2 border-white shadow-md"
+                    style={{ 
+                      backgroundColor: color,
+                      width: Math.max(16, size / 3),
+                      height: Math.max(16, size / 3)
+                    }}
                   />
                   <div>
-                    <p className="font-medium text-sm">{cliente.nome}</p>
-                    <p className="text-xs text-gray-500">{cliente.estado}</p>
+                    <p className="font-medium text-sm">{cidade.cidade}</p>
+                    <p className="text-xs text-gray-500">{cidade.estado} • {cidade.clientCount} cliente(s)</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-sm">{volume.toLocaleString()}</p>
+                  <p className="font-bold text-sm">{cidade.totalVolume.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">exames</p>
                 </div>
               </div>
@@ -276,8 +345,11 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
           })}
       </div>
 
-      {/* Mapa simplificado */}
-      <div className="h-96 rounded-lg overflow-hidden border">
+      {/* Mapa de Calor Interativo */}
+      <div className="h-96 rounded-lg overflow-hidden border relative">
+        <div className="absolute top-2 left-2 bg-white/90 rounded px-2 py-1 text-xs font-medium z-10">
+          Mapa de Calor: {cidadesArray.length} cidades • {clientesComCoordenadas.length} clientes
+        </div>
         <iframe
           width="100%"
           height="100%"
@@ -287,7 +359,7 @@ function MapaVolumetria({ clientes }: { clientes: ClienteComCoordenadas[] }) {
           marginWidth={0}
           src={`https://www.openstreetmap.org/export/embed.html?bbox=${center.lng-8},${center.lat-8},${center.lng+8},${center.lat+8}&layer=mapnik&marker=${center.lat},${center.lng}`}
           style={{ border: 0 }}
-          title="Mapa de Clientes por Volumetria"
+          title="Mapa de Calor - Distribuição de Clientes por Volumetria"
         />
       </div>
     </div>
