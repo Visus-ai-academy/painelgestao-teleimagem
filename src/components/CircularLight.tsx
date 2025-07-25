@@ -362,7 +362,7 @@ export function CircularLight({ size }: CircularLightProps) {
   return (
     <div className={`absolute pointer-events-none ${
       isMobile 
-        ? 'left-[36%] top-[41%] transform -translate-x-1/2 -translate-y-1/2' 
+        ? 'left-[36%] top-[46%] transform -translate-x-1/2 -translate-y-1/2' 
         : 'left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2'
     }`}>
       <canvas
