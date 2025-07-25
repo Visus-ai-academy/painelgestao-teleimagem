@@ -21,14 +21,12 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar exames zerados que não têm correspondência na tabela valores_referencia_de_para
+      // Buscar exames zerados (incluindo os que têm ESTUDO_DESCRICAO null)
       const { data, error } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA')
         .or('VALORES.eq.0,VALORES.is.null')
-        .in('arquivo_fonte', ['volumetria_fora_padrao', 'volumetria_fora_padrao_retroativo'])
-        .not('ESTUDO_DESCRICAO', 'is', null)
-        .neq('ESTUDO_DESCRICAO', '');
+        .in('arquivo_fonte', ['volumetria_fora_padrao', 'volumetria_fora_padrao_retroativo']);
 
       if (error) throw error;
 
@@ -108,7 +106,9 @@ export function VolumetriaExamesNaoIdentificados() {
           {examesNaoIdentificados.map((exame, index) => (
             <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div className="flex-1">
-                <div className="font-medium text-sm">{exame.estudo_descricao}</div>
+                <div className="font-medium text-sm">
+                  {exame.estudo_descricao || '(Sem descrição do estudo)'}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {exame.modalidade} • {exame.empresa}
                 </div>
