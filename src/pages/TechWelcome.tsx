@@ -103,7 +103,7 @@ export default function TechWelcome() {
       />
       
       {/* Overlay para harmonizar cores com o fundo */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/40 via-blue-900/30 to-slate-900/40"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/60 via-blue-900/50 to-slate-900/60 mix-blend-multiply"></div>
       
       {/* Animated Grid Background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse" />
@@ -184,7 +184,7 @@ export default function TechWelcome() {
         )}
 
         {/* Logo/Title Area - Responsive positioning and sizing */}
-        <div className="absolute left-1/2 top-[40%] md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none z-20">
+        <div className="absolute left-1/2 top-[18%] md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none z-20">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl leading-tight">
               TeleImagem
