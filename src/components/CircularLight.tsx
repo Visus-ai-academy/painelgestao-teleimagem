@@ -10,7 +10,7 @@ export function CircularLight({ size }: CircularLightProps) {
   const isMobile = useIsMobile();
   
   // Ajustar tamanho baseado no dispositivo
-  const adaptiveSize = size || (isMobile ? 280 : 442);
+  const adaptiveSize = size || (isMobile ? 180 : 442);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,7 +27,7 @@ export function CircularLight({ size }: CircularLightProps) {
 
     const centerX = adaptiveSize / 2;
     const centerY = adaptiveSize / 2;
-    const globeRadius = isMobile ? 80 : 122;
+    const globeRadius = isMobile ? 60 : 122;
 
     // Convert lat/lon to 3D coordinates - corrigido para hemisfério sul
     function latLonTo3D(lat: number, lon: number, radius: number) {
@@ -362,7 +362,7 @@ export function CircularLight({ size }: CircularLightProps) {
   return (
     <div className={`absolute pointer-events-none ${
       isMobile 
-        ? 'left-1/2 top-[65%] transform -translate-x-1/2 -translate-y-1/2' 
+        ? 'left-1/2 top-[25%] transform -translate-x-1/2 -translate-y-1/2' 
         : 'left-[45%] top-[60%] transform -translate-x-1/2 -translate-y-1/2'
     }`}>
       <canvas
@@ -371,8 +371,8 @@ export function CircularLight({ size }: CircularLightProps) {
         style={{ 
           filter: 'drop-shadow(0 0 15px rgba(100, 200, 255, 0.5))',
           opacity: isMobile ? 0.3 : 0.8,
-          maxWidth: isMobile ? '200px' : '442px',
-          maxHeight: isMobile ? '200px' : '442px'
+          maxWidth: isMobile ? '180px' : '442px',
+          maxHeight: isMobile ? '180px' : '442px'
         }}
       />
     </div>
