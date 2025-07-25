@@ -21,10 +21,10 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar TODOS os exames zerados (com ESTUDO_DESCRICAO e ACCESSION_NUMBER)
+      // Buscar TODOS os exames zerados (apenas ESTUDO_DESCRICAO)
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
-        .select('ESTUDO_DESCRICAO, ACCESSION_NUMBER, MODALIDADE, EMPRESA, arquivo_fonte')
+        .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA, arquivo_fonte')
         .or('VALORES.eq.0,VALORES.is.null');
 
       if (volumetriaError) throw volumetriaError;
@@ -56,16 +56,8 @@ export function VolumetriaExamesNaoIdentificados() {
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
-        // Usar ESTUDO_DESCRICAO quando disponível, senão ACCESSION_NUMBER, senão indicar problema no processamento
-        let nomeEstudo = '';
-        if (item.ESTUDO_DESCRICAO) {
-          nomeEstudo = item.ESTUDO_DESCRICAO;
-        } else if (item.ACCESSION_NUMBER) {
-          nomeEstudo = `[${item.ACCESSION_NUMBER}] - ESTUDO_DESCRICAO não processado`;
-        } else {
-          nomeEstudo = `[${item.arquivo_fonte}] - Dados incompletos no processamento`;
-        }
-        
+        // Usar apenas ESTUDO_DESCRICAO - se for NULL, indica erro no processamento
+        const nomeEstudo = item.ESTUDO_DESCRICAO || `[ERRO PROCESSAMENTO] - ${item.arquivo_fonte}`;
         const key = `${nomeEstudo}_${item.MODALIDADE}_${item.EMPRESA}`;
         
         if (agrupados[key]) {
