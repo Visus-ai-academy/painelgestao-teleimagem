@@ -98,6 +98,101 @@ export type Database = {
         }
         Relationships: []
       }
+      cadastro_exames: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          categoria_id: string | null
+          codigo_exame: string | null
+          created_at: string
+          created_by: string | null
+          criterio_quebra: Json | null
+          descricao: string | null
+          especialidade: string
+          especialidade_id: string | null
+          exames_derivados: Json | null
+          id: string
+          modalidade: string
+          modalidade_id: string | null
+          nome: string
+          permite_quebra: boolean
+          prioridade: string
+          prioridade_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          categoria_id?: string | null
+          codigo_exame?: string | null
+          created_at?: string
+          created_by?: string | null
+          criterio_quebra?: Json | null
+          descricao?: string | null
+          especialidade: string
+          especialidade_id?: string | null
+          exames_derivados?: Json | null
+          id?: string
+          modalidade: string
+          modalidade_id?: string | null
+          nome: string
+          permite_quebra?: boolean
+          prioridade: string
+          prioridade_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          categoria_id?: string | null
+          codigo_exame?: string | null
+          created_at?: string
+          created_by?: string | null
+          criterio_quebra?: Json | null
+          descricao?: string | null
+          especialidade?: string
+          especialidade_id?: string | null
+          exames_derivados?: Json | null
+          id?: string
+          modalidade?: string
+          modalidade_id?: string | null
+          nome?: string
+          permite_quebra?: boolean
+          prioridade?: string
+          prioridade_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadastro_exames_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_exame"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadastro_exames_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadastro_exames_modalidade_id_fkey"
+            columns: ["modalidade_id"]
+            isOneToOne: false
+            referencedRelation: "modalidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadastro_exames_prioridade_id_fkey"
+            columns: ["prioridade_id"]
+            isOneToOne: false
+            referencedRelation: "prioridades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_exame: {
         Row: {
           ativo: boolean
@@ -321,6 +416,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      controle_dados_origem: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string | null
+          id: string
+          metadados: Json | null
+          periodo_referencia: string | null
+          status: string
+          tabela_origem: string
+          tipo_dados: string
+          total_registros: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          metadados?: Json | null
+          periodo_referencia?: string | null
+          status?: string
+          tabela_origem: string
+          tipo_dados: string
+          total_registros?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          metadados?: Json | null
+          periodo_referencia?: string | null
+          status?: string
+          tabela_origem?: string
+          tipo_dados?: string
+          total_registros?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       custom_metric_values: {
         Row: {
@@ -782,6 +925,7 @@ export type Database = {
           cliente_email: string | null
           cliente_id: string | null
           cliente_nome: string
+          controle_origem_id: string | null
           created_at: string
           data_emissao: string
           data_exame: string | null
@@ -795,9 +939,11 @@ export type Database = {
           numero_fatura: string
           omie_id: string
           paciente: string | null
+          periodo_referencia: string | null
           prioridade: string | null
           quantidade: number | null
           sync_date: string
+          tipo_dados: string
           updated_at: string
           valor: number
           valor_bruto: number | null
@@ -808,6 +954,7 @@ export type Database = {
           cliente_email?: string | null
           cliente_id?: string | null
           cliente_nome: string
+          controle_origem_id?: string | null
           created_at?: string
           data_emissao: string
           data_exame?: string | null
@@ -821,9 +968,11 @@ export type Database = {
           numero_fatura: string
           omie_id: string
           paciente?: string | null
+          periodo_referencia?: string | null
           prioridade?: string | null
           quantidade?: number | null
           sync_date?: string
+          tipo_dados?: string
           updated_at?: string
           valor: number
           valor_bruto?: number | null
@@ -834,6 +983,7 @@ export type Database = {
           cliente_email?: string | null
           cliente_id?: string | null
           cliente_nome?: string
+          controle_origem_id?: string | null
           created_at?: string
           data_emissao?: string
           data_exame?: string | null
@@ -847,14 +997,24 @@ export type Database = {
           numero_fatura?: string
           omie_id?: string
           paciente?: string | null
+          periodo_referencia?: string | null
           prioridade?: string | null
           quantidade?: number | null
           sync_date?: string
+          tipo_dados?: string
           updated_at?: string
           valor?: number
           valor_bruto?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "faturamento_controle_origem_id_fkey"
+            columns: ["controle_origem_id"]
+            isOneToOne: false
+            referencedRelation: "controle_dados_origem"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       field_mappings: {
         Row: {
@@ -1446,9 +1606,13 @@ export type Database = {
       }
       precos_servicos: {
         Row: {
+          aplicar_incremental: boolean
+          aplicar_legado: boolean
           ativo: boolean
           categoria: string
           categoria_exame_id: string | null
+          cliente_id: string | null
+          codigo_servico: string | null
           created_at: string
           created_by: string | null
           data_fim_vigencia: string | null
@@ -1459,16 +1623,22 @@ export type Database = {
           id: string
           modalidade: string
           modalidade_id: string | null
+          observacoes: string | null
           prioridade: string
           prioridade_id: string | null
+          tipo_preco: string
           updated_at: string
           valor_base: number
           valor_urgencia: number
         }
         Insert: {
+          aplicar_incremental?: boolean
+          aplicar_legado?: boolean
           ativo?: boolean
           categoria: string
           categoria_exame_id?: string | null
+          cliente_id?: string | null
+          codigo_servico?: string | null
           created_at?: string
           created_by?: string | null
           data_fim_vigencia?: string | null
@@ -1479,16 +1649,22 @@ export type Database = {
           id?: string
           modalidade: string
           modalidade_id?: string | null
+          observacoes?: string | null
           prioridade: string
           prioridade_id?: string | null
+          tipo_preco?: string
           updated_at?: string
           valor_base?: number
           valor_urgencia?: number
         }
         Update: {
+          aplicar_incremental?: boolean
+          aplicar_legado?: boolean
           ativo?: boolean
           categoria?: string
           categoria_exame_id?: string | null
+          cliente_id?: string | null
+          codigo_servico?: string | null
           created_at?: string
           created_by?: string | null
           data_fim_vigencia?: string | null
@@ -1499,8 +1675,10 @@ export type Database = {
           id?: string
           modalidade?: string
           modalidade_id?: string | null
+          observacoes?: string | null
           prioridade?: string
           prioridade_id?: string | null
+          tipo_preco?: string
           updated_at?: string
           valor_base?: number
           valor_urgencia?: number
@@ -1511,6 +1689,13 @@ export type Database = {
             columns: ["categoria_exame_id"]
             isOneToOne: false
             referencedRelation: "categorias_exame"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precos_servicos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
@@ -1566,6 +1751,66 @@ export type Database = {
           nome?: string
           ordem?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      processamento_uploads: {
+        Row: {
+          arquivo_nome: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          detalhes_erro: Json | null
+          hash_arquivo: string | null
+          id: string
+          periodo_referencia: string | null
+          registros_atualizados: number | null
+          registros_erro: number | null
+          registros_inseridos: number | null
+          registros_processados: number | null
+          status: string
+          tamanho_arquivo: number | null
+          tempo_processamento: unknown | null
+          tipo_arquivo: string
+          tipo_dados: string
+        }
+        Insert: {
+          arquivo_nome: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          detalhes_erro?: Json | null
+          hash_arquivo?: string | null
+          id?: string
+          periodo_referencia?: string | null
+          registros_atualizados?: number | null
+          registros_erro?: number | null
+          registros_inseridos?: number | null
+          registros_processados?: number | null
+          status?: string
+          tamanho_arquivo?: number | null
+          tempo_processamento?: unknown | null
+          tipo_arquivo: string
+          tipo_dados: string
+        }
+        Update: {
+          arquivo_nome?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          detalhes_erro?: Json | null
+          hash_arquivo?: string | null
+          id?: string
+          periodo_referencia?: string | null
+          registros_atualizados?: number | null
+          registros_erro?: number | null
+          registros_inseridos?: number | null
+          registros_processados?: number | null
+          status?: string
+          tamanho_arquivo?: number | null
+          tempo_processamento?: unknown | null
+          tipo_arquivo?: string
+          tipo_dados?: string
         }
         Relationships: []
       }
@@ -1660,6 +1905,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      regras_exclusao_faturamento: {
+        Row: {
+          aplicar_incremental: boolean
+          aplicar_legado: boolean
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          criterios: Json
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          prioridade: number
+          tipo_regra: string
+          updated_at: string
+        }
+        Insert: {
+          aplicar_incremental?: boolean
+          aplicar_legado?: boolean
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          criterios: Json
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          prioridade?: number
+          tipo_regra: string
+          updated_at?: string
+        }
+        Update: {
+          aplicar_incremental?: boolean
+          aplicar_legado?: boolean
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          criterios?: Json
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          prioridade?: number
+          tipo_regra?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       regua_cobranca: {
         Row: {
@@ -1901,6 +2197,7 @@ export type Database = {
           CODIGO_INTERNO: number | null
           CODIGO_PACIENTE: string | null
           COMPLEMENTAR: string | null
+          controle_origem_id: string | null
           created_at: string
           created_by: string | null
           DATA_LAUDO: string | null
@@ -1927,10 +2224,12 @@ export type Database = {
           MEDICO_REASSINATURA: string | null
           MODALIDADE: string | null
           NOME_PACIENTE: string
+          periodo_referencia: string | null
           POSSUI_IMAGENS_CHAVE: string | null
           PRIORIDADE: string | null
           SEGUNDA_ASSINATURA: string | null
           STATUS: string | null
+          tipo_dados: string
           updated_at: string
           VALORES: number | null
         }
@@ -1940,6 +2239,7 @@ export type Database = {
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
+          controle_origem_id?: string | null
           created_at?: string
           created_by?: string | null
           DATA_LAUDO?: string | null
@@ -1966,10 +2266,12 @@ export type Database = {
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
           NOME_PACIENTE: string
+          periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
           PRIORIDADE?: string | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
+          tipo_dados?: string
           updated_at?: string
           VALORES?: number | null
         }
@@ -1979,6 +2281,7 @@ export type Database = {
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
+          controle_origem_id?: string | null
           created_at?: string
           created_by?: string | null
           DATA_LAUDO?: string | null
@@ -2005,14 +2308,24 @@ export type Database = {
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
           NOME_PACIENTE?: string
+          periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
           PRIORIDADE?: string | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
+          tipo_dados?: string
           updated_at?: string
           VALORES?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "volumetria_mobilemed_controle_origem_id_fkey"
+            columns: ["controle_origem_id"]
+            isOneToOne: false
+            referencedRelation: "controle_dados_origem"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       volumetria_mobilemed_archive: {
         Row: {
