@@ -47,9 +47,9 @@ export default function Dashboard() {
         <div onClick={() => navigate("/volumetria")} className="cursor-pointer">
           <MetricCard
             title="Total de Exames"
-            value="8.450"
-            change="+12% vs mês anterior"
-            changeType="positive"
+            value="0"
+            change="Base limpa - aguardando novos uploads"
+            changeType="neutral"
             icon={Activity}
             iconColor="text-blue-600"
           />
