@@ -21,7 +21,7 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar TODOS os exames zerados (apenas ESTUDO_DESCRICAO)
+      // Buscar TODOS os exames zerados (sem limitação)
       const { data: volumetriaData, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA, arquivo_fonte')
@@ -29,7 +29,7 @@ export function VolumetriaExamesNaoIdentificados() {
 
       if (volumetriaError) throw volumetriaError;
 
-      // 2. Buscar estudos existentes no De Para
+      // 2. Buscar estudos existentes no De Para (sem limitação)
       const { data: deParaData, error: deParaError } = await supabase
         .from('valores_referencia_de_para')
         .select('estudo_descricao')
