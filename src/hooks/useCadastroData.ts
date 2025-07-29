@@ -9,14 +9,19 @@ export const useCadastroExames = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: exames, error } = await supabase
+      console.log('🔍 Buscando exames...');
+      
+      const { data: exames, error, count } = await supabase
         .from('cadastro_exames')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log(`✅ Exames carregados: ${exames?.length || 0} registros (total: ${count})`);
       setData(exames || []);
     } catch (err: any) {
+      console.error('❌ Erro ao carregar exames:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -38,14 +43,19 @@ export const useQuebraExames = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: quebras, error } = await supabase
+      console.log('🔍 Buscando quebra de exames...');
+      
+      const { data: quebras, error, count } = await supabase
         .from('regras_quebra_exames')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log(`✅ Quebra de exames carregadas: ${quebras?.length || 0} registros (total: ${count})`);
       setData(quebras || []);
     } catch (err: any) {
+      console.error('❌ Erro ao carregar quebra de exames:', err);
       setError(err.message);
     } finally {
       setLoading(false);

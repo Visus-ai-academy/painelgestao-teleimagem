@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 
 interface CadastroDataTableProps {
@@ -16,6 +16,96 @@ interface CadastroDataTableProps {
 
 export function CadastroDataTable({ data, loading, error, type, title }: CadastroDataTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
+  // Definir colunas por tipo
+  const getColumns = () => {
+    switch (type) {
+      case 'exames':
+        return [
+          { key: 'nome', label: 'Nome', filterable: true },
+          { key: 'codigo_exame', label: 'Código', filterable: true },
+          { key: 'modalidade', label: 'Modalidade', filterable: true },
+          { key: 'especialidade', label: 'Especialidade', filterable: true },
+          { key: 'categoria', label: 'Categoria', filterable: true },
+          { key: 'permite_quebra', label: 'Permite Quebra', filterable: false },
+          { key: 'ativo', label: 'Status', filterable: true },
+          { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+      case 'quebra':
+        return [
+          { key: 'exame_original', label: 'Exame Original', filterable: true },
+          { key: 'exame_quebrado', label: 'Exame Quebrado', filterable: true },
+          { key: 'categoria_quebrada', label: 'Categoria', filterable: true },
+          { key: 'ativo', label: 'Status', filterable: true },
+          { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+      case 'precos':
+        return [
+          { key: 'tipo_preco', label: 'Tipo', filterable: true },
+          { key: 'modalidade', label: 'Modalidade', filterable: true },
+          { key: 'especialidade', label: 'Especialidade', filterable: true },
+          { key: 'categoria', label: 'Categoria', filterable: true },
+          { key: 'prioridade', label: 'Prioridade', filterable: true },
+          { key: 'valor_base', label: 'Valor Base', filterable: false },
+          { key: 'valor_urgencia', label: 'Valor Urgência', filterable: false },
+          { key: 'ativo', label: 'Status', filterable: true }
+        ];
+      case 'regras':
+        return [
+          { key: 'nome_regra', label: 'Nome', filterable: true },
+          { key: 'descricao', label: 'Descrição', filterable: true },
+          { key: 'acao', label: 'Ação', filterable: true },
+          { key: 'prioridade', label: 'Prioridade', filterable: false },
+          { key: 'ativo', label: 'Status', filterable: true },
+          { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+      case 'repasse':
+        return [
+          { key: 'medico_nome', label: 'Médico', filterable: true },
+          { key: 'medico_crm', label: 'CRM', filterable: true },
+          { key: 'modalidade', label: 'Modalidade', filterable: true },
+          { key: 'especialidade', label: 'Especialidade', filterable: true },
+          { key: 'prioridade', label: 'Prioridade', filterable: true },
+          { key: 'valor', label: 'Valor', filterable: false },
+          { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+      default:
+        return [
+          { key: 'nome', label: 'Nome', filterable: true },
+          { key: 'descricao', label: 'Descrição', filterable: true },
+          { key: 'ordem', label: 'Ordem', filterable: false },
+          { key: 'ativo', label: 'Status', filterable: true },
+          { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+    }
+  };
+
+  const columns = getColumns();
+
+  // Função para obter valor de uma coluna
+  const getCellValue = (item: any, key: string) => {
+    switch (key) {
+      case 'medico_nome':
+        return item.medicos?.nome || 'Regra Geral';
+      case 'medico_crm':
+        return item.medicos?.crm || '-';
+      case 'valor_base':
+        return `R$ ${Number(item.valor_base || 0).toFixed(2)}`;
+      case 'valor_urgencia':
+        return `R$ ${Number(item.valor_urgencia || 0).toFixed(2)}`;
+      case 'valor':
+        return `R$ ${Number(item.valor || 0).toFixed(2)}`;
+      case 'permite_quebra':
+        return item.permite_quebra ? "Sim" : "Não";
+      case 'ativo':
+        return item.ativo ? "Ativo" : "Inativo";
+      case 'created_at':
+        return format(new Date(item.created_at), 'dd/MM/yyyy');
+      default:
+        return item[key] || '-';
+    }
+  };
 
   // Filtrar e ordenar dados
   const filteredAndSortedData = useMemo(() => {
@@ -23,102 +113,43 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
     
     let filtered = data;
     
-    // Aplicar filtro de pesquisa
+    // Aplicar filtro de pesquisa global
     if (searchTerm) {
       filtered = data.filter((item) => {
         const searchLower = searchTerm.toLowerCase();
-        
-        switch (type) {
-          case 'exames':
-            return (
-              item.nome?.toLowerCase().includes(searchLower) ||
-              item.codigo_exame?.toLowerCase().includes(searchLower) ||
-              item.modalidade?.toLowerCase().includes(searchLower) ||
-              item.especialidade?.toLowerCase().includes(searchLower) ||
-              item.categoria?.toLowerCase().includes(searchLower)
-            );
-          case 'quebra':
-            return (
-              item.exame_original?.toLowerCase().includes(searchLower) ||
-              item.exame_quebrado?.toLowerCase().includes(searchLower) ||
-              item.categoria_quebrada?.toLowerCase().includes(searchLower)
-            );
-          case 'precos':
-            return (
-              item.modalidade?.toLowerCase().includes(searchLower) ||
-              item.especialidade?.toLowerCase().includes(searchLower) ||
-              item.categoria?.toLowerCase().includes(searchLower) ||
-              item.prioridade?.toLowerCase().includes(searchLower) ||
-              item.tipo_preco?.toLowerCase().includes(searchLower)
-            );
-          case 'regras':
-            return (
-              item.nome_regra?.toLowerCase().includes(searchLower) ||
-              item.descricao?.toLowerCase().includes(searchLower) ||
-              item.acao?.toLowerCase().includes(searchLower)
-            );
-          case 'repasse':
-            return (
-              item.medicos?.nome?.toLowerCase().includes(searchLower) ||
-              item.medicos?.crm?.toLowerCase().includes(searchLower) ||
-              item.modalidade?.toLowerCase().includes(searchLower) ||
-              item.especialidade?.toLowerCase().includes(searchLower) ||
-              item.prioridade?.toLowerCase().includes(searchLower)
-            );
-          case 'modalidades':
-          case 'especialidades':
-          case 'categorias':
-          case 'prioridades':
-            return (
-              item.nome?.toLowerCase().includes(searchLower) ||
-              item.descricao?.toLowerCase().includes(searchLower)
-            );
-          default:
-            return true;
-        }
+        return columns.some(col => {
+          const value = getCellValue(item, col.key);
+          return value.toString().toLowerCase().includes(searchLower);
+        });
       });
     }
     
-    // Ordenar alfabeticamente
-    return filtered.sort((a, b) => {
-      let aValue = '';
-      let bValue = '';
-      
-      switch (type) {
-        case 'exames':
-          aValue = a.nome || '';
-          bValue = b.nome || '';
-          break;
-        case 'quebra':
-          aValue = a.exame_original || '';
-          bValue = b.exame_original || '';
-          break;
-        case 'precos':
-          aValue = `${a.modalidade || ''} ${a.especialidade || ''}`;
-          bValue = `${b.modalidade || ''} ${b.especialidade || ''}`;
-          break;
-        case 'regras':
-          aValue = a.nome_regra || '';
-          bValue = b.nome_regra || '';
-          break;
-        case 'repasse':
-          aValue = a.medicos?.nome || 'Regra Geral';
-          bValue = b.medicos?.nome || 'Regra Geral';
-          break;
-        case 'modalidades':
-        case 'especialidades':
-        case 'categorias':
-        case 'prioridades':
-          aValue = a.nome || '';
-          bValue = b.nome || '';
-          break;
-        default:
-          return 0;
+    // Aplicar filtros por coluna
+    Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
+      if (filterValue) {
+        filtered = filtered.filter(item => {
+          const value = getCellValue(item, columnKey);
+          return value.toString().toLowerCase().includes(filterValue.toLowerCase());
+        });
       }
-      
-      return aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' });
     });
-  }, [data, searchTerm, type]);
+    
+    // Ordenar alfabeticamente pela primeira coluna
+    return filtered.sort((a, b) => {
+      const aValue = getCellValue(a, columns[0].key);
+      const bValue = getCellValue(b, columns[0].key);
+      return aValue.toString().localeCompare(bValue.toString(), 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [data, searchTerm, columnFilters, columns]);
+
+  // Handler para atualizar filtro de coluna
+  const updateColumnFilter = (columnKey: string, value: string) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnKey]: value
+    }));
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -156,237 +187,82 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
     );
   }
 
-  const renderTableContent = () => {
-    switch (type) {
-      case 'exames':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Modalidade</TableHead>
-                <TableHead>Especialidade</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Permite Quebra</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.nome}</TableCell>
-                  <TableCell>{item.codigo_exame || '-'}</TableCell>
-                  <TableCell>{item.modalidade}</TableCell>
-                  <TableCell>{item.especialidade}</TableCell>
-                  <TableCell>{item.categoria}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.permite_quebra ? "default" : "secondary"}>
-                      {item.permite_quebra ? "Sim" : "Não"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.ativo ? "default" : "secondary"}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      case 'quebra':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Exame Original</TableHead>
-                <TableHead>Exame Quebrado</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.exame_original}</TableCell>
-                  <TableCell>{item.exame_quebrado}</TableCell>
-                  <TableCell>{item.categoria_quebrada}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.ativo ? "default" : "secondary"}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      case 'precos':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Modalidade</TableHead>
-                <TableHead>Especialidade</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Valor Base</TableHead>
-                <TableHead>Valor Urgência</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.tipo_preco}</TableCell>
-                  <TableCell>{item.modalidade}</TableCell>
-                  <TableCell>{item.especialidade}</TableCell>
-                  <TableCell>{item.categoria}</TableCell>
-                  <TableCell>{item.prioridade}</TableCell>
-                  <TableCell>R$ {Number(item.valor_base).toFixed(2)}</TableCell>
-                  <TableCell>R$ {Number(item.valor_urgencia).toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.ativo ? "default" : "secondary"}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      case 'regras':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Ação</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.nome_regra}</TableCell>
-                  <TableCell>{item.descricao || '-'}</TableCell>
-                  <TableCell>{item.acao}</TableCell>
-                  <TableCell>{item.prioridade}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.ativo ? "default" : "secondary"}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      case 'repasse':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Médico</TableHead>
-                <TableHead>CRM</TableHead>
-                <TableHead>Modalidade</TableHead>
-                <TableHead>Especialidade</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    {item.medicos?.nome || 'Regra Geral'}
-                  </TableCell>
-                  <TableCell>{item.medicos?.crm || '-'}</TableCell>
-                  <TableCell>{item.modalidade}</TableCell>
-                  <TableCell>{item.especialidade}</TableCell>
-                  <TableCell>{item.prioridade}</TableCell>
-                  <TableCell>R$ {Number(item.valor).toFixed(2)}</TableCell>
-                  <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      case 'modalidades':
-      case 'especialidades':
-      case 'categorias':
-      case 'prioridades':
-        return (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Ordem</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.nome}</TableCell>
-                  <TableCell>{item.descricao || '-'}</TableCell>
-                  <TableCell>{item.ordem || '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.ativo ? "default" : "secondary"}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">{title}</h3>
-        <Badge variant="outline">{filteredAndSortedData.length} de {data.length} itens</Badge>
+        <Badge variant="outline">
+          {filteredAndSortedData.length} de {data.length} itens
+        </Badge>
       </div>
       
-      {/* Campo de pesquisa */}
+      {/* Campo de pesquisa global */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
-          placeholder="Pesquisar..."
+          placeholder="Pesquisar em todas as colunas..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
         />
       </div>
       
-      <div className="border rounded-md max-h-96 overflow-auto">
-        {renderTableContent()}
+      <div className="border rounded-md max-h-[500px] overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col.key} className="sticky top-0 bg-background">
+                  <div className="space-y-2">
+                    <div className="font-medium">{col.label}</div>
+                    {col.filterable && (
+                      <div className="relative">
+                        <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
+                        <Input
+                          placeholder="Filtrar..."
+                          value={columnFilters[col.key] || ''}
+                          onChange={(e) => updateColumnFilter(col.key, e.target.value)}
+                          className="pl-7 h-7 text-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredAndSortedData.map((item) => (
+              <TableRow key={item.id}>
+                {columns.map((col) => (
+                  <TableCell key={col.key}>
+                    {(col.key === 'permite_quebra' || col.key === 'ativo') ? (
+                      <Badge variant={
+                        col.key === 'permite_quebra' 
+                          ? (item.permite_quebra ? "default" : "secondary")
+                          : (item.ativo ? "default" : "secondary")
+                      }>
+                        {getCellValue(item, col.key)}
+                      </Badge>
+                    ) : (
+                      <span className={col.key === columns[0].key ? "font-medium" : ""}>
+                        {getCellValue(item, col.key)}
+                      </span>
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
+      
+      {filteredAndSortedData.length === 0 && (searchTerm || Object.values(columnFilters).some(f => f)) && (
+        <div className="text-center py-8 text-muted-foreground">
+          Nenhum item encontrado com os filtros aplicados.
+        </div>
+      )}
     </div>
   );
 }
