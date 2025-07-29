@@ -9,147 +9,190 @@ import jsPDF from 'jspdf';
 const RelatorioImplementacoes = () => {
   const implementacoes = [
     {
-      titulo: "Sistema de Segurança e Auditoria",
+      titulo: "Sistema de Segurança e Auditoria Completo",
       icon: <Shield className="h-6 w-6" />,
       cor: "destructive",
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Métricas de Segurança: Monitoramento em tempo real de tentativas de acesso, falhas de autenticação e atividades suspeitas",
-        "Alertas de Segurança: Sistema automatizado de notificações para eventos críticos de segurança",
-        "Logs de Auditoria: Registro completo de todas as ações realizadas no sistema com rastreabilidade total",
-        "Autenticação de Dois Fatores (2FA): Implementação de camada adicional de segurança para acesso ao sistema",
-        "Políticas de Senha: Configuração e aplicação de regras rigorosas para senhas dos usuários",
-        "Criptografia de Dados: Proteção avançada de informações sensíveis com algoritmos de criptografia",
-        "Conformidade LGPD: Adequação completa às normas da Lei Geral de Proteção de Dados",
-        "Backup e Recuperação: Sistema automatizado de backup com procedimentos de recuperação de dados"
+        "Métricas de Segurança: Monitoramento em tempo real com indicadores críticos",
+        "Alertas de Segurança: Sistema automatizado de notificações para eventos críticos", 
+        "Logs de Auditoria: Registro completo com rastreabilidade total de ações",
+        "Logs de Acesso a Dados: Monitoramento LGPD de acessos sensíveis",
+        "Autenticação de Dois Fatores (2FA): Camada adicional de segurança",
+        "Políticas de Senha: Configuração avançada e aplicação rigorosa",
+        "Criptografia de Dados: Proteção SHA-256 de informações sensíveis",
+        "Conformidade LGPD: Adequação completa às normas de proteção",
+        "Backup e Recuperação: Sistema automatizado com cronograma inteligente",
+        "Monitoramento de Performance: Análise contínua de sistema"
       ],
       edgeFunctions: [
-        "security-monitor: Monitoramento contínuo de atividades suspeitas",
+        "security-monitor: Monitoramento contínuo de ameaças",
         "backup-manager: Gerenciamento automatizado de backups",
-        "data-encryption: Processamento seguro de criptografia de dados",
-        "lgpd-compliance: Verificação automática de conformidade LGPD"
+        "data-encryption: Processamento seguro de criptografia",
+        "lgpd-compliance: Verificação automática de conformidade",
+        "performance-monitor: Monitoramento de performance do sistema"
       ]
     },
     {
-      titulo: "Sistema Hierárquico de Funções e Permissões",
+      titulo: "Sistema Hierárquico de Roles e Permissões",
       icon: <Users className="h-6 w-6" />,
       cor: "default",
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Hierarquia de Funções: Super Admin > Admin > Manager > User > Guest",
-        "Row Level Security (RLS): Políticas de segurança a nível de linha no banco de dados",
-        "Políticas Granulares: Controle detalhado de acesso a recursos específicos",
-        "Componentes Protegidos: Interface adaptativa baseada em permissões do usuário",
-        "Controle de Menu: Exibição dinâmica de opções conforme nível de acesso"
+        "Hierarquia Completa: Super Admin > Admin > Manager > Medico > User > Guest",
+        "Row Level Security (RLS): Políticas avançadas em todas as tabelas",
+        "Políticas Granulares: Controle detalhado por função e contexto",
+        "Componentes Protegidos: Interface adaptativa baseada em permissões",
+        "Controle de Menu: Exibição dinâmica conforme nível de acesso",
+        "Auditoria de Permissões: Rastreamento completo de acessos",
+        "Proteção Temporal: Controle de dados históricos e futuros"
       ]
     },
     {
-      titulo: "Gestão de Dados Mestre",
+      titulo: "Gestão de Dados Mestres Avançada",
       icon: <Database className="h-6 w-6" />,
-      cor: "secondary",
+      cor: "secondary", 
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Gerenciar Usuários: CRUD completo com controle de permissões e auditoria",
-        "Gerenciar Médicos: Cadastro especializado com informações profissionais",
-        "Gerenciar Listas: Controle de listas de dados do sistema",
-        "Colaboradores: Gestão completa de equipe interna",
-        "Contratos (Clientes e Fornecedores): Gestão integrada de relacionamentos comerciais"
+        "Gerenciar Usuários: CRUD completo com controle hierárquico",
+        "Gerenciar Médicos: Cadastro especializado com categorias",
+        "Gerenciar Listas: Controle de configurações mestras",
+        "Colaboradores: Gestão completa de equipes internas",
+        "Contratos Clientes: Gestão comercial avançada",
+        "Especialidades e Modalidades: Configuração médica completa",
+        "Categorias de Exames: Organização estruturada",
+        "Prioridades: Sistema de classificação inteligente"
       ]
     },
     {
-      titulo: "Sistema Avançado de Faturamento",
+      titulo: "Sistema de Faturamento e ERP Integrado",
       icon: <DollarSign className="h-6 w-6" />,
+      cor: "default",
+      data: "17 Jul 2024 - 29 Jan 2025", 
+      itens: [
+        "Integração Omie: Sincronização bidirecional automática",
+        "Geração Automatizada: Processamento inteligente de faturas",
+        "Controle de Períodos: Gestão flexível (8 ao 7 do mês)",
+        "Templates Personalizados: Faturamento por cliente",
+        "Régua de Cobrança: Automatização completa do processo",
+        "Relatórios Financeiros: Dashboards em tempo real",
+        "Validação de Dados: Verificação automática de integridade",
+        "Sistema de Emails: Cobrança automatizada"
+      ],
+      edgeFunctions: [
+        "sincronizar-omie: Integração bidirecional com ERP",
+        "gerar-fatura: Processamento automatizado de faturas",
+        "processar-faturamento: Análise e validação completa",
+        "processar-faturamento-pdf: Geração de relatórios PDF",
+        "gerar-relatorio-faturamento: Relatórios detalhados",
+        "ativar-regua-cobranca: Sistema de cobrança automática",
+        "processar-emails-cobranca: Envio automatizado"
+      ]
+    },
+    {
+      titulo: "Dashboards e Analytics Avançados",
+      icon: <Eye className="h-6 w-6" />,
+      cor: "outline",
+      data: "17 Jul 2024 - 29 Jan 2025",
+      itens: [
+        "Dashboard Principal: Métricas em tempo real consolidadas",
+        "Dashboard Operacional: Controle de produção e qualidade",
+        "Dashboard Financeiro: Análises financeiras completas",
+        "Dashboard Volumetria: Análise detalhada de volumes",
+        "Dashboard Segurança: Monitoramento de ameaças",
+        "Componentes Visuais: Speedometer, MetricCard, Charts",
+        "Filtros Avançados: Busca inteligente e filtragem dinâmica",
+        "Controles de Período: Seleção flexível de competências"
+      ]
+    },
+    {
+      titulo: "Sistema de Importação Inteligente",
+      icon: <FileText className="h-6 w-6" />,
       cor: "default",
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Sincronização Omie: Integração bidirecional automática com sistema ERP",
-        "Geração Automatizada: Processamento inteligente de faturas baseado em contratos",
-        "Controle de Períodos: Gestão precisa de competências e datas de faturamento",
-        "Importação Inteligente: Sistema automatizado de upload e processamento de dados",
-        "Relatórios Avançados: Dashboards e análises detalhadas de faturamento",
-        "Validação de Dados: Verificação automática de integridade e consistência"
+        "Mapeamento Inteligente: Auto-detecção de campos",
+        "Templates Configuráveis: Modelos para todos os sistemas",
+        "Validação em Tempo Real: Verificação automática",
+        "Histórico Completo: Logs detalhados com metadados",
+        "Processamento em Lote: Otimização para grandes volumes",
+        "Recuperação de Erros: Sistema robusto de tratamento",
+        "Sincronização Automática: Atualização de mapeamentos"
       ],
       edgeFunctions: [
-        "sincronizar-omie: Integração automática com ERP Omie",
-        "gerar-fatura: Processamento automatizado de faturas",
-        "processar-faturamento: Análise e validação de dados de faturamento",
-        "processar-faturamento-pdf: Geração de relatórios em PDF",
-        "gerar-relatorio-faturamento: Criação de relatórios detalhados"
+        "processar-importacao-inteligente: IA para detecção de formato",
+        "sincronizar-mapeamentos: Sincronização automática",
+        "sincronizar-template: Gestão de templates"
       ]
     },
     {
-      titulo: "Sistema de Contratos e Assinaturas Digitais",
+      titulo: "Sistema de Otimização e Performance",
+      icon: <Settings className="h-6 w-6" />,
+      cor: "secondary",
+      data: "17 Jul 2024 - 29 Jan 2025",
+      itens: [
+        "Paginação Inteligente: Superação do limite de 1000 registros",
+        "Carregamento Progressivo: Fetch em lotes otimizado",
+        "Cache Inteligente: Múltiplas camadas de cache",
+        "Consultas Otimizadas: SQL com índices estratégicos",
+        "Lazy Loading: Carregamento sob demanda",
+        "Virtual Scrolling: Listas longas otimizadas",
+        "Debounce em Filtros: Otimização de busca"
+      ]
+    },
+    {
+      titulo: "Sistema Operacional e Volumetria",
+      icon: <Eye className="h-6 w-6" />,
+      cor: "destructive",
+      data: "17 Jul 2024 - 29 Jan 2025",
+      itens: [
+        "Gestão de Escalas: Sistema completo de programação médica",
+        "Controle de Qualidade: Monitoramento e métricas SLA",
+        "Volumetria Avançada: Análise detalhada de produção",
+        "Processamento de Exames: Automatização completa",
+        "Métricas em Tempo Real: KPIs operacionais",
+        "Integração MobileMed: Importação automática",
+        "Mapeamento Visual: Geolocalização de clientes"
+      ],
+      edgeFunctions: [
+        "processar-escalas: Processamento automatizado de escalas",
+        "processar-exames: Análise e validação de exames",
+        "processar-volumetria-mobilemed: Dados MobileMed",
+        "limpar-dados-volumetria: Limpeza inteligente"
+      ]
+    },
+    {
+      titulo: "Contratos e Assinaturas Digitais",
       icon: <FileText className="h-6 w-6" />,
       cor: "outline",
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Integração ClickSign: Plataforma completa de assinaturas digitais",
-        "Templates Automatizados: Geração dinâmica de contratos baseada em dados",
-        "Fluxo de Aprovação: Processo estruturado de revisão e assinatura",
-        "Gestão de Status: Acompanhamento em tempo real do progresso dos contratos",
-        "Notificações Automáticas: Alertas de prazos e pendências",
-        "Armazenamento Seguro: Repositório central de documentos assinados"
+        "Integração ClickSign: Plataforma completa de assinaturas",
+        "Templates Automatizados: Geração dinâmica de contratos",
+        "Fluxo de Aprovação: Processo estruturado de assinatura",
+        "Gestão de Status: Acompanhamento em tempo real",
+        "Notificações Automáticas: Alertas de prazos",
+        "Armazenamento Seguro: Repositório central",
+        "Webhook Integrado: Atualizações automáticas"
       ],
       edgeFunctions: [
-        "enviar-contrato-clicksign: Envio automatizado para assinatura",
-        "enviar-contrato-medico: Processamento específico para contratos médicos",
-        "webhook-clicksign: Recebimento de atualizações de status"
+        "enviar-contrato-clicksign: Envio automatizado",
+        "enviar-contrato-medico: Contratos médicos específicos",
+        "webhook-clicksign: Recebimento de atualizações"
       ]
     },
     {
-      titulo: "Sistema Operacional e Produção",
+      titulo: "Arquitetura e Documentação Visual",
       icon: <Settings className="h-6 w-6" />,
       cor: "default",
       data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
-        "Gestão de Escalas: Sistema completo de programação médica",
-        "Controle de Qualidade: Monitoramento e métricas de performance",
-        "Volumetria: Análise detalhada de volumes de produção",
-        "Importação de Exames: Processamento automatizado de dados médicos",
-        "Dashboard Operacional: Visão consolidada de indicadores",
-        "Métricas em Tempo Real: Acompanhamento instantâneo de KPIs"
-      ],
-      edgeFunctions: [
-        "processar-escalas: Processamento automatizado de escalas médicas",
-        "processar-exames: Análise e validação de dados de exames"
-      ]
-    },
-    {
-      titulo: "Sistema Financeiro e Cobrança",
-      icon: <DollarSign className="h-6 w-6" />,
-      cor: "destructive",
-      data: "17 Jul 2024 - 29 Jan 2025",
-      itens: [
-        "Régua de Cobrança: Automatização completa do processo de cobrança",
-        "Pagamentos Médicos: Gestão de remuneração e bonificações",
-        "Controle Financeiro: Dashboard com indicadores financeiros",
-        "Processamento de Emails: Sistema automatizado de comunicação",
-        "Análise de Inadimplência: Relatórios e métricas de cobrança",
-        "Integração Bancária: Conciliação automática de pagamentos"
-      ],
-      edgeFunctions: [
-        "ativar-regua-cobranca: Ativação automática do processo de cobrança",
-        "processar-emails-cobranca: Envio automatizado de cobranças",
-        "processar-financeiro: Análise de dados financeiros"
-      ]
-    },
-    {
-      titulo: "Sistema de Importação e Processamento",
-      icon: <Eye className="h-6 w-6" />,
-      cor: "secondary",
-      data: "17 Jul 2024 - 29 Jan 2025",
-      itens: [
-        "Importação Inteligente: Sistema automatizado de análise e validação",
-        "Processamento de Clientes: Gestão completa de base de clientes",
-        "Validação de Dados: Verificação automática de integridade",
-        "Templates Personalizados: Modelos para diferentes tipos de importação",
-        "Logs Detalhados: Rastreamento completo de operações",
-        "Recuperação de Erros: Sistema robusto de tratamento de falhas"
-      ],
-      edgeFunctions: [
-        "processar-importacao-inteligente: Sistema avançado de importação",
-        "processar-clientes: Processamento de dados de clientes",
-        "processar-contratos: Análise de contratos importados"
+        "Mapa Mental: Visão geral dos módulos interativos",
+        "ERD Interativo: Relacionamentos detalhados do banco",
+        "Arquitetura Técnica: Camadas frontend/backend/integrações", 
+        "Fluxos de Processo: Visualização de processos principais",
+        "Documentação Automática: Relatórios auto-gerados",
+        "Diagramas Atualizados: Sempre sincronizados"
       ]
     }
   ];
@@ -191,7 +234,7 @@ const RelatorioImplementacoes = () => {
     yPosition += 6;
     doc.text(`• Edge Functions: ${estatisticas.totalEdgeFunctions}`, 20, yPosition);
     yPosition += 6;
-    doc.text("• Dias de Desenvolvimento: 195+", 20, yPosition);
+    doc.text("• Dias de Desenvolvimento: 196 dias corridos", 20, yPosition);
     yPosition += 15;
     
     // Implementações
@@ -314,11 +357,11 @@ const RelatorioImplementacoes = () => {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dias de Desenvolvimento</CardTitle>
+            <CardTitle className="text-sm font-medium">Dias Corridos de Desenvolvimento</CardTitle>
             <UserCheck className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">195+</div>
+            <div className="text-2xl font-bold">196</div>
           </CardContent>
         </Card>
       </div>
