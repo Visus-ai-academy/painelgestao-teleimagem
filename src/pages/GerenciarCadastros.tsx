@@ -1,14 +1,42 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { FileUpload } from '@/components/FileUpload';
-import { FileText, DollarSign, Shield, UserCheck, Database } from "lucide-react";
+import { FileText, DollarSign, Shield, UserCheck, Database, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 
 export default function GerenciarCadastros() {
   const { toast } = useToast();
+  const [isClearing, setIsClearing] = useState(false);
+
+  // Handler para limpar cadastros
+  const handleClearCadastros = async () => {
+    setIsClearing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('limpar-cadastros');
+
+      if (error) throw error;
+
+      toast({
+        title: "Limpeza Concluída!",
+        description: "Todas as tabelas de cadastro foram limpas com sucesso",
+      });
+
+      // Recarregar a página para atualizar o status
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Erro na Limpeza",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   // Handler para cadastro de exames
   const handleUploadExames = async (file: File) => {
@@ -129,11 +157,22 @@ export default function GerenciarCadastros() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Gerenciar Cadastros</h1>
-        <p className="text-muted-foreground mt-2">
-          Upload e gerenciamento de todos os tipos de cadastros do sistema
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Gerenciar Cadastros</h1>
+          <p className="text-muted-foreground mt-2">
+            Upload e gerenciamento de todos os tipos de cadastros do sistema
+          </p>
+        </div>
+        <Button 
+          variant="destructive" 
+          onClick={handleClearCadastros}
+          disabled={isClearing}
+          className="flex items-center gap-2"
+        >
+          <Trash2 className="h-4 w-4" />
+          {isClearing ? 'Limpando...' : 'Limpar Cadastros'}
+        </Button>
       </div>
 
       {/* Painel de Status dos Uploads */}
