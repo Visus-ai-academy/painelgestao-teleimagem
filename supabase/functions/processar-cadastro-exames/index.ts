@@ -101,12 +101,22 @@ serve(async (req) => {
           ativo: true
         };
 
-        // Verificar se já existe (por nome ou código)
+        // Verificar se já existe (primeiro por nome, depois por código se houver)
         let { data: existente } = await supabase
           .from('cadastro_exames')
           .select('id')
-          .or(`nome.eq.${exameData.nome},codigo_exame.eq.${exameData.codigo_exame}`)
-          .single();
+          .eq('nome', exameData.nome)
+          .maybeSingle();
+
+        // Se não encontrou por nome e tem código, buscar por código
+        if (!existente && exameData.codigo_exame) {
+          const { data: existentePorCodigo } = await supabase
+            .from('cadastro_exames')
+            .select('id')
+            .eq('codigo_exame', exameData.codigo_exame)
+            .maybeSingle();
+          existente = existentePorCodigo;
+        }
 
         if (existente) {
           // Atualizar existente
