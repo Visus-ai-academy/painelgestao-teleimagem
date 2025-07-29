@@ -2,35 +2,75 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FileUpload } from '@/components/FileUpload';
-import { FileText, DollarSign, Shield, UserCheck, Database, Trash2 } from "lucide-react";
+import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 export default function GerenciarCadastros() {
   const { toast } = useToast();
+  const { isAdmin } = useUserPermissions();
   const [isClearing, setIsClearing] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [clearOptions, setClearOptions] = useState({
+    cadastro_exames: false,
+    quebra_exames: false,
+    logs_uploads: false
+  });
 
-  // Handler para limpar cadastros
+  // Handler para limpar cadastros (individualizado)
   const handleClearCadastros = async () => {
+    if (!isAdmin) {
+      toast({
+        title: "Acesso Negado",
+        description: "Apenas administradores podem limpar cadastros",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verificar se pelo menos uma opção foi selecionada
+    const hasSelection = Object.values(clearOptions).some(option => option);
+    if (!hasSelection) {
+      toast({
+        title: "Nenhuma Opção Selecionada",
+        description: "Selecione pelo menos uma tabela para limpar",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsClearing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('limpar-cadastros');
+      const { data, error } = await supabase.functions.invoke('limpar-cadastros', {
+        body: clearOptions
+      });
 
       if (error) throw error;
 
       toast({
         title: "Limpeza Concluída!",
-        description: "Todas as tabelas de cadastro foram limpas com sucesso",
+        description: `${data.message}. Tabelas limpas: ${data.tabelas_limpas.join(', ')}`,
       });
 
-      // Recarregar a página para atualizar o status
+      // Resetar opções e fechar dialog
+      setClearOptions({
+        cadastro_exames: false,
+        quebra_exames: false,
+        logs_uploads: false
+      });
+      setShowClearDialog(false);
+
+      // Recarregar o painel de status
       window.location.reload();
     } catch (error: any) {
       toast({
         title: "Erro na Limpeza",
-        description: error.message,
+        description: error.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -164,15 +204,17 @@ export default function GerenciarCadastros() {
             Upload e gerenciamento de todos os tipos de cadastros do sistema
           </p>
         </div>
-        <Button 
-          variant="destructive" 
-          onClick={handleClearCadastros}
-          disabled={isClearing}
-          className="flex items-center gap-2"
-        >
-          <Trash2 className="h-4 w-4" />
-          {isClearing ? 'Limpando...' : 'Limpar Cadastros'}
-        </Button>
+        {isAdmin && (
+          <Button 
+            variant="destructive" 
+            onClick={() => setShowClearDialog(true)}
+            disabled={isClearing}
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar Cadastros
+          </Button>
+        )}
       </div>
 
       {/* Painel de Status dos Uploads */}
@@ -428,6 +470,74 @@ export default function GerenciarCadastros() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de Confirmação para Limpeza */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              ⚠️ ATENÇÃO - Limpeza de Cadastros
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta é uma operação <strong>IRREVERSÍVEL</strong> e pode causar perda de dados permanente. 
+              Selecione cuidadosamente quais tabelas deseja limpar:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="cadastro-exames"
+                checked={clearOptions.cadastro_exames}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, cadastro_exames: !!checked }))
+                }
+              />
+              <label htmlFor="cadastro-exames" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Cadastro de Exames ({clearOptions.cadastro_exames ? 'TODOS os exames serão removidos' : 'Manter exames'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="quebra-exames"
+                checked={clearOptions.quebra_exames}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, quebra_exames: !!checked }))
+                }
+              />
+              <label htmlFor="quebra-exames" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Regras de Quebra ({clearOptions.quebra_exames ? 'TODAS as regras serão removidas' : 'Manter regras'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="logs-uploads"
+                checked={clearOptions.logs_uploads}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, logs_uploads: !!checked }))
+                }
+              />
+              <label htmlFor="logs-uploads" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Logs de Upload ({clearOptions.logs_uploads ? 'TODOS os logs serão removidos' : 'Manter logs'})
+              </label>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearCadastros}
+              disabled={isClearing || !Object.values(clearOptions).some(option => option)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isClearing ? 'Limpando...' : 'CONFIRMAR LIMPEZA'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

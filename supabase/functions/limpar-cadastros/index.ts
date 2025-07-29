@@ -17,45 +17,62 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('Iniciando limpeza de cadastros...');
+    // Receber opções do body da requisição
+    const options = await req.json();
+    console.log('Opções recebidas:', options);
 
-    // Limpar tabela de cadastro de exames
-    const { error: errorCadastro } = await supabase
-      .from('cadastro_exames')
-      .delete()
-      .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+    const tabelasLimpas: string[] = [];
+    let totalLimpezas = 0;
 
-    if (errorCadastro) {
-      console.error('Erro ao limpar cadastro_exames:', errorCadastro);
-      // Não interromper se a tabela não existir
-    } else {
-      console.log('Tabela cadastro_exames limpa com sucesso');
+    // Limpar tabela de cadastro de exames se solicitado
+    if (options.cadastro_exames) {
+      console.log('Limpando tabela cadastro_exames...');
+      const { error: errorCadastro, count } = await supabase
+        .from('cadastro_exames')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorCadastro) {
+        console.error('Erro ao limpar cadastro_exames:', errorCadastro);
+      } else {
+        console.log('Tabela cadastro_exames limpa com sucesso');
+        tabelasLimpas.push('cadastro_exames');
+        totalLimpezas += count || 0;
+      }
     }
 
-    // Limpar tabela de regras de quebra de exames
-    const { error: errorQuebra } = await supabase
-      .from('regras_quebra_exames')
-      .delete()
-      .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+    // Limpar tabela de regras de quebra de exames se solicitado
+    if (options.quebra_exames) {
+      console.log('Limpando tabela regras_quebra_exames...');
+      const { error: errorQuebra, count } = await supabase
+        .from('regras_quebra_exames')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
 
-    if (errorQuebra) {
-      console.error('Erro ao limpar regras_quebra_exames:', errorQuebra);
-      // Não interromper se a tabela não existir
-    } else {
-      console.log('Tabela regras_quebra_exames limpa com sucesso');
+      if (errorQuebra) {
+        console.error('Erro ao limpar regras_quebra_exames:', errorQuebra);
+      } else {
+        console.log('Tabela regras_quebra_exames limpa com sucesso');
+        tabelasLimpas.push('regras_quebra_exames');
+        totalLimpezas += count || 0;
+      }
     }
 
-    // Limpar logs de processamento relacionados
-    const { error: errorLogs } = await supabase
-      .from('processamento_uploads')
-      .delete()
-      .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames']);
+    // Limpar logs de processamento se solicitado
+    if (options.logs_uploads) {
+      console.log('Limpando logs de processamento...');
+      const { error: errorLogs, count } = await supabase
+        .from('processamento_uploads')
+        .delete()
+        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames']);
 
-    if (errorLogs) {
-      console.error('Erro ao limpar logs:', errorLogs);
-      // Não interromper se a tabela não existir
-    } else {
-      console.log('Logs de processamento limpos com sucesso');
+      if (errorLogs) {
+        console.error('Erro ao limpar logs:', errorLogs);
+      } else {
+        console.log('Logs de processamento limpos com sucesso');
+        tabelasLimpas.push('processamento_uploads');
+        totalLimpezas += count || 0;
+      }
     }
 
     // Log da operação de limpeza
@@ -66,7 +83,7 @@ serve(async (req) => {
         tipo_arquivo: 'sistema',
         tipo_dados: 'limpeza',
         status: 'concluido',
-        registros_processados: 0,
+        registros_processados: totalLimpezas,
         registros_inseridos: 0,
         registros_atualizados: 0,
         registros_erro: 0,
@@ -79,8 +96,9 @@ serve(async (req) => {
 
     const resultado = {
       sucesso: true,
-      message: 'Limpeza realizada com sucesso',
-      tabelas_limpas: ['cadastro_exames', 'regras_quebra_exames', 'processamento_uploads'],
+      message: `Limpeza realizada com sucesso. ${totalLimpezas} registros removidos.`,
+      tabelas_limpas: tabelasLimpas,
+      total_registros_removidos: totalLimpezas,
       timestamp: new Date().toISOString()
     };
 
