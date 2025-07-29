@@ -29,7 +29,7 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico'])
+        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades'])
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -83,7 +83,11 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       'quebra_exames': 'Quebra de Exames',
       'precos_servicos': 'Preços de Serviços',
       'regras_exclusao': 'Regras de Exclusão',
-      'repasse_medico': 'Repasse Médico'
+      'repasse_medico': 'Repasse Médico',
+      'modalidades': 'Modalidades',
+      'especialidades': 'Especialidades',
+      'categorias_exame': 'Categorias de Exame',
+      'prioridades': 'Prioridades'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };

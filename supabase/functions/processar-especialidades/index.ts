@@ -27,6 +27,26 @@ serve(async (req) => {
 
     console.log('📂 Processando especialidades:', file.name)
     
+    // Registrar início do upload na tabela de logs
+    const { data: uploadLog, error: logError } = await supabase
+      .from('processamento_uploads')
+      .insert({
+        tipo_arquivo: 'especialidades',
+        arquivo_nome: file.name,
+        status: 'processando',
+        registros_processados: 0,
+        registros_inseridos: 0,
+        registros_atualizados: 0,
+        registros_erro: 0
+      })
+      .select()
+      .single()
+
+    if (logError) {
+      console.error('❌ Erro ao criar log de upload:', logError)
+      throw logError
+    }
+    
     // Ler arquivo (suporta Excel e CSV)
     const arrayBuffer = await file.arrayBuffer()
     let dataRows: string[][] = []
@@ -122,6 +142,19 @@ serve(async (req) => {
         errosDetalhes.push(`Linha "${row.join(',')}": ${error.message}`)
       }
     }
+
+    // Atualizar log com resultado final
+    await supabase
+      .from('processamento_uploads')
+      .update({
+        status: erros === dataRows.length ? 'erro' : 'concluido',
+        registros_processados: dataRows.length,
+        registros_inseridos: inseridos,
+        registros_atualizados: atualizados,
+        registros_erro: erros,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', uploadLog.id)
 
     console.log(`✅ Especialidades processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
 

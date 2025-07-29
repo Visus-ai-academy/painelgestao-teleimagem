@@ -25,13 +25,13 @@ serve(async (req) => {
       throw new Error('Nenhum arquivo enviado')
     }
 
-    console.log('📂 Processando prioridades:', file.name)
+    console.log('📂 Processando categorias:', file.name)
     
     // Registrar início do upload na tabela de logs
     const { data: uploadLog, error: logError } = await supabase
       .from('processamento_uploads')
       .insert({
-        tipo_arquivo: 'prioridades',
+        tipo_arquivo: 'categorias_exame',
         arquivo_nome: file.name,
         status: 'processando',
         registros_processados: 0,
@@ -103,9 +103,9 @@ serve(async (req) => {
           continue
         }
 
-        // Verificar se prioridade já existe
+        // Verificar se categoria já existe
         const { data: existing } = await supabase
-          .from('prioridades')
+          .from('categorias_exame')
           .select('id')
           .eq('nome', nome)
           .single()
@@ -113,7 +113,7 @@ serve(async (req) => {
         if (existing) {
           // Atualizar
           const { error } = await supabase
-            .from('prioridades')
+            .from('categorias_exame')
             .update({
               nome,
               ativo: true,
@@ -126,7 +126,7 @@ serve(async (req) => {
         } else {
           // Inserir
           const { error } = await supabase
-            .from('prioridades')
+            .from('categorias_exame')
             .insert({
               nome,
               ativo: true
@@ -156,7 +156,7 @@ serve(async (req) => {
       })
       .eq('id', uploadLog.id)
 
-    console.log(`✅ Prioridades processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
+    console.log(`✅ Categorias processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
 
     const response = {
       sucesso: true,
