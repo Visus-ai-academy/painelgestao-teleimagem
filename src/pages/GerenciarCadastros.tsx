@@ -5,6 +5,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { FileText, DollarSign, Shield, UserCheck, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 
 export default function GerenciarCadastros() {
   const { toast } = useToast();
@@ -134,6 +135,9 @@ export default function GerenciarCadastros() {
           Upload e gerenciamento de todos os tipos de cadastros do sistema
         </p>
       </div>
+
+      {/* Painel de Status dos Uploads */}
+      <UploadStatusPanel />
 
       <Tabs defaultValue="exames" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
