@@ -101,7 +101,7 @@ export type Database = {
       cadastro_exames: {
         Row: {
           ativo: boolean
-          categoria: string
+          categoria: string | null
           categoria_id: string | null
           codigo_exame: string | null
           created_at: string
@@ -122,7 +122,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
-          categoria: string
+          categoria?: string | null
           categoria_id?: string | null
           codigo_exame?: string | null
           created_at?: string
@@ -143,7 +143,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
-          categoria?: string
+          categoria?: string | null
           categoria_id?: string | null
           codigo_exame?: string | null
           created_at?: string
@@ -1960,7 +1960,7 @@ export type Database = {
       regras_quebra_exames: {
         Row: {
           ativo: boolean
-          categoria_quebrada: string
+          categoria_quebrada: string | null
           created_at: string
           created_by: string | null
           exame_original: string
@@ -1970,7 +1970,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
-          categoria_quebrada: string
+          categoria_quebrada?: string | null
           created_at?: string
           created_by?: string | null
           exame_original: string
@@ -1980,7 +1980,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
-          categoria_quebrada?: string
+          categoria_quebrada?: string | null
           created_at?: string
           created_by?: string | null
           exame_original?: string
