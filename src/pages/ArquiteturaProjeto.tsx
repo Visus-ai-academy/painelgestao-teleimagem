@@ -39,26 +39,33 @@ const ArquiteturaProjeto = () => {
       }
     },
 
-    // RAMO AUTENTICAÇÃO (Topo)
+    // RAMO AUTENTICAÇÃO E SEGURANÇA (Topo)
     {
       id: 'auth-branch',
       type: 'default',
       position: { x: 400, y: 120 },
-      data: { label: '🔐 AUTENTICAÇÃO' },
+      data: { label: '🔐 AUTENTICAÇÃO\n& SEGURANÇA' },
       style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
     },
     {
       id: 'auth-supabase',
       type: 'default',
-      position: { x: 300, y: 50 },
+      position: { x: 250, y: 50 },
       data: { label: 'Supabase Auth' },
       style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
     },
     {
       id: 'auth-context',
       type: 'default',
-      position: { x: 500, y: 50 },
+      position: { x: 400, y: 30 },
       data: { label: 'AuthContext' },
+      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
+    },
+    {
+      id: 'roles-permissions',
+      type: 'default',
+      position: { x: 550, y: 50 },
+      data: { label: 'Roles & RLS' },
       style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
     },
 
@@ -66,29 +73,36 @@ const ArquiteturaProjeto = () => {
     {
       id: 'operacional-branch',
       type: 'default',
-      position: { x: 150, y: 200 },
+      position: { x: 120, y: 200 },
       data: { label: '⚙️ OPERACIONAL' },
       style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140, height: 60 }
     },
     {
       id: 'escala-medica',
       type: 'default',
-      position: { x: 50, y: 120 },
+      position: { x: 20, y: 120 },
       data: { label: '📅 Escala Médica' },
       style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
     },
     {
       id: 'producao',
       type: 'default',
-      position: { x: 50, y: 180 },
+      position: { x: 20, y: 180 },
       data: { label: '📊 Produção' },
       style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
     },
     {
       id: 'qualidade',
       type: 'default',
-      position: { x: 50, y: 240 },
+      position: { x: 20, y: 240 },
       data: { label: '✅ Qualidade' },
+      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
+    },
+    {
+      id: 'volumetria',
+      type: 'default',
+      position: { x: 20, y: 300 },
+      data: { label: '📈 Volumetria' },
       style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
     },
 
@@ -96,29 +110,36 @@ const ArquiteturaProjeto = () => {
     {
       id: 'financeiro-branch',
       type: 'default',
-      position: { x: 650, y: 200 },
+      position: { x: 680, y: 200 },
       data: { label: '💰 FINANCEIRO' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
     },
     {
       id: 'faturamento',
       type: 'default',
-      position: { x: 750, y: 120 },
+      position: { x: 780, y: 120 },
       data: { label: '🧾 Faturamento' },
       style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
     },
     {
       id: 'pagamentos',
       type: 'default',
-      position: { x: 750, y: 180 },
+      position: { x: 780, y: 180 },
       data: { label: '💳 Pagamentos' },
       style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
     },
     {
       id: 'cobranca',
       type: 'default',
-      position: { x: 750, y: 240 },
+      position: { x: 780, y: 240 },
       data: { label: '📬 Cobrança' },
+      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
+    },
+    {
+      id: 'omie-integration',
+      type: 'default',
+      position: { x: 780, y: 300 },
+      data: { label: '🔗 Integração Omie' },
       style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
     },
 
@@ -126,29 +147,36 @@ const ArquiteturaProjeto = () => {
     {
       id: 'people-branch',
       type: 'default',
-      position: { x: 150, y: 450 },
+      position: { x: 120, y: 450 },
       data: { label: '👥 PEOPLE / RH' },
       style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
     },
     {
       id: 'colaboradores',
       type: 'default',
-      position: { x: 50, y: 400 },
+      position: { x: 20, y: 400 },
       data: { label: '👤 Colaboradores' },
       style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
     },
     {
       id: 'carreira',
       type: 'default',
-      position: { x: 50, y: 460 },
+      position: { x: 20, y: 460 },
       data: { label: '📈 P. Carreira' },
       style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
     },
     {
       id: 'treinamento',
       type: 'default',
-      position: { x: 50, y: 520 },
+      position: { x: 20, y: 520 },
       data: { label: '🎓 Treinamento' },
+      style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
+    },
+    {
+      id: 'medicos-gestao',
+      type: 'default',
+      position: { x: 20, y: 580 },
+      data: { label: '👨‍⚕️ Gestão Médicos' },
       style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
     },
 
@@ -156,45 +184,52 @@ const ArquiteturaProjeto = () => {
     {
       id: 'gestao-branch',
       type: 'default',
-      position: { x: 650, y: 450 },
+      position: { x: 680, y: 450 },
       data: { label: '⚡ GESTÃO' },
       style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 140, height: 60 }
     },
     {
       id: 'usuarios',
       type: 'default',
-      position: { x: 750, y: 400 },
+      position: { x: 780, y: 380 },
       data: { label: '👨‍💼 Usuários' },
       style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
     },
     {
       id: 'listas',
       type: 'default',
-      position: { x: 750, y: 460 },
-      data: { label: '📋 Listas' },
+      position: { x: 780, y: 440 },
+      data: { label: '📋 Listas Mestras' },
       style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
     },
     {
       id: 'contratos',
       type: 'default',
-      position: { x: 750, y: 520 },
+      position: { x: 780, y: 500 },
       data: { label: '📄 Contratos' },
       style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
     },
+    {
+      id: 'configuracoes',
+      type: 'default',
+      position: { x: 780, y: 560 },
+      data: { label: '⚙️ Configurações' },
+      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
+    },
 
-    // RAMO DADOS (Inferior Central)
+    // RAMO DADOS E UPLOADS (Inferior Central)
     {
       id: 'dados-branch',
       type: 'default',
       position: { x: 400, y: 550 },
-      data: { label: '📊 DADOS' },
+      data: { label: '📊 DADOS & UPLOADS' },
       style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140, height: 60 }
     },
     {
-      id: 'volumetria',
+      id: 'upload-dados',
       type: 'default',
       position: { x: 300, y: 620 },
-      data: { label: '📈 Volumetria' },
+      data: { label: '📤 Upload Dados' },
       style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
     },
     {
@@ -210,6 +245,20 @@ const ArquiteturaProjeto = () => {
       position: { x: 500, y: 620 },
       data: { label: '📊 Relatórios' },
       style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
+    },
+    {
+      id: 'importacao-inteligente',
+      type: 'default',
+      position: { x: 300, y: 680 },
+      data: { label: '🧠 Importação\nInteligente' },
+      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
+    },
+    {
+      id: 'mapeamento-visual',
+      type: 'default',
+      position: { x: 500, y: 680 },
+      data: { label: '🗺️ Mapeamento\nVisual' },
+      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
     }
   ], []);
 
@@ -222,34 +271,41 @@ const ArquiteturaProjeto = () => {
     { id: 'e-gestao', source: 'sistema-central', target: 'gestao-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
     { id: 'e-dados', source: 'sistema-central', target: 'dados-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
 
-    // Ramificações da autenticação
+    // Ramificações da autenticação e segurança
     { id: 'e-auth1', source: 'auth-branch', target: 'auth-supabase', type: 'smoothstep', style: { stroke: '#f59e0b' } },
     { id: 'e-auth2', source: 'auth-branch', target: 'auth-context', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'e-auth3', source: 'auth-branch', target: 'roles-permissions', type: 'smoothstep', style: { stroke: '#f59e0b' } },
 
     // Ramificações operacional
     { id: 'e-op1', source: 'operacional-branch', target: 'escala-medica', type: 'smoothstep', style: { stroke: '#22c55e' } },
     { id: 'e-op2', source: 'operacional-branch', target: 'producao', type: 'smoothstep', style: { stroke: '#22c55e' } },
     { id: 'e-op3', source: 'operacional-branch', target: 'qualidade', type: 'smoothstep', style: { stroke: '#22c55e' } },
+    { id: 'e-op4', source: 'operacional-branch', target: 'volumetria', type: 'smoothstep', style: { stroke: '#22c55e' } },
 
     // Ramificações financeiro
     { id: 'e-fin1', source: 'financeiro-branch', target: 'faturamento', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'e-fin2', source: 'financeiro-branch', target: 'pagamentos', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'e-fin3', source: 'financeiro-branch', target: 'cobranca', type: 'smoothstep', style: { stroke: '#a855f7' } },
+    { id: 'e-fin4', source: 'financeiro-branch', target: 'omie-integration', type: 'smoothstep', style: { stroke: '#a855f7' } },
 
     // Ramificações people
     { id: 'e-people1', source: 'people-branch', target: 'colaboradores', type: 'smoothstep', style: { stroke: '#f59e0b' } },
     { id: 'e-people2', source: 'people-branch', target: 'carreira', type: 'smoothstep', style: { stroke: '#f59e0b' } },
     { id: 'e-people3', source: 'people-branch', target: 'treinamento', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'e-people4', source: 'people-branch', target: 'medicos-gestao', type: 'smoothstep', style: { stroke: '#f59e0b' } },
 
     // Ramificações gestão
     { id: 'e-gestao1', source: 'gestao-branch', target: 'usuarios', type: 'smoothstep', style: { stroke: '#ef4444' } },
     { id: 'e-gestao2', source: 'gestao-branch', target: 'listas', type: 'smoothstep', style: { stroke: '#ef4444' } },
     { id: 'e-gestao3', source: 'gestao-branch', target: 'contratos', type: 'smoothstep', style: { stroke: '#ef4444' } },
+    { id: 'e-gestao4', source: 'gestao-branch', target: 'configuracoes', type: 'smoothstep', style: { stroke: '#ef4444' } },
 
-    // Ramificações dados
-    { id: 'e-dados1', source: 'dados-branch', target: 'volumetria', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    // Ramificações dados e uploads
+    { id: 'e-dados1', source: 'dados-branch', target: 'upload-dados', type: 'smoothstep', style: { stroke: '#3b82f6' } },
     { id: 'e-dados2', source: 'dados-branch', target: 'dashboard', type: 'smoothstep', style: { stroke: '#3b82f6' } },
     { id: 'e-dados3', source: 'dados-branch', target: 'relatorios', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e-dados4', source: 'dados-branch', target: 'importacao-inteligente', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e-dados5', source: 'dados-branch', target: 'mapeamento-visual', type: 'smoothstep', style: { stroke: '#3b82f6' } },
   ], []);
 
   // 2. ERD INTERATIVO - Relações Detalhadas do Banco
@@ -435,34 +491,92 @@ const ArquiteturaProjeto = () => {
       style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 90 }
     },
 
-    // RAMO SISTEMA (Inferior Central)
+    // RAMO SISTEMA E AUDITORIA (Inferior Central)
     {
       id: 'system-branch',
       type: 'default',
       position: { x: 400, y: 550 },
-      data: { label: '🔧 SISTEMA' },
+      data: { label: '🔧 SISTEMA & AUDITORIA' },
       style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 140, height: 60 }
     },
     {
       id: 'upload-logs',
       type: 'default',
-      position: { x: 320, y: 620 },
+      position: { x: 250, y: 620 },
       data: { label: 'upload_logs' },
+      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+    },
+    {
+      id: 'audit-logs',
+      type: 'default',
+      position: { x: 350, y: 620 },
+      data: { label: 'audit_logs' },
+      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+    },
+    {
+      id: 'security-alerts',
+      type: 'default',
+      position: { x: 450, y: 620 },
+      data: { label: 'security_alerts' },
+      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+    },
+    {
+      id: 'data-access-logs',
+      type: 'default',
+      position: { x: 550, y: 620 },
+      data: { label: 'data_access_\nlogs' },
       style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
     },
     {
       id: 'config-protecao',
       type: 'default',
-      position: { x: 420, y: 650 },
+      position: { x: 300, y: 680 },
       data: { label: 'configuracao_\nprotecao' },
       style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
     },
     {
       id: 'prioridades',
       type: 'default',
-      position: { x: 520, y: 620 },
+      position: { x: 400, y: 680 },
       data: { label: 'prioridades' },
       style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+    },
+    {
+      id: 'field-mappings',
+      type: 'default',
+      position: { x: 500, y: 680 },
+      data: { label: 'field_mappings' },
+      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+    },
+
+    // RAMO IMPORTS E TEMPLATES (Superior Central)
+    {
+      id: 'imports-branch',
+      type: 'default',
+      position: { x: 400, y: 400 },
+      data: { label: '📥 IMPORTS' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
+    },
+    {
+      id: 'import-templates',
+      type: 'default',
+      position: { x: 300, y: 330 },
+      data: { label: 'import_\ntemplates' },
+      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
+    },
+    {
+      id: 'import-history',
+      type: 'default',
+      position: { x: 400, y: 330 },
+      data: { label: 'import_history' },
+      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
+    },
+    {
+      id: 'controle-origem',
+      type: 'default',
+      position: { x: 500, y: 330 },
+      data: { label: 'controle_dados_\norigem' },
+      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
     }
   ], []);
 
@@ -502,10 +616,22 @@ const ArquiteturaProjeto = () => {
     { id: 'cfg3', source: 'config-branch', target: 'categorias-exame', type: 'smoothstep', style: { stroke: '#ef4444' } },
     { id: 'cfg4', source: 'config-branch', target: 'categorias-medico', type: 'smoothstep', style: { stroke: '#ef4444' } },
 
-    // Ramificações sistema
+    // Ramificações sistema e auditoria
     { id: 's1', source: 'system-branch', target: 'upload-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's2', source: 'system-branch', target: 'config-protecao', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's3', source: 'system-branch', target: 'prioridades', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's2', source: 'system-branch', target: 'audit-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's3', source: 'system-branch', target: 'security-alerts', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's4', source: 'system-branch', target: 'data-access-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's5', source: 'system-branch', target: 'config-protecao', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's6', source: 'system-branch', target: 'prioridades', type: 'smoothstep', style: { stroke: '#6b7280' } },
+    { id: 's7', source: 'system-branch', target: 'field-mappings', type: 'smoothstep', style: { stroke: '#6b7280' } },
+
+    // Ramificações imports
+    { id: 'imp1', source: 'imports-branch', target: 'import-templates', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'imp2', source: 'imports-branch', target: 'import-history', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'imp3', source: 'imports-branch', target: 'controle-origem', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+
+    // Conexão adicional para imports
+    { id: 'db-imports', source: 'db-central', target: 'imports-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
 
     // Relacionamentos entre tabelas (Foreign Keys)
     { id: 'fk1', source: 'medicos', target: 'escalas', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'medico_id' },
@@ -628,37 +754,74 @@ const ArquiteturaProjeto = () => {
     {
       id: 'email-service',
       type: 'default',
-      position: { x: 120, y: 650 },
+      position: { x: 80, y: 650 },
       data: { label: '📧 Email\n(Resend)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'pdf-service',
       type: 'default',
-      position: { x: 260, y: 650 },
-      data: { label: '📄 PDF\n(jsPDF)' },
+      position: { x: 220, y: 650 },
+      data: { label: '📄 PDF\n(jsPDF/html2canvas)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'clicksign',
       type: 'default',
-      position: { x: 400, y: 650 },
+      position: { x: 360, y: 650 },
       data: { label: '✍️ Assinatura\n(ClickSign)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'omie',
       type: 'default',
-      position: { x: 540, y: 650 },
+      position: { x: 500, y: 650 },
       data: { label: '💼 ERP\n(Omie)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
     },
     {
       id: 'mobilemed',
       type: 'default',
-      position: { x: 680, y: 650 },
+      position: { x: 640, y: 650 },
       data: { label: '🏥 Sistema\n(Mobilemed)' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+    },
+    {
+      id: 'maps-service',
+      type: 'default',
+      position: { x: 780, y: 650 },
+      data: { label: '🗺️ Maps\n(Leaflet)' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+    },
+
+    // PERFORMANCE & MONITORING
+    {
+      id: 'monitoring',
+      type: 'default',
+      position: { x: 80, y: 750 },
+      data: { label: '📊 Performance\nMonitoring' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+    },
+    {
+      id: 'backup-service',
+      type: 'default',
+      position: { x: 220, y: 750 },
+      data: { label: '💾 Backup\nManager' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+    },
+    {
+      id: 'security-monitor',
+      type: 'default',
+      position: { x: 360, y: 750 },
+      data: { label: '🔒 Security\nMonitor' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+    },
+    {
+      id: 'lgpd-compliance',
+      type: 'default',
+      position: { x: 500, y: 750 },
+      data: { label: '🛡️ LGPD\nCompliance' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
     }
   ], []);
 
@@ -686,12 +849,21 @@ const ArquiteturaProjeto = () => {
     { id: 'int-click', source: 'integrations', target: 'clicksign', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'int-omie', source: 'integrations', target: 'omie', type: 'smoothstep', style: { stroke: '#a855f7' } },
     { id: 'int-mobilemed', source: 'integrations', target: 'mobilemed', type: 'smoothstep', style: { stroke: '#a855f7' } },
+    { id: 'int-maps', source: 'integrations', target: 'maps-service', type: 'smoothstep', style: { stroke: '#a855f7' } },
+
+    // Performance & Monitoring connections
+    { id: 'edge-monitoring', source: 'edge-functions', target: 'monitoring', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
+    { id: 'edge-backup', source: 'edge-functions', target: 'backup-service', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
+    { id: 'edge-security', source: 'edge-functions', target: 'security-monitor', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
+    { id: 'edge-lgpd', source: 'edge-functions', target: 'lgpd-compliance', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
 
     // Direct connections
     { id: 'pages-auth', source: 'pages', target: 'auth-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
     { id: 'pages-db', source: 'pages', target: 'database-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
+    { id: 'state-db', source: 'state-management', target: 'database-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
     { id: 'edge-email', source: 'edge-functions', target: 'email-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
     { id: 'mobilemed-volumetria', source: 'mobilemed', target: 'database-service', type: 'smoothstep', style: { stroke: '#10b981', strokeDasharray: '10,5' }, label: 'Dados Volumetria' },
+    { id: 'omie-faturamento', source: 'omie', target: 'database-service', type: 'smoothstep', style: { stroke: '#10b981', strokeDasharray: '10,5' }, label: 'Sincronização ERP' },
   ], []);
 
   // 4. FLUXOS DE PROCESSO PRINCIPAIS
@@ -835,6 +1007,80 @@ const ArquiteturaProjeto = () => {
       position: { x: 850, y: 500 },
       data: { label: '📱 Notificar\nEquipe' },
       style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+    },
+
+    // FLUXO DE IMPORTAÇÃO INTELIGENTE
+    {
+      id: 'import-start',
+      type: 'input',
+      position: { x: 50, y: 650 },
+      data: { label: '📤 Importar\nArquivo' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
+    },
+    {
+      id: 'detect-format',
+      type: 'default',
+      position: { x: 250, y: 650 },
+      data: { label: '🧠 Detectar\nFormato' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
+    },
+    {
+      id: 'apply-mapping',
+      type: 'default',
+      position: { x: 450, y: 650 },
+      data: { label: '🗺️ Aplicar\nMapeamento' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+    },
+    {
+      id: 'validate-data',
+      type: 'default',
+      position: { x: 650, y: 650 },
+      data: { label: '✅ Validar\nDados' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
+    },
+    {
+      id: 'import-complete',
+      type: 'output',
+      position: { x: 850, y: 650 },
+      data: { label: '✨ Importação\nCompleta' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+    },
+
+    // FLUXO DE SEGURANÇA E AUDITORIA
+    {
+      id: 'security-event',
+      type: 'input',
+      position: { x: 50, y: 800 },
+      data: { label: '🚨 Evento\nSegurança' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
+    },
+    {
+      id: 'analyze-threat',
+      type: 'default',
+      position: { x: 250, y: 800 },
+      data: { label: '🔍 Analisar\nAmeaça' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
+    },
+    {
+      id: 'create-alert',
+      type: 'default',
+      position: { x: 450, y: 800 },
+      data: { label: '⚠️ Criar\nAlerta' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+    },
+    {
+      id: 'log-audit',
+      type: 'default',
+      position: { x: 650, y: 800 },
+      data: { label: '📝 Log\nAuditoria' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
+    },
+    {
+      id: 'notify-admin',
+      type: 'output',
+      position: { x: 850, y: 800 },
+      data: { label: '📧 Notificar\nAdmin' },
+      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
     }
   ], []);
 
@@ -861,6 +1107,18 @@ const ArquiteturaProjeto = () => {
     { id: 'sched2', source: 'check-availability', target: 'assign-doctor', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
     { id: 'sched3', source: 'assign-doctor', target: 'confirm-schedule', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
     { id: 'sched4', source: 'confirm-schedule', target: 'notify-team', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+
+    // Fluxo de Importação Inteligente
+    { id: 'imp1', source: 'import-start', target: 'detect-format', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'imp2', source: 'detect-format', target: 'apply-mapping', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'imp3', source: 'apply-mapping', target: 'validate-data', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'imp4', source: 'validate-data', target: 'import-complete', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+
+    // Fluxo de Segurança
+    { id: 'sec1', source: 'security-event', target: 'analyze-threat', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'sec2', source: 'analyze-threat', target: 'create-alert', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'sec3', source: 'create-alert', target: 'log-audit', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'sec4', source: 'log-audit', target: 'notify-admin', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
   ], []);
 
   // Estados dos flows
