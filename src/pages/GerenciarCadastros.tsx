@@ -659,7 +659,7 @@ export default function GerenciarCadastros() {
                 Modalidades
               </CardTitle>
               <CardDescription>
-                Upload de arquivo CSV com modalidades de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=modalidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de planilha com modalidades de exames disponíveis no sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -696,7 +696,7 @@ export default function GerenciarCadastros() {
                 Especialidades
               </CardTitle>
               <CardDescription>
-                Upload de arquivo CSV com especialidades médicas. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=especialidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de planilha com especialidades médicas disponíveis no sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -733,7 +733,7 @@ export default function GerenciarCadastros() {
                 Categorias de Exame
               </CardTitle>
               <CardDescription>
-                Upload de arquivo CSV com categorias de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=categorias_exame', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de planilha com categorias de exames disponíveis no sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -770,7 +770,7 @@ export default function GerenciarCadastros() {
                 Prioridades
               </CardTitle>
               <CardDescription>
-                Upload de arquivo CSV com prioridades de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=prioridades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de planilha com prioridades de exames disponíveis no sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
