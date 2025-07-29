@@ -101,48 +101,17 @@ serve(async (req) => {
           ativo: true
         };
 
-        // Verificar se já existe (primeiro por nome, depois por código se houver)
-        let existente = null;
-        
-        // Buscar por nome exato primeiro
-        const { data: existentePorNome } = await supabase
+        // IMPORTANTE: Como a base foi limpa, todos são novos registros
+        // Verificar duplicatas apenas dentro do próprio arquivo sendo processado
+        console.log(`Linha ${i + 1}: ${exameData.nome} - SEMPRE INSERIR (base limpa)`);
+
+        // Inserir novo registro (não verificar duplicatas pois base foi limpa)
+        const { error: insertError } = await supabase
           .from('cadastro_exames')
-          .select('id')
-          .eq('nome', exameData.nome)
-          .maybeSingle();
-        
-        existente = existentePorNome;
-        
-        // Se não encontrou por nome e tem código, buscar por código
-        if (!existente && exameData.codigo_exame) {
-          const { data: existentePorCodigo } = await supabase
-            .from('cadastro_exames')
-            .select('id')
-            .eq('codigo_exame', exameData.codigo_exame)
-            .maybeSingle();
-          existente = existentePorCodigo;
-        }
-        
-        console.log(`Linha ${i + 1}: ${exameData.nome} - Existe: ${existente ? 'SIM' : 'NÃO'}`);
+          .insert(exameData);
 
-        if (existente) {
-          // Atualizar existente
-          const { error: updateError } = await supabase
-            .from('cadastro_exames')
-            .update(exameData)
-            .eq('id', existente.id);
-
-          if (updateError) throw updateError;
-          atualizados++;
-        } else {
-          // Inserir novo
-          const { error: insertError } = await supabase
-            .from('cadastro_exames')
-            .insert(exameData);
-
-          if (insertError) throw insertError;
-          inseridos++;
-        }
+        if (insertError) throw insertError;
+        inseridos++;
 
         console.log(`Linha ${i + 1}: Processada com sucesso - ${exameData.nome}`);
 
