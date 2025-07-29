@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,40 +27,59 @@ serve(async (req) => {
 
     console.log('📂 Processando categorias de exame:', file.name)
     
-    // Ler arquivo como ArrayBuffer para tratar encoding
+    // Ler arquivo (suporta Excel e CSV)
     const arrayBuffer = await file.arrayBuffer()
-    const decoder = new TextDecoder('utf-8')
-    let text = decoder.decode(arrayBuffer)
+    let dataRows: string[][] = []
     
-    // Remover BOM se presente
-    if (text.charCodeAt(0) === 0xFEFF) {
-      text = text.slice(1)
-    }
-    
-    const lines = text.split('\n').filter(line => line.trim())
-    
-    if (lines.length < 2) {
-      throw new Error('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados')
-    }
+    if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+      // Processar arquivo Excel
+      console.log('📊 Processando arquivo Excel')
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][]
+      
+      if (jsonData.length < 2) {
+        throw new Error('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados')
+      }
+      
+      // Pular a primeira linha (cabeçalho)
+      dataRows = jsonData.slice(1)
+    } else {
+      // Processar arquivo CSV
+      console.log('📄 Processando arquivo CSV')
+      const decoder = new TextDecoder('utf-8')
+      let text = decoder.decode(arrayBuffer)
+      
+      // Remover BOM se presente
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1)
+      }
+      
+      const lines = text.split('\n').filter(line => line.trim())
+      
+      if (lines.length < 2) {
+        throw new Error('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados')
+      }
 
-    // Pular a primeira linha (cabeçalho)
-    const dataLines = lines.slice(1)
+      // Pular a primeira linha (cabeçalho) e converter para array de arrays
+      dataRows = lines.slice(1).map(line => line.split(',').map(col => col.trim().replace(/"/g, '')))
+    }
     
     let inseridos = 0
     let atualizados = 0
     let erros = 0
     const errosDetalhes: string[] = []
 
-    for (const line of dataLines) {
-      if (!line.trim()) continue
+    for (const row of dataRows) {
+      if (!row || row.length === 0) continue
       
       try {
-        const cols = line.split(',').map(col => col.trim().replace(/"/g, ''))
-        const nome = cols[0]
+        const nome = row[0]?.toString()?.trim()
         
         if (!nome) {
           erros++
-          errosDetalhes.push(`Linha sem nome: ${line}`)
+          errosDetalhes.push(`Linha sem nome: ${row.join(',')}`)
           continue
         }
 
@@ -97,9 +117,9 @@ serve(async (req) => {
         }
         
       } catch (error) {
-        console.error('❌ Erro ao processar linha:', line, error)
+        console.error('❌ Erro ao processar linha:', row.join(','), error)
         erros++
-        errosDetalhes.push(`Linha "${line}": ${error.message}`)
+        errosDetalhes.push(`Linha "${row.join(',')}": ${error.message}`)
       }
     }
 
@@ -107,7 +127,7 @@ serve(async (req) => {
 
     const response = {
       sucesso: true,
-      processados: dataLines.length,
+      processados: dataRows.length,
       inseridos,
       atualizados,
       erros,
