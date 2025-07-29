@@ -15,7 +15,7 @@ export const useCadastroExames = () => {
       const { data: exames, error: examesError } = await supabase
         .from('cadastro_exames')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('nome', { ascending: true });
 
       if (examesError) throw examesError;
 
