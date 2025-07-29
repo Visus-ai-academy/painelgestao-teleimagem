@@ -665,8 +665,8 @@ export default function GerenciarCadastros() {
             <CardContent>
               <FileUpload
                 title="Upload de Modalidades"
-                description="Arquivo CSV com uma coluna contendo os nomes das modalidades"
-                acceptedTypes={['.csv']}
+                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das modalidades"
+                acceptedTypes={['.csv', '.xlsx', '.xls']}
                 maxSizeInMB={10}
                 expectedFormat={[
                   "modalidade (obrigatório) - Nome da modalidade"
@@ -702,8 +702,8 @@ export default function GerenciarCadastros() {
             <CardContent>
               <FileUpload
                 title="Upload de Especialidades"
-                description="Arquivo CSV com uma coluna contendo os nomes das especialidades"
-                acceptedTypes={['.csv']}
+                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das especialidades"
+                acceptedTypes={['.csv', '.xlsx', '.xls']}
                 maxSizeInMB={10}
                 expectedFormat={[
                   "especialidade (obrigatório) - Nome da especialidade"
@@ -739,8 +739,8 @@ export default function GerenciarCadastros() {
             <CardContent>
               <FileUpload
                 title="Upload de Categorias"
-                description="Arquivo CSV com uma coluna contendo os nomes das categorias"
-                acceptedTypes={['.csv']}
+                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das categorias"
+                acceptedTypes={['.csv', '.xlsx', '.xls']}
                 maxSizeInMB={10}
                 expectedFormat={[
                   "categoria (obrigatório) - Nome da categoria"
@@ -776,8 +776,8 @@ export default function GerenciarCadastros() {
             <CardContent>
               <FileUpload
                 title="Upload de Prioridades"
-                description="Arquivo CSV com uma coluna contendo os nomes das prioridades"
-                acceptedTypes={['.csv']}
+                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das prioridades"
+                acceptedTypes={['.csv', '.xlsx', '.xls']}
                 maxSizeInMB={10}
                 expectedFormat={[
                   "prioridade (obrigatório) - Nome da prioridade"
