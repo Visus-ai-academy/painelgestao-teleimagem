@@ -1,0 +1,5 @@
+medico_id,modalidade,especialidade,prioridade,valor
+"","MR","NE","Rotina",150.00
+"","MR","NE","Urgente",225.00
+"550e8400-e29b-41d4-a716-446655440003","CT","RA","Rotina",120.00
+"550e8400-e29b-41d4-a716-446655440003","CT","RA","Urgente",180.00

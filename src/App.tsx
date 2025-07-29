@@ -46,6 +46,7 @@ import MapeamentoVisual from "./pages/MapeamentoVisual";
 import Seguranca from "./pages/Seguranca";
 import Pendencias from "./pages/Pendencias";
 import ControleRegras from "./pages/ControleRegras";
+import GerenciarCadastros from "./pages/GerenciarCadastros";
 import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
 import NotFound from "./pages/NotFound";
 
@@ -368,6 +369,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <ControleRegras />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/gerenciar-cadastros" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['admin']}>
+                    <GerenciarCadastros />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

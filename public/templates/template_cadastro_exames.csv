@@ -1,0 +1,4 @@
+nome,descricao,modalidade,especialidade,categoria,prioridade,codigo_exame,permite_quebra,criterio_quebra,exames_derivados
+"RM Crânio sem Contraste","Ressonância Magnética do Crânio sem uso de Contraste","MR","NE","Normal","Rotina","RM001",false,"","[]"
+"TC Tórax com Contraste","Tomografia Computadorizada do Tórax com Contraste","CT","RA","Normal","Urgente","TC002",false,"","[]"
+"US Abdome Total","Ultrassonografia de Abdome Total","US","AB","Normal","Rotina","US003",true,"{""criterio"": ""sexo"", ""valores"": [""M"", ""F""]}","[""US003M"", ""US003F""]"

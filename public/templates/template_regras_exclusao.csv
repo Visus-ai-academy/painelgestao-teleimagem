@@ -1,0 +1,4 @@
+nome_regra,descricao,criterios,prioridade,acao,motivo_exclusao,aplicar_legado,aplicar_incremental
+"Exclusão Valores Zero","Excluir registros com valor zero ou nulo","{""valor"": 0}",1,"exclusao","Valor zerado - não deve ser faturado",true,true
+"Exclusão Exames Cancelados","Excluir exames com status cancelado","{""status"": ""CANCELADO""}",2,"exclusao","Exame cancelado pelo cliente",true,true
+"Alerta Valores Altos","Alertar para valores acima de R$ 1000","{""valor"": {"">="": 1000}}",10,"alerta","Valor alto - requer aprovação",false,true

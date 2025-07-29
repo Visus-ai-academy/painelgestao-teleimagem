@@ -159,6 +159,9 @@ const menuItems: MenuItem[] = [
     url: "/upload-dados", 
     icon: Upload,
     requiredRoles: ['manager', 'admin'],
+    subItems: [
+      { title: "Gerenciar Cadastros", url: "/gerenciar-cadastros", requiredRoles: ['admin'] },
+    ]
   },
   { 
     title: "Meu Perfil", 
