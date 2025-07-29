@@ -39,7 +39,10 @@ const listConfigs: ListConfig[] = [
 ];
 
 export default function GerenciarListas() {
-  const [activeTab, setActiveTab] = useState("modalidades");
+  const [activeTab, setActiveTab] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('tab') || "modalidades";
+  });
   const [items, setItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

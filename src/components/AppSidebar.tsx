@@ -129,7 +129,6 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Configuração de Faturamento", url: "/configuracao/faturamento", requiredRoles: ['admin'] },
       { title: "Gerenciar Usuários", url: "/configuracao/usuarios", requiredRoles: ['admin'] },
-      { title: "Listas do Sistema", url: "/configuracao/listas", requiredRoles: ['admin'] },
       { title: "Logomarca", url: "/configuracao/logomarca", requiredRoles: ['admin'] },
       { title: "Estrutura de Vendas", url: "/estrutura-vendas", requiredRoles: ['admin'] },
       { title: "Configuração Importação", url: "/configuracao-importacao", requiredRoles: ['admin'] },
@@ -161,6 +160,10 @@ const menuItems: MenuItem[] = [
     requiredRoles: ['manager', 'admin'],
     subItems: [
       { title: "Gerenciar Cadastros", url: "/gerenciar-cadastros", requiredRoles: ['admin'] },
+      { title: "Modalidades", url: "/configuracao/listas?tab=modalidades", requiredRoles: ['admin'] },
+      { title: "Especialidades", url: "/configuracao/listas?tab=especialidades", requiredRoles: ['admin'] },
+      { title: "Categorias de Exame", url: "/configuracao/listas?tab=categorias_exame", requiredRoles: ['admin'] },
+      { title: "Prioridades", url: "/configuracao/listas?tab=prioridades", requiredRoles: ['admin'] },
     ]
   },
   { 
