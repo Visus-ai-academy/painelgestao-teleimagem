@@ -58,10 +58,10 @@ serve(async (req) => {
         // Mapear campos com diferentes variações de nome
         const exameOriginal = row.EXAME || row.exame;
         const exameQuebrado = row.QUEBRA || row.quebra;
-        const categoriaQuebrada = row.CATEGORIA || row.categoria;
+        const categoriaQuebrada = row.CATEGORIA || row.categoria || 'GERAL'; // Categoria padrão se não informada
         
-        if (!exameOriginal || !exameQuebrado || !categoriaQuebrada) {
-          throw new Error('Campos obrigatórios em branco: EXAME, QUEBRA, CATEGORIA');
+        if (!exameOriginal || !exameQuebrado) {
+          throw new Error('Campos obrigatórios em branco: EXAME, QUEBRA');
         }
 
         // Preparar dados da regra de quebra
