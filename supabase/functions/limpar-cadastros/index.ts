@@ -177,18 +177,55 @@ serve(async (req) => {
       }
     }
 
-    // Limpar logs de processamento se solicitado
+    // Mapeamento de tabelas para tipos de arquivo
+    const tipoArquivoMap = {
+      'cadastro_exames': 'cadastro_exames',
+      'regras_quebra_exames': 'quebra_exames',
+      'precos_servicos': 'precos_servicos',
+      'regras_exclusao': 'regras_exclusao',
+      'medicos_valores_repasse': 'repasse_medico',
+      'modalidades': 'modalidades',
+      'especialidades': 'especialidades',
+      'categorias_exame': 'categorias_exame',
+      'prioridades': 'prioridades'
+    };
+
+    // Coletar tipos de arquivo para limpar logs automaticamente
+    const tiposArquivoParaLimpar: string[] = [];
+    tabelasLimpas.forEach(tabela => {
+      const tipoArquivo = tipoArquivoMap[tabela as keyof typeof tipoArquivoMap];
+      if (tipoArquivo) {
+        tiposArquivoParaLimpar.push(tipoArquivo);
+      }
+    });
+
+    // Limpar logs relacionados às tabelas que foram limpas
+    if (tiposArquivoParaLimpar.length > 0) {
+      console.log('Limpando logs relacionados aos tipos:', tiposArquivoParaLimpar);
+      const { error: errorLogsRelacionados } = await supabase
+        .from('processamento_uploads')
+        .delete()
+        .in('tipo_arquivo', tiposArquivoParaLimpar);
+
+      if (errorLogsRelacionados) {
+        console.error('Erro ao limpar logs relacionados:', errorLogsRelacionados);
+      } else {
+        console.log('Logs relacionados limpos com sucesso');
+      }
+    }
+
+    // Limpar logs de processamento explicitamente se solicitado
     if (options.logs_uploads) {
-      console.log('Limpando logs de processamento...');
+      console.log('Limpando logs de processamento explicitos...');
       const { error: errorLogs, count } = await supabase
         .from('processamento_uploads')
         .delete()
-        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades']);
+        .not('tipo_arquivo', 'in', ['limpeza']); // Preservar logs de limpeza
 
       if (errorLogs) {
-        console.error('Erro ao limpar logs:', errorLogs);
+        console.error('Erro ao limpar logs explicitos:', errorLogs);
       } else {
-        console.log('Logs de processamento limpos com sucesso');
+        console.log('Logs de processamento explicitos limpos com sucesso');
         tabelasLimpas.push('processamento_uploads');
         totalLimpezas += count || 0;
       }
