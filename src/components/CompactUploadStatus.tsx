@@ -34,14 +34,16 @@ export function CompactUploadStatus({ fileType, refreshTrigger }: CompactUploadS
         .select('*')
         .eq('tipo_arquivo', fileType)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Erro ao buscar estatística:', error);
+        setUploadStat(null);
+        return;
       }
 
-      setUploadStat(data || null);
+      // Se não há dados, é array vazio, então pegar o primeiro item ou null
+      setUploadStat(data && data.length > 0 ? data[0] : null);
     } catch (error) {
       console.error('Erro ao buscar estatística:', error);
       setUploadStat(null);
