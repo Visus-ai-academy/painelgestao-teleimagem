@@ -58,7 +58,7 @@ serve(async (req) => {
         // Mapear campos com diferentes variações de nome
         const exameOriginal = row.EXAME || row.exame;
         const exameQuebrado = row.QUEBRA || row.quebra;
-        const categoriaQuebrada = row.CATEGORIA || row.categoria || 'GERAL'; // Categoria padrão se não informada
+        const categoriaQuebrada = row.CATEGORIA || row.categoria; // Deixar em branco se não informada
         
         if (!exameOriginal || !exameQuebrado) {
           throw new Error('Campos obrigatórios em branco: EXAME, QUEBRA');
@@ -68,7 +68,7 @@ serve(async (req) => {
         const regraData = {
           exame_original: exameOriginal.trim(),
           exame_quebrado: exameQuebrado.trim(),
-          categoria_quebrada: categoriaQuebrada.trim(),
+          categoria_quebrada: categoriaQuebrada?.trim() || null, // Deixar null se não informada
           ativo: true
         };
 

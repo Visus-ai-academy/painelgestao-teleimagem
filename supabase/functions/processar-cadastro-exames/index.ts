@@ -75,7 +75,7 @@ serve(async (req) => {
         const nomeExame = row.EXAME || row.nome;
         const modalidade = row.MODALIDADE || row.modalidade;
         const especialidade = row.ESPECIALIDADE || row.especialidade;
-        const categoria = row.CATEGORIA || row.categoria || 'GERAL'; // Categoria padrão se não informada
+        const categoria = row.CATEGORIA || row.categoria; // Deixar em branco se não informada
         const prioridade = row.PRIORIDADE || row.prioridade;
         
         if (!nomeExame || !modalidade || !especialidade) {
@@ -88,11 +88,11 @@ serve(async (req) => {
           descricao: (row.DESCRICAO || row.descricao)?.trim() || null,
           modalidade: modalidade.trim(),
           especialidade: especialidade.trim(),
-          categoria: categoria.trim(),
+          categoria: categoria?.trim() || null, // Deixar null se não informada
           prioridade: prioridade?.trim() || 'Rotina',
           modalidade_id: modalidadeMap.get(modalidade.toLowerCase().trim()),
           especialidade_id: especialidadeMap.get(especialidade.toLowerCase().trim()),
-          categoria_id: categoriaMap.get(categoria.toLowerCase().trim()),
+          categoria_id: categoria ? categoriaMap.get(categoria.toLowerCase().trim()) : null, // Só buscar ID se categoria existe
           prioridade_id: prioridadeMap.get((prioridade || 'Rotina').toLowerCase().trim()),
           codigo_exame: (row.CODIGO_EXAME || row.codigo_exame)?.trim() || null,
           permite_quebra: (row.PERMITE_QUEBRA || row.permite_quebra) === true || (row.PERMITE_QUEBRA || row.permite_quebra) === 'true' || (row.PERMITE_QUEBRA || row.permite_quebra) === 'SIM',
