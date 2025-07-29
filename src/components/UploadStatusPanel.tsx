@@ -30,7 +30,8 @@ export function UploadStatusPanel() {
         .from('processamento_uploads')
         .select('*')
         .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 
