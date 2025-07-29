@@ -51,6 +51,16 @@ export const useCadastroExames = () => {
       console.log('🔍 Exames com AVC carregados:', examesAVC.length);
       examesAVC.forEach(exam => console.log(`  - ${exam.nome}`));
       
+      // Debug: forçar nova busca imediatamente para verificar se a query está funcionando
+      console.log('🔄 Fazendo nova busca para debug...');
+      const { data: debugExames } = await supabase
+        .from('cadastro_exames')
+        .select('nome')
+        .ilike('nome', '%AVC%');
+      
+      console.log('🔍 Debug - Exames com AVC encontrados diretamente:', debugExames?.length || 0);
+      debugExames?.forEach(exam => console.log(`  DEBUG - ${exam.nome}`));
+      
       setData(examesAtualizados);
     } catch (err: any) {
       console.error('❌ Erro ao carregar exames:', err);
