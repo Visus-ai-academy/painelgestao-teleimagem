@@ -4,9 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Shield, Users, Database, DollarSign, FileText, Settings, Lock, Eye, UserCheck, CheckCircle, Download } from "lucide-react";
 import jsPDF from 'jspdf';
+import { differenceInBusinessDays } from 'date-fns';
 
 
 const RelatorioImplementacoes = () => {
+  // Calcular dias úteis entre 15/07/2025 e 29/07/2025
+  const dataInicio = new Date(2025, 6, 15); // 15/07/2025 (mês 6 = julho, 0-indexado)
+  const dataFim = new Date(2025, 6, 29);    // 29/07/2025
+  const diasUteis = differenceInBusinessDays(dataFim, dataInicio) + 1; // +1 para incluir o dia inicial
+  
   const implementacoes = [
     {
       titulo: "Sistema de Segurança e Auditoria Completo",
@@ -234,7 +240,7 @@ const RelatorioImplementacoes = () => {
     yPosition += 6;
     doc.text(`• Edge Functions: ${estatisticas.totalEdgeFunctions}`, 20, yPosition);
     yPosition += 6;
-    doc.text("• Dias de Desenvolvimento: 14 dias corridos", 20, yPosition);
+    doc.text(`• Dias Úteis de Desenvolvimento: ${diasUteis} dias úteis`, 20, yPosition);
     yPosition += 15;
     
     // Implementações
@@ -357,11 +363,11 @@ const RelatorioImplementacoes = () => {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dias Corridos de Desenvolvimento</CardTitle>
+            <CardTitle className="text-sm font-medium">Dias Úteis de Desenvolvimento</CardTitle>
             <UserCheck className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">14</div>
+            <div className="text-2xl font-bold">{diasUteis}</div>
           </CardContent>
         </Card>
       </div>
