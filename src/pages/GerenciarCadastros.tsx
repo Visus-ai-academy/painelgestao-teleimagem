@@ -5,11 +5,23 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileUpload } from '@/components/FileUpload';
+import { CadastroDataTable } from '@/components/CadastroDataTable';
 import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { 
+  useCadastroExames, 
+  useQuebraExames, 
+  usePrecosServicos, 
+  useRegrasExclusao, 
+  useRepasseMedico,
+  useModalidades,
+  useEspecialidades,
+  useCategoriasExame,
+  usePrioridades
+} from '@/hooks/useCadastroData';
 
 export default function GerenciarCadastros() {
   const { toast } = useToast();
@@ -21,6 +33,17 @@ export default function GerenciarCadastros() {
     quebra_exames: false,
     logs_uploads: false
   });
+
+  // Hooks para buscar dados dos cadastros
+  const examesData = useCadastroExames();
+  const quebraData = useQuebraExames();
+  const precosData = usePrecosServicos();
+  const regrasData = useRegrasExclusao();
+  const repasseData = useRepasseMedico();
+  const modalidadesData = useModalidades();
+  const especialidadesData = useEspecialidades();
+  const categoriasData = useCategoriasExame();
+  const prioridadesData = usePrioridades();
 
   // Handler para limpar cadastros (individualizado)
   const handleClearCadastros = async () => {
@@ -95,6 +118,9 @@ export default function GerenciarCadastros() {
       title: "Cadastro de Exames Processado!",
       description: `${data.inseridos} exames cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    examesData.refetch();
   };
 
   // Handler para quebra de exames
@@ -114,6 +140,9 @@ export default function GerenciarCadastros() {
       title: "Regras de Quebra Processadas!",
       description: `${data.inseridos} regras cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    quebraData.refetch();
   };
 
   // Handler para preços de serviços
@@ -133,6 +162,9 @@ export default function GerenciarCadastros() {
       title: "Preços de Serviços Processados!",
       description: `${data.inseridos} preços cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    precosData.refetch();
   };
 
   // Handler para regras de exclusão
@@ -152,6 +184,9 @@ export default function GerenciarCadastros() {
       title: "Regras de Exclusão Processadas!",
       description: `${data.inseridos} regras cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    regrasData.refetch();
   };
 
   // Handler para repasse médico
@@ -171,6 +206,9 @@ export default function GerenciarCadastros() {
       title: "Repasse Médico Processado!",
       description: `${data.inseridos} valores cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    repasseData.refetch();
   };
 
   // Handler para modalidades
@@ -190,6 +228,9 @@ export default function GerenciarCadastros() {
       title: "Modalidades Processadas!",
       description: `${data.inseridos} modalidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    modalidadesData.refetch();
   };
 
   // Handler para especialidades
@@ -209,6 +250,9 @@ export default function GerenciarCadastros() {
       title: "Especialidades Processadas!",
       description: `${data.inseridos} especialidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    especialidadesData.refetch();
   };
 
   // Handler para categorias
@@ -228,6 +272,9 @@ export default function GerenciarCadastros() {
       title: "Categorias Processadas!",
       description: `${data.inseridos} categorias cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    categoriasData.refetch();
   };
 
   // Handler para prioridades
@@ -247,6 +294,9 @@ export default function GerenciarCadastros() {
       title: "Prioridades Processadas!",
       description: `${data.inseridos} prioridades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
+    
+    // Recarregar dados
+    prioridadesData.refetch();
   };
 
   // Handler para dados legados
@@ -341,6 +391,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadExames}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={examesData.data}
+                  loading={examesData.loading}
+                  error={examesData.error}
+                  type="exames"
+                  title="Exames Cadastrados"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -370,6 +430,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadQuebraExames}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={quebraData.data}
+                  loading={quebraData.loading}
+                  error={quebraData.error}
+                  type="quebra"
+                  title="Regras de Quebra Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -408,6 +478,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadPrecos}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={precosData.data}
+                  loading={precosData.loading}
+                  error={precosData.error}
+                  type="precos"
+                  title="Preços de Serviços Cadastrados"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -442,6 +522,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadRegras}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={regrasData.data}
+                  loading={regrasData.loading}
+                  error={regrasData.error}
+                  type="regras"
+                  title="Regras de Exclusão Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -473,6 +563,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadRepasse}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={repasseData.data}
+                  loading={repasseData.loading}
+                  error={repasseData.error}
+                  type="repasse"
+                  title="Valores de Repasse Cadastrados"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -573,6 +673,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadModalidades}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={modalidadesData.data}
+                  loading={modalidadesData.loading}
+                  error={modalidadesData.error}
+                  type="modalidades"
+                  title="Modalidades Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -600,6 +710,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadEspecialidades}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={especialidadesData.data}
+                  loading={especialidadesData.loading}
+                  error={especialidadesData.error}
+                  type="especialidades"
+                  title="Especialidades Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -627,6 +747,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadCategorias}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={categoriasData.data}
+                  loading={categoriasData.loading}
+                  error={categoriasData.error}
+                  type="categorias"
+                  title="Categorias Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -654,6 +784,16 @@ export default function GerenciarCadastros() {
                 ]}
                 onUpload={handleUploadPrioridades}
               />
+              
+              <div className="mt-8">
+                <CadastroDataTable
+                  data={prioridadesData.data}
+                  loading={prioridadesData.loading}
+                  error={prioridadesData.error}
+                  type="prioridades"
+                  title="Prioridades Cadastradas"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
