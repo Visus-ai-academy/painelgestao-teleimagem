@@ -31,6 +31,13 @@ export default function GerenciarCadastros() {
   const [clearOptions, setClearOptions] = useState({
     cadastro_exames: false,
     quebra_exames: false,
+    precos_servicos: false,
+    regras_exclusao: false,
+    medicos_valores_repasse: false,
+    modalidades: false,
+    especialidades: false,
+    categorias_exame: false,
+    prioridades: false,
     logs_uploads: false
   });
 
@@ -84,6 +91,13 @@ export default function GerenciarCadastros() {
       setClearOptions({
         cadastro_exames: false,
         quebra_exames: false,
+        precos_servicos: false,
+        regras_exclusao: false,
+        medicos_valores_repasse: false,
+        modalidades: false,
+        especialidades: false,
+        categorias_exame: false,
+        prioridades: false,
         logs_uploads: false
       });
       setShowClearDialog(false);
@@ -837,6 +851,97 @@ export default function GerenciarCadastros() {
               />
               <label htmlFor="quebra-exames" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Limpar Regras de Quebra ({clearOptions.quebra_exames ? 'TODAS as regras serão removidas' : 'Manter regras'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="precos-servicos"
+                checked={clearOptions.precos_servicos}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, precos_servicos: !!checked }))
+                }
+              />
+              <label htmlFor="precos-servicos" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Preços de Serviços ({clearOptions.precos_servicos ? 'TODOS os preços serão removidos' : 'Manter preços'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="regras-exclusao"
+                checked={clearOptions.regras_exclusao}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, regras_exclusao: !!checked }))
+                }
+              />
+              <label htmlFor="regras-exclusao" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Regras de Exclusão ({clearOptions.regras_exclusao ? 'TODAS as regras serão removidas' : 'Manter regras'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="medicos-valores-repasse"
+                checked={clearOptions.medicos_valores_repasse}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, medicos_valores_repasse: !!checked }))
+                }
+              />
+              <label htmlFor="medicos-valores-repasse" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Valores de Repasse Médico ({clearOptions.medicos_valores_repasse ? 'TODOS os valores serão removidos' : 'Manter valores'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="modalidades"
+                checked={clearOptions.modalidades}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, modalidades: !!checked }))
+                }
+              />
+              <label htmlFor="modalidades" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Modalidades ({clearOptions.modalidades ? 'TODAS as modalidades serão removidas' : 'Manter modalidades'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="especialidades"
+                checked={clearOptions.especialidades}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, especialidades: !!checked }))
+                }
+              />
+              <label htmlFor="especialidades" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Especialidades ({clearOptions.especialidades ? 'TODAS as especialidades serão removidas' : 'Manter especialidades'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="categorias-exame"
+                checked={clearOptions.categorias_exame}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, categorias_exame: !!checked }))
+                }
+              />
+              <label htmlFor="categorias-exame" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Categorias de Exame ({clearOptions.categorias_exame ? 'TODAS as categorias serão removidas' : 'Manter categorias'})
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="prioridades"
+                checked={clearOptions.prioridades}
+                onCheckedChange={(checked) => 
+                  setClearOptions(prev => ({ ...prev, prioridades: !!checked }))
+                }
+              />
+              <label htmlFor="prioridades" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Limpar Prioridades ({clearOptions.prioridades ? 'TODAS as prioridades serão removidas' : 'Manter prioridades'})
               </label>
             </div>
             
