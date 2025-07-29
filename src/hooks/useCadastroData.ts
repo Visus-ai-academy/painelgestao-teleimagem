@@ -46,20 +46,10 @@ export const useCadastroExames = () => {
       console.log(`✅ Exames carregados: ${examesAtualizados.length} registros`);
       console.log(`✅ Exames com quebra: ${examesComQuebra.size} registros`);
       
-      // Debug: verificar se exames com AVC estão sendo carregados
-      const examesAVC = examesAtualizados.filter(exam => exam.nome.includes('AVC'));
-      console.log('🔍 Exames com AVC carregados:', examesAVC.length);
-      examesAVC.forEach(exam => console.log(`  - ${exam.nome}`));
-      
-      // Debug: forçar nova busca imediatamente para verificar se a query está funcionando
-      console.log('🔄 Fazendo nova busca para debug...');
-      const { data: debugExames } = await supabase
-        .from('cadastro_exames')
-        .select('nome')
-        .ilike('nome', '%AVC%');
-      
-      console.log('🔍 Debug - Exames com AVC encontrados diretamente:', debugExames?.length || 0);
-      debugExames?.forEach(exam => console.log(`  DEBUG - ${exam.nome}`));
+      // Debug: verificar exames que começam com parênteses
+      const examesComParenteses = examesAtualizados.filter(exam => exam.nome.startsWith('('));
+      console.log('🔍 Exames que começam com parênteses:', examesComParenteses.length);
+      examesComParenteses.slice(0, 5).forEach(exam => console.log(`  - ${exam.nome}`));
       
       setData(examesAtualizados);
     } catch (err: any) {
