@@ -103,8 +103,37 @@ export default function GerenciarCadastros() {
       });
       setShowClearDialog(false);
 
-      // Recarregar o painel de status
-      window.location.reload();
+      // Recarregar dados conforme as tabelas que foram limpas
+      if (data.tabelas_limpas?.includes('cadastro_exames')) {
+        examesData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('regras_quebra_exames')) {
+        quebraData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('precos_servicos')) {
+        precosData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('regras_exclusao')) {
+        regrasData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('medicos_valores_repasse')) {
+        repasseData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('modalidades')) {
+        modalidadesData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('especialidades')) {
+        especialidadesData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('categorias_exame')) {
+        categoriasData.refetch();
+      }
+      if (data.tabelas_limpas?.includes('prioridades')) {
+        prioridadesData.refetch();
+      }
+      
+      // Atualizar status dos uploads
+      setRefreshStatusPanel(prev => prev + 1);
     } catch (error: any) {
       toast({
         title: "Erro na Limpeza",
