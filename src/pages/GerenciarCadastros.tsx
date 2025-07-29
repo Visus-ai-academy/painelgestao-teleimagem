@@ -313,7 +313,7 @@ export default function GerenciarCadastros() {
     const formData = new FormData();
     formData.append('file', file);
 
-    const { data, error } = await supabase.functions.invoke('processar-categorias-exame', {
+    const { data, error } = await supabase.functions.invoke('processar-categorias', {
       body: formData
     });
 
