@@ -41,7 +41,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
             return (
               item.exame_original?.toLowerCase().includes(searchLower) ||
               item.exame_quebrado?.toLowerCase().includes(searchLower) ||
-              item.categoria_quebra?.toLowerCase().includes(searchLower)
+              item.categoria_quebrada?.toLowerCase().includes(searchLower)
             );
           case 'precos':
             return (
@@ -215,7 +215,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.exame_original}</TableCell>
                   <TableCell>{item.exame_quebrado}</TableCell>
-                  <TableCell>{item.categoria_quebra}</TableCell>
+                  <TableCell>{item.categoria_quebrada}</TableCell>
                   <TableCell>
                     <Badge variant={item.ativo ? "default" : "secondary"}>
                       {item.ativo ? "Ativo" : "Inativo"}
