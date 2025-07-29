@@ -8,12 +8,13 @@ const corsHeaders = {
 };
 
 interface ExameRow {
-  nome: string;
+  EXAME?: string;
+  nome?: string;
   descricao?: string;
   modalidade: string;
   especialidade: string;
   categoria: string;
-  prioridade: string;
+  prioridade?: string;
   codigo_exame?: string;
   permite_quebra?: boolean;
   criterio_quebra?: string;
@@ -70,22 +71,25 @@ serve(async (req) => {
       processados++;
 
       try {
-        if (!row.nome || !row.modalidade || !row.especialidade || !row.categoria || !row.prioridade) {
-          throw new Error('Campos obrigatórios em branco: nome, modalidade, especialidade, categoria, prioridade');
+        // Mapear campo EXAME para nome
+        const nomeExame = row.EXAME || row.nome;
+        
+        if (!nomeExame || !row.modalidade || !row.especialidade || !row.categoria) {
+          throw new Error('Campos obrigatórios em branco: EXAME, modalidade, especialidade, categoria');
         }
 
         // Preparar dados do exame
         const exameData = {
-          nome: row.nome.trim(),
+          nome: nomeExame.trim(),
           descricao: row.descricao?.trim() || null,
           modalidade: row.modalidade.trim(),
           especialidade: row.especialidade.trim(),
           categoria: row.categoria.trim(),
-          prioridade: row.prioridade.trim(),
+          prioridade: row.prioridade?.trim() || 'Rotina',
           modalidade_id: modalidadeMap.get(row.modalidade.toLowerCase().trim()),
           especialidade_id: especialidadeMap.get(row.especialidade.toLowerCase().trim()),
           categoria_id: categoriaMap.get(row.categoria.toLowerCase().trim()),
-          prioridade_id: prioridadeMap.get(row.prioridade.toLowerCase().trim()),
+          prioridade_id: prioridadeMap.get((row.prioridade || 'Rotina').toLowerCase().trim()),
           codigo_exame: row.codigo_exame?.trim() || null,
           permite_quebra: row.permite_quebra === true || row.permite_quebra === 'true' || row.permite_quebra === 'SIM',
           criterio_quebra: row.criterio_quebra ? JSON.parse(row.criterio_quebra) : null,

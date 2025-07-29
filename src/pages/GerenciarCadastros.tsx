@@ -144,12 +144,11 @@ export default function GerenciarCadastros() {
                 acceptedTypes={['.csv', '.xlsx', '.xls']}
                 maxSizeInMB={50}
                 expectedFormat={[
-                  "nome (obrigatório)",
+                  "EXAME (obrigatório)",
                   "descricao (opcional)",
                   "modalidade (obrigatório)",
                   "especialidade (obrigatório)",
                   "categoria (obrigatório)",
-                  "prioridade (obrigatório)",
                   "codigo_exame (opcional)",
                   "permite_quebra (true/false)",
                   "criterio_quebra (JSON opcional)",
