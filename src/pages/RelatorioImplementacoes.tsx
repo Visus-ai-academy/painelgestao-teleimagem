@@ -13,6 +13,54 @@ const RelatorioImplementacoes = () => {
   const dataFim = new Date(2025, 6, 29);    // 29/07/2025
   const diasUteis = differenceInBusinessDays(dataFim, dataInicio) + 1; // +1 para incluir o dia inicial
   
+  // Todas as regras implementadas no sistema
+  const regrasImplementadas = [
+    // VOLUMETRIA
+    { id: 'v001', nome: 'Proteção Temporal de Dados', modulo: 'volumetria', categoria: 'temporal', criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros.' },
+    { id: 'v002', nome: 'Validação de Atraso de Laudos', modulo: 'volumetria', categoria: 'validação', criterio: 'Identifica exames com atraso quando DATA_LAUDO > DATA_PRAZO. Calcula percentual de atraso.' },
+    { id: 'v003', nome: 'Filtro por Período', modulo: 'volumetria', categoria: 'dados', criterio: 'Permite filtrar dados por períodos pré-definidos (Hoje, Ontem, Última Semana, etc.) ou período customizado.' },
+    { id: 'v004', nome: 'Segmentação por Cliente', modulo: 'volumetria', categoria: 'dados', criterio: 'Filtra dados por cliente específico ou exibe todos. Lista clientes únicos disponíveis.' },
+    { id: 'v005', nome: 'Agregação por Modalidade', modulo: 'volumetria', categoria: 'dados', criterio: 'Agrupa exames por modalidade, calcula totais e percentuais para análise comparativa.' },
+    { id: 'v006', nome: 'Agregação por Especialidade', modulo: 'volumetria', categoria: 'dados', criterio: 'Agrupa exames por especialidade médica, calcula estatísticas de volume.' },
+    { id: 'v007', nome: 'Comparação entre Arquivos', modulo: 'volumetria', categoria: 'validação', criterio: 'Identifica clientes presentes em um arquivo mas ausentes em outro para validação de consistência.' },
+    { id: 'v008', nome: 'Cache de Performance', modulo: 'volumetria', categoria: 'dados', criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.' },
+    { id: 'v009', nome: 'Tratamento de Arquivo 1 - Data de Exame', modulo: 'volumetria', categoria: 'dados', criterio: 'Processa dados do primeiro arquivo de upload, extrai DATA_REALIZACAO e converte para formato padrão.' },
+    { id: 'v010', nome: 'Tratamento de Arquivo 2 - Data de Laudo', modulo: 'volumetria', categoria: 'dados', criterio: 'Processa dados do segundo arquivo de upload, extrai DATA_LAUDO e DATA_PRAZO para análise de prazo.' },
+    { id: 'v011', nome: 'Tratamento de Arquivo 3 - Valores e Prioridades', modulo: 'volumetria', categoria: 'dados', criterio: 'Processa dados do terceiro arquivo, extrai VALORES e PRIORIDADE para cálculos financeiros.' },
+    { id: 'v012', nome: 'Tratamento de Arquivo 4 - Dados Complementares', modulo: 'volumetria', categoria: 'dados', criterio: 'Processa dados do quarto arquivo, extrai informações complementares como MEDICO, ESPECIALIDADE e STATUS.' },
+    { id: 'v013', nome: 'Validação de Formato Excel', modulo: 'volumetria', categoria: 'validação', criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.' },
+    { id: 'v014', nome: 'Mapeamento Dinâmico de Campos', modulo: 'volumetria', categoria: 'dados', criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.' },
+    { id: 'v015', nome: 'Limpeza de Dados Duplicados', modulo: 'volumetria', categoria: 'dados', criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.' },
+    { id: 'v016', nome: 'Processamento em Lotes', modulo: 'volumetria', categoria: 'dados', criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance e evitar timeouts.' },
+    { id: 'v017', nome: 'Log de Upload e Auditoria', modulo: 'volumetria', categoria: 'dados', criterio: 'Registra todos os uploads na tabela upload_logs com status, erros e estatísticas de processamento.' },
+    { id: 'v018', nome: 'Transformação de Valores Numéricos', modulo: 'volumetria', categoria: 'dados', criterio: 'Converte colunas de valores para formato numérico, remove caracteres não numéricos e ajusta casas decimais.' },
+    { id: 'v019', nome: 'Remoção de Decimais Desnecessários', modulo: 'volumetria', categoria: 'dados', criterio: 'Remove ".00" de valores monetários quando não há centavos, mantendo apenas valores inteiros limpos.' },
+    { id: 'v020', nome: 'Formatação Padrão CNPJ Brasil', modulo: 'volumetria', categoria: 'dados', criterio: 'Aplica máscara padrão brasileira XX.XXX.XXX/XXXX-XX em colunas de CNPJ, validando formato e dígitos.' },
+    { id: 'v021', nome: 'Padronização de Formato de Data', modulo: 'volumetria', categoria: 'dados', criterio: 'Converte todas as datas para formato padrão DD/MM/YYYY, detectando automaticamente formatos de entrada.' },
+    { id: 'v022', nome: 'Validação e Limpeza de Caracteres Especiais', modulo: 'volumetria', categoria: 'dados', criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).' },
+    { id: 'v023', nome: 'Tratamento de Campos Vazios e Nulos', modulo: 'volumetria', categoria: 'dados', criterio: 'Define valores padrão para campos obrigatórios vazios e converte strings vazias em NULL apropriadamente.' },
+    { id: 'v024', nome: 'Normalização de Nomes e Textos', modulo: 'volumetria', categoria: 'dados', criterio: 'Padroniza capitalização de nomes (Title Case), remove acentos desnecessários e corrige encoding.' },
+    { id: 'v025', nome: 'Validação de Integridade Referencial', modulo: 'volumetria', categoria: 'validação', criterio: 'Verifica se códigos de cliente, médico e especialidade existem nas tabelas de referência antes da inserção.' },
+    { id: 'v026', nome: 'Mapeamento De Para - Valores por Estudo', modulo: 'volumetria', categoria: 'dados', criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados nos arquivos 1, 2, 3 e 4 através de correspondência por descrição do estudo.' },
+    
+    // FATURAMENTO
+    { id: 'f001', nome: 'Geração Automática de Faturas', modulo: 'faturamento', categoria: 'automação', criterio: 'Gera faturas automaticamente baseado nos exames realizados e valores contratuais.' },
+    { id: 'f002', nome: 'Integração OMIE', modulo: 'faturamento', categoria: 'integração', criterio: 'Sincroniza dados de faturamento com sistema OMIE para controle fiscal.' },
+    
+    // CLIENTES
+    { id: 'c001', nome: 'Validação de CNPJ', modulo: 'clientes', categoria: 'validação', criterio: 'Valida formato e autenticidade do CNPJ do cliente antes do cadastro.' },
+    
+    // MÉDICOS
+    { id: 'm001', nome: 'Validação de CRM', modulo: 'médicos', categoria: 'validação', criterio: 'Valida formato do CRM e especialidade médica cadastrada.' },
+    
+    // ESCALAS
+    { id: 'e001', nome: 'Proteção Temporal Escalas', modulo: 'escalas', categoria: 'temporal', criterio: 'Aplicação das mesmas regras temporais de volumetria para escalas médicas.' },
+    
+    // SEGURANÇA
+    { id: 's001', nome: 'Controle de Acesso por Perfil', modulo: 'segurança', categoria: 'acesso', criterio: 'Define permissões específicas baseadas no perfil do usuário (admin, manager, médico).' },
+    { id: 's002', nome: 'Auditoria de Operações', modulo: 'segurança', categoria: 'acesso', criterio: 'Registra todas as operações críticas com identificação do usuário, timestamp e dados alterados.' }
+  ];
+
   const implementacoes = [
     {
       titulo: "Sistema de Segurança e Auditoria Completo",
@@ -305,6 +353,61 @@ const RelatorioImplementacoes = () => {
       yPosition += 10;
     });
     
+    // Adicionar seção de regras
+    yPosition += 10;
+    if (yPosition > 250) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REGRAS DE NEGÓCIO IMPLEMENTADAS', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total de Regras: ${regrasImplementadas.length}`, 20, yPosition);
+    yPosition += 10;
+    
+    // Agrupar regras por módulo
+    const regrasPorModulo = regrasImplementadas.reduce((acc, regra) => {
+      if (!acc[regra.modulo]) acc[regra.modulo] = [];
+      acc[regra.modulo].push(regra);
+      return acc;
+    }, {} as Record<string, typeof regrasImplementadas>);
+    
+    Object.entries(regrasPorModulo).forEach(([modulo, regras]) => {
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${modulo.toUpperCase()} (${regras.length} regras)`, 20, yPosition);
+      yPosition += 8;
+      
+      regras.forEach((regra) => {
+        if (yPosition > 260) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${regra.id} - ${regra.nome}`, 25, yPosition);
+        yPosition += 5;
+        
+        doc.setFont('helvetica', 'normal');
+        const splitCriterio = doc.splitTextToSize(`Critério: ${regra.criterio}`, 165);
+        doc.text(splitCriterio, 25, yPosition);
+        yPosition += splitCriterio.length * 4 + 3;
+      });
+      
+      yPosition += 5;
+    });
+
     // Salvar PDF
     doc.save('relatorio-implementacoes.pdf');
   };
