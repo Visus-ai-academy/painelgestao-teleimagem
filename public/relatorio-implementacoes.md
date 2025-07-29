@@ -1,5 +1,5 @@
 # RELATÓRIO DE IMPLEMENTAÇÕES
-## Período: 15/07/2024 até 29/01/2025
+## Período: 15/07/2025 até 29/01/2026
 
 ---
 
