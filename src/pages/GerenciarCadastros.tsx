@@ -28,6 +28,7 @@ export default function GerenciarCadastros() {
   const { isAdmin } = useUserPermissions();
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [refreshStatusPanel, setRefreshStatusPanel] = useState(0);
   const [clearOptions, setClearOptions] = useState({
     cadastro_exames: false,
     quebra_exames: false,
@@ -133,8 +134,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} exames cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     examesData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para quebra de exames
@@ -155,8 +157,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} regras cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     quebraData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para preços de serviços
@@ -177,8 +180,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} preços cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     precosData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para regras de exclusão
@@ -199,8 +203,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} regras cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     regrasData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para repasse médico
@@ -221,8 +226,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} valores cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     repasseData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para modalidades
@@ -243,8 +249,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} modalidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     modalidadesData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para especialidades
@@ -265,8 +272,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} especialidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     especialidadesData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para categorias
@@ -287,8 +295,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} categorias cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     categoriasData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para prioridades
@@ -309,8 +318,9 @@ export default function GerenciarCadastros() {
       description: `${data.inseridos} prioridades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
     });
     
-    // Recarregar dados
+    // Recarregar dados e status
     prioridadesData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
   };
 
   // Handler para dados legados
@@ -358,7 +368,7 @@ export default function GerenciarCadastros() {
       </div>
 
       {/* Painel de Status dos Uploads */}
-      <UploadStatusPanel />
+      <UploadStatusPanel key={refreshStatusPanel} />
 
       <Tabs defaultValue="exames" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10">
