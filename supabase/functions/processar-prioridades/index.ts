@@ -26,7 +26,16 @@ serve(async (req) => {
 
     console.log('📂 Processando prioridades:', file.name)
     
-    const text = await file.text()
+    // Ler arquivo como ArrayBuffer para tratar encoding
+    const arrayBuffer = await file.arrayBuffer()
+    const decoder = new TextDecoder('utf-8')
+    let text = decoder.decode(arrayBuffer)
+    
+    // Remover BOM se presente
+    if (text.charCodeAt(0) === 0xFEFF) {
+      text = text.slice(1)
+    }
+    
     const lines = text.split('\n').filter(line => line.trim())
     
     if (lines.length < 2) {
