@@ -154,12 +154,12 @@ const menuItems: MenuItem[] = [
     requiredRoles: ['manager', 'admin'],
   },
   { 
-    title: "Upload de Dados", 
+    title: "Cadastros Base", 
     url: "/upload-dados", 
     icon: Upload,
     requiredRoles: ['manager', 'admin'],
     subItems: [
-      { title: "Gerenciar Cadastros", url: "/gerenciar-cadastros", requiredRoles: ['admin'] },
+      { title: "Cadastros", url: "/gerenciar-cadastros", requiredRoles: ['admin'] },
     ]
   },
   { 
