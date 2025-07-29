@@ -23,27 +23,27 @@ serve(async (req) => {
     const { error: errorCadastro } = await supabase
       .from('cadastro_exames')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
     if (errorCadastro) {
       console.error('Erro ao limpar cadastro_exames:', errorCadastro);
-      throw errorCadastro;
+      // Não interromper se a tabela não existir
+    } else {
+      console.log('Tabela cadastro_exames limpa com sucesso');
     }
-
-    console.log('Tabela cadastro_exames limpa com sucesso');
 
     // Limpar tabela de regras de quebra de exames
     const { error: errorQuebra } = await supabase
       .from('regras_quebra_exames')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
     if (errorQuebra) {
       console.error('Erro ao limpar regras_quebra_exames:', errorQuebra);
-      throw errorQuebra;
+      // Não interromper se a tabela não existir
+    } else {
+      console.log('Tabela regras_quebra_exames limpa com sucesso');
     }
-
-    console.log('Tabela regras_quebra_exames limpa com sucesso');
 
     // Limpar logs de processamento relacionados
     const { error: errorLogs } = await supabase
@@ -53,10 +53,10 @@ serve(async (req) => {
 
     if (errorLogs) {
       console.error('Erro ao limpar logs:', errorLogs);
-      throw errorLogs;
+      // Não interromper se a tabela não existir
+    } else {
+      console.log('Logs de processamento limpos com sucesso');
     }
-
-    console.log('Logs de processamento limpos com sucesso');
 
     // Log da operação de limpeza
     const { error: logError } = await supabase
