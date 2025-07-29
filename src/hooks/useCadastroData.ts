@@ -11,11 +11,12 @@ export const useCadastroExames = () => {
       setLoading(true);
       console.log('🔍 Buscando exames...');
       
-      // Buscar exames
+      // Buscar exames - SEM LIMITAÇÃO
       const { data: exames, error: examesError } = await supabase
         .from('cadastro_exames')
         .select('*')
-        .order('nome', { ascending: true });
+        .order('nome', { ascending: true })
+        .limit(10000); // Limite muito alto para garantir que todos os registros sejam carregados
 
       if (examesError) throw examesError;
 
