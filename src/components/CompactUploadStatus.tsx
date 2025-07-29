@@ -38,17 +38,82 @@ export function CompactUploadStatus({ fileType, refreshTrigger }: CompactUploadS
 
       if (error) {
         console.error('Erro ao buscar estatística:', error);
-        setUploadStat(null);
+      }
+
+      // Se não há dados no log, buscar informações da tabela correspondente
+      if (!data || data.length === 0) {
+        await fetchTableStats();
         return;
       }
 
-      // Se não há dados, é array vazio, então pegar o primeiro item ou null
-      setUploadStat(data && data.length > 0 ? data[0] : null);
+      setUploadStat(data[0]);
     } catch (error) {
       console.error('Erro ao buscar estatística:', error);
-      setUploadStat(null);
+      await fetchTableStats();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Buscar estatísticas diretamente das tabelas quando não há log
+  const fetchTableStats = async () => {
+    try {
+      let count = 0;
+      let lastCreated = '';
+
+      switch (fileType) {
+        case 'modalidades': {
+          const { count: modalidadesCount } = await supabase.from('modalidades').select('*', { count: 'exact', head: true });
+          const { data: lastRecord } = await supabase.from('modalidades').select('created_at').order('created_at', { ascending: false }).limit(1);
+          count = modalidadesCount || 0;
+          lastCreated = lastRecord?.[0]?.created_at || new Date().toISOString();
+          break;
+        }
+        case 'especialidades': {
+          const { count: especialidadesCount } = await supabase.from('especialidades').select('*', { count: 'exact', head: true });
+          const { data: lastRecord } = await supabase.from('especialidades').select('created_at').order('created_at', { ascending: false }).limit(1);
+          count = especialidadesCount || 0;
+          lastCreated = lastRecord?.[0]?.created_at || new Date().toISOString();
+          break;
+        }
+        case 'categorias_exame': {
+          const { count: categoriasCount } = await supabase.from('categorias_exame').select('*', { count: 'exact', head: true });
+          const { data: lastRecord } = await supabase.from('categorias_exame').select('created_at').order('created_at', { ascending: false }).limit(1);
+          count = categoriasCount || 0;
+          lastCreated = lastRecord?.[0]?.created_at || new Date().toISOString();
+          break;
+        }
+        case 'prioridades': {
+          const { count: prioridadesCount } = await supabase.from('prioridades').select('*', { count: 'exact', head: true });
+          const { data: lastRecord } = await supabase.from('prioridades').select('created_at').order('created_at', { ascending: false }).limit(1);
+          count = prioridadesCount || 0;
+          lastCreated = lastRecord?.[0]?.created_at || new Date().toISOString();
+          break;
+        }
+        default: 
+          setUploadStat(null);
+          return;
+      }
+
+      if (count > 0) {
+        // Criar um status simulado baseado nos dados da tabela
+        setUploadStat({
+          tipo_arquivo: fileType,
+          arquivo_nome: 'Upload anterior (dados existentes)',
+          status: 'concluido',
+          registros_processados: count,
+          registros_inseridos: count,
+          registros_atualizados: 0,
+          registros_erro: 0,
+          created_at: lastCreated
+        });
+      } else {
+        setUploadStat(null);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao buscar dados da tabela:', error);
+      setUploadStat(null);
     }
   };
 
