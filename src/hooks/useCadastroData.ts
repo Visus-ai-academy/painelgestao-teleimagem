@@ -14,6 +14,7 @@ export const useCadastroExames = () => {
       const { data: exames, error, count } = await supabase
         .from('cadastro_exames')
         .select('*', { count: 'exact' })
+        .limit(50000) // Remover limitação de 1000 registros
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -48,6 +49,7 @@ export const useQuebraExames = () => {
       const { data: quebras, error, count } = await supabase
         .from('regras_quebra_exames')
         .select('*', { count: 'exact' })
+        .limit(50000) // Remover limitação de 1000 registros
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -80,6 +82,7 @@ export const usePrecosServicos = () => {
       const { data: precos, error } = await supabase
         .from('precos_servicos')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -109,6 +112,7 @@ export const useRegrasExclusao = () => {
       const { data: regras, error } = await supabase
         .from('regras_exclusao_faturamento')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -141,6 +145,7 @@ export const useRepasseMedico = () => {
           *,
           medicos(nome, crm)
         `)
+        .limit(50000) // Remover limitação de 1000 registros
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -170,6 +175,7 @@ export const useModalidades = () => {
       const { data: modalidades, error } = await supabase
         .from('modalidades')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('ordem', { ascending: true });
 
       if (error) throw error;
@@ -199,6 +205,7 @@ export const useEspecialidades = () => {
       const { data: especialidades, error } = await supabase
         .from('especialidades')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('ordem', { ascending: true });
 
       if (error) throw error;
@@ -228,6 +235,7 @@ export const useCategoriasExame = () => {
       const { data: categorias, error } = await supabase
         .from('categorias_exame')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('ordem', { ascending: true });
 
       if (error) throw error;
@@ -257,6 +265,7 @@ export const usePrioridades = () => {
       const { data: prioridades, error } = await supabase
         .from('prioridades')
         .select('*')
+        .limit(50000) // Remover limitação de 1000 registros
         .order('ordem', { ascending: true });
 
       if (error) throw error;
