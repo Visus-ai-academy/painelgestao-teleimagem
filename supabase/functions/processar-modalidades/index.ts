@@ -46,6 +46,8 @@ serve(async (req) => {
       
       try {
         const cols = line.split(',').map(col => col.trim().replace(/"/g, ''))
+        
+        // Espera apenas uma coluna: nome
         const nome = cols[0]
         
         if (!nome) {
