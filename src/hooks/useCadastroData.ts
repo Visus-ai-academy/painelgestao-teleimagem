@@ -19,20 +19,28 @@ export const useCadastroExames = () => {
 
       if (examesError) throw examesError;
 
-      // Buscar regras de quebra
+      // Buscar regras de quebra com contagem
       const { data: quebras, error: quebrasError } = await supabase
         .from('regras_quebra_exames')
         .select('exame_original');
 
       if (quebrasError) throw quebrasError;
 
+      // Criar mapa com contagem de quebras por exame
+      const contagemQuebras = quebras?.reduce((acc, quebra) => {
+        const exame = quebra.exame_original;
+        acc[exame] = (acc[exame] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
       // Criar set com exames que permitem quebra
       const examesComQuebra = new Set(quebras?.map(q => q.exame_original) || []);
 
-      // Atualizar exames com a informação de permite_quebra
+      // Atualizar exames com a informação de permite_quebra e quantidade_quebras
       const examesAtualizados = exames?.map(exame => ({
         ...exame,
-        permite_quebra: examesComQuebra.has(exame.nome)
+        permite_quebra: examesComQuebra.has(exame.nome),
+        quantidade_quebras: contagemQuebras[exame.nome] || 0
       })) || [];
       
       console.log(`✅ Exames carregados: ${examesAtualizados.length} registros`);

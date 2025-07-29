@@ -29,7 +29,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
           { key: 'especialidade', label: 'Especialidade', filterable: true },
           { key: 'categoria', label: 'Categoria', filterable: true },
           { key: 'permite_quebra', label: 'Permite Quebra', filterable: true },
-          { key: 'ativo', label: 'Status', filterable: true },
+          { key: 'quantidade_quebras', label: 'Qtd. Quebras', filterable: false },
           { key: 'created_at', label: 'Criado em', filterable: false }
         ];
       case 'quebra':
@@ -98,6 +98,8 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return `R$ ${Number(item.valor || 0).toFixed(2)}`;
       case 'permite_quebra':
         return item.permite_quebra ? "Sim" : "Não";
+      case 'quantidade_quebras':
+        return item.quantidade_quebras || 0;
       case 'ativo':
         return item.ativo ? "Ativo" : "Inativo";
       case 'created_at':
