@@ -11,15 +11,33 @@ export const useCadastroExames = () => {
       setLoading(true);
       console.log('🔍 Buscando exames...');
       
-      const { data: exames, error } = await supabase
+      // Buscar exames
+      const { data: exames, error: examesError } = await supabase
         .from('cadastro_exames')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (examesError) throw examesError;
+
+      // Buscar regras de quebra
+      const { data: quebras, error: quebrasError } = await supabase
+        .from('regras_quebra_exames')
+        .select('exame_original');
+
+      if (quebrasError) throw quebrasError;
+
+      // Criar set com exames que permitem quebra
+      const examesComQuebra = new Set(quebras?.map(q => q.exame_original) || []);
+
+      // Atualizar exames com a informação de permite_quebra
+      const examesAtualizados = exames?.map(exame => ({
+        ...exame,
+        permite_quebra: examesComQuebra.has(exame.nome)
+      })) || [];
       
-      console.log(`✅ Exames carregados: ${exames?.length || 0} registros`);
-      setData(exames || []);
+      console.log(`✅ Exames carregados: ${examesAtualizados.length} registros`);
+      console.log(`✅ Exames com quebra: ${examesComQuebra.size} registros`);
+      setData(examesAtualizados);
     } catch (err: any) {
       console.error('❌ Erro ao carregar exames:', err);
       setError(err.message);
