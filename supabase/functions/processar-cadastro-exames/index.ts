@@ -143,7 +143,7 @@ serve(async (req) => {
       .insert({
         arquivo_nome: file.name,
         tipo_arquivo: 'cadastro_exames',
-        tipo_dados: 'configuracao',
+        tipo_dados: 'incremental',
         status: erros === processados ? 'erro' : 'concluido',
         registros_processados: processados,
         registros_inseridos: inseridos,
