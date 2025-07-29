@@ -71,29 +71,33 @@ serve(async (req) => {
       processados++;
 
       try {
-        // Mapear campo EXAME para nome
+        // Mapear campos considerando maiúsculo/minúsculo
         const nomeExame = row.EXAME || row.nome;
+        const modalidade = row.MODALIDADE || row.modalidade;
+        const especialidade = row.ESPECIALIDADE || row.especialidade;
+        const categoria = row.CATEGORIA || row.categoria;
+        const prioridade = row.PRIORIDADE || row.prioridade;
         
-        if (!nomeExame || !row.modalidade || !row.especialidade || !row.categoria) {
+        if (!nomeExame || !modalidade || !especialidade || !categoria) {
           throw new Error('Campos obrigatórios em branco: EXAME, modalidade, especialidade, categoria');
         }
 
         // Preparar dados do exame
         const exameData = {
           nome: nomeExame.trim(),
-          descricao: row.descricao?.trim() || null,
-          modalidade: row.modalidade.trim(),
-          especialidade: row.especialidade.trim(),
-          categoria: row.categoria.trim(),
-          prioridade: row.prioridade?.trim() || 'Rotina',
-          modalidade_id: modalidadeMap.get(row.modalidade.toLowerCase().trim()),
-          especialidade_id: especialidadeMap.get(row.especialidade.toLowerCase().trim()),
-          categoria_id: categoriaMap.get(row.categoria.toLowerCase().trim()),
-          prioridade_id: prioridadeMap.get((row.prioridade || 'Rotina').toLowerCase().trim()),
-          codigo_exame: row.codigo_exame?.trim() || null,
-          permite_quebra: row.permite_quebra === true || row.permite_quebra === 'true' || row.permite_quebra === 'SIM',
-          criterio_quebra: row.criterio_quebra ? JSON.parse(row.criterio_quebra) : null,
-          exames_derivados: row.exames_derivados ? JSON.parse(row.exames_derivados) : null,
+          descricao: (row.DESCRICAO || row.descricao)?.trim() || null,
+          modalidade: modalidade.trim(),
+          especialidade: especialidade.trim(),
+          categoria: categoria.trim(),
+          prioridade: prioridade?.trim() || 'Rotina',
+          modalidade_id: modalidadeMap.get(modalidade.toLowerCase().trim()),
+          especialidade_id: especialidadeMap.get(especialidade.toLowerCase().trim()),
+          categoria_id: categoriaMap.get(categoria.toLowerCase().trim()),
+          prioridade_id: prioridadeMap.get((prioridade || 'Rotina').toLowerCase().trim()),
+          codigo_exame: (row.CODIGO_EXAME || row.codigo_exame)?.trim() || null,
+          permite_quebra: (row.PERMITE_QUEBRA || row.permite_quebra) === true || (row.PERMITE_QUEBRA || row.permite_quebra) === 'true' || (row.PERMITE_QUEBRA || row.permite_quebra) === 'SIM',
+          criterio_quebra: (row.CRITERIO_QUEBRA || row.criterio_quebra) ? JSON.parse(row.CRITERIO_QUEBRA || row.criterio_quebra) : null,
+          exames_derivados: (row.EXAMES_DERIVADOS || row.exames_derivados) ? JSON.parse(row.EXAMES_DERIVADOS || row.exames_derivados) : null,
           ativo: true
         };
 
