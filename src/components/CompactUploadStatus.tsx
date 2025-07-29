@@ -38,7 +38,7 @@ export function CompactUploadStatus({ fileType, refreshTrigger }: CompactUploadS
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Erro ao buscar estatística:', error);
       }
 
       setUploadStat(data || null);
