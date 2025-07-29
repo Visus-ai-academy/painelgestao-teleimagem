@@ -28,6 +28,25 @@ export default function GerenciarCadastros() {
     });
   };
 
+  // Handler para quebra de exames
+  const handleUploadQuebraExames = async (file: File) => {
+    console.log('🔄 Iniciando upload de quebra de exames:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-quebra-exames', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Regras de Quebra Processadas!",
+      description: `${data.inseridos} regras cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
+    });
+  };
+
   // Handler para preços de serviços
   const handleUploadPrecos = async (file: File) => {
     console.log('🔄 Iniciando upload de preços de serviços:', file.name);
@@ -117,8 +136,9 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="exames">Exames</TabsTrigger>
+          <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
@@ -155,6 +175,35 @@ export default function GerenciarCadastros() {
                   "exames_derivados (JSON opcional)"
                 ]}
                 onUpload={handleUploadExames}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Quebra de Exames */}
+        <TabsContent value="quebra-exames">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Regras de Quebra de Exames
+              </CardTitle>
+              <CardDescription>
+                Upload de regras para quebrar exames originais em múltiplos exames com categorias específicas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload
+                title="Quebra de Exames"
+                description="Planilha com regras para dividir exames em sub-exames específicos"
+                acceptedTypes={['.csv', '.xlsx', '.xls']}
+                maxSizeInMB={50}
+                expectedFormat={[
+                  "EXAME (obrigatório) - Nome do exame original",
+                  "QUEBRA (obrigatório) - Nome do exame quebrado", 
+                  "CATEGORIA (obrigatório) - Categoria do exame quebrado"
+                ]}
+                onUpload={handleUploadQuebraExames}
               />
             </CardContent>
           </Card>

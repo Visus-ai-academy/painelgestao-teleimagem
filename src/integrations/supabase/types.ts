@@ -1957,6 +1957,39 @@ export type Database = {
         }
         Relationships: []
       }
+      regras_quebra_exames: {
+        Row: {
+          ativo: boolean
+          categoria_quebrada: string
+          created_at: string
+          created_by: string | null
+          exame_original: string
+          exame_quebrado: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_quebrada: string
+          created_at?: string
+          created_by?: string | null
+          exame_original: string
+          exame_quebrado: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_quebrada?: string
+          created_at?: string
+          created_by?: string | null
+          exame_original?: string
+          exame_quebrado?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       regua_cobranca: {
         Row: {
           ativo: boolean
