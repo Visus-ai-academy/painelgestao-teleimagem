@@ -173,6 +173,82 @@ export default function GerenciarCadastros() {
     });
   };
 
+  // Handler para modalidades
+  const handleUploadModalidades = async (file: File) => {
+    console.log('🔄 Iniciando upload de modalidades:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-modalidades', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Modalidades Processadas!",
+      description: `${data.inseridos} modalidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
+    });
+  };
+
+  // Handler para especialidades
+  const handleUploadEspecialidades = async (file: File) => {
+    console.log('🔄 Iniciando upload de especialidades:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-especialidades', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Especialidades Processadas!",
+      description: `${data.inseridos} especialidades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
+    });
+  };
+
+  // Handler para categorias
+  const handleUploadCategorias = async (file: File) => {
+    console.log('🔄 Iniciando upload de categorias:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-categorias-exame', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Categorias Processadas!",
+      description: `${data.inseridos} categorias cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
+    });
+  };
+
+  // Handler para prioridades
+  const handleUploadPrioridades = async (file: File) => {
+    console.log('🔄 Iniciando upload de prioridades:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-prioridades', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Prioridades Processadas!",
+      description: `${data.inseridos} prioridades cadastradas, ${data.atualizados} atualizadas, ${data.erros} erros`,
+    });
+  };
+
   // Handler para dados legados
   const handleUploadLegado = async (file: File, tipoArquivo: string, periodoReferencia: string, descricao?: string) => {
     console.log('🔄 Iniciando upload de dados legados:', file.name);
@@ -483,14 +559,20 @@ export default function GerenciarCadastros() {
                 Modalidades
               </CardTitle>
               <CardDescription>
-                Gerencie as modalidades de exames do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=modalidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de arquivo CSV com modalidades de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=modalidades', '_blank')}>Acessar Gerenciamento Completo</Button>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Para gerenciar modalidades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
-                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as modalidades do sistema.</p>
-              </div>
+              <FileUpload
+                title="Upload de Modalidades"
+                description="Arquivo CSV com uma coluna contendo os nomes das modalidades"
+                acceptedTypes={['.csv']}
+                maxSizeInMB={10}
+                expectedFormat={[
+                  "modalidade (obrigatório) - Nome da modalidade"
+                ]}
+                onUpload={handleUploadModalidades}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -504,14 +586,20 @@ export default function GerenciarCadastros() {
                 Especialidades
               </CardTitle>
               <CardDescription>
-                Gerencie as especialidades médicas do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=especialidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de arquivo CSV com especialidades médicas. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=especialidades', '_blank')}>Acessar Gerenciamento Completo</Button>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Para gerenciar especialidades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
-                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as especialidades do sistema.</p>
-              </div>
+              <FileUpload
+                title="Upload de Especialidades"
+                description="Arquivo CSV com uma coluna contendo os nomes das especialidades"
+                acceptedTypes={['.csv']}
+                maxSizeInMB={10}
+                expectedFormat={[
+                  "especialidade (obrigatório) - Nome da especialidade"
+                ]}
+                onUpload={handleUploadEspecialidades}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -525,14 +613,20 @@ export default function GerenciarCadastros() {
                 Categorias de Exame
               </CardTitle>
               <CardDescription>
-                Gerencie as categorias de exames do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=categorias_exame', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de arquivo CSV com categorias de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=categorias_exame', '_blank')}>Acessar Gerenciamento Completo</Button>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Para gerenciar categorias de exame, utilize o link "Acessar Gerenciamento Completo" acima.</p>
-                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as categorias do sistema.</p>
-              </div>
+              <FileUpload
+                title="Upload de Categorias"
+                description="Arquivo CSV com uma coluna contendo os nomes das categorias"
+                acceptedTypes={['.csv']}
+                maxSizeInMB={10}
+                expectedFormat={[
+                  "categoria (obrigatório) - Nome da categoria"
+                ]}
+                onUpload={handleUploadCategorias}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -546,14 +640,20 @@ export default function GerenciarCadastros() {
                 Prioridades
               </CardTitle>
               <CardDescription>
-                Gerencie as prioridades do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=prioridades', '_blank')}>Acessar Gerenciamento Completo</Button>
+                Upload de arquivo CSV com prioridades de exames. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=prioridades', '_blank')}>Acessar Gerenciamento Completo</Button>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Para gerenciar prioridades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
-                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as prioridades do sistema.</p>
-              </div>
+              <FileUpload
+                title="Upload de Prioridades"
+                description="Arquivo CSV com uma coluna contendo os nomes das prioridades"
+                acceptedTypes={['.csv']}
+                maxSizeInMB={10}
+                expectedFormat={[
+                  "prioridade (obrigatório) - Nome da prioridade"
+                ]}
+                onUpload={handleUploadPrioridades}
+              />
             </CardContent>
           </Card>
         </TabsContent>
