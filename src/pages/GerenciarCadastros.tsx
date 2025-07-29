@@ -221,13 +221,17 @@ export default function GerenciarCadastros() {
       <UploadStatusPanel />
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
           <TabsTrigger value="legado">Legado</TabsTrigger>
+          <TabsTrigger value="modalidades">Modalidades</TabsTrigger>
+          <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
+          <TabsTrigger value="categorias">Categorias</TabsTrigger>
+          <TabsTrigger value="prioridades">Prioridades</TabsTrigger>
         </TabsList>
 
         {/* Cadastro de Exames */}
@@ -468,6 +472,90 @@ export default function GerenciarCadastros() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Modalidades */}
+        <TabsContent value="modalidades">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Modalidades
+              </CardTitle>
+              <CardDescription>
+                Gerencie as modalidades de exames do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=modalidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Para gerenciar modalidades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
+                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as modalidades do sistema.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Especialidades */}
+        <TabsContent value="especialidades">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Especialidades
+              </CardTitle>
+              <CardDescription>
+                Gerencie as especialidades médicas do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=especialidades', '_blank')}>Acessar Gerenciamento Completo</Button>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Para gerenciar especialidades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
+                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as especialidades do sistema.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Categorias */}
+        <TabsContent value="categorias">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Categorias de Exame
+              </CardTitle>
+              <CardDescription>
+                Gerencie as categorias de exames do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=categorias_exame', '_blank')}>Acessar Gerenciamento Completo</Button>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Para gerenciar categorias de exame, utilize o link "Acessar Gerenciamento Completo" acima.</p>
+                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as categorias do sistema.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Prioridades */}
+        <TabsContent value="prioridades">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Prioridades
+              </CardTitle>
+              <CardDescription>
+                Gerencie as prioridades do sistema. <Button variant="link" className="p-0 h-auto" onClick={() => window.open('/configuracao/listas?tab=prioridades', '_blank')}>Acessar Gerenciamento Completo</Button>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Para gerenciar prioridades, utilize o link "Acessar Gerenciamento Completo" acima.</p>
+                <p className="text-sm mt-2">Você pode criar, editar, ativar/desativar e reordenar as prioridades do sistema.</p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
