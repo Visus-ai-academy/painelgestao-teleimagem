@@ -96,15 +96,32 @@ export const useQuebraExames = () => {
       setLoading(true);
       console.log('🔍 Buscando quebra de exames...');
       
-      const { data: quebras, error } = await supabase
-        .from('regras_quebra_exames')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('regras_quebra_exames')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
       
-      console.log(`✅ Quebra de exames carregadas: ${quebras?.length || 0} registros`);
-      setData(quebras || []);
+      console.log(`✅ Quebra de exames carregadas: ${allData.length} registros`);
+      setData(allData);
     } catch (err: any) {
       console.error('❌ Erro ao carregar quebra de exames:', err);
       setError(err.message);
@@ -128,13 +145,32 @@ export const usePrecosServicos = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: precos, error } = await supabase
-        .from('precos_servicos')
-        .select('*')
-        .order('created_at', { ascending: false });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(precos || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('precos_servicos')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -157,13 +193,32 @@ export const useRegrasExclusao = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: regras, error } = await supabase
-        .from('regras_exclusao_faturamento')
-        .select('*')
-        .order('created_at', { ascending: false });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(regras || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('regras_exclusao_faturamento')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -186,16 +241,35 @@ export const useRepasseMedico = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: repasses, error } = await supabase
-        .from('medicos_valores_repasse')
-        .select(`
-          *,
-          medicos(nome, crm)
-        `)
-        .order('created_at', { ascending: false });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(repasses || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('medicos_valores_repasse')
+          .select(`
+            *,
+            medicos(nome, crm)
+          `)
+          .order('created_at', { ascending: false })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -218,13 +292,32 @@ export const useModalidades = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: modalidades, error } = await supabase
-        .from('modalidades')
-        .select('*')
-        .order('ordem', { ascending: true });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(modalidades || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('modalidades')
+          .select('*')
+          .order('ordem', { ascending: true })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -247,13 +340,32 @@ export const useEspecialidades = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: especialidades, error } = await supabase
-        .from('especialidades')
-        .select('*')
-        .order('ordem', { ascending: true });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(especialidades || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('especialidades')
+          .select('*')
+          .order('ordem', { ascending: true })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -276,13 +388,32 @@ export const useCategoriasExame = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: categorias, error } = await supabase
-        .from('categorias_exame')
-        .select('*')
-        .order('ordem', { ascending: true });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(categorias || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('categorias_exame')
+          .select('*')
+          .order('ordem', { ascending: true })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -305,13 +436,32 @@ export const usePrioridades = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: prioridades, error } = await supabase
-        .from('prioridades')
-        .select('*')
-        .order('ordem', { ascending: true });
+      
+      // Buscar TODOS os registros usando paginação
+      let allData: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setData(prioridades || []);
+      while (hasMore) {
+        const { data: dataBatch, error } = await supabase
+          .from('prioridades')
+          .select('*')
+          .order('ordem', { ascending: true })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (error) throw error;
+
+        if (dataBatch && dataBatch.length > 0) {
+          allData = [...allData, ...dataBatch];
+          rangeStart += rangeSize;
+          hasMore = dataBatch.length === rangeSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setData(allData);
     } catch (err: any) {
       setError(err.message);
     } finally {
