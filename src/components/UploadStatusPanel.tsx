@@ -25,25 +25,18 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar os uploads mais recentes por tipo
+      // Buscar TODOS os uploads recentes (não apenas o último de cada tipo)
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
         .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades'])
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(20); // Mostrar os últimos 20 uploads
 
       if (error) throw error;
 
-      // Agrupar por tipo e pegar o mais recente de cada
-      const latestByType = data.reduce((acc: Record<string, UploadStats>, current: UploadStats) => {
-        if (!acc[current.tipo_arquivo] || new Date(current.created_at) > new Date(acc[current.tipo_arquivo].created_at)) {
-          acc[current.tipo_arquivo] = current;
-        }
-        return acc;
-      }, {});
-
-      setUploadStats(Object.values(latestByType));
+      // Mostrar todos os uploads, não apenas o último de cada tipo
+      setUploadStats(data || []);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
     } finally {
@@ -117,9 +110,9 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
           </div>
         ) : (
           <div className="space-y-4">
-            {uploadStats.map((stat) => (
+            {uploadStats.map((stat, index) => (
               <div
-                key={stat.tipo_arquivo}
+                key={`${stat.tipo_arquivo}-${stat.created_at}-${index}`}
                 className="flex items-center justify-between p-4 border rounded-lg"
               >
                 <div className="space-y-1">
