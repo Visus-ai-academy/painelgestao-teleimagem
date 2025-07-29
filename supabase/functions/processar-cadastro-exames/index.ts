@@ -104,19 +104,35 @@ serve(async (req) => {
         // IMPORTANTE: Como a base foi limpa, todos são novos registros
         // Verificar duplicatas apenas dentro do próprio arquivo sendo processado
         console.log(`Linha ${i + 1}: ${exameData.nome} - SEMPRE INSERIR (base limpa)`);
+        
+        // Log específico para exame problemático
+        if (exameData.nome.includes('AVC') || exameData.nome.includes('CRANIO')) {
+          console.log(`🔍 EXAME AVC/CRANIO ENCONTRADO: "${exameData.nome}" - Modalidade: ${exameData.modalidade}, Especialidade: ${exameData.especialidade}, Categoria: ${exameData.categoria}`);
+        }
 
         // Inserir novo registro (não verificar duplicatas pois base foi limpa)
         const { error: insertError } = await supabase
           .from('cadastro_exames')
           .insert(exameData);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          // Log específico para erro com exame AVC/CRANIO
+          if (exameData.nome.includes('AVC') || exameData.nome.includes('CRANIO')) {
+            console.error(`❌ ERRO AO INSERIR EXAME AVC/CRANIO: "${exameData.nome}" - Erro: ${insertError.message}`);
+          }
+          throw insertError;
+        }
         inseridos++;
 
         console.log(`Linha ${i + 1}: Processada com sucesso - ${exameData.nome}`);
 
       } catch (error: any) {
         erros++;
+        
+        // Log específico para erro com exame AVC/CRANIO  
+        if (nomeExame && (nomeExame.includes('AVC') || nomeExame.includes('CRANIO'))) {
+          console.error(`❌ ERRO GERAL EXAME AVC/CRANIO: "${nomeExame}" - Erro: ${error.message}`);
+        }
         const detalheErro = {
           linha: i + 1,
           dados: row,
