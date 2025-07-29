@@ -1,6 +1,9 @@
+import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { format } from "date-fns";
 
 interface CadastroDataTableProps {
@@ -12,6 +15,110 @@ interface CadastroDataTableProps {
 }
 
 export function CadastroDataTable({ data, loading, error, type, title }: CadastroDataTableProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Filtrar e ordenar dados
+  const filteredAndSortedData = useMemo(() => {
+    if (!data) return [];
+    
+    let filtered = data;
+    
+    // Aplicar filtro de pesquisa
+    if (searchTerm) {
+      filtered = data.filter((item) => {
+        const searchLower = searchTerm.toLowerCase();
+        
+        switch (type) {
+          case 'exames':
+            return (
+              item.nome?.toLowerCase().includes(searchLower) ||
+              item.codigo_exame?.toLowerCase().includes(searchLower) ||
+              item.modalidade?.toLowerCase().includes(searchLower) ||
+              item.especialidade?.toLowerCase().includes(searchLower) ||
+              item.categoria?.toLowerCase().includes(searchLower)
+            );
+          case 'quebra':
+            return (
+              item.exame_original?.toLowerCase().includes(searchLower) ||
+              item.exame_quebrado?.toLowerCase().includes(searchLower) ||
+              item.categoria_quebra?.toLowerCase().includes(searchLower)
+            );
+          case 'precos':
+            return (
+              item.modalidade?.toLowerCase().includes(searchLower) ||
+              item.especialidade?.toLowerCase().includes(searchLower) ||
+              item.categoria?.toLowerCase().includes(searchLower) ||
+              item.prioridade?.toLowerCase().includes(searchLower) ||
+              item.tipo_preco?.toLowerCase().includes(searchLower)
+            );
+          case 'regras':
+            return (
+              item.nome_regra?.toLowerCase().includes(searchLower) ||
+              item.descricao?.toLowerCase().includes(searchLower) ||
+              item.acao?.toLowerCase().includes(searchLower)
+            );
+          case 'repasse':
+            return (
+              item.medicos?.nome?.toLowerCase().includes(searchLower) ||
+              item.medicos?.crm?.toLowerCase().includes(searchLower) ||
+              item.modalidade?.toLowerCase().includes(searchLower) ||
+              item.especialidade?.toLowerCase().includes(searchLower) ||
+              item.prioridade?.toLowerCase().includes(searchLower)
+            );
+          case 'modalidades':
+          case 'especialidades':
+          case 'categorias':
+          case 'prioridades':
+            return (
+              item.nome?.toLowerCase().includes(searchLower) ||
+              item.descricao?.toLowerCase().includes(searchLower)
+            );
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Ordenar alfabeticamente
+    return filtered.sort((a, b) => {
+      let aValue = '';
+      let bValue = '';
+      
+      switch (type) {
+        case 'exames':
+          aValue = a.nome || '';
+          bValue = b.nome || '';
+          break;
+        case 'quebra':
+          aValue = a.exame_original || '';
+          bValue = b.exame_original || '';
+          break;
+        case 'precos':
+          aValue = `${a.modalidade || ''} ${a.especialidade || ''}`;
+          bValue = `${b.modalidade || ''} ${b.especialidade || ''}`;
+          break;
+        case 'regras':
+          aValue = a.nome_regra || '';
+          bValue = b.nome_regra || '';
+          break;
+        case 'repasse':
+          aValue = a.medicos?.nome || 'Regra Geral';
+          bValue = b.medicos?.nome || 'Regra Geral';
+          break;
+        case 'modalidades':
+        case 'especialidades':
+        case 'categorias':
+        case 'prioridades':
+          aValue = a.nome || '';
+          bValue = b.nome || '';
+          break;
+        default:
+          return 0;
+      }
+      
+      return aValue.localeCompare(bValue, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [data, searchTerm, type]);
   if (loading) {
     return (
       <div className="space-y-4">
@@ -67,7 +174,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.nome}</TableCell>
                   <TableCell>{item.codigo_exame || '-'}</TableCell>
@@ -104,7 +211,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.exame_original}</TableCell>
                   <TableCell>{item.exame_quebrado}</TableCell>
@@ -137,7 +244,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.tipo_preco}</TableCell>
                   <TableCell>{item.modalidade}</TableCell>
@@ -171,7 +278,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.nome_regra}</TableCell>
                   <TableCell>{item.descricao || '-'}</TableCell>
@@ -204,7 +311,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     {item.medicos?.nome || 'Regra Geral'}
@@ -237,7 +344,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
+              {filteredAndSortedData.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.nome}</TableCell>
                   <TableCell>{item.descricao || '-'}</TableCell>
@@ -263,8 +370,20 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">{title}</h3>
-        <Badge variant="outline">{data.length} itens</Badge>
+        <Badge variant="outline">{filteredAndSortedData.length} de {data.length} itens</Badge>
       </div>
+      
+      {/* Campo de pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Pesquisar..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      
       <div className="border rounded-md max-h-96 overflow-auto">
         {renderTableContent()}
       </div>
