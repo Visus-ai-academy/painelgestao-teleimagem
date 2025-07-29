@@ -15,8 +15,7 @@ export const useCadastroExames = () => {
       const { data: exames, error: examesError } = await supabase
         .from('cadastro_exames')
         .select('*')
-        .order('nome', { ascending: true })
-        .limit(10000); // Limite muito alto para garantir que todos os registros sejam carregados
+        .order('nome', { ascending: true });
 
       if (examesError) throw examesError;
 
