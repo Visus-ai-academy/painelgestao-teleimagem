@@ -199,18 +199,22 @@ serve(async (req) => {
       }
     });
 
-    // Limpar logs relacionados às tabelas que foram limpas
+    // Limpar logs relacionados às tabelas que foram limpas SEMPRE
     if (tiposArquivoParaLimpar.length > 0) {
       console.log('Limpando logs relacionados aos tipos:', tiposArquivoParaLimpar);
-      const { error: errorLogsRelacionados, count: logsRemovidos } = await supabase
-        .from('processamento_uploads')
-        .delete()
-        .in('tipo_arquivo', tiposArquivoParaLimpar);
+      
+      for (const tipoArquivo of tiposArquivoParaLimpar) {
+        const { error: errorLogsRelacionados, count: logsRemovidos } = await supabase
+          .from('processamento_uploads')
+          .delete()
+          .eq('tipo_arquivo', tipoArquivo);
 
-      if (errorLogsRelacionados) {
-        console.error('Erro ao limpar logs relacionados:', errorLogsRelacionados);
-      } else {
-        console.log(`Logs relacionados limpos com sucesso: ${logsRemovidos} registros removidos`);
+        if (errorLogsRelacionados) {
+          console.error(`Erro ao limpar logs do tipo ${tipoArquivo}:`, errorLogsRelacionados);
+        } else {
+          console.log(`Logs do tipo ${tipoArquivo} limpos: ${logsRemovidos || 0} registros removidos`);
+          totalLimpezas += logsRemovidos || 0;
+        }
       }
     }
 

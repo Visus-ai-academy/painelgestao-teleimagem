@@ -102,12 +102,17 @@ serve(async (req) => {
         };
 
         // Verificar se já existe (primeiro por nome, depois por código se houver)
-        let { data: existente } = await supabase
+        let existente = null;
+        
+        // Buscar por nome exato primeiro
+        const { data: existentePorNome } = await supabase
           .from('cadastro_exames')
           .select('id')
           .eq('nome', exameData.nome)
           .maybeSingle();
-
+        
+        existente = existentePorNome;
+        
         // Se não encontrou por nome e tem código, buscar por código
         if (!existente && exameData.codigo_exame) {
           const { data: existentePorCodigo } = await supabase
@@ -117,6 +122,8 @@ serve(async (req) => {
             .maybeSingle();
           existente = existentePorCodigo;
         }
+        
+        console.log(`Linha ${i + 1}: ${exameData.nome} - Existe: ${existente ? 'SIM' : 'NÃO'}`);
 
         if (existente) {
           // Atualizar existente
