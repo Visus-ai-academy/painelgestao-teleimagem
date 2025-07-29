@@ -9,7 +9,7 @@ import { CadastroDataTable } from '@/components/CadastroDataTable';
 import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadStatusPanel } from '@/components/UploadStatusPanel';
+import { CompactUploadStatus } from '@/components/CompactUploadStatus';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { 
   useCadastroExames, 
@@ -396,9 +396,6 @@ export default function GerenciarCadastros() {
         )}
       </div>
 
-      {/* Painel de Status dos Uploads */}
-      <UploadStatusPanel refreshTrigger={refreshStatusPanel} />
-
       <Tabs defaultValue="exames" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10">
           <TabsTrigger value="exames">Exames</TabsTrigger>
@@ -426,24 +423,34 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Cadastro de Exames"
-                description="Planilha com todas as informações dos exames cadastrados no sistema"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={50}
-                expectedFormat={[
-                  "EXAME (obrigatório)",
-                  "descricao (opcional)",
-                  "modalidade (obrigatório)",
-                  "especialidade (obrigatório)",
-                  "categoria (obrigatório)",
-                  "codigo_exame (opcional)",
-                  "permite_quebra (true/false)",
-                  "criterio_quebra (JSON opcional)",
-                  "exames_derivados (JSON opcional)"
-                ]}
-                onUpload={handleUploadExames}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Cadastro de Exames"
+                    description="Planilha com informações dos exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={50}
+                    expectedFormat={[
+                      "EXAME (obrigatório)",
+                      "descricao (opcional)",
+                      "modalidade (obrigatório)",
+                      "especialidade (obrigatório)",
+                      "categoria (obrigatório)",
+                      "codigo_exame (opcional)",
+                      "permite_quebra (true/false)",
+                      "criterio_quebra (JSON opcional)",
+                      "exames_derivados (JSON opcional)"
+                    ]}
+                    onUpload={handleUploadExames}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="cadastro_exames" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -471,18 +478,28 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Quebra de Exames"
-                description="Planilha com regras para dividir exames em sub-exames específicos"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={50}
-                expectedFormat={[
-                  "EXAME (obrigatório) - Nome do exame original",
-                  "QUEBRA (obrigatório) - Nome do exame quebrado", 
-                  "CATEGORIA (obrigatório) - Categoria do exame quebrado"
-                ]}
-                onUpload={handleUploadQuebraExames}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Quebra de Exames"
+                    description="Regras para dividir exames em sub-exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={50}
+                    expectedFormat={[
+                      "EXAME (obrigatório) - Nome do exame original",
+                      "QUEBRA (obrigatório) - Nome do exame quebrado", 
+                      "CATEGORIA (obrigatório) - Categoria do exame quebrado"
+                    ]}
+                    onUpload={handleUploadQuebraExames}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="quebra_exames" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -510,27 +527,37 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Tabela de Preços"
-                description="Planilha com preços base e de urgência por combinação de serviços"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={50}
-                expectedFormat={[
-                  "tipo_preco (padrao/cliente_especifico)",
-                  "modalidade (obrigatório)",
-                  "especialidade (obrigatório)",
-                  "categoria (obrigatório)",
-                  "prioridade (obrigatório)",
-                  "valor_base (obrigatório)",
-                  "valor_urgencia (obrigatório)",
-                  "cliente_id (opcional, para preços específicos)",
-                  "data_inicio_vigencia (obrigatório)",
-                  "data_fim_vigencia (opcional)",
-                  "aplicar_legado (true/false)",
-                  "aplicar_incremental (true/false)"
-                ]}
-                onUpload={handleUploadPrecos}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Tabela de Preços"
+                    description="Preços base e de urgência por serviços"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={50}
+                    expectedFormat={[
+                      "tipo_preco (padrao/cliente_especifico)",
+                      "modalidade (obrigatório)",
+                      "especialidade (obrigatório)",
+                      "categoria (obrigatório)",
+                      "prioridade (obrigatório)",
+                      "valor_base (obrigatório)",
+                      "valor_urgencia (obrigatório)",
+                      "cliente_id (opcional, para preços específicos)",
+                      "data_inicio_vigencia (obrigatório)",
+                      "data_fim_vigencia (opcional)",
+                      "aplicar_legado (true/false)",
+                      "aplicar_incremental (true/false)"
+                    ]}
+                    onUpload={handleUploadPrecos}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="precos_servicos" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -558,23 +585,33 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Regras de Exclusão"
-                description="Planilha com critérios para exclusão automática de itens do faturamento"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={50}
-                expectedFormat={[
-                  "nome_regra (obrigatório)",
-                  "descricao (opcional)",
-                  "criterios (JSON com condições)",
-                  "prioridade (1-100, menor = maior prioridade)",
-                  "acao (exclusao/alerta)",
-                  "motivo_exclusao (obrigatório)",
-                  "aplicar_legado (true/false)",
-                  "aplicar_incremental (true/false)"
-                ]}
-                onUpload={handleUploadRegras}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Regras de Exclusão"
+                    description="Critérios para exclusão automática"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={50}
+                    expectedFormat={[
+                      "nome_regra (obrigatório)",
+                      "descricao (opcional)",
+                      "criterios (JSON com condições)",
+                      "prioridade (1-100, menor = maior prioridade)",
+                      "acao (exclusao/alerta)",
+                      "motivo_exclusao (obrigatório)",
+                      "aplicar_legado (true/false)",
+                      "aplicar_incremental (true/false)"
+                    ]}
+                    onUpload={handleUploadRegras}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="regras_exclusao" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -602,20 +639,30 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Valores de Repasse"
-                description="Planilha com valores de repasse específicos por médico ou gerais"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={50}
-                expectedFormat={[
-                  "medico_id (opcional, se vazio = regra geral)",
-                  "modalidade (obrigatório)",
-                  "especialidade (obrigatório)",
-                  "prioridade (obrigatório)",
-                  "valor (obrigatório)"
-                ]}
-                onUpload={handleUploadRepasse}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Valores de Repasse"
+                    description="Valores de repasse por médico"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={50}
+                    expectedFormat={[
+                      "medico_id (opcional, se vazio = regra geral)",
+                      "modalidade (obrigatório)",
+                      "especialidade (obrigatório)",
+                      "prioridade (obrigatório)",
+                      "valor (obrigatório)"
+                    ]}
+                    onUpload={handleUploadRepasse}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="repasse_medico" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -716,16 +763,26 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Upload de Modalidades"
-                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das modalidades"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={[
-                  "modalidade (obrigatório) - Nome da modalidade"
-                ]}
-                onUpload={handleUploadModalidades}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Upload de Modalidades"
+                    description="Arquivo com modalidades de exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={10}
+                    expectedFormat={[
+                      "modalidade (obrigatório) - Nome da modalidade"
+                    ]}
+                    onUpload={handleUploadModalidades}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="modalidades" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -753,16 +810,26 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Upload de Especialidades"
-                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das especialidades"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={[
-                  "especialidade (obrigatório) - Nome da especialidade"
-                ]}
-                onUpload={handleUploadEspecialidades}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Upload de Especialidades"
+                    description="Arquivo com especialidades médicas"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={10}
+                    expectedFormat={[
+                      "especialidade (obrigatório) - Nome da especialidade"
+                    ]}
+                    onUpload={handleUploadEspecialidades}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="especialidades" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -790,16 +857,26 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Upload de Categorias"
-                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das categorias"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={[
-                  "categoria (obrigatório) - Nome da categoria"
-                ]}
-                onUpload={handleUploadCategorias}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Upload de Categorias"
+                    description="Arquivo com categorias de exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={10}
+                    expectedFormat={[
+                      "categoria (obrigatório) - Nome da categoria"
+                    ]}
+                    onUpload={handleUploadCategorias}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="categorias_exame" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
@@ -827,16 +904,26 @@ export default function GerenciarCadastros() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUpload
-                title="Upload de Prioridades"
-                description="Arquivo Excel ou CSV com uma coluna contendo os nomes das prioridades"
-                acceptedTypes={['.csv', '.xlsx', '.xls']}
-                maxSizeInMB={10}
-                expectedFormat={[
-                  "prioridade (obrigatório) - Nome da prioridade"
-                ]}
-                onUpload={handleUploadPrioridades}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <FileUpload
+                    title="Upload de Prioridades"
+                    description="Arquivo com prioridades de exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    maxSizeInMB={10}
+                    expectedFormat={[
+                      "prioridade (obrigatório) - Nome da prioridade"
+                    ]}
+                    onUpload={handleUploadPrioridades}
+                  />
+                </div>
+                <div>
+                  <CompactUploadStatus 
+                    fileType="prioridades" 
+                    refreshTrigger={refreshStatusPanel} 
+                  />
+                </div>
+              </div>
               
               <div className="mt-8">
                 <CadastroDataTable
