@@ -28,7 +28,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
           { key: 'modalidade', label: 'Modalidade', filterable: true },
           { key: 'especialidade', label: 'Especialidade', filterable: true },
           { key: 'categoria', label: 'Categoria', filterable: true },
-          { key: 'permite_quebra', label: 'Permite Quebra', filterable: false },
+          { key: 'permite_quebra', label: 'Permite Quebra', filterable: true },
           { key: 'ativo', label: 'Status', filterable: true },
           { key: 'created_at', label: 'Criado em', filterable: false }
         ];
@@ -192,7 +192,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">{title}</h3>
         <Badge variant="outline">
-          {filteredAndSortedData.length} de {data.length} itens
+          {data.length} itens
         </Badge>
       </div>
       
