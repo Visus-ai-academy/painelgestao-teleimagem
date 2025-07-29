@@ -11,13 +11,29 @@ export const useCadastroExames = () => {
       setLoading(true);
       console.log('🔍 Buscando exames...');
       
-      // Buscar exames - SEM LIMITAÇÃO ALGUMA
-      const { data: exames, error: examesError } = await supabase
-        .from('cadastro_exames')
-        .select('*')
-        .order('nome', { ascending: true });
+      // Buscar TODOS os exames usando paginação para superar limite do Supabase
+      let allExames: any[] = [];
+      let rangeStart = 0;
+      const rangeSize = 1000;
+      let hasMore = true;
 
-      if (examesError) throw examesError;
+      while (hasMore) {
+        const { data: examesBatch, error: examesError } = await supabase
+          .from('cadastro_exames')
+          .select('*')
+          .order('nome', { ascending: true })
+          .range(rangeStart, rangeStart + rangeSize - 1);
+
+        if (examesError) throw examesError;
+
+        if (examesBatch && examesBatch.length > 0) {
+          allExames = [...allExames, ...examesBatch];
+          rangeStart += rangeSize;
+          hasMore = examesBatch.length === rangeSize; // Se retornou menos que o tamanho da página, não há mais dados
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Buscar regras de quebra com contagem
       const { data: quebras, error: quebrasError } = await supabase
@@ -37,7 +53,7 @@ export const useCadastroExames = () => {
       const examesComQuebra = new Set(quebras?.map(q => q.exame_original) || []);
 
       // Atualizar exames com a informação de permite_quebra e quantidade_quebras
-      const examesAtualizados = exames?.map(exame => ({
+      const examesAtualizados = allExames?.map(exame => ({
         ...exame,
         permite_quebra: examesComQuebra.has(exame.nome),
         quantidade_quebras: contagemQuebras[exame.nome] || 0
@@ -46,10 +62,13 @@ export const useCadastroExames = () => {
       console.log(`✅ Exames carregados: ${examesAtualizados.length} registros`);
       console.log(`✅ Exames com quebra: ${examesComQuebra.size} registros`);
       
-      // Debug: verificar exames que começam com parênteses
-      const examesComParenteses = examesAtualizados.filter(exam => exam.nome.startsWith('('));
-      console.log('🔍 Exames que começam com parênteses:', examesComParenteses.length);
-      examesComParenteses.slice(0, 5).forEach(exam => console.log(`  - ${exam.nome}`));
+      // Debug: verificar se o exame específico foi carregado
+      const urotomoExame = examesAtualizados.find(exam => exam.nome.includes('UROTOMOGRAFIA') && exam.nome.includes('ONCO'));
+      if (urotomoExame) {
+        console.log('🎯 Exame UROTOMOGRAFIA - ONCO encontrado:', urotomoExame.nome);
+      } else {
+        console.log('❌ Exame UROTOMOGRAFIA - ONCO NÃO encontrado');
+      }
       
       setData(examesAtualizados);
     } catch (err: any) {
