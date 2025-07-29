@@ -15,13 +15,13 @@ interface UploadStats {
   created_at: string;
 }
 
-export function UploadStatusPanel() {
+export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
   const [uploadStats, setUploadStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchUploadStats();
-  }, []);
+  }, [refreshTrigger]);
 
   const fetchUploadStats = async () => {
     try {

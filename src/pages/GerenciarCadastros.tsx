@@ -368,7 +368,7 @@ export default function GerenciarCadastros() {
       </div>
 
       {/* Painel de Status dos Uploads */}
-      <UploadStatusPanel key={refreshStatusPanel} />
+      <UploadStatusPanel refreshTrigger={refreshStatusPanel} />
 
       <Tabs defaultValue="exames" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10">

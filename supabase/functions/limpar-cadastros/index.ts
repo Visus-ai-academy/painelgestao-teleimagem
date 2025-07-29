@@ -202,7 +202,7 @@ serve(async (req) => {
     // Limpar logs relacionados às tabelas que foram limpas
     if (tiposArquivoParaLimpar.length > 0) {
       console.log('Limpando logs relacionados aos tipos:', tiposArquivoParaLimpar);
-      const { error: errorLogsRelacionados } = await supabase
+      const { error: errorLogsRelacionados, count: logsRemovidos } = await supabase
         .from('processamento_uploads')
         .delete()
         .in('tipo_arquivo', tiposArquivoParaLimpar);
@@ -210,7 +210,7 @@ serve(async (req) => {
       if (errorLogsRelacionados) {
         console.error('Erro ao limpar logs relacionados:', errorLogsRelacionados);
       } else {
-        console.log('Logs relacionados limpos com sucesso');
+        console.log(`Logs relacionados limpos com sucesso: ${logsRemovidos} registros removidos`);
       }
     }
 
