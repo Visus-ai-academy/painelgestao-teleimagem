@@ -12,7 +12,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema de Segurança e Auditoria",
       icon: <Shield className="h-6 w-6" />,
       cor: "destructive",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Métricas de Segurança: Monitoramento em tempo real de tentativas de acesso, falhas de autenticação e atividades suspeitas",
         "Alertas de Segurança: Sistema automatizado de notificações para eventos críticos de segurança",
@@ -34,7 +34,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema Hierárquico de Funções e Permissões",
       icon: <Users className="h-6 w-6" />,
       cor: "default",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Hierarquia de Funções: Super Admin > Admin > Manager > User > Guest",
         "Row Level Security (RLS): Políticas de segurança a nível de linha no banco de dados",
@@ -47,7 +47,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Gestão de Dados Mestre",
       icon: <Database className="h-6 w-6" />,
       cor: "secondary",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Gerenciar Usuários: CRUD completo com controle de permissões e auditoria",
         "Gerenciar Médicos: Cadastro especializado com informações profissionais",
@@ -60,7 +60,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema Avançado de Faturamento",
       icon: <DollarSign className="h-6 w-6" />,
       cor: "default",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Sincronização Omie: Integração bidirecional automática com sistema ERP",
         "Geração Automatizada: Processamento inteligente de faturas baseado em contratos",
@@ -81,7 +81,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema de Contratos e Assinaturas Digitais",
       icon: <FileText className="h-6 w-6" />,
       cor: "outline",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Integração ClickSign: Plataforma completa de assinaturas digitais",
         "Templates Automatizados: Geração dinâmica de contratos baseada em dados",
@@ -100,7 +100,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema Operacional e Produção",
       icon: <Settings className="h-6 w-6" />,
       cor: "default",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Gestão de Escalas: Sistema completo de programação médica",
         "Controle de Qualidade: Monitoramento e métricas de performance",
@@ -118,7 +118,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema Financeiro e Cobrança",
       icon: <DollarSign className="h-6 w-6" />,
       cor: "destructive",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Régua de Cobrança: Automatização completa do processo de cobrança",
         "Pagamentos Médicos: Gestão de remuneração e bonificações",
@@ -137,7 +137,7 @@ const RelatorioImplementacoes = () => {
       titulo: "Sistema de Importação e Processamento",
       icon: <Eye className="h-6 w-6" />,
       cor: "secondary",
-      data: "17-21 Jul 2024",
+      data: "17 Jul 2024 - 29 Jan 2025",
       itens: [
         "Importação Inteligente: Sistema automatizado de análise e validação",
         "Processamento de Clientes: Gestão completa de base de clientes",
@@ -158,7 +158,7 @@ const RelatorioImplementacoes = () => {
     totalImplementacoes: implementacoes.length,
     totalFuncionalidades: implementacoes.reduce((acc, impl) => acc + impl.itens.length, 0),
     totalEdgeFunctions: implementacoes.reduce((acc, impl) => acc + (impl.edgeFunctions?.length || 0), 0),
-    periodo: "17 a 21 de Julho de 2024"
+    periodo: "17 de Julho de 2024 até 29 de Janeiro de 2025"
   };
 
   const gerarPDF = () => {
@@ -191,7 +191,7 @@ const RelatorioImplementacoes = () => {
     yPosition += 6;
     doc.text(`• Edge Functions: ${estatisticas.totalEdgeFunctions}`, 20, yPosition);
     yPosition += 6;
-    doc.text(`• Dias de Desenvolvimento: 5`, 20, yPosition);
+    doc.text("• Dias de Desenvolvimento: 195+", 20, yPosition);
     yPosition += 15;
     
     // Implementações
@@ -318,7 +318,7 @@ const RelatorioImplementacoes = () => {
             <UserCheck className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">195+</div>
           </CardContent>
         </Card>
       </div>
