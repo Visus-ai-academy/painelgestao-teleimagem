@@ -527,7 +527,51 @@ const RelatorioImplementacoes = () => {
           </Card>
         ))}
       </div>
-
+      
+      {/* Seção de Regras de Negócio */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            Regras de Negócio Implementadas
+          </CardTitle>
+          <CardDescription>
+            Total de {regrasImplementadas.length} regras implementadas em {Object.keys(regrasImplementadas.reduce((acc, regra) => ({ ...acc, [regra.modulo]: true }), {})).length} módulos diferentes
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {Object.entries(regrasImplementadas.reduce((acc, regra) => {
+            if (!acc[regra.modulo]) acc[regra.modulo] = [];
+            acc[regra.modulo].push(regra);
+            return acc;
+          }, {} as Record<string, typeof regrasImplementadas>)).map(([modulo, regras]) => (
+            <div key={modulo} className="mb-6">
+              <h3 className="text-lg font-bold mb-3 capitalize text-primary">
+                {modulo} ({regras.length} regras)
+              </h3>
+              <div className="space-y-3">
+                {regras.map((regra) => (
+                  <div key={regra.id} className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {regra.id}
+                      </Badge>
+                      <h4 className="font-semibold">{regra.nome}</h4>
+                      <Badge variant="secondary" className="text-xs">
+                        {regra.categoria}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      <strong>Critério:</strong> {regra.criterio}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      
       {/* Footer */}
       <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
         <CardContent className="p-6 text-center">
