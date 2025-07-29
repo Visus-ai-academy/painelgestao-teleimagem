@@ -58,13 +58,132 @@ serve(async (req) => {
       }
     }
 
+    // Limpar tabela de preços de serviços se solicitado
+    if (options.precos_servicos) {
+      console.log('Limpando tabela precos_servicos...');
+      const { error: errorPrecos, count } = await supabase
+        .from('precos_servicos')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorPrecos) {
+        console.error('Erro ao limpar precos_servicos:', errorPrecos);
+      } else {
+        console.log('Tabela precos_servicos limpa com sucesso');
+        tabelasLimpas.push('precos_servicos');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar tabela de regras de exclusão se solicitado
+    if (options.regras_exclusao) {
+      console.log('Limpando tabela regras_exclusao...');
+      const { error: errorRegras, count } = await supabase
+        .from('regras_exclusao')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorRegras) {
+        console.error('Erro ao limpar regras_exclusao:', errorRegras);
+      } else {
+        console.log('Tabela regras_exclusao limpa com sucesso');
+        tabelasLimpas.push('regras_exclusao');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar tabela de valores de repasse médicos se solicitado
+    if (options.medicos_valores_repasse) {
+      console.log('Limpando tabela medicos_valores_repasse...');
+      const { error: errorRepasse, count } = await supabase
+        .from('medicos_valores_repasse')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorRepasse) {
+        console.error('Erro ao limpar medicos_valores_repasse:', errorRepasse);
+      } else {
+        console.log('Tabela medicos_valores_repasse limpa com sucesso');
+        tabelasLimpas.push('medicos_valores_repasse');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar modalidades se solicitado
+    if (options.modalidades) {
+      console.log('Limpando tabela modalidades...');
+      const { error: errorModalidades, count } = await supabase
+        .from('modalidades')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorModalidades) {
+        console.error('Erro ao limpar modalidades:', errorModalidades);
+      } else {
+        console.log('Tabela modalidades limpa com sucesso');
+        tabelasLimpas.push('modalidades');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar especialidades se solicitado
+    if (options.especialidades) {
+      console.log('Limpando tabela especialidades...');
+      const { error: errorEspecialidades, count } = await supabase
+        .from('especialidades')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorEspecialidades) {
+        console.error('Erro ao limpar especialidades:', errorEspecialidades);
+      } else {
+        console.log('Tabela especialidades limpa com sucesso');
+        tabelasLimpas.push('especialidades');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar categorias de exame se solicitado
+    if (options.categorias_exame) {
+      console.log('Limpando tabela categorias_exame...');
+      const { error: errorCategorias, count } = await supabase
+        .from('categorias_exame')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorCategorias) {
+        console.error('Erro ao limpar categorias_exame:', errorCategorias);
+      } else {
+        console.log('Tabela categorias_exame limpa com sucesso');
+        tabelasLimpas.push('categorias_exame');
+        totalLimpezas += count || 0;
+      }
+    }
+
+    // Limpar prioridades se solicitado
+    if (options.prioridades) {
+      console.log('Limpando tabela prioridades...');
+      const { error: errorPrioridades, count } = await supabase
+        .from('prioridades')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000');
+
+      if (errorPrioridades) {
+        console.error('Erro ao limpar prioridades:', errorPrioridades);
+      } else {
+        console.log('Tabela prioridades limpa com sucesso');
+        tabelasLimpas.push('prioridades');
+        totalLimpezas += count || 0;
+      }
+    }
+
     // Limpar logs de processamento se solicitado
     if (options.logs_uploads) {
       console.log('Limpando logs de processamento...');
       const { error: errorLogs, count } = await supabase
         .from('processamento_uploads')
         .delete()
-        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames']);
+        .in('tipo_arquivo', ['cadastro_exames', 'quebra_exames', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades']);
 
       if (errorLogs) {
         console.error('Erro ao limpar logs:', errorLogs);
@@ -75,13 +194,13 @@ serve(async (req) => {
       }
     }
 
-    // Log da operação de limpeza
+    // Log da operação de limpeza usando valores válidos para o constraint
     const { error: logError } = await supabase
       .from('processamento_uploads')
       .insert({
         arquivo_nome: 'limpeza_sistema',
-        tipo_arquivo: 'sistema',
-        tipo_dados: 'limpeza',
+        tipo_arquivo: 'limpeza',
+        tipo_dados: 'incremental',
         status: 'concluido',
         registros_processados: totalLimpezas,
         registros_inseridos: 0,
