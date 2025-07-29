@@ -75,11 +75,11 @@ serve(async (req) => {
         const nomeExame = row.EXAME || row.nome;
         const modalidade = row.MODALIDADE || row.modalidade;
         const especialidade = row.ESPECIALIDADE || row.especialidade;
-        const categoria = row.CATEGORIA || row.categoria;
+        const categoria = row.CATEGORIA || row.categoria || 'GERAL'; // Categoria padrão se não informada
         const prioridade = row.PRIORIDADE || row.prioridade;
         
-        if (!nomeExame || !modalidade || !especialidade || !categoria) {
-          throw new Error('Campos obrigatórios em branco: EXAME, modalidade, especialidade, categoria');
+        if (!nomeExame || !modalidade || !especialidade) {
+          throw new Error('Campos obrigatórios em branco: EXAME, modalidade, especialidade');
         }
 
         // Preparar dados do exame
