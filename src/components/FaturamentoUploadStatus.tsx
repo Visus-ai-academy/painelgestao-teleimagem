@@ -12,6 +12,7 @@ interface UploadStats {
   registros_inseridos: number;
   registros_atualizados: number;
   registros_erro: number;
+  total_exames: number; // Novo campo para mostrar o total de exames (soma dos VALORES)
   created_at: string;
 }
 
@@ -26,7 +27,6 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
   const fetchUploadStats = async () => {
     try {
       // Buscar apenas uploads específicos do faturamento (excluindo cadastros da página base)
-      // Filtra EXCLUINDO os tipos da página "Cadastros Base - Cadastros"
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -41,67 +41,62 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       (data || []).forEach(upload => {
         const currentLatest = latestUploads.get(upload.tipo_arquivo);
         if (!currentLatest || new Date(upload.created_at) > new Date(currentLatest.created_at)) {
-          latestUploads.set(upload.tipo_arquivo, upload);
+          latestUploads.set(upload.tipo_arquivo, {
+            ...upload,
+            total_exames: upload.registros_inseridos // Para dados da processamento_uploads, assumir que inseridos = exames
+          });
         }
       });
 
-      // Se não há dados de processamento_uploads, buscar diretamente da volumetria_mobilemed
-      if (latestUploads.size === 0) {
-        const { data: volumetriaData, error: volumetriaError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('arquivo_fonte, created_at')
-          .order('created_at', { ascending: false })
-          .limit(1000); // Limitar para evitar carregar muitos dados
+      // Se não há dados suficientes de processamento_uploads, buscar diretamente da volumetria_mobilemed
+      const tiposVolumetria = [
+        'volumetria_padrao', 
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo', 
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao'
+      ];
 
-        if (volumetriaError) throw volumetriaError;
-
-        // Agrupar por arquivo_fonte e pegar o mais recente de cada tipo
-        const volumetriaMap = new Map<string, any>();
-        
-        (volumetriaData || []).forEach(item => {
-          const currentLatest = volumetriaMap.get(item.arquivo_fonte);
-          if (!currentLatest || new Date(item.created_at) > new Date(currentLatest.created_at)) {
-            volumetriaMap.set(item.arquivo_fonte, item);
-          }
-        });
-
-        // Contar registros e somar valores por arquivo_fonte
-        for (const [arquivo_fonte, latestItem] of volumetriaMap.entries()) {
+      // Para cada tipo de volumetria, buscar dados específicos
+      for (const tipo of tiposVolumetria) {
+        if (!latestUploads.has(tipo)) {
+          // Buscar estatísticas específicas para este tipo
           const { data: statsData, error: statsError } = await supabase
             .from('volumetria_mobilemed')
-            .select('arquivo_fonte')
-            .eq('arquivo_fonte', arquivo_fonte);
-          
-          const { data: sumData, error: sumError } = await supabase
-            .rpc('get_volumetria_stats', { 
-              p_empresa: null, 
-              p_data_inicio: null, 
-              p_data_fim: null 
-            });
+            .select('created_at, "VALORES"')
+            .eq('arquivo_fonte', tipo)
+            .order('created_at', { ascending: false })
+            .limit(1);
 
-          if (!statsError && !sumError && statsData && sumData) {
-            // Contar registros especificamente para este arquivo_fonte
-            const totalRegistros = statsData.length;
-            
-            // Somar valores especificamente para este arquivo_fonte
-            const { data: valorData, error: valorError } = await supabase
+          if (!statsError && statsData && statsData.length > 0) {
+            // Contar total de registros para este tipo
+            const { count: totalRegistros, error: countError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*', { count: 'exact', head: true })
+              .eq('arquivo_fonte', tipo);
+
+            // Somar total de exames (VALORES) para este tipo
+            const { data: valoresData, error: valoresError } = await supabase
               .from('volumetria_mobilemed')
               .select('"VALORES"')
-              .eq('arquivo_fonte', arquivo_fonte);
-            
-            const totalExames = valorData?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+              .eq('arquivo_fonte', tipo);
 
-            const uploadStat: UploadStats = {
-              tipo_arquivo: arquivo_fonte,
-              arquivo_nome: `Upload ${arquivo_fonte}`,
-              status: 'concluido',
-              registros_processados: totalRegistros,
-              registros_inseridos: totalExames, // Agora mostra o total de exames (soma dos valores)
-              registros_atualizados: 0,
-              registros_erro: 0,
-              created_at: latestItem.created_at
-            };
-            latestUploads.set(arquivo_fonte, uploadStat);
+            if (!countError && !valoresError && totalRegistros !== null && valoresData) {
+              const totalExames = valoresData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+
+              const uploadStat: UploadStats = {
+                tipo_arquivo: tipo,
+                arquivo_nome: `Upload ${tipo}`,
+                status: 'concluido',
+                registros_processados: totalRegistros,
+                registros_inseridos: totalRegistros,
+                registros_atualizados: 0,
+                registros_erro: 0,
+                total_exames: totalExames,
+                created_at: statsData[0].created_at
+              };
+              latestUploads.set(tipo, uploadStat);
+            }
           }
         }
       }
@@ -121,7 +116,6 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         const indexA = orderedTypes.indexOf(a.tipo_arquivo);
         const indexB = orderedTypes.indexOf(b.tipo_arquivo);
         
-        // Se não encontrou na lista ordenada, colocar no final
         if (indexA === -1 && indexB === -1) return 0;
         if (indexA === -1) return 1;
         if (indexB === -1) return -1;
@@ -200,47 +194,80 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
             Nenhum upload de faturamento realizado ainda
           </div>
         ) : (
-          <div className="space-y-2">
-            {uploadStats.map((stat, index) => (
-              <div
-                key={`${stat.tipo_arquivo}-${stat.created_at}-${index}`}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {getStatusIcon(stat.status)}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{getTypeLabel(stat.tipo_arquivo)}</span>
-                      <Badge className={`${getStatusColor(stat.status)} text-xs`}>
-                        {stat.status}
-                      </Badge>
+          <div className="space-y-4">
+            {/* Lista individual de cada arquivo */}
+            <div className="space-y-2">
+              {uploadStats.map((stat, index) => (
+                <div
+                  key={`${stat.tipo_arquivo}-${stat.created_at}-${index}`}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {getStatusIcon(stat.status)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">{getTypeLabel(stat.tipo_arquivo)}</span>
+                        <Badge className={`${getStatusColor(stat.status)} text-xs`}>
+                          {stat.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {stat.arquivo_nome} • {new Date(stat.created_at).toLocaleString('pt-BR')}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {stat.arquivo_nome} • {new Date(stat.created_at).toLocaleString('pt-BR')}
+                  </div>
+                  
+                  <div className="flex gap-3 text-xs">
+                    <div className="text-center">
+                      <div className="font-medium text-blue-600">{stat.registros_processados.toLocaleString('pt-BR')}</div>
+                      <div className="text-muted-foreground">Registros</div>
                     </div>
+                    <div className="text-center">
+                      <div className="font-medium text-green-600">{stat.total_exames.toLocaleString('pt-BR')}</div>
+                      <div className="text-muted-foreground">Exames</div>
+                    </div>
+                    {stat.registros_erro > 0 && (
+                      <div className="text-center">
+                        <div className="font-medium text-red-600">{stat.registros_erro}</div>
+                        <div className="text-muted-foreground">Erro</div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                <div className="flex gap-3 text-xs">
-                  <div className="text-center">
-                    <div className="font-medium text-blue-600">{stat.registros_processados}</div>
-                    <div className="text-muted-foreground">Registros</div>
+              ))}
+            </div>
+
+            {/* Somatório total - apenas para volumetria */}
+            {uploadStats.some(stat => stat.tipo_arquivo.includes('volumetria')) && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border-2 border-primary/20">
+                  <div className="flex items-center gap-3">
+                    <div className="font-semibold text-primary">Total Volumetria</div>
                   </div>
-                  <div className="text-center">
-                    <div className="font-medium text-green-600">{stat.registros_inseridos}</div>
-                    <div className="text-muted-foreground">Exames</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium text-orange-600">{stat.registros_atualizados}</div>
-                    <div className="text-muted-foreground">Atual.</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium text-red-600">{stat.registros_erro}</div>
-                    <div className="text-muted-foreground">Erro</div>
+                  
+                  <div className="flex gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="font-bold text-blue-600 text-lg">
+                        {uploadStats
+                          .filter(stat => stat.tipo_arquivo.includes('volumetria'))
+                          .reduce((sum, stat) => sum + stat.registros_processados, 0)
+                          .toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-muted-foreground font-medium">Total Registros</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-green-600 text-lg">
+                        {uploadStats
+                          .filter(stat => stat.tipo_arquivo.includes('volumetria'))
+                          .reduce((sum, stat) => sum + stat.total_exames, 0)
+                          .toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-muted-foreground font-medium">Total Exames</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </CardContent>
