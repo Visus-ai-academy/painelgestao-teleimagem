@@ -37,16 +37,31 @@ export function VolumetriaExamesNaoIdentificados() {
 
       if (deParaError) throw deParaError;
 
-      const estudosNoDePara = new Set(deParaData?.map(item => item.estudo_descricao) || []);
+      const estudosNoDePara = new Set(deParaData?.map(item => 
+        item.estudo_descricao?.toUpperCase().trim()
+      ).filter(Boolean) || []);
 
-      // 3. Filtrar TODOS os registros zerados (incluindo NULL e não encontrados no De Para)
+      console.log('📋 Estudos no De Para:', estudosNoDePara.size);
+      console.log('📊 Total registros volumetria zerados:', volumetriaData?.length || 0);
+
+      // 3. Filtrar registros zerados que não estão no De Para
       const estudosNaoEncontrados = volumetriaData?.filter(item => {
-        // Se ESTUDO_DESCRICAO é NULL, incluir sempre
-        if (!item.ESTUDO_DESCRICAO) {
+        // Se ESTUDO_DESCRICAO é NULL ou vazio, incluir sempre
+        if (!item.ESTUDO_DESCRICAO?.trim()) {
           return true;
         }
+        
+        // Normalizar para comparação (uppercase e trim)
+        const estudoNormalizado = item.ESTUDO_DESCRICAO.toUpperCase().trim();
+        
         // Se tem ESTUDO_DESCRICAO mas não está no De Para, incluir
-        return !estudosNoDePara.has(item.ESTUDO_DESCRICAO);
+        const naoEncontrado = !estudosNoDePara.has(estudoNormalizado);
+        
+        if (naoEncontrado && estudoNormalizado.includes('TC CRANIO')) {
+          console.log(`🔍 TC CRANIO não encontrado no De Para: "${estudoNormalizado}"`);
+        }
+        
+        return naoEncontrado;
       }) || [];
 
       console.log('🔍 Total de exames zerados:', volumetriaData?.length);
