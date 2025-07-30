@@ -8,6 +8,7 @@ import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
+import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 
 
 // Função para obter filtros padrão para o mês atual
@@ -69,6 +70,9 @@ export default function Volumetria() {
           {stats.total_clientes} clientes
         </p>
       </div>
+
+      {/* Status dos Uploads Recentes - Dados MobileMed */}
+      <VolumetriaStatusPanel />
 
       {/* Estatísticas dos Uploads */}
       <VolumetriaUploadStats />

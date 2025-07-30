@@ -15,7 +15,7 @@ interface UploadStats {
   created_at: string;
 }
 
-export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
+export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
   const [uploadStats, setUploadStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,24 +25,36 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar TODOS os uploads recentes de cadastros
+      // Buscar uploads de volumetria/mobilemed
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .neq('tipo_dados', 'volumetria') // Excluir uploads de volumetria
+        .in('tipo_arquivo', [
+          'volumetria_padrao', 
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo', 
+          'volumetria_fora_padrao_retroativo',
+          'volumetria_onco_padrao'
+        ])
         .order('created_at', { ascending: false })
-        .limit(20); // Mostrar os últimos 20 uploads
+        .limit(20);
 
       if (error) throw error;
 
-      // Ordenar os uploads conforme a ordem das abas em Gerenciar Cadastros
-      const orderedTypes = ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades'];
+      // Ordenar os uploads conforme a ordem dos arquivos
+      const orderedTypes = [
+        'volumetria_padrao', 
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo', 
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao'
+      ];
       
       const sortedData = (data || []).sort((a, b) => {
         const indexA = orderedTypes.indexOf(a.tipo_arquivo);
         const indexB = orderedTypes.indexOf(b.tipo_arquivo);
         
-        // Se os tipos são diferentes, ordenar pela ordem das abas
+        // Se os tipos são diferentes, ordenar pela ordem dos arquivos
         if (indexA !== indexB) {
           return indexA - indexB;
         }
@@ -87,15 +99,11 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const getTypeLabel = (tipo: string) => {
     const labels = {
-      'cadastro_exames': 'Cadastro de Exames',
-      'quebra_exames': 'Quebra de Exames',
-      'precos_servicos': 'Preços de Serviços',
-      'regras_exclusao': 'Regras de Exclusão',
-      'repasse_medico': 'Repasse Médico',
-      'modalidades': 'Modalidades',
-      'especialidades': 'Especialidades',
-      'categorias_exame': 'Categorias de Exame',
-      'prioridades': 'Prioridades'
+      'volumetria_padrao': 'Arquivo 1: Volumetria Padrão',
+      'volumetria_fora_padrao': 'Arquivo 2: Volumetria Fora do Padrão',
+      'volumetria_padrao_retroativo': 'Arquivo 3: Volumetria Padrão Retroativo',
+      'volumetria_fora_padrao_retroativo': 'Arquivo 4: Volumetria Fora do Padrão Retroativo',
+      'volumetria_onco_padrao': 'Arquivo 5: Volumetria Onco Padrão'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };
@@ -104,7 +112,7 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Status dos Uploads</CardTitle>
+          <CardTitle>Status dos Uploads Recentes - Dados MobileMed</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground">Carregando...</div>
@@ -116,7 +124,7 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Status dos Uploads Recentes</CardTitle>
+        <CardTitle>Status dos Uploads Recentes - Dados MobileMed</CardTitle>
       </CardHeader>
       <CardContent>
         {uploadStats.length === 0 ? (
