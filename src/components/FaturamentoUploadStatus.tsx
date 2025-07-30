@@ -65,20 +65,38 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
           }
         });
 
-        // Contar registros por arquivo_fonte
+        // Contar registros e somar valores por arquivo_fonte
         for (const [arquivo_fonte, latestItem] of volumetriaMap.entries()) {
-          const { count, error: countError } = await supabase
+          const { data: statsData, error: statsError } = await supabase
             .from('volumetria_mobilemed')
-            .select('*', { count: 'exact', head: true })
+            .select('arquivo_fonte')
             .eq('arquivo_fonte', arquivo_fonte);
+          
+          const { data: sumData, error: sumError } = await supabase
+            .rpc('get_volumetria_stats', { 
+              p_empresa: null, 
+              p_data_inicio: null, 
+              p_data_fim: null 
+            });
 
-          if (!countError && count !== null) {
+          if (!statsError && !sumError && statsData && sumData) {
+            // Contar registros especificamente para este arquivo_fonte
+            const totalRegistros = statsData.length;
+            
+            // Somar valores especificamente para este arquivo_fonte
+            const { data: valorData, error: valorError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('"VALORES"')
+              .eq('arquivo_fonte', arquivo_fonte);
+            
+            const totalExames = valorData?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+
             const uploadStat: UploadStats = {
               tipo_arquivo: arquivo_fonte,
               arquivo_nome: `Upload ${arquivo_fonte}`,
               status: 'concluido',
-              registros_processados: count,
-              registros_inseridos: count,
+              registros_processados: totalRegistros,
+              registros_inseridos: totalExames, // Agora mostra o total de exames (soma dos valores)
               registros_atualizados: 0,
               registros_erro: 0,
               created_at: latestItem.created_at
@@ -206,11 +224,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 <div className="flex gap-3 text-xs">
                   <div className="text-center">
                     <div className="font-medium text-blue-600">{stat.registros_processados}</div>
-                    <div className="text-muted-foreground">Proc.</div>
+                    <div className="text-muted-foreground">Registros</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-green-600">{stat.registros_inseridos}</div>
-                    <div className="text-muted-foreground">Ins.</div>
+                    <div className="text-muted-foreground">Exames</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-orange-600">{stat.registros_atualizados}</div>
