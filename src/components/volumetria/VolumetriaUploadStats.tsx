@@ -183,6 +183,7 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
     loadStats();
   }, [refreshTrigger]); // Refresh when trigger changes
 
+
   const getCategoryColor = (category: UploadStats['category']) => {
     switch (category) {
       case 'padrão':
