@@ -109,7 +109,7 @@ serve(async (req) => {
           .from('prioridades')
           .select('id')
           .eq('nome', nome)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           // Atualizar

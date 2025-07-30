@@ -109,7 +109,7 @@ serve(async (req) => {
           .from('categorias_exame')
           .select('id')
           .eq('nome', nome)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           // Atualizar

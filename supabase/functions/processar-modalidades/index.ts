@@ -110,7 +110,7 @@ serve(async (req) => {
           .from('modalidades')
           .select('id')
           .eq('nome', nome)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           // Atualizar
