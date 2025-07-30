@@ -35,8 +35,23 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
       if (error) throw error;
 
-      // Mostrar todos os uploads, não apenas o último de cada tipo
-      setUploadStats(data || []);
+      // Ordenar os uploads conforme a ordem das abas em Gerenciar Cadastros
+      const orderedTypes = ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades'];
+      
+      const sortedData = (data || []).sort((a, b) => {
+        const indexA = orderedTypes.indexOf(a.tipo_arquivo);
+        const indexB = orderedTypes.indexOf(b.tipo_arquivo);
+        
+        // Se os tipos são diferentes, ordenar pela ordem das abas
+        if (indexA !== indexB) {
+          return indexA - indexB;
+        }
+        
+        // Se são do mesmo tipo, ordenar pela data (mais recente primeiro)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
+      setUploadStats(sortedData);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
     } finally {

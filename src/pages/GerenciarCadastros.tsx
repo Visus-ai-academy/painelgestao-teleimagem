@@ -434,10 +434,6 @@ export default function GerenciarCadastros() {
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadExames}
                   />
-                  <CompactUploadStatus 
-                    fileType="cadastro_exames" 
-                    refreshTrigger={refreshStatusPanel} 
-                  />
                 </div>
               </div>
               
@@ -473,10 +469,6 @@ export default function GerenciarCadastros() {
                     title="Upload Quebra de Exames"
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadQuebraExames}
-                  />
-                  <CompactUploadStatus 
-                    fileType="quebra_exames" 
-                    refreshTrigger={refreshStatusPanel} 
                   />
                 </div>
               </div>
@@ -514,10 +506,6 @@ export default function GerenciarCadastros() {
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadPrecos}
                   />
-                  <CompactUploadStatus 
-                    fileType="precos_servicos" 
-                    refreshTrigger={refreshStatusPanel} 
-                  />
                 </div>
               </div>
               
@@ -554,10 +542,6 @@ export default function GerenciarCadastros() {
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadRegras}
                   />
-                  <CompactUploadStatus 
-                    fileType="regras_exclusao" 
-                    refreshTrigger={refreshStatusPanel} 
-                  />
                 </div>
               </div>
               
@@ -593,10 +577,6 @@ export default function GerenciarCadastros() {
                     title="Upload Repasse Médico"
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadRepasse}
-                  />
-                  <CompactUploadStatus 
-                    fileType="repasse_medico" 
-                    refreshTrigger={refreshStatusPanel} 
                   />
                 </div>
               </div>
@@ -677,10 +657,6 @@ export default function GerenciarCadastros() {
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadModalidades}
                   />
-                  <CompactUploadStatus 
-                    fileType="modalidades" 
-                    refreshTrigger={refreshStatusPanel} 
-                  />
                 </div>
               </div>
               
@@ -716,10 +692,6 @@ export default function GerenciarCadastros() {
                     title="Upload Especialidades"
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadEspecialidades}
-                  />
-                  <CompactUploadStatus 
-                    fileType="especialidades" 
-                    refreshTrigger={refreshStatusPanel} 
                   />
                 </div>
               </div>
@@ -757,10 +729,6 @@ export default function GerenciarCadastros() {
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadCategorias}
                   />
-                  <CompactUploadStatus 
-                    fileType="categorias_exame" 
-                    refreshTrigger={refreshStatusPanel} 
-                  />
                 </div>
               </div>
               
@@ -796,10 +764,6 @@ export default function GerenciarCadastros() {
                     title="Upload Prioridades"
                     acceptedTypes={['.csv', '.xlsx', '.xls']}
                     onUpload={handleUploadPrioridades}
-                  />
-                  <CompactUploadStatus 
-                    fileType="prioridades" 
-                    refreshTrigger={refreshStatusPanel} 
                   />
                 </div>
               </div>
