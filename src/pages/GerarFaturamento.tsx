@@ -1025,9 +1025,6 @@ export default function GerarFaturamento() {
                 </div>
 
                 
-                {/* Status dos Uploads Recentes - Dados MobileMed */}
-                <VolumetriaStatusPanel />
-
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />
 
