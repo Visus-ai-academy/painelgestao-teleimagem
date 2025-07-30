@@ -67,18 +67,41 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
           .limit(1);
 
         if (!existeError && existeData && existeData.length > 0) {
-          // Consultas diretas simples para garantir dados corretos
-          const registrosQuery = await supabase
+          // Usar uma consulta direta para cada estatística individual
+          
+          // 1. Contar registros
+          const { count: totalRegistros, error: countError } = await supabase
             .from('volumetria_mobilemed')
             .select('*', { count: 'exact', head: true })
             .eq('arquivo_fonte', tipo);
 
-          const examesQuery = await supabase
+          // 2. Usar função SQL para somar valores (mais preciso)
+          const { data: somaData, error: somaError } = await supabase
             .from('volumetria_mobilemed')
-            .select('"VALORES"')
-            .eq('arquivo_fonte', tipo);
+            .select('*')
+            .eq('arquivo_fonte', tipo)
+            .limit(1);
+          
+          let totalExames = 0;
+          let registrosZerados = 0;
+          
+          if (!somaError) {
+            // Buscar TODOS os valores para somar corretamente (sem limits)
+            const { data: todosValores, error: valoresError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('"VALORES"')
+              .eq('arquivo_fonte', tipo);
+            
+            if (!valoresError && todosValores) {
+              console.log(`${tipo}: carregados ${todosValores.length} registros para soma`);
+              totalExames = todosValores.reduce((acc, item) => acc + (Number(item.VALORES) || 0), 0);
+              registrosZerados = todosValores.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
+              console.log(`${tipo}: totalExames=${totalExames}, registrosZerados=${registrosZerados}`);
+            }
+          }
 
-          const ultimoUploadQuery = await supabase
+          // 3. Buscar data do último upload
+          const { data: ultimoUpload, error: uploadError } = await supabase
             .from('volumetria_mobilemed')
             .select('created_at')
             .eq('arquivo_fonte', tipo)
@@ -86,11 +109,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
             .limit(1)
             .single();
 
-          if (!registrosQuery.error && !examesQuery.error && !ultimoUploadQuery.error) {
-            const totalRegistros = registrosQuery.count || 0;
-            const totalExames = examesQuery.data?.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0) || 0;
-            const registrosZerados = examesQuery.data?.filter(item => !item.VALORES || Number(item.VALORES) === 0).length || 0;
-
+          if (!countError && totalRegistros !== null) {
             const uploadStat: UploadStats = {
               tipo_arquivo: tipo,
               arquivo_nome: `Upload ${tipo}`,
@@ -100,7 +119,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
               registros_atualizados: 0,
               registros_erro: registrosZerados,
               total_exames: totalExames,
-              created_at: ultimoUploadQuery.data?.created_at || new Date().toISOString()
+              created_at: ultimoUpload?.created_at || new Date().toISOString()
             };
             latestUploads.set(tipo, uploadStat);
           }
