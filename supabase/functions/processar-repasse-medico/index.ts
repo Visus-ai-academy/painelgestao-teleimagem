@@ -147,7 +147,7 @@ serve(async (req) => {
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file.name,
-        tipo_arquivo: 'medicos_valores_repasse',
+        tipo_arquivo: 'repasse_medico',
         tipo_dados: 'configuracao',
         status: erros === processados ? 'erro' : 'concluido',
         registros_processados: processados,

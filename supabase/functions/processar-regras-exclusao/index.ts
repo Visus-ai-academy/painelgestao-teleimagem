@@ -136,7 +136,7 @@ serve(async (req) => {
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file.name,
-        tipo_arquivo: 'regras_exclusao_faturamento',
+        tipo_arquivo: 'regras_exclusao',
         tipo_dados: 'configuracao',
         status: erros === processados ? 'erro' : 'concluido',
         registros_processados: processados,

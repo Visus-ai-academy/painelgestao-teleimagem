@@ -125,6 +125,26 @@ serve(async (req) => {
 
     console.log(`✅ Categorias de exame processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
 
+    // Registrar processamento
+    const { error: logError } = await supabase
+      .from('processamento_uploads')
+      .insert({
+        arquivo_nome: file.name,
+        tipo_arquivo: 'categorias_exame',
+        tipo_dados: 'incremental',
+        status: erros === dataRows.length ? 'erro' : 'concluido',
+        registros_processados: dataRows.length,
+        registros_inseridos: inseridos,
+        registros_atualizados: atualizados,
+        registros_erro: erros,
+        mensagem_erro: erros > 0 ? errosDetalhes.slice(0, 3).join('; ') : null,
+        detalhes_erro: erros > 0 ? errosDetalhes : null
+      });
+
+    if (logError) {
+      console.error('Erro ao registrar log de processamento:', logError);
+    }
+
     const response = {
       sucesso: true,
       processados: dataRows.length,

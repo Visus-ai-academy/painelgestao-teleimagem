@@ -157,6 +157,26 @@ serve(async (req) => {
       })
       .eq('id', uploadLog.id)
 
+    // Registrar processamento
+    const { error: logError } = await supabase
+      .from('processamento_uploads')
+      .insert({
+        arquivo_nome: file.name,
+        tipo_arquivo: 'modalidades',
+        tipo_dados: 'incremental',
+        status: erros === dataRows.length ? 'erro' : 'concluido',
+        registros_processados: dataRows.length,
+        registros_inseridos: inseridos,
+        registros_atualizados: atualizados,
+        registros_erro: erros,
+        mensagem_erro: erros > 0 ? errosDetalhes.slice(0, 3).map(e => e.erro).join('; ') : null,
+        detalhes_erro: erros > 0 ? errosDetalhes : null
+      });
+
+    if (logError) {
+      console.error('Erro ao registrar log de processamento:', logError);
+    }
+
     console.log(`✅ Modalidades processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
 
     const response = {
