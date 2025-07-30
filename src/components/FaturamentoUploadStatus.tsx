@@ -57,12 +57,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         'volumetria_onco_padrao'
       ];
 
-      // Para cada tipo de volumetria, buscar estatísticas agrupadas
+      // Para cada tipo de volumetria, buscar estatísticas agrupadas (SEM LIMIT)
       const { data: volumetriaStats, error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
-        .select('arquivo_fonte, created_at, "VALORES"')
-        .in('arquivo_fonte', tiposVolumetria)
-        .order('created_at', { ascending: false });
+        .select('arquivo_fonte, "VALORES"')
+        .in('arquivo_fonte', tiposVolumetria);
 
       if (!volumetriaError && volumetriaStats) {
         // Agrupar por arquivo_fonte
@@ -71,8 +70,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
             acc[item.arquivo_fonte] = {
               registros: 0,
               exames: 0,
-              zerados: 0,
-              ultimo_upload: item.created_at
+              zerados: 0
             };
           }
           
@@ -83,13 +81,25 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
             acc[item.arquivo_fonte].zerados++;
           }
           
-          // Manter o upload mais recente
-          if (new Date(item.created_at) > new Date(acc[item.arquivo_fonte].ultimo_upload)) {
-            acc[item.arquivo_fonte].ultimo_upload = item.created_at;
-          }
-          
           return acc;
         }, {} as Record<string, any>);
+
+        // Buscar a data de upload mais recente para cada tipo
+        for (const tipo of tiposVolumetria) {
+          if (statsByType[tipo]) {
+            const { data: ultimoUpload, error: uploadError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('created_at')
+              .eq('arquivo_fonte', tipo)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (!uploadError && ultimoUpload) {
+              statsByType[tipo].ultimo_upload = ultimoUpload.created_at;
+            }
+          }
+        }
 
         // Converter para formato UploadStats
         Object.entries(statsByType).forEach(([tipo, stats]) => {
