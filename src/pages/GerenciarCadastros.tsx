@@ -10,6 +10,7 @@ import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangl
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CompactUploadStatus } from '@/components/CompactUploadStatus';
+import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { 
   useCadastroExames, 
@@ -376,6 +377,9 @@ export default function GerenciarCadastros() {
 
   return (
     <div className="space-y-8">
+      {/* Status dos Uploads */}
+      <UploadStatusPanel refreshTrigger={refreshStatusPanel} />
+      
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gerenciar Cadastros</h1>
