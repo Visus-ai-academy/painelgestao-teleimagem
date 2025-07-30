@@ -76,13 +76,14 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
               .eq('arquivo_fonte', tipo);
 
             // Somar total de exames (VALORES) para este tipo
-            const { data: valoresData, error: valoresError } = await supabase
+            const { data: valorData, error: valorError } = await supabase
               .from('volumetria_mobilemed')
               .select('"VALORES"')
               .eq('arquivo_fonte', tipo);
-
-            if (!countError && !valoresError && totalRegistros !== null && valoresData) {
-              const totalExames = valoresData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+            
+            if (!countError && !valorError && totalRegistros !== null && valorData) {
+              const totalExames = valorData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+              const registrosZerados = valorData.filter(item => !item.VALORES || item.VALORES === 0).length;
 
               const uploadStat: UploadStats = {
                 tipo_arquivo: tipo,
@@ -91,7 +92,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 registros_processados: totalRegistros,
                 registros_inseridos: totalRegistros,
                 registros_atualizados: 0,
-                registros_erro: 0,
+                registros_erro: registrosZerados, // Mostrar registros zerados como "erro"
                 total_exames: totalExames,
                 created_at: statsData[0].created_at
               };
@@ -229,7 +230,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                     {stat.registros_erro > 0 && (
                       <div className="text-center">
                         <div className="font-medium text-red-600">{stat.registros_erro}</div>
-                        <div className="text-muted-foreground">Erro</div>
+                        <div className="text-muted-foreground">Zerados</div>
                       </div>
                     )}
                   </div>
