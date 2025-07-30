@@ -48,7 +48,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         }
       });
 
-      // Buscar dados de volumetria diretamente da tabela volumetria_mobilemed
+      // Buscar dados de volumetria usando consultas diretas para cada tipo
       const tiposVolumetria = [
         'volumetria_padrao', 
         'volumetria_fora_padrao', 
@@ -57,67 +57,54 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         'volumetria_onco_padrao'
       ];
 
-      // Para cada tipo de volumetria, buscar estatísticas agrupadas (SEM LIMIT)
-      const { data: volumetriaStats, error: volumetriaError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('arquivo_fonte, "VALORES"')
-        .in('arquivo_fonte', tiposVolumetria);
+      // Para cada tipo, fazer consulta individual para garantir dados corretos
+      for (const tipo of tiposVolumetria) {
+        // Verificar se existe dados para este tipo
+        const { data: existeData, error: existeError } = await supabase
+          .from('volumetria_mobilemed')
+          .select('created_at')
+          .eq('arquivo_fonte', tipo)
+          .limit(1);
 
-      if (!volumetriaError && volumetriaStats) {
-        // Agrupar por arquivo_fonte
-        const statsByType = volumetriaStats.reduce((acc, item) => {
-          if (!acc[item.arquivo_fonte]) {
-            acc[item.arquivo_fonte] = {
-              registros: 0,
-              exames: 0,
-              zerados: 0
-            };
-          }
-          
-          acc[item.arquivo_fonte].registros++;
-          acc[item.arquivo_fonte].exames += Number(item.VALORES) || 0;
-          
-          if (!item.VALORES || Number(item.VALORES) === 0) {
-            acc[item.arquivo_fonte].zerados++;
-          }
-          
-          return acc;
-        }, {} as Record<string, any>);
+        if (!existeError && existeData && existeData.length > 0) {
+          // Consultas diretas simples para garantir dados corretos
+          const registrosQuery = await supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', tipo);
 
-        // Buscar a data de upload mais recente para cada tipo
-        for (const tipo of tiposVolumetria) {
-          if (statsByType[tipo]) {
-            const { data: ultimoUpload, error: uploadError } = await supabase
-              .from('volumetria_mobilemed')
-              .select('created_at')
-              .eq('arquivo_fonte', tipo)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (!uploadError && ultimoUpload) {
-              statsByType[tipo].ultimo_upload = ultimoUpload.created_at;
-            }
-          }
-        }
+          const examesQuery = await supabase
+            .from('volumetria_mobilemed')
+            .select('"VALORES"')
+            .eq('arquivo_fonte', tipo);
 
-        // Converter para formato UploadStats
-        Object.entries(statsByType).forEach(([tipo, stats]) => {
-          if (!latestUploads.has(tipo)) {
+          const ultimoUploadQuery = await supabase
+            .from('volumetria_mobilemed')
+            .select('created_at')
+            .eq('arquivo_fonte', tipo)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (!registrosQuery.error && !examesQuery.error && !ultimoUploadQuery.error) {
+            const totalRegistros = registrosQuery.count || 0;
+            const totalExames = examesQuery.data?.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0) || 0;
+            const registrosZerados = examesQuery.data?.filter(item => !item.VALORES || Number(item.VALORES) === 0).length || 0;
+
             const uploadStat: UploadStats = {
               tipo_arquivo: tipo,
               arquivo_nome: `Upload ${tipo}`,
               status: 'concluido',
-              registros_processados: stats.registros,
-              registros_inseridos: stats.registros,
+              registros_processados: totalRegistros,
+              registros_inseridos: totalRegistros,
               registros_atualizados: 0,
-              registros_erro: stats.zerados,
-              total_exames: stats.exames,
-              created_at: stats.ultimo_upload
+              registros_erro: registrosZerados,
+              total_exames: totalExames,
+              created_at: ultimoUploadQuery.data?.created_at || new Date().toISOString()
             };
             latestUploads.set(tipo, uploadStat);
           }
-        });
+        }
       }
 
       // Ordenar conforme a ordem na página
