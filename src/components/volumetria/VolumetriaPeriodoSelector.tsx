@@ -78,7 +78,7 @@ export function VolumetriaPeriodoSelector({
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Obrigatório:</strong> Defina o período de faturamento antes de fazer uploads dos arquivos retroativos (3 e 4).
+                <strong>Obrigatório:</strong> Defina o período de faturamento antes de fazer uploads dos arquivos.
               </AlertDescription>
             </Alert>
 
