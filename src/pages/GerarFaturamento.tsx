@@ -1032,14 +1032,6 @@ export default function GerarFaturamento() {
                 {/* Comparação de Clientes por Arquivo */}
                 <VolumetriaClientesComparison />
 
-                {/* Status dos Uploads */}
-                <div className="mt-6">
-                  <h4 className="font-medium mb-4 flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    Status dos Uploads
-                  </h4>
-                  <FaturamentoUploadStatus refreshTrigger={refreshUploadStatus} />
-                </div>
               </CardContent>
             </Card>
           </div>
