@@ -146,7 +146,7 @@ serve(async (req) => {
     }
 
     // Atualizar log com resultado final
-    await supabase
+    const { error: updateError } = await supabase
       .from('processamento_uploads')
       .update({
         status: erros === dataRows.length ? 'erro' : 'concluido',
@@ -157,6 +157,11 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', uploadLog.id)
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar log:', updateError)
+      throw updateError
+    }
 
 
     console.log(`✅ Modalidades processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
