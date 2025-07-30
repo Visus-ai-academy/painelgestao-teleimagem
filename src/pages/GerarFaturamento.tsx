@@ -98,6 +98,7 @@ export default function GerarFaturamento() {
   const [relatoriosGerados, setRelatoriosGerados] = useState(0);
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(false);
   
   // Controle de período para volumetria retroativa
@@ -933,6 +934,7 @@ export default function GerarFaturamento() {
                           title: "Upload Concluído",
                           description: "Dados de volumetria padrão processados com sucesso!",
                         });
+                        setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
                   </div>
@@ -947,6 +949,7 @@ export default function GerarFaturamento() {
                           title: "Upload Concluído",
                           description: "Dados de volumetria fora do padrão processados com sucesso!",
                         });
+                        setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
                   </div>
@@ -961,6 +964,7 @@ export default function GerarFaturamento() {
                           title: "Upload Concluído",
                           description: "Dados de volumetria padrão retroativa processados com sucesso!",
                         });
+                        setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
                   </div>
@@ -975,6 +979,7 @@ export default function GerarFaturamento() {
                           title: "Upload Concluído",
                           description: "Dados de volumetria fora do padrão retroativa processados com sucesso!",
                         });
+                        setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
                   </div>
@@ -989,6 +994,7 @@ export default function GerarFaturamento() {
                           title: "Upload Concluído",
                           description: "Dados de volumetria oncológica processados com sucesso!",
                         });
+                        setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
                   </div>
@@ -1028,7 +1034,7 @@ export default function GerarFaturamento() {
                     <Upload className="h-4 w-4" />
                     Status dos Uploads
                   </h4>
-                  <FaturamentoUploadStatus />
+                  <FaturamentoUploadStatus refreshTrigger={refreshUploadStatus} />
                 </div>
               </CardContent>
             </Card>
@@ -1255,7 +1261,7 @@ export default function GerarFaturamento() {
                     <Upload className="h-4 w-4" />
                     Status dos Uploads de Faturamento
                   </h4>
-                  <FaturamentoUploadStatus />
+                  <FaturamentoUploadStatus refreshTrigger={refreshUploadStatus} />
                 </div>
               </CardContent>
             </Card>
