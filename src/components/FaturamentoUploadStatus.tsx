@@ -25,19 +25,12 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar apenas uploads específicos do faturamento (excluindo cadastros)
+      // Buscar apenas uploads específicos do faturamento (excluindo cadastros da página base)
+      // Filtra EXCLUINDO os tipos da página "Cadastros Base - Cadastros"
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .in('tipo_arquivo', [
-          'volumetria_padrao', 
-          'volumetria_fora_padrao', 
-          'volumetria_padrao_retroativo', 
-          'volumetria_fora_padrao_retroativo',
-          'volumetria_onco_padrao',
-          'faturamento',
-          'faturamento_pdf'
-        ])
+        .not('tipo_arquivo', 'in', '(cadastro_exames,categorias_exame,especialidades,modalidades,prioridades,quebra_exames,limpeza)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
