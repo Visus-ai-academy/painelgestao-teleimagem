@@ -25,8 +25,12 @@ export function ExamesForaPadraoUpload() {
     setProgress(0);
 
     try {
-      // Upload do arquivo para storage
-      const fileName = `exames_fora_padrao_${Date.now()}_${file.name}`;
+      // Upload do arquivo para storage - sanitizar nome do arquivo
+      const sanitizedName = file.name
+        .replace(/[^a-zA-Z0-9.-]/g, '_') // Substituir caracteres especiais por underscore
+        .replace(/_{2,}/g, '_') // Remover underscores duplos
+        .toLowerCase();
+      const fileName = `exames_fora_padrao_${Date.now()}_${sanitizedName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('uploads')
         .upload(fileName, file);
