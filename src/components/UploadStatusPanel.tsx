@@ -29,9 +29,10 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .not('tipo_arquivo', 'in', '("volumetria_mobilemed_data_exame","volumetria_mobilemed_data_laudo","limpeza")')
+        .not('tipo_arquivo', 'like', '%volumetria%')
+        .neq('tipo_arquivo', 'limpeza')
         .order('created_at', { ascending: false })
-        .limit(20); // Mostrar os últimos 20 uploads
+        .limit(20);
 
       if (error) throw error;
 
