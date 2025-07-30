@@ -25,6 +25,11 @@ import {
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
+import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
+import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
+import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
+import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
+import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 import { Speedometer } from "@/components/Speedometer";
 import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -1010,6 +1015,22 @@ export default function GerarFaturamento() {
                     <li><Badge variant="secondary">Validação</Badge> Campos obrigatórios e formatos</li>
                   </ul>
                 </div>
+
+                
+                {/* Status dos Uploads Recentes - Dados MobileMed */}
+                <VolumetriaStatusPanel />
+
+                {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
+                <ExamesForaPadraoUpload />
+
+                {/* Análise dos Uploads Realizados */}
+                <VolumetriaUploadStats />
+
+                {/* Exames Não Identificados no "De Para" */}
+                <VolumetriaExamesNaoIdentificados />
+
+                {/* Comparação de Clientes por Arquivo */}
+                <VolumetriaClientesComparison />
 
                 {/* Status dos Uploads */}
                 <div className="mt-6">
