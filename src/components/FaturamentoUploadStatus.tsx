@@ -80,7 +80,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 registros_processados: registros,
                 registros_inseridos: comValor,
                 registros_atualizados: uploadInfo.registros_atualizados || 0,
-                registros_erro: uploadInfo.registros_erro || 0,
+                registros_erro: zerados,
                 total_exames: exames,
                 zerados,
                 created_at: uploadInfo.created_at
@@ -98,7 +98,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 registros_atualizados: uploadInfo.registros_atualizados || 0,
                 registros_erro: uploadInfo.registros_erro || 0,
                 total_exames: 0,
-                zerados: 0,
+                zerados: uploadInfo.registros_erro || 0,
                 created_at: uploadInfo.created_at
               });
             }
