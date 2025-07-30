@@ -51,6 +51,18 @@ export default async function handler(req: Request): Promise<Response> {
       )
     }
 
+    // Também limpar os registros de status na tabela processamento_uploads
+    const { error: statusError } = await supabase
+      .from('processamento_uploads')
+      .delete()
+      .in('tipo_arquivo', arquivos_fonte)
+
+    if (statusError) {
+      console.warn('Aviso ao limpar status:', statusError.message)
+    } else {
+      console.log('Status de upload também removidos')
+    }
+
     console.log(`${count} registros removidos com sucesso`)
 
     return new Response(
