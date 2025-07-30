@@ -31,18 +31,40 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
       try {
         console.log('📊 Carregando estatísticas por arquivo_fonte...');
         
-        // Buscar contagem total por arquivo_fonte usando agregação no banco
-        const { data: counts, error: countError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('arquivo_fonte, VALORES')
-          .not('arquivo_fonte', 'is', null);
+        // Buscar dados usando paginação para evitar limite do Supabase
+        let allData: any[] = [];
+        let offset = 0;
+        const limit = 1000;
+        let hasMoreData = true;
 
-        if (countError) {
-          console.error('❌ Erro ao buscar contagens:', countError);
-          throw countError;
+        while (hasMoreData) {
+          const { data: batchData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('arquivo_fonte, VALORES')
+            .not('arquivo_fonte', 'is', null)
+            .range(offset, offset + limit - 1);
+
+          if (error) {
+            console.error('❌ Erro ao buscar dados:', error);
+            throw error;
+          }
+
+          if (!batchData || batchData.length === 0) {
+            hasMoreData = false;
+            break;
+          }
+
+          allData = [...allData, ...batchData];
+          console.log(`📦 Lote ${Math.floor(offset/limit) + 1}: ${batchData.length} registros (total: ${allData.length})`);
+
+          if (batchData.length < limit) {
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
         }
 
-        console.log('📊 Total de registros encontrados:', counts?.length || 0);
+        console.log('📊 Total de registros carregados:', allData.length);
 
         // Processar dados por arquivo_fonte
         const statsMap = new Map<string, {
@@ -60,24 +82,22 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
 
         // Processar todos os dados
-        if (counts) {
-          counts.forEach(record => {
-            const fonte = record.arquivo_fonte;
-            const valor = record.VALORES || 0;
+        allData.forEach(record => {
+          const fonte = record.arquivo_fonte;
+          const valor = record.VALORES || 0;
+          
+          if (statsMap.has(fonte)) {
+            const stats = statsMap.get(fonte)!;
+            stats.totalRecords++;
             
-            if (statsMap.has(fonte)) {
-              const stats = statsMap.get(fonte)!;
-              stats.totalRecords++;
-              
-              if (valor > 0) {
-                stats.recordsWithValue++;
-                stats.totalValue += valor;
-              } else {
-                stats.recordsZeroed++;
-              }
+            if (valor > 0) {
+              stats.recordsWithValue++;
+              stats.totalValue += valor;
+            } else {
+              stats.recordsZeroed++;
             }
-          });
-        }
+          }
+        });
 
         console.log('📊 Estatísticas processadas:', {
           'volumetria_padrao': statsMap.get('volumetria_padrao'),
