@@ -28,70 +28,24 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
 
   const loadStats = async () => {
     try {
-      console.log('📊 Carregando estatísticas por arquivo_fonte...');
+      console.log('📊 Carregando estatísticas usando agregação SQL...');
+      setLoading(true);
       
-      // PRIMEIRO: Verificar contagem total por arquivo_fonte para comparar com arquivos originais
-      console.log('🔍 Verificando se há filtros ou limitações na consulta...');
+      // SOLUÇÃO ROBUSTA: Usar agregação SQL direta no banco
+      // Isso garante que TODOS os registros sejam contados, independente do volume
       
-      const { data: countData, error: countError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('arquivo_fonte')
-        .not('arquivo_fonte', 'is', null);
-        
-      if (countError) {
-        console.error('❌ Erro ao buscar contagem total:', countError);
-        throw countError;
-      }
+      const { data: aggregatedStats, error: statsError } = await supabase.rpc('get_volumetria_aggregated_stats');
       
-      console.log('🔍 Total de registros retornados pela consulta:', countData?.length || 0);
-      console.log('🔍 Primeiros 10 registros para debug:', countData?.slice(0, 10));
-      
-      const totalBySource = (countData || []).reduce((acc: Record<string, number>, item) => {
-        acc[item.arquivo_fonte] = (acc[item.arquivo_fonte] || 0) + 1;
-        return acc;
-      }, {});
-      
-      console.log('🔍 CONTAGEM TOTAL POR ARQUIVO (sem paginação):', totalBySource);
-      console.log('🔍 COMPARAÇÃO COM ARQUIVOS ORIGINAIS:');
-      console.log('   - Volumetria Padrão: Arquivo=34351, Banco=' + (totalBySource['volumetria_padrao'] || 0) + ' (diferença: ' + (34351 - (totalBySource['volumetria_padrao'] || 0)) + ')');
-      console.log('   - Volumetria Fora Padrão: Arquivo=57, Banco=' + (totalBySource['volumetria_fora_padrao'] || 0) + ' (diferença: ' + (57 - (totalBySource['volumetria_fora_padrao'] || 0)) + ')');
-      
-      // SEGUNDO: Buscar dados usando paginação para calcular estatísticas
-      let allData: any[] = [];
-      let offset = 0;
-      const limit = 1000;
-      let hasMoreData = true;
-
-      while (hasMoreData) {
-        const { data: batchData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('arquivo_fonte, VALORES')
-          .not('arquivo_fonte', 'is', null)
-          .range(offset, offset + limit - 1);
-
-        if (error) {
-          console.error('❌ Erro ao buscar dados:', error);
-          throw error;
-        }
-
-        if (!batchData || batchData.length === 0) {
-          hasMoreData = false;
-          break;
-        }
-
-        allData = [...allData, ...batchData];
-        console.log(`📦 Lote ${Math.floor(offset/limit) + 1}: ${batchData.length} registros (total: ${allData.length})`);
-
-        if (batchData.length < limit) {
-          hasMoreData = false;
-        } else {
-          offset += limit;
-        }
+      if (statsError) {
+        console.error('❌ Erro ao buscar estatísticas agregadas:', statsError);
+        // Fallback para consulta manual se a função não existir
+        await loadStatsManual();
+        return;
       }
 
-      console.log('📊 Total de registros carregados:', allData.length);
-
-      // Processar dados por arquivo_fonte
+      console.log('✅ Estatísticas agregadas carregadas:', aggregatedStats);
+      
+      // Processar dados agregados
       const statsMap = new Map<string, {
         totalRecords: number;
         recordsWithValue: number;
@@ -99,51 +53,35 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         totalValue: number;
       }>();
 
-      // Inicializar contadores
+      // Inicializar com zeros
       const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
       statsMap.set('volumetria_padrao', { ...initStats });
       statsMap.set('volumetria_fora_padrao', { ...initStats });
       statsMap.set('volumetria_padrao_retroativo', { ...initStats });
       statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
 
-      // Processar todos os dados
-      allData.forEach(record => {
-        const fonte = record.arquivo_fonte;
-        const valor = record.VALORES || 0;
-        
-        if (statsMap.has(fonte)) {
-          const stats = statsMap.get(fonte)!;
-          stats.totalRecords++;
-          
-          if (valor > 0) {
-            stats.recordsWithValue++;
-            stats.totalValue += valor;
-          } else {
-            stats.recordsZeroed++;
-          }
+      // Processar resultados agregados
+      (aggregatedStats || []).forEach((stat: any) => {
+        if (statsMap.has(stat.arquivo_fonte)) {
+          statsMap.set(stat.arquivo_fonte, {
+            totalRecords: stat.total_records || 0,
+            recordsWithValue: stat.records_with_value || 0,
+            recordsZeroed: stat.records_zeroed || 0,
+            totalValue: stat.total_value || 0
+          });
         }
       });
 
-      console.log('📊 Estatísticas processadas:', {
-        'volumetria_padrao': statsMap.get('volumetria_padrao'),
-        'volumetria_fora_padrao': statsMap.get('volumetria_fora_padrao'),
-        'volumetria_padrao_retroativo': statsMap.get('volumetria_padrao_retroativo'),
-        'volumetria_fora_padrao_retroativo': statsMap.get('volumetria_fora_padrao_retroativo')
-      });
-
-      // Buscar dados da tabela De-Para com contagem completa
-      console.log('🔍 Buscando dados da tabela De-Para...');
+      // Buscar contagem do De-Para
       const { count: deParaCount, error: deParaError } = await supabase
         .from('valores_referencia_de_para')
         .select('*', { count: 'exact', head: true });
 
       if (deParaError) {
         console.error('❌ Erro ao buscar contagem De-Para:', deParaError);
-      } else {
-        console.log('✅ Total de registros De-Para encontrados:', deParaCount || 0);
       }
 
-      // Converter para formato do componente
+      // Montar estatísticas finais
       const realStats: UploadStats[] = [
         {
           fileName: "Volumetria Padrão",
@@ -183,7 +121,7 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         }
       ];
 
-      // Adicionar status do De-Para se existe
+      // Adicionar De-Para se existe
       if (deParaCount && deParaCount > 0) {
         realStats.push({
           fileName: "Upload De-Para Exames",
@@ -196,12 +134,137 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         });
       }
 
-      console.log('📊 Estatísticas reais carregadas:', realStats);
+      console.log('📊 Estatísticas finais (MÉTODO ROBUSTO):', realStats);
       setStats(realStats);
+      
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error('❌ Erro geral ao carregar estatísticas:', error);
+      // Em caso de erro, tentar método manual como fallback
+      await loadStatsManual();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // MÉTODO FALLBACK: Consulta manual robusta com paginação confiável
+  const loadStatsManual = async () => {
+    try {
+      console.log('🔄 Usando método fallback com paginação robusta...');
+      
+      const statsMap = new Map<string, {
+        totalRecords: number;
+        recordsWithValue: number;
+        recordsZeroed: number;
+        totalValue: number;
+      }>();
+
+      // Inicializar contadores
+      const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
+      const fontes = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+      
+      fontes.forEach(fonte => statsMap.set(fonte, { ...initStats }));
+
+      // Processar cada fonte separadamente para evitar limitações
+      for (const fonte of fontes) {
+        console.log(`📦 Processando ${fonte}...`);
+        
+        let offset = 0;
+        const limit = 1000;
+        let hasMoreData = true;
+        let totalProcessed = 0;
+
+        while (hasMoreData) {
+          const { data: batchData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('VALORES')
+            .eq('arquivo_fonte', fonte)
+            .range(offset, offset + limit - 1);
+
+          if (error) {
+            console.error(`❌ Erro ao buscar ${fonte}:`, error);
+            break;
+          }
+
+          if (!batchData || batchData.length === 0) {
+            hasMoreData = false;
+            break;
+          }
+
+          // Processar lote
+          const stats = statsMap.get(fonte)!;
+          batchData.forEach(record => {
+            const valor = record.VALORES || 0;
+            stats.totalRecords++;
+            
+            if (valor > 0) {
+              stats.recordsWithValue++;
+              stats.totalValue += valor;
+            } else {
+              stats.recordsZeroed++;
+            }
+          });
+
+          totalProcessed += batchData.length;
+          console.log(`   📊 ${fonte}: ${totalProcessed} registros processados`);
+
+          if (batchData.length < limit) {
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
+
+          // Pequena pausa para evitar sobrecarga
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+
+      console.log('📊 Estatísticas processadas (MÉTODO MANUAL):', Object.fromEntries(statsMap));
+      
+      // Converter para formato do componente (mesmo código anterior)
+      const realStats: UploadStats[] = [
+        {
+          fileName: "Volumetria Padrão",
+          totalRecords: statsMap.get('volumetria_padrao')?.totalRecords || 0,
+          recordsWithValue: statsMap.get('volumetria_padrao')?.recordsWithValue || 0,
+          recordsZeroed: statsMap.get('volumetria_padrao')?.recordsZeroed || 0,
+          totalValue: statsMap.get('volumetria_padrao')?.totalValue || 0,
+          period: "Período Atual",
+          category: 'padrão'
+        },
+        {
+          fileName: "Volumetria Fora Padrão",
+          totalRecords: statsMap.get('volumetria_fora_padrao')?.totalRecords || 0,
+          recordsWithValue: statsMap.get('volumetria_fora_padrao')?.recordsWithValue || 0,
+          recordsZeroed: statsMap.get('volumetria_fora_padrao')?.recordsZeroed || 0,
+          totalValue: statsMap.get('volumetria_fora_padrao')?.totalValue || 0,
+          period: "Período Atual",
+          category: 'fora-padrão'
+        },
+        {
+          fileName: "Volumetria Padrão Retroativo",
+          totalRecords: statsMap.get('volumetria_padrao_retroativo')?.totalRecords || 0,
+          recordsWithValue: statsMap.get('volumetria_padrao_retroativo')?.recordsWithValue || 0,
+          recordsZeroed: statsMap.get('volumetria_padrao_retroativo')?.recordsZeroed || 0,
+          totalValue: statsMap.get('volumetria_padrao_retroativo')?.totalValue || 0,
+          period: "Período Retroativo",
+          category: 'retroativo'
+        },
+        {
+          fileName: "Volumetria Fora Padrão Retroativo",
+          totalRecords: statsMap.get('volumetria_fora_padrao_retroativo')?.totalRecords || 0,
+          recordsWithValue: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsWithValue || 0,
+          recordsZeroed: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsZeroed || 0,
+          totalValue: statsMap.get('volumetria_fora_padrao_retroativo')?.totalValue || 0,
+          period: "Período Retroativo",
+          category: 'fora-padrão'
+        }
+      ];
+
+      setStats(realStats);
+      
+    } catch (error) {
+      console.error('❌ Erro no método manual:', error);
+      throw error;
     }
   };
 
