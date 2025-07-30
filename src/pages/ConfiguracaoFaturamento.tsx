@@ -26,7 +26,7 @@ import {
   Zap,
   AlertTriangle
 } from "lucide-react";
-import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
+
 import { useToast } from "@/hooks/use-toast";
 
 // Tipos para fontes de dados
@@ -38,11 +38,7 @@ const PERIODO_ATUAL = "2025-07";
 export default function ConfiguracaoFaturamento() {
   const { toast } = useToast();
   
-  // Estados movidos da página GerarFaturamento
-  const [periodoSelecionado, setPeriodoSelecionado] = useState(PERIODO_ATUAL);
-  const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
   const [fonteDados, setFonteDados] = useState<FonteDados>('upload');
-  const [enviarEmails, setEnviarEmails] = useState(true);
   
   const [configuracaoMobilemed, setConfiguracaoMobilemed] = useState({
     url: '',
@@ -253,66 +249,42 @@ export default function ConfiguracaoFaturamento() {
         </CardContent>
       </Card>
 
-      {/* Configurações de Período e Opções de Envio - Movido do GerarFaturamento */}
+      {/* Nota sobre configuração de período - redirecionando para local correto */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Configurações de Período e Envio
+            Período de Faturamento
           </CardTitle>
           <CardDescription>
-            Configure o período padrão e opções de envio para geração de relatórios
+            Configure o período de faturamento diretamente no módulo de geração
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <ControlePeriodoFaturamento
-                periodoSelecionado={periodoSelecionado}
-                setPeriodoSelecionado={setPeriodoSelecionado}
-                mostrarApenasDisponiveis={mostrarApenasEditaveis}
-                setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
-              />
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-800">Configuração de Período</h4>
+                <p className="text-sm text-blue-700 mt-1">
+                  O período de faturamento deve ser configurado diretamente no módulo 
+                  <strong> Gerar Faturamento → Teste MobileMed → Definir Período de Faturamento</strong>.
+                  Isso garante que o período seja específico para cada processo de geração de relatórios.
+                </p>
+              </div>
             </div>
-            
-            <div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Opções de Envio
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={enviarEmails}
-                      onCheckedChange={setEnviarEmails}
-                      id="enviar-emails"
-                    />
-                    <Label htmlFor="enviar-emails">Enviar emails automaticamente</Label>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {enviarEmails 
-                      ? "Os PDFs serão gerados e enviados automaticamente por email para cada cliente."
-                      : "Apenas os PDFs serão gerados. Os emails poderão ser enviados posteriormente."
-                    }
-                  </p>
-                  {enviarEmails && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                      <strong>Remetente:</strong> financeiro@teleimagem.com.br<br/>
-                      <strong>Assunto:</strong> Relatório de volumetria - Faturamento Teleimagem - Mês/Ano
-                    </div>
-                  )}
-                  
-                  {/* Aviso sobre independência do faturamento */}
-                  <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                    <strong>ℹ️ Importante:</strong> A geração de relatórios de faturamento é independente 
-                    das validações de período para upload de dados operacionais. Relatórios podem ser 
-                    gerados para qualquer período que contenha dados.
-                  </div>
-                </CardContent>
-              </Card>
+          </div>
+          
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 text-green-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-green-800">Envio de Emails</h4>
+                <p className="text-sm text-green-700 mt-1">
+                  As configurações de envio de email também estão disponíveis no módulo de geração de relatórios,
+                  permitindo controle específico por processo de faturamento.
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
