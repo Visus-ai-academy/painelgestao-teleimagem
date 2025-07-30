@@ -25,15 +25,11 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar APENAS uploads de cadastros (excluir volumetria e limpeza)
+      // Buscar uploads de cadastros (excluir volumetria e limpeza)
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .in('tipo_arquivo', [
-          'cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 
-          'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 
-          'prioridades'
-        ])
+        .not('tipo_arquivo', 'in', '("volumetria_mobilemed_data_exame","volumetria_mobilemed_data_laudo","limpeza")')
         .order('created_at', { ascending: false })
         .limit(20); // Mostrar os últimos 20 uploads
 
