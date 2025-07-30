@@ -1006,6 +1006,11 @@ export default function GerarFaturamento() {
                       }}
                     />
                   </div>
+
+                  <div>
+                    {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
+                    <ExamesForaPadraoUpload />
+                  </div>
                 </div>
 
 
@@ -1022,9 +1027,6 @@ export default function GerarFaturamento() {
                 
                 {/* Status dos Uploads Recentes - Dados MobileMed */}
                 <VolumetriaStatusPanel />
-
-                {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
-                <ExamesForaPadraoUpload />
 
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />
