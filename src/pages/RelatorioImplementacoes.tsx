@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Users, Database, DollarSign, FileText, Settings, Lock, Eye, UserCheck, CheckCircle, Download } from "lucide-react";
+import { Shield, Users, Database, DollarSign, FileText, Settings, Lock, Eye, UserCheck, CheckCircle, Download, Globe, Key } from "lucide-react";
 import jsPDF from 'jspdf';
 import { differenceInBusinessDays } from 'date-fns';
 
@@ -528,6 +528,208 @@ const RelatorioImplementacoes = () => {
         ))}
       </div>
       
+      {/* Seção de Banco de Dados */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Database className="h-6 w-6" />
+            Estrutura do Banco de Dados
+          </CardTitle>
+          <CardDescription>
+            Sistema completo com 42 tabelas principais organizadas por funcionalidade
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Segurança e Usuários (8 tabelas)</h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• audit_logs - Logs de auditoria</li>
+                <li>• data_access_logs - Logs de acesso a dados</li>
+                <li>• login_attempts - Tentativas de login</li>
+                <li>• security_alerts - Alertas de segurança</li>
+                <li>• user_roles - Roles dos usuários</li>
+                <li>• password_policies - Políticas de senha</li>
+                <li>• lgpd_consent - Consentimentos LGPD</li>
+                <li>• encrypted_data - Dados criptografados</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Dados Mestres (12 tabelas)</h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• clientes - Cadastro de clientes</li>
+                <li>• medicos - Cadastro médico</li>
+                <li>• colaboradores - Equipe interna</li>
+                <li>• especialidades - Especialidades médicas</li>
+                <li>• modalidades - Modalidades de exames</li>
+                <li>• categorias_exame - Categorias</li>
+                <li>• categorias_medico - Categorias médicas</li>
+                <li>• cadastro_exames - Exames cadastrados</li>
+                <li>• precos_servicos - Preços</li>
+                <li>• medicos_valores_repasse - Repasses</li>
+                <li>• contratos_clientes - Contratos</li>
+                <li>• documentos_clientes - Documentos</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Faturamento e Financeiro (6 tabelas)</h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• faturamento - Dados de faturamento</li>
+                <li>• emails_cobranca - E-mails de cobrança</li>
+                <li>• pagamentos_medicos - Pagamentos</li>
+                <li>• valores_referencia_de_para - Valores ref.</li>
+                <li>• regras_exclusao - Regras exclusão</li>
+                <li>• quebra_exames - Quebra de exames</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Operacional (8 tabelas)</h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• exames - Exames realizados</li>
+                <li>• escalas_medicas - Escalas médicas</li>
+                <li>• volumetria_mobilemed - Volumetria</li>
+                <li>• pendencias - Pendências</li>
+                <li>• performance_logs - Logs performance</li>
+                <li>• custom_metrics - Métricas customizadas</li>
+                <li>• custom_metric_values - Valores métricas</li>
+                <li>• partition_analysis - Análise partições</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Sistema e Importação (8 tabelas)</h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• field_mappings - Mapeamentos</li>
+                <li>• import_templates - Templates</li>
+                <li>• import_history - Histórico importação</li>
+                <li>• controle_dados_origem - Controle origem</li>
+                <li>• configuracao_protecao - Config. proteção</li>
+                <li>• data_retention_policies - Políticas retenção</li>
+                <li>• backup_logs - Logs de backup</li>
+                <li>• profiles - Perfis de usuário</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção de Integrações */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Globe className="h-6 w-6" />
+            Integrações com Sistemas Externos
+          </CardTitle>
+          <CardDescription>
+            Conectividade total com 8 sistemas e serviços externos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">ERP e Faturamento</h3>
+              <div className="space-y-3">
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="font-semibold">Omie ERP</div>
+                  <div className="text-sm text-muted-foreground">Sincronização completa de dados financeiros, clientes e faturamento</div>
+                </div>
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="font-semibold">MobileMed</div>
+                  <div className="text-sm text-muted-foreground">Importação de dados de volumetria e exames</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Assinatura Digital</h3>
+              <div className="space-y-3">
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="font-semibold">ClickSign</div>
+                  <div className="text-sm text-muted-foreground">Assinatura digital de contratos médicos e documentos</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Comunicação</h3>
+              <div className="space-y-3">
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="font-semibold">Resend</div>
+                  <div className="text-sm text-muted-foreground">Envio de e-mails transacionais e relatórios</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-primary">Geolocalização</h3>
+              <div className="space-y-3">
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <div className="font-semibold">Leaflet Maps</div>
+                  <div className="text-sm text-muted-foreground">Mapas interativos para distribuição de clientes</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção de API Keys */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Key className="h-6 w-6" />
+            Chaves API Configuradas
+          </CardTitle>
+          <CardDescription>
+            Sistema de gerenciamento seguro de chaves API através do Supabase Secrets
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline">RESEND_API_KEY</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Chave para envio de e-mails transacionais e relatórios de faturamento
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline">REENVIAR_CHAVE_API</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Chave alternativa para backup do sistema de e-mails
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline">SUPABASE_SERVICE_ROLE_KEY</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Chave de serviço para operações administrativas do banco
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline">SUPABASE_DB_URL</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  URL de conexão direta com o banco PostgreSQL
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-4 w-4 text-blue-600" />
+                <span className="font-semibold text-blue-800">Segurança das Chaves</span>
+              </div>
+              <div className="text-sm text-blue-700">
+                Todas as chaves API são armazenadas de forma segura no Supabase Secrets, 
+                com criptografia em trânsito e em repouso. Acesso restrito apenas às Edge Functions autorizadas.
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Seção de Regras de Negócio */}
       <Card>
         <CardHeader>
