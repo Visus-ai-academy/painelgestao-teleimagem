@@ -34,7 +34,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       const { data: uploadsVolumetria, error: uploadsError } = await supabase
         .from('processamento_uploads')
         .select('tipo_arquivo, created_at, arquivo_nome, status, registros_processados, registros_inseridos, registros_atualizados, registros_erro')
-        .in('tipo_arquivo', ['volumetria_mobilemed_data_laudo', 'volumetria_mobilemed_data_exame'])
+        .in('tipo_arquivo', ['data_laudo', 'data_exame'])
         .order('created_at', { ascending: false });
 
       if (uploadsError) {
@@ -60,7 +60,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         // Para cada tipo com upload, buscar dados da tabela volumetria_mobilemed
         for (const [tipo, uploadInfo] of volumetriaLatest) {
           try {
-            const arquivoFonte = tipo === 'volumetria_mobilemed_data_laudo' ? 'data_laudo' : 'data_exame';
+            const arquivoFonte = tipo; // tipo já é 'data_laudo' ou 'data_exame'
             
             const { data: dadosCompletos, error: dadosError } = await supabase
               .from('volumetria_mobilemed')
@@ -111,10 +111,10 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       // Converter para array e ordenar
       const statsArray = Array.from(latestUploads.values());
       
-      // Ordem desejada para volumetria mobilemed
+      // Ordem desejada para dados mobilemed
       const tipoOrdem = [
-        'volumetria_mobilemed_data_laudo',
-        'volumetria_mobilemed_data_exame'
+        'data_laudo',
+        'data_exame'
       ];
 
       statsArray.sort((a, b) => {
@@ -167,8 +167,8 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const getTypeLabel = (tipo: string) => {
     const labels = {
-      'volumetria_mobilemed_data_laudo': 'Dados Mobilemed - Data Laudo',
-      'volumetria_mobilemed_data_exame': 'Dados Mobilemed - Data Exame'
+      'data_laudo': 'Dados Mobilemed - Data Laudo',
+      'data_exame': 'Dados Mobilemed - Data Exame'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };
