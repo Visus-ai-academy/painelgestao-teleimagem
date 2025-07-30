@@ -10,8 +10,9 @@ import { toast } from "sonner";
 export function ExamesForaPadraoUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -21,19 +22,25 @@ export function ExamesForaPadraoUpload() {
       return;
     }
 
+    setSelectedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
     setUploading(true);
     setProgress(0);
 
     try {
       // Upload do arquivo para storage - sanitizar nome do arquivo
-      const sanitizedName = file.name
+      const sanitizedName = selectedFile.name
         .replace(/[^a-zA-Z0-9.-]/g, '_') // Substituir caracteres especiais por underscore
         .replace(/_{2,}/g, '_') // Remover underscores duplos
         .toLowerCase();
       const fileName = `exames_fora_padrao_${Date.now()}_${sanitizedName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('uploads')
-        .upload(fileName, file);
+        .upload(fileName, selectedFile);
 
       if (uploadError) {
         throw uploadError;
@@ -55,7 +62,9 @@ export function ExamesForaPadraoUpload() {
       toast.success(`Arquivo De-Para processado com sucesso! ${data.registros_processados} registros processados.`);
       
       // Reset
-      event.target.value = '';
+      setSelectedFile(null);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
       
     } catch (error) {
       console.error('Erro no upload:', error);
@@ -71,7 +80,7 @@ export function ExamesForaPadraoUpload() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <File className="h-5 w-5" />
-          Upload Arquivo De-Para - Exames Fora de Padrão
+          Upload De-Para Exames
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -85,11 +94,14 @@ export function ExamesForaPadraoUpload() {
             <Input
               type="file"
               accept=".xlsx,.xls"
-              onChange={handleFileUpload}
+              onChange={handleFileSelect}
               disabled={uploading}
               className="flex-1"
             />
-            <Button disabled={uploading}>
+            <Button 
+              onClick={handleUpload} 
+              disabled={uploading || !selectedFile}
+            >
               {uploading ? (
                 <>
                   <Upload className="h-4 w-4 animate-pulse mr-2" />
@@ -103,6 +115,13 @@ export function ExamesForaPadraoUpload() {
               )}
             </Button>
           </div>
+
+          {selectedFile && !uploading && (
+            <div className="text-sm text-green-600 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Arquivo selecionado: {selectedFile.name}
+            </div>
+          )}
 
           {uploading && (
             <div className="space-y-2">
