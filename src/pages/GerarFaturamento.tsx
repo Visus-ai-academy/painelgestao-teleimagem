@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
+import { UploadStatusPanel } from "@/components/UploadStatusPanel";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -1012,6 +1013,15 @@ export default function GerarFaturamento() {
                     <li><Badge variant="secondary">Valores</Badge> 2.50 → 2 (parte inteira)</li>
                     <li><Badge variant="secondary">Validação</Badge> Campos obrigatórios e formatos</li>
                   </ul>
+                </div>
+
+                {/* Status dos Uploads */}
+                <div className="mt-6">
+                  <h4 className="font-medium mb-4 flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Status dos Uploads
+                  </h4>
+                  <UploadStatusPanel />
                 </div>
               </CardContent>
             </Card>
