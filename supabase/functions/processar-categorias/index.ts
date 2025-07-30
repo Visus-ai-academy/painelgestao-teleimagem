@@ -153,7 +153,7 @@ serve(async (req) => {
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
         registros_erro: erros,
-        updated_at: new Date().toISOString()
+        completed_at: new Date().toISOString()
       })
       .eq('id', uploadLog.id)
 
