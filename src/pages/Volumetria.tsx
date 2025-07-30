@@ -9,6 +9,7 @@ import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadS
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
+import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 
 
 // Função para obter filtros padrão para o mês atual
@@ -73,6 +74,9 @@ export default function Volumetria() {
 
       {/* Status dos Uploads Recentes - Dados MobileMed */}
       <VolumetriaStatusPanel />
+
+      {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
+      <ExamesForaPadraoUpload />
 
       {/* Estatísticas dos Uploads */}
       <VolumetriaUploadStats />

@@ -2109,6 +2109,48 @@ export type Database = {
         }
         Relationships: []
       }
+      uploads_exames_fora_padrao: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          detalhes_erro: string | null
+          id: string
+          nome_arquivo: string
+          registros_erro: number | null
+          registros_inseridos: number | null
+          registros_processados: number | null
+          status: string
+          updated_at: string | null
+          url_arquivo: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          detalhes_erro?: string | null
+          id?: string
+          nome_arquivo: string
+          registros_erro?: number | null
+          registros_inseridos?: number | null
+          registros_processados?: number | null
+          status?: string
+          updated_at?: string | null
+          url_arquivo: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          detalhes_erro?: string | null
+          id?: string
+          nome_arquivo?: string
+          registros_erro?: number | null
+          registros_inseridos?: number | null
+          registros_processados?: number | null
+          status?: string
+          updated_at?: string | null
+          url_arquivo?: string
+        }
+        Relationships: []
+      }
       user_2fa: {
         Row: {
           backup_codes: string[] | null

@@ -315,22 +315,36 @@ async function processFileInBackground(
     console.log(`Processamento concluído. Total inserido: ${totalInserted}`);
     console.log(`Erros encontrados: ${errors.length}`);
 
-    // Aplicar regras De-Para para arquivos fora do padrão
+    // Aplicar regras de tratamento específicas para cada tipo de arquivo
     let registrosAtualizadosDePara = 0;
-    if (arquivo_fonte === 'volumetria_fora_padrao' && totalInserted > 0) {
-      console.log('Aplicando regras De-Para para registros fora do padrão...');
+    if (totalInserted > 0) {
+      console.log('Aplicando regras de tratamento específicas...');
       try {
-        const { data: deParaResult, error: deParaError } = await supabaseClient
-          .rpc('aplicar_valores_de_para');
-        
-        if (deParaError) {
-          console.error('Erro ao aplicar De-Para:', deParaError);
+        // Chamar função para aplicar regras de tratamento
+        const response = await fetch(`${supabaseUrl}/functions/v1/aplicar-regras-tratamento`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ arquivo_fonte })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Erro na resposta das regras de tratamento:', errorText);
+          errors.push(`Erro ao aplicar regras de tratamento: ${errorText}`);
         } else {
-          registrosAtualizadosDePara = deParaResult?.registros_atualizados || 0;
-          console.log(`Regras De-Para aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
+          const regraResult = await response.json();
+          registrosAtualizadosDePara = regraResult?.registros_atualizados || 0;
+          console.log(`Regras de tratamento aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
+          if (regraResult?.detalhes) {
+            console.log('Detalhes das regras:', regraResult.detalhes);
+          }
         }
-      } catch (deParaErr) {
-        console.error('Erro crítico ao aplicar De-Para:', deParaErr);
+      } catch (regraErr) {
+        console.error('Erro crítico ao aplicar regras de tratamento:', regraErr);
+        errors.push(`Erro ao aplicar regras: ${regraErr instanceof Error ? regraErr.message : 'Erro desconhecido'}`);
       }
     }
 
