@@ -28,50 +28,71 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
   const fetchUploadStats = async () => {
     try {
       setLoading(true);
-      console.log('Iniciando busca de estatísticas de upload dos dados Mobilemed...');
+      console.log('Iniciando busca de estatísticas de upload de faturamento...');
 
-      // Buscar uploads de volumetria mobilemed - verificar todos os tipos de volumetria
-      const { data: uploadsVolumetria, error: uploadsError } = await supabase
+      // Buscar uploads de faturamento e dados financeiros
+      const { data: uploadsFaturamento, error: uploadsError } = await supabase
         .from('processamento_uploads')
         .select('tipo_arquivo, created_at, arquivo_nome, status, registros_processados, registros_inseridos, registros_atualizados, registros_erro')
-        .in('tipo_arquivo', ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao', 'data_laudo', 'data_exame'])
+        .in('tipo_arquivo', ['faturamento', 'financeiro', 'dados_legado', 'exames'])
         .order('created_at', { ascending: false });
 
       if (uploadsError) {
-        console.error('Erro ao buscar uploads de volumetria mobilemed:', uploadsError);
+        console.error('Erro ao buscar uploads de faturamento:', uploadsError);
         throw uploadsError;
       }
 
-      console.log('Uploads de volumetria mobilemed encontrados:', uploadsVolumetria?.length || 0);
+      console.log('Uploads de faturamento encontrados:', uploadsFaturamento?.length || 0);
 
       const latestUploads = new Map<string, UploadStats>();
 
-      // Processar uploads de volumetria mobilemed
-      if (uploadsVolumetria && uploadsVolumetria.length > 0) {
-        const volumetriaLatest = new Map<string, any>();
+      // Processar uploads de faturamento
+      if (uploadsFaturamento && uploadsFaturamento.length > 0) {
+        const faturamentoLatest = new Map<string, any>();
         
-        uploadsVolumetria.forEach(upload => {
-          const current = volumetriaLatest.get(upload.tipo_arquivo);
+        uploadsFaturamento.forEach(upload => {
+          const current = faturamentoLatest.get(upload.tipo_arquivo);
           if (!current || new Date(upload.created_at) > new Date(current.created_at)) {
-            volumetriaLatest.set(upload.tipo_arquivo, upload);
+            faturamentoLatest.set(upload.tipo_arquivo, upload);
           }
         });
 
-        // Para cada tipo com upload, buscar dados da tabela volumetria_mobilemed
-        for (const [tipo, uploadInfo] of volumetriaLatest) {
+        // Para cada tipo com upload, buscar dados das tabelas correspondentes
+        for (const [tipo, uploadInfo] of faturamentoLatest) {
           try {
-            const arquivoFonte = tipo; // tipo já é 'data_laudo' ou 'data_exame'
+            let dadosCompletos: any[] = [];
+            let tabelaQuery = '';
             
-            const { data: dadosCompletos, error: dadosError } = await supabase
-              .from('volumetria_mobilemed')
-              .select('created_at, "VALORES"')
-              .eq('arquivo_fonte', arquivoFonte);
+            switch (tipo) {
+              case 'faturamento':
+                const { data: dadosFaturamento } = await supabase
+                  .from('faturamento')
+                  .select('valor, quantidade')
+                  .limit(10000);
+                dadosCompletos = dadosFaturamento || [];
+                break;
+                
+              case 'exames':
+                const { data: dadosExames } = await supabase
+                  .from('exames')
+                  .select('valor_total, quantidade')
+                  .limit(10000);
+                dadosCompletos = dadosExames || [];
+                break;
+                
+              default:
+                // Para outros tipos, usar dados do upload
+                dadosCompletos = [];
+            }
 
-            if (!dadosError && dadosCompletos && dadosCompletos.length > 0) {
+            if (dadosCompletos.length > 0) {
               const registros = dadosCompletos.length;
-              const exames = dadosCompletos.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
-              const zerados = dadosCompletos.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
-              const comValor = dadosCompletos.filter(item => item.VALORES && Number(item.VALORES) > 0).length;
+              const valores = dadosCompletos.map(item => 
+                Number(item.valor || item.valor_total || 0) * Number(item.quantidade || 1)
+              );
+              const totalExames = valores.reduce((sum, val) => sum + val, 0);
+              const zerados = valores.filter(val => val === 0).length;
+              const comValor = valores.filter(val => val > 0).length;
 
               latestUploads.set(tipo, {
                 tipo_arquivo: tipo,
@@ -81,12 +102,12 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 registros_inseridos: comValor,
                 registros_atualizados: uploadInfo.registros_atualizados || 0,
                 registros_erro: zerados,
-                total_exames: exames,
+                total_exames: Math.round(totalExames),
                 zerados,
                 created_at: uploadInfo.created_at
               });
 
-              console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados`);
+              console.log(`${tipo}: ${registros} registros, R$ ${totalExames.toFixed(2)}, ${zerados} zerados`);
             } else {
               // Se não há dados na tabela, usar dados do upload
               latestUploads.set(tipo, {
@@ -111,15 +132,12 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       // Converter para array e ordenar
       const statsArray = Array.from(latestUploads.values());
       
-      // Ordem desejada para dados mobilemed
+      // Ordem desejada para dados de faturamento
       const tipoOrdem = [
-        'volumetria_padrao',
-        'volumetria_fora_padrao', 
-        'volumetria_padrao_retroativo',
-        'volumetria_fora_padrao_retroativo',
-        'volumetria_onco_padrao',
-        'data_laudo',
-        'data_exame'
+        'faturamento',
+        'financeiro',
+        'exames',
+        'dados_legado'
       ];
 
       statsArray.sort((a, b) => {
@@ -133,7 +151,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         return indexA - indexB;
       });
 
-      console.log('Estatísticas finais dos dados Mobilemed:', statsArray.length);
+      console.log('Estatísticas finais de faturamento:', statsArray.length);
       setUploadStats(statsArray);
 
     } catch (error) {
@@ -172,13 +190,10 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const getTypeLabel = (tipo: string) => {
     const labels = {
-      'volumetria_padrao': 'Volumetria Padrão',
-      'volumetria_fora_padrao': 'Volumetria Fora do Padrão', 
-      'volumetria_padrao_retroativo': 'Volumetria Padrão Retroativa',
-      'volumetria_fora_padrao_retroativo': 'Volumetria Fora Padrão Retroativa',
-      'volumetria_onco_padrao': 'Volumetria Onco Padrão',
-      'data_laudo': 'Dados Mobilemed - Data Laudo',
-      'data_exame': 'Dados Mobilemed - Data Exame'
+      'faturamento': 'Dados de Faturamento',
+      'financeiro': 'Dados Financeiros',
+      'exames': 'Dados de Exames',
+      'dados_legado': 'Dados Legado'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };
@@ -196,9 +211,9 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
     );
   }
 
-  // Calcular totais para dados mobilemed
+  // Calcular totais para dados de faturamento
   const totalRegistros = uploadStats.reduce((sum, stat) => sum + stat.registros_processados, 0);
-  const totalExames = uploadStats.reduce((sum, stat) => sum + stat.total_exames, 0);
+  const totalValor = uploadStats.reduce((sum, stat) => sum + stat.total_exames, 0);
   const totalZerados = uploadStats.reduce((sum, stat) => sum + (stat.zerados || 0), 0);
 
   return (
@@ -243,8 +258,8 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                     <div className="text-muted-foreground">Registros</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-green-600">{stat.total_exames}</div>
-                    <div className="text-muted-foreground">Exames</div>
+                    <div className="text-lg font-bold text-green-600">R$ {stat.total_exames.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div className="text-muted-foreground">Valor Total</div>
                   </div>
                   {stat.zerados !== undefined && stat.zerados > 0 && (
                     <div className="text-center">
@@ -262,22 +277,22 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
               </div>
             ))}
             
-            {/* Total dos Dados Mobilemed */}
+            {/* Total de Faturamento */}
             {uploadStats.length > 0 && (
               <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <h3 className="font-semibold text-primary mb-3">Total Dados Mobilemed</h3>
+                <h3 className="font-semibold text-primary mb-3">Total Faturamento</h3>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="text-2xl font-bold text-primary">{totalRegistros.toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Total Registros</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-primary">{totalExames.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Total Exames</div>
+                    <div className="text-2xl font-bold text-primary">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div className="text-sm text-muted-foreground">Valor Total</div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-orange-600">{totalZerados.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Total Zerados</div>
+                    <div className="text-sm text-muted-foreground">Zerados</div>
                   </div>
                 </div>
               </div>
