@@ -33,6 +33,7 @@ serve(async (req) => {
       .insert({
         tipo_arquivo: 'prioridades',
         arquivo_nome: file.name,
+        tipo_dados: 'incremental',
         status: 'processando',
         registros_processados: 0,
         registros_inseridos: 0,
