@@ -12,7 +12,7 @@ interface UploadStatus {
   lastUpdate: string | null;
 }
 
-export function useUploadStatus(fileType: string = 'faturamento') {
+export function useUploadStatus(fileType: string | string[] = 'faturamento') {
   const [status, setStatus] = useState<UploadStatus>({
     totalUploads: 0,
     completedUploads: 0,
@@ -29,12 +29,20 @@ export function useUploadStatus(fileType: string = 'faturamento') {
       // Buscar uploads ativos (processando) E recém-concluídos (últimos 3 minutos)
       const cutoffTime = new Date(Date.now() - 3 * 60 * 1000).toISOString();
       
-      const { data: uploads, error } = await supabase
+      let query = supabase
         .from('upload_logs')
         .select('status, records_processed, updated_at, created_at')
-        .eq('file_type', fileType)
         .in('status', ['processing', 'completed']) // Incluir concluídos também
         .gte('updated_at', cutoffTime); // Últimos 3 minutos
+      
+      // Aplicar filtro de tipo(s)
+      if (Array.isArray(fileType)) {
+        query = query.in('file_type', fileType);
+      } else {
+        query = query.eq('file_type', fileType);
+      }
+      
+      const { data: uploads, error } = await query;
 
       if (error) {
         console.error('Erro ao buscar status dos uploads:', error);
@@ -103,6 +111,10 @@ export function useUploadStatus(fileType: string = 'faturamento') {
     fetchStatus();
 
     // Configurar realtime subscription
+    const fileTypeFilter = Array.isArray(fileType) 
+      ? fileType.map(ft => `file_type=eq.${ft}`).join(',')
+      : `file_type=eq.${fileType}`;
+    
     const channel = supabase
       .channel('upload_logs_changes')
       .on(
@@ -111,7 +123,7 @@ export function useUploadStatus(fileType: string = 'faturamento') {
           event: '*',
           schema: 'public',
           table: 'upload_logs',
-          filter: `file_type=eq.${fileType}`
+          filter: Array.isArray(fileType) ? `file_type=in.(${fileType.join(',')})` : `file_type=eq.${fileType}`
         },
         (payload) => {
           console.log('Upload status changed:', payload);

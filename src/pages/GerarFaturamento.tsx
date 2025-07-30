@@ -1208,7 +1208,7 @@ export default function GerarFaturamento() {
               {/* Velocímetro de Status do Processamento */}
               <div className="mb-6">
                 <ProcessingSpeedometer 
-                  fileType="faturamento"
+                  fileType={['faturamento', 'volumetria_mobilemed']}
                   onReadyToGenerate={setSistemaProntoParagerar}
                 />
               </div>

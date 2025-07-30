@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, AlertCircle, Database } from 'lucide-react';
 
 interface ProcessingSpeedometerProps {
-  fileType?: string;
+  fileType?: string | string[];
   onReadyToGenerate?: (isReady: boolean) => void;
 }
 
