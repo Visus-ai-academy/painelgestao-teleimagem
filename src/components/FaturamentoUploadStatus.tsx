@@ -30,11 +30,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       setLoading(true);
       console.log('Iniciando busca de estatísticas de upload dos dados Mobilemed...');
 
-      // Buscar APENAS uploads de volumetria mobilemed (data_laudo e data_exame)
+      // Buscar uploads de volumetria mobilemed - verificar todos os tipos de volumetria
       const { data: uploadsVolumetria, error: uploadsError } = await supabase
         .from('processamento_uploads')
         .select('tipo_arquivo, created_at, arquivo_nome, status, registros_processados, registros_inseridos, registros_atualizados, registros_erro')
-        .in('tipo_arquivo', ['data_laudo', 'data_exame'])
+        .in('tipo_arquivo', ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao', 'data_laudo', 'data_exame'])
         .order('created_at', { ascending: false });
 
       if (uploadsError) {
@@ -113,6 +113,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       
       // Ordem desejada para dados mobilemed
       const tipoOrdem = [
+        'volumetria_padrao',
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao',
         'data_laudo',
         'data_exame'
       ];
@@ -167,6 +172,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const getTypeLabel = (tipo: string) => {
     const labels = {
+      'volumetria_padrao': 'Volumetria Padrão',
+      'volumetria_fora_padrao': 'Volumetria Fora do Padrão', 
+      'volumetria_padrao_retroativo': 'Volumetria Padrão Retroativa',
+      'volumetria_fora_padrao_retroativo': 'Volumetria Fora Padrão Retroativa',
+      'volumetria_onco_padrao': 'Volumetria Onco Padrão',
       'data_laudo': 'Dados Mobilemed - Data Laudo',
       'data_exame': 'Dados Mobilemed - Data Exame'
     };
