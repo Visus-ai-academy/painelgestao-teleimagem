@@ -1028,9 +1028,6 @@ export default function GerarFaturamento() {
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />
 
-                {/* Comparação de Clientes por Arquivo */}
-                <VolumetriaClientesComparison />
-
               </CardContent>
             </Card>
           </div>
