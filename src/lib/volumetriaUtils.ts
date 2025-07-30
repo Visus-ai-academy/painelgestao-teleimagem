@@ -317,7 +317,32 @@ export async function processVolumetriaFile(
   const XLSX = await import('xlsx');
   const { supabase } = await import('@/integrations/supabase/client');
   
+  let uploadLog: any = null;
+  
   try {
+    console.log('Iniciando processamento do arquivo:', file.name);
+    
+    // Criar log de upload inicial
+    const { data: uploadLogData, error: uploadLogError } = await supabase
+      .from('processamento_uploads')
+      .insert({
+        tipo_arquivo: arquivoFonte,
+        arquivo_nome: file.name,
+        tipo_dados: 'volumetria',
+        status: 'processando',
+        registros_processados: 0,
+        registros_inseridos: 0,
+        registros_atualizados: 0,
+        registros_erro: 0
+      })
+      .select()
+      .single();
+
+    if (uploadLogError) {
+      console.error('Erro ao criar log de upload:', uploadLogError);
+    } else {
+      uploadLog = uploadLogData;
+    }
     // Ler arquivo
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
@@ -401,6 +426,19 @@ export async function processVolumetriaFile(
       await new Promise(resolve => setTimeout(resolve, 10));
     }
 
+    // Atualizar log de upload com sucesso
+    if (uploadLog) {
+      await supabase
+        .from('processamento_uploads')
+        .update({
+          status: 'concluido',
+          registros_processados: jsonData.length,
+          registros_inseridos: totalInserted,
+          registros_erro: errors.length
+        })
+        .eq('id', uploadLog.id);
+    }
+
     return {
       success: true,
       totalProcessed: jsonData.length,
@@ -410,6 +448,18 @@ export async function processVolumetriaFile(
 
   } catch (error) {
     console.error('Erro no processamento:', error);
+    
+    // Atualizar log com erro se existir
+    if (uploadLog) {
+      await supabase
+        .from('processamento_uploads')
+        .update({
+          status: 'erro',
+          registros_erro: 1
+        })
+        .eq('id', uploadLog.id);
+    }
+    
     return {
       success: false,
       totalProcessed: 0,
