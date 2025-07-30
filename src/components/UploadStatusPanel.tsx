@@ -25,11 +25,15 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar TODOS os uploads recentes de cadastros
+      // Buscar APENAS uploads de cadastros (excluir volumetria e limpeza)
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .neq('tipo_dados', 'volumetria') // Excluir uploads de volumetria
+        .in('tipo_arquivo', [
+          'cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 
+          'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 
+          'prioridades'
+        ])
         .order('created_at', { ascending: false })
         .limit(20); // Mostrar os últimos 20 uploads
 
