@@ -319,14 +319,15 @@ async function processFileInBackground(
     console.log(`Processamento concluído. Total inserido: ${totalInserted}${isLimitedSample ? ' (processamento limitado devido ao tamanho do arquivo)' : ''}`);
     console.log(`Erros encontrados: ${errors.length}`);
 
-    // Atualizar log de upload com sucesso
+    // Atualizar log de upload com sucesso na tabela processamento_uploads
     try {
       const { error: updateError } = await supabaseClient
-        .from('upload_logs')
+        .from('processamento_uploads')
         .update({
-          status: totalInserted > 0 ? 'completed' : 'error',
-          records_processed: totalInserted,
-          error_message: errors.length > 0 ? errors.slice(0, 10).join('; ') + (errors.length > 10 ? '...' : '') : null
+          status: totalInserted > 0 ? 'concluido' : 'erro',
+          registros_processados: dataToProcess.length,
+          registros_inseridos: totalInserted,
+          registros_erro: errors.length
         })
         .eq('id', uploadLogId);
 
@@ -342,13 +343,13 @@ async function processFileInBackground(
   } catch (error) {
     console.error('Erro durante processamento em background:', error);
     
-    // Atualizar log com erro - com proteção contra null
+    // Atualizar log com erro na tabela processamento_uploads
     try {
       await supabaseClient
-        .from('upload_logs')
+        .from('processamento_uploads')
         .update({
-          status: 'error',
-          error_message: error?.message || String(error) || 'Erro desconhecido durante processamento'
+          status: 'erro',
+          erro_detalhes: error?.message || String(error) || 'Erro desconhecido durante processamento'
         })
         .eq('id', uploadLogId);
     } catch (finalErr) {
@@ -384,13 +385,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Criar log de upload
+    // Criar log de upload na tabela processamento_uploads
     const { data: uploadLog, error: logError } = await supabaseClient
-      .from('upload_logs')
+      .from('processamento_uploads')
       .insert({
-        filename: file_path,
-        file_type: 'volumetria_mobilemed',
-        status: 'processing'
+        arquivo_nome: file_path,
+        tipo_arquivo: arquivo_fonte,
+        status: 'processando',
+        registros_processados: 0,
+        registros_inseridos: 0,
+        registros_atualizados: 0,
+        registros_erro: 0
       })
       .select()
       .single();
