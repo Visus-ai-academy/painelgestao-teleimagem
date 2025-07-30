@@ -2613,6 +2613,16 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      get_volumetria_aggregated_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          arquivo_fonte: string
+          total_records: number
+          records_with_value: number
+          records_zeroed: number
+          total_value: number
+        }[]
+      }
       get_volumetria_stats: {
         Args: {
           p_empresa?: string

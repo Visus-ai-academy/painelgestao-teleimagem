@@ -28,24 +28,37 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
 
   const loadStats = async () => {
     try {
-      console.log('📊 Carregando estatísticas usando agregação SQL...');
+      console.log('📊 Carregando estatísticas usando consulta SQL direta...');
       setLoading(true);
       
-      // SOLUÇÃO ROBUSTA: Usar agregação SQL direta no banco
+      // SOLUÇÃO ROBUSTA: Usar consulta SQL direta com agregação
       // Isso garante que TODOS os registros sejam contados, independente do volume
       
-      const { data: aggregatedStats, error: statsError } = await supabase.rpc('get_volumetria_aggregated_stats');
+      const { data: aggregatedStats, error: statsError } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          arquivo_fonte,
+          count:VALORES.count(),
+          records_with_value:VALORES.count(),
+          total_value:VALORES.sum()
+        `, { count: 'exact' })
+        .in('arquivo_fonte', [
+          'volumetria_padrao', 
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo', 
+          'volumetria_fora_padrao_retroativo'
+        ]);
       
       if (statsError) {
         console.error('❌ Erro ao buscar estatísticas agregadas:', statsError);
-        // Fallback para consulta manual se a função não existir
+        // Fallback para consulta manual se houver erro
         await loadStatsManual();
         return;
       }
 
       console.log('✅ Estatísticas agregadas carregadas:', aggregatedStats);
       
-      // Processar dados agregados
+      // Processar dados agregados usando consultas separadas para maior precisão
       const statsMap = new Map<string, {
         totalRecords: number;
         recordsWithValue: number;
@@ -55,22 +68,43 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
 
       // Inicializar com zeros
       const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-      statsMap.set('volumetria_padrao', { ...initStats });
-      statsMap.set('volumetria_fora_padrao', { ...initStats });
-      statsMap.set('volumetria_padrao_retroativo', { ...initStats });
-      statsMap.set('volumetria_fora_padrao_retroativo', { ...initStats });
+      const fontes = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+      
+      fontes.forEach(fonte => statsMap.set(fonte, { ...initStats }));
 
-      // Processar resultados agregados
-      (aggregatedStats || []).forEach((stat: any) => {
-        if (statsMap.has(stat.arquivo_fonte)) {
-          statsMap.set(stat.arquivo_fonte, {
-            totalRecords: stat.total_records || 0,
-            recordsWithValue: stat.records_with_value || 0,
-            recordsZeroed: stat.records_zeroed || 0,
-            totalValue: stat.total_value || 0
-          });
-        }
-      });
+      // Buscar estatísticas para cada fonte separadamente para máxima precisão
+      for (const fonte of fontes) {
+        // Total de registros
+        const { count: totalCount } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', fonte);
+
+        // Registros com valores > 0
+        const { count: withValueCount } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', fonte)
+          .gt('VALORES', 0);
+
+        // Soma total dos valores
+        const { data: sumData } = await supabase
+          .from('volumetria_mobilemed')
+          .select('VALORES')
+          .eq('arquivo_fonte', fonte);
+
+        const totalValue = sumData?.reduce((sum, record) => sum + (record.VALORES || 0), 0) || 0;
+        const recordsZeroed = (totalCount || 0) - (withValueCount || 0);
+
+        statsMap.set(fonte, {
+          totalRecords: totalCount || 0,
+          recordsWithValue: withValueCount || 0,
+          recordsZeroed: recordsZeroed,
+          totalValue: totalValue
+        });
+
+        console.log(`📊 ${fonte}: ${totalCount} total, ${withValueCount} com valores, ${totalValue} soma`);
+      }
 
       // Buscar contagem do De-Para
       const { count: deParaCount, error: deParaError } = await supabase
