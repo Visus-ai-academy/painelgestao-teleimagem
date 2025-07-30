@@ -34,7 +34,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 
-import { ProcessingSpeedometer } from "@/components/ProcessingSpeedometer";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Período atual (julho/2025) - onde estão os dados carregados
@@ -1205,13 +1204,6 @@ export default function GerarFaturamento() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Velocímetro de Status do Processamento */}
-              <div className="mb-6">
-                <ProcessingSpeedometer 
-                  fileType={['faturamento', 'volumetria_mobilemed']}
-                  onReadyToGenerate={setSistemaProntoParagerar}
-                />
-              </div>
               {/* Controle de envio de emails */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center space-x-2">
