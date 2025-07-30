@@ -926,6 +926,8 @@ export default function GerarFaturamento() {
                   <div>
                     <VolumetriaUpload
                       arquivoFonte="volumetria_padrao"
+                      disabled={!periodoFaturamentoVolumetria}
+                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
@@ -938,6 +940,8 @@ export default function GerarFaturamento() {
                   <div>
                     <VolumetriaUpload
                       arquivoFonte="volumetria_fora_padrao"
+                      disabled={!periodoFaturamentoVolumetria}
+                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
@@ -978,6 +982,8 @@ export default function GerarFaturamento() {
                   <div>
                     <VolumetriaUpload
                       arquivoFonte="volumetria_onco_padrao"
+                      disabled={!periodoFaturamentoVolumetria}
+                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
                       onSuccess={() => {
                         toast({
                           title: "Upload Concluído",
