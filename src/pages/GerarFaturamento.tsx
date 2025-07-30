@@ -1000,23 +1000,6 @@ export default function GerarFaturamento() {
                   </div>
                 </div>
 
-                <div className="grid gap-2 pt-4">
-                  <Label>Templates de Teste</Label>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a href="/templates/template_volumetria_mobilemed_data_laudo.csv" download>
-                        <Download className="h-4 w-4 mr-2" />
-                        Template Data_Laudo
-                      </a>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <a href="/templates/template_volumetria_mobilemed_data_exame.csv" download>
-                        <Download className="h-4 w-4 mr-2" />
-                        Template Data_Exame
-                      </a>
-                    </Button>
-                  </div>
-                </div>
 
                 <div className="bg-muted p-4 rounded-lg">
                   <h4 className="font-medium mb-2">Conversões Automáticas:</h4>
