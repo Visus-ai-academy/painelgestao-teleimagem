@@ -90,10 +90,13 @@ serve(async (req) => {
     let inseridos = 0
     let atualizados = 0
     let erros = 0
+    let processados = 0
     const errosDetalhes: string[] = []
 
     for (const row of dataRows) {
       if (!row || row.length === 0) continue
+      
+      processados++ // Contar apenas linhas que não são vazias
       
       try {
         const nome = row[0]?.toString()?.trim()
@@ -148,8 +151,8 @@ serve(async (req) => {
     await supabase
       .from('processamento_uploads')
       .update({
-        status: erros === dataRows.length ? 'erro' : 'concluido',
-        registros_processados: dataRows.length,
+        status: erros === processados ? 'erro' : 'concluido',
+        registros_processados: processados,
         registros_inseridos: inseridos,
         registros_atualizados: atualizados,
         registros_erro: erros,
@@ -162,7 +165,7 @@ serve(async (req) => {
 
     const response = {
       sucesso: true,
-      processados: dataRows.length,
+      processados: processados,
       inseridos,
       atualizados,
       erros,
