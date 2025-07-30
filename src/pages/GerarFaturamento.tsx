@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 import { UploadStatusPanel } from "@/components/UploadStatusPanel";
+import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -1022,6 +1023,233 @@ export default function GerarFaturamento() {
                     Status dos Uploads
                   </h4>
                   <UploadStatusPanel />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="relatorios-prontos" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Relatórios Prontos - {PERIODO_ATUAL}
+              </CardTitle>
+              <CardDescription>
+                Faça upload dos relatórios de faturamento já prontos para cada cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Resumo */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-8 w-8 text-blue-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
+                      <div className="text-sm text-blue-700">Clientes Ativos</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-900">{resultados.filter(r => r.relatorioGerado).length}</div>
+                      <div className="text-sm text-green-700">Relatórios Gerados</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-8 w-8 text-orange-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-orange-900">
+                        {resultados.filter(r => r.emailEnviado).length}
+                      </div>
+                      <div className="text-sm text-orange-700">Emails Enviados</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Relatórios Gerados pelo Sistema */}
+              {resultados.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Relatórios Gerados pelo Sistema</h3>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={recarregarClientes}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Atualizar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {resultados.map((resultado) => (
+                      <div key={resultado.clienteId} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{resultado.clienteNome}</h4>
+                            <p className="text-sm text-muted-foreground">{resultado.emailDestino}</p>
+                            {resultado.detalhesRelatorio && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                {resultado.detalhesRelatorio.total_laudos} laudos - 
+                                R$ {resultado.detalhesRelatorio.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {resultado.relatorioGerado ? (
+                              <Badge variant="default" className="bg-green-100 text-green-800">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                PDF Gerado
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pendente
+                              </Badge>
+                            )}
+                            {resultado.emailEnviado && (
+                              <Badge variant="default" className="bg-blue-100 text-blue-800">
+                                <Mail className="h-3 w-3 mr-1" />
+                                Email Enviado
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {resultado.relatorioGerado && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-green-600" />
+                              <span className="text-sm text-green-800">Relatório disponível</span>
+                              {resultado.dataProcessamento && (
+                                <span className="text-xs text-green-600">
+                                  • {resultado.dataProcessamento}
+                                </span>
+                              )}
+                            </div>
+                            {resultado.linkRelatorio && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(resultado.linkRelatorio, '_blank')}
+                                className="text-green-700 border-green-300 hover:bg-green-50"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                Abrir
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        
+                        {resultado.erro && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded">
+                            <div className="flex items-center gap-2 text-red-800">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">Erro no processamento:</span>
+                            </div>
+                            <p className="text-sm text-red-700 mt-1">{resultado.erro}</p>
+                          </div>
+                        )}
+                        
+                        {resultado.erroEmail && (
+                          <div className="p-3 bg-orange-50 border border-orange-200 rounded">
+                            <div className="flex items-center gap-2 text-orange-800">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">Erro no envio do email:</span>
+                            </div>
+                            <p className="text-sm text-orange-700 mt-1">{resultado.erroEmail}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhum relatório gerado ainda</p>
+                  <p className="text-sm">Faça upload dos dados de faturamento para gerar relatórios</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="gerar" className="space-y-6 mt-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileBarChart2 className="h-5 w-5" />
+                  Gerar Faturamento - {PERIODO_ATUAL}
+                </CardTitle>
+                <CardDescription>
+                  Faça upload do arquivo de faturamento para gerar e enviar relatórios automáticos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Período de Faturamento */}
+                <ControlePeriodoFaturamento 
+                  periodoSelecionado={periodoSelecionado}
+                  setPeriodoSelecionado={setPeriodoSelecionado}
+                  mostrarApenasDisponiveis={mostrarApenasEditaveis}
+                  setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
+                  onPeriodoChange={setPeriodoSelecionado}
+                />
+
+                {/* Resumo do Sistema */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <FileBarChart2 className="h-4 w-4" />
+                    Status do Sistema
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded">
+                      <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
+                      <div className="text-sm text-blue-700">Clientes Ativos</div>
+                    </div>
+                    <div className="relative text-center p-3 bg-green-50 border border-green-200 rounded overflow-hidden">
+                      <div 
+                        className="absolute inset-0 transition-all duration-500"
+                        style={{ 
+                          width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%',
+                          background: 'rgba(34, 197, 94, 0.2)',
+                          boxShadow: 'inset -10px 0 15px -5px rgba(34, 197, 94, 0.8), 0 0 15px rgba(34, 197, 94, 0.5)'
+                        }}
+                      />
+                      <div className="relative z-10">
+                        <div className="text-2xl font-bold text-green-900">{relatoriosGerados}</div>
+                        <div className="text-sm text-green-700">Relatórios Gerados</div>
+                      </div>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded">
+                      <div className="text-2xl font-bold text-orange-900">{emailsEnviados}</div>
+                      <div className="text-sm text-orange-700">Emails Enviados</div>
+                    </div>
+                    <div className="text-center p-3 bg-gray-50 border border-gray-200 rounded">
+                      <div className="text-2xl font-bold text-gray-900">{resultados.filter(r => r.erro).length}</div>
+                      <div className="text-sm text-gray-700">Erros</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status dos Uploads de Faturamento */}
+                <div className="space-y-4">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Status dos Uploads de Faturamento
+                  </h4>
+                  <FaturamentoUploadStatus />
                 </div>
               </CardContent>
             </Card>
