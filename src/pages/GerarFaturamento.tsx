@@ -987,6 +987,18 @@ export default function GerarFaturamento() {
                       }}
                     />
                   </div>
+
+                  <div>
+                    <VolumetriaUpload
+                      arquivoFonte="volumetria_onco_padrao"
+                      onSuccess={() => {
+                        toast({
+                          title: "Upload Concluído",
+                          description: "Dados de volumetria oncológica processados com sucesso!",
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid gap-2 pt-4">

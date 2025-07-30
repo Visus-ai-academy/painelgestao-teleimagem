@@ -6,7 +6,7 @@ import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetr
 import { Upload, FileText, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 interface VolumetriaUploadProps {
-  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
   onSuccess?: () => void;
   disabled?: boolean;
   periodoFaturamento?: { ano: number; mes: number };

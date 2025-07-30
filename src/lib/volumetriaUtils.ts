@@ -32,7 +32,7 @@ export interface VolumetriaRecord {
   CODIGO_INTERNO?: number;
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
-  arquivo_fonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
+  arquivo_fonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
 }
 
 // Configuração dos tipos de upload
@@ -64,6 +64,13 @@ export const VOLUMETRIA_UPLOAD_CONFIGS = {
     validateValues: true,
     filterCurrentPeriod: true,
     appropriateValues: true
+  },
+  volumetria_onco_padrao: {
+    label: 'Arquivo 5: Volumetria Onco Padrão',
+    description: 'Upload para dados oncológicos - valores obrigatórios para faturamento',
+    validateValues: true,
+    filterCurrentPeriod: false,
+    appropriateValues: false
   }
 } as const;
 
@@ -200,7 +207,7 @@ export function appropriateExamValue(record: VolumetriaRecord): number {
 // Função para processar uma linha do Excel
 export function processRow(
   row: any, 
-  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo'
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao'
 ): VolumetriaRecord | null {
   try {
     // Validação robusta de entrada
@@ -288,7 +295,7 @@ export function processRow(
 // Função para processar arquivo Excel no frontend
 export async function processVolumetriaFile(
   file: File, 
-  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo',
+  arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao',
   onProgress?: (processed: number, total: number, inserted: number) => void,
   periodoFaturamento?: { ano: number; mes: number }
 ): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[] }> {
