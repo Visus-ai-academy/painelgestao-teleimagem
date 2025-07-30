@@ -106,11 +106,16 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
           'volumetria_fora_padrao_retroativo': statsMap.get('volumetria_fora_padrao_retroativo')
         });
 
-        // Buscar dados da tabela De-Para
-        const { data: deParaData } = await supabase
+        // Buscar dados da tabela De-Para com contagem completa
+        const { count: deParaCount, error: deParaError } = await supabase
           .from('valores_referencia_de_para')
-          .select('id')
-          .limit(1);
+          .select('*', { count: 'exact', head: true });
+
+        if (deParaError) {
+          console.error('❌ Erro ao buscar contagem De-Para:', deParaError);
+        }
+
+        console.log('📊 Total de registros De-Para:', deParaCount || 0);
 
         // Converter para formato do componente
         const realStats: UploadStats[] = [
@@ -153,14 +158,14 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         ];
 
         // Adicionar status do De-Para se existe
-        if (deParaData && deParaData.length > 0) {
+        if (deParaCount && deParaCount > 0) {
           realStats.push({
-            fileName: "Upload De-Para - Exames Fora de Padrão",
-            totalRecords: 0,
-            recordsWithValue: deParaData.length,
+            fileName: "Upload De-Para Exames",
+            totalRecords: deParaCount,
+            recordsWithValue: deParaCount,
             recordsZeroed: 0,
             totalValue: 0,
-            period: "Configurado",
+            period: "Processado",
             category: 'padrão'
           });
         }
