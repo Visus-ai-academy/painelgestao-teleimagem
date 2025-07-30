@@ -25,11 +25,19 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar apenas uploads relacionados ao faturamento e volumetria
+      // Buscar apenas uploads específicos do faturamento (excluindo cadastros)
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .or('tipo_arquivo.like.%volumetria%,tipo_arquivo.eq.faturamento,tipo_arquivo.eq.faturamento_pdf')
+        .in('tipo_arquivo', [
+          'volumetria_padrao', 
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo', 
+          'volumetria_fora_padrao_retroativo',
+          'volumetria_onco_padrao',
+          'faturamento',
+          'faturamento_pdf'
+        ])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
