@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertCircle, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface UploadStats {
@@ -13,6 +13,7 @@ interface UploadStats {
   registros_atualizados: number;
   registros_erro: number;
   total_exames: number;
+  zerados?: number;
   created_at: string;
 }
 
@@ -26,17 +27,24 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const fetchUploadStats = async () => {
     try {
-      console.log('Iniciando busca de estatísticas...');
-      
-      // Buscar uploads de faturamento da tabela processamento_uploads
+      setLoading(true);
+      console.log('Iniciando busca de estatísticas de upload...');
+
+      // Buscar uploads da tabela processamento_uploads - apenas tipos não-volumetria
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .not('tipo_arquivo', 'in', '(cadastro_exames,categorias_exame,especialidades,modalidades,prioridades,quebra_exames,limpeza)')
+        .not('tipo_arquivo', 'in', '(volumetria_padrao,volumetria_fora_padrao,volumetria_padrao_retroativo,volumetria_fora_padrao_retroativo,volumetria_onco_padrao)')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar uploads:', error);
+        throw error;
+      }
 
+      console.log('Dados de upload encontrados:', data?.length || 0);
+
+      // Processar apenas os tipos de faturamento mais recentes
       const latestUploads = new Map<string, UploadStats>();
       
       // Processar uploads existentes na tabela processamento_uploads
@@ -50,7 +58,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         }
       });
 
-      // Buscar dados de volumetria - consulta direta e simples para cada tipo
+      // Buscar dados de volumetria APENAS se houver uploads reais
       const tiposVolumetria = [
         'volumetria_padrao', 
         'volumetria_fora_padrao', 
@@ -59,67 +67,88 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         'volumetria_onco_padrao'
       ];
 
-      console.log('Processando tipos de volumetria:', tiposVolumetria);
+      console.log('Verificando uploads de volumetria...');
 
-      for (const tipo of tiposVolumetria) {
-        try {
-          console.log(`Processando ${tipo}...`);
-          
-          // Buscar todos os dados para este tipo específico
-          const { data: dadosCompletos, error: dadosError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('created_at, "VALORES"')
-            .eq('arquivo_fonte', tipo);
+      // Primeiro verificar se há uploads reais de volumetria
+      const { data: uploadsVolumetria, error: uploadsError } = await supabase
+        .from('processamento_uploads')
+        .select('tipo_arquivo, created_at, arquivo_nome, status, registros_processados, registros_inseridos, registros_atualizados, registros_erro')
+        .in('tipo_arquivo', tiposVolumetria)
+        .order('created_at', { ascending: false });
 
-          if (!dadosError && dadosCompletos && dadosCompletos.length > 0) {
-            const registros = dadosCompletos.length;
-            const exames = dadosCompletos.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
-            const zerados = dadosCompletos.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
-            const comValor = dadosCompletos.filter(item => item.VALORES && Number(item.VALORES) > 0).length;
-            const erros = registros - comValor; // Registros sem valor válido são considerados erros
-            
-            // Encontrar o upload mais recente
-            const ultimoUpload = dadosCompletos.reduce((latest, current) => {
-              return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-
-            console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados, ${erros} erros`);
-
-            const uploadStat: UploadStats = {
-              tipo_arquivo: tipo,
-              arquivo_nome: `Upload ${tipo}`,
-              status: 'concluido',
-              registros_processados: registros,
-              registros_inseridos: comValor,
-              registros_atualizados: 0,
-              registros_erro: erros,
-              total_exames: exames,
-              created_at: ultimoUpload.created_at
-            };
-
-            latestUploads.set(tipo, uploadStat);
-          } else {
-            console.log(`${tipo}: Nenhum dado encontrado`);
-          }
-        } catch (error) {
-          console.error(`Erro ao processar ${tipo}:`, error);
-        }
+      if (uploadsError) {
+        console.error('Erro ao buscar uploads de volumetria:', uploadsError);
       }
 
-      // Ordenar conforme a ordem na página
-      const orderedTypes = [
-        'volumetria_padrao', 
-        'volumetria_fora_padrao', 
-        'volumetria_padrao_retroativo', 
-        'volumetria_fora_padrao_retroativo',
-        'volumetria_onco_padrao',
-        'faturamento',
-        'faturamento_pdf'
-      ];
+      // Só processar dados de volumetria se houver uploads reais
+      if (uploadsVolumetria && uploadsVolumetria.length > 0) {
+        console.log('Encontrados uploads de volumetria:', uploadsVolumetria.length);
+        
+        // Processar uploads de volumetria
+        const volumetriaLatest = new Map<string, any>();
+        
+        uploadsVolumetria.forEach(upload => {
+          const current = volumetriaLatest.get(upload.tipo_arquivo);
+          if (!current || new Date(upload.created_at) > new Date(current.created_at)) {
+            volumetriaLatest.set(upload.tipo_arquivo, upload);
+          }
+        });
+
+        // Para cada tipo com upload, buscar dados da tabela volumetria_mobilemed
+        for (const [tipo, uploadInfo] of volumetriaLatest) {
+          try {
+            const { data: dadosCompletos, error: dadosError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('created_at, "VALORES"')
+              .eq('arquivo_fonte', tipo);
+
+            if (!dadosError && dadosCompletos && dadosCompletos.length > 0) {
+              const registros = dadosCompletos.length;
+              const exames = dadosCompletos.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+              const zerados = dadosCompletos.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
+              const comValor = dadosCompletos.filter(item => item.VALORES && Number(item.VALORES) > 0).length;
+
+              latestUploads.set(tipo, {
+                tipo_arquivo: tipo,
+                arquivo_nome: uploadInfo.arquivo_nome || `Upload ${tipo}`,
+                status: uploadInfo.status || 'concluido',
+                registros_processados: registros,
+                registros_inseridos: comValor,
+                registros_atualizados: uploadInfo.registros_atualizados || 0,
+                registros_erro: uploadInfo.registros_erro || 0,
+                total_exames: exames,
+                zerados,
+                created_at: uploadInfo.created_at
+              });
+
+              console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados`);
+            }
+          } catch (error) {
+            console.error(`Erro ao processar dados de ${tipo}:`, error);
+          }
+        }
+      } else {
+        console.log('Nenhum upload de volumetria encontrado');
+      }
+
+      // Converter para array e ordenar
+      const statsArray = Array.from(latestUploads.values());
       
-      const sortedData = Array.from(latestUploads.values()).sort((a, b) => {
-        const indexA = orderedTypes.indexOf(a.tipo_arquivo);
-        const indexB = orderedTypes.indexOf(b.tipo_arquivo);
+      // Ordem desejada
+      const tipoOrdem = [
+        'faturamento',
+        'clientes',
+        'contratos',
+        'volumetria_padrao',
+        'volumetria_fora_padrao',
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao'
+      ];
+
+      statsArray.sort((a, b) => {
+        const indexA = tipoOrdem.indexOf(a.tipo_arquivo);
+        const indexB = tipoOrdem.indexOf(b.tipo_arquivo);
         
         if (indexA === -1 && indexB === -1) return 0;
         if (indexA === -1) return 1;
@@ -127,11 +156,13 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         
         return indexA - indexB;
       });
-      
-      console.log('Dados finais:', sortedData);
-      setUploadStats(sortedData);
+
+      console.log('Estatísticas finais:', statsArray.length);
+      setUploadStats(statsArray);
+
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
+      console.error('Erro ao carregar estatísticas:', error);
+      setUploadStats([]);
     } finally {
       setLoading(false);
     }
@@ -165,13 +196,14 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const getTypeLabel = (tipo: string) => {
     const labels = {
+      'faturamento': 'Faturamento',
+      'clientes': 'Clientes', 
+      'contratos': 'Contratos',
       'volumetria_padrao': 'Volumetria Padrão',
       'volumetria_fora_padrao': 'Volumetria Fora do Padrão',
       'volumetria_padrao_retroativo': 'Volumetria Padrão Retroativa',
       'volumetria_fora_padrao_retroativo': 'Volumetria Fora Padrão Retroativa',
-      'volumetria_onco_padrao': 'Volumetria Oncológica',
-      'faturamento': 'Dados de Faturamento',
-      'faturamento_pdf': 'Faturamento PDF'
+      'volumetria_onco_padrao': 'Volumetria Onco Padrão'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };
@@ -189,6 +221,11 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
     );
   }
 
+  // Calcular totais para volumetria
+  const volumetriaStats = uploadStats.filter(stat => stat.tipo_arquivo.startsWith('volumetria_'));
+  const totalVolumetriaRegistros = volumetriaStats.reduce((sum, stat) => sum + stat.registros_processados, 0);
+  const totalVolumetriaExames = volumetriaStats.reduce((sum, stat) => sum + stat.total_exames, 0);
+
   return (
     <Card>
       <CardHeader>
@@ -197,85 +234,71 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       <CardContent>
         {uploadStats.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            Nenhum upload de faturamento realizado ainda
+            <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">Nenhum upload de faturamento realizado ainda</p>
+            <p className="text-sm">Faça upload dos seus dados para ver o status aqui</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Lista individual de cada arquivo */}
-            <div className="space-y-2">
-              {uploadStats.map((stat, index) => (
-                <div
-                  key={`${stat.tipo_arquivo}-${stat.created_at}-${index}`}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+            {uploadStats.map((stat, index) => (
+              <div
+                key={`${stat.tipo_arquivo}-${index}`}
+                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
                     {getStatusIcon(stat.status)}
-                    <div className="flex-1 min-w-0">
+                    <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{getTypeLabel(stat.tipo_arquivo)}</span>
+                        <h3 className="font-semibold">{getTypeLabel(stat.tipo_arquivo)}</h3>
                         <Badge className={`${getStatusColor(stat.status)} text-xs`}>
                           {stat.status}
                         </Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
+                      <p className="text-sm text-muted-foreground">
                         {stat.arquivo_nome} • {new Date(stat.created_at).toLocaleString('pt-BR')}
-                      </div>
+                      </p>
                     </div>
-                  </div>
-                  
-                  <div className="flex gap-3 text-xs">
-                    <div className="text-center">
-                      <div className="font-medium text-blue-600">{stat.registros_processados.toLocaleString('pt-BR')}</div>
-                      <div className="text-muted-foreground">Registros</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-medium text-green-600">{stat.total_exames.toLocaleString('pt-BR')}</div>
-                      <div className="text-muted-foreground">Exames</div>
-                    </div>
-                    {stat.registros_erro > 0 && (
-                      <div className="text-center">
-                        <div className="font-medium text-orange-600">{stat.registros_erro.toLocaleString('pt-BR')}</div>
-                        <div className="text-muted-foreground">Zerados</div>
-                      </div>
-                    )}
-                    {stat.tipo_arquivo.includes('volumetria') && (
-                      <div className="text-center">
-                        <div className="font-medium text-purple-600">{(stat.registros_processados - stat.registros_inseridos - stat.registros_erro).toLocaleString('pt-BR')}</div>
-                        <div className="text-muted-foreground">Erros</div>
-                      </div>
-                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Somatório total - apenas para volumetria */}
-            {uploadStats.some(stat => stat.tipo_arquivo.includes('volumetria')) && (
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border-2 border-primary/20">
-                  <div className="flex items-center gap-3">
-                    <div className="font-semibold text-primary">Total Volumetria</div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-blue-600">{stat.registros_processados}</div>
+                    <div className="text-muted-foreground">Registros</div>
                   </div>
-                  
-                  <div className="flex gap-4 text-sm">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-green-600">{stat.total_exames}</div>
+                    <div className="text-muted-foreground">Exames</div>
+                  </div>
+                  {stat.zerados !== undefined && stat.zerados > 0 && (
                     <div className="text-center">
-                      <div className="font-bold text-blue-600 text-lg">
-                        {uploadStats
-                          .filter(stat => stat.tipo_arquivo.includes('volumetria'))
-                          .reduce((sum, stat) => sum + stat.registros_processados, 0)
-                          .toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-muted-foreground font-medium">Total Registros</div>
+                      <div className="text-lg font-bold text-orange-600">{stat.zerados}</div>
+                      <div className="text-muted-foreground">Zerados</div>
                     </div>
+                  )}
+                  {stat.registros_erro > 0 && (
                     <div className="text-center">
-                      <div className="font-bold text-green-600 text-lg">
-                        {uploadStats
-                          .filter(stat => stat.tipo_arquivo.includes('volumetria'))
-                          .reduce((sum, stat) => sum + stat.total_exames, 0)
-                          .toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-muted-foreground font-medium">Total Exames</div>
+                      <div className="text-lg font-bold text-red-600">{stat.registros_erro}</div>
+                      <div className="text-muted-foreground">Erros</div>
                     </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            
+            {/* Total de Volumetria */}
+            {volumetriaStats.length > 0 && (
+              <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <h3 className="font-semibold text-primary mb-3">Total Volumetria</h3>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-primary">{totalVolumetriaRegistros.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Total Registros</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-primary">{totalVolumetriaExames.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Total Exames</div>
                   </div>
                 </div>
               </div>
