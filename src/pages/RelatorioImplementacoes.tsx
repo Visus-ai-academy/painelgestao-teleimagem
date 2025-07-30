@@ -255,6 +255,10 @@ const RelatorioImplementacoes = () => {
     totalImplementacoes: implementacoes.length,
     totalFuncionalidades: implementacoes.reduce((acc, impl) => acc + impl.itens.length, 0),
     totalEdgeFunctions: implementacoes.reduce((acc, impl) => acc + (impl.edgeFunctions?.length || 0), 0),
+    totalTabelas: 42, // Número total de tabelas do banco
+    totalRegrasNegocio: regrasImplementadas.length,
+    totalIntegracoes: 8, // Omie, MobileMed, ClickSign, Resend, Leaflet, Supabase, PostgreSQL, React
+    totalChavesAPI: 4, // RESEND_API_KEY, REENVIAR_CHAVE_API, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_URL
     periodo: "15 de Julho de 2025 até 29 de Julho de 2025"
   };
 
@@ -433,7 +437,7 @@ const RelatorioImplementacoes = () => {
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Sistemas</CardTitle>
@@ -466,11 +470,51 @@ const RelatorioImplementacoes = () => {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dias Úteis de Desenvolvimento</CardTitle>
+            <CardTitle className="text-sm font-medium">Dias Úteis</CardTitle>
             <UserCheck className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{diasUteis}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tabelas BD</CardTitle>
+            <Database className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{estatisticas.totalTabelas}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Regras Negócio</CardTitle>
+            <Settings className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{estatisticas.totalRegrasNegocio}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Integrações</CardTitle>
+            <Globe className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{estatisticas.totalIntegracoes}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Chaves API</CardTitle>
+            <Key className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{estatisticas.totalChavesAPI}</div>
           </CardContent>
         </Card>
       </div>
