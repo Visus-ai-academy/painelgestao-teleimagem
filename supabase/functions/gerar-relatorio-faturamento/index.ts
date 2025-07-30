@@ -90,18 +90,18 @@ serve(async (req: Request) => {
 
     console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
     
-    // DEBUG: Verificar se há dados na tabela
+    // DEBUG: Verificar se há dados na tabela volumetria_mobilemed
     const { data: totalCount, error: countError } = await supabase
-      .from('faturamento')
+      .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true });
     
-    console.log(`DEBUG: Total de registros na tabela faturamento: ${totalCount?.length || 'N/A'}`);
+    console.log(`DEBUG: Total de registros na tabela volumetria_mobilemed: ${totalCount?.length || 'N/A'}`);
     if (countError) console.log('DEBUG: Erro ao contar registros:', countError);
     
     // DEBUG: Buscar alguns registros para ver estrutura
     const { data: sampleData, error: sampleError } = await supabase
-      .from('faturamento')
-      .select('cliente, cliente_nome, data_emissao')
+      .from('volumetria_mobilemed')
+      .select('"EMPRESA", data_referencia')
       .limit(5);
     
     console.log('DEBUG: Amostra de dados na tabela:', JSON.stringify(sampleData));
@@ -109,62 +109,78 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento - primeiro por cliente_id, depois por nome
-    console.log('Buscando dados por cliente_id...');
+    // Buscar dados de volumetria - por nome da empresa
+    console.log('Buscando dados por nome da empresa...');
     
-    let { data: dataByClienteId, error: errorClienteId } = await supabase
-      .from('faturamento')
+    // Calcular período correto para volumetria (do dia 8 do mês anterior ao dia 7 do mês atual)
+    const [ano, mes] = periodo.split('-');
+    const mesInt = parseInt(mes);
+    const anoInt = parseInt(ano);
+    
+    // Para volumetria, o período é do dia 8 do mês anterior ao dia 7 do mês selecionado
+    const dataInicioVolumetria = `${anoInt}-${(mesInt - 1).toString().padStart(2, '0')}-08`;
+    const dataFimVolumetria = `${anoInt}-${mes.padStart(2, '0')}-07`;
+    
+    console.log(`Período volumetria: ${dataInicioVolumetria} a ${dataFimVolumetria}`);
+    
+    let { data: dataVolumetria, error: errorVolumetria } = await supabase
+      .from('volumetria_mobilemed')
       .select('*')
-      .eq('cliente_id', cliente_id)
-      .gte('data_emissao', dataInicio)
-      .lt('data_emissao', dataFim);
+      .eq('"EMPRESA"', cliente.nome)
+      .gte('data_referencia', dataInicioVolumetria)
+      .lte('data_referencia', dataFimVolumetria);
 
-    console.log(`Dados encontrados por cliente_id: ${dataByClienteId?.length || 0}`);
+    console.log(`Dados encontrados por nome da empresa: ${dataVolumetria?.length || 0}`);
 
-    let finalData = dataByClienteId || [];
+    let finalData = dataVolumetria || [];
     
-    // Se não encontrou por cliente_id, buscar por nome do cliente no campo paciente
+    // Se não encontrou dados exatos, tentar buscar com variações do nome
     if (finalData.length === 0) {
-      console.log('Nenhum dado encontrado por cliente_id, buscando por nome do cliente...');
+      console.log('Tentando buscar com variações do nome...');
       
-      // Tentar buscar por diferentes variações do nome
-      const { data: dataByNome, error: errorNome } = await supabase
-        .from('faturamento')
+      const { data: dataVariacao, error: errorVariacao } = await supabase
+        .from('volumetria_mobilemed')
         .select('*')
-        .or(`paciente.ilike.%${cliente.nome}%,paciente.eq.${cliente.nome}`)
-        .gte('data_emissao', dataInicio)
-        .lt('data_emissao', dataFim);
+        .ilike('"EMPRESA"', `%${cliente.nome}%`)
+        .gte('data_referencia', dataInicioVolumetria)
+        .lte('data_referencia', dataFimVolumetria);
 
-      if (errorNome) {
-        console.error('Erro ao buscar por nome:', errorNome);
+      if (errorVariacao) {
+        console.error('Erro ao buscar por variação do nome:', errorVariacao);
       } else {
-        finalData = dataByNome || [];
-        console.log(`Dados encontrados por nome: ${finalData.length}`);
+        finalData = dataVariacao || [];
+        console.log(`Dados encontrados por variação do nome: ${finalData.length}`);
       }
       
       // Se ainda não encontrou, tentar buscar todos os dados do período para debug
       if (finalData.length === 0) {
         console.log('Tentando buscar todos os dados do período para debug...');
         const { data: allData, error: allError } = await supabase
-          .from('faturamento')
-          .select('cliente, cliente_nome, paciente')
-          .gte('data_emissao', dataInicio)
-          .lt('data_emissao', dataFim)
+          .from('volumetria_mobilemed')
+          .select('"EMPRESA", data_referencia')
+          .gte('data_referencia', dataInicioVolumetria)
+          .lte('data_referencia', dataFimVolumetria)
           .limit(10);
         
         console.log('Dados do período encontrados:', JSON.stringify(allData));
+        
+        // Mostrar empresas únicas para debug
+        if (allData && allData.length > 0) {
+          const empresasUnicas = [...new Set(allData.map(item => item.EMPRESA))];
+          console.log('Empresas únicas no período:', JSON.stringify(empresasUnicas));
+        }
       }
     }
 
-    if (errorClienteId && finalData.length === 0) {
-      console.error('Erro ao buscar dados de faturamento:', errorClienteId);
+    if (errorVolumetria && finalData.length === 0) {
+      console.error('Erro ao buscar dados de volumetria:', errorVolumetria);
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
 
-    // Calcular resumo usando valor_bruto e quantidade
-    const valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor_bruto) || 0), 0);
-    const totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 1), 0);
+    // Calcular resumo usando VALORES da volumetria
+    const valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
+    const totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0); // VALORES já representa a quantidade
     
     // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
     const franquia = 0;
@@ -396,18 +412,18 @@ serve(async (req: Request) => {
           }
           
           doc.setFontSize(7);
-          const dataFormatada = item.data_exame ? 
-            item.data_exame.split('T')[0].split('-').reverse().join('/') : '-';
+          const dataFormatada = item.DATA_REALIZACAO ? 
+            item.DATA_REALIZACAO.split('T')[0].split('-').reverse().join('/') : '-';
           doc.text(dataFormatada, 22, yPosition + 2);
-          doc.text((item.cliente_nome || '-').substring(0, 20), 40, yPosition + 2); // Nome do paciente
-          doc.text((item.medico || '-').substring(0, 20), 80, yPosition + 2);
-          doc.text((item.nome_exame || '-').substring(0, 20), 120, yPosition + 2);
-          doc.text((item.modalidade || '-').substring(0, 12), 160, yPosition + 2);
-          doc.text((item.especialidade || '-').substring(0, 12), 180, yPosition + 2);
-          doc.text((item.categoria || '-').substring(0, 12), 205, yPosition + 2);
-          doc.text((item.prioridade || '-').substring(0, 12), 230, yPosition + 2);
-          doc.text((item.quantidade || '1').toString(), 250, yPosition + 2);
-          doc.text(`R$ ${parseFloat(item.valor_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
+          doc.text((item.NOME_PACIENTE || '-').substring(0, 20), 40, yPosition + 2);
+          doc.text((item.MEDICO || '-').substring(0, 20), 80, yPosition + 2);
+          doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 20), 120, yPosition + 2);
+          doc.text((item.MODALIDADE || '-').substring(0, 12), 160, yPosition + 2);
+          doc.text((item.ESPECIALIDADE || '-').substring(0, 12), 180, yPosition + 2);
+          doc.text((item.CATEGORIA || '-').substring(0, 12), 205, yPosition + 2);
+          doc.text((item.PRIORIDADE || '-').substring(0, 12), 230, yPosition + 2);
+          doc.text((item.VALORES || '0').toString(), 250, yPosition + 2);
+          doc.text(`R$ ${parseFloat(item.VALORES || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
           
           yPosition += 6;
         }
