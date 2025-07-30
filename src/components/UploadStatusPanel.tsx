@@ -31,25 +31,29 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
         .select('*')
         .not('tipo_arquivo', 'like', '%volumetria%')
         .neq('tipo_arquivo', 'limpeza')
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Filtrar apenas o upload mais recente de cada tipo de arquivo
+      const latestUploads = new Map<string, UploadStats>();
+      
+      (data || []).forEach(upload => {
+        const currentLatest = latestUploads.get(upload.tipo_arquivo);
+        if (!currentLatest || new Date(upload.created_at) > new Date(currentLatest.created_at)) {
+          latestUploads.set(upload.tipo_arquivo, upload);
+        }
+      });
 
       // Ordenar os uploads conforme a ordem das abas em Gerenciar Cadastros
       const orderedTypes = ['cadastro_exames', 'quebra_exames', 'precos_servicos', 'regras_exclusao', 'repasse_medico', 'modalidades', 'especialidades', 'categorias_exame', 'prioridades'];
       
-      const sortedData = (data || []).sort((a, b) => {
+      const sortedData = Array.from(latestUploads.values()).sort((a, b) => {
         const indexA = orderedTypes.indexOf(a.tipo_arquivo);
         const indexB = orderedTypes.indexOf(b.tipo_arquivo);
         
-        // Se os tipos são diferentes, ordenar pela ordem das abas
-        if (indexA !== indexB) {
-          return indexA - indexB;
-        }
-        
-        // Se são do mesmo tipo, ordenar pela data (mais recente primeiro)
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        // Ordenar pela ordem das abas
+        return indexA - indexB;
       });
       
       setUploadStats(sortedData);
