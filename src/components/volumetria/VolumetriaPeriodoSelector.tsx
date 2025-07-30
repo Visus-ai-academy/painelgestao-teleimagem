@@ -130,15 +130,6 @@ export function VolumetriaPeriodoSelector({
               </AlertDescription>
             </Alert>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-yellow-800 mb-2">
-                📅 Dados que serão EXCLUÍDOS dos arquivos retroativos:
-              </p>
-              <p className="text-sm text-yellow-700">
-                <strong>De:</strong> {getDataLimite(periodoSelecionado).dataInicio} <br />
-                <strong>Até:</strong> {getDataLimite(periodoSelecionado).dataFim}
-              </p>
-            </div>
 
             <Button 
               variant="outline" 
