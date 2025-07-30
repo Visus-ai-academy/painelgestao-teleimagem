@@ -75,22 +75,24 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
             const registros = dadosCompletos.length;
             const exames = dadosCompletos.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
             const zerados = dadosCompletos.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
+            const comValor = dadosCompletos.filter(item => item.VALORES && Number(item.VALORES) > 0).length;
+            const erros = registros - comValor; // Registros sem valor válido são considerados erros
             
             // Encontrar o upload mais recente
             const ultimoUpload = dadosCompletos.reduce((latest, current) => {
               return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
             });
 
-            console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados`);
+            console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados, ${erros} erros`);
 
             const uploadStat: UploadStats = {
               tipo_arquivo: tipo,
               arquivo_nome: `Upload ${tipo}`,
               status: 'concluido',
               registros_processados: registros,
-              registros_inseridos: registros,
+              registros_inseridos: comValor,
               registros_atualizados: 0,
-              registros_erro: zerados,
+              registros_erro: erros,
               total_exames: exames,
               created_at: ultimoUpload.created_at
             };
@@ -232,8 +234,14 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                     </div>
                     {stat.registros_erro > 0 && (
                       <div className="text-center">
-                        <div className="font-medium text-red-600">{stat.registros_erro}</div>
+                        <div className="font-medium text-orange-600">{stat.registros_erro.toLocaleString('pt-BR')}</div>
                         <div className="text-muted-foreground">Zerados</div>
+                      </div>
+                    )}
+                    {stat.tipo_arquivo.includes('volumetria') && (
+                      <div className="text-center">
+                        <div className="font-medium text-purple-600">{(stat.registros_processados - stat.registros_inseridos - stat.registros_erro).toLocaleString('pt-BR')}</div>
+                        <div className="text-muted-foreground">Erros</div>
                       </div>
                     )}
                   </div>
