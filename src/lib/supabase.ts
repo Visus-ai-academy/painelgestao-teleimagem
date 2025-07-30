@@ -250,3 +250,24 @@ export async function limparUploadsAntigos() {
     return { success: false, error: 'Erro interno' }
   }
 }
+
+export async function limparDadosVolumetria(arquivosFonte: string[]) {
+  try {
+    console.log('Limpando dados de volumetria para arquivos:', arquivosFonte)
+    
+    const { data, error } = await supabase.functions.invoke('limpar-dados-volumetria', {
+      body: { arquivos_fonte: arquivosFonte }
+    })
+    
+    if (error) {
+      console.error('Erro ao limpar dados de volumetria:', error)
+      throw new Error(`Erro ao limpar dados: ${error.message}`)
+    }
+    
+    console.log('Limpeza de volumetria concluída:', data)
+    return data
+  } catch (error) {
+    console.error('Erro na limpeza de volumetria:', error)
+    throw error
+  }
+}
