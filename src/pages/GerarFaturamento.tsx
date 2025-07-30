@@ -888,7 +888,7 @@ export default function GerarFaturamento() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
-            Teste MobileMed
+            Dados MobileMed
           </TabsTrigger>
           <TabsTrigger value="relatorios-prontos" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -906,10 +906,10 @@ export default function GerarFaturamento() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Zap className="h-5 w-5" />
-                  <CardTitle>Teste de Volumetria MobileMed</CardTitle>
+                  <CardTitle>Dados de Volumetria MobileMed</CardTitle>
                 </div>
                 <CardDescription>
-                  Teste o processamento dos novos arquivos de volumetria com conversões automáticas
+                  Processamento dos arquivos de volumetria com conversões automáticas
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
