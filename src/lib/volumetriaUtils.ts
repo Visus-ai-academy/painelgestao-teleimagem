@@ -187,6 +187,19 @@ export function isInBillingPeriod(dataRealizacao: Date, periodoFaturamento: { an
   return dataRealizacao >= inicioPeriodo && dataRealizacao <= fimPeriodo;
 }
 
+// Função para calcular a data limite de corte para faturamento (dia 7 do mês seguinte)
+export function getDataLimiteCorte(periodoFaturamento: { ano: number; mes: number }): Date {
+  const { ano, mes } = periodoFaturamento;
+  
+  // Calcular o mês seguinte
+  const anoSeguinte = mes === 12 ? ano + 1 : ano;
+  const mesSeguinte = mes === 12 ? 1 : mes + 1;
+  
+  // Data limite: dia 7 do mês seguinte ao período de faturamento
+  // Exemplo: para faturamento de junho/2025, a data limite é 07/07/2025
+  return new Date(anoSeguinte, mesSeguinte - 1, 7); // mes - 1 porque Date usa 0-11
+}
+
 // Função para apropriar valores baseado no tipo de exame
 export function appropriateExamValue(record: VolumetriaRecord): number {
   // Lógica de apropriação de valores - será expandida conforme necessário
@@ -346,6 +359,16 @@ export async function processVolumetriaFile(
         if (config.filterCurrentPeriod && record.DATA_REALIZACAO && periodoFaturamento) {
           if (isInBillingPeriod(record.DATA_REALIZACAO, periodoFaturamento)) {
             console.log(`Linha ${i + j + 2}: Excluída por estar no período de faturamento ${periodoFaturamento.mes}/${periodoFaturamento.ano}`);
+            continue;
+          }
+        }
+
+        // NOVA REGRA: Filtrar DATA_LAUDO para arquivos padrão (1 e 2) no faturamento
+        if ((arquivoFonte === 'volumetria_padrao' || arquivoFonte === 'volumetria_fora_padrao') && 
+            record.DATA_LAUDO && periodoFaturamento) {
+          const dataLimiteCorte = getDataLimiteCorte(periodoFaturamento);
+          if (record.DATA_LAUDO > dataLimiteCorte) {
+            console.log(`Linha ${i + j + 2}: Excluída - DATA_LAUDO (${record.DATA_LAUDO.toISOString().split('T')[0]}) superior à data limite de corte (${dataLimiteCorte.toISOString().split('T')[0]})`);
             continue;
           }
         }
