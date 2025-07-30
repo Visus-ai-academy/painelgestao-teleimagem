@@ -26,7 +26,9 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar uploads da tabela processamento_uploads (faturamento, etc)
+      console.log('Iniciando busca de estatísticas...');
+      
+      // Buscar uploads de faturamento da tabela processamento_uploads
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -48,7 +50,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         }
       });
 
-      // Buscar dados de volumetria usando consultas diretas para cada tipo
+      // Buscar dados de volumetria - consulta direta e simples para cada tipo
       const tiposVolumetria = [
         'volumetria_padrao', 
         'volumetria_fora_padrao', 
@@ -57,72 +59,48 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         'volumetria_onco_padrao'
       ];
 
-      // Para cada tipo, fazer consulta individual para garantir dados corretos
-      for (const tipo of tiposVolumetria) {
-        // Verificar se existe dados para este tipo
-        const { data: existeData, error: existeError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('created_at')
-          .eq('arquivo_fonte', tipo)
-          .limit(1);
+      console.log('Processando tipos de volumetria:', tiposVolumetria);
 
-        if (!existeError && existeData && existeData.length > 0) {
-          // Usar uma consulta direta para cada estatística individual
+      for (const tipo of tiposVolumetria) {
+        try {
+          console.log(`Processando ${tipo}...`);
           
-          // 1. Contar registros
-          const { count: totalRegistros, error: countError } = await supabase
+          // Buscar todos os dados para este tipo específico
+          const { data: dadosCompletos, error: dadosError } = await supabase
             .from('volumetria_mobilemed')
-            .select('*', { count: 'exact', head: true })
+            .select('created_at, "VALORES"')
             .eq('arquivo_fonte', tipo);
 
-          // 2. Usar função SQL para somar valores (mais preciso)
-          const { data: somaData, error: somaError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('arquivo_fonte', tipo)
-            .limit(1);
-          
-          let totalExames = 0;
-          let registrosZerados = 0;
-          
-          if (!somaError) {
-            // Buscar TODOS os valores para somar corretamente (sem limits)
-            const { data: todosValores, error: valoresError } = await supabase
-              .from('volumetria_mobilemed')
-              .select('"VALORES"')
-              .eq('arquivo_fonte', tipo);
+          if (!dadosError && dadosCompletos && dadosCompletos.length > 0) {
+            const registros = dadosCompletos.length;
+            const exames = dadosCompletos.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+            const zerados = dadosCompletos.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
             
-            if (!valoresError && todosValores) {
-              console.log(`${tipo}: carregados ${todosValores.length} registros para soma`);
-              totalExames = todosValores.reduce((acc, item) => acc + (Number(item.VALORES) || 0), 0);
-              registrosZerados = todosValores.filter(item => !item.VALORES || Number(item.VALORES) === 0).length;
-              console.log(`${tipo}: totalExames=${totalExames}, registrosZerados=${registrosZerados}`);
-            }
-          }
+            // Encontrar o upload mais recente
+            const ultimoUpload = dadosCompletos.reduce((latest, current) => {
+              return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+            });
 
-          // 3. Buscar data do último upload
-          const { data: ultimoUpload, error: uploadError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('created_at')
-            .eq('arquivo_fonte', tipo)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            console.log(`${tipo}: ${registros} registros, ${exames} exames, ${zerados} zerados`);
 
-          if (!countError && totalRegistros !== null) {
             const uploadStat: UploadStats = {
               tipo_arquivo: tipo,
               arquivo_nome: `Upload ${tipo}`,
               status: 'concluido',
-              registros_processados: totalRegistros,
-              registros_inseridos: totalRegistros,
+              registros_processados: registros,
+              registros_inseridos: registros,
               registros_atualizados: 0,
-              registros_erro: registrosZerados,
-              total_exames: totalExames,
-              created_at: ultimoUpload?.created_at || new Date().toISOString()
+              registros_erro: zerados,
+              total_exames: exames,
+              created_at: ultimoUpload.created_at
             };
+
             latestUploads.set(tipo, uploadStat);
+          } else {
+            console.log(`${tipo}: Nenhum dado encontrado`);
           }
+        } catch (error) {
+          console.error(`Erro ao processar ${tipo}:`, error);
         }
       }
 
@@ -148,6 +126,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         return indexA - indexB;
       });
       
+      console.log('Dados finais:', sortedData);
       setUploadStats(sortedData);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
