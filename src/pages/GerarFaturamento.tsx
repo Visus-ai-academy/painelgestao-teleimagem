@@ -920,6 +920,9 @@ export default function GerarFaturamento() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Análise dos Uploads Realizados - MOVIDO PARA O TOPO */}
+                <VolumetriaUploadStats refreshTrigger={refreshUploadStatus} />
+
                 {/* Seletor de Período de Faturamento */}
                 <VolumetriaPeriodoSelector
                   periodoSelecionado={periodoFaturamentoVolumetria}
@@ -1022,9 +1025,6 @@ export default function GerarFaturamento() {
 
                 {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
                 <ExamesForaPadraoUpload />
-
-                {/* Análise dos Uploads Realizados */}
-                <VolumetriaUploadStats />
 
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />

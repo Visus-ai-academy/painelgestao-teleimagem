@@ -22,7 +22,7 @@ interface UploadStats {
   category: 'padrão' | 'fora-padrão' | 'retroativo';
 }
 
-export function VolumetriaUploadStats() {
+export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: number }) {
   const [stats, setStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -154,7 +154,7 @@ export function VolumetriaUploadStats() {
     };
 
     loadStats();
-  }, []);
+  }, [refreshTrigger]); // Refresh when trigger changes
 
   const getCategoryColor = (category: UploadStats['category']) => {
     switch (category) {
