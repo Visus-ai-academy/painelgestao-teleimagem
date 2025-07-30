@@ -96,6 +96,7 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       'modalidades': 'Modalidades',
       'especialidades': 'Especialidades',
       'categorias_exame': 'Categorias de Exame',
+      'categorias': 'Categorias de Exame', // Alternativa
       'prioridades': 'Prioridades'
     };
     return labels[tipo as keyof typeof labels] || tipo;
