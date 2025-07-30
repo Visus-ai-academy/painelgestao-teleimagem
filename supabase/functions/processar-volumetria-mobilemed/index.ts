@@ -252,15 +252,11 @@ async function processFileInBackground(
       throw new Error('Arquivo Excel está vazio');
     }
 
-    // Para evitar timeout de CPU, processar apenas amostra muito pequena
+    // Processar todos os dados - removida limitação artificial
     let dataToProcess = jsonData;
     let isLimitedSample = false;
     
-    if (jsonData.length > 1000) {
-      console.log(`Arquivo muito grande (${jsonData.length} linhas). Processando apenas amostra de 500 linhas para evitar timeout.`);
-      dataToProcess = jsonData.slice(0, 500); // Processa apenas as primeiras 500 linhas
-      isLimitedSample = true;
-    }
+    console.log(`Processando arquivo completo com ${jsonData.length} linhas`);
 
     // Processar dados em micro-lotes com pausas para evitar timeout
     const errors: string[] = [];
@@ -316,8 +312,27 @@ async function processFileInBackground(
       await new Promise(resolve => setTimeout(resolve, 20));
     }
 
-    console.log(`Processamento concluído. Total inserido: ${totalInserted}${isLimitedSample ? ' (processamento limitado devido ao tamanho do arquivo)' : ''}`);
+    console.log(`Processamento concluído. Total inserido: ${totalInserted}`);
     console.log(`Erros encontrados: ${errors.length}`);
+
+    // Aplicar regras De-Para para arquivos fora do padrão
+    let registrosAtualizadosDePara = 0;
+    if (arquivo_fonte === 'volumetria_fora_padrao' && totalInserted > 0) {
+      console.log('Aplicando regras De-Para para registros fora do padrão...');
+      try {
+        const { data: deParaResult, error: deParaError } = await supabaseClient
+          .rpc('aplicar_valores_de_para');
+        
+        if (deParaError) {
+          console.error('Erro ao aplicar De-Para:', deParaError);
+        } else {
+          registrosAtualizadosDePara = deParaResult?.registros_atualizados || 0;
+          console.log(`Regras De-Para aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
+        }
+      } catch (deParaErr) {
+        console.error('Erro crítico ao aplicar De-Para:', deParaErr);
+      }
+    }
 
     // Atualizar log de upload com sucesso na tabela processamento_uploads
     try {
@@ -327,6 +342,7 @@ async function processFileInBackground(
           status: totalInserted > 0 ? 'concluido' : 'erro',
           registros_processados: dataToProcess.length,
           registros_inseridos: totalInserted,
+          registros_atualizados: registrosAtualizadosDePara,
           registros_erro: errors.length
         })
         .eq('id', uploadLogId);

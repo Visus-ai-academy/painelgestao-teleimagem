@@ -30,16 +30,16 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       const cutoffTime = new Date(Date.now() - 3 * 60 * 1000).toISOString();
       
       let query = supabase
-        .from('upload_logs')
-        .select('status, records_processed, updated_at, created_at')
-        .in('status', ['processing', 'completed']) // Incluir concluídos também
-        .gte('updated_at', cutoffTime); // Últimos 3 minutos
+        .from('processamento_uploads')
+        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at')
+        .in('status', ['processando', 'concluido']) // Incluir concluídos também
+        .gte('created_at', cutoffTime); // Últimos 3 minutos
       
       // Aplicar filtro de tipo(s)
       if (Array.isArray(fileType)) {
-        query = query.in('file_type', fileType);
+        query = query.in('tipo_arquivo', fileType);
       } else {
-        query = query.eq('file_type', fileType);
+        query = query.eq('tipo_arquivo', fileType);
       }
       
       const { data: uploads, error } = await query;
@@ -51,10 +51,10 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
 
       const activeUploads = uploads || [];
       const totalUploads = activeUploads.length;
-      const completedUploads = activeUploads.filter(u => u.status === 'completed').length;
-      const processingUploads = activeUploads.filter(u => u.status === 'processing').length;
-      const errorUploads = 0;
-      const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.records_processed || 0), 0);
+      const completedUploads = activeUploads.filter(u => u.status === 'concluido').length;
+      const processingUploads = activeUploads.filter(u => u.status === 'processando').length;
+      const errorUploads = activeUploads.filter(u => u.status === 'erro').length;
+      const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.registros_processados || 0), 0);
       
       const isProcessing = processingUploads > 0;
       
@@ -62,10 +62,10 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       let progressPercentage = 0;
       if (processingUploads > 0) {
         // Há processamento ativo
-        const uploadAtual = activeUploads.find(u => u.status === 'processing');
-        if (uploadAtual && uploadAtual.records_processed > 0) {
-          const estimatedTotal = 2000;
-          progressPercentage = Math.min(Math.round((uploadAtual.records_processed / estimatedTotal) * 100), 99);
+        const uploadAtual = activeUploads.find(u => u.status === 'processando');
+        if (uploadAtual && uploadAtual.registros_processados > 0) {
+          const estimatedTotal = Math.max(uploadAtual.registros_processados, 1000);
+          progressPercentage = Math.min(Math.round((uploadAtual.registros_inseridos / estimatedTotal) * 100), 99);
         } else {
           progressPercentage = 5; // Iniciando
         }
@@ -78,7 +78,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       }
       
       const lastUpdate = activeUploads.length > 0 
-        ? activeUploads.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0].updated_at
+        ? activeUploads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
         : null;
 
       console.log('Upload Status Debug:', {
@@ -110,24 +110,37 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
     // Buscar status inicial
     fetchStatus();
 
-    // Configurar realtime subscription
-    const fileTypeFilter = Array.isArray(fileType) 
-      ? fileType.map(ft => `file_type=eq.${ft}`).join(',')
-      : `file_type=eq.${fileType}`;
-    
+    // Configurar realtime subscription para processamento_uploads
     const channel = supabase
-      .channel('upload_logs_changes')
+      .channel('processamento_uploads_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'upload_logs',
-          filter: Array.isArray(fileType) ? `file_type=in.(${fileType.join(',')})` : `file_type=eq.${fileType}`
+          table: 'processamento_uploads',
+          filter: Array.isArray(fileType) ? `tipo_arquivo=in.(${fileType.join(',')})` : `tipo_arquivo=eq.${fileType}`
         },
         (payload) => {
           console.log('Upload status changed:', payload);
           fetchStatus(); // Atualizar status quando houver mudanças
+        }
+      )
+      .subscribe();
+
+    // Também configurar subscription para volumetria_mobilemed
+    const volumetriaChannel = supabase
+      .channel('volumetria_mobilemed_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'volumetria_mobilemed'
+        },
+        (payload) => {
+          console.log('Volumetria data changed:', payload);
+          fetchStatus(); // Atualizar status quando houver mudanças nos dados
         }
       )
       .subscribe();
@@ -137,6 +150,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(volumetriaChannel);
       clearInterval(interval);
     };
   }, [fileType]);

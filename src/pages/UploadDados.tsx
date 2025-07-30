@@ -120,10 +120,16 @@ export default function UploadDados() {
             Upload de dados incrementais e arquivos de referência
           </p>
         </div>
-        <Button onClick={() => navigate('/gerenciar-cadastros')} className="flex items-center gap-2">
-          <Settings className="h-4 w-4" />
-          Gerenciar Cadastros
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate('/gerenciar-cadastros')} className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Gerenciar Cadastros
+          </Button>
+          <Button onClick={() => navigate('/limpar-dados')} variant="outline" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Limpar Dados
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="incremental" className="space-y-6">
