@@ -607,7 +607,7 @@ const RelatorioImplementacoes = () => {
                 <li>• especialidades - Especialidades médicas</li>
                 <li>• modalidades - Modalidades de exames</li>
                 <li>• categorias_exame - Categorias</li>
-                <li>• categorias_medico - Categorias médicas</li>
+                <li>• categorias_medico - Níveis médicos</li>
                 <li>• cadastro_exames - Exames cadastrados</li>
                 <li>• precos_servicos - Preços</li>
                 <li>• medicos_valores_repasse - Repasses</li>
