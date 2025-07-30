@@ -31,6 +31,8 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
       console.log('📊 Carregando estatísticas por arquivo_fonte...');
       
       // PRIMEIRO: Verificar contagem total por arquivo_fonte para comparar com arquivos originais
+      console.log('🔍 Verificando se há filtros ou limitações na consulta...');
+      
       const { data: countData, error: countError } = await supabase
         .from('volumetria_mobilemed')
         .select('arquivo_fonte')
@@ -40,6 +42,9 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         console.error('❌ Erro ao buscar contagem total:', countError);
         throw countError;
       }
+      
+      console.log('🔍 Total de registros retornados pela consulta:', countData?.length || 0);
+      console.log('🔍 Primeiros 10 registros para debug:', countData?.slice(0, 10));
       
       const totalBySource = (countData || []).reduce((acc: Record<string, number>, item) => {
         acc[item.arquivo_fonte] = (acc[item.arquivo_fonte] || 0) + 1;
