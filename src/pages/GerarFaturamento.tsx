@@ -8,25 +8,19 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { 
   FileText, 
-  Send, 
-  Upload,
-  Database,
+  Send,
   CheckCircle,
   AlertTriangle,
   Clock,
   RefreshCw,
   Mail,
-  Calendar,
-  DollarSign,
-  Users,
   FileSpreadsheet,
-  Settings,
   Download,
   ExternalLink,
   FileBarChart2,
-  Link,
   Zap,
-  HardDrive
+  Users,
+  Upload
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
@@ -903,14 +897,6 @@ export default function GerarFaturamento() {
           <TabsTrigger value="faturamento" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
-          </TabsTrigger>
-          <TabsTrigger value="uploads" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Upload de Dados
-          </TabsTrigger>
-          <TabsTrigger value="database" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Base de Dados
           </TabsTrigger>
         </TabsList>
 
@@ -1830,178 +1816,6 @@ export default function GerarFaturamento() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="uploads" className="space-y-6 mt-6">
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
-                <div>
-                  <h3 className="font-semibold text-blue-800">Upload de Dados</h3>
-                  <p className="text-sm text-blue-700">
-                    Upload de clientes foi movido para a página "Cadastro de Clientes". Configure outras fontes de dados na página de Configuração de Faturamento.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => window.location.href = '/clientes/cadastro'}
-                  >
-                    Cadastro de Clientes
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => window.location.href = '/configuracao/faturamento'}
-                  >
-                    Configurar
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-green-900 mb-2">📋 Ordem Recomendada de Upload:</h3>
-            <ol className="list-decimal list-inside space-y-1 text-green-800">
-              <li><strong>Primeiro:</strong> Upload de Clientes (na página "Cadastro de Clientes")</li>
-              <li><strong>Segundo:</strong> Upload de Contratos (opcional, regras de preço)</li>
-              <li><strong>Terceiro:</strong> Escalas e Financeiro (opcionais)</li>
-              <li><strong>Quarto:</strong> <strong>Upload Laudos Para Faturamento</strong> (para geração de relatórios PDF)</li>
-            </ol>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <FileUpload
-              title="Upload de Contratos/Regras"
-              description="Upload de tabela de preços e contratos"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={10}
-              expectedFormat={["Cliente ID, Modalidade, Especialidade", "Valor, Desconto, Vigência"]}
-              onUpload={processContratosFile}
-              icon={<Users className="h-5 w-5" />}
-            />
-
-            <FileUpload
-              title="Upload de Escalas Médicas"
-              description="Escalas e horários dos médicos"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={10}
-              expectedFormat={["Médico, Data, Turno, Modalidade", "Status, Tipo de Escala"]}
-              onUpload={processEscalasFile}
-              icon={<Calendar className="h-5 w-5" />}
-            />
-
-            <FileUpload
-              title="Upload de Dados Financeiros"
-              description="Dados de pagamentos e faturamento"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={25}
-              expectedFormat={["Fatura ID, Valor, Data Pagamento", "Status, Observações"]}
-              onUpload={processFinanceiroFile}
-              icon={<DollarSign className="h-5 w-5" />}
-            />
-
-            {/* Template Download Section */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Template de Faturamento
-                </CardTitle>
-                <CardDescription>
-                  Baixe o template CSV com a estrutura correta para o upload de dados de faturamento
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-muted rounded-lg">
-                    <h4 className="font-medium mb-2">Estrutura do Template (11 colunas):</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Cliente → Paciente → Médico → Data_Exame → Modalidade → Especialidade → Categoria → Prioridade → Nome Exame → Quantidade → Valor_Bruto
-                    </p>
-                  </div>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/templates/template_faturamento.csv" download="template_faturamento.csv">
-                      <FileText className="mr-2 h-4 w-4" />
-                      Baixar Template CSV
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <FileUpload
-              title="Upload Laudos Para Faturamento"
-              description="Upload de arquivo de laudos para faturamento seguindo o template com as colunas: Cliente, Paciente, Médico, Data_Exame, Modalidade, Especialidade, Categoria, Prioridade, Nome Exame, Quantidade, Valor_Bruto. Baixar template CSV: /templates/template_faturamento.csv"
-              acceptedTypes={['.csv', '.xlsx', '.xls']}
-              maxSizeInMB={25}
-              expectedFormat={["nome (B), quantidade (J), valor_bruto (K)"]}
-              onUpload={async (file) => {
-                try {
-                  console.log('🔥 UPLOAD DE LAUDOS PARA FATURAMENTO INICIADO - ARQUIVO:', file.name);
-                  console.log('🔥 TAMANHO DO ARQUIVO:', file.size, 'bytes');
-                  console.log('🔥 TIPO DO ARQUIVO:', file.type);
-                  
-                  await processFaturamentoFile(file);
-                  
-                  console.log('🔥 UPLOAD DE LAUDOS PARA FATURAMENTO CONCLUÍDO COM SUCESSO');
-                  toast({
-                    title: "Upload de Laudos Concluído",
-                    description: "Dados de laudos para faturamento carregados com sucesso!",
-                  });
-                } catch (error: any) {
-                  console.error('🔥 ERRO NO UPLOAD DE LAUDOS PARA FATURAMENTO:', error);
-                  toast({
-                    title: "Erro no Upload de Laudos",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                }
-              }}
-               icon={<FileBarChart2 className="h-5 w-5" />}
-             />
-             
-             {/* Botão para limpar uploads antigos */}
-             <div className="mt-4">
-               <Button
-                 onClick={async () => {
-                   try {
-                     console.log('Iniciando limpeza de uploads antigos...');
-                     const result = await limparUploadsAntigos();
-                     console.log('Resultado da limpeza:', result);
-                     
-                     if (result.success) {
-                       toast({
-                         title: "Limpeza Concluída",
-                         description: `${result.uploads_cancelados || 0} uploads antigos foram cancelados`,
-                       });
-                     } else {
-                       toast({
-                         title: "Erro na Limpeza",
-                         description: result.error || "Erro desconhecido",
-                         variant: "destructive",
-                       });
-                     }
-                   } catch (error: any) {
-                     console.error('Erro na limpeza:', error);
-                     toast({
-                       title: "Erro na Limpeza",
-                       description: error.message,
-                       variant: "destructive",
-                     });
-                   }
-                 }}
-                 variant="outline"
-                 size="sm"
-                 className="w-full"
-               >
-                 <HardDrive className="h-4 w-4 mr-2" />
-                 Limpar Uploads Antigos
-               </Button>
-             </div>
-           </div>
-        </TabsContent>
 
       </Tabs>
     </div>
