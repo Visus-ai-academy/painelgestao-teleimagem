@@ -45,6 +45,49 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
         }
       });
 
+      // Se não há dados de processamento_uploads, buscar diretamente da volumetria_mobilemed
+      if (latestUploads.size === 0) {
+        const { data: volumetriaData, error: volumetriaError } = await supabase
+          .from('volumetria_mobilemed')
+          .select('arquivo_fonte, created_at')
+          .order('created_at', { ascending: false })
+          .limit(1000); // Limitar para evitar carregar muitos dados
+
+        if (volumetriaError) throw volumetriaError;
+
+        // Agrupar por arquivo_fonte e pegar o mais recente de cada tipo
+        const volumetriaMap = new Map<string, any>();
+        
+        (volumetriaData || []).forEach(item => {
+          const currentLatest = volumetriaMap.get(item.arquivo_fonte);
+          if (!currentLatest || new Date(item.created_at) > new Date(currentLatest.created_at)) {
+            volumetriaMap.set(item.arquivo_fonte, item);
+          }
+        });
+
+        // Contar registros por arquivo_fonte
+        for (const [arquivo_fonte, latestItem] of volumetriaMap.entries()) {
+          const { count, error: countError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', arquivo_fonte);
+
+          if (!countError && count !== null) {
+            const uploadStat: UploadStats = {
+              tipo_arquivo: arquivo_fonte,
+              arquivo_nome: `Upload ${arquivo_fonte}`,
+              status: 'concluido',
+              registros_processados: count,
+              registros_inseridos: count,
+              registros_atualizados: 0,
+              registros_erro: 0,
+              created_at: latestItem.created_at
+            };
+            latestUploads.set(arquivo_fonte, uploadStat);
+          }
+        }
+      }
+
       // Ordenar os uploads conforme a ordem na página de faturamento
       const orderedTypes = [
         'volumetria_padrao', 
