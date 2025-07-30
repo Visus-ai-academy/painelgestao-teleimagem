@@ -124,41 +124,43 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
             Nenhum upload realizado ainda
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {uploadStats.map((stat, index) => (
               <div
                 key={`${stat.tipo_arquivo}-${stat.created_at}-${index}`}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(stat.status)}
-                    <span className="font-medium">{getTypeLabel(stat.tipo_arquivo)}</span>
-                    <Badge className={getStatusColor(stat.status)}>
-                      {stat.status}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {stat.arquivo_nome} • {new Date(stat.created_at).toLocaleString('pt-BR')}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {getStatusIcon(stat.status)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">{getTypeLabel(stat.tipo_arquivo)}</span>
+                      <Badge className={`${getStatusColor(stat.status)} text-xs`}>
+                        {stat.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {stat.arquivo_nome} • {new Date(stat.created_at).toLocaleString('pt-BR')}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex gap-4 text-sm">
+                <div className="flex gap-3 text-xs">
                   <div className="text-center">
                     <div className="font-medium text-blue-600">{stat.registros_processados}</div>
-                    <div className="text-muted-foreground">Processados</div>
+                    <div className="text-muted-foreground">Proc.</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-green-600">{stat.registros_inseridos}</div>
-                    <div className="text-muted-foreground">Inseridos</div>
+                    <div className="text-muted-foreground">Ins.</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-orange-600">{stat.registros_atualizados}</div>
-                    <div className="text-muted-foreground">Atualizados</div>
+                    <div className="text-muted-foreground">Atual.</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-red-600">{stat.registros_erro}</div>
-                    <div className="text-muted-foreground">Erros</div>
+                    <div className="text-muted-foreground">Erro</div>
                   </div>
                 </div>
               </div>
