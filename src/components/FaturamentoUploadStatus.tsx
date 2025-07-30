@@ -60,44 +60,55 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
       // Para cada tipo de volumetria, buscar dados específicos
       for (const tipo of tiposVolumetria) {
         if (!latestUploads.has(tipo)) {
-          // Buscar estatísticas específicas para este tipo
-          const { data: statsData, error: statsError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('created_at, "VALORES"')
-            .eq('arquivo_fonte', tipo)
-            .order('created_at', { ascending: false })
-            .limit(1);
+          try {
+            // Buscar dados básicos para verificar se existe
+            const { data: basicData, error: basicError } = await supabase
+              .from('volumetria_mobilemed')
+              .select('created_at')
+              .eq('arquivo_fonte', tipo)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            
+            if (basicError || !basicData || basicData.length === 0) {
+              continue; // Pular se não há dados para este tipo
+            }
 
-          if (!statsError && statsData && statsData.length > 0) {
-            // Contar total de registros para este tipo
+            // Contar registros
             const { count: totalRegistros, error: countError } = await supabase
               .from('volumetria_mobilemed')
               .select('*', { count: 'exact', head: true })
               .eq('arquivo_fonte', tipo);
 
-            // Somar total de exames (VALORES) para este tipo
-            const { data: valorData, error: valorError } = await supabase
+            // Buscar todos os valores para somar manualmente (mais confiável)
+            const { data: valoresData, error: valoresError } = await supabase
               .from('volumetria_mobilemed')
               .select('"VALORES"')
               .eq('arquivo_fonte', tipo);
-            
-            if (!countError && !valorError && totalRegistros !== null && valorData) {
-              const totalExames = valorData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
-              const registrosZerados = valorData.filter(item => !item.VALORES || item.VALORES === 0).length;
+              
+            let totalExames = 0;
+            if (!valoresError && valoresData) {
+              totalExames = valoresData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+            }
 
-              const uploadStat: UploadStats = {
+            // Contar registros zerados a partir dos dados já carregados
+            const registrosZerados = valoresData ? 
+              valoresData.filter(item => !item.VALORES || Number(item.VALORES) === 0).length : 0;
+              if (!countError && totalRegistros !== null) {
+                const uploadStat: UploadStats = {
                 tipo_arquivo: tipo,
                 arquivo_nome: `Upload ${tipo}`,
                 status: 'concluido',
                 registros_processados: totalRegistros,
                 registros_inseridos: totalRegistros,
                 registros_atualizados: 0,
-                registros_erro: registrosZerados, // Mostrar registros zerados como "erro"
+                registros_erro: registrosZerados,
                 total_exames: totalExames,
-                created_at: statsData[0].created_at
+                created_at: basicData[0].created_at
               };
               latestUploads.set(tipo, uploadStat);
             }
+          } catch (error) {
+            console.error(`Erro ao buscar dados para ${tipo}:`, error);
           }
         }
       }
