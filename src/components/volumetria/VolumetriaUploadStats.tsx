@@ -104,6 +104,12 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
           }
         });
 
+        // Buscar dados da tabela De-Para
+        const { data: deParaData } = await supabase
+          .from('valores_referencia_de_para')
+          .select('id')
+          .limit(1);
+
         // Converter para formato do componente
         const realStats: UploadStats[] = [
           {
@@ -143,6 +149,19 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
             category: 'fora-padrão'
           }
         ];
+
+        // Adicionar status do De-Para se existe
+        if (deParaData && deParaData.length > 0) {
+          realStats.push({
+            fileName: "Upload De-Para - Exames Fora de Padrão",
+            totalRecords: 0,
+            recordsWithValue: deParaData.length,
+            recordsZeroed: 0,
+            totalValue: 0,
+            period: "Configurado",
+            category: 'padrão'
+          });
+        }
 
         console.log('📊 Estatísticas reais carregadas:', realStats);
         setStats(realStats);
