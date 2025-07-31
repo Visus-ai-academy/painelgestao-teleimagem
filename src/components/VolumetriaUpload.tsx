@@ -89,35 +89,27 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       const result = await processVolumetriaFile(
         file,
         arquivoFonte,
-        (processed, total, inserted) => {
-          const progressPercent = Math.round((processed / total) * 100);
-          setProgress(progressPercent);
-          setStats({ processed, total, inserted });
+        (progressData) => {
+          setProgress(progressData.progress);
+          setStats({ 
+            processed: progressData.processed, 
+            total: progressData.total, 
+            inserted: progressData.processed 
+          });
         },
         periodoFaturamento
       );
 
-        if (result.success) {
-          // Verificar se foi processamento limitado baseado no retorno da edge function
-          const isLimited = result.limitedProcessing || result.totalInserted === 499;
-          setIsLimitedProcessing(isLimited);
-          
-          if (isLimited && result.filePath) {
-            // Usar o caminho real do arquivo retornado pela função
-            setLastUploadedFile(result.filePath);
-          }
-          
-          toast({
-            title: isLimited ? "Upload processado (arquivo grande)" : "Upload concluído!",
-            description: isLimited 
-              ? `${result.totalInserted} registros inseridos (limitado). Use "Processamento Completo" para processar todos os registros.`
-              : `${result.totalInserted} registros inseridos com sucesso.`,
-          });
-          onSuccess?.();
-        } else {
+      if (result.success) {
+        toast({
+          title: "Upload concluído!",
+          description: `${result.totalInserted} registros inseridos com sucesso.`,
+        });
+        onSuccess?.();
+      } else {
         toast({
           title: "Erro no processamento",
-          description: result.errors[0] || "Erro desconhecido",
+          description: result.message || "Erro desconhecido",
           variant: "destructive"
         });
       }
