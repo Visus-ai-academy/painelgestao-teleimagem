@@ -449,13 +449,10 @@ serve(async (req) => {
 
     console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel com limitação de linhas para arquivos grandes
-    console.log('📖 Lendo arquivo Excel...');
+    // Ler Excel COMPLETO - sem limitações
+    console.log('📖 Lendo arquivo Excel COMPLETO...');
     const arrayBuffer = await fileData.arrayBuffer();
     console.log('✅ ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
-    
-    // Determinar limite de linhas baseado no tamanho do arquivo
-    const maxRows = fileData.size > 2000000 ? 500 : 0; // Limitar a 500 linhas para arquivos grandes
     
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
@@ -463,7 +460,7 @@ serve(async (req) => {
       cellNF: false, 
       cellHTML: false,
       dense: true,
-      sheetRows: maxRows, // Limitar linhas para arquivos grandes
+      // REMOVIDO: sheetRows - agora lê TODAS as linhas
       bookSST: false
     });
     
@@ -475,7 +472,7 @@ serve(async (req) => {
     console.log('✅ Workbook criado, planilhas:', workbook.SheetNames);
 
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    console.log('📊 Convertendo planilha para JSON...');
+    console.log('📊 Convertendo planilha COMPLETA para JSON...');
     
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
@@ -484,89 +481,50 @@ serve(async (req) => {
       blankrows: false
     });
     
-    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (limitado a ${maxRows || 'todas'})`);
+    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
     
-    // Se limitamos as linhas, avisar sobre processamento parcial
-    if (maxRows > 0 && jsonData.length >= maxRows) {
-      console.log(`⚠️ Arquivo grande - processando apenas primeiras ${maxRows} linhas`);
-    }
+    console.log(`🚀 Processando TODOS os ${jsonData.length} registros de uma vez`);
     
-    // Processamento simplificado para arquivos grandes
-    if (fileData.size > 2000000) { // 2MB
-      console.log(`🔄 Arquivo grande: ${fileData.size} bytes, ${jsonData.length} registros (limitados)`);
-      
-      // Para arquivos muito grandes, processar apenas o que conseguimos carregar
-      console.log(`🚀 Processando ${jsonData.length} registros diretamente`);
-      
-      const resultado = await processFileWithBatchControl(
-        jsonData, 
-        arquivo_fonte, 
-        uploadLog.id, 
-        supabaseClient, 
-        file_path, 
-        periodo
-      );
+    // Processar o arquivo COMPLETO sem limitações
+    const resultado = await processFileWithBatchControl(
+      jsonData, 
+      arquivo_fonte, 
+      uploadLog.id, 
+      supabaseClient, 
+      file_path, 
+      periodo
+    );
 
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Processamento concluído. ${jsonData.length} registros processados (arquivo grande - limitado a primeiras linhas)`,
-          upload_log_id: uploadLog.id,
-          limited_processing: true,
-          file_path: file_path, // Retornar o caminho do arquivo para processamento completo
-          file_size: fileData.size,
-          stats: {
-            total_limitado: jsonData.length,
-            processados: resultado.totalProcessed,
-            inseridos: resultado.totalInserted,
-            atualizados: resultado.registrosAtualizadosDePara,
-            erros: resultado.totalErrors,
-            completo: resultado.isComplete,
-            tempo_ms: resultado.executionTime
-          }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+    console.log('✅ Processamento concluído:', resultado);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: resultado.isComplete ? "Processamento concluído" : "Processamento parcial (timeout)",
+        upload_log_id: uploadLog.id,
+        totalProcessed: resultado.totalProcessed,
+        totalInserted: resultado.totalInserted,
+        totalErrors: resultado.totalErrors,
+        registrosAtualizadosDePara: resultado.registrosAtualizadosDePara,
+        isComplete: resultado.isComplete,
+        executionTime: resultado.executionTime,
+        stats: {
+          total_arquivo: jsonData.length,
+          processados: resultado.totalProcessed,
+          inseridos: resultado.totalInserted,
+          atualizados: resultado.registrosAtualizadosDePara,
+          erros: resultado.totalErrors,
+          completo: resultado.isComplete,
+          tempo_ms: resultado.executionTime,
+          lote_upload: resultado.loteUpload,
+          periodo_referencia: resultado.periodoReferencia
         }
-      );
-    } else {
-      // Processar arquivos menores normalmente
-      console.log('🚀 Iniciando processamento normal...');
-      const resultado = await processFileWithBatchControl(
-        jsonData, 
-        arquivo_fonte, 
-        uploadLog.id, 
-        supabaseClient, 
-        file_path, 
-        periodo
-      );
-
-      console.log('✅ Processamento concluído:', resultado);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: resultado.isComplete ? "Processamento concluído" : "Processamento parcial (timeout)",
-          upload_log_id: uploadLog.id,
-          stats: {
-            total_arquivo: jsonData.length,
-            processados: resultado.totalProcessed,
-            inseridos: resultado.totalInserted,
-            atualizados: resultado.registrosAtualizadosDePara,
-            erros: resultado.totalErrors,
-            completo: resultado.isComplete,
-            tempo_ms: resultado.executionTime,
-            lote_upload: resultado.loteUpload,
-            periodo_referencia: resultado.periodoReferencia
-          }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      );
-    }
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
 
   } catch (error) {
     console.error('💥 ERRO CRÍTICO na função:', {
