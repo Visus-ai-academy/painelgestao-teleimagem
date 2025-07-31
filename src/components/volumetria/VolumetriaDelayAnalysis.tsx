@@ -21,6 +21,7 @@ interface DelayAnalysisData {
   prioridades: DelayData[];
   totalAtrasados: number;
   percentualAtrasoGeral: number;
+  atrasosComTempo?: Array<{ tempoAtrasoMinutos: number; EMPRESA: string; [key: string]: any }>;
 }
 
 interface VolumetriaDelayAnalysisProps {
@@ -57,6 +58,26 @@ const createDelaySegments = (data: DelayData[]) => {
   }));
 };
 
+// Função para criar segmentação por tempo de atraso em minutos/horas
+const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: number; [key: string]: any }> = []) => {
+  const segments = {
+    'Até 30 min': atrasosComTempo.filter(item => item.tempoAtrasoMinutos <= 30).length,
+    '30 min - 1h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 30 && item.tempoAtrasoMinutos <= 60).length,
+    '1h - 2h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 60 && item.tempoAtrasoMinutos <= 120).length,
+    '2h - 5h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 120 && item.tempoAtrasoMinutos <= 300).length,
+    '5h - 12h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 300 && item.tempoAtrasoMinutos <= 720).length,
+    '12h - 24h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 720 && item.tempoAtrasoMinutos <= 1440).length,
+    'Mais de 24h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 1440).length
+  };
+
+  return Object.entries(segments).map(([name, value], index) => ({
+    name,
+    value,
+    percentage: atrasosComTempo.length > 0 ? (value / atrasosComTempo.length) * 100 : 0,
+    color: DELAY_COLORS[index % DELAY_COLORS.length]
+  }));
+};
+
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
   // Top 10 clientes com mais atrasos
   const topDelayClientes = data.clientes
@@ -79,6 +100,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   // Segmentação por tempo de atraso
   const clienteSegments = createDelaySegments(data.clientes);
   const modalidadeSegments = createDelaySegments(data.modalidades);
+  const timeDelaySegments = createTimeDelaySegments(data.atrasosComTempo);
 
   return (
     <div className="space-y-6">
@@ -320,6 +342,62 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               </div>
               <div className="text-sm text-muted-foreground">Clientes OK</div>
               <div className="text-xs text-green-600 mt-1">Sem atrasos</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Análise de Tempo de Atraso */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Análise de Tempo de Atraso</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gráfico de Pizza - Distribuição por Tempo */}
+            <div>
+              <h4 className="text-lg font-medium mb-4">Distribuição por Tempo de Atraso</h4>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={timeDelaySegments}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {timeDelaySegments.map((entry, index) => (
+                      <Cell key={`time-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => [`${value} laudos`, 'Quantidade']} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Cards de Estatísticas por Tempo */}
+            <div>
+              <h4 className="text-lg font-medium mb-4">Detalhamento por Faixa de Tempo</h4>
+              <div className="grid grid-cols-1 gap-3">
+                {timeDelaySegments.map((segment, index) => (
+                  <div key={segment.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: segment.color }}
+                      ></div>
+                      <span className="font-medium text-sm">{segment.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold">{segment.value}</div>
+                      <div className="text-xs text-muted-foreground">{segment.percentage.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>

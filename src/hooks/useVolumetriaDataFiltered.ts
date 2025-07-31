@@ -68,6 +68,7 @@ export interface VolumetriaData {
   atrasoEspecialidades: EspecialidadeData[];
   atrasoCategorias: ModalidadeData[];
   atrasoPrioridades: ModalidadeData[];
+  atrasosComTempo?: Array<{ tempoAtrasoMinutos: number; EMPRESA: string; [key: string]: any }>;
 }
 
 export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
@@ -206,7 +207,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         return;
       }
 
-      // Calcular atrasos
+      // Calcular atrasos com tempo de atraso
       const atrasados = allData.filter(item => {
         if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
         try {
@@ -216,6 +217,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         } catch {
           return false;
         }
+      });
+
+      // Calcular tempos de atraso em minutos
+      const atrasosComTempo = atrasados.map(item => {
+        const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+        const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+        const tempoAtrasoMinutos = Math.floor((dataLaudo.getTime() - dataPrazo.getTime()) / (1000 * 60));
+        return { ...item, tempoAtrasoMinutos };
       });
 
       console.log('📅 Debug datas:', {
@@ -322,7 +331,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         atrasoModalidades: modalidades.filter(m => m.atrasados && m.atrasados > 0),
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),
         atrasoCategorias: [],
-        atrasoPrioridades: []
+        atrasoPrioridades: [],
+        atrasosComTempo
       });
 
       // Debug dos dados de atraso

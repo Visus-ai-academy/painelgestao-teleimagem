@@ -46,6 +46,7 @@ export default function Volumetria() {
     atrasoEspecialidades,
     atrasoCategorias,
     atrasoPrioridades,
+    atrasosComTempo,
     loading, 
     refreshData 
   } = useVolumetriaDataFiltered(filters);
@@ -139,7 +140,8 @@ export default function Volumetria() {
                   categorias: atrasoCategorias.map(c => ({...c, atrasados: c.atrasados || 0, percentual_atraso: c.percentual_atraso || 0})),
                   prioridades: atrasoPrioridades.map(p => ({...p, atrasados: p.atrasados || 0, percentual_atraso: p.percentual_atraso || 0})),
                   totalAtrasados: stats.total_atrasados,
-                  percentualAtrasoGeral: stats.percentual_atraso
+                  percentualAtrasoGeral: stats.percentual_atraso,
+                  atrasosComTempo: atrasosComTempo
                 }}
               />
             </TabsContent>
