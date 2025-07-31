@@ -258,58 +258,98 @@ async function processFileInBackground(
     
     console.log(`Processando arquivo completo com ${jsonData.length} linhas`);
 
-    // Processar dados em micro-lotes com pausas para evitar timeout
+    // Processar dados com validação rigorosa para garantir integridade
     const errors: string[] = [];
-    const microChunkSize = 50; // Micro-lotes de apenas 50 linhas
-    const insertBatchSize = 10; // Inserções mínimas
+    const validRecords: VolumetriaRecord[] = [];
+    let totalProcessed = 0;
+    let totalValid = 0;
+    let totalInvalid = 0;
+
+    console.log(`🔍 INICIANDO VALIDAÇÃO DE ${dataToProcess.length} REGISTROS`);
+
+    // FASE 1: Validação e processamento de todos os registros
+    for (let i = 0; i < dataToProcess.length; i++) {
+      const row = dataToProcess[i];
+      const record = processRow(row, arquivo_fonte);
+      
+      if (record) {
+        validRecords.push(record);
+        totalValid++;
+      } else {
+        errors.push(`Linha ${i + 2}: Dados inválidos ou incompletos - ${JSON.stringify(row).substring(0, 100)}`);
+        totalInvalid++;
+      }
+      
+      totalProcessed++;
+      
+      // Log de progresso a cada 1000 registros
+      if (totalProcessed % 1000 === 0) {
+        console.log(`🔍 Validados ${totalProcessed}/${dataToProcess.length} registros (${totalValid} válidos, ${totalInvalid} inválidos)`);
+      }
+    }
+
+    console.log(`✅ VALIDAÇÃO CONCLUÍDA: ${totalValid} registros válidos, ${totalInvalid} registros inválidos`);
+
+    // FASE 2: Inserção otimizada em lotes maiores
     let totalInserted = 0;
+    let insertionErrors = 0;
+    const batchSize = 500; // Lotes maiores para eficiência
 
-    for (let chunkStart = 0; chunkStart < dataToProcess.length; chunkStart += microChunkSize) {
-      const chunk = dataToProcess.slice(chunkStart, chunkStart + microChunkSize);
-      const chunkRecords: VolumetriaRecord[] = [];
+    console.log(`📥 INICIANDO INSERÇÃO DE ${validRecords.length} REGISTROS EM LOTES DE ${batchSize}`);
+
+    for (let i = 0; i < validRecords.length; i += batchSize) {
+      const batch = validRecords.slice(i, i + batchSize);
       
-      // Processar micro-chunk
-      for (let i = 0; i < chunk.length; i++) {
-        const row = chunk[i];
-        const record = processRow(row, arquivo_fonte);
-        
-        if (record) {
-          chunkRecords.push(record);
-        } else {
-          errors.push(`Linha ${chunkStart + i + 2}: Dados inválidos ou incompletos`);
-        }
-      }
+      try {
+        const { data: insertedData, error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(batch)
+          .select('id');
 
-      // Inserir em mini-mini-lotes
-      for (let j = 0; j < chunkRecords.length; j += insertBatchSize) {
-        const miniBatch = chunkRecords.slice(j, j + insertBatchSize);
-        
-        try {
-          const { error: insertError } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(miniBatch);
-
-          if (insertError) {
-            console.error('Erro ao inserir mini-lote:', insertError);
-            errors.push(`Erro no mini-lote: ${insertError.message}`);
-          } else {
-            totalInserted += miniBatch.length;
+        if (insertError) {
+          console.error(`❌ Erro no lote ${Math.floor(i / batchSize) + 1}:`, insertError);
+          errors.push(`Erro no lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
+          insertionErrors += batch.length;
+          
+          // Tentar inserção individual para identificar registros problemáticos
+          console.log(`🔄 Tentando inserção individual para lote com erro...`);
+          for (const record of batch) {
+            try {
+              const { error: singleError } = await supabaseClient
+                .from('volumetria_mobilemed')
+                .insert([record]);
+              
+              if (!singleError) {
+                totalInserted++;
+              } else {
+                errors.push(`Registro individual falhou: ${singleError.message} - ${JSON.stringify(record).substring(0, 100)}`);
+              }
+            } catch (singleErr) {
+              errors.push(`Erro crítico no registro: ${singleErr} - ${JSON.stringify(record).substring(0, 100)}`);
+            }
           }
-        } catch (insertErr) {
-          console.error('Erro crítico na inserção:', insertErr);
-          errors.push(`Erro crítico: ${insertErr}`);
+        } else {
+          totalInserted += insertedData?.length || batch.length;
+          console.log(`✅ Lote ${Math.floor(i / batchSize) + 1} inserido: ${batch.length} registros`);
         }
-        
-        // Pausa obrigatória a cada inserção para reduzir CPU
-        await new Promise(resolve => setTimeout(resolve, 5));
+      } catch (batchErr) {
+        console.error(`💥 Erro crítico no lote ${Math.floor(i / batchSize) + 1}:`, batchErr);
+        errors.push(`Erro crítico no lote: ${batchErr}`);
+        insertionErrors += batch.length;
       }
-
-      // Log de progresso
-      const processed = Math.min(chunkStart + microChunkSize, dataToProcess.length);
-      console.log(`Processadas ${processed} de ${dataToProcess.length} linhas${isLimitedSample ? ' (amostra)' : ''} (${totalInserted} inseridas)`);
       
-      // Pausa maior a cada micro-chunk
-      await new Promise(resolve => setTimeout(resolve, 20));
+      // Log de progresso
+      const processedSoFar = Math.min(i + batchSize, validRecords.length);
+      console.log(`📥 Progresso inserção: ${processedSoFar}/${validRecords.length} processados, ${totalInserted} inseridos`);
+    }
+
+    console.log(`🎯 INSERÇÃO CONCLUÍDA: ${totalInserted} de ${validRecords.length} registros inseridos com sucesso`);
+    
+    // Verificação de integridade final
+    if (totalInserted !== validRecords.length) {
+      const discrepancy = validRecords.length - totalInserted;
+      console.error(`⚠️  DISCREPÂNCIA DETECTADA: ${discrepancy} registros não foram inseridos!`);
+      errors.push(`DISCREPÂNCIA CRÍTICA: ${discrepancy} registros válidos não foram inseridos no banco`);
     }
 
     console.log(`Processamento concluído. Total inserido: ${totalInserted}`);
