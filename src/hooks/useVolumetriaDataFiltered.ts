@@ -536,7 +536,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
   }, [filters, buildDateFilter, toast]);
 
   useEffect(() => {
+    console.log('🔄 [useVolumetriaDataFiltered] Carregando dados iniciais...');
     loadData();
+  }, [loadData]);
+
+  // Refresh manual disponível
+  const refreshData = useCallback(async () => {
+    console.log('🔄 [useVolumetriaDataFiltered] Refresh manual solicitado...');
+    await loadData();
   }, [loadData]);
 
   return { ...data, loading, refreshData: loadData };

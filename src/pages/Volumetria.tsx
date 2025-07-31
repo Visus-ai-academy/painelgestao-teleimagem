@@ -52,10 +52,20 @@ export default function Volumetria() {
   
   // Forçar refresh após mudanças no código
   useEffect(() => {
+    console.log('🔄 [VOLUMETRIA PAGE] Forçando refresh dos dados...');
     const timer = setTimeout(() => {
       refreshData();
     }, 500);
     return () => clearTimeout(timer);
+  }, [refreshData]);
+
+  // Forçar atualização a cada 30 segundos para garantir dados atualizados
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 [VOLUMETRIA PAGE] Refresh automático...');
+      refreshData();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [refreshData]);
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
