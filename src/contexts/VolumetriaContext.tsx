@@ -83,16 +83,49 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       for (const tipo of tiposArquivo) {
         console.log(`📊 Carregando dados para: ${tipo}`);
         
-        const { data: volumetriaData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('VALORES')
-          .eq('arquivo_fonte', tipo);
+        // Carregar TODOS os dados em batches para contornar limitação de 1000 registros
+        let allData: any[] = [];
+        let offset = 0;
+        const limit = 1000;
+        let hasMoreData = true;
+        
+        while (hasMoreData) {
+          const { data: batchData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('VALORES')
+            .eq('arquivo_fonte', tipo)
+            .range(offset, offset + limit - 1);
 
-        if (!error && volumetriaData) {
-          const totalRecords = volumetriaData.length;
-          const recordsWithValue = volumetriaData.filter(item => item.VALORES && item.VALORES > 0).length;
+          if (error) {
+            console.error(`❌ Erro ao carregar ${tipo}:`, error);
+            break;
+          }
+
+          if (!batchData || batchData.length === 0) {
+            break;
+          }
+
+          allData = [...allData, ...batchData];
+          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros no lote (offset: ${offset}), total: ${allData.length}`);
+          
+          if (batchData.length < limit) {
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
+
+          // Limite de segurança para evitar loops infinitos
+          if (offset > 100000) {
+            console.log(`⚠️ ${tipo}: Limite de segurança atingido (100k registros)`);
+            hasMoreData = false;
+          }
+        }
+
+        if (allData.length > 0) {
+          const totalRecords = allData.length;
+          const recordsWithValue = allData.filter(item => item.VALORES && item.VALORES > 0).length;
           const recordsZeroed = totalRecords - recordsWithValue;
-          const totalValue = volumetriaData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+          const totalValue = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
 
           statsResult[tipo] = {
             totalRecords,
