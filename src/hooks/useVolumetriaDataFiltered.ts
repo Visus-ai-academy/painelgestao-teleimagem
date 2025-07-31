@@ -133,11 +133,11 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
       `);
       
-      // Removendo filtro de data temporariamente para obter volume total correto
-      // const { startDate, endDate } = buildDateFilter();
-      // if (startDate && endDate) {
-      //   query = query.gte('DATA_LAUDO', startDate).lte('DATA_LAUDO', endDate);
-      // }
+      const { startDate, endDate } = buildDateFilter();
+      if (startDate && endDate) {
+        // Usar DATA_REALIZACAO como referência principal para consistência com MobileMed
+        query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
+      }
 
       if (filters.cliente !== 'todos') query = query.eq('EMPRESA', filters.cliente);
       if (filters.modalidade !== 'todos') query = query.eq('MODALIDADE', filters.modalidade);
