@@ -49,6 +49,7 @@ import ControleRegras from "./pages/ControleRegras";
 import GerenciarCadastros from "./pages/GerenciarCadastros";
 import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
 import NotFound from "./pages/NotFound";
+import LimparDados from "./pages/LimparDados";
 import LimparDadosCompleto from "./components/LimparDadosCompleto";
 
 const queryClient = new QueryClient();
@@ -379,6 +380,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <GerenciarCadastros />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/limpar-dados" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['admin']}>
+                    <LimparDados />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
