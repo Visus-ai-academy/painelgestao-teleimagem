@@ -230,8 +230,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             console.log('📊 [DASHBOARD] Dados agregados do BD:', totalFromAggregate);
             console.log('📊 [DASHBOARD] Dados da query atual:', { registros: allData.length });
             
-            // Se há diferença significativa, usar todos os dados sem limitações
-            if (totalFromAggregate.total_registros > allData.length) {
+            // Se a query retornou menos dados que o esperado, buscar todos
+            if (totalFromAggregate.total_registros > allData.length && totalFromAggregate.total_registros <= 50000) {
               console.log('⚠️ [DASHBOARD] Query limitada detectada - buscando TODOS os dados...');
               
               // Buscar TODOS os dados sem limitação de range
@@ -240,7 +240,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
               const batchSize = 5000;
               let hasMore = true;
 
-              while (hasMore && offset < 100000) { // Limite de segurança
+              while (hasMore && offset < totalFromAggregate.total_registros + 5000) { // Limite baseado no total real
                 const { data: batchData, error } = await supabase
                   .from('volumetria_mobilemed')
                   .select(`
