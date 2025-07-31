@@ -483,41 +483,83 @@ serve(async (req) => {
     
     console.log(`✅ Dados extraídos: ${jsonData.length} linhas`);
     
-    // Processar com controle de lote otimizado
-    console.log('🚀 Iniciando processamento dos dados...');
-    const resultado = await processFileWithBatchControl(
-      jsonData, 
-      arquivo_fonte, 
-      uploadLog.id, 
-      supabaseClient, 
-      file_path, 
-      periodo
-    );
+    // Para arquivos muito grandes (>2MB), usar processamento em background
+    if (fileData.size > 2000000) { // 2MB
+      console.log('🔄 Arquivo grande detectado - processamento em background');
+      
+      // Iniciar processamento em background sem bloquear a resposta
+      EdgeRuntime.waitUntil(
+        processFileWithBatchControl(
+          jsonData, 
+          arquivo_fonte, 
+          uploadLog.id, 
+          supabaseClient, 
+          file_path, 
+          periodo
+        ).catch(error => {
+          console.error('Erro no processamento em background:', error);
+          // Atualizar status com erro
+          supabaseClient
+            .from('processamento_uploads')
+            .update({
+              status: 'erro',
+              detalhes_erro: JSON.stringify({ error: error.message })
+            })
+            .eq('id', uploadLog.id);
+        })
+      );
 
-    console.log('✅ Processamento concluído:', resultado);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: resultado.isComplete ? "Processamento concluído" : "Processamento parcial (timeout)",
-        upload_log_id: uploadLog.id,
-        stats: {
-          total_arquivo: jsonData.length,
-          processados: resultado.totalProcessed,
-          inseridos: resultado.totalInserted,
-          atualizados: resultado.registrosAtualizadosDePara,
-          erros: resultado.totalErrors,
-          completo: resultado.isComplete,
-          tempo_ms: resultado.executionTime,
-          lote_upload: resultado.loteUpload,
-          periodo_referencia: resultado.periodoReferencia
+      // Retornar resposta imediata
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Arquivo grande em processamento em background. Acompanhe o status.",
+          upload_log_id: uploadLog.id,
+          background_processing: true,
+          file_size: fileData.size
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
         }
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+      );
+    } else {
+      // Processar arquivos menores normalmente
+      console.log('🚀 Iniciando processamento normal...');
+      const resultado = await processFileWithBatchControl(
+        jsonData, 
+        arquivo_fonte, 
+        uploadLog.id, 
+        supabaseClient, 
+        file_path, 
+        periodo
+      );
+
+      console.log('✅ Processamento concluído:', resultado);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: resultado.isComplete ? "Processamento concluído" : "Processamento parcial (timeout)",
+          upload_log_id: uploadLog.id,
+          stats: {
+            total_arquivo: jsonData.length,
+            processados: resultado.totalProcessed,
+            inseridos: resultado.totalInserted,
+            atualizados: resultado.registrosAtualizadosDePara,
+            erros: resultado.totalErrors,
+            completo: resultado.isComplete,
+            tempo_ms: resultado.executionTime,
+            lote_upload: resultado.loteUpload,
+            periodo_referencia: resultado.periodoReferencia
+          }
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
 
   } catch (error) {
     console.error('💥 ERRO CRÍTICO na função:', {
