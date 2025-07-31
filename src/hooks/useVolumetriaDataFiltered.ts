@@ -328,6 +328,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           }
         }
 
+        // Prioridades
+        if (item.PRIORIDADE) {
+          const current = prioridadesMap.get(item.PRIORIDADE) || { total_exames: 0, total_registros: 0, atrasados: 0 };
+          current.total_exames += item.VALORES || 0;
+          current.total_registros += 1;
+          if (isAtrasado) current.atrasados += 1;
+          prioridadesMap.set(item.PRIORIDADE, current);
+        }
+
         // Médicos com detalhes
         if (item.MEDICO) {
           const current = medicosMap.get(item.MEDICO) || { 
@@ -358,6 +367,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             }
             current.especialidades[item.ESPECIALIDADE].exames += item.VALORES || 0;
             current.especialidades[item.ESPECIALIDADE].registros += 1;
+          }
+          
+          // Detalhes por prioridade
+          if (item.PRIORIDADE) {
+            if (!current.prioridades[item.PRIORIDADE]) {
+              current.prioridades[item.PRIORIDADE] = { exames: 0, registros: 0 };
+            }
+            current.prioridades[item.PRIORIDADE].exames += item.VALORES || 0;
+            current.prioridades[item.PRIORIDADE].registros += 1;
           }
           
           medicosMap.set(item.MEDICO, current);
@@ -398,9 +416,17 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         }
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      // Categorias e prioridades vazias (não existem na tabela atual)
+      // Categorias vazias (não existem na tabela atual)
       const categorias: any[] = [];
-      const prioridades: any[] = [];
+      
+      // Prioridades processadas
+      const prioridades = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
+        nome, 
+        ...data, 
+        percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
+        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0,
+        total_medicos: 0 // TODO: implementar contagem de médicos por prioridade se necessário
+      })).sort((a, b) => b.total_exames - a.total_exames);
 
       setData({
         stats: {
@@ -413,14 +439,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           total_especialidades: especialidadesMap.size,
           total_medicos: medicosMap.size,
           total_categorias: 0,
-          total_prioridades: 0
+          total_prioridades: prioridadesMap.size
         },
         clientes, modalidades, especialidades, categorias, prioridades, medicos,
         atrasoClientes: clientes.filter(c => c.atrasados > 0),
         atrasoModalidades: modalidades.filter(m => m.atrasados && m.atrasados > 0),
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),
         atrasoCategorias: [],
-        atrasoPrioridades: [],
+        atrasoPrioridades: prioridades.filter(p => p.atrasados && p.atrasados > 0),
         atrasosComTempo
       });
 
