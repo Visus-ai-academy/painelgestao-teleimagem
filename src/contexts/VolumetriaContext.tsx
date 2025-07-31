@@ -192,6 +192,37 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
+
+    // Setup real-time subscription para atualizações automáticas
+    const channel = supabase
+      .channel('volumetria-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'volumetria_mobilemed'
+        },
+        () => {
+          console.log('🔄 Dados alterados - atualizando estatísticas...');
+          setTimeout(() => loadStats(), 1000); // Delay para garantir que os dados estejam salvos
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Auto-refresh a cada 30 segundos como fallback
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refresh das estatísticas...');
+      loadStats();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
