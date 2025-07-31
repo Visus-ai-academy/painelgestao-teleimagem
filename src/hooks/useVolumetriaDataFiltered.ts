@@ -146,8 +146,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     
     setLoading(true);
     try {
-      console.log('🔍 Iniciando carregamento de dados volumetria');
-      console.log('📅 Filtros aplicados:', filters);
+      console.log('🔍 [DASHBOARD] Iniciando carregamento de dados volumetria');
+      console.log('📅 [DASHBOARD] Filtros aplicados:', filters);
+      console.log('🎯 [DASHBOARD] Ano selecionado:', filters.ano);
+      console.log('🏢 [DASHBOARD] Cliente selecionado:', filters.cliente);
       
       // Fazer query em lotes para evitar limitações
       let allData: any[] = [];
@@ -207,7 +209,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         }
       }
       
-      console.log('📈 Resultado total da query paginada:', {
+      console.log('📈 [DASHBOARD] Resultado total da query paginada:', {
         totalRegistros: allData.length,
         temErro: false
       });
@@ -216,27 +218,64 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       if (filters.ano === 'todos' && filters.cliente === 'todos' && 
           filters.modalidade === 'todos' && filters.especialidade === 'todos' && 
           filters.medico === 'todos' && !filters.dataEspecifica) {
-        console.log('🎯 Usando dados agregados do BD para maior precisão...');
+        console.log('🎯 [DASHBOARD] Usando dados agregados do BD para maior precisão...');
         try {
           const { data: aggregatedData, error: aggError } = await supabase.rpc('get_volumetria_aggregated_stats');
-          if (!aggError && aggregatedData) {
+          if (!aggError && aggregatedData && aggregatedData.length > 0) {
             const totalFromAggregate = aggregatedData.reduce((acc: any, item: any) => ({
               total_exames: acc.total_exames + (item.total_value || 0),
               total_registros: acc.total_registros + (item.total_records || 0),
             }), { total_exames: 0, total_registros: 0 });
             
-            console.log('📊 Dados agregados do BD:', totalFromAggregate);
-            // Usar dados agregados se diferentes dos filtrados
-            if (Math.abs(totalFromAggregate.total_registros - allData.length) > 100) {
-              console.log('⚠️ Diferença significativa detectada - usando dados agregados');
-              allData = Array(totalFromAggregate.total_registros).fill({
-                EMPRESA: 'Agregado',
-                VALORES: totalFromAggregate.total_exames / totalFromAggregate.total_registros
-              });
+            console.log('📊 [DASHBOARD] Dados agregados do BD:', totalFromAggregate);
+            console.log('📊 [DASHBOARD] Dados da query atual:', { registros: allData.length });
+            
+            // Se há diferença significativa, usar todos os dados sem limitações
+            if (totalFromAggregate.total_registros > allData.length) {
+              console.log('⚠️ [DASHBOARD] Query limitada detectada - buscando TODOS os dados...');
+              
+              // Buscar TODOS os dados sem limitação de range
+              let allDataComplete: any[] = [];
+              let offset = 0;
+              const batchSize = 5000;
+              let hasMore = true;
+
+              while (hasMore && offset < 100000) { // Limite de segurança
+                const { data: batchData, error } = await supabase
+                  .from('volumetria_mobilemed')
+                  .select(`
+                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
+                    VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
+                  `)
+                  .range(offset, offset + batchSize - 1);
+
+                if (error) {
+                  console.error('❌ [DASHBOARD] Erro na query completa:', error);
+                  break;
+                }
+
+                if (!batchData || batchData.length === 0) {
+                  break;
+                }
+
+                allDataComplete = [...allDataComplete, ...batchData];
+                console.log(`📦 [DASHBOARD] Lote ${Math.floor(offset/batchSize) + 1}: ${batchData.length} registros, total: ${allDataComplete.length}`);
+                
+                if (batchData.length < batchSize) {
+                  hasMore = false;
+                } else {
+                  offset += batchSize;
+                }
+              }
+              
+              if (allDataComplete.length > allData.length) {
+                console.log(`✅ [DASHBOARD] Dados completos carregados: ${allDataComplete.length} registros`);
+                allData = allDataComplete;
+              }
             }
           }
         } catch (error) {
-          console.warn('⚠️ Erro ao buscar dados agregados:', error);
+          console.warn('⚠️ [DASHBOARD] Erro ao buscar dados agregados:', error);
         }
       }
 
