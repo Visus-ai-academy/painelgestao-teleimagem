@@ -42,6 +42,7 @@ import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
 import { UploadStatusPanel } from "@/components/UploadStatusPanel";
 import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
+import LimparDadosCompleto from "@/components/LimparDadosCompleto";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -1001,6 +1002,9 @@ export default function GerarFaturamento() {
               <CardContent className="space-y-6">
                 {/* Análise dos Uploads Realizados - MOVIDO PARA O TOPO */}
                 <VolumetriaUploadStats refreshTrigger={refreshUploadStatus} />
+                
+                {/* Limpeza Completa de Dados */}
+                <LimparDadosCompleto />
 
                 {/* Seletor de Período de Faturamento */}
                 <VolumetriaPeriodoSelector
