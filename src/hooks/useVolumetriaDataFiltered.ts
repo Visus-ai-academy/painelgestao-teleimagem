@@ -135,8 +135,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       
       const { startDate, endDate } = buildDateFilter();
       if (startDate && endDate) {
-        // Usar DATA_LAUDO como prioridade, senão DATA_REALIZACAO
-        query = query.gte('DATA_LAUDO', startDate).lte('DATA_LAUDO', endDate);
+        // Usar DATA_LAUDO quando disponível, senão DATA_REALIZACAO
+        query = query.or(`and(DATA_LAUDO.gte.${startDate},DATA_LAUDO.lte.${endDate}),and(DATA_LAUDO.is.null,DATA_REALIZACAO.gte.${startDate},DATA_REALIZACAO.lte.${endDate})`);
       }
 
       if (filters.cliente !== 'todos') query = query.eq('EMPRESA', filters.cliente);
