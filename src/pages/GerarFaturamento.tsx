@@ -166,25 +166,36 @@ export default function GerarFaturamento() {
 
   // Função para limpar dados de volumetria
   const handleLimparDadosVolumetria = async () => {
-    console.log('🗑️ Botão de limpeza COMPLETA clicado!');
+    console.log('🗑️ [INICIO] Botão de limpeza COMPLETA clicado!');
+    console.log('🗑️ [INICIO] Estado atual isClearing:', isClearing);
+    
     setIsClearing(true);
+    console.log('🗑️ [ESTADO] setIsClearing(true) executado');
+    
     try {
-      console.log('🧹 Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para...');
-      console.log('📡 Fazendo chamada para edge function limpar-dados-volumetria...');
+      console.log('🧹 [PROCESSO] Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para...');
+      console.log('📡 [CHAMADA] Fazendo chamada para edge function limpar-dados-volumetria...');
+      console.log('📡 [CHAMADA] Supabase client disponível:', !!supabase);
       
+      console.log('📡 [CHAMADA] Supabase client available');
+      
+      console.log('📡 [ANTES] Prestes a chamar limparDadosVolumetria()...');
       const resultado = await limparDadosVolumetria();
+      console.log('📡 [DEPOIS] Chamada limparDadosVolumetria() concluída');
       
-      console.log('✅ Resultado completo da limpeza:', resultado);
-      console.log('📊 Registros removidos:', resultado?.registros_removidos);
-      console.log('📁 Detalhes por tabela:', resultado?.detalhes_por_tabela);
+      console.log('✅ [RESULTADO] Resultado completo da limpeza:', resultado);
+      console.log('📊 [RESULTADO] Registros removidos:', resultado?.registros_removidos);
+      console.log('📁 [RESULTADO] Detalhes por tabela:', resultado?.detalhes_por_tabela);
+      console.log('🎯 [RESULTADO] Success flag:', resultado?.success);
       
       if (resultado?.success) {
+        console.log('✅ [SUCESSO] Limpeza foi bem-sucedida, mostrando toast...');
         toast({
           title: "✅ Limpeza completa realizada!",
           description: `${resultado.registros_removidos || 0} registros removidos de todas as tabelas de volumetria e de-para`,
         });
       } else {
-        console.error('❌ Resultado indica falha:', resultado);
+        console.error('❌ [ERRO] Resultado indica falha:', resultado);
         toast({
           title: "❌ Erro ao limpar dados",
           description: resultado?.error || 'Erro desconhecido na edge function',
@@ -192,21 +203,28 @@ export default function GerarFaturamento() {
         });
       }
 
-      console.log('🔄 Atualizando status dos uploads...');
+      console.log('🔄 [REFRESH] Atualizando status dos uploads...');
+      setRefreshUploadStatus(prev => {
+        console.log('🔄 [REFRESH] Valor anterior:', prev, 'Novo valor:', prev + 1);
+        return prev + 1;
+      });
       
-      // Atualizar os dados após a limpeza
-      setRefreshUploadStatus(prev => prev + 1);
     } catch (error) {
-      console.error('❌ Erro caught na função handleLimparDadosVolumetria:', error);
-      console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      console.error('❌ [CATCH] Erro caught na função handleLimparDadosVolumetria:', error);
+      console.error('❌ [CATCH] Tipo do erro:', typeof error);
+      console.error('❌ [CATCH] Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      console.error('❌ [CATCH] Mensagem:', error instanceof Error ? error.message : String(error));
+      
       toast({
         title: "❌ Erro ao limpar dados",
         description: `Ocorreu um erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
-      console.log('🏁 Finalizando processo de limpeza...');
+      console.log('🏁 [FINALLY] Finalizando processo de limpeza...');
+      console.log('🏁 [FINALLY] setIsClearing(false) será executado');
       setIsClearing(false);
+      console.log('🏁 [FINALLY] Processo de limpeza finalizado');
     }
   };
 
