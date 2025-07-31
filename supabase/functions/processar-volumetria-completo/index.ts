@@ -122,27 +122,36 @@ serve(async (req) => {
     
     // Extrair dados do batch linha por linha para economizar memória
     const batchData = [];
+    
+    // Primeiro, obter os cabeçalhos da primeira linha
+    const headerRow: any = {};
+    const headerColumns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
+    for (let colIndex = 0; colIndex < headerColumns.length; colIndex++) {
+      const cellRef = headerColumns[colIndex] + '1';
+      const cell = worksheet[cellRef];
+      if (cell) {
+        headerRow[colIndex] = cell.v;
+      }
+    }
+    
+    console.log('📋 Cabeçalhos detectados:', headerRow);
+    
     for (let rowIndex = actualStartRow; rowIndex < endRow; rowIndex++) {
       const row: any = {};
-      // Ler apenas as colunas essenciais para economizar memória
-      const essentialColumns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
       
-      for (let colIndex = 0; colIndex < essentialColumns.length; colIndex++) {
-        const cellRef = essentialColumns[colIndex] + (rowIndex + 1);
+      for (let colIndex = 0; colIndex < headerColumns.length; colIndex++) {
+        const cellRef = headerColumns[colIndex] + (rowIndex + 1);
         const cell = worksheet[cellRef];
-        if (cell) {
-          // Mapear para nomes de colunas conhecidos
-          const columnNames = ['EMPRESA', 'NOME_PACIENTE', 'CODIGO_PACIENTE', 'ESTUDO_DESCRICAO', 
-                              'ACCESSION_NUMBER', 'MODALIDADE', 'PRIORIDADE', 'ESPECIALIDADE', 
-                              'MEDICO', 'VALORES', 'DATA_REALIZACAO'];
-          if (columnNames[colIndex]) {
-            row[columnNames[colIndex]] = cell.v;
-          }
+        if (cell && headerRow[colIndex]) {
+          // Usar o nome da coluna do cabeçalho
+          row[headerRow[colIndex]] = cell.v;
         }
       }
       
-      if (row['EMPRESA'] || row['NOME_PACIENTE']) {
+      // Verificar se a linha tem dados essenciais
+      if (row['EMPRESA'] || row['NOME_PACIENTE'] || Object.keys(row).length > 0) {
         batchData.push(row);
+        console.log(`📝 Linha ${rowIndex + 1}:`, row);
       }
     }
     
