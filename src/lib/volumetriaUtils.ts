@@ -420,3 +420,91 @@ export async function processVolumetriaFile(
     throw new Error(`Erro no processamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
   }
 }
+
+// Função otimizada para processamento completo de arquivos de volumetria (sem limitação de registros)
+export async function processVolumetriaOtimizado(
+  file: File,
+  arquivoFonte: string,
+  periodo?: { ano: number; mes: number },
+  onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
+): Promise<{ success: boolean; message: string; stats: any }> {
+  console.log('🚀 Iniciando processamento otimizado de volumetria:', arquivoFonte);
+  
+  try {
+    // Upload do arquivo
+    if (onProgress) {
+      onProgress({ progress: 10, processed: 0, total: 100, status: 'Fazendo upload do arquivo...' });
+    }
+    
+    const fileName = `volumetria_${Date.now()}_${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      throw new Error(`Erro no upload: ${uploadError.message}`);
+    }
+
+    console.log('✅ Arquivo enviado:', fileName);
+    
+    if (onProgress) {
+      onProgress({ progress: 30, processed: 0, total: 100, status: 'Processando arquivo...' });
+    }
+
+    // Chamar edge function otimizada
+    const { data: processData, error: processError } = await supabase.functions.invoke('processar-volumetria-otimizado', {
+      body: { 
+        file_path: fileName,
+        arquivo_fonte: arquivoFonte,
+        periodo: periodo
+      }
+    });
+
+    if (processError) {
+      console.error('❌ Erro no processamento:', processError);
+      throw new Error(`Erro no processamento: ${processError.message}`);
+    }
+
+    if (!processData.success) {
+      throw new Error(processData.error || 'Erro no processamento');
+    }
+
+    console.log('✅ Processamento otimizado concluído:', processData);
+
+    if (onProgress) {
+      onProgress({ 
+        progress: 100, 
+        processed: processData.stats.inserted_count, 
+        total: processData.stats.total_rows, 
+        status: `Concluído! ${processData.stats.inserted_count} registros processados` 
+      });
+    }
+
+    // Forçar atualização das estatísticas
+    if ((window as any).volumetriaContext) {
+      setTimeout(() => {
+        (window as any).volumetriaContext.refreshData();
+      }, 2000);
+    }
+
+    return {
+      success: true,
+      message: processData.message,
+      stats: processData.stats
+    };
+
+  } catch (error) {
+    console.error('❌ Erro no processamento otimizado:', error);
+    
+    if (onProgress) {
+      onProgress({ 
+        progress: 0, 
+        processed: 0, 
+        total: 100, 
+        status: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+      });
+    }
+
+    throw error;
+  }
+}

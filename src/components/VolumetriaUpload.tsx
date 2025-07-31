@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
+import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
 import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
 
@@ -86,24 +86,42 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      const result = await processVolumetriaFile(
-        file,
-        arquivoFonte,
-        (progressData) => {
-          setProgress(progressData.progress);
-          setStats({ 
-            processed: progressData.processed, 
-            total: progressData.total, 
-            inserted: progressData.processed 
-          });
-        },
-        periodoFaturamento
-      );
+      // Usar processamento otimizado para arquivos de volumetria grandes ou retroativos
+      const useOptimized = arquivoFonte.includes('retroativo') || file.size > 10 * 1024 * 1024; // >10MB
+      
+      const result = useOptimized 
+        ? await processVolumetriaOtimizado(
+            file,
+            arquivoFonte,
+            periodoFaturamento,
+            (progressData) => {
+              setProgress(progressData.progress);
+              setStats({ 
+                processed: progressData.processed, 
+                total: progressData.total, 
+                inserted: progressData.processed 
+              });
+            }
+          )
+        : await processVolumetriaFile(
+            file,
+            arquivoFonte,
+            (progressData) => {
+              setProgress(progressData.progress);
+              setStats({ 
+                processed: progressData.processed, 
+                total: progressData.total, 
+                inserted: progressData.processed 
+              });
+            },
+            periodoFaturamento
+          );
 
       if (result.success) {
+        const insertedCount = 'stats' in result ? result.stats?.inserted_count : result.totalInserted;
         toast({
           title: "Upload concluído!",
-          description: `${result.totalInserted} registros inseridos com sucesso.`,
+          description: `${insertedCount || 0} registros inseridos com sucesso.`,
         });
         onSuccess?.();
       } else {

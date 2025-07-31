@@ -141,7 +141,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       case 'volumetria_fora_padrao_retroativo':
         // Arquivo 4: Combinar regras 2 e 3
-        const dataLimite4 = new Date(REGRAS_PADRAO.arquivo4.dataLimiteMinima);
+        const dataLimite4 = new Date(REGRAS_PADRAO.arquivo3.dataLimiteMinima);
         
         // Remover registros muito antigos
         const { error: deleteError4 } = await supabase
