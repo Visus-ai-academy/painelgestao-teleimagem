@@ -350,7 +350,8 @@ export async function processVolumetriaFile(
     const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
       body: { 
         file_path: filePath,
-        arquivo_fonte: edgeFunctionSource
+        arquivo_fonte: edgeFunctionSource,
+        periodo: periodoFaturamento
       }
     });
 
