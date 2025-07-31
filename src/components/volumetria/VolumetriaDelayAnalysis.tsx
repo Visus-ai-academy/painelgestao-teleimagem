@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clock, AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 
 interface DelayData {
@@ -79,9 +80,25 @@ const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: nu
 };
 
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
-  // Top 10 clientes com mais atrasos
-  const topDelayClientes = data.clientes
+  // Calcular tempo médio de atraso por cliente
+  const clientesComTempoAtraso = data.clientes
     .filter(c => c.atrasados > 0)
+    .map(cliente => {
+      const atrasosCliente = data.atrasosComTempo?.filter(atraso => atraso.EMPRESA === cliente.nome) || [];
+      const tempoMedioAtraso = atrasosCliente.length > 0 
+        ? atrasosCliente.reduce((sum, atraso) => sum + atraso.tempoAtrasoMinutos, 0) / atrasosCliente.length 
+        : 0;
+      
+      const nivelAtraso = cliente.percentual_atraso >= 20 ? 'Crítico' :
+                         cliente.percentual_atraso >= 10 ? 'Alto' :
+                         cliente.percentual_atraso >= 5 ? 'Médio' : 'Baixo';
+      
+      return {
+        ...cliente,
+        tempoMedioAtraso,
+        nivelAtraso
+      };
+    })
     .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
     .slice(0, 10);
 
@@ -145,27 +162,56 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
       {/* Gráficos de Análise */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Clientes com Atrasos */}
+        {/* Top Clientes com Atrasos - Tabela */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Top 10 Clientes - Maior % de Atrasos</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topDelayClientes} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="nome" type="category" width={100} />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    `${value.toFixed(1)}%`, 
-                    'Taxa de Atraso'
-                  ]}
-                  labelFormatter={(label) => `Cliente: ${label}`}
-                />
-                <Bar dataKey="percentual_atraso" fill="#ef4444" />
-              </BarChart>
-            </ResponsiveContainer>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="text-center">Total</TableHead>
+                  <TableHead className="text-center">Atrasos</TableHead>
+                  <TableHead className="text-center">% Atraso</TableHead>
+                  <TableHead className="text-center">Tempo Médio</TableHead>
+                  <TableHead className="text-center">Nível</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clientesComTempoAtraso.map((cliente, index) => {
+                  const formatarTempo = (minutos: number) => {
+                    if (minutos < 60) return `${Math.round(minutos)}min`;
+                    if (minutos < 1440) return `${Math.round(minutos / 60)}h`;
+                    return `${Math.round(minutos / 1440)}d`;
+                  };
+                  
+                  return (
+                    <TableRow key={cliente.nome}>
+                      <TableCell className="font-medium">{cliente.nome}</TableCell>
+                      <TableCell className="text-center">{cliente.total_exames.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">{cliente.atrasados.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
+                          {cliente.percentual_atraso.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={
+                          cliente.nivelAtraso === 'Crítico' ? "destructive" :
+                          cliente.nivelAtraso === 'Alto' ? "secondary" :
+                          cliente.nivelAtraso === 'Médio' ? "outline" : "default"
+                        }>
+                          {cliente.nivelAtraso}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
@@ -247,7 +293,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topDelayClientes.map((cliente, index) => {
+              {clientesComTempoAtraso.map((cliente, index) => {
                 const category = categorizeDelay(cliente.percentual_atraso);
                 return (
                   <div key={cliente.nome} className={`p-3 rounded-lg ${category.bgColor}`}>
