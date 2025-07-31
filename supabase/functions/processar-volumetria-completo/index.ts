@@ -30,11 +30,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Baixar arquivo do storage
-    console.log(`📥 Baixando arquivo: ${file_path}`);
+    // Baixar arquivo do storage - remover prefixo "uploads/" se existir
+    const cleanFilePath = file_path.replace(/^uploads\//, '');
+    console.log(`📥 Baixando arquivo: ${file_path} -> ${cleanFilePath}`);
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
-      .download(file_path);
+      .download(cleanFilePath);
 
     if (downloadError) {
       console.error('❌ Erro no download:', downloadError);
