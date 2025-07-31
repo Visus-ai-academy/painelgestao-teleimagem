@@ -86,42 +86,26 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      // Usar processamento otimizado para arquivos de volumetria grandes ou retroativos
-      const useOptimized = true; // Sempre usar processamento otimizado para evitar limitações
-      
-      const result = useOptimized 
-        ? await processVolumetriaOtimizado(
-            file,
-            arquivoFonte,
-            periodoFaturamento,
-            (progressData) => {
-              setProgress(progressData.progress);
-              setStats({ 
-                processed: progressData.processed, 
-                total: progressData.total, 
-                inserted: progressData.processed 
-              });
-            }
-          )
-        : await processVolumetriaFile(
-            file,
-            arquivoFonte,
-            (progressData) => {
-              setProgress(progressData.progress);
-              setStats({ 
-                processed: progressData.processed, 
-                total: progressData.total, 
-                inserted: progressData.processed 
-              });
-            },
-            periodoFaturamento
-          );
+      // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
+      const result = await processVolumetriaOtimizado(
+        file,
+        arquivoFonte,
+        periodoFaturamento,
+        (progressData) => {
+          setProgress(progressData.progress);
+          setStats({ 
+            processed: progressData.processed, 
+            total: progressData.total, 
+            inserted: progressData.processed 
+          });
+        }
+      );
 
       if (result.success) {
-        const insertedCount = 'stats' in result ? result.stats?.inserted_count : result.totalInserted;
+        const insertedCount = result.stats?.inserted_count || 0;
         toast({
           title: "Upload concluído!",
-          description: `${insertedCount || 0} registros inseridos com sucesso.`,
+          description: `${insertedCount} registros inseridos com sucesso.`,
         });
         onSuccess?.();
       } else {
