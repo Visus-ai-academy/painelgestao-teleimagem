@@ -13,16 +13,12 @@ import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-// Função para obter filtros padrão para o mês atual
+// Função para obter filtros padrão - SEM FILTRO DE DATA
 const getDefaultFilters = (): VolumetriaFilters => {
-  const now = new Date();
-  const currentYear = now.getFullYear().toString();
-  const currentMonth = (now.getMonth() + 1).toString();
-  
   return {
-    ano: currentYear,
+    ano: 'todos',
     trimestre: 'todos',
-    mes: currentMonth,
+    mes: 'todos',
     semana: 'todos',
     dia: 'todos',
     dataEspecifica: null,

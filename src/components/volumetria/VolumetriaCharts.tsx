@@ -35,162 +35,147 @@ interface VolumetriaChartsProps {
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export function VolumetriaCharts({ clientes, modalidades, especialidades, categorias, prioridades }: VolumetriaChartsProps) {
+  // Filtrando apenas dados válidos
+  const topClientes = clientes.slice(0, 10);
+  const topModalidades = modalidades.slice(0, 8);
+  const topEspecialidades = especialidades.slice(0, 10);
+
   return (
-    <>
-      {/* Gráficos Principais */}
+    <div className="space-y-6">
+      {/* Gráficos de Volume (sem misturar com %) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top 10 Clientes */}
+        {/* Top 10 Clientes - Somente Volume */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Top 10 Clientes por Volume
+              Top 10 Clientes - Volume de Laudos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={clientes.slice(0, 10)}>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={topClientes} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="nome" 
-                  tick={{fontSize: 10}}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={100}
+                  fontSize={11}
                 />
-                <YAxis />
+                <YAxis 
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
                 <Tooltip 
-                  formatter={(value, name) => [
-                    typeof value === 'number' ? value.toLocaleString() : value,
-                    name === 'total_exames' ? 'Exames' : 'Registros'
-                  ]}
+                  formatter={(value: number) => [value.toLocaleString(), "Laudos"]}
+                  labelFormatter={(label) => `Cliente: ${label}`}
                 />
-                <Legend />
-                <Bar dataKey="total_exames" fill="#3b82f6" name="Exames" />
-                <Bar dataKey="total_registros" fill="#10b981" name="Registros" />
+                <Bar dataKey="total_exames" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Top Modalidades */}
+        {/* Top 8 Modalidades - Somente Volume */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Distribuição por Modalidade
+              Top 8 Modalidades - Volume de Laudos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={topModalidades} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="nome" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  fontSize={11}
+                />
+                <YAxis 
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [value.toLocaleString(), "Laudos"]}
+                  labelFormatter={(label) => `Modalidade: ${label}`}
+                />
+                <Bar dataKey="total_exames" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Segunda linha - Especialidades e Distribuição Percentual */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top 10 Especialidades - Somente Volume */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Top 10 Especialidades - Volume de Laudos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={topEspecialidades} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="nome" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  fontSize={11}
+                />
+                <YAxis 
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [value.toLocaleString(), "Laudos"]}
+                  labelFormatter={(label) => `Especialidade: ${label}`}
+                />
+                <Bar dataKey="total_exames" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Distribuição Percentual - Gráfico de Pizza Separado */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Distribuição Percentual - Modalidades
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
-                  data={modalidades.slice(0, 8)}
+                  data={topModalidades}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
                   label={({nome, percentual}) => `${nome}: ${percentual.toFixed(1)}%`}
-                  outerRadius={80}
+                  outerRadius={100}
                   fill="#8884d8"
-                  dataKey="total_exames"
+                  dataKey="percentual"
                 >
-                  {modalidades.slice(0, 8).map((entry, index) => (
+                  {topModalidades.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']} />
+                <Tooltip 
+                  formatter={(value: number) => [`${value.toFixed(1)}%`, "Participação"]}
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
-
-      {/* Gráficos de Barras */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Especialidades */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Top 10 Especialidades
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={especialidades.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="nome" 
-                  tick={{fontSize: 10}}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
-                />
-                <Bar dataKey="total_exames" fill="#8b5cf6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Top Categorias */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Top 10 Categorias
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={categorias.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="nome" 
-                  tick={{fontSize: 10}}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
-                />
-                <Bar dataKey="total_exames" fill="#06b6d4" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Prioridades */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Distribuição por Prioridade
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={prioridades}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="nome" 
-                tick={{fontSize: 12}}
-              />
-              <YAxis />
-              <Tooltip 
-                formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
-              />
-              <Bar dataKey="total_exames" fill="#f97316" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    </>
+    </div>
   );
 }

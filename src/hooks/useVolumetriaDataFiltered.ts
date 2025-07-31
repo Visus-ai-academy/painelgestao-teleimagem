@@ -130,18 +130,18 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     try {
       let query = supabase.from('volumetria_mobilemed').select(`
         EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
-        VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, data_referencia
+        VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
       `);
       
       const { startDate, endDate } = buildDateFilter();
       if (startDate && endDate) {
-        query = query.gte('data_referencia', startDate).lte('data_referencia', endDate);
+        // Usar DATA_LAUDO como prioridade, senão DATA_REALIZACAO
+        query = query.gte('DATA_LAUDO', startDate).lte('DATA_LAUDO', endDate);
       }
 
       if (filters.cliente !== 'todos') query = query.eq('EMPRESA', filters.cliente);
       if (filters.modalidade !== 'todos') query = query.eq('MODALIDADE', filters.modalidade);
       if (filters.especialidade !== 'todos') query = query.eq('ESPECIALIDADE', filters.especialidade);
-      // Categoria e prioridade não existem na tabela atual
       if (filters.medico !== 'todos') query = query.eq('MEDICO', filters.medico);
 
       const { data: rawData, error } = await query;
@@ -207,17 +207,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           modalidadesMap.set(item.MODALIDADE, current);
         }
 
-        // Demais campos...
-        ['ESPECIALIDADE', 'CATEGORIA', 'PRIORIDADE'].forEach(field => {
-          const map = field === 'ESPECIALIDADE' ? especialidadesMap : field === 'CATEGORIA' ? categoriasMap : prioridadesMap;
-          if (item[field]) {
-            const current = map.get(item[field]) || { total_exames: 0, total_registros: 0, atrasados: 0 };
-            current.total_exames += item.VALORES || 0;
-            current.total_registros += 1;
-            if (isAtrasado) current.atrasados += 1;
-            map.set(item[field], current);
-          }
-        });
+        // Especialidades apenas
+        if (item.ESPECIALIDADE) {
+          const current = especialidadesMap.get(item.ESPECIALIDADE) || { total_exames: 0, total_registros: 0, atrasados: 0 };
+          current.total_exames += item.VALORES || 0;
+          current.total_registros += 1;
+          if (isAtrasado) current.atrasados += 1;
+          especialidadesMap.set(item.ESPECIALIDADE, current);
+        }
 
         if (item.MEDICO) medicosSet.add(item.MEDICO);
       });
@@ -237,15 +234,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      const categorias = Array.from(categoriasMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalExames > 0 ? (data.total_exames / totalExames) * 100 : 0,
-        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
-      })).sort((a, b) => b.total_exames - a.total_exames);
-
-      const prioridades = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalExames > 0 ? (data.total_exames / totalExames) * 100 : 0,
-        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
-      })).sort((a, b) => b.total_exames - a.total_exames);
+      // Categorias e prioridades vazias (não existem na tabela atual)
+      const categorias: any[] = [];
+      const prioridades: any[] = [];
 
       setData({
         stats: {
@@ -257,15 +248,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           total_modalidades: modalidadesMap.size,
           total_especialidades: especialidadesMap.size,
           total_medicos: medicosSet.size,
-          total_categorias: categoriasMap.size,
-          total_prioridades: prioridadesMap.size
+          total_categorias: 0,
+          total_prioridades: 0
         },
         clientes, modalidades, especialidades, categorias, prioridades,
         atrasoClientes: clientes.filter(c => c.atrasados > 0),
         atrasoModalidades: modalidades.filter(m => m.atrasados && m.atrasados > 0),
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),
-        atrasoCategorias: categorias.filter(c => c.atrasados && c.atrasados > 0),
-        atrasoPrioridades: prioridades.filter(p => p.atrasados && p.atrasados > 0)
+        atrasoCategorias: [],
+        atrasoPrioridades: []
       });
 
     } catch (error) {

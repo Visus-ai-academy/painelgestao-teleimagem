@@ -82,13 +82,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       console.log('🔄 Carregando opções dos filtros...');
 
       // Buscar todos os dados únicos em paralelo
-      const [anosRes, clientesRes, modalidadesRes, especialidadesRes, prioridadesRes, medicosRes] = await Promise.all([
-        // Anos únicos baseados em data_referencia
-        supabase
-          .from('volumetria_mobilemed')
-          .select('data_referencia')
-          .not('data_referencia', 'is', null),
-        
+      const [clientesRes, modalidadesRes, especialidadesRes, medicosRes] = await Promise.all([
         // Clientes únicos - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
@@ -107,12 +101,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           .select('ESPECIALIDADE')
           .not('ESPECIALIDADE', 'is', null),
         
-        // Prioridades únicas - SEM LIMITE
-        supabase
-          .from('volumetria_mobilemed')
-          .select('PRIORIDADE')
-          .not('PRIORIDADE', 'is', null),
-        
         // Médicos únicos - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
@@ -120,18 +108,22 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           .not('MEDICO', 'is', null)
       ]);
 
-      // Processar anos únicos
+      // Processar anos únicos das datas disponíveis
+      const anosDataLaudo = await supabase
+        .from('volumetria_mobilemed')
+        .select('DATA_LAUDO')
+        .not('DATA_LAUDO', 'is', null);
+      
       const anosUnicos = [...new Set(
-        (anosRes.data || [])
-          .map(item => item.data_referencia ? new Date(item.data_referencia).getFullYear().toString() : null)
+        (anosDataLaudo.data || [])
+          .map(item => item.DATA_LAUDO ? new Date(item.DATA_LAUDO).getFullYear().toString() : null)
           .filter(Boolean)
-      )].sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+      )].sort((a, b) => parseInt(b) - parseInt(a)); // Mais recente primeiro
 
       // Processar outros dados únicos
       const clientesUnicos = [...new Set((clientesRes.data || []).map(item => item.EMPRESA).filter(Boolean))].sort();
       const modalidadesUnicas = [...new Set((modalidadesRes.data || []).map(item => item.MODALIDADE).filter(Boolean))].sort();
       const especialidadesUnicas = [...new Set((especialidadesRes.data || []).map(item => item.ESPECIALIDADE).filter(Boolean))].sort();
-      const prioridadesUnicas = [...new Set((prioridadesRes.data || []).map(item => item.PRIORIDADE).filter(Boolean))].sort();
       const medicosUnicos = [...new Set((medicosRes.data || []).map(item => item.MEDICO).filter(Boolean))].sort();
 
       setOptions({
@@ -139,7 +131,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         clientes: clientesUnicos,
         modalidades: modalidadesUnicas,
         especialidades: especialidadesUnicas,
-        prioridades: prioridadesUnicas,
+        prioridades: [], // Não existe na tabela atual
         medicos: medicosUnicos
       });
 
@@ -148,7 +140,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         clientes: clientesUnicos.length,
         modalidades: modalidadesUnicas.length,
         especialidades: especialidadesUnicas.length,
-        prioridades: prioridadesUnicas.length,
         medicos: medicosUnicos.length
       });
 
