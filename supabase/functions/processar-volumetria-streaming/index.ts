@@ -190,7 +190,7 @@ async function initializeProcessing(requestData: any, supabaseClient: any) {
       arquivo_nome: file_path,
       tipo_arquivo: arquivo_fonte,
       tipo_dados: 'volumetria',
-      status: 'processando',
+      status: 'pendente',
       registros_processados: 0,
       registros_inseridos: 0,
       registros_atualizados: 0,
