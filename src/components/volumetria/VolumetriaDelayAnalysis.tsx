@@ -126,9 +126,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       
       return sortDirection === 'asc' 
         ? (fieldA as number) - (fieldB as number)
-        : (fieldB as number) - (fieldA as number);
-    })
-    .slice(0, 10);
+      : (fieldB as number) - (fieldA as number);
+    });
 
   // Função para renderizar ícone de ordenação
   const renderSortIcon = (field: typeof sortField) => {
@@ -203,7 +202,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         {/* Top Clientes com Atrasos - Tabela */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Top 10 Clientes - Maior quant. ou % de Atrasos</CardTitle>
+            <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
