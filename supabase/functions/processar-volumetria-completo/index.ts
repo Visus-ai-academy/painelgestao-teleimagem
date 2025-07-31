@@ -48,28 +48,51 @@ serve(async (req) => {
 
     console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
-    // Processar Excel de forma otimizada
+    // Processar Excel de forma ultra otimizada para máxima economia de memória
     const arrayBuffer = await fileData.arrayBuffer();
     
-    // Configurações otimizadas para reduzir uso de memória
+    // Usar apenas a quantidade mínima de memória necessária
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
       cellDates: false,
-      dense: false,  // Usar sparse para economizar memória
+      dense: true,  // Usar dense para economizar memória
       bookSST: false,
-      raw: true
+      raw: false,  // Não raw para economizar processamento
+      sheetRows: start_row + batch_size + 1  // Ler apenas as linhas necessárias
     });
 
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
-    // Obter range da planilha
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:Z1000');
-    const totalRows = range.e.r; // Total de linhas incluindo cabeçalho
+    // Se não há dados na planilha na faixa especificada
+    if (!worksheet || !worksheet['!ref']) {
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Processamento concluído - não há mais dados",
+        batch_info: {
+          start_row,
+          end_row: start_row,
+          batch_size: 0,
+          total_records: 0,
+          inserted: 0,
+          errors: 0,
+          de_para_updated: 0,
+          progress_percent: 100,
+          has_more: false,
+          next_start_row: null
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
+    // Obter apenas o range necessário
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    const totalRows = range.e.r;
     
     console.log(`📊 Total de linhas detectadas: ${totalRows}`);
     
     if (start_row >= totalRows - 1) {
-      // Não há mais dados para processar
       return new Response(JSON.stringify({
         success: true,
         message: "Processamento concluído - não há mais dados",
@@ -91,29 +114,41 @@ serve(async (req) => {
       });
     }
 
-    // Calcular range do batch atual
-    const actualStartRow = start_row + 1; // +1 para pular cabeçalho
+    // Processar apenas o batch ultra pequeno
+    const actualStartRow = start_row + 1;
     const endRow = Math.min(actualStartRow + batch_size, totalRows);
     
     console.log(`📦 Processando linhas ${actualStartRow} a ${endRow - 1}`);
     
-    // Extrair cabeçalhos (primeira linha)
-    const headerData = XLSX.utils.sheet_to_json(worksheet, { 
-      range: 0, // Apenas primeira linha
-      header: 1
-    })[0] as string[];
+    // Extrair dados do batch linha por linha para economizar memória
+    const batchData = [];
+    for (let rowIndex = actualStartRow; rowIndex < endRow; rowIndex++) {
+      const row: any = {};
+      // Ler apenas as colunas essenciais para economizar memória
+      const essentialColumns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
+      
+      for (let colIndex = 0; colIndex < essentialColumns.length; colIndex++) {
+        const cellRef = essentialColumns[colIndex] + (rowIndex + 1);
+        const cell = worksheet[cellRef];
+        if (cell) {
+          // Mapear para nomes de colunas conhecidos
+          const columnNames = ['EMPRESA', 'NOME_PACIENTE', 'CODIGO_PACIENTE', 'ESTUDO_DESCRICAO', 
+                              'ACCESSION_NUMBER', 'MODALIDADE', 'PRIORIDADE', 'ESPECIALIDADE', 
+                              'MEDICO', 'VALORES', 'DATA_REALIZACAO'];
+          if (columnNames[colIndex]) {
+            row[columnNames[colIndex]] = cell.v;
+          }
+        }
+      }
+      
+      if (row['EMPRESA'] || row['NOME_PACIENTE']) {
+        batchData.push(row);
+      }
+    }
     
-    // Extrair dados do batch específico
-    const batchData = XLSX.utils.sheet_to_json(worksheet, { 
-      range: `${actualStartRow}:${endRow - 1}`,
-      header: 1,
-      raw: true,
-      defval: null
-    });
-
     console.log(`✅ Batch carregado: ${batchData.length} registros`);
-
-    // Processar dados do batch
+    
+    // Extrair dados linha por linha para economizar memória
     const loteUpload = `${arquivo_fonte}_batch_${Math.floor(start_row / batch_size)}_${Date.now()}`;
     const periodoReferencia = new Date().toISOString().substring(0, 7);
 
@@ -121,7 +156,7 @@ serve(async (req) => {
     let errors = 0;
 
     // Processar registros em mini-batches muito pequenos para evitar sobrecarga
-    const miniBatchSize = 5; // Ultra pequeno: apenas 5 registros por vez
+    const miniBatchSize = 3; // Ainda menor: apenas 3 registros por vez
     for (let i = 0; i < batchData.length; i += miniBatchSize) {
       const miniBatch = batchData.slice(i, i + miniBatchSize);
       const records = [];
