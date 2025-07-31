@@ -157,145 +157,177 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
   }
 }
 
-// Função otimizada para processamento de arquivos grandes
-async function processLargeFile(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
-  console.log(`=== PROCESSAMENTO OTIMIZADO PARA ARQUIVOS GRANDES ===`);
+// Função super otimizada para arquivos grandes
+async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
+  console.log(`=== PROCESSAMENTO SUPER OTIMIZADO ===`);
   console.log(`Total de registros: ${jsonData.length}`);
   
   if (jsonData.length === 0) {
     throw new Error('Arquivo Excel está vazio');
   }
 
-  // Configurações otimizadas
-  const CHUNK_SIZE = 1000; // Processar 1000 registros por vez
-  const BATCH_SIZE = 100;  // Inserir 100 registros por batch
-  const MAX_EXECUTION_TIME = 8000; // 8 segundos de segurança
+  // Configurações ultra otimizadas para arquivos grandes
+  const CHUNK_SIZE = Math.min(500, jsonData.length); // Chunks menores
+  const BATCH_SIZE = 50;  // Batches menores para inserção mais rápida
+  const MAX_EXECUTION_TIME = 6000; // 6 segundos de segurança
   
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
   const startTime = Date.now();
 
-  // Processar em chunks para evitar timeout
+  // Processar em chunks menores para evitar timeout
   for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
-    // Verificar tempo de execução
-    if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-      console.log(`Timeout preventivo atingido após ${totalProcessed} registros`);
+    // Verificar tempo de execução mais rigorosamente
+    const currentTime = Date.now();
+    if (currentTime - startTime > MAX_EXECUTION_TIME) {
+      console.log(`⏰ Timeout preventivo após ${totalProcessed} registros em ${currentTime - startTime}ms`);
       break;
     }
 
     const chunk = jsonData.slice(chunkStart, chunkStart + CHUNK_SIZE);
-    console.log(`Processando chunk ${Math.floor(chunkStart / CHUNK_SIZE) + 1}: ${chunk.length} registros`);
+    const chunkNumber = Math.floor(chunkStart / CHUNK_SIZE) + 1;
+    const totalChunks = Math.ceil(jsonData.length / CHUNK_SIZE);
+    
+    console.log(`📦 Chunk ${chunkNumber}/${totalChunks}: ${chunk.length} registros`);
 
-    // Processar chunk em batches menores
-    for (let i = 0; i < chunk.length; i += BATCH_SIZE) {
-      const batch = chunk.slice(i, i + BATCH_SIZE);
-      const validRecords: VolumetriaRecord[] = [];
-      
-      // Processamento sequencial rápido
-      for (const row of batch) {
-        try {
-          const record = processRow(row, arquivo_fonte);
-          if (record) {
-            validRecords.push(record);
-          } else {
-            totalErrors++;
-          }
-        } catch (error) {
+    // Processamento ultra-rápido do chunk
+    const allRecords: VolumetriaRecord[] = [];
+    
+    // Processar todas as linhas do chunk de uma vez
+    for (const row of chunk) {
+      try {
+        const record = processRow(row, arquivo_fonte);
+        if (record && record.EMPRESA && record.NOME_PACIENTE) {
+          allRecords.push(record);
+        } else {
           totalErrors++;
         }
-        totalProcessed++;
+      } catch (error) {
+        totalErrors++;
       }
+      totalProcessed++;
+    }
+    
+    // Inserção em batches pequenos e rápidos
+    for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
+      const batch = allRecords.slice(i, i + BATCH_SIZE);
       
-      // Inserção otimizada
-      if (validRecords.length > 0) {
-        try {
-          const { error: insertError } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(validRecords);
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(batch);
 
-          if (insertError) {
-            console.error('Erro na inserção:', insertError.message);
-            totalErrors += validRecords.length;
-          } else {
-            totalInserted += validRecords.length;
-          }
-        } catch (batchErr) {
-          console.error('Erro no batch:', batchErr);
-          totalErrors += validRecords.length;
+        if (insertError) {
+          console.error(`❌ Erro inserção batch ${i}: ${insertError.message}`);
+          totalErrors += batch.length;
+        } else {
+          totalInserted += batch.length;
         }
+      } catch (batchErr) {
+        console.error(`❌ Erro batch ${i}:`, batchErr);
+        totalErrors += batch.length;
       }
     }
 
-    // Atualizar progresso a cada chunk
-    try {
-      await supabaseClient
-        .from('processamento_uploads')
-        .update({ 
-          registros_processados: totalProcessed,
-          registros_inseridos: totalInserted,
-          registros_erro: totalErrors,
-          detalhes_erro: JSON.stringify({
-            status: 'Processando',
-            progresso: `${Math.round((totalProcessed / jsonData.length) * 100)}%`,
-            chunk_atual: Math.floor(chunkStart / CHUNK_SIZE) + 1,
-            total_chunks: Math.ceil(jsonData.length / CHUNK_SIZE),
-            tempo_execucao: `${Math.round((Date.now() - startTime) / 1000)}s`
+    // Atualizar progresso menos frequentemente para ganhar tempo
+    if (chunkNumber % 2 === 0 || chunkNumber === totalChunks) {
+      try {
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({ 
+            registros_processados: totalProcessed,
+            registros_inseridos: totalInserted,
+            registros_erro: totalErrors,
+            detalhes_erro: JSON.stringify({
+              status: 'Processando Rápido',
+              progresso: `${Math.round((totalProcessed / jsonData.length) * 100)}%`,
+              chunk: `${chunkNumber}/${totalChunks}`,
+              tempo: `${Math.round((Date.now() - startTime) / 1000)}s`,
+              taxa: `${Math.round(totalProcessed / ((Date.now() - startTime) / 1000))}/s`
+            })
           })
-        })
-        .eq('id', uploadLogId);
-    } catch (updateErr) {
-      console.error('Erro ao atualizar progresso:', updateErr);
+          .eq('id', uploadLogId);
+      } catch (updateErr) {
+        // Ignorar erros de update para ganhar tempo
+      }
     }
   }
 
   const executionTime = Date.now() - startTime;
-  console.log(`Processamento concluído em ${executionTime}ms: ${totalInserted} inseridos, ${totalErrors} erros`);
+  console.log(`✅ Processamento: ${totalInserted} inseridos, ${totalErrors} erros em ${executionTime}ms`);
   
-  // Aplicar regras de negócio
+  // Aplicar regras de negócio apenas se houver dados inseridos
   let registrosAtualizadosDePara = 0;
-  if (totalInserted > 0) {
+  if (totalInserted > 0 && executionTime < MAX_EXECUTION_TIME) {
     try {
-      console.log('Aplicando regras de negócio...');
+      console.log('🔧 Aplicando regras...');
+      
+      // Aplicar regras em paralelo quando possível
+      const regrasPromises = [];
       
       if (arquivo_fonte === 'volumetria_fora_padrao') {
-        const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
-        registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
-        console.log(`De-Para valores aplicado: ${deParaResult?.registros_atualizados || 0} registros`);
+        regrasPromises.push(
+          supabaseClient.rpc('aplicar_valores_de_para').then(result => {
+            console.log(`✅ De-Para valores: ${result.data?.registros_atualizados || 0}`);
+            return result.data?.registros_atualizados || 0;
+          })
+        );
       }
 
-      const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
-      registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
-      console.log(`De-Para prioridade aplicado: ${prioridadeResult?.registros_atualizados || 0} registros`);
+      regrasPromises.push(
+        supabaseClient.rpc('aplicar_de_para_prioridade').then(result => {
+          console.log(`✅ De-Para prioridade: ${result.data?.registros_atualizados || 0}`);
+          return result.data?.registros_atualizados || 0;
+        })
+      );
+      
+      const resultados = await Promise.all(regrasPromises);
+      registrosAtualizadosDePara = resultados.reduce((acc, val) => acc + val, 0);
       
     } catch (regraErr) {
-      console.error('Erro ao aplicar regras:', regraErr);
+      console.error('❌ Erro regras:', regraErr);
     }
   }
 
-  // Finalizar processamento
+  // Finalizar com status adequado
   const isComplete = totalProcessed >= jsonData.length;
+  const finalStatus = isComplete 
+    ? (totalInserted > 0 ? 'concluido' : 'erro')
+    : 'processamento_parcial';
+
   await supabaseClient
     .from('processamento_uploads')
     .update({
-      status: isComplete ? (totalInserted > 0 ? 'concluido' : 'erro') : 'processamento_parcial',
+      status: finalStatus,
       registros_processados: totalProcessed,
       registros_inseridos: totalInserted,
       registros_atualizados: registrosAtualizadosDePara,
       registros_erro: totalErrors,
       completed_at: isComplete ? new Date().toISOString() : null,
       detalhes_erro: JSON.stringify({
-        status: isComplete ? 'Concluído' : 'Processamento Parcial',
-        total_arquivo: jsonData.length,
+        status: isComplete ? 'Concluído' : 'Parcial - Timeout',
+        arquivo_tamanho: jsonData.length,
         processados: totalProcessed,
         inseridos: totalInserted,
         atualizados: registrosAtualizadosDePara,
         erros: totalErrors,
-        tempo_execucao: `${Math.round(executionTime / 1000)}s`,
-        completo: isComplete
+        tempo_ms: executionTime,
+        taxa_por_segundo: Math.round(totalProcessed / (executionTime / 1000)),
+        completo: isComplete,
+        motivo_parada: isComplete ? 'Arquivo completo' : 'Timeout preventivo'
       })
     })
     .eq('id', uploadLogId);
+
+  return {
+    totalProcessed,
+    totalInserted,
+    totalErrors,
+    registrosAtualizadosDePara,
+    isComplete,
+    executionTime
+  };
 }
 
 serve(async (req) => {
@@ -306,7 +338,7 @@ serve(async (req) => {
   try {
     const { file_path, arquivo_fonte } = await req.json();
 
-    console.log('=== PROCESSAR VOLUMETRIA MOBILEMED OTIMIZADO ===');
+    console.log('=== PROCESSAR VOLUMETRIA MOBILEMED ===');
     console.log('Arquivo:', file_path);
     console.log('Fonte:', arquivo_fonte);
 
@@ -357,14 +389,15 @@ serve(async (req) => {
 
     console.log('Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel de forma otimizada
+    // Ler Excel com configurações ultra otimizadas
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
       cellDates: false,
       cellNF: false, 
       cellHTML: false,
-      dense: true // Otimização para arquivos grandes
+      dense: true, // Otimização para arquivos grandes
+      sheetRows: 100000 // Limitar linhas para evitar overflow
     });
     
     if (!workbook.SheetNames.length) {
@@ -375,19 +408,29 @@ serve(async (req) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
       raw: true,
-      dateNF: 'dd/mm/yyyy'
+      dateNF: 'dd/mm/yyyy',
+      blankrows: false // Pular linhas vazias
     });
     
     console.log(`Dados extraídos: ${jsonData.length} linhas`);
     
-    // Processar com nova função otimizada
-    await processLargeFile(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
+    // Processar com função super otimizada
+    const resultado = await processLargeFileOptimized(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Processamento concluído com otimizações",
-        upload_log_id: uploadLog.id
+        message: resultado.isComplete ? "Processamento concluído" : "Processamento parcial (timeout)",
+        upload_log_id: uploadLog.id,
+        stats: {
+          total_arquivo: jsonData.length,
+          processados: resultado.totalProcessed,
+          inseridos: resultado.totalInserted,
+          atualizados: resultado.registrosAtualizadosDePara,
+          erros: resultado.totalErrors,
+          completo: resultado.isComplete,
+          tempo_ms: resultado.executionTime
+        }
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
