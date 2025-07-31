@@ -1791,7 +1791,7 @@ export type Database = {
           tamanho_arquivo?: number | null
           tempo_processamento?: unknown | null
           tipo_arquivo: string
-          tipo_dados: string
+          tipo_dados?: string
         }
         Update: {
           arquivo_nome?: string

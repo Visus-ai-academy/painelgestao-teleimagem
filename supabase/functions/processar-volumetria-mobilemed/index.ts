@@ -370,6 +370,10 @@ async function processFileInBackground(
     if (totalInserted > 0) {
       console.log('Aplicando regras de tratamento específicas...');
       try {
+        // Definir URLs para chamada da função
+        const supabaseUrl = 'https://atbvikgxdcohnznkmaus.supabase.co';
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        
         // Chamar função para aplicar regras de tratamento
         const response = await fetch(`${supabaseUrl}/functions/v1/aplicar-regras-tratamento`, {
           method: 'POST',
