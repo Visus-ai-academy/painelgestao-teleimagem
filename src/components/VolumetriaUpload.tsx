@@ -90,14 +90,15 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       // Limpar uploads travados antes de iniciar novo processamento
       console.log('🧹 Verificando uploads travados...');
       try {
-        await supabase.functions.invoke('limpar-uploads-travados');
-        console.log('✅ Uploads travados limpos');
+        const { data: cleanResult } = await supabase.functions.invoke('limpar-uploads-travados');
+        console.log('✅ Resultado limpeza uploads:', cleanResult);
       } catch (cleanError) {
         console.warn('⚠️ Aviso na limpeza de uploads:', cleanError);
-        // Continuar mesmo se a limpeza falhar
       }
 
-      // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
+      console.log(`🚀 Iniciando processamento para ${arquivoFonte}...`);
+      
+      // SEMPRE usar processamento otimizado
       const result = await processVolumetriaOtimizado(
         file,
         arquivoFonte,

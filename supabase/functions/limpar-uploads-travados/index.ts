@@ -20,8 +20,8 @@ serve(async (req) => {
 
     console.log('🧹 Limpando uploads travados...');
 
-    // Limpar uploads que estão em "processando" há mais de 30 minutos
-    const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    // Limpar uploads que estão em "processando" há mais de 10 minutos (tempo mais curto)
+    const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     
     const { data: uploadsAntigos, error: selectError } = await supabaseClient
       .from('processamento_uploads')

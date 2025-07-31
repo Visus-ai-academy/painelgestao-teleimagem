@@ -167,6 +167,11 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       record.data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
     }
 
+    // Log especial apenas para o primeiro registro de arquivos retroativos
+    if (arquivoFonte.includes('retroativo') && loteUpload.endsWith('_0')) {
+      console.log(`📅 Primeiro registro retroativo - Data referência: ${record.data_referencia}`);
+    }
+
     return record;
   } catch (error) {
     console.error('Erro ao processar linha:', error);
@@ -185,6 +190,12 @@ serve(async (req) => {
     console.log('🚀 PROCESSAMENTO OTIMIZADO INICIADO');
     console.log('📁 Arquivo:', file_path);
     console.log('🏷️ Fonte:', arquivo_fonte);
+    console.log('🗓️ Período:', periodo);
+    
+    // Log especial para arquivos retroativos
+    if (arquivo_fonte.includes('retroativo')) {
+      console.log('⚠️ ARQUIVO RETROATIVO DETECTADO - Processamento especial ativado');
+    }
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
