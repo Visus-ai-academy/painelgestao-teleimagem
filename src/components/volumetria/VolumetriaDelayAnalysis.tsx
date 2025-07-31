@@ -4,7 +4,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
+import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { useState } from "react";
 
 interface DelayData {
   nome: string;
@@ -80,6 +81,20 @@ const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: nu
 };
 
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
+  // Estado para controle de ordenação
+  const [sortField, setSortField] = useState<'nome' | 'total_exames' | 'atrasados' | 'percentual_atraso' | 'tempoMedioAtraso'>('atrasados');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Função para alternar ordenação
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
   // Calcular tempo médio de atraso por cliente
   const clientesComTempoAtraso = data.clientes
     .filter(c => c.atrasados > 0)
@@ -99,8 +114,31 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         nivelAtraso
       };
     })
-    .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
+    .sort((a, b) => {
+      const fieldA = a[sortField];
+      const fieldB = b[sortField];
+      
+      if (typeof fieldA === 'string' && typeof fieldB === 'string') {
+        return sortDirection === 'asc' 
+          ? fieldA.localeCompare(fieldB)
+          : fieldB.localeCompare(fieldA);
+      }
+      
+      return sortDirection === 'asc' 
+        ? (fieldA as number) - (fieldB as number)
+        : (fieldB as number) - (fieldA as number);
+    })
     .slice(0, 10);
+
+  // Função para renderizar ícone de ordenação
+  const renderSortIcon = (field: typeof sortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-blue-600" />
+      : <ArrowDown className="h-4 w-4 text-blue-600" />;
+  };
 
   // Top 5 modalidades com mais atrasos
   const topDelayModalidades = data.modalidades
@@ -165,17 +203,57 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         {/* Top Clientes com Atrasos - Tabela */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Top 10 Clientes - Maior % de Atrasos</CardTitle>
+            <CardTitle className="text-lg">Top 10 Clientes - Maior quant. ou % de Atrasos</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-center">Atrasos</TableHead>
-                  <TableHead className="text-center">% Atraso</TableHead>
-                  <TableHead className="text-center">Tempo Médio</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('nome')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Cliente
+                      {renderSortIcon('nome')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-center cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('total_exames')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Total
+                      {renderSortIcon('total_exames')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-center cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('atrasados')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Atrasos
+                      {renderSortIcon('atrasados')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-center cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('percentual_atraso')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      % Atraso
+                      {renderSortIcon('percentual_atraso')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-center cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('tempoMedioAtraso')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Tempo Médio
+                      {renderSortIcon('tempoMedioAtraso')}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-center">Nível</TableHead>
                 </TableRow>
               </TableHeader>
