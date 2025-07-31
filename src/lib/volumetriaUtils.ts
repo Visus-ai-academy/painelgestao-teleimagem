@@ -111,7 +111,7 @@ export async function processVolumetriaFile(
     console.log('Arquivo enviado com sucesso, iniciando processamento...');
 
     // Chamar a nova edge function de processamento streaming
-    const { data, error } = await supabase.functions.invoke('processar-volumetria-streaming', {
+    const { data, error } = await supabase.functions.invoke('processar-volumetria-simples', {
       body: { 
         file_path: filePath,
         arquivo_fonte: arquivoFonte,
