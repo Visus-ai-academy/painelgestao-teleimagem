@@ -204,9 +204,11 @@ async function initializeProcessing(requestData: any, supabaseClient: any) {
 
   // Baixar e ler arquivo COMPLETO para obter total de linhas
   console.log('📖 Lendo arquivo para análise inicial...');
+  // Remove "uploads/" prefix if present
+  const cleanFilePath = file_path.replace(/^uploads\//, '');
   const { data: fileData, error: downloadError } = await supabaseClient.storage
     .from('uploads')
-    .download(file_path);
+    .download(cleanFilePath);
 
   if (downloadError) throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
 
@@ -316,6 +318,7 @@ async function processBatch(state: ProcessingState, jsonData: any[], supabaseCli
         errorCount += subBatch.length;
       } else {
         insertedCount += subBatch.length;
+        console.log(`✅ Sub-batch ${Math.floor(i/subBatchSize) + 1} inserido: ${subBatch.length} registros`);
       }
     } catch (batchErr) {
       console.error(`❌ Erro crítico no sub-batch ${i}:`, batchErr);
@@ -330,13 +333,22 @@ async function processBatch(state: ProcessingState, jsonData: any[], supabaseCli
   const progress = Math.round((state.processed_rows / state.total_rows) * 100);
   const isComplete = state.processed_rows >= state.total_rows;
 
-  // Atualizar log de progresso
+  // Atualizar log de progresso com dados acumulados
+  const { data: currentLog } = await supabaseClient
+    .from('processamento_uploads')
+    .select('registros_inseridos, registros_erro')
+    .eq('id', state.upload_log_id)
+    .single();
+
+  const totalInserted = (currentLog?.registros_inseridos || 0) + insertedCount;
+  const totalErrors = (currentLog?.registros_erro || 0) + errorCount;
+
   await supabaseClient
     .from('processamento_uploads')
     .update({
       registros_processados: state.processed_rows,
-      registros_inseridos: insertedCount,
-      registros_erro: errorCount,
+      registros_inseridos: totalInserted,
+      registros_erro: totalErrors,
       status: isComplete ? 'processando' : 'processando',
       detalhes_erro: JSON.stringify({
         status: isComplete ? 'Finalizando Processamento' : 'Processamento em Andamento',
@@ -345,14 +357,16 @@ async function processBatch(state: ProcessingState, jsonData: any[], supabaseCli
         batch_total: Math.ceil(state.total_rows / state.batch_size),
         inseridos_este_batch: insertedCount,
         erros_este_batch: errorCount,
+        total_inseridos: totalInserted,
+        total_erros: totalErrors,
         lote_upload: state.lote_upload
       })
     })
     .eq('id', state.upload_log_id);
 
   return {
-    insertedCount,
-    errorCount,
+    insertedCount: totalInserted,
+    errorCount: totalErrors,
     isComplete,
     progress
   };
@@ -380,10 +394,11 @@ serve(async (req) => {
       console.log('⏩ Continuando processamento existente...');
       state = existingState;
       
-      // Re-baixar dados se necessário (cache seria melhor, mas por simplicidade)
+      // Re-baixar dados se necessário (cache seria melhor, mas por simplicidade)  
+      const cleanFilePath = state.file_path.replace(/^uploads\//, '');
       const { data: fileData } = await supabaseClient.storage
         .from('uploads')
-        .download(state.file_path);
+        .download(cleanFilePath);
       
       const arrayBuffer = await fileData.arrayBuffer();
       const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array', dense: true });
@@ -397,10 +412,10 @@ serve(async (req) => {
       jsonData = initResult.jsonData;
     }
 
-    // Processar próximo batch
-    const batchResult = await processBatch(state, jsonData, supabaseClient);
+  // Processar próximo batch
+  const batchResult = await processBatch(state, jsonData, supabaseClient);
 
-    if (batchResult.isComplete) {
+  if (batchResult.isComplete) {
       // Aplicar regras de negócio
       console.log('🔧 Aplicando regras de negócio...');
       let registrosAtualizados = 0;
@@ -429,6 +444,8 @@ serve(async (req) => {
           detalhes_erro: JSON.stringify({
             status: 'Processamento Concluído',
             total_processado: state.processed_rows,
+            total_inserido: batchResult.insertedCount,
+            total_erros: batchResult.errorCount,
             regras_aplicadas: registrosAtualizados,
             lote_upload: state.lote_upload
           })
