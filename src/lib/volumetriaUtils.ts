@@ -408,11 +408,17 @@ export async function processVolumetriaFile(
       attempts++;
     }
 
-    // Limpar arquivo temporário do storage
-    try {
-      await supabase.storage.from('uploads').remove([filePath]);
-    } catch (cleanupError) {
-      console.warn('Erro ao limpar arquivo temporário:', cleanupError);
+    // Só limpar arquivo temporário se NÃO foi processamento limitado
+    const isLimitedProcessing = finalStatus.limited_processing || false;
+    if (!isLimitedProcessing) {
+      try {
+        await supabase.storage.from('uploads').remove([filePath]);
+        console.log('🗑️ Arquivo temporário removido após processamento completo');
+      } catch (cleanupError) {
+        console.warn('Erro ao limpar arquivo temporário:', cleanupError);
+      }
+    } else {
+      console.log('📁 Arquivo preservado para processamento completo:', filePath);
     }
 
     if (!finalStatus) {
