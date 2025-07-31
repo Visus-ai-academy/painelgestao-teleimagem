@@ -403,37 +403,51 @@ export async function processVolumetriaFile(
         console.log(`✅ ${arquivoFonte}: Dados anteriores a 2023-01-01 removidos`);
       }
       
-      // 2. REGRA CORRETA: Excluir exames com DATA_REALIZACAO do mês atual em diante
-      // Se estamos faturando julho/2025, excluir todos com DATA_REALIZACAO >= 01/07/2025
+      // 2. REGRA CORRETA PARA RETROATIVOS: Manter apenas exames que foram:
+      // - Realizados ANTES do mês de faturamento (DATA_REALIZACAO < 2025-06-01)
+      // - E laudados NO PERÍODO de faturamento (DATA_LAUDO entre 08/06/2025 e 07/07/2025)
       try {
-        const anoAtual = new Date().getFullYear();
-        const mesAtual = new Date().getMonth() + 1; // Janeiro = 1
-        const primeiroDiaFaturamento = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}-01`;
-        
-        console.log(`📅 ${arquivoFonte}: Faturando ${mesAtual}/${anoAtual} - Excluindo DATA_REALIZACAO >= ${primeiroDiaFaturamento}`);
-        
-        // Contar quantos serão removidos antes
-        const { data: countToRemove } = await supabase
-          .from('volumetria_mobilemed')
-          .select('id', { count: 'exact' })
-          .eq('arquivo_fonte', arquivoFonte)
-          .gte('DATA_REALIZACAO', primeiroDiaFaturamento);
+        // Obter período de faturamento de junho/2025
+        const { data: currentPeriodData } = await supabase
+          .rpc('get_periodo_faturamento', { data_referencia: '2025-07-15' }) // Para pegar junho
+          .single();
           
-        console.log(`🗑️ ${arquivoFonte}: ${countToRemove?.length || 0} registros a serem removidos`);
-        
-        const { error: deleteCurrentError } = await supabase
-          .from('volumetria_mobilemed')
-          .delete()
-          .eq('arquivo_fonte', arquivoFonte)
-          .gte('DATA_REALIZACAO', primeiroDiaFaturamento);
+        if (currentPeriodData) {
+          const dataLimiteRealizacao = '2025-06-01'; // Excluir realizados >= 01/06/2025
+          const inicioLaudo = currentPeriodData.inicio_periodo; // 08/06/2025
+          const fimLaudo = currentPeriodData.fim_periodo;       // 07/07/2025
           
-        if (deleteCurrentError) {
-          console.warn(`⚠️ ${arquivoFonte}: Erro ao remover exames do mês atual:`, deleteCurrentError);
-        } else {
-          console.log(`✅ ${arquivoFonte}: Exames com DATA_REALIZACAO >= ${primeiroDiaFaturamento} removidos`);
+          console.log(`📅 ${arquivoFonte}: Faturando ${currentPeriodData.mes_referencia}`);
+          console.log(`🔍 ${arquivoFonte}: Mantendo apenas exames:`);
+          console.log(`   - DATA_REALIZACAO < ${dataLimiteRealizacao}`);
+          console.log(`   - DATA_LAUDO entre ${inicioLaudo} e ${fimLaudo}`);
+          
+          // Contar registros válidos antes da remoção
+          const { data: validRecords } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id', { count: 'exact' })
+            .eq('arquivo_fonte', arquivoFonte)
+            .lt('DATA_REALIZACAO', dataLimiteRealizacao)
+            .gte('DATA_LAUDO', inicioLaudo)
+            .lte('DATA_LAUDO', fimLaudo);
+            
+          console.log(`✅ ${arquivoFonte}: ${validRecords?.length || 0} registros atendem aos critérios retroativos`);
+          
+          // Remover todos os registros que NÃO atendem aos critérios
+          const { error: deleteInvalidError } = await supabase
+            .from('volumetria_mobilemed')
+            .delete()
+            .eq('arquivo_fonte', arquivoFonte)
+            .or(`DATA_REALIZACAO.gte.${dataLimiteRealizacao},DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gt.${fimLaudo}`);
+            
+          if (deleteInvalidError) {
+            console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar regras retroativas:`, deleteInvalidError);
+          } else {
+            console.log(`✅ ${arquivoFonte}: Regras retroativas aplicadas com sucesso`);
+          }
         }
       } catch (periodError) {
-        console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar filtro de DATA_REALIZACAO:`, periodError);
+        console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar regras retroativas:`, periodError);
       }
       
       // Contar registros após as regras
