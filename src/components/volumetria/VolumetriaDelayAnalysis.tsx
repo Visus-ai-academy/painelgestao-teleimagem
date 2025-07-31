@@ -357,8 +357,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           {/* Container fixo com altura definida e scroll interno */}
           <div className="h-96 flex flex-col">
             {/* Cabeçalho fixo da tabela */}
-            <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm">
-              <Table className="w-full min-w-[1600px]">
+            <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm overflow-x-auto">
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead 
@@ -415,8 +415,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </div>
             
             {/* Área de scroll com conteúdo da tabela */}
-            <div className="flex-1 overflow-auto">
-              <Table className="w-full min-w-[1600px]">
+            <div className="flex-1 overflow-y-auto overflow-x-auto">
+              <Table className="w-full">
                 <TableBody>
                   {clientesComTempoAtraso.map((cliente, index) => {
                     const formatarTempo = (minutos: number) => {
