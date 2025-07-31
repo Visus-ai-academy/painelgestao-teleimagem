@@ -62,6 +62,7 @@ export default function CadastroClientes() {
     cod_cliente: "",
     data_inicio_contrato: "",
     data_termino_vigencia: "",
+    tipo_cliente: "",
     ativo: true,
     status: "Ativo"
   });
@@ -142,6 +143,7 @@ export default function CadastroClientes() {
         cod_cliente: "",
         data_inicio_contrato: "",
         data_termino_vigencia: "",
+        tipo_cliente: "",
         ativo: true,
         status: "Ativo"
       });
@@ -170,6 +172,7 @@ export default function CadastroClientes() {
       cod_cliente: cliente.cod_cliente || "",
       data_inicio_contrato: cliente.data_inicio_contrato || "",
       data_termino_vigencia: cliente.data_termino_vigencia || "",
+      tipo_cliente: cliente.tipo_cliente || "",
       ativo: cliente.ativo,
       status: cliente.status || (cliente.ativo ? "Ativo" : "Inativo")
     });
@@ -462,25 +465,38 @@ export default function CadastroClientes() {
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="contato" className="text-sm font-semibold text-foreground">Contato</Label>
-                <Input
-                  id="contato"
-                  value={clienteData.contato}
-                  onChange={(e) => handleInputChange("contato", e.target.value)}
-                  placeholder="Nome do contato"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="data_inicio" className="text-sm font-semibold text-foreground">Data Início Contrato</Label>
-                <Input
-                  id="data_inicio"
-                  type="date"
-                  value={clienteData.data_inicio_contrato}
-                  onChange={(e) => handleInputChange("data_inicio_contrato", e.target.value)}
-                />
-              </div>
+               <div className="space-y-2">
+                 <Label htmlFor="contato" className="text-sm font-semibold text-foreground">Contato</Label>
+                 <Input
+                   id="contato"
+                   value={clienteData.contato}
+                   onChange={(e) => handleInputChange("contato", e.target.value)}
+                   placeholder="Nome do contato"
+                 />
+               </div>
+
+               <div className="space-y-2">
+                 <Label htmlFor="tipo_cliente" className="text-sm font-semibold text-foreground">Tipo Cliente</Label>
+                 <Select value={clienteData.tipo_cliente} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                   <SelectTrigger>
+                     <SelectValue placeholder="Selecione o tipo" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="CO">CO - Cliente Operacional</SelectItem>
+                     <SelectItem value="NC">NC - Não Contratual</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               
+               <div className="space-y-2">
+                 <Label htmlFor="data_inicio" className="text-sm font-semibold text-foreground">Data Início Contrato</Label>
+                 <Input
+                   id="data_inicio"
+                   type="date"
+                   value={clienteData.data_inicio_contrato}
+                   onChange={(e) => handleInputChange("data_inicio_contrato", e.target.value)}
+                 />
+               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="data_fim" className="text-sm font-semibold text-foreground">Data Término Vigência</Label>
@@ -890,26 +906,39 @@ export default function CadastroClientes() {
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-contato" className="text-sm font-semibold text-foreground">Contato</Label>
-                  <Input
-                    id="edit-contato"
-                    value={clienteData.contato}
-                    onChange={(e) => handleInputChange("contato", e.target.value)}
-                    placeholder="Nome do contato"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="edit-endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
-                  <Textarea
-                    id="edit-endereco"
-                    value={clienteData.endereco}
-                    onChange={(e) => handleInputChange("endereco", e.target.value)}
-                    placeholder="Endereço completo do cliente"
-                    rows={3}
-                  />
-                </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-contato" className="text-sm font-semibold text-foreground">Contato</Label>
+                   <Input
+                     id="edit-contato"
+                     value={clienteData.contato}
+                     onChange={(e) => handleInputChange("contato", e.target.value)}
+                     placeholder="Nome do contato"
+                   />
+                 </div>
+
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-tipo_cliente" className="text-sm font-semibold text-foreground">Tipo Cliente</Label>
+                   <Select value={clienteData.tipo_cliente} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Selecione o tipo" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="CO">CO - Cliente Operacional</SelectItem>
+                       <SelectItem value="NC">NC - Não Contratual</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
+                   <Textarea
+                     id="edit-endereco"
+                     value={clienteData.endereco}
+                     onChange={(e) => handleInputChange("endereco", e.target.value)}
+                     placeholder="Endereço completo do cliente"
+                     rows={3}
+                   />
+                 </div>
                 
                 <div className="flex items-center space-x-2">
                   <Switch

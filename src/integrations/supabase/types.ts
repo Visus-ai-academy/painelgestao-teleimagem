@@ -2622,6 +2622,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      aplicar_de_para_automatico: {
+        Args: { arquivo_fonte_param: string }
+        Returns: Json
+      }
       aplicar_de_para_prioridade: {
         Args: Record<PropertyKey, never>
         Returns: Json

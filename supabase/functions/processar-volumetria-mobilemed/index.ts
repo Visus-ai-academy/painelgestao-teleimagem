@@ -313,9 +313,11 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
       console.log('🔧 Aplicando regras rápidas...');
       
       if (arquivo_fonte === 'volumetria_fora_padrao' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
-        const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
+        const { data: deParaResult } = await supabaseClient.rpc('aplicar_de_para_automatico', { 
+          arquivo_fonte_param: arquivo_fonte 
+        });
         registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
-        console.log(`✅ De-Para valores: ${deParaResult?.registros_atualizados || 0}`);
+        console.log(`✅ De-Para valores automático: ${deParaResult?.registros_atualizados || 0}`);
       }
 
       const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
