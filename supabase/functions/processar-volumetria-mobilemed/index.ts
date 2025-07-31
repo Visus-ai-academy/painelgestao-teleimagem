@@ -141,22 +141,16 @@ function convertValues(valueStr: string | number): number | null {
 // Função para processar uma linha do Excel
 function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao'): VolumetriaRecord | null {
   try {
-    // Validação robusta de entrada
+    // Validação básica apenas para garantir que existe um objeto
     if (!row || typeof row !== 'object') {
       console.warn('Linha inválida: objeto row não definido ou inválido');
       return null;
     }
 
-    // Campos obrigatórios com validação null-safe
-    const empresa = row['EMPRESA'];
-    const nomePaciente = row['NOME_PACIENTE'];
-    
-    if (!empresa || !nomePaciente || 
-        typeof empresa !== 'string' && typeof empresa !== 'number' ||
-        typeof nomePaciente !== 'string' && typeof nomePaciente !== 'number') {
-      console.warn('Linha ignorada: EMPRESA e NOME_PACIENTE são obrigatórios e devem ser válidos');
-      return null;
-    }
+    // ACEITAR TODOS OS REGISTROS - não validar campos obrigatórios
+    // Cada linha do arquivo é um registro válido que deve ser mantido
+    const empresa = row['EMPRESA'] || '';
+    const nomePaciente = row['NOME_PACIENTE'] || '';
 
     // Função helper para conversão segura de string
     const safeString = (value: any): string | undefined => {
