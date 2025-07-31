@@ -30,35 +30,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Baixar arquivo do storage - remover prefixo "uploads/" se existir
-    const cleanFilePath = file_path.replace(/^uploads\//, '');
-    console.log(`📥 Tentando baixar arquivo:`);
-    console.log(`  - Caminho original: ${file_path}`);
-    console.log(`  - Caminho limpo: ${cleanFilePath}`);
-    console.log(`  - Bucket: uploads`);
-    
-    // Primeiro verificar se o arquivo existe
-    const { data: listData, error: listError } = await supabaseClient.storage
-      .from('uploads')
-      .list('', { search: cleanFilePath });
-    
-    if (listError) {
-      console.error('❌ Erro ao listar arquivos:', listError);
-    } else {
-      console.log('📋 Arquivos encontrados no bucket:', listData?.map(f => f.name));
-    }
+    // Baixar arquivo do storage
+    console.log(`📥 Tentando baixar arquivo: ${file_path}`);
     
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
-      .download(cleanFilePath);
+      .download(file_path);
 
     if (downloadError) {
       console.error('❌ Erro no download:', downloadError);
-      console.error('❌ Detalhes completos do erro:', {
-        message: downloadError.message,
-        cause: downloadError.cause,
-        stack: downloadError.stack
-      });
       throw new Error(`Erro ao baixar arquivo: ${JSON.stringify(downloadError)}`);
     }
 
