@@ -28,113 +28,54 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
 
   const loadStats = async () => {
     try {
-      console.log('📊 Carregando estatísticas usando função do banco...');
+      console.log('📊 Carregando estatísticas usando método manual...');
       setLoading(true);
-      
-      // Timeout para evitar travamento
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout ao carregar estatísticas')), 10000)
-      );
-      
-      // Usar a função do banco para estatísticas agregadas
-      const statsPromise = supabase.rpc('get_volumetria_aggregated_stats');
-      
-      const { data: aggregatedStats, error: statsError } = await Promise.race([
-        statsPromise, 
-        timeoutPromise
-      ]) as any;
-      
-      if (statsError) {
-        console.error('❌ Erro ao buscar estatísticas agregadas:', statsError);
-        console.log('🔄 Usando método fallback simplificado...');
-        
-        // Fallback simples - apenas mostrar zeros
-        const defaultStats: UploadStats[] = [
-          {
-            fileName: "Volumetria Padrão",
-            totalRecords: 0,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0,
-            period: "Nenhum dado encontrado",
-            category: 'padrão'
-          },
-          {
-            fileName: "Volumetria Fora Padrão",
-            totalRecords: 0,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0,
-            period: "Nenhum dado encontrado",
-            category: 'fora-padrão'
-          }
-        ];
-        
-        setStats(defaultStats);
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ Estatísticas agregadas carregadas:', aggregatedStats);
-      
-      // Processar dados agregados
-      const processedStats: UploadStats[] = [];
-      
-      if (aggregatedStats && Array.isArray(aggregatedStats)) {
-        for (const stat of aggregatedStats) {
-          processedStats.push({
-            fileName: `Dados ${stat.arquivo_fonte}`,
-            totalRecords: Number(stat.total_records) || 0,
-            recordsWithValue: Number(stat.records_with_value) || 0,
-            recordsZeroed: Number(stat.records_zeroed) || 0,
-            totalValue: Number(stat.total_value) || 0,
-            period: 'Todos os períodos',
-            category: getCategoryFromSource(stat.arquivo_fonte)
-          });
-        }
-      }
-      
-      // Se não há dados, adicionar entradas vazias para todas as categorias
-      const expectedSources = [
-        'volumetria_padrao', 
-        'volumetria_fora_padrao', 
-        'volumetria_padrao_retroativo', 
-        'volumetria_fora_padrao_retroativo'
-      ];
-      
-      for (const source of expectedSources) {
-        if (!processedStats.find(s => s.fileName.includes(source))) {
-          processedStats.push({
-            fileName: `Dados ${source}`,
-            totalRecords: 0,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0,
-            period: 'Nenhum dado',
-            category: getCategoryFromSource(source)
-          });
-        }
-      }
-
-      setStats(processedStats);
+      await loadStatsManual();
       setLoading(false);
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas:', error);
       
-      // Em caso de erro, definir estatísticas vazias para não travar
-      const errorStats: UploadStats[] = [
+      // Em caso de erro, usar método fallback mais robusto
+      const fallbackStats: UploadStats[] = [
         {
-          fileName: "Erro ao carregar dados",
+          fileName: "Volumetria Padrão",
           totalRecords: 0,
           recordsWithValue: 0,
           recordsZeroed: 0,
           totalValue: 0,
           period: "Erro de carregamento",
           category: 'padrão'
+        },
+        {
+          fileName: "Volumetria Fora Padrão",
+          totalRecords: 0,
+          recordsWithValue: 0,
+          recordsZeroed: 0,
+          totalValue: 0,
+          period: "Erro de carregamento",
+          category: 'fora-padrão'
+        },
+        {
+          fileName: "Volumetria Padrão Retroativo",
+          totalRecords: 0,
+          recordsWithValue: 0,
+          recordsZeroed: 0,
+          totalValue: 0,
+          period: "Erro de carregamento",
+          category: 'retroativo'
+        },
+        {
+          fileName: "Volumetria Fora Padrão Retroativo",
+          totalRecords: 0,
+          recordsWithValue: 0,
+          recordsZeroed: 0,
+          totalValue: 0,
+          period: "Erro de carregamento",
+          category: 'fora-padrão'
         }
       ];
       
-      setStats(errorStats);
+      setStats(fallbackStats);
       setLoading(false);
     }
   };
