@@ -471,6 +471,7 @@ serve(async (req) => {
       .insert({
         arquivo_nome: file_path,
         tipo_arquivo: arquivo_fonte,
+        tipo_dados: 'volumetria', // Campo obrigatório adicionado
         status: 'processando',
         registros_processados: 0,
         registros_inseridos: 0,
