@@ -74,7 +74,12 @@ export function DeParaPrioridadeUpload() {
       });
 
       if (data.registros_processados > 0) {
-        toast.success(`Upload concluído! ${data.registros_processados} registros processados.`);
+        toast.success(`Upload concluído! ${data.registros_processados} registros processados. Dashboard será atualizado automaticamente.`);
+        
+        // Forçar refresh da página após 2 segundos para atualizar todos os dados
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       } else {
         toast.error("Nenhum registro foi processado. Verifique o formato do arquivo.");
       }
