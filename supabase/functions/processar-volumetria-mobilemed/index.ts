@@ -380,27 +380,39 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte, periodo } = await req.json();
+    console.log('📥 Recebendo request...');
+    const requestData = await req.json();
+    console.log('📋 Request data:', JSON.stringify(requestData));
+    
+    const { file_path, arquivo_fonte, periodo } = requestData;
 
     console.log('=== PROCESSAR VOLUMETRIA MOBILEMED ===');
     console.log('Arquivo:', file_path);
     console.log('Fonte:', arquivo_fonte);
+    console.log('Período:', JSON.stringify(periodo));
 
     if (!file_path || !arquivo_fonte) {
+      console.error('❌ Parâmetros obrigatórios ausentes');
       throw new Error('file_path e arquivo_fonte são obrigatórios');
     }
 
     const validSources = ['data_laudo', 'data_exame', 'volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
     if (!validSources.includes(arquivo_fonte)) {
+      console.error('❌ Fonte inválida:', arquivo_fonte);
       throw new Error(`arquivo_fonte deve ser um dos: ${validSources.join(', ')}`);
     }
 
+    console.log('✅ Validações básicas OK');
+
+    console.log('🔧 Criando cliente Supabase...');
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    console.log('✅ Cliente Supabase criado');
 
     // Criar log de upload
+    console.log('📝 Criando log de upload...');
     const { data: uploadLog, error: logError } = await supabaseClient
       .from('processamento_uploads')
       .insert({
@@ -418,25 +430,30 @@ serve(async (req) => {
       .single();
 
     if (logError) {
-      throw new Error('Erro ao criar log de upload');
+      console.error('❌ Erro ao criar log:', logError);
+      throw new Error(`Erro ao criar log de upload: ${logError.message}`);
     }
 
-    console.log('Log criado:', uploadLog.id);
+    console.log('✅ Log criado:', uploadLog.id);
 
     // Baixar arquivo
-    console.log('Baixando arquivo...');
+    console.log('⬇️ Baixando arquivo do storage...');
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
 
     if (downloadError) {
+      console.error('❌ Erro no download:', downloadError);
       throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
     }
 
-    console.log('Arquivo baixado, tamanho:', fileData.size);
+    console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
     // Ler Excel com otimizações para arquivos grandes
+    console.log('📖 Lendo arquivo Excel...');
     const arrayBuffer = await fileData.arrayBuffer();
+    console.log('✅ ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
+    
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
       cellDates: false,
@@ -448,10 +465,15 @@ serve(async (req) => {
     });
     
     if (!workbook.SheetNames.length) {
+      console.error('❌ Arquivo sem planilhas');
       throw new Error('Arquivo Excel não possui planilhas');
     }
 
+    console.log('✅ Workbook criado, planilhas:', workbook.SheetNames);
+
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    console.log('📊 Convertendo planilha para JSON...');
+    
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
       raw: true,
@@ -459,9 +481,10 @@ serve(async (req) => {
       blankrows: false
     });
     
-    console.log(`Dados extraídos: ${jsonData.length} linhas`);
+    console.log(`✅ Dados extraídos: ${jsonData.length} linhas`);
     
     // Processar com controle de lote otimizado
+    console.log('🚀 Iniciando processamento dos dados...');
     const resultado = await processFileWithBatchControl(
       jsonData, 
       arquivo_fonte, 
@@ -470,6 +493,8 @@ serve(async (req) => {
       file_path, 
       periodo
     );
+
+    console.log('✅ Processamento concluído:', resultado);
 
     return new Response(
       JSON.stringify({ 
@@ -495,11 +520,17 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Erro na função:', error);
+    console.error('💥 ERRO CRÍTICO na função:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        details: error.stack
       }),
       {
         status: 500,
