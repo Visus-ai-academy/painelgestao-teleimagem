@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
-import { Upload, FileText, CheckCircle, Lock } from 'lucide-react';
+import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
+import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
 
 interface VolumetriaUploadProps {
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
@@ -19,6 +22,9 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     total: number;
     inserted: number;
   } | null>(null);
+  const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
+  const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
+  const [isLimitedProcessing, setIsLimitedProcessing] = useState(false);
   const { toast } = useToast();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,9 +98,19 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       );
 
         if (result.success) {
+          // Verificar se foi processamento limitado
+          const isLimited = result.limitedProcessing || false;
+          setIsLimitedProcessing(isLimited);
+          
+          if (isLimited && result.filePath) {
+            setLastUploadedFile(result.filePath);
+          }
+          
           toast({
-            title: "Upload concluído!",
-            description: `${result.totalInserted} registros inseridos com sucesso.`,
+            title: isLimited ? "Upload processado (arquivo grande)" : "Upload concluído!",
+            description: isLimited 
+              ? `${result.totalInserted} registros inseridos (limitado). Use "Processamento Completo" para processar todos os registros.`
+              : `${result.totalInserted} registros inseridos com sucesso.`,
           });
           onSuccess?.();
         } else {
@@ -191,6 +207,47 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         <div className="flex items-center gap-2 text-sm text-green-600">
           <CheckCircle className="w-4 h-4" />
           <span>Concluído: {stats.inserted} registros inseridos</span>
+        </div>
+      )}
+
+      {/* Botão de Processamento Completo */}
+      {lastUploadedFile && isLimitedProcessing && (
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-sm">Processamento Completo Disponível</h4>
+              <p className="text-xs text-muted-foreground">
+                Seu último arquivo foi limitado. Use o processamento completo para processar todos os registros.
+              </p>
+            </div>
+            <Dialog open={showProcessarCompleto} onOpenChange={setShowProcessarCompleto}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="flex items-center gap-2">
+                  <Zap className="h-3 w-3" />
+                  Processamento Completo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Processamento Completo do Arquivo</DialogTitle>
+                  <DialogDescription>
+                    Processa o arquivo inteiro em batches pequenos para evitar timeouts.
+                    Este processo pode levar alguns minutos dependendo do tamanho do arquivo.
+                  </DialogDescription>
+                </DialogHeader>
+                <ProcessarArquivoCompleto
+                  filePath={lastUploadedFile}
+                  arquivoFonte={arquivoFonte}
+                  totalEstimado={34000}
+                  onComplete={() => {
+                    setShowProcessarCompleto(false);
+                    setLastUploadedFile(null);
+                    setIsLimitedProcessing(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       )}
 

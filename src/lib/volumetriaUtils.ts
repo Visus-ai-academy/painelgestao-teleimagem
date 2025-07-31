@@ -311,7 +311,7 @@ export async function processVolumetriaFile(
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao',
   onProgress?: (processed: number, total: number, inserted: number) => void,
   periodoFaturamento?: { ano: number; mes: number }
-): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[] }> {
+): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[]; limitedProcessing?: boolean; filePath?: string }> {
   
   const { supabase } = await import('@/integrations/supabase/client');
   
@@ -453,7 +453,9 @@ export async function processVolumetriaFile(
       success: true,
       totalProcessed: finalStatus.registros_processados || 0,
       totalInserted: finalStatus.registros_inseridos || 0,
-      errors
+      errors,
+      limitedProcessing: finalStatus.limited_processing || false,
+      filePath: finalStatus.limited_processing ? filePath : undefined
     };
 
   } catch (error) {
@@ -463,7 +465,8 @@ export async function processVolumetriaFile(
       success: false,
       totalProcessed: 0,
       totalInserted: 0,
-      errors: [error instanceof Error ? error.message : 'Erro desconhecido']
+      errors: [error instanceof Error ? error.message : 'Erro desconhecido'],
+      limitedProcessing: false
     };
   }
 }
