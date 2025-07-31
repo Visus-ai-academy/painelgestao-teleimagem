@@ -291,7 +291,7 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     try {
       console.log('🔧 Aplicando regras rápidas...');
       
-      if (arquivo_fonte === 'volumetria_fora_padrao') {
+      if (arquivo_fonte === 'volumetria_fora_padrao' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
         const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
         registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
         console.log(`✅ De-Para valores: ${deParaResult?.registros_atualizados || 0}`);
