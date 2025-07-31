@@ -190,7 +190,7 @@ async function initializeProcessing(requestData: any, supabaseClient: any) {
       arquivo_nome: file_path,
       tipo_arquivo: arquivo_fonte,
       tipo_dados: 'volumetria',
-      status: 'iniciando',
+      status: 'processando',
       registros_processados: 0,
       registros_inseridos: 0,
       registros_atualizados: 0,
@@ -260,7 +260,7 @@ async function initializeProcessing(requestData: any, supabaseClient: any) {
   await supabaseClient
     .from('processamento_uploads')
     .update({
-      status: 'processando_streaming',
+      status: 'processando',
       detalhes_erro: JSON.stringify({
         status: 'Processamento Streaming Iniciado',
         total_linhas: totalRows,
@@ -337,7 +337,7 @@ async function processBatch(state: ProcessingState, jsonData: any[], supabaseCli
       registros_processados: state.processed_rows,
       registros_inseridos: insertedCount,
       registros_erro: errorCount,
-      status: isComplete ? 'processando_finalizacao' : 'processando_streaming',
+      status: isComplete ? 'processando' : 'processando',
       detalhes_erro: JSON.stringify({
         status: isComplete ? 'Finalizando Processamento' : 'Processamento em Andamento',
         progresso: `${progress}%`,
