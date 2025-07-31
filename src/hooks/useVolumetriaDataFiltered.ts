@@ -218,6 +218,19 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         }
       });
 
+      console.log('📅 Debug datas:', {
+        totalRegistros: allData.length,
+        registrosComDatas: allData.filter(item => item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO).length,
+        totalAtrasados: atrasados.length,
+        amostraDatas: allData.slice(0, 3).map(item => ({
+          DATA_LAUDO: item.DATA_LAUDO,
+          HORA_LAUDO: item.HORA_LAUDO,
+          DATA_PRAZO: item.DATA_PRAZO,
+          HORA_PRAZO: item.HORA_PRAZO,
+          EMPRESA: item.EMPRESA
+        }))
+      });
+
       const totalLaudos = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
       const totalRegistros = allData.length;
       const totalAtrasados = atrasados.length;
@@ -310,6 +323,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),
         atrasoCategorias: [],
         atrasoPrioridades: []
+      });
+
+      // Debug dos dados de atraso
+      console.log('🚨 Debug atrasos:', {
+        totalClientesComDados: clientes.length,
+        clientesComAtraso: clientes.filter(c => c.atrasados > 0).length,
+        amostraClientes: clientes.slice(0, 5).map(c => ({ nome: c.nome, atrasados: c.atrasados, percentual_atraso: c.percentual_atraso })),
+        totalAtrasados,
+        percentualAtraso
       });
 
     } catch (error) {
