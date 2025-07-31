@@ -108,7 +108,7 @@ export function VolumetriaUploadStats() {
         </CardTitle>
         {/* Resumo no Header */}
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold text-blue-900">{totalStats.totalRecords}</div>
               <div className="text-sm text-blue-700">Total de Registros</div>
@@ -116,6 +116,10 @@ export function VolumetriaUploadStats() {
             <div>
               <div className="text-2xl font-bold text-green-900">{totalStats.recordsWithValue}</div>
               <div className="text-sm text-green-700">Com Valores</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-red-900">{totalStats.totalRecords - totalStats.recordsWithValue}</div>
+              <div className="text-sm text-red-700">Total de Zerados</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-orange-900">{totalStats.totalValue}</div>
