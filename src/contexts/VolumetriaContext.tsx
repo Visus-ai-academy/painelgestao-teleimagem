@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VolumetriaData {
@@ -59,7 +59,20 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     loading: true
   });
 
-  const loadStats = async () => {
+  // Usar ref para controlar se já está carregando para evitar chamadas duplicadas
+  const isLoadingRef = useRef(false);
+  const lastLoadTime = useRef(0);
+
+  const loadStats = useCallback(async () => {
+    // Evitar chamadas duplicadas e muito frequentes
+    const now = Date.now();
+    if (isLoadingRef.current || (now - lastLoadTime.current < 2000)) {
+      return;
+    }
+    
+    isLoadingRef.current = true;
+    lastLoadTime.current = now;
+    
     try {
       console.log('🔄 Carregando estatísticas centralizadas...');
       
@@ -121,13 +134,15 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas centralizadas:', error);
       setData(prev => ({ ...prev, loading: false }));
+    } finally {
+      isLoadingRef.current = false;
     }
-  };
+  }, []);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setData(prev => ({ ...prev, loading: true }));
     await loadStats();
-  };
+  }, [loadStats]);
 
   const clearData = async () => {
     console.log('🧹 Limpando dados centralizados...');
@@ -190,8 +205,12 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
+  }, [loadStats, refreshData]);
 
-    // Setup real-time subscription para atualizações automáticas
+  // Real-time subscription otimizada - com debounce
+  useEffect(() => {
+    let debounceTimer: NodeJS.Timeout;
+    
     const channel = supabase
       .channel('volumetria-updates')
       .on(
@@ -202,18 +221,23 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'volumetria_mobilemed'
         },
         () => {
-          console.log('🔄 Dados alterados - atualizando estatísticas...');
-          setTimeout(() => loadStats(), 1000); // Delay para garantir que os dados estejam salvos
+          console.log('🔄 Dados alterados - programando atualização...');
+          // Debounce de 3 segundos para evitar múltiplas atualizações
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            loadStats();
+          }, 3000);
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [loadStats]);
 
-  // Auto-refresh inteligente - só atualiza se não há uploads em andamento
+  // Auto-refresh muito mais conservador - só quando necessário
   useEffect(() => {
     const interval = setInterval(async () => {
       // Verificar se há uploads em andamento antes de atualizar
@@ -233,10 +257,10 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('❌ Erro ao verificar uploads ativos:', error);
       }
-    }, 15000); // Reduzido para 15 segundos
+    }, 60000); // Aumentado para 60 segundos
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadStats]);
 
   return (
     <VolumetriaContext.Provider value={{ data, refreshData, clearData }}>
