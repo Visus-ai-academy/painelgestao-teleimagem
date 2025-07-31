@@ -354,57 +354,57 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="relative max-h-96 overflow-auto">
+            <div className="relative max-h-96 overflow-auto border">
               <Table className="w-full min-w-[1600px]">
-                <TableHeader className="sticky top-0 bg-white z-20 border-b border-gray-200">
+                <TableHeader className="sticky top-0 bg-white z-30 shadow-md border-b-2 border-gray-200">
                   <TableRow className="bg-white">
                     <TableHead 
-                      className="cursor-pointer hover:bg-gray-50 min-w-[400px] bg-white border-r"
+                      className="cursor-pointer hover:bg-gray-100 min-w-[400px] bg-white sticky top-0 z-30 border-r font-semibold"
                       onClick={() => handleSort('nome')}
                     >
-                      <div className="flex items-center gap-2 py-3">
+                      <div className="flex items-center gap-2 py-4">
                         Cliente
                         {renderSortIcon('nome')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[200px] bg-white border-r"
+                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[200px] bg-white sticky top-0 z-30 border-r font-semibold"
                       onClick={() => handleSort('total_exames')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-3">
+                      <div className="flex items-center justify-center gap-2 py-4">
                         Total
                         {renderSortIcon('total_exames')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[200px] bg-white border-r"
+                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[200px] bg-white sticky top-0 z-30 border-r font-semibold"
                       onClick={() => handleSort('atrasados')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-3">
+                      <div className="flex items-center justify-center gap-2 py-4">
                         Atrasos
                         {renderSortIcon('atrasados')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[240px] bg-white border-r"
+                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[240px] bg-white sticky top-0 z-30 border-r font-semibold"
                       onClick={() => handleSort('percentual_atraso')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-3">
+                      <div className="flex items-center justify-center gap-2 py-4">
                         % Atraso
                         {renderSortIcon('percentual_atraso')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[240px] bg-white border-r"
+                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[240px] bg-white sticky top-0 z-30 border-r font-semibold"
                       onClick={() => handleSort('tempoMedioAtraso')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-3">
+                      <div className="flex items-center justify-center gap-2 py-4">
                         Tempo Médio
                         {renderSortIcon('tempoMedioAtraso')}
                       </div>
                     </TableHead>
-                    <TableHead className="text-center min-w-[200px] bg-white">
-                      <div className="py-3">Nível</div>
+                    <TableHead className="text-center min-w-[200px] bg-white sticky top-0 z-30 font-semibold">
+                      <div className="py-4">Nível</div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
