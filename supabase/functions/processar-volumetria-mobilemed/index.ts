@@ -164,14 +164,14 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     throw new Error('Arquivo Excel está vazio');
   }
 
-  // Limitar o número máximo de registros para evitar timeout
-  const MAX_RECORDS = 10000;
+  // Limitar para evitar timeout absoluto
+  const MAX_RECORDS = 5000;
   if (jsonData.length > MAX_RECORDS) {
     console.log(`Arquivo muito grande (${jsonData.length} registros). Processando apenas os primeiros ${MAX_RECORDS} registros.`);
     jsonData = jsonData.slice(0, MAX_RECORDS);
   }
 
-  const BATCH_SIZE = 1000; // Lotes maiores para velocidade
+  const BATCH_SIZE = 500; // Reduzido para maior estabilidade
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
@@ -180,77 +180,63 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     const batch = jsonData.slice(i, i + BATCH_SIZE);
     const validRecords: VolumetriaRecord[] = [];
     
-    // Processamento paralelo das linhas do lote
-    const promises = batch.map(row => {
+    // Processamento simples sem promises paralelas
+    for (const row of batch) {
       try {
-        return processRow(row, arquivo_fonte);
+        const record = processRow(row, arquivo_fonte);
+        if (record) {
+          validRecords.push(record);
+        } else {
+          totalErrors++;
+        }
       } catch (error) {
-        return null;
-      }
-    });
-    
-    const results = await Promise.all(promises);
-    
-    for (const record of results) {
-      if (record) {
-        validRecords.push(record);
-      } else {
         totalErrors++;
       }
       totalProcessed++;
     }
     
-    // Inserção em massa com retry simples
+    // Inserção em massa simples
     if (validRecords.length > 0) {
-      let inserted = false;
-      let retries = 0;
-      
-      while (!inserted && retries < 2) {
-        try {
-          const { error: insertError } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(validRecords);
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(validRecords);
 
-          if (insertError) {
-            throw insertError;
-          }
-          
+        if (insertError) {
+          console.error('Erro na inserção:', insertError);
+          totalErrors += validRecords.length;
+        } else {
           totalInserted += validRecords.length;
-          inserted = true;
-        } catch (batchErr) {
-          retries++;
-          if (retries >= 2) {
-            totalErrors += validRecords.length;
-          } else {
-            // Aguardar um pouco antes de tentar novamente
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
         }
+      } catch (batchErr) {
+        console.error('Erro no lote:', batchErr);
+        totalErrors += validRecords.length;
       }
     }
     
     // Atualizar progresso a cada lote
-    await supabaseClient
-      .from('processamento_uploads')
-      .update({ 
-        registros_processados: totalProcessed,
-        registros_inseridos: totalInserted,
-        registros_erro: totalErrors
-      })
-      .eq('id', uploadLogId);
-      
-    // Pequena pausa para não sobrecarregar
-    if (i % (BATCH_SIZE * 5) === 0) {
-      await new Promise(resolve => setTimeout(resolve, 10));
+    try {
+      await supabaseClient
+        .from('processamento_uploads')
+        .update({ 
+          registros_processados: totalProcessed,
+          registros_inseridos: totalInserted,
+          registros_erro: totalErrors
+        })
+        .eq('id', uploadLogId);
+    } catch (updateErr) {
+      console.error('Erro ao atualizar progresso:', updateErr);
     }
   }
 
   console.log(`Processamento concluído: ${totalInserted} inseridos, ${totalErrors} erros`);
   
-  // Aplicar regras rapidamente
+  // Aplicar regras apenas se houver dados inseridos
   let registrosAtualizadosDePara = 0;
   if (totalInserted > 0) {
     try {
+      console.log('Aplicando regras de negócio...');
+      
       if (arquivo_fonte === 'volumetria_fora_padrao') {
         const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
         registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
@@ -258,6 +244,8 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
 
       const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
       registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
+      
+      console.log(`Regras aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
     } catch (regraErr) {
       console.error('Erro ao aplicar regras:', regraErr);
     }
@@ -274,7 +262,7 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
       registros_erro: totalErrors,
       completed_at: new Date().toISOString(),
       detalhes_erro: JSON.stringify({
-        status: 'Concluído',
+        status: totalInserted > 0 ? 'Concluído' : 'Erro no processamento',
         total_linhas_arquivo: jsonData.length,
         registros_inseridos: totalInserted,
         registros_atualizados_de_para: registrosAtualizadosDePara,
@@ -283,6 +271,7 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     })
     .eq('id', uploadLogId);
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
