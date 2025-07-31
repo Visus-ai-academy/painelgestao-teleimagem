@@ -144,7 +144,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       // Categoria e prioridade não existem na tabela atual
       if (filters.medico !== 'todos') query = query.eq('MEDICO', filters.medico);
 
-      const { data: rawData, error } = await query.limit(10000);
+      const { data: rawData, error } = await query;
 
       if (error) throw error;
 

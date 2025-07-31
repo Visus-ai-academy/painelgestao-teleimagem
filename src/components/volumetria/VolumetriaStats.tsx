@@ -15,7 +15,7 @@ interface VolumetriaStatsProps {
 
 export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
@@ -24,11 +24,11 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-primary">
+          <div className="text-3xl font-bold text-primary">
             {stats.total_exames.toLocaleString()}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Total de Laudos
+          <p className="text-sm text-muted-foreground mt-1">
+            Total de Laudos Processados
           </p>
         </CardContent>
       </Card>
@@ -36,33 +36,16 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Registros</span>
-            <Activity className="h-4 w-4 text-blue-500" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-600">
-            {stats.total_registros.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Total de registros na base
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Clientes</span>
+            <span className="text-sm text-muted-foreground">Clientes Ativos</span>
             <Users className="h-4 w-4 text-green-500" />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-3xl font-bold text-green-600">
             {stats.total_clientes}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Clientes únicos ativos
+          <p className="text-sm text-muted-foreground mt-1">
+            Clientes únicos no período
           </p>
         </CardContent>
       </Card>
@@ -75,11 +58,11 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">
+          <div className="text-3xl font-bold text-red-600">
             {stats.percentual_atraso.toFixed(1)}%
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {stats.total_atrasados.toLocaleString()} registros atrasados
+          <p className="text-sm text-muted-foreground mt-1">
+            {stats.total_atrasados.toLocaleString()} laudos atrasados
           </p>
         </CardContent>
       </Card>

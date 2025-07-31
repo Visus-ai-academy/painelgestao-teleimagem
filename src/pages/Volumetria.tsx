@@ -5,11 +5,12 @@ import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
-import { VolumetriaAtrasoAnalysis } from '@/components/volumetria/VolumetriaAtrasoAnalysis';
+import { VolumetriaDelayAnalysis } from '@/components/volumetria/VolumetriaDelayAnalysis';
+import { VolumetriaExecutiveSummary } from '@/components/volumetria/VolumetriaExecutiveSummary';
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
-import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 // Função para obter filtros padrão para o mês atual
@@ -62,7 +63,7 @@ export default function Volumetria() {
   }, [refreshData]);
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
-  const hasNoData = stats.total_registros === 0;
+  const hasNoData = stats.total_exames === 0;
 
   if (loading) {
     return (
@@ -81,8 +82,8 @@ export default function Volumetria() {
         <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
         <p className="text-muted-foreground mt-1">
           Análise executiva completa de volumetria - 
-          {stats.total_registros.toLocaleString()} registros | 
-          {stats.total_clientes} clientes
+          {stats.total_exames.toLocaleString()} laudos | 
+          {stats.total_clientes} clientes ativos
         </p>
       </div>
 
@@ -103,25 +104,57 @@ export default function Volumetria() {
           {/* Métricas Principais */}
           <VolumetriaStats stats={stats} />
 
-          {/* Gráficos */}
-          <VolumetriaCharts 
-            clientes={clientes}
-            modalidades={modalidades}
-            especialidades={especialidades}
-            categorias={categorias}
-            prioridades={prioridades}
-          />
+          {/* Dashboard Profissional com Tabs */}
+          <Tabs defaultValue="executive" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="executive">Resumo Executivo</TabsTrigger>
+              <TabsTrigger value="charts">Análise de Volume</TabsTrigger>
+              <TabsTrigger value="delays">Análise de Atrasos</TabsTrigger>
+              <TabsTrigger value="operational">Operacional</TabsTrigger>
+            </TabsList>
 
-          {/* Análise de Atrasos */}
-          <VolumetriaAtrasoAnalysis 
-            clientes={atrasoClientes}
-            modalidades={atrasoModalidades.map(m => ({...m, atrasados: m.atrasados || 0, percentual_atraso: m.percentual_atraso || 0}))}
-            especialidades={atrasoEspecialidades.map(e => ({...e, atrasados: e.atrasados || 0, percentual_atraso: e.percentual_atraso || 0}))}
-            categorias={[]}
-            prioridades={[]}
-            totalAtrasados={stats.total_atrasados}
-            percentualAtrasoGeral={stats.percentual_atraso}
-          />
+            <TabsContent value="executive" className="mt-6">
+              <VolumetriaExecutiveSummary 
+                data={{
+                  stats,
+                  clientes,
+                  modalidades,
+                  especialidades
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="charts" className="mt-6">
+              <VolumetriaCharts 
+                clientes={clientes}
+                modalidades={modalidades}
+                especialidades={especialidades}
+                categorias={categorias}
+                prioridades={prioridades}
+              />
+            </TabsContent>
+
+            <TabsContent value="delays" className="mt-6">
+              <VolumetriaDelayAnalysis 
+                data={{
+                  clientes: atrasoClientes,
+                  modalidades: atrasoModalidades.map(m => ({...m, atrasados: m.atrasados || 0, percentual_atraso: m.percentual_atraso || 0})),
+                  especialidades: atrasoEspecialidades.map(e => ({...e, atrasados: e.atrasados || 0, percentual_atraso: e.percentual_atraso || 0})),
+                  categorias: atrasoCategorias.map(c => ({...c, atrasados: c.atrasados || 0, percentual_atraso: c.percentual_atraso || 0})),
+                  prioridades: atrasoPrioridades.map(p => ({...p, atrasados: p.atrasados || 0, percentual_atraso: p.percentual_atraso || 0})),
+                  totalAtrasados: stats.total_atrasados,
+                  percentualAtrasoGeral: stats.percentual_atraso
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="operational" className="mt-6">
+              <div className="grid grid-cols-1 gap-6">
+                <VolumetriaExamesNaoIdentificados />
+                <VolumetriaUploadStats />
+              </div>
+            </TabsContent>
+          </Tabs>
         </>
       )}
 
