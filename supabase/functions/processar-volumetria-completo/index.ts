@@ -13,13 +13,19 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte, start_row = 0, batch_size = 500 } = await req.json();
+    const requestBody = await req.json();
+    const { file_path, arquivo_fonte, start_row = 0, batch_size = 500 } = requestBody;
 
     console.log(`=== PROCESSAMENTO COMPLETO - BATCH ${Math.floor(start_row / batch_size) + 1} ===`);
-    console.log(`Arquivo: ${file_path}`);
-    console.log(`Fonte: ${arquivo_fonte}`);
-    console.log(`Linha inicial: ${start_row}`);
-    console.log(`Tamanho do batch: ${batch_size}`);
+    console.log(`📋 Dados recebidos:`, JSON.stringify(requestBody));
+    console.log(`📂 Arquivo: ${file_path}`);
+    console.log(`📑 Fonte: ${arquivo_fonte}`);
+    console.log(`📊 Linha inicial: ${start_row}`);
+    console.log(`📦 Tamanho do batch: ${batch_size}`);
+
+    if (!file_path) {
+      throw new Error('file_path é obrigatório');
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -27,15 +33,22 @@ serve(async (req) => {
     );
 
     // Baixar arquivo
+    console.log(`📥 Tentando baixar arquivo: ${file_path}`);
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
 
     if (downloadError) {
-      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+      console.error('❌ Erro no download:', downloadError);
+      throw new Error(`Erro ao baixar arquivo: ${JSON.stringify(downloadError)}`);
     }
 
-    console.log('Arquivo baixado, tamanho:', fileData.size);
+    if (!fileData) {
+      console.error('❌ Arquivo não encontrado ou vazio');
+      throw new Error('Arquivo não encontrado no storage');
+    }
+
+    console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
     // Ler Excel completo para obter total de linhas
     const arrayBuffer = await fileData.arrayBuffer();
