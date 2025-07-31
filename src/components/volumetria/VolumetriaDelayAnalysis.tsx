@@ -137,7 +137,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               ({data.totalAtrasados.toLocaleString()} de {(data.totalAtrasados / (data.percentualAtrasoGeral/100)).toLocaleString()} laudos)
               {data.percentualAtrasoGeral >= 15 && (
                 <span className="block mt-2 text-red-600 font-medium">
-                  ⚠️ Nível crítico de atrasos detectado! Ação imediata necessária.
+                  ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
                 </span>
               )}
             </AlertDescription>
@@ -145,7 +145,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{data.totalAtrasados.toLocaleString()}</div>
+              <div className="text-3xl font-bold text-red-600">{data.totalAtrasados.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
             </div>
             <div className="text-center">
@@ -215,10 +215,36 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </CardContent>
         </Card>
 
-        {/* Segmentação de Atraso por Clientes */}
+        {/* Top Modalidades com Atrasos */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Distribuição de Atrasos - Clientes</CardTitle>
+            <CardTitle className="text-lg">Top 5 Modalidades - Maior % de Atrasos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={topDelayModalidades}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="nome" angle={-45} textAnchor="end" height={80} />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: number, name: string) => [
+                    `${value.toFixed(1)}%`, 
+                    'Taxa de Atraso'
+                  ]}
+                />
+                <Bar dataKey="percentual_atraso" fill="#f97316" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Análise Detalhada */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribuição de Atrasos - Clientes */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição de Atrasos - Clientes</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -234,62 +260,19 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                   dataKey="value"
                 >
                   {clienteSegments.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell key={`client-cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value: number) => [`${value} clientes`, 'Quantidade']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Top Modalidades com Atrasos */}
+        {/* Resumo por Cliente */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Top 5 Modalidades - Maior % de Atrasos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topDelayModalidades}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nome" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: number) => [`${value.toFixed(1)}%`, 'Taxa de Atraso']}
-                />
-                <Bar dataKey="percentual_atraso" fill="#f97316" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Top Especialidades com Atrasos */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Top 5 Especialidades - Maior % de Atrasos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topDelayEspecialidades}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nome" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: number) => [`${value.toFixed(1)}%`, 'Taxa de Atraso']}
-                />
-                <Bar dataKey="percentual_atraso" fill="#eab308" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Listas Detalhadas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Lista Top 10 Clientes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Ranking de Atrasos - Clientes</CardTitle>
+            <CardTitle>Resumo - Clientes Críticos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -317,41 +300,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </div>
           </CardContent>
         </Card>
-
-        {/* Lista Top 5 Modalidades */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Ranking de Atrasos - Modalidades</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {topDelayModalidades.map((modalidade, index) => {
-                const category = categorizeDelay(modalidade.percentual_atraso);
-                return (
-                  <div key={modalidade.nome} className={`p-3 rounded-lg ${category.bgColor}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
-                        <span className="font-medium text-sm">{modalidade.nome}</span>
-                      </div>
-                      <Badge style={{ backgroundColor: category.color, color: 'white' }}>
-                        {category.label}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>{modalidade.atrasados} atrasados de {modalidade.total_exames} laudos</span>
-                      <span className="font-bold">{modalidade.percentual_atraso.toFixed(1)}%</span>
-                    </div>
-                    <Progress value={modalidade.percentual_atraso} className="h-2" />
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Estatísticas Avançadas */}
+      {/* Análise de Nível de Atraso */}
       <Card>
         <CardHeader>
           <CardTitle>Análise de Nível de Atraso</CardTitle>
