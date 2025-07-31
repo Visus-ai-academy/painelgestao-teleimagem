@@ -161,15 +161,16 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       while (hasMore) {
         let query = supabase.from('volumetria_mobilemed').select(`
           EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
-          VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
+          VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
         `).range(from, from + batchSize - 1);
         
-        // CORREÇÃO: Só aplicar filtro de data se startDate E endDate existirem
-        if (startDate && endDate) {
-          query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
-          console.log('🎯 Filtro de data aplicado na DATA_REALIZACAO:', startDate, 'até', endDate);
+        // Só aplicar filtro de data se AMBOS startDate E endDate existirem E não forem 'todos'
+        if (startDate && endDate && filters.ano !== 'todos') {
+          // Usar data_referencia ao invés de DATA_REALIZACAO para melhor cobertura
+          query = query.gte('data_referencia', startDate).lte('data_referencia', endDate);
+          console.log('🎯 Filtro de data aplicado na data_referencia:', startDate, 'até', endDate);
         } else {
-          console.log('⚠️ Nenhum filtro de data aplicado - buscando TODOS os registros');
+          console.log('📊 BUSCANDO TODOS OS REGISTROS (sem filtro de data)');
         }
 
         if (filters.cliente !== 'todos') {
@@ -431,7 +432,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       setData({
         stats: {
           total_exames: totalLaudos,
-          total_registros: totalLaudos,
+          total_registros: totalRegistros, // Corrigido: usar a contagem real de registros
           total_atrasados: totalAtrasados,
           percentual_atraso: percentualAtraso,
           total_clientes: clientesMap.size,
