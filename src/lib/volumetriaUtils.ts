@@ -374,6 +374,27 @@ export async function processVolumetriaFile(
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
     console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros, ${registrosAtualizados} atualizados`);
 
+    // Aplicar regras específicas para arquivos retroativos
+    if (arquivoFonte.includes('retroativo')) {
+      console.log('🔧 Aplicando regras específicas para arquivo retroativo...');
+      try {
+        const { data: regrasResult, error: regrasError } = await supabase.functions.invoke('aplicar-regras-tratamento', {
+          body: {
+            arquivo_fonte: arquivoFonte
+          }
+        });
+        
+        if (regrasError) {
+          console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
+        } else {
+          console.log('✅ Regras específicas aplicadas:', regrasResult);
+          registrosAtualizados += regrasResult?.registros_atualizados || 0;
+        }
+      } catch (regrasError) {
+        console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
+      }
+    }
+
     // Forçar atualização das estatísticas após processamento
     console.log('🔄 Atualizando estatísticas...');
     try {
