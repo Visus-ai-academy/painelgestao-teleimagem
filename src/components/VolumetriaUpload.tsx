@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { processVolumetriaFile, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
-import { Upload, FileText, CheckCircle, AlertCircle, Lock, XCircle, Clock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { Badge } from "@/components/ui/badge";
+import { Upload, FileText, CheckCircle, Lock } from 'lucide-react';
 
 interface VolumetriaUploadProps {
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
@@ -22,75 +19,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     total: number;
     inserted: number;
   } | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<{
-    tipo_arquivo: string;
-    arquivo_nome: string;
-    status: string;
-    registros_processados: number;
-    registros_inseridos: number;
-    registros_atualizados: number;
-    registros_erro: number;
-    created_at: string;
-  } | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
   const { toast } = useToast();
-
-  // Buscar status do último upload na inicialização
-  useEffect(() => {
-    fetchUploadStatus();
-  }, [arquivoFonte]);
-
-  const fetchUploadStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .eq('tipo_arquivo', arquivoFonte)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Erro ao buscar status:', error);
-      }
-
-      if (data && data.length > 0) {
-        setUploadStatus(data[0]);
-      } else {
-        setUploadStatus(null);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar status:', error);
-      setUploadStatus(null);
-    } finally {
-      setStatusLoading(false);
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'concluido':
-        return <CheckCircle className="h-3 w-3 text-green-500" />;
-      case 'erro':
-        return <XCircle className="h-3 w-3 text-red-500" />;
-      case 'processando':
-        return <Clock className="h-3 w-3 text-yellow-500" />;
-      default:
-        return <AlertCircle className="h-3 w-3 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'concluido':
-        return 'bg-green-100 text-green-800';
-      case 'erro':
-        return 'bg-red-100 text-red-800';
-      case 'processando':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -167,8 +96,6 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
             title: "Upload concluído!",
             description: `${result.totalInserted} registros inseridos com sucesso.`,
           });
-          // Atualizar status após sucesso
-          await fetchUploadStatus();
           onSuccess?.();
         } else {
         toast({
@@ -267,52 +194,6 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         </div>
       )}
 
-      {/* Status do último upload */}
-      {!statusLoading && uploadStatus && (
-        <div className="space-y-2 mt-4 p-3 bg-muted/30 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {getStatusIcon(uploadStatus.status)}
-              <span className="text-sm font-medium">Último Upload</span>
-              <Badge className={`text-xs ${getStatusColor(uploadStatus.status)}`}>
-                {uploadStatus.status}
-              </Badge>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {new Date(uploadStatus.created_at).toLocaleDateString('pt-BR')} {new Date(uploadStatus.created_at).toLocaleTimeString('pt-BR')}
-            </div>
-          </div>
-          
-          <div className="text-xs text-muted-foreground truncate">
-            <strong>Arquivo:</strong> {uploadStatus.arquivo_nome}
-          </div>
-          
-          <div className="grid grid-cols-4 gap-2 text-xs">
-            <div className="text-center">
-              <div className="font-medium text-blue-600">{uploadStatus.registros_processados}</div>
-              <div className="text-muted-foreground">Proc.</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-green-600">{uploadStatus.registros_inseridos}</div>
-              <div className="text-muted-foreground">Inser.</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-orange-600">{uploadStatus.registros_atualizados}</div>
-              <div className="text-muted-foreground">Atual.</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-red-600">{uploadStatus.registros_erro}</div>
-              <div className="text-muted-foreground">Erros</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!statusLoading && !uploadStatus && !isProcessing && (
-        <div className="text-xs text-muted-foreground text-center">
-          Nenhum upload realizado
-        </div>
-      )}
     </div>
   );
 }
