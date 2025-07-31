@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -79,6 +80,28 @@ export function ControlePeriodoFaturamento({
     onPeriodoChange?.(periodo);
   };
 
+  // Memoizar os períodos para evitar recálculos constantes
+  const periodos = useMemo(() => {
+    return Array.from({ length: 26 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - 24 + i); // -24 a +2 meses
+      const periodo = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const status = getStatusPeriodoFaturamento(periodo);
+      const isDisponivel = isPeriodoDisponivelFaturamento(periodo);
+      
+      return {
+        periodo,
+        status,
+        isDisponivel
+      };
+    });
+  }, []); // Array vazio - só calcula uma vez na montagem
+
+  // Memoizar o status do período selecionado
+  const statusPeriodoSelecionado = useMemo(() => {
+    return getStatusPeriodoFaturamento(periodoSelecionado);
+  }, [periodoSelecionado]);
+
   return (
     <Card>
       <CardHeader>
@@ -100,40 +123,31 @@ export function ControlePeriodoFaturamento({
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Gerar lista dos últimos 24 meses + próximos 2 */}
-                  {Array.from({ length: 26 }, (_, i) => {
-                    const date = new Date();
-                    date.setMonth(date.getMonth() - 24 + i); // -24 a +2 meses
-                    const periodo = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    const status = getStatusPeriodoFaturamento(periodo);
-                    const isDisponivel = isPeriodoDisponivelFaturamento(periodo);
-                    
-                    return (
-                      <SelectItem 
-                        key={periodo} 
-                        value={periodo}
-                        disabled={mostrarApenasDisponiveis && !isDisponivel}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>{periodo}</span>
-                          <Badge 
-                            variant={
-                              status === 'concluido' ? 'default' :
-                              status === 'pronto' ? 'default' :
-                              status === 'futuro' ? 'secondary' : 'outline'
-                            }
-                            className="text-xs"
-                          >
-                            {
-                              status === 'concluido' ? 'Concluído' :
-                              status === 'pronto' ? 'Pronto' :
-                              status === 'futuro' ? 'Futuro' : 'Em Andamento'
-                            }
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {periodos.map(({ periodo, status, isDisponivel }) => (
+                    <SelectItem 
+                      key={periodo} 
+                      value={periodo}
+                      disabled={mostrarApenasDisponiveis && !isDisponivel}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{periodo}</span>
+                        <Badge 
+                          variant={
+                            status === 'concluido' ? 'default' :
+                            status === 'pronto' ? 'default' :
+                            status === 'futuro' ? 'secondary' : 'outline'
+                          }
+                          className="text-xs"
+                        >
+                          {
+                            status === 'concluido' ? 'Concluído' :
+                            status === 'pronto' ? 'Pronto' :
+                            status === 'futuro' ? 'Futuro' : 'Em Andamento'
+                          }
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -151,43 +165,35 @@ export function ControlePeriodoFaturamento({
             <div className="p-4 border rounded-lg">
               <h4 className="font-medium mb-3">Status do Período Selecionado</h4>
               <div className="space-y-2">
-                {(() => {
-                  const status = getStatusPeriodoFaturamento(periodoSelecionado);
-                  
-                  return (
-                    <>
-                       <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${
-                          status === 'concluido' ? 'bg-green-500' :
-                          status === 'pronto' ? 'bg-blue-500' :
-                          status === 'futuro' ? 'bg-yellow-500' : 'bg-orange-500'
-                        }`}></div>
-                        <span className="font-medium">
-                          {periodoSelecionado} - {
-                            status === 'concluido' ? 'Concluído' :
-                            status === 'pronto' ? 'Pronto p/ Faturar' :
-                            status === 'futuro' ? 'Futuro' : 'Em Andamento'
-                          }
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm text-gray-600">
-                        {status === 'concluido' && (
-                          <p className="text-green-700">✅ Dados históricos - Faturamento/Volumetria concluída</p>
-                        )}
-                        {status === 'pronto' && (
-                          <p className="text-blue-700">💰 Período pronto para faturamento - dados completos</p>
-                        )}
-                        {status === 'futuro' && (
-                          <p className="text-yellow-700">📅 Período futuro - dados podem não estar completos</p>
-                        )}
-                        {status === 'pendente' && (
-                          <p className="text-orange-700">⏳ Período em andamento - aguardando fechamento</p>
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${
+                    statusPeriodoSelecionado === 'concluido' ? 'bg-green-500' :
+                    statusPeriodoSelecionado === 'pronto' ? 'bg-blue-500' :
+                    statusPeriodoSelecionado === 'futuro' ? 'bg-yellow-500' : 'bg-orange-500'
+                  }`}></div>
+                  <span className="font-medium">
+                    {periodoSelecionado} - {
+                      statusPeriodoSelecionado === 'concluido' ? 'Concluído' :
+                      statusPeriodoSelecionado === 'pronto' ? 'Pronto p/ Faturar' :
+                      statusPeriodoSelecionado === 'futuro' ? 'Futuro' : 'Em Andamento'
+                    }
+                  </span>
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  {statusPeriodoSelecionado === 'concluido' && (
+                    <p className="text-green-700">✅ Dados históricos - Faturamento/Volumetria concluída</p>
+                  )}
+                  {statusPeriodoSelecionado === 'pronto' && (
+                    <p className="text-blue-700">💰 Período pronto para faturamento - dados completos</p>
+                  )}
+                  {statusPeriodoSelecionado === 'futuro' && (
+                    <p className="text-yellow-700">📅 Período futuro - dados podem não estar completos</p>
+                  )}
+                  {statusPeriodoSelecionado === 'pendente' && (
+                    <p className="text-orange-700">⏳ Período em andamento - aguardando fechamento</p>
+                  )}
+                </div>
               </div>
             </div>
 
