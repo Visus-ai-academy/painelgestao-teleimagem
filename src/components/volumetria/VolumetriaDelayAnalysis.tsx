@@ -107,7 +107,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       // Buscar dados do cliente específico
       const { data: clientData, error } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO')
+        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, PRIORIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO')
         .eq('EMPRESA', clienteName);
 
       if (error) throw error;
@@ -159,11 +159,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             catData.tempoTotal += tempoAtraso;
           }
 
-          // Processar prioridades (baseado no tempo de atraso)
-          let prioridade = 'Normal';
-          if (tempoAtraso > 1440) prioridade = 'Crítica'; // Mais de 24h
-          else if (tempoAtraso > 480) prioridade = 'Alta'; // Mais de 8h
-          else if (tempoAtraso > 120) prioridade = 'Média'; // Mais de 2h
+          // Processar prioridades (usando dados reais da coluna PRIORIDADE)
+          // Buscar prioridade real dos dados ou usar valor padrão
+          const prioridade = row.PRIORIDADE || 'Não Informado';
           
           if (!prioridadesMap.has(prioridade)) {
             prioridadesMap.set(prioridade, { total: 0, atrasados: 0, tempoTotal: 0 });
