@@ -1,15 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from '@/components/FileUpload';
+import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, Database, BarChart3, Settings } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileText, Upload, Database, BarChart3, Settings, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 
 export default function UploadDados() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
+  const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
 
   const handleUploadSuccess = () => {
     console.log('Upload realizado com sucesso');
@@ -73,23 +78,56 @@ export default function UploadDados() {
     }
   };
 
-  // Handler para volumetria incremental
+  
+  // Handler para volumetria normal (limitada)
   const handleUploadVolumetria = async (file: File) => {
     console.log('🔄 Iniciando upload de volumetria:', file.name);
     
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      // 1. Upload do arquivo para o storage
+      const fileName = `volumetria_padrao_${Date.now()}_${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
 
-    const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
-      body: formData
-    });
+      if (uploadError) throw uploadError;
 
-    if (error) throw error;
-    
-    toast({
-      title: "Volumetria Processada!",
-      description: `${data.inseridos} registros inseridos, ${data.erros} erros`,
-    });
+      // 2. Chamar edge function para processar
+      const { data, error: processError } = await supabase.functions
+        .invoke('processar-volumetria-mobilemed', {
+          body: { 
+            file_path: fileName,
+            arquivo_fonte: 'volumetria_padrao'
+          }
+        });
+
+      if (processError) throw processError;
+
+      if (data.success) {
+        const isLimited = data.limited_processing;
+        
+        toast({
+          title: isLimited ? "Upload processado (arquivo grande)" : "Upload realizado com sucesso!",
+          description: isLimited 
+            ? `${data.stats?.inseridos || 0} registros inseridos (limitado). Use "Processamento Completo" para processar todos os registros.`
+            : `${data.stats?.inseridos || 0} registros inseridos.`,
+        });
+
+        // Se foi limitado, salvar para processamento completo
+        if (isLimited) {
+          setLastUploadedFile(fileName);
+        }
+      } else {
+        throw new Error(data.error || 'Erro no processamento');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro no upload",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   // Handler para faturamento incremental
@@ -150,7 +188,7 @@ export default function UploadDados() {
                 Upload de dados de volumetria do mês atual para processamento incremental
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <FileUpload
                 title="Dados de Volumetria"
                 description="Arquivo com dados de exames e laudos do período atual"
@@ -174,6 +212,45 @@ export default function UploadDados() {
                 ]}
                 onUpload={handleUploadVolumetria}
               />
+              
+              {lastUploadedFile && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Processamento Completo Disponível</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Seu último arquivo foi limitado. Use o processamento completo para processar todos os registros.
+                      </p>
+                    </div>
+                    <Dialog open={showProcessarCompleto} onOpenChange={setShowProcessarCompleto}>
+                      <DialogTrigger asChild>
+                        <Button className="flex items-center gap-2">
+                          <Zap className="h-4 w-4" />
+                          Processamento Completo
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Processamento Completo do Arquivo</DialogTitle>
+                          <DialogDescription>
+                            Processa o arquivo inteiro em batches pequenos para evitar timeouts.
+                            Este processo pode levar alguns minutos dependendo do tamanho do arquivo.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ProcessarArquivoCompleto
+                          filePath={lastUploadedFile}
+                          arquivoFonte="volumetria_padrao"
+                          totalEstimado={34000}
+                          onComplete={() => {
+                            setShowProcessarCompleto(false);
+                            setLastUploadedFile(null);
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
