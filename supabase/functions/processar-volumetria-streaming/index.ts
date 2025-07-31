@@ -204,11 +204,15 @@ async function initializeProcessing(requestData: any, supabaseClient: any) {
 
   // Baixar e ler arquivo COMPLETO para obter total de linhas
   console.log('📖 Lendo arquivo para análise inicial...');
-  console.log('📁 Arquivo path:', file_path);
+  console.log('📁 Arquivo path original:', file_path);
+  
+  // Remove "uploads/" prefix se presente (o bucket já é "uploads")
+  const cleanFilePath = file_path.replace(/^uploads\//, '');
+  console.log('📁 Arquivo path limpo:', cleanFilePath);
   
   const { data: fileData, error: downloadError } = await supabaseClient.storage
     .from('uploads')
-    .download(file_path);
+    .download(cleanFilePath);
     
   if (downloadError) {
     console.error('❌ Erro download:', downloadError);
@@ -399,9 +403,10 @@ serve(async (req) => {
       
       // Re-baixar dados se necessário (cache seria melhor, mas por simplicidade)  
       console.log('📁 Re-downloading file:', state.file_path);
+      const cleanFilePath = state.file_path.replace(/^uploads\//, '');
       const { data: fileData } = await supabaseClient.storage
         .from('uploads')
-        .download(state.file_path);
+        .download(cleanFilePath);
       
       const arrayBuffer = await fileData.arrayBuffer();
       const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array', dense: true });
