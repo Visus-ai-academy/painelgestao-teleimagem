@@ -38,7 +38,7 @@ interface VolumetriaRecord {
   CODIGO_INTERNO?: number;
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
-  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
+  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
   lote_upload?: string;
   periodo_referencia?: string;
 }
@@ -102,7 +102,7 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao', loteUpload: string, periodoReferencia: string): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string): VolumetriaRecord | null {
   try {
     if (!row || typeof row !== 'object') return null;
 
@@ -365,8 +365,9 @@ serve(async (req) => {
       throw new Error('file_path e arquivo_fonte são obrigatórios');
     }
 
-    if (!['data_laudo', 'data_exame', 'volumetria_fora_padrao'].includes(arquivo_fonte)) {
-      throw new Error('arquivo_fonte deve ser "data_laudo", "data_exame" ou "volumetria_fora_padrao"');
+    const validSources = ['data_laudo', 'data_exame', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+    if (!validSources.includes(arquivo_fonte)) {
+      throw new Error(`arquivo_fonte deve ser um dos: ${validSources.join(', ')}`);
     }
 
     const supabaseClient = createClient(

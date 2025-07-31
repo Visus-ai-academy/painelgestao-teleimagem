@@ -321,23 +321,10 @@ export async function processVolumetriaFile(
     console.log('Fonte:', arquivoFonte);
     console.log('Período:', periodoFaturamento);
     
-    // Determinar o arquivo_fonte para a edge function baseado no tipo
-    let edgeFunctionSource: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
+    // Determinar o arquivo_fonte para a edge function - agora enviando o tipo exato
+    const edgeFunctionSource = arquivoFonte; // Enviar o tipo exato sem mapeamento
     
-    // Mapear tipos de arquivo para fontes da edge function
-    switch (arquivoFonte) {
-      case 'volumetria_padrao':
-      case 'volumetria_padrao_retroativo':
-      case 'volumetria_onco_padrao':
-        edgeFunctionSource = 'data_laudo'; // Arquivo com data de laudo
-        break;
-      case 'volumetria_fora_padrao':
-      case 'volumetria_fora_padrao_retroativo':
-        edgeFunctionSource = 'volumetria_fora_padrao'; // Arquivo fora do padrão
-        break;
-      default:
-        throw new Error(`Tipo de arquivo não suportado: ${arquivoFonte}`);
-    }
+    console.log(`📁 Tipo de arquivo enviado: ${edgeFunctionSource}`);
 
     // Upload do arquivo para o storage
     const timestamp = Date.now();
