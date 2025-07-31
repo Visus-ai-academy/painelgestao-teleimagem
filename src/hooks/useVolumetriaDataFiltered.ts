@@ -131,50 +131,69 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       console.log('🔍 Iniciando carregamento de dados volumetria');
       console.log('📅 Filtros aplicados:', filters);
       
-      let query = supabase.from('volumetria_mobilemed').select(`
-        EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
-        VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
-      `).limit(100000); // Removendo qualquer limitação padrão
-      
+      // Fazer query em lotes para evitar limitações
+      let allData: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
       const { startDate, endDate } = buildDateFilter();
       console.log('📊 Período selecionado:', { startDate, endDate });
-      
-      // CORREÇÃO: Só aplicar filtro de data se startDate E endDate existirem
-      if (startDate && endDate) {
-        query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
-        console.log('🎯 Filtro de data aplicado na DATA_REALIZACAO:', startDate, 'até', endDate);
-      } else {
-        console.log('⚠️ Nenhum filtro de data aplicado - buscando TODOS os registros');
-      }
 
-      if (filters.cliente !== 'todos') {
-        query = query.eq('EMPRESA', filters.cliente);
-        console.log('🏢 Filtro cliente aplicado:', filters.cliente);
-      }
-      if (filters.modalidade !== 'todos') {
-        query = query.eq('MODALIDADE', filters.modalidade);
-        console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
-      }
-      if (filters.especialidade !== 'todos') {
-        query = query.eq('ESPECIALIDADE', filters.especialidade);
-        console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
-      }
-      if (filters.medico !== 'todos') {
-        query = query.eq('MEDICO', filters.medico);
-        console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
-      }
+      while (hasMore) {
+        let query = supabase.from('volumetria_mobilemed').select(`
+          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
+          VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
+        `).range(from, from + batchSize - 1);
+        
+        // CORREÇÃO: Só aplicar filtro de data se startDate E endDate existirem
+        if (startDate && endDate) {
+          query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
+          console.log('🎯 Filtro de data aplicado na DATA_REALIZACAO:', startDate, 'até', endDate);
+        } else {
+          console.log('⚠️ Nenhum filtro de data aplicado - buscando TODOS os registros');
+        }
 
-      const { data: rawData, error } = await query;
+        if (filters.cliente !== 'todos') {
+          query = query.eq('EMPRESA', filters.cliente);
+          console.log('🏢 Filtro cliente aplicado:', filters.cliente);
+        }
+        if (filters.modalidade !== 'todos') {
+          query = query.eq('MODALIDADE', filters.modalidade);
+          console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
+        }
+        if (filters.especialidade !== 'todos') {
+          query = query.eq('ESPECIALIDADE', filters.especialidade);
+          console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
+        }
+        if (filters.medico !== 'todos') {
+          query = query.eq('MEDICO', filters.medico);
+          console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
+        }
+
+        const { data: batchData, error } = await query;
+        
+        if (error) throw error;
+
+        if (batchData && batchData.length > 0) {
+          allData = allData.concat(batchData);
+          from += batchSize;
+          
+          // Se recebeu menos que o batchSize, não há mais dados
+          if (batchData.length < batchSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
       
-      console.log('📈 Resultado da query:', {
-        totalRegistros: rawData?.length || 0,
-        temErro: !!error,
-        erro: error?.message
+      console.log('📈 Resultado total da query paginada:', {
+        totalRegistros: allData.length,
+        temErro: false
       });
 
-      if (error) throw error;
-
-      if (!rawData || rawData.length === 0) {
+      if (!allData || allData.length === 0) {
         setData({
           stats: {
             total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
@@ -188,7 +207,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       }
 
       // Calcular atrasos
-      const atrasados = rawData.filter(item => {
+      const atrasados = allData.filter(item => {
         if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
         try {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
@@ -199,8 +218,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         }
       });
 
-      const totalLaudos = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-      const totalRegistros = rawData.length;
+      const totalLaudos = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      const totalRegistros = allData.length;
       const totalAtrasados = atrasados.length;
       const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
       
@@ -209,7 +228,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         totalRegistros,
         totalAtrasados,
         percentualAtraso,
-        amostraValores: rawData.slice(0, 5).map(item => ({ VALORES: item.VALORES, DATA_REALIZACAO: item.DATA_REALIZACAO }))
+        amostraValores: allData.slice(0, 5).map(item => ({ VALORES: item.VALORES, DATA_REALIZACAO: item.DATA_REALIZACAO }))
       });
 
       // Agrupar dados
@@ -220,7 +239,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const prioridadesMap = new Map();
       const medicosSet = new Set();
 
-      rawData.forEach(item => {
+      allData.forEach(item => {
         const isAtrasado = atrasados.includes(item);
         
         // Clientes
