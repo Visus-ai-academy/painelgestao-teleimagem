@@ -117,7 +117,7 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     const record: VolumetriaRecord = {
       EMPRESA: String(empresa).trim(),
       NOME_PACIENTE: String(nomePaciente).trim(),
-      arquivo_fonte: arquivoFonte,
+      arquivo_fonte: arquivoFonte as any,
       lote_upload: loteUpload,
       periodo_referencia: periodoReferencia,
       
@@ -161,11 +161,12 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
   }
 }
 
-// Função para processamento com controle de lote
+// Função para processamento com controle de lote otimizado para arquivos grandes
 async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any, fileName: string, periodo: any) {
   console.log(`=== PROCESSAMENTO COM CONTROLE DE LOTE ===`);
-  console.log(`Total de registros: ${jsonData.length}`);
   console.log(`Arquivo: ${fileName}`);
+  console.log(`Fonte: ${arquivo_fonte}`);
+  console.log(`Total de registros: ${jsonData.length}`);
   console.log(`Período: ${JSON.stringify(periodo)}`);
   
   if (jsonData.length === 0) {
@@ -174,10 +175,23 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
 
   // Gerar identificadores únicos para este lote
   const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLogId.substring(0, 8)}`;
-  const periodoReferencia = periodo ? `${periodo.mes}/${periodo.ano}` : new Date().toISOString().substring(0, 7);
+  const periodoReferencia = periodo ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` : new Date().toISOString().substring(0, 7);
 
   console.log(`🏷️ Lote: ${loteUpload}`);
   console.log(`📅 Período: ${periodoReferencia}`);
+
+  // Constantes otimizadas para arquivos grandes
+  const LARGE_FILE_THRESHOLD = 5000; // Reduzido para ser mais conservativo
+  const isLargeFile = jsonData.length > LARGE_FILE_THRESHOLD;
+  
+  // Configuração adaptativa baseada no tamanho do arquivo
+  const CHUNK_SIZE = isLargeFile ? 50 : 250;           // Chunks muito pequenos para arquivos grandes
+  const BATCH_SIZE = isLargeFile ? 10 : 20;            // Batches ainda menores
+  const MAX_EXECUTION_TIME = isLargeFile ? 50000 : 30000; // Mais tempo para arquivos grandes
+  const PROGRESS_UPDATE_INTERVAL = isLargeFile ? 5 : 3;    // Updates mais frequentes
+
+  console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
+  console.log(`⚙️ Config: Chunk=${CHUNK_SIZE}, Batch=${BATCH_SIZE}, Timeout=${MAX_EXECUTION_TIME}ms`);
 
   // IMPORTANTE: Limpar dados existentes do mesmo arquivo_fonte e período para evitar acúmulo
   try {
@@ -193,22 +207,19 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     console.error('⚠️ Erro na limpeza (continuando):', cleanupError);
   }
 
-  // Configurações otimizadas
-  const CHUNK_SIZE = Math.min(200, jsonData.length); // Chunks ainda menores
-  const BATCH_SIZE = 25;  // Batches muito pequenos para inserção rápida
-  const MAX_EXECUTION_TIME = 5000; // 5 segundos de segurança máxima
-  
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
   const startTime = Date.now();
 
-  // Processar em chunks pequenos
+  // Processar em chunks pequenos para evitar overflow de memória
   for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
-    // Controle rigoroso de tempo
     const currentTime = Date.now();
-    if (currentTime - startTime > MAX_EXECUTION_TIME) {
-      console.log(`⏰ TIMEOUT após ${totalProcessed} registros em ${currentTime - startTime}ms`);
+    const elapsedTime = currentTime - startTime;
+    
+    // Controle rigoroso de timeout
+    if (elapsedTime > MAX_EXECUTION_TIME) {
+      console.log(`⏰ TIMEOUT após ${totalProcessed} registros em ${elapsedTime}ms`);
       break;
     }
 
@@ -216,7 +227,7 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     const chunkNumber = Math.floor(chunkStart / CHUNK_SIZE) + 1;
     const totalChunks = Math.ceil(jsonData.length / CHUNK_SIZE);
     
-    console.log(`📦 Chunk ${chunkNumber}/${totalChunks}: ${chunk.length} registros`);
+    console.log(`📦 Chunk ${chunkNumber}/${totalChunks}: ${chunk.length} registros (${Math.round(elapsedTime/1000)}s)`);
 
     // Processamento das linhas
     const allRecords: VolumetriaRecord[] = [];
@@ -235,7 +246,7 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
       totalProcessed++;
     }
     
-    // Inserção em micro-batches
+    // Inserção em micro-batches para reduzir uso de memória
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
       
@@ -257,9 +268,12 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
       }
     }
 
-    // Update de progresso esporádico
-    if (chunkNumber % 3 === 0 || chunkNumber === totalChunks) {
+    // Update de progresso otimizado
+    if (chunkNumber % PROGRESS_UPDATE_INTERVAL === 0 || chunkNumber === totalChunks) {
       try {
+        const progressPercentage = Math.round((totalProcessed / jsonData.length) * 100);
+        const elapsedSeconds = Math.round(elapsedTime / 1000);
+        
         await supabaseClient
           .from('processamento_uploads')
           .update({ 
@@ -267,27 +281,34 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
             registros_inseridos: totalInserted,
             registros_erro: totalErrors,
             detalhes_erro: JSON.stringify({
-              status: 'Processando Rápido',
-              progresso: `${Math.round((totalProcessed / jsonData.length) * 100)}%`,
+              status: isLargeFile ? 'Processando Arquivo Grande' : 'Processando Rápido',
+              progresso: `${progressPercentage}%`,
               chunk: `${chunkNumber}/${totalChunks}`,
               lote: loteUpload,
               periodo: periodoReferencia,
-              tempo: `${Math.round((Date.now() - startTime) / 1000)}s`
+              tempo: `${elapsedSeconds}s`,
+              otimizado: true
             })
           })
           .eq('id', uploadLogId);
       } catch (updateErr) {
-        // Ignorar para ganhar tempo
+        // Ignorar erros de update para não atrapalhar o processamento
       }
     }
+    
+    // Forçar garbage collection liberando a referência do array
+    allRecords.length = 0;
   }
 
   const executionTime = Date.now() - startTime;
   console.log(`⚡ Processamento: ${totalInserted} inseridos, ${totalErrors} erros em ${executionTime}ms`);
   
-  // Aplicar regras apenas se necessário e dentro do tempo
+  // Aplicar regras apenas se tiver tempo suficiente e não for arquivo muito grande
   let registrosAtualizadosDePara = 0;
-  if (totalInserted > 0 && executionTime < MAX_EXECUTION_TIME - 1000) {
+  const hasTimeForRules = executionTime < (MAX_EXECUTION_TIME - 8000);
+  const shouldApplyRules = totalInserted > 0 && hasTimeForRules && !isLargeFile;
+  
+  if (shouldApplyRules) {
     try {
       console.log('🔧 Aplicando regras rápidas...');
       
@@ -300,10 +321,11 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
       const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
       registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
       console.log(`✅ De-Para prioridade: ${prioridadeResult?.registros_atualizados || 0}`);
-      
-    } catch (regraErr) {
-      console.error('⚠️ Erro regras:', regraErr);
+    } catch (rulesError) {
+      console.log(`⚠️ Erro nas regras (ignorado): ${rulesError.message}`);
     }
+  } else if (isLargeFile) {
+    console.log('⏭️ Pulando aplicação de regras para arquivo grande - será feito em background');
   }
 
   // Status final
@@ -387,7 +409,7 @@ serve(async (req) => {
         registros_inseridos: 0,
         registros_atualizados: 0,
         registros_erro: 0,
-        periodo_referencia: periodo ? `${periodo.mes}/${periodo.ano}` : null
+        periodo_referencia: periodo ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` : null
       })
       .select()
       .single();
@@ -410,7 +432,7 @@ serve(async (req) => {
 
     console.log('Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel com máxima otimização
+    // Ler Excel com otimizações para arquivos grandes
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
@@ -418,7 +440,7 @@ serve(async (req) => {
       cellNF: false, 
       cellHTML: false,
       dense: true,
-      sheetRows: 50000, // Limitar para evitar overflow
+      sheetRows: 0, // Não limitar linhas
       bookSST: false
     });
     
@@ -436,7 +458,7 @@ serve(async (req) => {
     
     console.log(`Dados extraídos: ${jsonData.length} linhas`);
     
-    // Processar com controle de lote
+    // Processar com controle de lote otimizado
     const resultado = await processFileWithBatchControl(
       jsonData, 
       arquivo_fonte, 
