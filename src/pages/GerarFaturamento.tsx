@@ -20,7 +20,8 @@ import {
   FileBarChart2,
   Zap,
   Users,
-  Upload
+  Upload,
+  Trash2
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
@@ -31,7 +32,7 @@ import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/Volume
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 import { Speedometer } from "@/components/Speedometer";
-import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos } from "@/lib/supabase";
+import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos, limparDadosVolumetria } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -104,6 +105,7 @@ export default function GerarFaturamento() {
   const [emailsEnviados, setEmailsEnviados] = useState(0);
   const [processandoTodos, setProcessandoTodos] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
+  const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(false);
   
   // Controle de período para volumetria retroativa
@@ -161,6 +163,42 @@ export default function GerarFaturamento() {
   }>>([]);
   
   const { toast } = useToast();
+
+  // Função para limpar dados de volumetria
+  const handleLimparDadosVolumetria = async () => {
+    setIsClearing(true);
+    try {
+      const arquivosParaLimpar = [
+        'volumetria_padrao',
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo'
+      ];
+
+      console.log('Iniciando limpeza dos dados de volumetria...');
+      
+      const resultado = await limparDadosVolumetria(arquivosParaLimpar);
+      
+      toast({
+        title: "Dados limpos com sucesso!",
+        description: `${resultado.registros_removidos} registros de volumetria removidos`,
+      });
+
+      console.log('Limpeza concluída:', resultado);
+      
+      // Atualizar os dados após a limpeza
+      setRefreshUploadStatus(prev => prev + 1);
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+      toast({
+        title: "Erro ao limpar dados",
+        description: "Ocorreu um erro ao tentar limpar os dados de volumetria",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   // Carregar clientes da base de dados (inicialização)
   const carregarClientes = async () => {
@@ -911,9 +949,21 @@ export default function GerarFaturamento() {
           <div className="grid gap-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  <CardTitle>Dados de Volumetria MobileMed</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    <CardTitle>Dados de Volumetria MobileMed</CardTitle>
+                  </div>
+                  <Button 
+                    onClick={handleLimparDadosVolumetria} 
+                    disabled={isClearing}
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {isClearing ? "Limpando..." : "Limpar Dados"}
+                  </Button>
                 </div>
                 <CardDescription>
                   Processamento dos arquivos de volumetria com conversões automáticas

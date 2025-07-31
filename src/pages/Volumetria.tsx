@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
@@ -9,9 +9,6 @@ import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadS
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { limparDadosVolumetria } from "@/lib/supabase";
 
 
 // Função para obter filtros padrão para o mês atual
@@ -38,46 +35,8 @@ const getDefaultFilters = (): VolumetriaFilters => {
 
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>(getDefaultFilters());
-  const [isClearing, setIsClearing] = useState(false);
-  const { toast } = useToast();
   
   const { stats, clientes, modalidades, especialidades, loading, refreshData } = useVolumetriaDataFiltered(filters);
-
-  // Função para limpar dados de volumetria
-  const handleLimparDados = async () => {
-    setIsClearing(true);
-    try {
-      const arquivosParaLimpar = [
-        'volumetria_padrao',
-        'volumetria_fora_padrao', 
-        'volumetria_padrao_retroativo',
-        'volumetria_fora_padrao_retroativo'
-      ];
-
-      console.log('Iniciando limpeza dos dados de volumetria...');
-      
-      const resultado = await limparDadosVolumetria(arquivosParaLimpar);
-      
-      toast({
-        title: "Dados limpos com sucesso!",
-        description: `${resultado.registros_removidos} registros de volumetria removidos`,
-      });
-
-      console.log('Limpeza concluída:', resultado);
-      
-      // Atualizar os dados após a limpeza
-      refreshData();
-    } catch (error) {
-      console.error('Erro ao limpar dados:', error);
-      toast({
-        title: "Erro ao limpar dados",
-        description: "Ocorreu um erro ao tentar limpar os dados de volumetria",
-        variant: "destructive",
-      });
-    } finally {
-      setIsClearing(false);
-    }
-  };
   
   // Forçar refresh após mudanças no código
   useEffect(() => {
@@ -103,24 +62,13 @@ export default function Volumetria() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
-          <p className="text-muted-foreground mt-1">
-            Análise executiva completa de volumetria - 
-            {stats.total_registros.toLocaleString()} registros | 
-            {stats.total_clientes} clientes
-          </p>
-        </div>
-        <Button 
-          onClick={handleLimparDados} 
-          disabled={isClearing}
-          variant="destructive"
-          className="flex items-center gap-2"
-        >
-          <Trash2 className="h-4 w-4" />
-          {isClearing ? "Limpando..." : "Limpar Dados"}
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
+        <p className="text-muted-foreground mt-1">
+          Análise executiva completa de volumetria - 
+          {stats.total_registros.toLocaleString()} registros | 
+          {stats.total_clientes} clientes
+        </p>
       </div>
 
       {/* Filtros Avançados */}
