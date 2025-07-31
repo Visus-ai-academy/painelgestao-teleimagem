@@ -53,16 +53,16 @@ export function useClienteStats() {
     .not('contato', 'is', null)
     .neq('contato', '');
 
-  // Tipos de cliente - verificando status atual
+  // Tipos de cliente CO e NC baseado no campo tipo_cliente
   const { count: tipoClienteCO } = await supabase
     .from('clientes')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'Ativo');
+    .eq('tipo_cliente', 'CO');
 
   const { count: tipoClienteNC } = await supabase
     .from('clientes')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'Inativo');
+    .eq('tipo_cliente', 'NC');
 
       setStats({
         totalRegistros: totalRegistros || 0,
