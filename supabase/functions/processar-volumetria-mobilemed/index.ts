@@ -322,12 +322,12 @@ async function processFileInBackground(
       
       totalProcessed++;
       
-      // Log de progresso a cada 1000 registros E atualizar banco
-      if (totalProcessed % 1000 === 0) {
+      // Log de progresso a cada 500 registros para arquivos grandes (otimizado)
+      if (totalProcessed % 500 === 0) {
         console.log(`🔍 Validados ${totalProcessed}/${dataToProcess.length} registros (${totalValid} válidos, ${totalInvalid} inválidos)`);
         
-        // Atualizar progresso no banco
-        await supabaseClient
+        // Atualizar progresso no banco de forma assíncrona
+        supabaseClient
           .from('processamento_uploads')
           .update({ 
             registros_processados: totalProcessed,
@@ -339,16 +339,18 @@ async function processFileInBackground(
               invalidos: totalInvalid 
             })
           })
-          .eq('id', uploadLogId);
+          .eq('id', uploadLogId)
+          .then(() => {}) // Fire and forget
+          .catch(err => console.warn('Erro ao atualizar progresso:', err));
       }
     }
 
     console.log(`✅ VALIDAÇÃO CONCLUÍDA: ${totalValid} registros válidos, ${totalInvalid} registros inválidos`);
 
-    // FASE 2: Inserção otimizada em lotes maiores
+    // FASE 2: Inserção otimizada em lotes menores para evitar timeout
     let totalInserted = 0;
     let insertionErrors = 0;
-    const batchSize = 500; // Lotes maiores para eficiência
+    const batchSize = 100; // Lotes menores para evitar timeout
 
     console.log(`📥 INICIANDO INSERÇÃO DE ${validRecords.length} REGISTROS EM LOTES DE ${batchSize}`);
 
@@ -393,9 +395,25 @@ async function processFileInBackground(
         insertionErrors += batch.length;
       }
       
-      // Log de progresso
+      // Log de progresso mais detalhado e atualização assíncrona
       const processedSoFar = Math.min(i + batchSize, validRecords.length);
       console.log(`📥 Progresso inserção: ${processedSoFar}/${validRecords.length} processados, ${totalInserted} inseridos`);
+      
+      // Atualizar progresso no banco a cada 10 lotes (assíncrono)
+      if (Math.floor(i / batchSize) % 10 === 0) {
+        supabaseClient
+          .from('processamento_uploads')
+          .update({ 
+            registros_inseridos: totalInserted,
+            detalhes_erro: JSON.stringify({ 
+              status: `Inserindo... ${processedSoFar}/${validRecords.length}`,
+              inseridos: totalInserted 
+            })
+          })
+          .eq('id', uploadLogId)
+          .then(() => {}) // Fire and forget
+          .catch(err => console.warn('Erro ao atualizar progresso inserção:', err));
+      }
     }
 
     console.log(`🎯 INSERÇÃO CONCLUÍDA: ${totalInserted} de ${validRecords.length} registros inseridos com sucesso`);
