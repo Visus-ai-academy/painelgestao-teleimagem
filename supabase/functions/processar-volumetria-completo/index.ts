@@ -158,8 +158,8 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame'): Volume
   return record;
 }
 
-// FASE 2: De-para de quebra de exames
-async function aplicarDeParaQuebraExames(supabaseClient: any, records: VolumetriaRecord[]): Promise<VolumetriaRecord[]> {
+// FASE 2: De-para de quebra de exames (aplicar regras existentes)
+async function aplicarDeParaQuebraExames(supabaseClient: any, records: VolumetriaRecord[], config: any): Promise<VolumetriaRecord[]> {
   console.log('FASE 2: Aplicando de-para de quebra de exames...');
   
   // Buscar regras de quebra ativas
@@ -203,25 +203,71 @@ async function aplicarDeParaQuebraExames(supabaseClient: any, records: Volumetri
   return resultadoFinal;
 }
 
-// FASE 3: Filtro de datas
-function aplicarFiltroDatas(records: VolumetriaRecord[]): VolumetriaRecord[] {
+// FASE 3: Filtro de datas (aplicar regras de negócio existentes)
+function aplicarFiltroDatas(records: VolumetriaRecord[], config: any): VolumetriaRecord[] {
   console.log('FASE 3: Aplicando filtro de datas...');
   
   const hoje = new Date();
   const dataLimiteMinima = new Date('2020-01-01');
 
   const recordsFiltrados = records.filter(record => {
-    const dataReferencia = record.arquivo_fonte === 'data_laudo' ? record.DATA_LAUDO : record.DATA_REALIZACAO;
+    // Determinar data de referência baseada no tipo de arquivo
+    let dataReferencia = null;
     
+    if (record.arquivo_fonte === 'data_laudo') {
+      dataReferencia = record.DATA_LAUDO;
+    } else {
+      dataReferencia = record.DATA_REALIZACAO;
+    }
+    
+    // Filtros básicos
     if (!dataReferencia) return false;
     if (dataReferencia > hoje) return false;
     if (dataReferencia < dataLimiteMinima) return false;
+    
+    // Aplicar regras específicas de período de faturamento
+    if (config.periodoFaturamento) {
+      // Para arquivos retroativos: excluir período atual
+      if (config.filterCurrentPeriod && record.DATA_REALIZACAO) {
+        if (isInBillingPeriod(record.DATA_REALIZACAO, config.periodoFaturamento)) {
+          console.log(`Excluído por estar no período de faturamento ${config.periodoFaturamento.mes}/${config.periodoFaturamento.ano}`);
+          return false;
+        }
+      }
+      
+      // Para arquivos padrão: filtrar DATA_LAUDO
+      if ((config.arquivoFonte === 'volumetria_padrao' || config.arquivoFonte === 'volumetria_fora_padrao') && 
+          record.DATA_LAUDO) {
+        const dataLimiteCorte = getDataLimiteCorte(config.periodoFaturamento);
+        if (record.DATA_LAUDO > dataLimiteCorte) {
+          console.log(`Excluído - DATA_LAUDO superior à data limite de corte`);
+          return false;
+        }
+      }
+    }
     
     return true;
   });
 
   console.log(`Filtro de datas aplicado: ${records.length} → ${recordsFiltrados.length} registros`);
   return recordsFiltrados;
+}
+
+// Funções auxiliares das regras de negócio existentes
+function isInBillingPeriod(dataRealizacao: Date, periodoFaturamento: { ano: number; mes: number }): boolean {
+  const { ano, mes } = periodoFaturamento;
+  const anoSeguinte = mes === 12 ? ano + 1 : ano;
+  const mesSeguinte = mes === 12 ? 1 : mes + 1;
+  const inicioPeriodo = new Date(ano, mes - 1, 8);
+  const fimPeriodo = new Date(anoSeguinte, mesSeguinte - 1, 7);
+  return dataRealizacao >= inicioPeriodo && dataRealizacao <= fimPeriodo;
+}
+
+function getDataLimiteCorte(periodoFaturamento: { ano: number; mes: number }): Date {
+  const { ano, mes } = periodoFaturamento;
+  const anoSeguinte = mes === 12 ? ano + 1 : ano;
+  const mesSeguinte = mes === 12 ? 1 : mes + 1;
+  return new Date(anoSeguinte, mesSeguinte - 1, 7);
 }
 
 // FASE 4: De-para de prioridade
@@ -305,10 +351,12 @@ async function processarVolumetriaCompleto(
   supabaseClient: any,
   file_path: string,
   arquivo_fonte: 'data_laudo' | 'data_exame',
-  uploadLogId: string
+  uploadLogId: string,
+  config?: any
 ) {
   try {
     console.log('=== INICIANDO PROCESSAMENTO COMPLETO ===');
+    console.log('Config recebido:', JSON.stringify(config));
     
     // Baixar arquivo do storage
     const { data: fileData, error: downloadError } = await supabaseClient.storage
@@ -348,10 +396,10 @@ async function processarVolumetriaCompleto(
     console.log(`FASE 1 concluída: ${recordsProcessados.length} registros processados`);
 
     // FASE 2: De-para de quebra de exames
-    recordsProcessados = await aplicarDeParaQuebraExames(supabaseClient, recordsProcessados);
+    recordsProcessados = await aplicarDeParaQuebraExames(supabaseClient, recordsProcessados, config);
 
     // FASE 3: Filtro de datas
-    recordsProcessados = aplicarFiltroDatas(recordsProcessados);
+    recordsProcessados = aplicarFiltroDatas(recordsProcessados, config);
 
     // FASE 4: De-para de prioridade
     recordsProcessados = await aplicarDeParaPrioridade(supabaseClient, recordsProcessados);
@@ -454,11 +502,12 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte } = await req.json();
+    const { file_path, arquivo_fonte, config } = await req.json();
 
     console.log('=== PROCESSAR VOLUMETRIA COMPLETO ===');
     console.log('Arquivo:', file_path);
     console.log('Fonte:', arquivo_fonte);
+    console.log('Config:', JSON.stringify(config));
 
     if (!file_path || !arquivo_fonte) {
       throw new Error('file_path e arquivo_fonte são obrigatórios');
@@ -478,7 +527,7 @@ serve(async (req) => {
       .from('processamento_uploads')
       .insert({
         arquivo_nome: file_path,
-        tipo_arquivo: arquivo_fonte,
+        tipo_arquivo: config?.arquivoFonte || arquivo_fonte,
         status: 'processando',
         registros_processados: 0,
         registros_inseridos: 0,
@@ -497,7 +546,8 @@ serve(async (req) => {
       supabaseClient,
       file_path,
       arquivo_fonte as 'data_laudo' | 'data_exame',
-      uploadLog.id
+      uploadLog.id,
+      config
     );
 
     if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {

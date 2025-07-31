@@ -305,7 +305,7 @@ export function processRow(
   }
 }
 
-// Função para processar arquivo Excel no frontend
+// Função para processar arquivo Excel utilizando a nova edge function completa
 export async function processVolumetriaFile(
   file: File, 
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao',
@@ -313,152 +313,165 @@ export async function processVolumetriaFile(
   periodoFaturamento?: { ano: number; mes: number }
 ): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; errors: string[] }> {
   
-  // Importação dinâmica do XLSX
-  const XLSX = await import('xlsx');
   const { supabase } = await import('@/integrations/supabase/client');
   
-  let uploadLog: any = null;
-  
   try {
-    console.log('Iniciando processamento do arquivo:', file.name);
+    console.log('=== INICIANDO PROCESSAMENTO COM EDGE FUNCTION COMPLETA ===');
+    console.log('Arquivo:', file.name);
+    console.log('Fonte:', arquivoFonte);
+    console.log('Período:', periodoFaturamento);
     
-    // Criar log de upload inicial
-    const { data: uploadLogData, error: uploadLogError } = await supabase
-      .from('processamento_uploads')
-      .insert({
-        tipo_arquivo: arquivoFonte,
-        arquivo_nome: file.name,
-        tipo_dados: 'volumetria',
-        status: 'processando',
-        registros_processados: 0,
-        registros_inseridos: 0,
-        registros_atualizados: 0,
-        registros_erro: 0
-      })
-      .select()
-      .single();
-
-    if (uploadLogError) {
-      console.error('Erro ao criar log de upload:', uploadLogError);
-    } else {
-      uploadLog = uploadLogData;
-    }
-    // Ler arquivo
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    // Determinar o arquivo_fonte para a edge function baseado no tipo
+    let edgeFunctionSource: 'data_laudo' | 'data_exame';
     
-    if (!workbook.SheetNames.length) {
-      throw new Error('Arquivo Excel não possui planilhas');
+    // Mapear tipos de arquivo para fontes da edge function
+    switch (arquivoFonte) {
+      case 'volumetria_padrao':
+      case 'volumetria_padrao_retroativo':
+      case 'volumetria_onco_padrao':
+        edgeFunctionSource = 'data_laudo'; // Arquivo com data de laudo
+        break;
+      case 'volumetria_fora_padrao':
+      case 'volumetria_fora_padrao_retroativo':
+        edgeFunctionSource = 'data_exame'; // Arquivo com data de exame
+        break;
+      default:
+        throw new Error(`Tipo de arquivo não suportado: ${arquivoFonte}`);
     }
 
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    // Upload do arquivo para o storage
+    const timestamp = Date.now();
+    const fileName = `${arquivoFonte}_${timestamp}_${file.name}`;
+    const filePath = `uploads/${fileName}`;
 
-    if (jsonData.length === 0) {
-      throw new Error('Arquivo Excel está vazio');
+    console.log('Uploading arquivo para storage:', filePath);
+    
+    const { error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(`Erro ao fazer upload: ${uploadError.message}`);
     }
 
-    console.log(`Iniciando processamento de ${jsonData.length} linhas`);
+    console.log('Arquivo enviado com sucesso, iniciando processamento...');
 
-    const errors: string[] = [];
-    let totalInserted = 0;
-    const batchSize = 100;
-    const config = VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte];
-
-    // Processar em lotes
-    for (let i = 0; i < jsonData.length; i += batchSize) {
-      const batch = jsonData.slice(i, i + batchSize);
-      const processedRecords: any[] = [];
-
-      // Processar lote
-      for (let j = 0; j < batch.length; j++) {
-        const row = batch[j];
-        const record = processRow(row, arquivoFonte);
-        
-        if (!record) {
-          errors.push(`Linha ${i + j + 2}: Dados inválidos ou incompletos`);
-          continue;
-        }
-
-        // Filtrar período de faturamento para arquivos retroativos
-        if (config.filterCurrentPeriod && record.DATA_REALIZACAO && periodoFaturamento) {
-          if (isInBillingPeriod(record.DATA_REALIZACAO, periodoFaturamento)) {
-            console.log(`Linha ${i + j + 2}: Excluída por estar no período de faturamento ${periodoFaturamento.mes}/${periodoFaturamento.ano}`);
-            continue;
-          }
-        }
-
-        // NOVA REGRA: Filtrar DATA_LAUDO para arquivos padrão (1 e 2) no faturamento
-        if ((arquivoFonte === 'volumetria_padrao' || arquivoFonte === 'volumetria_fora_padrao') && 
-            record.DATA_LAUDO && periodoFaturamento) {
-          const dataLimiteCorte = getDataLimiteCorte(periodoFaturamento);
-          if (record.DATA_LAUDO > dataLimiteCorte) {
-            console.log(`Linha ${i + j + 2}: Excluída - DATA_LAUDO (${record.DATA_LAUDO.toISOString().split('T')[0]}) superior à data limite de corte (${dataLimiteCorte.toISOString().split('T')[0]})`);
-            continue;
-          }
-        }
-
-        // Permitir valores zerados - apropriação será feita posteriormente via configuração
-        // A validação de valores obrigatórios foi removida para permitir valores zero
-
-        processedRecords.push(record);
-      }
-
-      // Inserir lote no banco
-      if (processedRecords.length > 0) {
-        const { error: insertError } = await supabase
-          .from('volumetria_mobilemed')
-          .insert(processedRecords);
-
-        if (insertError) {
-          console.error('Erro ao inserir lote:', insertError);
-          errors.push(`Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
-        } else {
-          totalInserted += processedRecords.length;
+    // Chamar a nova edge function de processamento completo
+    const { data, error } = await supabase.functions.invoke('processar-volumetria-completo', {
+      body: { 
+        file_path: filePath,
+        arquivo_fonte: edgeFunctionSource,
+        config: {
+          arquivoFonte: arquivoFonte,
+          periodoFaturamento: periodoFaturamento,
+          validateValues: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].validateValues,
+          filterCurrentPeriod: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].filterCurrentPeriod,
+          appropriateValues: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].appropriateValues
         }
       }
+    });
 
-      // Atualizar progresso
-      const processed = Math.min(i + batchSize, jsonData.length);
-      onProgress?.(processed, jsonData.length, totalInserted);
-
-      // Pequena pausa para não bloquear a UI
-      await new Promise(resolve => setTimeout(resolve, 10));
+    if (error) {
+      throw new Error(`Erro na edge function: ${error.message}`);
     }
 
-    // Atualizar log de upload com sucesso
-    if (uploadLog) {
-      await supabase
+    console.log('Edge function iniciada:', data);
+
+    // Monitorar progresso via polling do log de upload
+    const uploadLogId = data.upload_log_id;
+    let finalStatus = null;
+    let attempts = 0;
+    const maxAttempts = 120; // 2 minutos máximo
+    
+    console.log('Monitorando progresso do upload log:', uploadLogId);
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Aguardar 1 segundo
+      
+      const { data: statusData, error: statusError } = await supabase
         .from('processamento_uploads')
-        .update({
-          status: 'concluido',
-          registros_processados: jsonData.length,
-          registros_inseridos: totalInserted,
-          registros_erro: errors.length
-        })
-        .eq('id', uploadLog.id);
+        .select('*')
+        .eq('id', uploadLogId)
+        .single();
+
+      if (statusError) {
+        console.error('Erro ao buscar status:', statusError);
+        break;
+      }
+
+      if (statusData) {
+        const progress = statusData.registros_processados || 0;
+        const inserted = statusData.registros_inseridos || 0;
+        
+        // Estimar total baseado no progresso (se disponível)
+        const estimatedTotal = progress > 0 ? progress : 1000; // Fallback
+        
+        // Atualizar progresso na UI
+        onProgress?.(progress, estimatedTotal, inserted);
+        
+        // Verificar se terminou
+        if (statusData.status === 'concluido' || statusData.status === 'erro') {
+          finalStatus = statusData;
+          break;
+        }
+      }
+      
+      attempts++;
     }
+
+    // Limpar arquivo temporário do storage
+    try {
+      await supabase.storage.from('uploads').remove([filePath]);
+    } catch (cleanupError) {
+      console.warn('Erro ao limpar arquivo temporário:', cleanupError);
+    }
+
+    if (!finalStatus) {
+      throw new Error('Timeout no processamento - não foi possível obter o status final');
+    }
+
+    if (finalStatus.status === 'erro') {
+      const errorMessage = finalStatus.erro_detalhes || 'Erro desconhecido no processamento';
+      throw new Error(errorMessage);
+    }
+
+    // Verificar se existem registros com erro
+    const errors: string[] = [];
+    if (finalStatus.registros_erro > 0) {
+      // Buscar registros de erro específicos
+      const { data: errorRecords, error: errorFetchError } = await supabase
+        .from('volumetria_erros')
+        .select('*')
+        .eq('arquivo_fonte', edgeFunctionSource)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!errorFetchError && errorRecords) {
+        for (const errorRecord of errorRecords) {
+          errors.push(`${errorRecord.empresa} - ${errorRecord.nome_paciente}: ${errorRecord.erro_detalhes}`);
+        }
+      }
+      
+      errors.push(`⚠️ ATENÇÃO: ${finalStatus.registros_erro} registros com erros foram salvos na tabela de erros para correção.`);
+    }
+
+    console.log('=== PROCESSAMENTO COMPLETO FINALIZADO ===');
+    console.log(`Registros processados: ${finalStatus.registros_processados}`);
+    console.log(`Registros inseridos: ${finalStatus.registros_inseridos}`);
+    console.log(`Registros com erro: ${finalStatus.registros_erro}`);
 
     return {
       success: true,
-      totalProcessed: jsonData.length,
-      totalInserted,
+      totalProcessed: finalStatus.registros_processados || 0,
+      totalInserted: finalStatus.registros_inseridos || 0,
       errors
     };
 
   } catch (error) {
-    console.error('Erro no processamento:', error);
-    
-    // Atualizar log com erro se existir
-    if (uploadLog) {
-      await supabase
-        .from('processamento_uploads')
-        .update({
-          status: 'erro',
-          registros_erro: 1
-        })
-        .eq('id', uploadLog.id);
-    }
+    console.error('Erro no processamento completo:', error);
     
     return {
       success: false,
