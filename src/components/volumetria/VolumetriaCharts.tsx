@@ -28,11 +28,13 @@ interface VolumetriaChartsProps {
   clientes: ClienteData[];
   modalidades: ModalidadeData[];
   especialidades: EspecialidadeData[];
+  categorias: ModalidadeData[];
+  prioridades: ModalidadeData[];
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316'];
 
-export function VolumetriaCharts({ clientes, modalidades, especialidades }: VolumetriaChartsProps) {
+export function VolumetriaCharts({ clientes, modalidades, especialidades, categorias, prioridades }: VolumetriaChartsProps) {
   return (
     <>
       {/* Gráficos Principais */}
@@ -103,30 +105,88 @@ export function VolumetriaCharts({ clientes, modalidades, especialidades }: Volu
         </Card>
       </div>
 
-      {/* Top Especialidades */}
+      {/* Gráficos de Barras */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Especialidades */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Top 10 Especialidades
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={especialidades.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="nome" 
+                  tick={{fontSize: 10}}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
+                />
+                <Bar dataKey="total_exames" fill="#8b5cf6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Top Categorias */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Top 10 Categorias
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={categorias.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="nome" 
+                  tick={{fontSize: 10}}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
+                />
+                <Bar dataKey="total_exames" fill="#06b6d4" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Prioridades */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Top 15 Especialidades
+            <BarChart3 className="h-5 w-5" />
+            Distribuição por Prioridade
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={especialidades.slice(0, 15)}>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={prioridades}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="nome" 
-                tick={{fontSize: 10}}
-                angle={-45}
-                textAnchor="end"
-                height={100}
+                tick={{fontSize: 12}}
               />
               <YAxis />
               <Tooltip 
                 formatter={(value) => [typeof value === 'number' ? value.toLocaleString() : value, 'Exames']}
               />
-              <Bar dataKey="total_exames" fill="#8b5cf6" />
+              <Bar dataKey="total_exames" fill="#f97316" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
