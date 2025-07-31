@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 interface VolumetriaRecord {
-  // Campos exatos do arquivo - sem mapeamento necessário
   EMPRESA: string;
   NOME_PACIENTE: string;
   CODIGO_PACIENTE?: string;
@@ -42,26 +41,18 @@ interface VolumetriaRecord {
   arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
 }
 
-// Função para converter data do formato brasileiro (dd/mm/aa ou dd/mm/aaaa)
 function convertBrazilianDate(dateStr: string): Date | null {
   if (!dateStr || dateStr.trim() === '') return null;
   
   try {
-    // Remove espaços e caracteres especiais
     const cleanDate = dateStr.trim();
-    
-    // Formatos aceitos: dd/mm/aa, dd/mm/aaaa, dd-mm-aa, dd-mm-aaaa
     const dateRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
     const match = cleanDate.match(dateRegex);
     
-    if (!match) {
-      console.warn(`Formato de data inválido: ${dateStr}`);
-      return null;
-    }
+    if (!match) return null;
     
     let [, day, month, year] = match;
     
-    // Converte ano de 2 dígitos para 4 dígitos
     if (year.length === 2) {
       const currentYear = new Date().getFullYear();
       const currentCentury = Math.floor(currentYear / 100) * 100;
@@ -69,102 +60,63 @@ function convertBrazilianDate(dateStr: string): Date | null {
     }
     
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    
-    // Valida se a data é válida
-    if (isNaN(date.getTime())) {
-      console.warn(`Data inválida: ${dateStr}`);
-      return null;
-    }
-    
-    return date;
+    return isNaN(date.getTime()) ? null : date;
   } catch (error) {
-    console.warn(`Erro ao converter data: ${dateStr}`, error);
     return null;
   }
 }
 
-// Função para converter hora (hh:mm:ss ou hh:mm)
 function convertTime(timeStr: string): string | null {
   if (!timeStr || timeStr.trim() === '') return null;
   
   try {
     const cleanTime = timeStr.trim();
-    
-    // Formatos aceitos: hh:mm:ss, hh:mm
     const timeRegex = /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/;
     const match = cleanTime.match(timeRegex);
     
-    if (!match) {
-      console.warn(`Formato de hora inválido: ${timeStr}`);
-      return null;
-    }
+    if (!match) return null;
     
     const [, hours, minutes, seconds = '00'] = match;
-    
-    // Valida se os valores são válidos
     const h = parseInt(hours);
     const m = parseInt(minutes);
     const s = parseInt(seconds);
     
-    if (h > 23 || m > 59 || s > 59) {
-      console.warn(`Hora inválida: ${timeStr}`);
-      return null;
-    }
+    if (h > 23 || m > 59 || s > 59) return null;
     
     return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
   } catch (error) {
-    console.warn(`Erro ao converter hora: ${timeStr}`, error);
     return null;
   }
 }
 
-// Função para converter valores (parte inteira apenas)
 function convertValues(valueStr: string | number): number | null {
   if (valueStr === null || valueStr === undefined || valueStr === '') return null;
   
   try {
     const numValue = typeof valueStr === 'string' ? parseFloat(valueStr) : valueStr;
-    
-    if (isNaN(numValue)) {
-      console.warn(`Valor numérico inválido: ${valueStr}`);
-      return null;
-    }
-    
-    // Retorna apenas a parte inteira
-    return Math.floor(numValue);
+    return isNaN(numValue) ? null : Math.floor(numValue);
   } catch (error) {
-    console.warn(`Erro ao converter valor: ${valueStr}`, error);
     return null;
   }
 }
 
-// Função para processar uma linha do Excel
 function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao'): VolumetriaRecord | null {
   try {
-    // Validação básica apenas para garantir que existe um objeto
-    if (!row || typeof row !== 'object') {
-      console.warn('Linha inválida: objeto row não definido ou inválido');
-      return null;
-    }
+    if (!row || typeof row !== 'object') return null;
 
-    // ACEITAR TODOS OS REGISTROS - não validar campos obrigatórios
-    // Cada linha do arquivo é um registro válido que deve ser mantido
     const empresa = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
 
-    // Função helper para conversão segura de string
     const safeString = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
       return String(value).trim() || undefined;
     };
 
     const record: VolumetriaRecord = {
-      // Campos obrigatórios - conversão segura
       EMPRESA: String(empresa).trim(),
       NOME_PACIENTE: String(nomePaciente).trim(),
       arquivo_fonte: arquivoFonte,
       
-      // Campos opcionais de texto - conversão null-safe
       CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
       ESTUDO_DESCRICAO: safeString(row['ESTUDO_DESCRICAO']),
       ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
@@ -180,20 +132,17 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
       DIGITADOR: safeString(row['DIGITADOR']),
       COMPLEMENTAR: safeString(row['COMPLEMENTAR']),
       
-      // Campos numéricos - conversão null-safe
       VALORES: row['VALORES'] ? convertValues(row['VALORES']) : undefined,
       IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : undefined,
       IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
       CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
       
-      // Campos de data - conversão null-safe
       DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : undefined,
       DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : undefined,
       DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : undefined,
       DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : undefined,
       DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : undefined,
       
-      // Campos de hora - conversão null-safe
       HORA_REALIZACAO: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : undefined,
       HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : undefined,
       HORA_LAUDO: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : undefined,
@@ -203,30 +152,114 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
 
     return record;
   } catch (error) {
-    console.error('❌ ERRO AO PROCESSAR LINHA - DADOS PERDIDOS:', error);
-    console.error('❌ LINHA PROBLEMÁTICA:', JSON.stringify(row));
-    console.error('❌ STACK TRACE:', error instanceof Error ? error.stack : 'N/A');
-    
-    // ⚠️ TEMPORÁRIO: Em vez de rejeitar, vamos tentar criar um registro básico
-    try {
-      const basicRecord: VolumetriaRecord = {
-        EMPRESA: String(row['EMPRESA'] || '').trim(),
-        NOME_PACIENTE: String(row['NOME_PACIENTE'] || '').trim(),
-        arquivo_fonte: arquivoFonte,
-        // Todos os outros campos ficam undefined - aceita registro mesmo com erro
-      };
-      console.warn('⚠️ REGISTRO SALVO COM DADOS BÁSICOS APENAS');
-      return basicRecord;
-    } catch (criticalError) {
-      console.error('💥 ERRO CRÍTICO - REGISTRO REJEITADO:', criticalError);
-      return null;
-    }
+    console.error('Erro ao processar linha:', error);
+    return null;
   }
 }
 
+async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
+  console.log(`Processando ${jsonData.length} registros`);
+  
+  if (jsonData.length === 0) {
+    throw new Error('Arquivo Excel está vazio');
+  }
+
+  const BATCH_SIZE = 25; // Lotes menores para evitar WORKER_LIMIT
+  let totalProcessed = 0;
+  let totalInserted = 0;
+  let totalErrors = 0;
+
+  for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+    const batch = jsonData.slice(i, i + BATCH_SIZE);
+    const validRecords: VolumetriaRecord[] = [];
+    
+    for (const row of batch) {
+      const record = processRow(row, arquivo_fonte);
+      if (record) {
+        validRecords.push(record);
+      } else {
+        totalErrors++;
+      }
+      totalProcessed++;
+    }
+    
+    if (validRecords.length > 0) {
+      try {
+        const { data: insertedData, error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(validRecords)
+          .select('id');
+
+        if (insertError) {
+          console.error(`Erro no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
+          totalErrors += validRecords.length;
+        } else {
+          totalInserted += insertedData?.length || validRecords.length;
+        }
+      } catch (batchErr) {
+        console.error(`Erro crítico no lote:`, batchErr);
+        totalErrors += validRecords.length;
+      }
+    }
+    
+    // Atualizar progresso a cada 5 lotes para reduzir IO
+    if (Math.floor(i / BATCH_SIZE) % 5 === 0) {
+      await supabaseClient
+        .from('processamento_uploads')
+        .update({ 
+          registros_processados: totalProcessed,
+          registros_inseridos: totalInserted,
+          registros_erro: totalErrors,
+          detalhes_erro: JSON.stringify({ 
+            status: `Processando... ${totalProcessed}/${jsonData.length}`,
+            inseridos: totalInserted,
+            erros: totalErrors
+          })
+        })
+        .eq('id', uploadLogId);
+    }
+  }
+
+  console.log(`Processamento concluído: ${totalInserted} inseridos, ${totalErrors} erros`);
+  
+  // Aplicar regras
+  let registrosAtualizadosDePara = 0;
+  if (totalInserted > 0) {
+    try {
+      if (arquivo_fonte === 'volumetria_fora_padrao') {
+        const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
+        registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
+      }
+
+      const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
+      registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
+    } catch (regraErr) {
+      console.error('Erro ao aplicar regras:', regraErr);
+    }
+  }
+
+  // Log final
+  await supabaseClient
+    .from('processamento_uploads')
+    .update({
+      status: totalInserted > 0 ? 'concluido' : 'erro',
+      registros_processados: totalProcessed,
+      registros_inseridos: totalInserted,
+      registros_atualizados: registrosAtualizadosDePara,
+      registros_erro: totalErrors,
+      completed_at: new Date().toISOString(),
+      detalhes_erro: JSON.stringify({
+        status: 'Concluído',
+        total_linhas_arquivo: jsonData.length,
+        registros_inseridos: totalInserted,
+        registros_atualizados_de_para: registrosAtualizadosDePara,
+        registros_erro: totalErrors
+      })
+    })
+    .eq('id', uploadLogId);
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -268,17 +301,52 @@ serve(async (req) => {
       .single();
 
     if (logError) {
-      console.error('Erro ao criar log:', logError);
       throw new Error('Erro ao criar log de upload');
     }
 
     console.log('Log criado:', uploadLog.id);
 
-    // Retornar resposta imediata
+    // Baixar arquivo
+    console.log('Baixando arquivo...');
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(file_path);
+
+    if (downloadError) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+    }
+
+    console.log('Arquivo baixado, tamanho:', fileData.size);
+
+    // Ler Excel
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
+      type: 'array',
+      cellDates: false,
+      cellNF: false, 
+      cellHTML: false
+    });
+    
+    if (!workbook.SheetNames.length) {
+      throw new Error('Arquivo Excel não possui planilhas');
+    }
+
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      defval: '',
+      raw: true,
+      dateNF: 'dd/mm/yyyy'
+    });
+    
+    console.log(`Dados extraídos: ${jsonData.length} linhas`);
+    
+    // Processar dados
+    await processExcelData(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Upload registrado com sucesso",
+        message: "Processamento concluído",
         upload_log_id: uploadLog.id
       }),
       { 
