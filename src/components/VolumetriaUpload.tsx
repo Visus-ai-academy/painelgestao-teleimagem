@@ -98,12 +98,14 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       );
 
         if (result.success) {
-          // Verificar se foi processamento limitado
-          const isLimited = result.limitedProcessing || false;
+          // Verificar se foi processamento limitado baseado no retorno da edge function
+          // ou no número de registros (499 indica limite do processamento)
+          const isLimited = result.limitedProcessing || result.totalInserted === 499;
           setIsLimitedProcessing(isLimited);
           
-          if (isLimited && result.filePath) {
-            setLastUploadedFile(result.filePath);
+          if (isLimited) {
+            // Para processamento limitado, usar nome genérico que será resolvido pelo processamento completo
+            setLastUploadedFile(`${arquivoFonte}_limited_${Date.now()}.xlsx`);
           }
           
           toast({
