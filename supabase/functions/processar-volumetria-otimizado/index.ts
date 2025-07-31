@@ -375,14 +375,28 @@ serve(async (req) => {
     console.log('🔧 Aplicando regras de De-Para...');
     try {
       if (arquivo_fonte.includes('volumetria')) {
-        const { data: deParaResult } = await supabaseClient.rpc('aplicar_de_para_automatico', { 
+        const { data: deParaResult, error: deParaError } = await supabaseClient.rpc('aplicar_de_para_automatico', { 
           arquivo_fonte_param: arquivo_fonte 
         });
-        registrosAtualizados += deParaResult?.registros_atualizados || 0;
+        
+        if (deParaError) {
+          console.warn('⚠️ Erro na aplicação de De-Para automático:', deParaError);
+        } else {
+          const atualizados = deParaResult?.registros_atualizados || 0;
+          registrosAtualizados += atualizados;
+          console.log(`✅ De-Para automático: ${atualizados} registros atualizados`);
+        }
       }
 
-      const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
-      registrosAtualizados += prioridadeResult?.registros_atualizados || 0;
+      const { data: prioridadeResult, error: prioridadeError } = await supabaseClient.rpc('aplicar_de_para_prioridade');
+      
+      if (prioridadeError) {
+        console.warn('⚠️ Erro na aplicação de De-Para prioridade:', prioridadeError);
+      } else {
+        const atualizados = prioridadeResult?.registros_atualizados || 0;
+        registrosAtualizados += atualizados;
+        console.log(`✅ De-Para prioridade: ${atualizados} registros atualizados`);
+      }
     } catch (rulesError) {
       console.log('⚠️ Erro nas regras de De-Para (ignorado):', rulesError.message);
     }
