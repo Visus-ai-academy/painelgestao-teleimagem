@@ -215,12 +215,27 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Auto-refresh a cada 30 segundos como fallback
+  // Auto-refresh inteligente - só atualiza se não há uploads em andamento
   useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refresh das estatísticas...');
-      loadStats();
-    }, 30000);
+    const interval = setInterval(async () => {
+      // Verificar se há uploads em andamento antes de atualizar
+      try {
+        const { data: activeUploads } = await supabase
+          .from('processamento_uploads')
+          .select('status')
+          .in('status', ['processando', 'iniciado'])
+          .limit(1);
+        
+        if (!activeUploads || activeUploads.length === 0) {
+          console.log('🔄 Auto-refresh das estatísticas (nenhum upload ativo)...');
+          loadStats();
+        } else {
+          console.log('⏸️ Auto-refresh pausado - upload em andamento');
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar uploads ativos:', error);
+      }
+    }, 15000); // Reduzido para 15 segundos
 
     return () => clearInterval(interval);
   }, []);
