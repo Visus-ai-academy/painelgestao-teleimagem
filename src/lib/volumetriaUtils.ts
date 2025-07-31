@@ -97,16 +97,19 @@ export async function processVolumetriaFile(
 
     console.log('Uploading arquivo para storage:', filePath);
     
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('uploads')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: true
       });
 
     if (uploadError) {
+      console.error('❌ Erro upload:', uploadError);
       throw new Error(`Erro ao fazer upload: ${uploadError.message}`);
     }
+
+    console.log('✅ Upload realizado:', uploadData);
 
     console.log('Arquivo enviado com sucesso, iniciando processamento...');
 
