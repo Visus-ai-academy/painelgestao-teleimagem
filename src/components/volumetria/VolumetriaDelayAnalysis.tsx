@@ -424,6 +424,12 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                       if (minutos < 1440) return `${Math.round(minutos / 60)}h`;
                       return `${Math.round(minutos / 1440)}d`;
                     };
+
+                    // Função específica para detalhes expandidos (sem dias)
+                    const formatarTempoDetalhes = (minutos: number) => {
+                      if (minutos < 60) return `${Math.round(minutos)}min`;
+                      return `${Math.round(minutos / 60)}h`;
+                    };
                     
                     const isExpanded = expandedClients.has(cliente.nome);
                     const isLoading = loadingDetails.has(cliente.nome);
@@ -496,10 +502,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {esp.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between text-xs text-gray-600">
-                                            <span>{esp.atrasados}/{esp.total_exames}</span>
-                                            <span>{formatarTempo(esp.tempo_medio_atraso || 0)}</span>
-                                          </div>
+                                           <div className="flex justify-between text-xs text-gray-600">
+                                             <span>{esp.atrasados}/{esp.total_exames}</span>
+                                             <span>{formatarTempoDetalhes(esp.tempo_medio_atraso || 0)}</span>
+                                           </div>
                                         </div>
                                       ))}
                                       {details.especialidades.length > 5 && (
@@ -525,10 +531,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {cat.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between text-xs text-gray-600">
-                                            <span>{cat.atrasados}/{cat.total_exames}</span>
-                                            <span>{formatarTempo(cat.tempo_medio_atraso || 0)}</span>
-                                          </div>
+                                           <div className="flex justify-between text-xs text-gray-600">
+                                             <span>{cat.atrasados}/{cat.total_exames}</span>
+                                             <span>{formatarTempoDetalhes(cat.tempo_medio_atraso || 0)}</span>
+                                           </div>
                                         </div>
                                       ))}
                                       {details.categorias.length > 5 && (
@@ -554,10 +560,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {prio.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between text-xs text-gray-600">
-                                            <span>{prio.atrasados}/{prio.total_exames}</span>
-                                            <span>{formatarTempo(prio.tempo_medio_atraso || 0)}</span>
-                                          </div>
+                                           <div className="flex justify-between text-xs text-gray-600">
+                                             <span>{prio.atrasados}/{prio.total_exames}</span>
+                                             <span>{formatarTempoDetalhes(prio.tempo_medio_atraso || 0)}</span>
+                                           </div>
                                         </div>
                                       ))}
                                     </div>
