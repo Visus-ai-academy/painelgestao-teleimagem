@@ -51,6 +51,9 @@ verify_jwt = true
 [functions.limpar-cadastros]
 verify_jwt = true
 
+[functions.limpar-dados-volumetria]
+verify_jwt = true
+
 # Public endpoints (use with extreme caution)
 [functions.webhook-clicksign]
 verify_jwt = false  # External webhook needs to validate signature
