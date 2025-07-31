@@ -203,7 +203,7 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
         console.log(`📦 Processando ${fonte}...`);
         
         let offset = 0;
-        const limit = 1000;
+        const limit = 10000; // Aumentado para processar mais registros por vez
         let hasMoreData = true;
         let totalProcessed = 0;
 

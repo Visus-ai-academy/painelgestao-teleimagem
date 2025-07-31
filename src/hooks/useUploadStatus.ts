@@ -64,7 +64,8 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
         // Há processamento ativo
         const uploadAtual = activeUploads.find(u => u.status === 'processando');
         if (uploadAtual && uploadAtual.registros_processados > 0) {
-          const estimatedTotal = Math.max(uploadAtual.registros_processados, 1000);
+          // Usar o total real baseado no progresso atual, não limitado a 1000
+          const estimatedTotal = Math.max(uploadAtual.registros_processados, uploadAtual.registros_inseridos);
           progressPercentage = Math.min(Math.round((uploadAtual.registros_inseridos / estimatedTotal) * 100), 99);
         } else {
           progressPercentage = 5; // Iniciando
