@@ -128,23 +128,49 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     
     setLoading(true);
     try {
+      console.log('🔍 Iniciando carregamento de dados volumetria');
+      console.log('📅 Filtros aplicados:', filters);
+      
       let query = supabase.from('volumetria_mobilemed').select(`
         EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
         VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
       `);
       
       const { startDate, endDate } = buildDateFilter();
+      console.log('📊 Período selecionado:', { startDate, endDate });
+      
       if (startDate && endDate) {
         // Usar DATA_REALIZACAO como referência principal para consistência com MobileMed
         query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
+        console.log('🎯 Filtro de data aplicado na DATA_REALIZACAO:', startDate, 'até', endDate);
+      } else {
+        console.log('⚠️ Nenhum filtro de data aplicado - buscando todos os registros');
       }
 
-      if (filters.cliente !== 'todos') query = query.eq('EMPRESA', filters.cliente);
-      if (filters.modalidade !== 'todos') query = query.eq('MODALIDADE', filters.modalidade);
-      if (filters.especialidade !== 'todos') query = query.eq('ESPECIALIDADE', filters.especialidade);
-      if (filters.medico !== 'todos') query = query.eq('MEDICO', filters.medico);
+      if (filters.cliente !== 'todos') {
+        query = query.eq('EMPRESA', filters.cliente);
+        console.log('🏢 Filtro cliente aplicado:', filters.cliente);
+      }
+      if (filters.modalidade !== 'todos') {
+        query = query.eq('MODALIDADE', filters.modalidade);
+        console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
+      }
+      if (filters.especialidade !== 'todos') {
+        query = query.eq('ESPECIALIDADE', filters.especialidade);
+        console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
+      }
+      if (filters.medico !== 'todos') {
+        query = query.eq('MEDICO', filters.medico);
+        console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
+      }
 
       const { data: rawData, error } = await query;
+      
+      console.log('📈 Resultado da query:', {
+        totalRegistros: rawData?.length || 0,
+        temErro: !!error,
+        erro: error?.message
+      });
 
       if (error) throw error;
 
@@ -177,6 +203,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const totalRegistros = rawData.length;
       const totalAtrasados = atrasados.length;
       const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
+      
+      console.log('💰 Cálculos finais:', {
+        totalLaudos,
+        totalRegistros,
+        totalAtrasados,
+        percentualAtraso,
+        amostraValores: rawData.slice(0, 5).map(item => ({ VALORES: item.VALORES, DATA_REALIZACAO: item.DATA_REALIZACAO }))
+      });
 
       // Agrupar dados
       const clientesMap = new Map();
