@@ -286,7 +286,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       {/* Estatísticas Avançadas */}
       <Card>
         <CardHeader>
-          <CardTitle>Estatísticas Detalhadas por Categoria</CardTitle>
+          <CardTitle>Análise de Nível de Atraso</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
