@@ -37,6 +37,13 @@ export function ProcessarArquivoCompleto({
         arquivoFonte
       });
 
+      // Adicionar logs detalhados para debug
+      console.log('📋 Dados enviados para edge function:', {
+        file_path: filePath,
+        arquivo_fonte: arquivoFonte,
+        periodo: { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
+      });
+
       const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
         body: {
           file_path: filePath,
@@ -45,7 +52,7 @@ export function ProcessarArquivoCompleto({
         }
       });
 
-      console.log('📥 Resposta da edge function:', { data, error });
+      console.log('📥 Resposta completa da edge function:', JSON.stringify({ data, error }, null, 2));
 
       if (error) {
         console.error('❌ Erro da edge function:', error);
@@ -54,6 +61,7 @@ export function ProcessarArquivoCompleto({
 
       // A função original retorna os dados diretamente
       const result = data;
+      console.log('📊 Resultado parseado:', result);
       
       setStats({
         totalInserted: result.totalInserted || 0,
@@ -63,10 +71,21 @@ export function ProcessarArquivoCompleto({
       
       setProgress(100);
 
-      toast({
-        title: "Processamento concluído!",
-        description: `${result.totalInserted || 0} registros inseridos, ${result.registrosAtualizadosDePara || 0} de-para aplicados`,
-      });
+      const insertedCount = result.totalInserted || 0;
+      const deParaCount = result.registrosAtualizadosDePara || 0;
+      
+      if (insertedCount === 0) {
+        toast({
+          title: "Processamento concluído com problemas",
+          description: `Nenhum registro foi inserido. Verificar logs para detalhes.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Processamento concluído!",
+          description: `${insertedCount} registros inseridos, ${deParaCount} de-para aplicados`,
+        });
+      }
       
       onComplete?.();
 
