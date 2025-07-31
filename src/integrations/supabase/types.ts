@@ -2370,6 +2370,7 @@ export type Database = {
           id: string
           IMAGENS_CAPTURADAS: number | null
           IMAGENS_CHAVES: number | null
+          lote_upload: string | null
           MEDICO: string | null
           MEDICO_REASSINATURA: string | null
           MODALIDADE: string | null
@@ -2412,6 +2413,7 @@ export type Database = {
           id?: string
           IMAGENS_CAPTURADAS?: number | null
           IMAGENS_CHAVES?: number | null
+          lote_upload?: string | null
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
@@ -2454,6 +2456,7 @@ export type Database = {
           id?: string
           IMAGENS_CAPTURADAS?: number | null
           IMAGENS_CHAVES?: number | null
+          lote_upload?: string | null
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null

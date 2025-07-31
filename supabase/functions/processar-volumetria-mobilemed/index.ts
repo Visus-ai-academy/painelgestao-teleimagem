@@ -39,6 +39,8 @@ interface VolumetriaRecord {
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
   arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
+  lote_upload?: string;
+  periodo_referencia?: string;
 }
 
 function convertBrazilianDate(dateStr: string): Date | null {
@@ -100,7 +102,7 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao'): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao', loteUpload: string, periodoReferencia: string): VolumetriaRecord | null {
   try {
     if (!row || typeof row !== 'object') return null;
 
@@ -116,6 +118,8 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
       EMPRESA: String(empresa).trim(),
       NOME_PACIENTE: String(nomePaciente).trim(),
       arquivo_fonte: arquivoFonte,
+      lote_upload: loteUpload,
+      periodo_referencia: periodoReferencia,
       
       CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
       ESTUDO_DESCRICAO: safeString(row['ESTUDO_DESCRICAO']),
@@ -157,31 +161,54 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
   }
 }
 
-// Função super otimizada para arquivos grandes
-async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
-  console.log(`=== PROCESSAMENTO SUPER OTIMIZADO ===`);
+// Função para processamento com controle de lote
+async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any, fileName: string, periodo: any) {
+  console.log(`=== PROCESSAMENTO COM CONTROLE DE LOTE ===`);
   console.log(`Total de registros: ${jsonData.length}`);
+  console.log(`Arquivo: ${fileName}`);
+  console.log(`Período: ${JSON.stringify(periodo)}`);
   
   if (jsonData.length === 0) {
     throw new Error('Arquivo Excel está vazio');
   }
 
-  // Configurações ultra otimizadas para arquivos grandes
-  const CHUNK_SIZE = Math.min(500, jsonData.length); // Chunks menores
-  const BATCH_SIZE = 50;  // Batches menores para inserção mais rápida
-  const MAX_EXECUTION_TIME = 6000; // 6 segundos de segurança
+  // Gerar identificadores únicos para este lote
+  const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLogId.substring(0, 8)}`;
+  const periodoReferencia = periodo ? `${periodo.mes}/${periodo.ano}` : new Date().toISOString().substring(0, 7);
+
+  console.log(`🏷️ Lote: ${loteUpload}`);
+  console.log(`📅 Período: ${periodoReferencia}`);
+
+  // IMPORTANTE: Limpar dados existentes do mesmo arquivo_fonte e período para evitar acúmulo
+  try {
+    console.log(`🧹 Limpando dados anteriores: ${arquivo_fonte} - ${periodoReferencia}`);
+    const { count: deletedCount } = await supabaseClient
+      .from('volumetria_mobilemed')
+      .delete()
+      .eq('arquivo_fonte', arquivo_fonte)
+      .eq('periodo_referencia', periodoReferencia);
+    
+    console.log(`🗑️ Removidos ${deletedCount || 0} registros anteriores`);
+  } catch (cleanupError) {
+    console.error('⚠️ Erro na limpeza (continuando):', cleanupError);
+  }
+
+  // Configurações otimizadas
+  const CHUNK_SIZE = Math.min(200, jsonData.length); // Chunks ainda menores
+  const BATCH_SIZE = 25;  // Batches muito pequenos para inserção rápida
+  const MAX_EXECUTION_TIME = 5000; // 5 segundos de segurança máxima
   
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
   const startTime = Date.now();
 
-  // Processar em chunks menores para evitar timeout
+  // Processar em chunks pequenos
   for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
-    // Verificar tempo de execução mais rigorosamente
+    // Controle rigoroso de tempo
     const currentTime = Date.now();
     if (currentTime - startTime > MAX_EXECUTION_TIME) {
-      console.log(`⏰ Timeout preventivo após ${totalProcessed} registros em ${currentTime - startTime}ms`);
+      console.log(`⏰ TIMEOUT após ${totalProcessed} registros em ${currentTime - startTime}ms`);
       break;
     }
 
@@ -191,13 +218,12 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
     
     console.log(`📦 Chunk ${chunkNumber}/${totalChunks}: ${chunk.length} registros`);
 
-    // Processamento ultra-rápido do chunk
+    // Processamento das linhas
     const allRecords: VolumetriaRecord[] = [];
     
-    // Processar todas as linhas do chunk de uma vez
     for (const row of chunk) {
       try {
-        const record = processRow(row, arquivo_fonte);
+        const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
         if (record && record.EMPRESA && record.NOME_PACIENTE) {
           allRecords.push(record);
         } else {
@@ -209,7 +235,7 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
       totalProcessed++;
     }
     
-    // Inserção em batches pequenos e rápidos
+    // Inserção em micro-batches
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
       
@@ -219,19 +245,20 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
           .insert(batch);
 
         if (insertError) {
-          console.error(`❌ Erro inserção batch ${i}: ${insertError.message}`);
+          console.error(`❌ Erro batch ${i}:`, insertError.message);
           totalErrors += batch.length;
         } else {
           totalInserted += batch.length;
+          console.log(`✅ Batch ${i}: ${batch.length} inseridos`);
         }
       } catch (batchErr) {
-        console.error(`❌ Erro batch ${i}:`, batchErr);
+        console.error(`❌ Erro crítico batch ${i}:`, batchErr);
         totalErrors += batch.length;
       }
     }
 
-    // Atualizar progresso menos frequentemente para ganhar tempo
-    if (chunkNumber % 2 === 0 || chunkNumber === totalChunks) {
+    // Update de progresso esporádico
+    if (chunkNumber % 3 === 0 || chunkNumber === totalChunks) {
       try {
         await supabaseClient
           .from('processamento_uploads')
@@ -243,54 +270,43 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
               status: 'Processando Rápido',
               progresso: `${Math.round((totalProcessed / jsonData.length) * 100)}%`,
               chunk: `${chunkNumber}/${totalChunks}`,
-              tempo: `${Math.round((Date.now() - startTime) / 1000)}s`,
-              taxa: `${Math.round(totalProcessed / ((Date.now() - startTime) / 1000))}/s`
+              lote: loteUpload,
+              periodo: periodoReferencia,
+              tempo: `${Math.round((Date.now() - startTime) / 1000)}s`
             })
           })
           .eq('id', uploadLogId);
       } catch (updateErr) {
-        // Ignorar erros de update para ganhar tempo
+        // Ignorar para ganhar tempo
       }
     }
   }
 
   const executionTime = Date.now() - startTime;
-  console.log(`✅ Processamento: ${totalInserted} inseridos, ${totalErrors} erros em ${executionTime}ms`);
+  console.log(`⚡ Processamento: ${totalInserted} inseridos, ${totalErrors} erros em ${executionTime}ms`);
   
-  // Aplicar regras de negócio apenas se houver dados inseridos
+  // Aplicar regras apenas se necessário e dentro do tempo
   let registrosAtualizadosDePara = 0;
-  if (totalInserted > 0 && executionTime < MAX_EXECUTION_TIME) {
+  if (totalInserted > 0 && executionTime < MAX_EXECUTION_TIME - 1000) {
     try {
-      console.log('🔧 Aplicando regras...');
-      
-      // Aplicar regras em paralelo quando possível
-      const regrasPromises = [];
+      console.log('🔧 Aplicando regras rápidas...');
       
       if (arquivo_fonte === 'volumetria_fora_padrao') {
-        regrasPromises.push(
-          supabaseClient.rpc('aplicar_valores_de_para').then(result => {
-            console.log(`✅ De-Para valores: ${result.data?.registros_atualizados || 0}`);
-            return result.data?.registros_atualizados || 0;
-          })
-        );
+        const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
+        registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
+        console.log(`✅ De-Para valores: ${deParaResult?.registros_atualizados || 0}`);
       }
 
-      regrasPromises.push(
-        supabaseClient.rpc('aplicar_de_para_prioridade').then(result => {
-          console.log(`✅ De-Para prioridade: ${result.data?.registros_atualizados || 0}`);
-          return result.data?.registros_atualizados || 0;
-        })
-      );
-      
-      const resultados = await Promise.all(regrasPromises);
-      registrosAtualizadosDePara = resultados.reduce((acc, val) => acc + val, 0);
+      const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
+      registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
+      console.log(`✅ De-Para prioridade: ${prioridadeResult?.registros_atualizados || 0}`);
       
     } catch (regraErr) {
-      console.error('❌ Erro regras:', regraErr);
+      console.error('⚠️ Erro regras:', regraErr);
     }
   }
 
-  // Finalizar com status adequado
+  // Status final
   const isComplete = totalProcessed >= jsonData.length;
   const finalStatus = isComplete 
     ? (totalInserted > 0 ? 'concluido' : 'erro')
@@ -313,9 +329,10 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
         atualizados: registrosAtualizadosDePara,
         erros: totalErrors,
         tempo_ms: executionTime,
-        taxa_por_segundo: Math.round(totalProcessed / (executionTime / 1000)),
+        lote_upload: loteUpload,
+        periodo_referencia: periodoReferencia,
         completo: isComplete,
-        motivo_parada: isComplete ? 'Arquivo completo' : 'Timeout preventivo'
+        dados_limpos: true
       })
     })
     .eq('id', uploadLogId);
@@ -326,7 +343,9 @@ async function processLargeFileOptimized(jsonData: any[], arquivo_fonte: string,
     totalErrors,
     registrosAtualizadosDePara,
     isComplete,
-    executionTime
+    executionTime,
+    loteUpload,
+    periodoReferencia
   };
 }
 
@@ -336,7 +355,7 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte } = await req.json();
+    const { file_path, arquivo_fonte, periodo } = await req.json();
 
     console.log('=== PROCESSAR VOLUMETRIA MOBILEMED ===');
     console.log('Arquivo:', file_path);
@@ -366,7 +385,8 @@ serve(async (req) => {
         registros_processados: 0,
         registros_inseridos: 0,
         registros_atualizados: 0,
-        registros_erro: 0
+        registros_erro: 0,
+        periodo_referencia: periodo ? `${periodo.mes}/${periodo.ano}` : null
       })
       .select()
       .single();
@@ -389,15 +409,16 @@ serve(async (req) => {
 
     console.log('Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel com configurações ultra otimizadas
+    // Ler Excel com máxima otimização
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
       cellDates: false,
       cellNF: false, 
       cellHTML: false,
-      dense: true, // Otimização para arquivos grandes
-      sheetRows: 100000 // Limitar linhas para evitar overflow
+      dense: true,
+      sheetRows: 50000, // Limitar para evitar overflow
+      bookSST: false
     });
     
     if (!workbook.SheetNames.length) {
@@ -409,13 +430,20 @@ serve(async (req) => {
       defval: '',
       raw: true,
       dateNF: 'dd/mm/yyyy',
-      blankrows: false // Pular linhas vazias
+      blankrows: false
     });
     
     console.log(`Dados extraídos: ${jsonData.length} linhas`);
     
-    // Processar com função super otimizada
-    const resultado = await processLargeFileOptimized(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
+    // Processar com controle de lote
+    const resultado = await processFileWithBatchControl(
+      jsonData, 
+      arquivo_fonte, 
+      uploadLog.id, 
+      supabaseClient, 
+      file_path, 
+      periodo
+    );
 
     return new Response(
       JSON.stringify({ 
@@ -429,7 +457,9 @@ serve(async (req) => {
           atualizados: resultado.registrosAtualizadosDePara,
           erros: resultado.totalErrors,
           completo: resultado.isComplete,
-          tempo_ms: resultado.executionTime
+          tempo_ms: resultado.executionTime,
+          lote_upload: resultado.loteUpload,
+          periodo_referencia: resultado.periodoReferencia
         }
       }),
       { 
