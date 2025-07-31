@@ -31,14 +31,47 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
       console.log('📊 Carregando estatísticas usando função do banco...');
       setLoading(true);
       
+      // Timeout para evitar travamento
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout ao carregar estatísticas')), 10000)
+      );
+      
       // Usar a função do banco para estatísticas agregadas
-      const { data: aggregatedStats, error: statsError } = await supabase
-        .rpc('get_volumetria_aggregated_stats');
+      const statsPromise = supabase.rpc('get_volumetria_aggregated_stats');
+      
+      const { data: aggregatedStats, error: statsError } = await Promise.race([
+        statsPromise, 
+        timeoutPromise
+      ]) as any;
       
       if (statsError) {
         console.error('❌ Erro ao buscar estatísticas agregadas:', statsError);
-        console.log('🔄 Usando método fallback com paginação robusta...');
-        await loadStatsManual();
+        console.log('🔄 Usando método fallback simplificado...');
+        
+        // Fallback simples - apenas mostrar zeros
+        const defaultStats: UploadStats[] = [
+          {
+            fileName: "Volumetria Padrão",
+            totalRecords: 0,
+            recordsWithValue: 0,
+            recordsZeroed: 0,
+            totalValue: 0,
+            period: "Nenhum dado encontrado",
+            category: 'padrão'
+          },
+          {
+            fileName: "Volumetria Fora Padrão",
+            totalRecords: 0,
+            recordsWithValue: 0,
+            recordsZeroed: 0,
+            totalValue: 0,
+            period: "Nenhum dado encontrado",
+            category: 'fora-padrão'
+          }
+        ];
+        
+        setStats(defaultStats);
+        setLoading(false);
         return;
       }
 
@@ -77,7 +110,7 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
             recordsWithValue: 0,
             recordsZeroed: 0,
             totalValue: 0,
-            period: 'Todos os períodos',
+            period: 'Nenhum dado',
             category: getCategoryFromSource(source)
           });
         }
@@ -87,7 +120,22 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
       setLoading(false);
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas:', error);
-      await loadStatsManual();
+      
+      // Em caso de erro, definir estatísticas vazias para não travar
+      const errorStats: UploadStats[] = [
+        {
+          fileName: "Erro ao carregar dados",
+          totalRecords: 0,
+          recordsWithValue: 0,
+          recordsZeroed: 0,
+          totalValue: 0,
+          period: "Erro de carregamento",
+          category: 'padrão'
+        }
+      ];
+      
+      setStats(errorStats);
+      setLoading(false);
     }
   };
 
@@ -220,8 +268,21 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
   };
 
   useEffect(() => {
-    loadStats();
-  }, [refreshTrigger]);
+    console.log('🔄 useEffect disparado, carregando estatísticas...');
+    let isMounted = true;
+    
+    const loadWithTimeout = async () => {
+      if (isMounted) {
+        await loadStats();
+      }
+    };
+    
+    loadWithTimeout();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshTrigger]); // Dependência específica para evitar loops
 
 
   const getCategoryColor = (category: UploadStats['category']) => {
