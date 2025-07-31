@@ -46,23 +46,23 @@ export function useClienteStats() {
       
       const cnpjUnicos = new Set(cnpjData?.map(item => item.cnpj) || []).size;
 
-      // Total com Nome_Fantasia preenchido (usando contato como proxy)
-      const { count: totalNomeFantasia } = await supabase
-        .from('clientes')
-        .select('*', { count: 'exact', head: true })
-        .not('contato', 'is', null)
-        .neq('contato', '');
+  // Total com Nome_Fantasia preenchido (usando contato como proxy)
+  const { count: totalNomeFantasia } = await supabase
+    .from('clientes')
+    .select('*', { count: 'exact', head: true })
+    .not('contato', 'is', null)
+    .neq('contato', '');
 
-      // Tipos de cliente CO e NC
-      const { count: tipoClienteCO } = await supabase
-        .from('clientes')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'CO');
+  // Tipos de cliente - verificando status atual
+  const { count: tipoClienteCO } = await supabase
+    .from('clientes')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'Ativo');
 
-      const { count: tipoClienteNC } = await supabase
-        .from('clientes')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'NC');
+  const { count: tipoClienteNC } = await supabase
+    .from('clientes')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'Inativo');
 
       setStats({
         totalRegistros: totalRegistros || 0,

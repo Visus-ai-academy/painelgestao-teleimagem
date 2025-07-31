@@ -583,7 +583,7 @@ export default function CadastroClientes() {
             <div className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-200 rounded-md">
               <div className="w-3 h-3 bg-cyan-600 rounded-full"></div>
               <div className="text-left">
-                <div className="text-sm font-medium text-cyan-700">Tipo CO</div>
+                <div className="text-sm font-medium text-cyan-700">Clientes Ativos</div>
                 <div className="text-xs text-cyan-600">
                   {loadingStats ? "..." : stats.tipoClienteCO}
                 </div>
@@ -593,7 +593,7 @@ export default function CadastroClientes() {
             <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 border border-pink-200 rounded-md">
               <div className="w-3 h-3 bg-pink-600 rounded-full"></div>
               <div className="text-left">
-                <div className="text-sm font-medium text-pink-700">Tipo NC</div>
+                <div className="text-sm font-medium text-pink-700">Clientes Inativos</div>
                 <div className="text-xs text-pink-600">
                   {loadingStats ? "..." : stats.tipoClienteNC}
                 </div>
