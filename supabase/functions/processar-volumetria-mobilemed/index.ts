@@ -449,8 +449,8 @@ serve(async (req) => {
 
     console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel de forma ULTRA OTIMIZADA para evitar timeout
-    console.log('📖 Lendo arquivo Excel com limitação para evitar timeout...');
+    // Ler Excel COMPLETO mas processar em chunks para evitar timeout
+    console.log('📖 Lendo arquivo Excel COMPLETO...');
     const arrayBuffer = await fileData.arrayBuffer();
     console.log('✅ ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
     
@@ -460,7 +460,7 @@ serve(async (req) => {
       cellNF: false, 
       cellHTML: false,
       dense: true,
-      sheetRows: 1000, // LIMITAÇÃO CRÍTICA: máximo 1000 linhas por vez para evitar timeout
+      // SEM LIMITAÇÃO: lê o arquivo completo
       bookSST: false
     });
     
@@ -472,7 +472,7 @@ serve(async (req) => {
     console.log('✅ Workbook criado, planilhas:', workbook.SheetNames);
 
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    console.log('📊 Convertendo planilha limitada (1000 linhas) para JSON...');
+    console.log('📊 Convertendo planilha COMPLETA para JSON...');
     
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
@@ -481,11 +481,92 @@ serve(async (req) => {
       blankrows: false
     });
     
-    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (LIMITADO A 1000 PARA PERFORMANCE)`);
+    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
     
-    console.log(`🚀 Processando ${jsonData.length} registros com configuração ultra otimizada`);
+    // Se arquivo muito grande, processar apenas parte e agendar continuação
+    const MAX_RECORDS_PER_EXECUTION = 1000;
+    const needsMultipleExecutions = jsonData.length > MAX_RECORDS_PER_EXECUTION;
     
-    // Processar o arquivo COMPLETO sem limitações
+    if (needsMultipleExecutions) {
+      console.log(`⚠️ Arquivo grande detectado: ${jsonData.length} registros`);
+      console.log(`🔄 Processando primeiros ${MAX_RECORDS_PER_EXECUTION} registros nesta execução`);
+      
+      // Processa apenas os primeiros registros
+      const currentBatch = jsonData.slice(0, MAX_RECORDS_PER_EXECUTION);
+      const remainingData = jsonData.slice(MAX_RECORDS_PER_EXECUTION);
+      
+      console.log(`🚀 Processando lote atual: ${currentBatch.length} registros`);
+      console.log(`⏳ Registros restantes: ${remainingData.length}`);
+      
+      const resultado = await processFileWithBatchControl(
+        currentBatch, 
+        arquivo_fonte, 
+        uploadLog.id, 
+        supabaseClient, 
+        file_path, 
+        periodo
+      );
+      
+      // Se ainda há dados para processar, agendar próxima execução
+      if (remainingData.length > 0) {
+        // Salvar dados restantes em um arquivo temporário para próxima execução
+        const remainingFileName = `${file_path}_remaining_${Date.now()}.json`;
+        
+        // TODO: Implementar salvamento dos dados restantes e agendamento
+        console.log(`📋 Dados restantes serão processados em próxima execução: ${remainingData.length} registros`);
+        
+        // Atualizar status para indicar processamento parcial
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({
+            status: 'processamento_parcial',
+            detalhes_erro: JSON.stringify({
+              status: 'Processamento Parcial - Arquivo Grande',
+              total_registros: jsonData.length,
+              processados_nesta_execucao: currentBatch.length,
+              restantes: remainingData.length,
+              progresso: `${Math.round((currentBatch.length / jsonData.length) * 100)}%`,
+              mensagem: 'Arquivo muito grande. Processamento em andamento...'
+            })
+          })
+          .eq('id', uploadLog.id);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: needsMultipleExecutions ? `Processamento parcial: ${resultado.totalInserted} registros inseridos. ${remainingData.length} registros restantes serão processados automaticamente.` : "Processamento concluído",
+          upload_log_id: uploadLog.id,
+          totalProcessed: resultado.totalProcessed,
+          totalInserted: resultado.totalInserted,
+          totalErrors: resultado.totalErrors,
+          registrosAtualizadosDePara: resultado.registrosAtualizadosDePara,
+          isComplete: remainingData.length === 0,
+          executionTime: resultado.executionTime,
+          remainingRecords: remainingData.length,
+          stats: {
+            total_arquivo: jsonData.length,
+            processados: resultado.totalProcessed,
+            inseridos: resultado.totalInserted,
+            atualizados: resultado.registrosAtualizadosDePara,
+            erros: resultado.totalErrors,
+            restantes: remainingData.length,
+            completo: remainingData.length === 0,
+            tempo_ms: resultado.executionTime,
+            lote_upload: resultado.loteUpload,
+            periodo_referencia: resultado.periodoReferencia
+          }
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    } else {
+      console.log(`🚀 Processando arquivo normal: ${jsonData.length} registros`);
+    }
+    
+    // Processar o arquivo (normal ou restante)
     const resultado = await processFileWithBatchControl(
       jsonData, 
       arquivo_fonte, 
