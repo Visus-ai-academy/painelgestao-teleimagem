@@ -224,152 +224,6 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
   }
 }
 
-// Função auxiliar otimizada para processar dados do Excel
-async function processExcelDataOptimized(
-  jsonData: any[], 
-  arquivo_fonte: string, 
-  uploadLogId: string, 
-  supabaseClient: any
-) {
-  // Atualizar status com total de linhas encontradas
-  await supabaseClient
-    .from('processamento_uploads')
-    .update({ 
-      registros_processados: jsonData.length,
-      detalhes_erro: JSON.stringify({ status: `Encontradas ${jsonData.length} linhas. Iniciando validação...` })
-    })
-    .eq('id', uploadLogId);
-
-  if (jsonData.length === 0) {
-    throw new Error('Arquivo Excel está vazio');
-  }
-
-  console.log(`🔍 INICIANDO PROCESSAMENTO OTIMIZADO DE ${jsonData.length} REGISTROS`);
-
-  // Processamento em lotes pequenos para economizar memória
-  const BATCH_SIZE = 50; // Lotes menores para economizar recursos
-  let totalProcessed = 0;
-  let totalInserted = 0;
-  let totalErrors = 0;
-
-  // Processar arquivo em pequenos lotes
-  for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-    const batch = jsonData.slice(i, i + BATCH_SIZE);
-    const validRecords: VolumetriaRecord[] = [];
-    
-    // Processar lote atual
-    for (const row of batch) {
-      const record = processRow(row, arquivo_fonte);
-      if (record) {
-        validRecords.push(record);
-      } else {
-        totalErrors++;
-      }
-      totalProcessed++;
-    }
-    
-    // Inserir lote se tiver registros válidos
-    if (validRecords.length > 0) {
-      try {
-        const { data: insertedData, error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(validRecords)
-          .select('id');
-
-        if (insertError) {
-          console.error(`❌ Erro no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
-          totalErrors += validRecords.length;
-        } else {
-          totalInserted += insertedData?.length || validRecords.length;
-          console.log(`✅ Lote ${Math.floor(i / BATCH_SIZE) + 1} inserido: ${validRecords.length} registros`);
-        }
-      } catch (batchErr) {
-        console.error(`💥 Erro crítico no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, batchErr);
-        totalErrors += validRecords.length;
-      }
-    }
-    
-    // Atualizar progresso a cada 10 lotes
-    if (Math.floor(i / BATCH_SIZE) % 10 === 0) {
-      console.log(`📥 Progresso: ${totalProcessed}/${jsonData.length} processados, ${totalInserted} inseridos`);
-      
-      await supabaseClient
-        .from('processamento_uploads')
-        .update({ 
-          registros_processados: totalProcessed,
-          registros_inseridos: totalInserted,
-          registros_erro: totalErrors,
-          detalhes_erro: JSON.stringify({ 
-            status: `Processando... ${totalProcessed}/${jsonData.length}`,
-            inseridos: totalInserted,
-            erros: totalErrors
-          })
-        })
-        .eq('id', uploadLogId);
-    }
-    
-    // Liberar memória do lote processado
-    // @ts-ignore
-    batch.length = 0;
-  }
-
-  console.log(`🎯 PROCESSAMENTO CONCLUÍDO: ${totalInserted} inseridos, ${totalErrors} erros`);
-  
-  // Aplicar regras de tratamento se houve inserções
-  let registrosAtualizadosDePara = 0;
-  if (totalInserted > 0) {
-    console.log('Aplicando regras de De-Para...');
-    try {
-      if (arquivo_fonte === 'volumetria_fora_padrao') {
-        const { data: deParaResult, error: deParaError } = await supabaseClient
-          .rpc('aplicar_valores_de_para');
-        
-        if (!deParaError) {
-          registrosAtualizadosDePara = deParaResult?.registros_atualizados || 0;
-          console.log(`De-Para valores aplicado: ${registrosAtualizadosDePara} registros`);
-        }
-      }
-
-      const { data: prioridadeResult, error: prioridadeError } = await supabaseClient
-        .rpc('aplicar_de_para_prioridade');
-      
-      if (!prioridadeError) {
-        const registrosPrioridade = prioridadeResult?.registros_atualizados || 0;
-        registrosAtualizadosDePara += registrosPrioridade;
-        console.log(`De-Para prioridade aplicado: ${registrosPrioridade} registros`);
-      }
-    } catch (regraErr) {
-      console.error('Erro ao aplicar regras:', regraErr);
-    }
-  }
-
-  // Atualizar log final
-  await supabaseClient
-    .from('processamento_uploads')
-    .update({
-      status: totalInserted > 0 ? 'concluido' : 'erro',
-      registros_processados: totalProcessed,
-      registros_inseridos: totalInserted,
-      registros_atualizados: registrosAtualizadosDePara,
-      registros_erro: totalErrors,
-      completed_at: new Date().toISOString(),
-      detalhes_erro: JSON.stringify({
-        status: 'Concluído',
-        total_linhas_arquivo: jsonData.length,
-        registros_inseridos: totalInserted,
-        registros_atualizados_de_para: registrosAtualizadosDePara,
-        registros_erro: totalErrors,
-        timestamp: new Date().toISOString()
-      })
-    })
-    .eq('id', uploadLogId);
-
-  console.log('✅ Processamento finalizado com sucesso');
-  
-  // Liberar memória
-  // @ts-ignore
-  jsonData.length = 0;
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -384,7 +238,6 @@ serve(async (req) => {
     console.log('Arquivo:', file_path);
     console.log('Fonte:', arquivo_fonte);
 
-    // Validar parâmetros
     if (!file_path || !arquivo_fonte) {
       throw new Error('file_path e arquivo_fonte são obrigatórios');
     }
@@ -398,7 +251,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Criar log de upload PRIMEIRO
+    // Criar log de upload
     const { data: uploadLog, error: logError } = await supabaseClient
       .from('processamento_uploads')
       .insert({
@@ -421,14 +274,12 @@ serve(async (req) => {
 
     console.log('Log criado:', uploadLog.id);
 
-    // RETORNAR RESPOSTA IMEDIATA
-    const response = new Response(
+    // Retornar resposta imediata
+    return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Processamento iniciado em background",
-        upload_log_id: uploadLog.id,
-        arquivo_fonte: arquivo_fonte,
-        status: "processing"
+        message: "Upload registrado com sucesso",
+        upload_log_id: uploadLog.id
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -436,32 +287,12 @@ serve(async (req) => {
       }
     );
 
-    // FAZER TODO O PROCESSAMENTO EM BACKGROUND
-    EdgeRuntime.waitUntil((async () => {
-      try {
-        await processFileInBackground(file_path, arquivo_fonte, uploadLog.id, supabaseClient);
-      } catch (error) {
-        console.error('Erro no processamento background:', error);
-        await supabaseClient
-          .from('processamento_uploads')
-          .update({ 
-            status: 'erro',
-            detalhes_erro: JSON.stringify({ erro: error.message }),
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', uploadLog.id);
-      }
-    })());
-
-    return response;
-
   } catch (error) {
-    console.error('Erro na função processar-volumetria-mobilemed:', error);
+    console.error('Erro na função:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        details: 'Erro interno na função de processamento'
+        error: error.message
       }),
       {
         status: 500,
@@ -469,86 +300,4 @@ serve(async (req) => {
       }
     );
   }
-});
-
-// Função para processar arquivo em background com otimizações de memória
-async function processFileInBackground(
-  file_path: string, 
-  arquivo_fonte: string, 
-  uploadLogId: string, 
-  supabaseClient: any
-) {
-  // Atualizar status
-  await supabaseClient
-    .from('processamento_uploads')
-    .update({ 
-      detalhes_erro: JSON.stringify({ status: 'Baixando arquivo...' })
-    })
-    .eq('id', uploadLogId);
-  
-  // Baixar arquivo do storage
-  console.log('Iniciando download do arquivo:', file_path);
-  const { data: fileData, error: downloadError } = await supabaseClient.storage
-    .from('uploads')
-    .download(file_path);
-
-  if (downloadError) {
-    throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
-  }
-
-  console.log('Arquivo baixado, tamanho:', fileData.size);
-  
-  // Atualizar status
-  await supabaseClient
-    .from('processamento_uploads')
-    .update({ 
-      detalhes_erro: JSON.stringify({ status: 'Lendo arquivo Excel...' })
-    })
-    .eq('id', uploadLogId);
-  
-  // Ler arquivo Excel com otimização de memória
-  const arrayBuffer = await fileData.arrayBuffer();
-  console.log('ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
-  
-  const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
-    type: 'array',
-    cellDates: false, // Evita conversão automática de datas para economizar memória
-    cellNF: false, // Remove formatação numérica para economizar memória
-    cellHTML: false // Remove HTML para economizar memória
-  });
-  
-  console.log('Workbook lido, planilhas:', workbook.SheetNames.length);
-  
-  if (!workbook.SheetNames.length) {
-    throw new Error('Arquivo Excel não possui planilhas');
-  }
-
-  // Atualizar status
-  await supabaseClient
-    .from('processamento_uploads')
-    .update({ 
-      detalhes_erro: JSON.stringify({ status: 'Extraindo dados...' })
-    })
-    .eq('id', uploadLogId);
-
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-    defval: '', // Valor padrão para células vazias
-    raw: true, // Manter valores como estão para economizar processamento
-    dateNF: 'dd/mm/yyyy' // Formato de data simples
-  });
-  
-  console.log(`Dados extraídos: ${jsonData.length} linhas`);
-  
-  // Liberar memória do workbook
-  // @ts-ignore
-  workbook = null;
-  
-  // Processar dados com otimizações
-  await processExcelDataOptimized(jsonData, arquivo_fonte, uploadLogId, supabaseClient);
-}
-
-// Tratar shutdown da função
-addEventListener('beforeunload', (ev) => {
-  console.log('Function shutdown due to:', ev.detail?.reason);
 });
