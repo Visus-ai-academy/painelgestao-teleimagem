@@ -4,8 +4,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { useState } from "react";
+import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DelayData {
   nome: string;
@@ -13,6 +14,12 @@ interface DelayData {
   atrasados: number;
   percentual_atraso: number;
   tempo_medio_atraso?: number;
+}
+
+interface ClienteDetalhe {
+  especialidades: DelayData[];
+  categorias: DelayData[];
+  prioridades: DelayData[];
 }
 
 interface DelayAnalysisData {
@@ -84,6 +91,141 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   // Estado para controle de ordenação
   const [sortField, setSortField] = useState<'nome' | 'total_exames' | 'atrasados' | 'percentual_atraso' | 'tempoMedioAtraso'>('atrasados');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Estado para controle de expansão dos clientes
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [clientDetails, setClientDetails] = useState<Map<string, ClienteDetalhe>>(new Map());
+  const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
+
+  // Função para buscar detalhes de um cliente específico
+  const fetchClientDetails = async (clienteName: string) => {
+    if (clientDetails.has(clienteName) || loadingDetails.has(clienteName)) return;
+    
+    setLoadingDetails(prev => new Set(prev).add(clienteName));
+    
+    try {
+      // Buscar dados do cliente específico
+      const { data: clientData, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, VALORES, DATA_LAUDO, DATA_PRAZO, DATA_REALIZACAO')
+        .eq('EMPRESA', clienteName);
+
+      if (error) throw error;
+
+      if (clientData) {
+        // Processar especialidades
+        const especialidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        
+        // Processar categorias (baseado na modalidade para simplificar)
+        const categoriasMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        
+        // Processar prioridades (vamos usar uma lógica baseada no tempo de atraso)
+        const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+
+        clientData.forEach(row => {
+          const dataLaudo = new Date(row.DATA_LAUDO);
+          const dataPrazo = new Date(row.DATA_PRAZO);
+          const isAtrasado = dataLaudo > dataPrazo;
+          const tempoAtraso = isAtrasado ? (dataLaudo.getTime() - dataPrazo.getTime()) / (1000 * 60) : 0;
+
+          // Processar especialidades
+          const esp = row.ESPECIALIDADE || 'Não Informado';
+          if (!especialidadesMap.has(esp)) {
+            especialidadesMap.set(esp, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const espData = especialidadesMap.get(esp)!;
+          espData.total++;
+          if (isAtrasado) {
+            espData.atrasados++;
+            espData.tempoTotal += tempoAtraso;
+          }
+
+          // Processar categorias (usando modalidade)
+          const cat = row.MODALIDADE || 'Não Informado';
+          if (!categoriasMap.has(cat)) {
+            categoriasMap.set(cat, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const catData = categoriasMap.get(cat)!;
+          catData.total++;
+          if (isAtrasado) {
+            catData.atrasados++;
+            catData.tempoTotal += tempoAtraso;
+          }
+
+          // Processar prioridades (baseado no tempo de atraso)
+          let prioridade = 'Normal';
+          if (tempoAtraso > 1440) prioridade = 'Crítica'; // Mais de 24h
+          else if (tempoAtraso > 480) prioridade = 'Alta'; // Mais de 8h
+          else if (tempoAtraso > 120) prioridade = 'Média'; // Mais de 2h
+          
+          if (!prioridadesMap.has(prioridade)) {
+            prioridadesMap.set(prioridade, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const prioData = prioridadesMap.get(prioridade)!;
+          prioData.total++;
+          if (isAtrasado) {
+            prioData.atrasados++;
+            prioData.tempoTotal += tempoAtraso;
+          }
+        });
+
+        // Converter para formato DelayData
+        const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        }));
+
+        const categorias: DelayData[] = Array.from(categoriasMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        }));
+
+        const prioridades: DelayData[] = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        }));
+
+        const detalhe: ClienteDetalhe = {
+          especialidades,
+          categorias,
+          prioridades
+        };
+
+        setClientDetails(prev => new Map(prev).set(clienteName, detalhe));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do cliente:', error);
+    } finally {
+      setLoadingDetails(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(clienteName);
+        return newSet;
+      });
+    }
+  };
+
+  // Função para alternar expansão do cliente
+  const toggleClientExpansion = async (clienteName: string) => {
+    const newExpanded = new Set(expandedClients);
+    
+    if (newExpanded.has(clienteName)) {
+      newExpanded.delete(clienteName);
+    } else {
+      newExpanded.add(clienteName);
+      await fetchClientDetails(clienteName);
+    }
+    
+    setExpandedClients(newExpanded);
+  };
 
   // Função para alternar ordenação
   const handleSort = (field: typeof sortField) => {
@@ -267,27 +409,149 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                       return `${Math.round(minutos / 1440)}d`;
                     };
                     
+                    const isExpanded = expandedClients.has(cliente.nome);
+                    const isLoading = loadingDetails.has(cliente.nome);
+                    const details = clientDetails.get(cliente.nome);
+                    
                     return (
-                      <TableRow key={cliente.nome} className="hover:bg-gray-50">
-                        <TableCell className="font-medium border-r">{cliente.nome}</TableCell>
-                        <TableCell className="text-center border-r">{cliente.total_exames.toLocaleString()}</TableCell>
-                        <TableCell className="text-center border-r">{cliente.atrasados.toLocaleString()}</TableCell>
-                        <TableCell className="text-center border-r">
-                          <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
-                            {cliente.percentual_atraso.toFixed(1)}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center border-r">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={
-                            cliente.nivelAtraso === 'Crítico' ? "destructive" :
-                            cliente.nivelAtraso === 'Alto' ? "secondary" :
-                            cliente.nivelAtraso === 'Médio' ? "outline" : "default"
-                          }>
-                            {cliente.nivelAtraso}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow key={cliente.nome} className="hover:bg-gray-50">
+                          <TableCell className="font-medium border-r">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => toggleClientExpansion(cliente.nome)}
+                                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors"
+                                disabled={isLoading}
+                              >
+                                {isLoading ? (
+                                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                ) : isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                )}
+                              </button>
+                              <span className="cursor-pointer" onClick={() => toggleClientExpansion(cliente.nome)}>
+                                {cliente.nome}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center border-r">{cliente.total_exames.toLocaleString()}</TableCell>
+                          <TableCell className="text-center border-r">{cliente.atrasados.toLocaleString()}</TableCell>
+                          <TableCell className="text-center border-r">
+                            <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
+                              {cliente.percentual_atraso.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center border-r">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={
+                              cliente.nivelAtraso === 'Crítico' ? "destructive" :
+                              cliente.nivelAtraso === 'Alto' ? "secondary" :
+                              cliente.nivelAtraso === 'Médio' ? "outline" : "default"
+                            }>
+                              {cliente.nivelAtraso}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {/* Linha expandida com detalhes */}
+                        {isExpanded && details && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="p-0 bg-gray-50">
+                              <div className="p-6 space-y-6">
+                                <h4 className="text-lg font-semibold text-gray-800 mb-4">
+                                  Detalhes de Atrasos - {cliente.nome}
+                                </h4>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                  {/* Especialidades */}
+                                  <div>
+                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                      Especialidades
+                                    </h5>
+                                    <div className="space-y-2">
+                                      {details.especialidades.slice(0, 5).map((esp) => (
+                                        <div key={esp.nome} className="bg-white p-3 rounded-lg border">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium text-sm">{esp.nome}</span>
+                                            <Badge variant={esp.percentual_atraso >= 20 ? "destructive" : esp.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
+                                              {esp.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between text-xs text-gray-600">
+                                            <span>{esp.atrasados}/{esp.total_exames}</span>
+                                            <span>{formatarTempo(esp.tempo_medio_atraso || 0)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {details.especialidades.length > 5 && (
+                                        <div className="text-xs text-gray-500 text-center">
+                                          +{details.especialidades.length - 5} outras especialidades
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Categorias */}
+                                  <div>
+                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                      Categorias
+                                    </h5>
+                                    <div className="space-y-2">
+                                      {details.categorias.slice(0, 5).map((cat) => (
+                                        <div key={cat.nome} className="bg-white p-3 rounded-lg border">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium text-sm">{cat.nome}</span>
+                                            <Badge variant={cat.percentual_atraso >= 20 ? "destructive" : cat.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
+                                              {cat.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between text-xs text-gray-600">
+                                            <span>{cat.atrasados}/{cat.total_exames}</span>
+                                            <span>{formatarTempo(cat.tempo_medio_atraso || 0)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {details.categorias.length > 5 && (
+                                        <div className="text-xs text-gray-500 text-center">
+                                          +{details.categorias.length - 5} outras categorias
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Prioridades */}
+                                  <div>
+                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                                      Prioridades
+                                    </h5>
+                                    <div className="space-y-2">
+                                      {details.prioridades.map((prio) => (
+                                        <div key={prio.nome} className="bg-white p-3 rounded-lg border">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium text-sm">{prio.nome}</span>
+                                            <Badge variant={prio.percentual_atraso >= 20 ? "destructive" : prio.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
+                                              {prio.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between text-xs text-gray-600">
+                                            <span>{prio.atrasados}/{prio.total_exames}</span>
+                                            <span>{formatarTempo(prio.tempo_medio_atraso || 0)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>
