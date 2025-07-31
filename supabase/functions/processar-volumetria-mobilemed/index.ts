@@ -259,7 +259,6 @@ async function processFileInBackground(
     await supabaseClient
       .from('processamento_uploads')
       .update({ 
-        registros_processados: 2,
         detalhes_erro: JSON.stringify({ status: 'Processando arquivo Excel...' })
       })
       .eq('id', uploadLogId);
@@ -455,10 +454,21 @@ async function processFileInBackground(
         .from('processamento_uploads')
         .update({
           status: totalInserted > 0 ? 'concluido' : 'erro',
-          registros_processados: dataToProcess.length,
+          registros_processados: totalProcessed, // Total de registros que foram validados
           registros_inseridos: totalInserted,
           registros_atualizados: registrosAtualizadosDePara,
-          registros_erro: errors.length
+          registros_erro: totalInvalid + insertionErrors,
+          completed_at: new Date().toISOString(),
+          detalhes_erro: JSON.stringify({
+            status: 'Concluído',
+            total_linhas_arquivo: dataToProcess.length,
+            registros_validos: totalValid,
+            registros_inseridos: totalInserted,
+            registros_atualizados_de_para: registrosAtualizadosDePara,
+            registros_invalidos: totalInvalid,
+            erros_insercao: insertionErrors,
+            timestamp: new Date().toISOString()
+          })
         })
         .eq('id', uploadLogId);
 
