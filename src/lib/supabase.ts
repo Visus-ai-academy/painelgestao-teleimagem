@@ -260,8 +260,13 @@ export async function limparDadosVolumetria(arquivosFonte: string[]) {
     })
     
     if (error) {
-      console.error('Erro ao limpar dados de volumetria:', error)
+      console.error('Erro ao chamar edge function:', error)
       throw new Error(`Erro ao limpar dados: ${error.message}`)
+    }
+    
+    if (data?.error) {
+      console.error('Erro retornado pela edge function:', data.error)
+      throw new Error(`Erro ao limpar dados: ${data.error}`)
     }
     
     console.log('Limpeza de volumetria concluída:', data)
