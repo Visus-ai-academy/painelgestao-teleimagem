@@ -1003,7 +1003,7 @@ export default function GerarFaturamento() {
               <CardContent className="space-y-6">
                 <VolumetriaProvider>
                 {/* Análise dos Uploads Realizados - MOVIDO PARA O TOPO */}
-                <VolumetriaUploadStats refreshTrigger={refreshUploadStatus} />
+                <VolumetriaUploadStats />
                 
                 {/* Limpeza Completa de Dados */}
                 <LimparDadosCompleto />

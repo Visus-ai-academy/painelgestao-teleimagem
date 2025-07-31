@@ -16,14 +16,8 @@ interface UploadStats {
   category: 'padrão' | 'fora-padrão' | 'retroativo';
 }
 
-export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: number }) {
-  const { data, refreshData } = useVolumetria();
-
-  useEffect(() => {
-    if (refreshTrigger !== undefined) {
-      refreshData();
-    }
-  }, [refreshTrigger, refreshData]);
+export function VolumetriaUploadStats() {
+  const { data } = useVolumetria();
 
   // Converter dados do contexto para o formato de stats
   const stats: UploadStats[] = [
