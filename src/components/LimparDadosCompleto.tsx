@@ -85,8 +85,8 @@ export default function LimparDadosCompleto() {
         description: "Todos os dados duplicados foram removidos da base",
       });
 
-      // Verificar novamente
-      await verificarDados();
+      // Forçar atualização da página para limpar todos os caches
+      window.location.reload();
       
     } catch (error) {
       console.error('Erro na limpeza:', error);
