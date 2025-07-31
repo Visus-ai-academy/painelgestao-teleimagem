@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { FileUpload } from "@/components/FileUpload";
-import { Users, Upload, Plus, Search, Edit, Trash2, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, Upload, Plus, Search, Edit, Trash2, Filter, ArrowUpDown, ArrowUp, ArrowDown, FileText, Building, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useClienteStats } from "@/hooks/useClienteStats";
 
 interface Cliente {
   id: string;
@@ -37,6 +38,9 @@ export default function CadastroClientes() {
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Hook para estatísticas detalhadas
+  const { stats, loading: loadingStats, refreshStats } = useClienteStats();
   
   // Estados para busca, filtro e ordenação
   const [busca, setBusca] = useState("");
@@ -142,6 +146,7 @@ export default function CadastroClientes() {
       });
       
       carregarClientes();
+      refreshStats();
     } catch (error: any) {
       toast({
         title: "Erro ao salvar cliente",
@@ -196,6 +201,7 @@ export default function CadastroClientes() {
       setShowEditarCliente(false);
       setClienteEditando(null);
       carregarClientes();
+      refreshStats();
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar cliente",
@@ -224,6 +230,7 @@ export default function CadastroClientes() {
       });
       
       carregarClientes();
+      refreshStats();
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -365,8 +372,9 @@ export default function CadastroClientes() {
                 throw new Error(data.error || 'Erro no processamento');
               }
               
-              // Recarregar lista de clientes
+              // Recarregar lista de clientes e estatísticas
               carregarClientes();
+              refreshStats();
             } catch (error: any) {
               toast({
                 title: "Erro no upload",
@@ -530,25 +538,66 @@ export default function CadastroClientes() {
             Lista dos clientes ativos e inativos do sistema
           </CardDescription>
           
-          {/* Contadores */}
-          <div className="flex flex-wrap gap-4 pt-2">
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-sm font-medium text-blue-700">
-                Total: {clientes.length}
-              </span>
+          {/* Estatísticas Detalhadas */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+              <Users className="h-4 w-4 text-blue-600" />
+              <div className="text-left">
+                <div className="text-sm font-medium text-blue-700">Total Registros</div>
+                <div className="text-xs text-blue-600">
+                  {loadingStats ? "..." : stats.totalRegistros}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-md">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium text-green-700">
-                Ativos: {clientes.filter(c => c.ativo).length}
-              </span>
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md">
+              <FileText className="h-4 w-4 text-green-600" />
+              <div className="text-left">
+                <div className="text-sm font-medium text-green-700">NOME_MOBILEMED</div>
+                <div className="text-xs text-green-600">
+                  {loadingStats ? "..." : stats.totalNomeMobilemed}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-red-50 border border-red-200 rounded-md">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="text-sm font-medium text-red-700">
-                Inativos: {clientes.filter(c => !c.ativo).length}
-              </span>
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-md">
+              <Building className="h-4 w-4 text-purple-600" />
+              <div className="text-left">
+                <div className="text-sm font-medium text-purple-700">CNPJs Únicos</div>
+                <div className="text-xs text-purple-600">
+                  {loadingStats ? "..." : stats.totalCnpjUnicos}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-md">
+              <Mail className="h-4 w-4 text-orange-600" />
+              <div className="text-left">
+                <div className="text-sm font-medium text-orange-700">Nome_Fantasia</div>
+                <div className="text-xs text-orange-600">
+                  {loadingStats ? "..." : stats.totalNomeFantasia}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-200 rounded-md">
+              <div className="w-3 h-3 bg-cyan-600 rounded-full"></div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-cyan-700">Tipo CO</div>
+                <div className="text-xs text-cyan-600">
+                  {loadingStats ? "..." : stats.tipoClienteCO}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 border border-pink-200 rounded-md">
+              <div className="w-3 h-3 bg-pink-600 rounded-full"></div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-pink-700">Tipo NC</div>
+                <div className="text-xs text-pink-600">
+                  {loadingStats ? "..." : stats.tipoClienteNC}
+                </div>
+              </div>
             </div>
           </div>
         </CardHeader>
