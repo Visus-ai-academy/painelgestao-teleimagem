@@ -43,6 +43,7 @@ interface ModalidadeData {
   total_exames: number;
   total_registros: number;
   percentual: number;
+  total_medicos: number;
   atrasados?: number;
   percentual_atraso?: number;
 }
@@ -52,6 +53,7 @@ interface EspecialidadeData {
   total_exames: number;
   total_registros: number;
   percentual: number;
+  total_medicos: number;
   atrasados?: number;
   percentual_atraso?: number;
 }
@@ -61,6 +63,12 @@ interface MedicoData {
   total_exames: number;
   total_registros: number;
   percentual: number;
+  detalhes?: {
+    modalidades: { [key: string]: { exames: number; registros: number } };
+    especialidades: { [key: string]: { exames: number; registros: number } };
+    categorias: { [key: string]: { exames: number; registros: number } };
+    prioridades: { [key: string]: { exames: number; registros: number } };
+  };
 }
 
 export interface VolumetriaData {
@@ -269,6 +277,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const categoriasMap = new Map();
       const prioridadesMap = new Map();
       const medicosMap = new Map();
+      
+      // Maps para rastrear médicos únicos por segmento
+      const modalidadeMedicosMap = new Map();
+      const especialidadeMedicosMap = new Map();
 
       allData.forEach(item => {
         const isAtrasado = atrasados.includes(item);
@@ -289,6 +301,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           current.total_registros += 1;
           if (isAtrasado) current.atrasados += 1;
           modalidadesMap.set(item.MODALIDADE, current);
+          
+          // Rastrear médicos únicos por modalidade
+          if (item.MEDICO) {
+            if (!modalidadeMedicosMap.has(item.MODALIDADE)) {
+              modalidadeMedicosMap.set(item.MODALIDADE, new Set());
+            }
+            modalidadeMedicosMap.get(item.MODALIDADE).add(item.MEDICO);
+          }
         }
 
         // Especialidades apenas
@@ -298,13 +318,48 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           current.total_registros += 1;
           if (isAtrasado) current.atrasados += 1;
           especialidadesMap.set(item.ESPECIALIDADE, current);
+          
+          // Rastrear médicos únicos por especialidade
+          if (item.MEDICO) {
+            if (!especialidadeMedicosMap.has(item.ESPECIALIDADE)) {
+              especialidadeMedicosMap.set(item.ESPECIALIDADE, new Set());
+            }
+            especialidadeMedicosMap.get(item.ESPECIALIDADE).add(item.MEDICO);
+          }
         }
 
-        // Médicos
+        // Médicos com detalhes
         if (item.MEDICO) {
-          const current = medicosMap.get(item.MEDICO) || { total_exames: 0, total_registros: 0 };
+          const current = medicosMap.get(item.MEDICO) || { 
+            total_exames: 0, 
+            total_registros: 0,
+            modalidades: {},
+            especialidades: {},
+            categorias: {},
+            prioridades: {}
+          };
+          
           current.total_exames += item.VALORES || 0;
           current.total_registros += 1;
+          
+          // Detalhes por modalidade
+          if (item.MODALIDADE) {
+            if (!current.modalidades[item.MODALIDADE]) {
+              current.modalidades[item.MODALIDADE] = { exames: 0, registros: 0 };
+            }
+            current.modalidades[item.MODALIDADE].exames += item.VALORES || 0;
+            current.modalidades[item.MODALIDADE].registros += 1;
+          }
+          
+          // Detalhes por especialidade
+          if (item.ESPECIALIDADE) {
+            if (!current.especialidades[item.ESPECIALIDADE]) {
+              current.especialidades[item.ESPECIALIDADE] = { exames: 0, registros: 0 };
+            }
+            current.especialidades[item.ESPECIALIDADE].exames += item.VALORES || 0;
+            current.especialidades[item.ESPECIALIDADE].registros += 1;
+          }
+          
           medicosMap.set(item.MEDICO, current);
         }
       });
@@ -315,17 +370,32 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       const modalidades = Array.from(modalidadesMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
-        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
+        nome, 
+        ...data, 
+        percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
+        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0,
+        total_medicos: modalidadeMedicosMap.get(nome)?.size || 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       const especialidades = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
-        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
+        nome, 
+        ...data, 
+        percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
+        percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0,
+        total_medicos: especialidadeMedicosMap.get(nome)?.size || 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       const medicos = Array.from(medicosMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0
+        nome, 
+        total_exames: data.total_exames,
+        total_registros: data.total_registros,
+        percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
+        detalhes: {
+          modalidades: data.modalidades,
+          especialidades: data.especialidades,
+          categorias: data.categorias,
+          prioridades: data.prioridades
+        }
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       // Categorias e prioridades vazias (não existem na tabela atual)

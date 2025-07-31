@@ -2,14 +2,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { User, Activity, TrendingUp, Users } from "lucide-react";
+import { User, Activity, TrendingUp, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 interface MedicoData {
   nome: string;
   total_exames: number;
   total_registros: number;
   percentual: number;
+  detalhes?: {
+    modalidades: { [key: string]: { exames: number; registros: number } };
+    especialidades: { [key: string]: { exames: number; registros: number } };
+    categorias: { [key: string]: { exames: number; registros: number } };
+    prioridades: { [key: string]: { exames: number; registros: number } };
+  };
 }
 
 interface SegmentData {
@@ -17,6 +26,7 @@ interface SegmentData {
   total_exames: number;
   total_registros: number;
   percentual: number;
+  total_medicos: number;
 }
 
 interface VolumetriaMedicosAnalysisProps {
@@ -38,6 +48,7 @@ export function VolumetriaMedicosAnalysis({
   prioridades, 
   totalExames 
 }: VolumetriaMedicosAnalysisProps) {
+  const [expandedMedicos, setExpandedMedicos] = useState<Set<string>>(new Set());
   
   const formatPercentual = (valor: number) => {
     return `${valor.toFixed(1)}%`;
@@ -48,6 +59,16 @@ export function VolumetriaMedicosAnalysis({
     if (percentual >= 5) return <Badge variant="default" className="bg-blue-500">Médio Volume</Badge>;
     if (percentual >= 1) return <Badge variant="default" className="bg-yellow-500">Baixo Volume</Badge>;
     return <Badge variant="outline">Mínimo</Badge>;
+  };
+
+  const toggleMedicoExpansion = (medicoNome: string) => {
+    const newExpanded = new Set(expandedMedicos);
+    if (newExpanded.has(medicoNome)) {
+      newExpanded.delete(medicoNome);
+    } else {
+      newExpanded.add(medicoNome);
+    }
+    setExpandedMedicos(newExpanded);
   };
 
   const topMedicos = medicos.slice(0, 10);
@@ -191,17 +212,18 @@ export function VolumetriaMedicosAnalysis({
             </Card>
           </div>
 
-          {/* Tabela Detalhada dos Médicos */}
+          {/* Tabela Detalhada dos Médicos com Expansão */}
           <Card>
             <CardHeader>
               <CardTitle>Ranking Completo de Médicos</CardTitle>
-              <CardDescription>Volume de exames e participação percentual</CardDescription>
+              <CardDescription>Volume de exames e participação percentual - Clique para ver detalhes</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-96 overflow-y-auto">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
                     <TableRow>
+                      <TableHead className="w-12"></TableHead>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Médico</TableHead>
                       <TableHead className="text-right">Exames</TableHead>
@@ -212,14 +234,64 @@ export function VolumetriaMedicosAnalysis({
                   </TableHeader>
                   <TableBody>
                     {medicos.map((medico, index) => (
-                      <TableRow key={medico.nome}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{medico.nome}</TableCell>
-                        <TableCell className="text-right">{medico.total_exames.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{medico.total_registros.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{formatPercentual(medico.percentual)}</TableCell>
-                        <TableCell className="text-center">{getPerformanceBadge(medico.percentual)}</TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow key={medico.nome} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleMedicoExpansion(medico.nome)}
+                              className="p-0 h-6 w-6"
+                            >
+                              {expandedMedicos.has(medico.nome) ? 
+                                <ChevronDown className="h-4 w-4" /> : 
+                                <ChevronRight className="h-4 w-4" />
+                              }
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell className="font-medium">{medico.nome}</TableCell>
+                          <TableCell className="text-right">{medico.total_exames.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{medico.total_registros.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{formatPercentual(medico.percentual)}</TableCell>
+                          <TableCell className="text-center">{getPerformanceBadge(medico.percentual)}</TableCell>
+                        </TableRow>
+                        
+                        {/* Linha expandida com detalhes */}
+                        {expandedMedicos.has(medico.nome) && medico.detalhes && (
+                          <TableRow key={`${medico.nome}-details`}>
+                            <TableCell colSpan={7} className="p-4 bg-muted/20">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Modalidades */}
+                                <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Por Modalidade</h4>
+                                  <div className="space-y-1">
+                                    {Object.entries(medico.detalhes.modalidades).map(([modalidade, data]) => (
+                                      <div key={modalidade} className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{modalidade}</span>
+                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                {/* Especialidades */}
+                                <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Por Especialidade</h4>
+                                  <div className="space-y-1">
+                                    {Object.entries(medico.detalhes.especialidades).map(([especialidade, data]) => (
+                                      <div key={especialidade} className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{especialidade}</span>
+                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     ))}
                   </TableBody>
                 </Table>
@@ -260,6 +332,7 @@ export function VolumetriaMedicosAnalysis({
                       <TableRow>
                         <TableHead>Modalidade</TableHead>
                         <TableHead className="text-right">Exames</TableHead>
+                        <TableHead className="text-right">Médicos</TableHead>
                         <TableHead className="text-right">%</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -268,6 +341,7 @@ export function VolumetriaMedicosAnalysis({
                         <TableRow key={item.nome}>
                           <TableCell>{item.nome}</TableCell>
                           <TableCell className="text-right">{item.total_exames.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{item.total_medicos}</TableCell>
                           <TableCell className="text-right">{formatPercentual(item.percentual)}</TableCell>
                         </TableRow>
                       ))}
@@ -311,6 +385,7 @@ export function VolumetriaMedicosAnalysis({
                       <TableRow>
                         <TableHead>Especialidade</TableHead>
                         <TableHead className="text-right">Exames</TableHead>
+                        <TableHead className="text-right">Médicos</TableHead>
                         <TableHead className="text-right">%</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -319,6 +394,7 @@ export function VolumetriaMedicosAnalysis({
                         <TableRow key={item.nome}>
                           <TableCell>{item.nome}</TableCell>
                           <TableCell className="text-right">{item.total_exames.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{item.total_medicos}</TableCell>
                           <TableCell className="text-right">{formatPercentual(item.percentual)}</TableCell>
                         </TableRow>
                       ))}
