@@ -480,7 +480,11 @@ async function processFileInBackground(
         .from('processamento_uploads')
         .update({
           status: 'erro',
-          erro_detalhes: error?.message || String(error) || 'Erro desconhecido durante processamento'
+          detalhes_erro: JSON.stringify({ 
+            erro: error?.message || String(error) || 'Erro desconhecido durante processamento',
+            timestamp: new Date().toISOString()
+          }),
+          completed_at: new Date().toISOString()
         })
         .eq('id', uploadLogId);
     } catch (finalErr) {
