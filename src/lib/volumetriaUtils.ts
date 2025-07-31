@@ -403,30 +403,37 @@ export async function processVolumetriaFile(
         console.log(`✅ ${arquivoFonte}: Dados anteriores a 2023-01-01 removidos`);
       }
       
-      // 2. CRÍTICO: Excluir dados do período atual de faturamento para arquivos retroativos
+      // 2. REGRA CORRETA: Excluir exames com DATA_REALIZACAO do mês atual em diante
+      // Se estamos faturando julho/2025, excluir todos com DATA_REALIZACAO >= 01/07/2025
       try {
-        const { data: currentPeriodData } = await supabase
-          .rpc('get_periodo_faturamento', { data_referencia: new Date().toISOString().split('T')[0] })
-          .single();
+        const anoAtual = new Date().getFullYear();
+        const mesAtual = new Date().getMonth() + 1; // Janeiro = 1
+        const primeiroDiaFaturamento = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}-01`;
+        
+        console.log(`📅 ${arquivoFonte}: Faturando ${mesAtual}/${anoAtual} - Excluindo DATA_REALIZACAO >= ${primeiroDiaFaturamento}`);
+        
+        // Contar quantos serão removidos antes
+        const { data: countToRemove } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id', { count: 'exact' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .gte('DATA_REALIZACAO', primeiroDiaFaturamento);
           
-        if (currentPeriodData) {
-          console.log(`📅 ${arquivoFonte}: Removendo período atual: ${currentPeriodData.inicio_periodo} até ${currentPeriodData.fim_periodo}`);
+        console.log(`🗑️ ${arquivoFonte}: ${countToRemove?.length || 0} registros a serem removidos`);
+        
+        const { error: deleteCurrentError } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .eq('arquivo_fonte', arquivoFonte)
+          .gte('DATA_REALIZACAO', primeiroDiaFaturamento);
           
-          const { error: deleteCurrentError } = await supabase
-            .from('volumetria_mobilemed')
-            .delete()
-            .eq('arquivo_fonte', arquivoFonte)
-            .gte('data_referencia', currentPeriodData.inicio_periodo)
-            .lte('data_referencia', currentPeriodData.fim_periodo);
-            
-          if (deleteCurrentError) {
-            console.warn(`⚠️ ${arquivoFonte}: Erro ao remover período atual:`, deleteCurrentError);
-          } else {
-            console.log(`✅ ${arquivoFonte}: Dados do período atual removidos`);
-          }
+        if (deleteCurrentError) {
+          console.warn(`⚠️ ${arquivoFonte}: Erro ao remover exames do mês atual:`, deleteCurrentError);
+        } else {
+          console.log(`✅ ${arquivoFonte}: Exames com DATA_REALIZACAO >= ${primeiroDiaFaturamento} removidos`);
         }
       } catch (periodError) {
-        console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar filtro de período atual:`, periodError);
+        console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar filtro de DATA_REALIZACAO:`, periodError);
       }
       
       // Contar registros após as regras
