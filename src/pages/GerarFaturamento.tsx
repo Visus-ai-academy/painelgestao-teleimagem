@@ -43,6 +43,7 @@ import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturame
 import { UploadStatusPanel } from "@/components/UploadStatusPanel";
 import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
 import LimparDadosCompleto from "@/components/LimparDadosCompleto";
+import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -1000,6 +1001,7 @@ export default function GerarFaturamento() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <VolumetriaProvider>
                 {/* Análise dos Uploads Realizados - MOVIDO PARA O TOPO */}
                 <VolumetriaUploadStats refreshTrigger={refreshUploadStatus} />
                 
@@ -1116,6 +1118,7 @@ export default function GerarFaturamento() {
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />
 
+                </VolumetriaProvider>
               </CardContent>
             </Card>
           </div>

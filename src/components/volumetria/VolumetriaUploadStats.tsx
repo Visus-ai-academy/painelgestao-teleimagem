@@ -1,17 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Calendar, BarChart3, AlertCircle } from "lucide-react";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
+// Dados estruturados
 interface UploadStats {
   fileName: string;
   totalRecords: number;
@@ -23,237 +17,98 @@ interface UploadStats {
 }
 
 export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: number }) {
-  const [stats, setStats] = useState<UploadStats[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadStats = async () => {
-    try {
-      console.log('📊 Carregando estatísticas usando método manual...');
-      setLoading(true);
-      await loadStatsManual();
-      setLoading(false);
-    } catch (error) {
-      console.error('❌ Erro ao carregar estatísticas:', error);
-      
-      // Em caso de erro, usar método fallback mais robusto
-      const fallbackStats: UploadStats[] = [
-        {
-          fileName: "Volumetria Padrão",
-          totalRecords: 0,
-          recordsWithValue: 0,
-          recordsZeroed: 0,
-          totalValue: 0,
-          period: "Erro de carregamento",
-          category: 'padrão'
-        },
-        {
-          fileName: "Volumetria Fora Padrão",
-          totalRecords: 0,
-          recordsWithValue: 0,
-          recordsZeroed: 0,
-          totalValue: 0,
-          period: "Erro de carregamento",
-          category: 'fora-padrão'
-        },
-        {
-          fileName: "Volumetria Padrão Retroativo",
-          totalRecords: 0,
-          recordsWithValue: 0,
-          recordsZeroed: 0,
-          totalValue: 0,
-          period: "Erro de carregamento",
-          category: 'retroativo'
-        },
-        {
-          fileName: "Volumetria Fora Padrão Retroativo",
-          totalRecords: 0,
-          recordsWithValue: 0,
-          recordsZeroed: 0,
-          totalValue: 0,
-          period: "Erro de carregamento",
-          category: 'fora-padrão'
-        }
-      ];
-      
-      setStats(fallbackStats);
-      setLoading(false);
-    }
-  };
-
-  const getCategoryFromSource = (source: string): 'padrão' | 'fora-padrão' | 'retroativo' => {
-    if (source.includes('retroativo')) return 'retroativo';
-    if (source.includes('fora_padrao')) return 'fora-padrão';
-    return 'padrão';
-  };
-
-  // MÉTODO FALLBACK: Consulta manual robusta com paginação confiável
-  const loadStatsManual = async () => {
-    try {
-      console.log('🔄 Usando método fallback com paginação robusta...');
-      
-      const statsMap = new Map<string, {
-        totalRecords: number;
-        recordsWithValue: number;
-        recordsZeroed: number;
-        totalValue: number;
-      }>();
-
-      // Inicializar contadores
-      const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-      const fontes = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
-      
-      fontes.forEach(fonte => statsMap.set(fonte, { ...initStats }));
-
-      // Processar cada fonte separadamente para evitar limitações
-      for (const fonte of fontes) {
-        console.log(`📦 Processando ${fonte}...`);
-        
-        let offset = 0;
-        const limit = 10000; // Aumentado para processar mais registros por vez
-        let hasMoreData = true;
-        let totalProcessed = 0;
-
-        while (hasMoreData) {
-          const { data: batchData, error } = await supabase
-            .from('volumetria_mobilemed')
-            .select('VALORES')
-            .eq('arquivo_fonte', fonte)
-            .range(offset, offset + limit - 1);
-
-          if (error) {
-            console.error(`❌ Erro ao buscar ${fonte}:`, error);
-            break;
-          }
-
-          if (!batchData || batchData.length === 0) {
-            hasMoreData = false;
-            break;
-          }
-
-          // Processar lote
-          const stats = statsMap.get(fonte)!;
-          batchData.forEach(record => {
-            const valor = record.VALORES || 0;
-            stats.totalRecords++;
-            
-            if (valor > 0) {
-              stats.recordsWithValue++;
-              stats.totalValue += valor;
-            } else {
-              stats.recordsZeroed++;
-            }
-          });
-
-          totalProcessed += batchData.length;
-          console.log(`   📊 ${fonte}: ${totalProcessed} registros processados`);
-
-          if (batchData.length < limit) {
-            hasMoreData = false;
-          } else {
-            offset += limit;
-          }
-
-          // Pequena pausa para evitar sobrecarga
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-      }
-
-      console.log('📊 Estatísticas processadas (MÉTODO MANUAL):', Object.fromEntries(statsMap));
-      
-      // Converter para formato do componente (mesmo código anterior)
-      const realStats: UploadStats[] = [
-        {
-          fileName: "Volumetria Padrão",
-          totalRecords: statsMap.get('volumetria_padrao')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_padrao')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_padrao')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_padrao')?.totalValue || 0,
-          period: "Período Atual",
-          category: 'padrão'
-        },
-        {
-          fileName: "Volumetria Fora Padrão",
-          totalRecords: statsMap.get('volumetria_fora_padrao')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_fora_padrao')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_fora_padrao')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_fora_padrao')?.totalValue || 0,
-          period: "Período Atual",
-          category: 'fora-padrão'
-        },
-        {
-          fileName: "Volumetria Padrão Retroativo",
-          totalRecords: statsMap.get('volumetria_padrao_retroativo')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_padrao_retroativo')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_padrao_retroativo')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_padrao_retroativo')?.totalValue || 0,
-          period: "Período Retroativo",
-          category: 'retroativo'
-        },
-        {
-          fileName: "Volumetria Fora Padrão Retroativo",
-          totalRecords: statsMap.get('volumetria_fora_padrao_retroativo')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_fora_padrao_retroativo')?.totalValue || 0,
-          period: "Período Retroativo",
-          category: 'fora-padrão'
-        }
-      ];
-
-      setStats(realStats);
-      
-    } catch (error) {
-      console.error('❌ Erro no método manual:', error);
-      throw error;
-    }
-  };
+  const { data, refreshData } = useVolumetria();
 
   useEffect(() => {
-    console.log('🔄 useEffect disparado, carregando estatísticas...');
-    let isMounted = true;
-    
-    const loadWithTimeout = async () => {
-      if (isMounted) {
-        await loadStats();
-      }
-    };
-    
-    loadWithTimeout();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshTrigger]); // Dependência específica para evitar loops
-
-
-  const getCategoryColor = (category: UploadStats['category']) => {
-    switch (category) {
-      case 'padrão':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'fora-padrão':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'retroativo':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+    if (refreshTrigger !== undefined) {
+      refreshData();
     }
-  };
+  }, [refreshTrigger, refreshData]);
+
+  // Converter dados do contexto para o formato de stats
+  const stats: UploadStats[] = [
+    {
+      fileName: "Volumetria Padrão",
+      totalRecords: data.stats.volumetria_padrao.totalRecords,
+      recordsWithValue: data.stats.volumetria_padrao.recordsWithValue,
+      recordsZeroed: data.stats.volumetria_padrao.recordsZeroed,
+      totalValue: data.stats.volumetria_padrao.totalValue,
+      period: data.lastUploads.volumetria_padrao ? 
+        new Date(data.lastUploads.volumetria_padrao.created_at).toLocaleDateString('pt-BR') : 
+        "Nenhum upload",
+      category: 'padrão'
+    },
+    {
+      fileName: "Volumetria Fora Padrão", 
+      totalRecords: data.stats.volumetria_fora_padrao.totalRecords,
+      recordsWithValue: data.stats.volumetria_fora_padrao.recordsWithValue,
+      recordsZeroed: data.stats.volumetria_fora_padrao.recordsZeroed,
+      totalValue: data.stats.volumetria_fora_padrao.totalValue,
+      period: data.lastUploads.volumetria_fora_padrao ?
+        new Date(data.lastUploads.volumetria_fora_padrao.created_at).toLocaleDateString('pt-BR') :
+        "Nenhum upload",
+      category: 'fora-padrão'
+    },
+    {
+      fileName: "Volumetria Padrão Retroativo",
+      totalRecords: data.stats.volumetria_padrao_retroativo.totalRecords,
+      recordsWithValue: data.stats.volumetria_padrao_retroativo.recordsWithValue,
+      recordsZeroed: data.stats.volumetria_padrao_retroativo.recordsZeroed,
+      totalValue: data.stats.volumetria_padrao_retroativo.totalValue,
+      period: data.lastUploads.volumetria_padrao_retroativo ?
+        new Date(data.lastUploads.volumetria_padrao_retroativo.created_at).toLocaleDateString('pt-BR') :
+        "Nenhum upload",
+      category: 'retroativo'
+    },
+    {
+      fileName: "Volumetria Fora Padrão Retroativo",
+      totalRecords: data.stats.volumetria_fora_padrao_retroativo.totalRecords,
+      recordsWithValue: data.stats.volumetria_fora_padrao_retroativo.recordsWithValue,
+      recordsZeroed: data.stats.volumetria_fora_padrao_retroativo.recordsZeroed,
+      totalValue: data.stats.volumetria_fora_padrao_retroativo.totalValue,
+      period: data.lastUploads.volumetria_fora_padrao_retroativo ?
+        new Date(data.lastUploads.volumetria_fora_padrao_retroativo.created_at).toLocaleDateString('pt-BR') :
+        "Nenhum upload",
+      category: 'fora-padrão'
+    }
+  ];
 
   const totalStats = stats.reduce((acc, stat) => ({
     totalRecords: acc.totalRecords + stat.totalRecords,
     recordsWithValue: acc.recordsWithValue + stat.recordsWithValue,
-    totalValue: acc.totalValue + stat.totalValue
+    totalValue: acc.totalValue + stat.totalValue,
   }), { totalRecords: 0, recordsWithValue: 0, totalValue: 0 });
 
-  if (loading) {
+  const getCategoryColor = (category: 'padrão' | 'fora-padrão' | 'retroativo') => {
+    switch (category) {
+      case 'padrão':
+        return 'bg-blue-100 text-blue-800';
+      case 'fora-padrão':
+        return 'bg-orange-100 text-orange-800';
+      case 'retroativo':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (data.loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Carregando estatísticas...
+            <FileText className="h-5 w-5" />
+            Análise dos Uploads Realizados
           </CardTitle>
         </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">Carregando estatísticas...</p>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     );
   }
@@ -262,77 +117,84 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
+          <FileText className="h-5 w-5" />
           Análise dos Uploads Realizados
         </CardTitle>
-        <div className="grid grid-cols-3 gap-4 pt-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{totalStats.totalRecords.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Total de Registros</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{totalStats.recordsWithValue.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Com Valores</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{totalStats.totalValue.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Total de Exames</div>
+        {/* Resumo no Header */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-blue-900">{totalStats.totalRecords}</div>
+              <div className="text-sm text-blue-700">Total de Registros</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-900">{totalStats.recordsWithValue}</div>
+              <div className="text-sm text-green-700">Com Valores</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-orange-900">{totalStats.totalValue}</div>
+              <div className="text-sm text-orange-700">Total de Exames</div>
+            </div>
           </div>
         </div>
       </CardHeader>
       <CardContent>
+        {/* Tabela Detalhada */}
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[300px]">Arquivo</TableHead>
+              <TableHead className="w-[300px]">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Arquivo
+                </div>
+              </TableHead>
               <TableHead className="text-center">Registros</TableHead>
-              <TableHead className="text-center">Com Valores</TableHead>
               <TableHead className="text-center">Zerados</TableHead>
-              <TableHead className="text-center">Total Exames</TableHead>
-              <TableHead className="text-center">Período</TableHead>
+              <TableHead className="text-center">Total de Exames</TableHead>
+              <TableHead className="text-center">
+                <div className="flex items-center gap-1 justify-center">
+                  <Calendar className="h-4 w-4" />
+                  Período
+                </div>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {stats.map((stat, index) => (
               <TableRow key={index}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium">{stat.fileName}</div>
-                      <Badge 
-                        variant="outline" 
-                        className={`mt-1 ${getCategoryColor(stat.category)}`}
-                      >
-                        {stat.category}
-                      </Badge>
-                    </div>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{stat.fileName}</span>
+                    <Badge className={getCategoryColor(stat.category)}>
+                      {stat.category}
+                    </Badge>
                   </div>
-                </TableCell>
-                <TableCell className="text-center font-mono">
-                  {stat.totalRecords.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-center font-mono text-green-600">
-                  {stat.recordsWithValue.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-center font-mono">
-                  {stat.recordsZeroed > 0 ? (
-                    <div className="flex items-center justify-center gap-1 text-orange-600">
-                      <AlertCircle className="h-4 w-4" />
-                      {stat.recordsZeroed.toLocaleString()}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">0</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center font-mono text-blue-600">
-                  {stat.totalValue.toLocaleString()}
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    {stat.period}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-blue-600">{stat.totalRecords}</span>
+                    <span className="text-xs text-green-600">{stat.recordsWithValue} com valores</span>
                   </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  {stat.recordsZeroed > 0 ? (
+                    <div className="flex items-center justify-center gap-1">
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      <span className="text-yellow-600 font-medium">{stat.recordsZeroed}</span>
+                    </div>
+                  ) : (
+                    <span className="text-green-600">0</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <BarChart3 className="h-4 w-4 text-orange-500" />
+                    <span className="font-semibold text-orange-600">{stat.totalValue}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-center text-sm text-muted-foreground">
+                  {stat.period}
                 </TableCell>
               </TableRow>
             ))}
