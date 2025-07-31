@@ -135,15 +135,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const { error: statusError } = await supabase
         .from('processamento_uploads')
         .delete()
-        .in('tipo_arquivo', [
-          'volumetria_padrao',
-          'volumetria_fora_padrao', 
-          'volumetria_padrao_retroativo',
-          'volumetria_fora_padrao_retroativo',
-          'volumetria_onco_padrao',
-          'data_laudo',
-          'data_exame'
-        ]);
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (statusError) {
         console.warn('Aviso ao limpar status:', statusError.message);
@@ -153,20 +145,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const { error: importError } = await supabase
         .from('import_history')
         .delete()
-        .in('file_type', [
-          'volumetria_padrao',
-          'volumetria_fora_padrao', 
-          'volumetria_padrao_retroativo',
-          'volumetria_fora_padrao_retroativo',
-          'volumetria_onco_padrao'
-        ]);
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (importError) {
         console.warn('Aviso ao limpar import history:', importError.message);
       }
 
-      // Atualizar dados após limpeza
-      await refreshData();
+
+      // Resetar dados locais imediatamente
+      setData({
+        stats: {
+          volumetria_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+          volumetria_fora_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+          volumetria_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+          volumetria_fora_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+        },
+        lastUploads: {},
+        loading: false
+      });
       
       console.log('✅ Limpeza centralizada concluída');
       
