@@ -269,6 +269,10 @@ export async function processVolumetriaFile(
             HORA_REASSINATURA: convertTime(String(row['HORA_REASSINATURA'] || '')),
           };
 
+          // Definir data_referencia baseado no tipo de arquivo
+          // Para arquivos padrão, usar DATA_LAUDO ou DATA_REALIZACAO como fallback
+          (record as any).data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
+
           records.push(record);
         } catch (error) {
           console.error('Erro ao processar linha:', error);
@@ -374,25 +378,51 @@ export async function processVolumetriaFile(
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
     console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros, ${registrosAtualizados} atualizados`);
 
-    // Aplicar regras específicas para arquivos retroativos
+    // Aplicar regras específicas para arquivos retroativos DIRETAMENTE
     if (arquivoFonte.includes('retroativo')) {
       console.log('🔧 Aplicando regras específicas para arquivo retroativo...');
-      try {
-        const { data: regrasResult, error: regrasError } = await supabase.functions.invoke('aplicar-regras-tratamento', {
-          body: {
-            arquivo_fonte: arquivoFonte
-          }
-        });
+      
+      // 1. Remover registros com data anterior a 2023-01-01
+      const { error: deleteOldError } = await supabase
+        .from('volumetria_mobilemed')
+        .delete()
+        .eq('arquivo_fonte', arquivoFonte)
+        .eq('periodo_referencia', periodoReferencia)
+        .lt('data_referencia', '2023-01-01');
         
-        if (regrasError) {
-          console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
-        } else {
-          console.log('✅ Regras específicas aplicadas:', regrasResult);
-          registrosAtualizados += regrasResult?.registros_atualizados || 0;
-        }
-      } catch (regrasError) {
-        console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
+      if (deleteOldError) {
+        console.warn('⚠️ Erro ao remover dados antigos:', deleteOldError);
+      } else {
+        console.log('✅ Dados anteriores a 2023-01-01 removidos');
       }
+      
+      // 2. Filtrar período atual (excluir dados do período atual de faturamento)
+      // Usar função do banco que já implementa essa lógica
+      try {
+        const { data: currentPeriodData } = await supabase
+          .rpc('get_periodo_faturamento', { data_referencia: new Date().toISOString().split('T')[0] })
+          .single();
+          
+        if (currentPeriodData) {
+          const { error: deleteCurrentError } = await supabase
+            .from('volumetria_mobilemed')
+            .delete()
+            .eq('arquivo_fonte', arquivoFonte)
+            .eq('periodo_referencia', periodoReferencia)
+            .gte('data_referencia', currentPeriodData.inicio_periodo)
+            .lte('data_referencia', currentPeriodData.fim_periodo);
+            
+          if (deleteCurrentError) {
+            console.warn('⚠️ Erro ao remover período atual:', deleteCurrentError);
+          } else {
+            console.log('✅ Dados do período atual de faturamento removidos');
+          }
+        }
+      } catch (periodError) {
+        console.warn('⚠️ Erro ao aplicar filtro de período atual:', periodError);
+      }
+      
+      console.log('✅ Regras específicas de retroativo aplicadas');
     }
 
     // Forçar atualização das estatísticas após processamento
