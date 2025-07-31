@@ -380,10 +380,15 @@ export async function processVolumetriaFile(
 
     // Aplicar regras específicas para arquivos retroativos DIRETAMENTE
     if (arquivoFonte.includes('retroativo')) {
-      console.log('🔧 Aplicando regras específicas para arquivo retroativo...');
+      console.log(`🔧 Aplicando regras específicas para arquivo retroativo: ${arquivoFonte}`);
       
-      let registrosRemovidosAntes2023 = 0;
-      let registrosRemovidosPeriodoAtual = 0;
+      // Contar registros antes das regras
+      const { data: beforeRules } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id', { count: 'exact' })
+        .eq('arquivo_fonte', arquivoFonte);
+        
+      console.log(`📊 ${arquivoFonte}: ${beforeRules?.length || 0} registros antes das regras`);
       
       // 1. Remover registros com data anterior a 2023-01-01
       const { error: deleteOldError } = await supabase
@@ -393,37 +398,23 @@ export async function processVolumetriaFile(
         .lt('data_referencia', '2023-01-01');
         
       if (deleteOldError) {
-        console.warn('⚠️ Erro ao remover dados antigos:', deleteOldError);
+        console.warn(`⚠️ ${arquivoFonte}: Erro ao remover dados antigos:`, deleteOldError);
       } else {
-        console.log('✅ Dados anteriores a 2023-01-01 removidos');
+        console.log(`✅ ${arquivoFonte}: Dados anteriores a 2023-01-01 removidos`);
       }
       
-      // 2. Filtrar período atual (excluir dados do período atual de faturamento)
-      // Usar função do banco que já implementa essa lógica
-      try {
-        const { data: currentPeriodData } = await supabase
-          .rpc('get_periodo_faturamento', { data_referencia: new Date().toISOString().split('T')[0] })
-          .single();
-          
-        if (currentPeriodData) {
-          const { error: deleteCurrentError } = await supabase
-            .from('volumetria_mobilemed')
-            .delete()
-            .eq('arquivo_fonte', arquivoFonte)
-            .gte('data_referencia', currentPeriodData.inicio_periodo)
-            .lte('data_referencia', currentPeriodData.fim_periodo);
-            
-          if (deleteCurrentError) {
-            console.warn('⚠️ Erro ao remover período atual:', deleteCurrentError);
-          } else {
-            console.log('✅ Dados do período atual de faturamento removidos');
-          }
-        }
-      } catch (periodError) {
-        console.warn('⚠️ Erro ao aplicar filtro de período atual:', periodError);
-      }
+      // 2. IMPORTANTE: Para arquivos retroativos, NÃO remover período atual 
+      // pois os dados podem ser do período de fechamento
+      console.log(`📋 ${arquivoFonte}: Mantendo dados do período atual (retroativo permitido)`);
       
-      console.log('✅ Regras específicas de retroativo aplicadas');
+      // Contar registros após as regras
+      const { data: afterRules } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id', { count: 'exact' })
+        .eq('arquivo_fonte', arquivoFonte);
+        
+      console.log(`📊 ${arquivoFonte}: ${afterRules?.length || 0} registros após as regras`);
+      console.log(`✅ ${arquivoFonte}: Regras específicas de retroativo aplicadas`);
     }
 
     // Forçar atualização das estatísticas após processamento
