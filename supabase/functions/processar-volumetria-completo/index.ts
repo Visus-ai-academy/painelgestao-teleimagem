@@ -48,29 +48,27 @@ serve(async (req) => {
 
     console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
-    // Processar Excel de forma ultra otimizada para máxima economia de memória
+    // SIMPLIFICADO: Usar a abordagem clássica que sabemos que funciona
     const arrayBuffer = await fileData.arrayBuffer();
-    
-    // Usar apenas a quantidade mínima de memória necessária
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
-      type: 'array',
-      cellDates: false,
-      dense: true,  // Usar dense para economizar memória
-      bookSST: false,
-      raw: false,  // Não raw para economizar processamento
-      sheetRows: start_row + batch_size + 1  // Ler apenas as linhas necessárias
-    });
-
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
-    // Se não há dados na planilha na faixa especificada
-    if (!worksheet || !worksheet['!ref']) {
+    // Converter para JSON para analisar os dados
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    console.log('📊 Dados brutos do Excel:');
+    console.log(`📊 Total de linhas: ${jsonData.length}`);
+    console.log('📊 Primeira linha (cabeçalhos):', jsonData[0]);
+    console.log('📊 Segunda linha (dados):', jsonData[1]);
+    console.log('📊 Terceira linha (dados):', jsonData[2]);
+    
+    if (jsonData.length <= 1) {
       return new Response(JSON.stringify({
         success: true,
-        message: "Processamento concluído - não há mais dados",
+        message: "Arquivo vazio ou apenas cabeçalhos",
         batch_info: {
-          start_row,
-          end_row: start_row,
+          start_row: 0,
+          end_row: 0,
           batch_size: 0,
           total_records: 0,
           inserted: 0,
@@ -86,55 +84,26 @@ serve(async (req) => {
       });
     }
     
-    // Obter apenas o range necessário
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-    const totalRows = range.e.r;
+    // Mapear cabeçalhos
+    const headers = jsonData[0] as string[];
+    console.log('📋 Cabeçalhos mapeados:', headers);
     
-    console.log(`📊 Total de linhas detectadas: ${totalRows}`);
+    // Determinar quantas linhas processar neste batch
+    const totalDataRows = jsonData.length - 1; // Subtrair linha de cabeçalho
+    const actualStartRow = start_row;
+    const endRow = Math.min(actualStartRow + batch_size, totalDataRows);
     
-    if (start_row >= totalRows - 1) {
+    console.log(`📦 Processando batch: linhas ${actualStartRow} a ${endRow - 1} de ${totalDataRows} total`);
+    
+    if (actualStartRow >= totalDataRows) {
       return new Response(JSON.stringify({
         success: true,
         message: "Processamento concluído - não há mais dados",
         batch_info: {
           start_row,
-          end_row: start_row,
-          batch_size: 0,
-          total_records: totalRows - 1,
-          inserted: 0,
-          errors: 0,
-          de_para_updated: 0,
-          progress_percent: 100,
-          has_more: false,
-          next_start_row: null
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
-
-    // Processar apenas o batch ultra pequeno
-    const actualStartRow = start_row + 1;
-    const endRow = Math.min(actualStartRow + batch_size, totalRows);
-    
-    console.log(`📦 Processando linhas ${actualStartRow} a ${endRow - 1}`);
-    console.log(`📊 Worksheet ref:`, worksheet['!ref']);
-    console.log(`📊 Total rows:`, totalRows);
-    console.log(`📊 Start row:`, actualStartRow);
-    console.log(`📊 End row:`, endRow);
-    
-    // Verificar se há dados para processar
-    if (actualStartRow >= endRow) {
-      console.log('⚠️ Não há dados para processar neste batch');
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Processamento concluído - não há dados neste batch",
-        batch_info: {
-          start_row,
           end_row: actualStartRow,
           batch_size: 0,
-          total_records: totalRows - 1,
+          total_records: totalDataRows,
           inserted: 0,
           errors: 0,
           de_para_updated: 0,
@@ -148,106 +117,79 @@ serve(async (req) => {
       });
     }
     
-    // Extrair dados do batch linha por linha para economizar memória
-    const batchData = [];
-    
-    // Primeiro, obter os cabeçalhos da primeira linha
-    const headerRow: any = {};
-    const headerColumns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
-    for (let colIndex = 0; colIndex < headerColumns.length; colIndex++) {
-      const cellRef = headerColumns[colIndex] + '1';
-      const cell = worksheet[cellRef];
-      if (cell) {
-        headerRow[colIndex] = cell.v;
-      }
-    }
-    
-    console.log('📋 Cabeçalhos detectados:', headerRow);
-    
-    for (let rowIndex = actualStartRow; rowIndex < endRow; rowIndex++) {
-      const row: any = {};
-      
-      for (let colIndex = 0; colIndex < headerColumns.length; colIndex++) {
-        const cellRef = headerColumns[colIndex] + (rowIndex + 1);
-        const cell = worksheet[cellRef];
-        if (cell && headerRow[colIndex]) {
-          // Usar o nome da coluna do cabeçalho
-          row[headerRow[colIndex]] = cell.v;
-        }
-      }
-      
-      // Verificar se a linha tem dados essenciais
-      if (row['EMPRESA'] || row['NOME_PACIENTE'] || Object.keys(row).length > 0) {
-        batchData.push(row);
-        console.log(`📝 Linha ${rowIndex + 1}:`, row);
-      }
-    }
-    
-    console.log(`✅ Batch carregado: ${batchData.length} registros`);
-    
-    // Extrair dados linha por linha para economizar memória
+    // Processar as linhas do batch
     const loteUpload = `${arquivo_fonte}_batch_${Math.floor(start_row / batch_size)}_${Date.now()}`;
     const periodoReferencia = new Date().toISOString().substring(0, 7);
-
+    
     let inserted = 0;
     let errors = 0;
-
-    // Processar registros em mini-batches muito pequenos para evitar sobrecarga
-    const miniBatchSize = 3; // Ainda menor: apenas 3 registros por vez
-    for (let i = 0; i < batchData.length; i += miniBatchSize) {
-      const miniBatch = batchData.slice(i, i + miniBatchSize);
-      const records = [];
-
-      for (const row of miniBatch) {
-        try {
-          if (!row['EMPRESA'] || !row['NOME_PACIENTE']) continue;
-
-          const record = {
-            EMPRESA: String(row['EMPRESA']).trim(),
-            NOME_PACIENTE: String(row['NOME_PACIENTE']).trim(),
-            arquivo_fonte: arquivo_fonte,
-            lote_upload: loteUpload,
-            periodo_referencia: periodoReferencia,
-            CODIGO_PACIENTE: row['CODIGO_PACIENTE'] ? String(row['CODIGO_PACIENTE']).trim() : null,
-            ESTUDO_DESCRICAO: row['ESTUDO_DESCRICAO'] ? String(row['ESTUDO_DESCRICAO']).trim() : null,
-            ACCESSION_NUMBER: row['ACCESSION_NUMBER'] ? String(row['ACCESSION_NUMBER']).trim() : null,
-            MODALIDADE: row['MODALIDADE'] ? String(row['MODALIDADE']).trim() : null,
-            PRIORIDADE: row['PRIORIDADE'] ? String(row['PRIORIDADE']).trim() : null,
-            ESPECIALIDADE: row['ESPECIALIDADE'] ? String(row['ESPECIALIDADE']).trim() : null,
-            MEDICO: row['MEDICO'] ? String(row['MEDICO']).trim() : null,
-            VALORES: row['VALORES'] ? Math.floor(Number(row['VALORES'])) : null,
-            data_referencia: row['DATA_REALIZACAO'] ? new Date(row['DATA_REALIZACAO']) : null
-          };
-
-          records.push(record);
-        } catch (rowError) {
-          console.error('Erro ao processar linha:', rowError);
-          errors++;
-        }
+    
+    for (let i = actualStartRow; i < endRow; i++) {
+      const rowIndex = i + 1; // +1 para pular cabeçalho no array JSON
+      const rowData = jsonData[rowIndex] as any[];
+      
+      if (!rowData || rowData.length === 0) {
+        console.log(`⚠️ Linha ${rowIndex} vazia, pulando`);
+        continue;
       }
-
-      // Inserir mini-batch
-      if (records.length > 0) {
-        try {
+      
+      console.log(`📝 Processando linha ${rowIndex}:`, rowData);
+      
+      try {
+        // Mapear dados usando índices dos cabeçalhos
+        const record: any = {
+          arquivo_fonte: arquivo_fonte,
+          lote_upload: loteUpload,
+          periodo_referencia: periodoReferencia
+        };
+        
+        // Mapear campos essenciais
+        if (headers.includes('EMPRESA') && rowData[headers.indexOf('EMPRESA')]) {
+          record.EMPRESA = String(rowData[headers.indexOf('EMPRESA')]).trim();
+        }
+        if (headers.includes('NOME_PACIENTE') && rowData[headers.indexOf('NOME_PACIENTE')]) {
+          record.NOME_PACIENTE = String(rowData[headers.indexOf('NOME_PACIENTE')]).trim();
+        }
+        if (headers.includes('CODIGO_PACIENTE') && rowData[headers.indexOf('CODIGO_PACIENTE')]) {
+          record.CODIGO_PACIENTE = String(rowData[headers.indexOf('CODIGO_PACIENTE')]).trim();
+        }
+        if (headers.includes('ESTUDO_DESCRICAO') && rowData[headers.indexOf('ESTUDO_DESCRICAO')]) {
+          record.ESTUDO_DESCRICAO = String(rowData[headers.indexOf('ESTUDO_DESCRICAO')]).trim();
+        }
+        if (headers.includes('MODALIDADE') && rowData[headers.indexOf('MODALIDADE')]) {
+          record.MODALIDADE = String(rowData[headers.indexOf('MODALIDADE')]).trim();
+        }
+        if (headers.includes('VALORES') && rowData[headers.indexOf('VALORES')]) {
+          record.VALORES = Number(rowData[headers.indexOf('VALORES')]) || 0;
+        }
+        
+        console.log('📄 Registro mapeado:', record);
+        
+        // Só inserir se tiver dados mínimos
+        if (record.EMPRESA || record.NOME_PACIENTE) {
           const { error: insertError } = await supabaseClient
             .from('volumetria_mobilemed')
-            .insert(records);
-
+            .insert(record);
+          
           if (insertError) {
-            console.error('Erro ao inserir mini-batch:', insertError);
-            errors += records.length;
+            console.error('❌ Erro ao inserir:', insertError);
+            errors++;
           } else {
-            inserted += records.length;
+            console.log('✅ Registro inserido com sucesso');
+            inserted++;
           }
-        } catch (insertError) {
-          console.error('Erro crítico na inserção:', insertError);
-          errors += records.length;
+        } else {
+          console.log('⚠️ Registro ignorado - sem dados essenciais');
         }
+        
+      } catch (error) {
+        console.error('❌ Erro ao processar linha:', error);
+        errors++;
       }
     }
-
+    
     console.log(`✅ Batch processado: ${inserted} inseridos, ${errors} erros`);
-
+    
     // Aplicar de-para se necessário
     let deParaUpdated = 0;
     if (arquivo_fonte.includes('volumetria') && inserted > 0) {
@@ -261,19 +203,19 @@ serve(async (req) => {
         console.log(`⚠️ Erro no de-para (ignorado): ${deParaError.message}`);
       }
     }
-
-    const nextStartRow = endRow - 1; // -1 porque endRow é exclusivo
-    const hasMore = nextStartRow < totalRows - 1;
-    const progress = Math.round(((endRow - 1) / (totalRows - 1)) * 100);
+    
+    const nextStartRow = endRow;
+    const hasMore = nextStartRow < totalDataRows;
+    const progress = Math.round((endRow / totalDataRows) * 100);
 
     return new Response(JSON.stringify({
       success: true,
       message: `Batch ${Math.floor(start_row / batch_size) + 1} processado: ${inserted} inseridos, ${deParaUpdated} de-para aplicados`,
       batch_info: {
         start_row,
-        end_row: endRow - 1,
-        batch_size: batchData.length,
-        total_records: totalRows - 1,
+        end_row: endRow,
+        batch_size: endRow - actualStartRow,
+        total_records: totalDataRows,
         inserted,
         errors,
         de_para_updated: deParaUpdated,
