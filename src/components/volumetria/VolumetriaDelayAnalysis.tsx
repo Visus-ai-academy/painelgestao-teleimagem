@@ -350,64 +350,73 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       <div className="grid grid-cols-1 gap-6">
         {/* Top Clientes com Atrasos - Tabela */}
         <Card className="w-full">
-          <CardHeader className="bg-white border-b">
+          <CardHeader className="bg-white border-b sticky top-0 z-40">
             <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="relative max-h-96 overflow-auto border">
+          
+          {/* Container fixo com altura definida e scroll interno */}
+          <div className="h-96 flex flex-col">
+            {/* Cabeçalho fixo da tabela */}
+            <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm">
               <Table className="w-full min-w-[1600px]">
-                <TableHeader className="sticky top-0 bg-white z-30 shadow-md border-b-2 border-gray-200">
-                  <TableRow className="bg-white">
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead 
-                      className="cursor-pointer hover:bg-gray-100 min-w-[400px] bg-white sticky top-0 z-30 border-r font-semibold"
+                      className="cursor-pointer hover:bg-gray-200 min-w-[400px] border-r font-semibold h-12"
                       onClick={() => handleSort('nome')}
                     >
-                      <div className="flex items-center gap-2 py-4">
+                      <div className="flex items-center gap-2">
                         Cliente
                         {renderSortIcon('nome')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[200px] bg-white sticky top-0 z-30 border-r font-semibold"
+                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[200px] border-r font-semibold h-12"
                       onClick={() => handleSort('total_exames')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="flex items-center justify-center gap-2">
                         Total
                         {renderSortIcon('total_exames')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[200px] bg-white sticky top-0 z-30 border-r font-semibold"
+                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[200px] border-r font-semibold h-12"
                       onClick={() => handleSort('atrasados')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="flex items-center justify-center gap-2">
                         Atrasos
                         {renderSortIcon('atrasados')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[240px] bg-white sticky top-0 z-30 border-r font-semibold"
+                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[240px] border-r font-semibold h-12"
                       onClick={() => handleSort('percentual_atraso')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="flex items-center justify-center gap-2">
                         % Atraso
                         {renderSortIcon('percentual_atraso')}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-100 min-w-[240px] bg-white sticky top-0 z-30 border-r font-semibold"
+                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[240px] border-r font-semibold h-12"
                       onClick={() => handleSort('tempoMedioAtraso')}
                     >
-                      <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="flex items-center justify-center gap-2">
                         Tempo Médio
                         {renderSortIcon('tempoMedioAtraso')}
                       </div>
                     </TableHead>
-                    <TableHead className="text-center min-w-[200px] bg-white sticky top-0 z-30 font-semibold">
-                      <div className="py-4">Nível</div>
+                    <TableHead className="text-center min-w-[200px] font-semibold h-12">
+                      Nível
                     </TableHead>
                   </TableRow>
                 </TableHeader>
+              </Table>
+            </div>
+            
+            {/* Área de scroll com conteúdo da tabela */}
+            <div className="flex-1 overflow-auto">
+              <Table className="w-full min-w-[1600px]">
                 <TableBody>
                   {clientesComTempoAtraso.map((cliente, index) => {
                     const formatarTempo = (minutos: number) => {
@@ -422,8 +431,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                     
                     return (
                       <>
-                        <TableRow key={cliente.nome} className="hover:bg-gray-50">
-                          <TableCell className="font-medium border-r">
+                        <TableRow key={cliente.nome} className="hover:bg-gray-50 border-b">
+                          <TableCell className="font-medium border-r min-w-[400px]">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => toggleClientExpansion(cliente.nome)}
@@ -443,15 +452,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-center border-r">{cliente.total_exames.toLocaleString()}</TableCell>
-                          <TableCell className="text-center border-r">{cliente.atrasados.toLocaleString()}</TableCell>
-                          <TableCell className="text-center border-r">
+                          <TableCell className="text-center border-r min-w-[200px]">{cliente.total_exames.toLocaleString()}</TableCell>
+                          <TableCell className="text-center border-r min-w-[200px]">{cliente.atrasados.toLocaleString()}</TableCell>
+                          <TableCell className="text-center border-r min-w-[240px]">
                             <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
                               {cliente.percentual_atraso.toFixed(1)}%
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center border-r">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center border-r min-w-[240px]">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
+                          <TableCell className="text-center min-w-[200px]">
                             <Badge variant={
                               cliente.nivelAtraso === 'Crítico' ? "destructive" :
                               cliente.nivelAtraso === 'Alto' ? "secondary" :
@@ -564,12 +573,13 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                 </TableBody>
               </Table>
             </div>
-            <div className="p-4 border-t bg-gray-50">
-              <div className="text-sm text-muted-foreground text-center">
-                Exibindo {clientesComTempoAtraso.length} clientes com atrasos
-              </div>
+          </div>
+          
+          <div className="p-4 border-t bg-gray-50">
+            <div className="text-sm text-muted-foreground text-center">
+              Exibindo {clientesComTempoAtraso.length} clientes com atrasos
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Top Modalidades com Atrasos */}
