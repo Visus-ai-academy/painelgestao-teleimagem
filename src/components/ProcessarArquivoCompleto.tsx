@@ -58,7 +58,7 @@ export function ProcessarArquivoCompleto({
           file_path: filePath,
           arquivo_fonte: arquivoFonte,
           start_row: startRow,
-          batch_size: 100 // Reduzido para 100 registros por batch
+          batch_size: 10 // Ultra pequeno: apenas 10 registros por batch
         }
       });
 

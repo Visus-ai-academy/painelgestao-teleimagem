@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    const { file_path, arquivo_fonte, start_row = 0, batch_size = 100 } = requestBody; // Reduzido para 100
+    const { file_path, arquivo_fonte, start_row = 0, batch_size = 10 } = requestBody; // Ultra pequeno: apenas 10 registros
 
     console.log(`=== PROCESSAMENTO COMPLETO - BATCH ${Math.floor(start_row / batch_size) + 1} ===`);
     console.log(`📂 Arquivo: ${file_path}`);
@@ -120,7 +120,7 @@ serve(async (req) => {
     let errors = 0;
 
     // Processar registros em mini-batches muito pequenos para evitar sobrecarga
-    const miniBatchSize = 10; // Ainda menor para máxima estabilidade
+    const miniBatchSize = 5; // Ultra pequeno: apenas 5 registros por vez
     for (let i = 0; i < batchData.length; i += miniBatchSize) {
       const miniBatch = batchData.slice(i, i + miniBatchSize);
       const records = [];
