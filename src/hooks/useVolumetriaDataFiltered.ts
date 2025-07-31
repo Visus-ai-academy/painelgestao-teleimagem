@@ -173,10 +173,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         }
       });
 
-      const totalVolume = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-      const totalLaudos = rawData.length;
+      const totalLaudos = rawData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      const totalRegistros = rawData.length;
       const totalAtrasados = atrasados.length;
-      const percentualAtraso = totalLaudos > 0 ? (totalAtrasados / totalLaudos) * 100 : 0;
+      const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
 
       // Agrupar dados
       const clientesMap = new Map();
@@ -225,12 +225,12 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       const modalidades = Array.from(modalidadesMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalVolume > 0 ? (data.total_exames / totalVolume) * 100 : 0,
+        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
         percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       const especialidades = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
-        nome, ...data, percentual: totalVolume > 0 ? (data.total_exames / totalVolume) * 100 : 0,
+        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
         percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
