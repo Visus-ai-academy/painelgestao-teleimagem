@@ -25,20 +25,30 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
 
   const fetchUploadStats = async () => {
     try {
-      // Buscar uploads de cadastros (excluir volumetria e limpeza)
+      // Buscar uploads de cadastros (excluir tipos específicos de volumetria e limpeza)
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
-        .not('tipo_arquivo', 'like', '%volumetria%')
-        .neq('tipo_arquivo', 'limpeza')
+        .not('tipo_arquivo', 'in', '(data_laudo,data_exame,volumetria_padrao,volumetria_fora_padrao,volumetria_padrao_retroativo,volumetria_fora_padrao_retroativo,limpeza)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // Filtrar apenas uploads de cadastros válidos
+      const validCadastroTypes = [
+        'cadastro_exames', 'quebra_exames', 'precos_servicos', 
+        'regras_exclusao', 'repasse_medico', 'modalidades', 
+        'especialidades', 'categorias_exame', 'prioridades'
+      ];
+
+      const filteredData = (data || []).filter(upload => 
+        validCadastroTypes.includes(upload.tipo_arquivo)
+      );
+
       // Filtrar apenas o upload mais recente de cada tipo de arquivo
       const latestUploads = new Map<string, UploadStats>();
       
-      (data || []).forEach(upload => {
+      filteredData.forEach(upload => {
         const currentLatest = latestUploads.get(upload.tipo_arquivo);
         if (!currentLatest || new Date(upload.created_at) > new Date(currentLatest.created_at)) {
           latestUploads.set(upload.tipo_arquivo, upload);
@@ -51,6 +61,10 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       const sortedData = Array.from(latestUploads.values()).sort((a, b) => {
         const indexA = orderedTypes.indexOf(a.tipo_arquivo);
         const indexB = orderedTypes.indexOf(b.tipo_arquivo);
+        
+        // Se não está na lista ordenada, vai para o final
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
         
         // Ordenar pela ordem das abas
         return indexA - indexB;
