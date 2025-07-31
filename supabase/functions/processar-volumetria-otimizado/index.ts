@@ -167,11 +167,6 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       record.data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
     }
 
-    // Log especial apenas para o primeiro registro de arquivos retroativos
-    if (arquivoFonte.includes('retroativo') && loteUpload.endsWith('_0')) {
-      console.log(`📅 Primeiro registro retroativo - Data referência: ${record.data_referencia}`);
-    }
-
     return record;
   } catch (error) {
     console.error('Erro ao processar linha:', error);
@@ -194,7 +189,7 @@ serve(async (req) => {
     
     // Log especial para arquivos retroativos
     if (arquivo_fonte.includes('retroativo')) {
-      console.log('⚠️ ARQUIVO RETROATIVO DETECTADO - Processamento especial ativado');
+      console.log('⚠️ ARQUIVO RETROATIVO DETECTADO - Processamento ultra-otimizado ativado');
     }
     
     const supabaseClient = createClient(
@@ -250,49 +245,48 @@ serve(async (req) => {
       .eq('arquivo_fonte', arquivo_fonte)
       .eq('periodo_referencia', periodoReferencia);
 
-    // Processar TODOS os dados em lotes otimizados
+    // Configuração específica para arquivos retroativos grandes
     const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLog.id.substring(0, 8)}`;
-    const batchSize = arquivo_fonte.includes('retroativo') ? 500 : 1000; // Lotes menores para retroativos
+    const batchSize = arquivo_fonte.includes('retroativo') ? 100 : 1000; // Lotes muito pequenos para retroativos
+    const subBatchSize = arquivo_fonte.includes('retroativo') ? 50 : 500; // Sub-lotes minúsculos
     let totalInserted = 0;
     let totalErrors = 0;
 
-    console.log(`📦 Processando em lotes de ${batchSize} registros (otimizado para ${arquivo_fonte})...`);
+    console.log(`📦 PROCESSAMENTO ULTRA-OTIMIZADO: ${jsonData.length} registros em lotes de ${batchSize}/${subBatchSize}`);
 
+    // Processar em chunks ultra-pequenos para retroativos
     for (let i = 0; i < jsonData.length; i += batchSize) {
       const batch = jsonData.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(jsonData.length / batchSize);
+      
+      console.log(`📋 Lote ${batchNumber}/${totalBatches} (${i + 1}-${Math.min(i + batchSize, jsonData.length)})`);
+
       const records: VolumetriaRecord[] = [];
 
-      console.log(`📋 Processando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(jsonData.length / batchSize)} - ${batch.length} registros`);
-
-      // Processar linhas do batch com validação extra para retroativos
+      // Processar registros com validação rigorosa
       for (const row of batch) {
-        const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
-        if (record) {
-          // Para arquivos retroativos, validar se tem dados mínimos necessários
-          if (arquivo_fonte.includes('retroativo')) {
-            if (!record.EMPRESA || !record.NOME_PACIENTE) {
-              totalErrors++;
-              continue;
-            }
+        try {
+          const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
+          if (record && record.EMPRESA && record.NOME_PACIENTE) {
+            records.push(record);
+          } else {
+            totalErrors++;
           }
-          records.push(record);
-        } else {
+        } catch (rowError) {
           totalErrors++;
         }
       }
 
-      console.log(`🔍 Lote processado: ${records.length} registros válidos de ${batch.length} originais`);
-
       if (records.length === 0) {
-        console.log('⚠️ Nenhum registro válido neste lote, pulando inserção');
+        console.log(`⚠️ Lote ${batchNumber}: Sem registros válidos`);
         continue;
       }
 
-      // Inserir em sub-lotes de 250 para arquivos retroativos (ainda menores)
-      const subBatchSize = arquivo_fonte.includes('retroativo') ? 250 : 500;
+      // Inserir em sub-lotes ultra-pequenos
       for (let j = 0; j < records.length; j += subBatchSize) {
         const subBatch = records.slice(j, j + subBatchSize);
-        console.log(`💾 Inserindo sub-lote ${j}-${j + subBatch.length}: ${subBatch.length} registros`);
+        const subBatchNumber = Math.floor(j / subBatchSize) + 1;
         
         try {
           const { error: insertError } = await supabaseClient
@@ -300,41 +294,42 @@ serve(async (req) => {
             .insert(subBatch);
 
           if (insertError) {
-            console.error(`❌ Erro inserção lote ${i}-${j}:`, insertError.message);
-            console.error('❌ Primeiro registro com erro:', JSON.stringify(subBatch[0], null, 2));
+            console.error(`❌ Erro ${batchNumber}.${subBatchNumber}:`, insertError.message);
             totalErrors += subBatch.length;
           } else {
             totalInserted += subBatch.length;
-            console.log(`✅ Sub-lote ${i}-${j}: ${subBatch.length} registros inseridos com sucesso`);
+            console.log(`✅ ${batchNumber}.${subBatchNumber}: ${subBatch.length} registros OK`);
           }
         } catch (insertException) {
-          console.error(`❌ Exceção na inserção lote ${i}-${j}:`, insertException);
+          console.error(`❌ Exceção ${batchNumber}.${subBatchNumber}:`, insertException);
           totalErrors += subBatch.length;
         }
 
-        // Para arquivos retroativos, adicionar pequenas pausas para evitar timeout
-        if (arquivo_fonte.includes('retroativo') && j % 1000 === 0) {
-          console.log('⏸️ Pausa técnica para evitar timeout...');
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Pausa obrigatória entre cada sub-lote para arquivos retroativos
+        if (arquivo_fonte.includes('retroativo')) {
+          await new Promise(resolve => setTimeout(resolve, 25));
         }
       }
 
-      // Atualizar progresso com mais frequência
-      const progress = Math.round(((i + batchSize) / jsonData.length) * 100);
-      console.log(`📈 Progresso: ${progress}% - ${totalInserted} inseridos, ${totalErrors} erros`);
+      // Atualizar progresso a cada lote
+      const processedCount = Math.min(i + batchSize, jsonData.length);
+      const progress = Math.min(Math.round((processedCount / jsonData.length) * 100), 100);
       
+      console.log(`📈 ${progress}% (${processedCount}/${jsonData.length}) - ${totalInserted} inseridos, ${totalErrors} erros`);
+      
+      // Atualizar log de progresso no banco
       try {
         await supabaseClient
           .from('processamento_uploads')
           .update({
-            registros_processados: Math.min(i + batchSize, jsonData.length),
+            registros_processados: processedCount,
             registros_inseridos: totalInserted,
             registros_erro: totalErrors,
             detalhes_erro: JSON.stringify({
               progresso: `${progress}%`,
-              lote_atual: Math.floor(i / batchSize) + 1,
-              total_lotes: Math.ceil(jsonData.length / batchSize),
-              status: 'processando',
+              lote_atual: batchNumber,
+              total_lotes: totalBatches,
+              status: progress === 100 ? 'finalizando' : 'processando',
               arquivo_fonte: arquivo_fonte,
               timestamp: new Date().toISOString()
             })
@@ -343,35 +338,39 @@ serve(async (req) => {
       } catch (updateError) {
         console.warn('⚠️ Erro ao atualizar progresso:', updateError);
       }
+
+      // Pausa preventiva a cada 10 lotes para retroativos
+      if (arquivo_fonte.includes('retroativo') && batchNumber % 10 === 0) {
+        console.log('⏸️ Pausa preventiva...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
-    console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
-    console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros`);
+    console.log('✅ PROCESSAMENTO CONCLUÍDO!');
+    console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
 
     // Aplicar regras específicas para arquivos retroativos
     let registrosAtualizados = 0;
     
     if (arquivo_fonte.includes('retroativo')) {
-      console.log('🔧 Aplicando regras específicas para arquivo retroativo...');
+      console.log('🔧 Aplicando regras específicas para retroativo...');
       try {
         const { data: regrasResult, error: regrasError } = await supabaseClient.functions.invoke('aplicar-regras-tratamento', {
-          body: {
-            arquivo_fonte: arquivo_fonte
-          }
+          body: { arquivo_fonte: arquivo_fonte }
         });
         
         if (regrasError) {
-          console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
-        } else {
+          console.warn('⚠️ Erro regras específicas:', regrasError);
+        } else if (regrasResult) {
           console.log('✅ Regras específicas aplicadas:', regrasResult);
           registrosAtualizados += regrasResult?.registros_atualizados || 0;
         }
       } catch (regrasError) {
-        console.warn('⚠️ Erro ao aplicar regras específicas:', regrasError);
+        console.warn('⚠️ Erro regras específicas:', regrasError);
       }
     }
 
-    // Aplicar regras gerais de De-Para
+    // Aplicar regras gerais de De-Para com validação de erro
     console.log('🔧 Aplicando regras de De-Para...');
     try {
       if (arquivo_fonte.includes('volumetria')) {
@@ -380,28 +379,28 @@ serve(async (req) => {
         });
         
         if (deParaError) {
-          console.warn('⚠️ Erro na aplicação de De-Para automático:', deParaError);
-        } else {
+          console.warn('⚠️ Erro De-Para automático:', deParaError.message);
+        } else if (deParaResult) {
           const atualizados = deParaResult?.registros_atualizados || 0;
           registrosAtualizados += atualizados;
-          console.log(`✅ De-Para automático: ${atualizados} registros atualizados`);
+          console.log(`✅ De-Para automático: ${atualizados} atualizados`);
         }
       }
 
       const { data: prioridadeResult, error: prioridadeError } = await supabaseClient.rpc('aplicar_de_para_prioridade');
       
       if (prioridadeError) {
-        console.warn('⚠️ Erro na aplicação de De-Para prioridade:', prioridadeError);
-      } else {
+        console.warn('⚠️ Erro De-Para prioridade:', prioridadeError.message);
+      } else if (prioridadeResult) {
         const atualizados = prioridadeResult?.registros_atualizados || 0;
         registrosAtualizados += atualizados;
-        console.log(`✅ De-Para prioridade: ${atualizados} registros atualizados`);
+        console.log(`✅ De-Para prioridade: ${atualizados} atualizados`);
       }
     } catch (rulesError) {
-      console.log('⚠️ Erro nas regras de De-Para (ignorado):', rulesError.message);
+      console.warn('⚠️ Erro nas regras De-Para:', rulesError);
     }
 
-    // Finalizar log
+    // Finalizar log de processamento
     await supabaseClient
       .from('processamento_uploads')
       .update({
@@ -421,7 +420,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Processamento otimizado concluído com sucesso!',
+      message: 'Processamento ultra-otimizado concluído!',
       stats: {
         total_rows: jsonData.length,
         inserted_count: totalInserted,
@@ -434,7 +433,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('💥 ERRO:', error);
+    console.error('💥 ERRO CRÍTICO:', error);
     
     return new Response(JSON.stringify({
       success: false,
@@ -445,4 +444,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-});
+})
