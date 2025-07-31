@@ -157,71 +157,91 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
   }
 }
 
-async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
-  console.log(`Processando ${jsonData.length} registros`);
+// Função otimizada para processamento de arquivos grandes
+async function processLargeFile(jsonData: any[], arquivo_fonte: string, uploadLogId: string, supabaseClient: any) {
+  console.log(`=== PROCESSAMENTO OTIMIZADO PARA ARQUIVOS GRANDES ===`);
+  console.log(`Total de registros: ${jsonData.length}`);
   
   if (jsonData.length === 0) {
     throw new Error('Arquivo Excel está vazio');
   }
 
-  // Limitar para evitar timeout absoluto
-  const MAX_RECORDS = 5000;
-  if (jsonData.length > MAX_RECORDS) {
-    console.log(`Arquivo muito grande (${jsonData.length} registros). Processando apenas os primeiros ${MAX_RECORDS} registros.`);
-    jsonData = jsonData.slice(0, MAX_RECORDS);
-  }
-
-  const BATCH_SIZE = 500; // Reduzido para maior estabilidade
+  // Configurações otimizadas
+  const CHUNK_SIZE = 1000; // Processar 1000 registros por vez
+  const BATCH_SIZE = 100;  // Inserir 100 registros por batch
+  const MAX_EXECUTION_TIME = 8000; // 8 segundos de segurança
+  
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
+  const startTime = Date.now();
 
-  for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-    const batch = jsonData.slice(i, i + BATCH_SIZE);
-    const validRecords: VolumetriaRecord[] = [];
-    
-    // Processamento simples sem promises paralelas
-    for (const row of batch) {
-      try {
-        const record = processRow(row, arquivo_fonte);
-        if (record) {
-          validRecords.push(record);
-        } else {
+  // Processar em chunks para evitar timeout
+  for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
+    // Verificar tempo de execução
+    if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+      console.log(`Timeout preventivo atingido após ${totalProcessed} registros`);
+      break;
+    }
+
+    const chunk = jsonData.slice(chunkStart, chunkStart + CHUNK_SIZE);
+    console.log(`Processando chunk ${Math.floor(chunkStart / CHUNK_SIZE) + 1}: ${chunk.length} registros`);
+
+    // Processar chunk em batches menores
+    for (let i = 0; i < chunk.length; i += BATCH_SIZE) {
+      const batch = chunk.slice(i, i + BATCH_SIZE);
+      const validRecords: VolumetriaRecord[] = [];
+      
+      // Processamento sequencial rápido
+      for (const row of batch) {
+        try {
+          const record = processRow(row, arquivo_fonte);
+          if (record) {
+            validRecords.push(record);
+          } else {
+            totalErrors++;
+          }
+        } catch (error) {
           totalErrors++;
         }
-      } catch (error) {
-        totalErrors++;
+        totalProcessed++;
       }
-      totalProcessed++;
-    }
-    
-    // Inserção em massa simples
-    if (validRecords.length > 0) {
-      try {
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(validRecords);
+      
+      // Inserção otimizada
+      if (validRecords.length > 0) {
+        try {
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(validRecords);
 
-        if (insertError) {
-          console.error('Erro na inserção:', insertError);
+          if (insertError) {
+            console.error('Erro na inserção:', insertError.message);
+            totalErrors += validRecords.length;
+          } else {
+            totalInserted += validRecords.length;
+          }
+        } catch (batchErr) {
+          console.error('Erro no batch:', batchErr);
           totalErrors += validRecords.length;
-        } else {
-          totalInserted += validRecords.length;
         }
-      } catch (batchErr) {
-        console.error('Erro no lote:', batchErr);
-        totalErrors += validRecords.length;
       }
     }
-    
-    // Atualizar progresso a cada lote
+
+    // Atualizar progresso a cada chunk
     try {
       await supabaseClient
         .from('processamento_uploads')
         .update({ 
           registros_processados: totalProcessed,
           registros_inseridos: totalInserted,
-          registros_erro: totalErrors
+          registros_erro: totalErrors,
+          detalhes_erro: JSON.stringify({
+            status: 'Processando',
+            progresso: `${Math.round((totalProcessed / jsonData.length) * 100)}%`,
+            chunk_atual: Math.floor(chunkStart / CHUNK_SIZE) + 1,
+            total_chunks: Math.ceil(jsonData.length / CHUNK_SIZE),
+            tempo_execucao: `${Math.round((Date.now() - startTime) / 1000)}s`
+          })
         })
         .eq('id', uploadLogId);
     } catch (updateErr) {
@@ -229,9 +249,10 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     }
   }
 
-  console.log(`Processamento concluído: ${totalInserted} inseridos, ${totalErrors} erros`);
+  const executionTime = Date.now() - startTime;
+  console.log(`Processamento concluído em ${executionTime}ms: ${totalInserted} inseridos, ${totalErrors} erros`);
   
-  // Aplicar regras apenas se houver dados inseridos
+  // Aplicar regras de negócio
   let registrosAtualizadosDePara = 0;
   if (totalInserted > 0) {
     try {
@@ -240,38 +261,42 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
       if (arquivo_fonte === 'volumetria_fora_padrao') {
         const { data: deParaResult } = await supabaseClient.rpc('aplicar_valores_de_para');
         registrosAtualizadosDePara += deParaResult?.registros_atualizados || 0;
+        console.log(`De-Para valores aplicado: ${deParaResult?.registros_atualizados || 0} registros`);
       }
 
       const { data: prioridadeResult } = await supabaseClient.rpc('aplicar_de_para_prioridade');
       registrosAtualizadosDePara += prioridadeResult?.registros_atualizados || 0;
+      console.log(`De-Para prioridade aplicado: ${prioridadeResult?.registros_atualizados || 0} registros`);
       
-      console.log(`Regras aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
     } catch (regraErr) {
       console.error('Erro ao aplicar regras:', regraErr);
     }
   }
 
-  // Log final
+  // Finalizar processamento
+  const isComplete = totalProcessed >= jsonData.length;
   await supabaseClient
     .from('processamento_uploads')
     .update({
-      status: totalInserted > 0 ? 'concluido' : 'erro',
+      status: isComplete ? (totalInserted > 0 ? 'concluido' : 'erro') : 'processamento_parcial',
       registros_processados: totalProcessed,
       registros_inseridos: totalInserted,
       registros_atualizados: registrosAtualizadosDePara,
       registros_erro: totalErrors,
-      completed_at: new Date().toISOString(),
+      completed_at: isComplete ? new Date().toISOString() : null,
       detalhes_erro: JSON.stringify({
-        status: totalInserted > 0 ? 'Concluído' : 'Erro no processamento',
-        total_linhas_arquivo: jsonData.length,
-        registros_inseridos: totalInserted,
-        registros_atualizados_de_para: registrosAtualizadosDePara,
-        registros_erro: totalErrors
+        status: isComplete ? 'Concluído' : 'Processamento Parcial',
+        total_arquivo: jsonData.length,
+        processados: totalProcessed,
+        inseridos: totalInserted,
+        atualizados: registrosAtualizadosDePara,
+        erros: totalErrors,
+        tempo_execucao: `${Math.round(executionTime / 1000)}s`,
+        completo: isComplete
       })
     })
     .eq('id', uploadLogId);
 }
-
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -281,7 +306,7 @@ serve(async (req) => {
   try {
     const { file_path, arquivo_fonte } = await req.json();
 
-    console.log('=== PROCESSAR VOLUMETRIA MOBILEMED ===');
+    console.log('=== PROCESSAR VOLUMETRIA MOBILEMED OTIMIZADO ===');
     console.log('Arquivo:', file_path);
     console.log('Fonte:', arquivo_fonte);
 
@@ -332,13 +357,14 @@ serve(async (req) => {
 
     console.log('Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel
+    // Ler Excel de forma otimizada
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
       type: 'array',
       cellDates: false,
       cellNF: false, 
-      cellHTML: false
+      cellHTML: false,
+      dense: true // Otimização para arquivos grandes
     });
     
     if (!workbook.SheetNames.length) {
@@ -354,13 +380,13 @@ serve(async (req) => {
     
     console.log(`Dados extraídos: ${jsonData.length} linhas`);
     
-    // Processar dados
-    await processExcelData(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
+    // Processar com nova função otimizada
+    await processLargeFile(jsonData, arquivo_fonte, uploadLog.id, supabaseClient);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Processamento concluído",
+        message: "Processamento concluído com otimizações",
         upload_log_id: uploadLog.id
       }),
       { 
