@@ -134,17 +134,17 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       let query = supabase.from('volumetria_mobilemed').select(`
         EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
         VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO
-      `);
+      `).limit(100000); // Removendo qualquer limitação padrão
       
       const { startDate, endDate } = buildDateFilter();
       console.log('📊 Período selecionado:', { startDate, endDate });
       
+      // CORREÇÃO: Só aplicar filtro de data se startDate E endDate existirem
       if (startDate && endDate) {
-        // Usar DATA_REALIZACAO como referência principal para consistência com MobileMed
         query = query.gte('DATA_REALIZACAO', startDate).lte('DATA_REALIZACAO', endDate);
         console.log('🎯 Filtro de data aplicado na DATA_REALIZACAO:', startDate, 'até', endDate);
       } else {
-        console.log('⚠️ Nenhum filtro de data aplicado - buscando todos os registros');
+        console.log('⚠️ Nenhum filtro de data aplicado - buscando TODOS os registros');
       }
 
       if (filters.cliente !== 'todos') {
