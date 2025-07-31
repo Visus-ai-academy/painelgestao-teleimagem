@@ -46,6 +46,13 @@ export function ProcessarArquivoCompleto({
 
   const processBatch = async (startRow: number): Promise<BatchInfo | null> => {
     try {
+      console.log('🚀 Iniciando processamento do batch:', {
+        filePath,
+        arquivoFonte,
+        startRow,
+        batchSize: 500
+      });
+
       const { data, error } = await supabase.functions.invoke('processar-volumetria-completo', {
         body: {
           file_path: filePath,
@@ -55,11 +62,16 @@ export function ProcessarArquivoCompleto({
         }
       });
 
-      if (error) throw error;
+      console.log('📥 Resposta da edge function:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro da edge function:', error);
+        throw error;
+      }
 
       return data.batch_info;
     } catch (error: any) {
-      console.error('Erro ao processar batch:', error);
+      console.error('💥 Erro ao processar batch:', error);
       toast({
         title: "Erro no processamento",
         description: error.message,
