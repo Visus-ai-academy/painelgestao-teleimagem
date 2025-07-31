@@ -2295,6 +2295,48 @@ export type Database = {
         }
         Relationships: []
       }
+      volumetria_erros: {
+        Row: {
+          arquivo_fonte: string
+          corrigido_em: string | null
+          corrigido_por: string | null
+          created_at: string
+          dados_originais: Json
+          empresa: string
+          erro_detalhes: string
+          id: string
+          nome_paciente: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          corrigido_em?: string | null
+          corrigido_por?: string | null
+          created_at?: string
+          dados_originais: Json
+          empresa: string
+          erro_detalhes: string
+          id?: string
+          nome_paciente: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          corrigido_em?: string | null
+          corrigido_por?: string | null
+          created_at?: string
+          dados_originais?: Json
+          empresa?: string
+          erro_detalhes?: string
+          id?: string
+          nome_paciente?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       volumetria_mobilemed: {
         Row: {
           ACCESSION_NUMBER: string | null
