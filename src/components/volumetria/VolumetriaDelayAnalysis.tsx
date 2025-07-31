@@ -110,7 +110,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{topDelayClientes.length}</div>
+              <div className="text-2xl font-bold text-orange-600">{data.clientes.filter(c => c.atrasados > 0).length}</div>
               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
             </div>
             <div className="text-center">
