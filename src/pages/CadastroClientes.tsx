@@ -662,7 +662,7 @@ export default function CadastroClientes() {
                       onClick={() => handleOrdenacao('nome')}
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                     >
-                      Nome
+                      Nome Mobilemed
                       {renderIconeOrdenacao('nome')}
                     </Button>
                   </TableHead>
@@ -682,18 +682,18 @@ export default function CadastroClientes() {
                       onClick={() => handleOrdenacao('email')}
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                     >
-                      Email
+                      E-mail Envio NF
                       {renderIconeOrdenacao('email')}
                     </Button>
                   </TableHead>
                   <TableHead>
                     <Button
                       variant="ghost"
-                      onClick={() => handleOrdenacao('cod_cliente')}
+                      onClick={() => handleOrdenacao('contato')}
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                     >
-                      Código
-                      {renderIconeOrdenacao('cod_cliente')}
+                      Nome Fantasia
+                      {renderIconeOrdenacao('contato')}
                     </Button>
                   </TableHead>
                   <TableHead>
@@ -735,7 +735,7 @@ export default function CadastroClientes() {
                     <TableCell className="font-medium">{cliente.nome}</TableCell>
                     <TableCell>{cliente.cnpj}</TableCell>
                     <TableCell>{cliente.email}</TableCell>
-                    <TableCell>{cliente.cod_cliente}</TableCell>
+                    <TableCell>{cliente.contato || "-"}</TableCell>
                     <TableCell>{cliente.cidade || "-"}</TableCell>
                     <TableCell>{cliente.estado || "-"}</TableCell>
                     <TableCell>
