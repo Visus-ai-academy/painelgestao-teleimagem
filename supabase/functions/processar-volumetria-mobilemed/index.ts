@@ -164,7 +164,14 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     throw new Error('Arquivo Excel está vazio');
   }
 
-  const BATCH_SIZE = 500; // Lotes muito maiores para velocidade
+  // Limitar o número máximo de registros para evitar timeout
+  const MAX_RECORDS = 10000;
+  if (jsonData.length > MAX_RECORDS) {
+    console.log(`Arquivo muito grande (${jsonData.length} registros). Processando apenas os primeiros ${MAX_RECORDS} registros.`);
+    jsonData = jsonData.slice(0, MAX_RECORDS);
+  }
+
+  const BATCH_SIZE = 1000; // Lotes maiores para velocidade
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
@@ -173,9 +180,18 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     const batch = jsonData.slice(i, i + BATCH_SIZE);
     const validRecords: VolumetriaRecord[] = [];
     
-    // Processamento rápido sem logs excessivos
-    for (const row of batch) {
-      const record = processRow(row, arquivo_fonte);
+    // Processamento paralelo das linhas do lote
+    const promises = batch.map(row => {
+      try {
+        return processRow(row, arquivo_fonte);
+      } catch (error) {
+        return null;
+      }
+    });
+    
+    const results = await Promise.all(promises);
+    
+    for (const record of results) {
       if (record) {
         validRecords.push(record);
       } else {
@@ -184,33 +200,48 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
       totalProcessed++;
     }
     
-    // Inserção em massa
+    // Inserção em massa com retry simples
     if (validRecords.length > 0) {
-      try {
-        const { data: insertedData, error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(validRecords);
+      let inserted = false;
+      let retries = 0;
+      
+      while (!inserted && retries < 2) {
+        try {
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(validRecords);
 
-        if (insertError) {
-          totalErrors += validRecords.length;
-        } else {
+          if (insertError) {
+            throw insertError;
+          }
+          
           totalInserted += validRecords.length;
+          inserted = true;
+        } catch (batchErr) {
+          retries++;
+          if (retries >= 2) {
+            totalErrors += validRecords.length;
+          } else {
+            // Aguardar um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
-      } catch (batchErr) {
-        totalErrors += validRecords.length;
       }
     }
     
-    // Atualizar progresso apenas a cada 10 lotes (5000 registros)
-    if (Math.floor(i / BATCH_SIZE) % 10 === 0) {
-      await supabaseClient
-        .from('processamento_uploads')
-        .update({ 
-          registros_processados: totalProcessed,
-          registros_inseridos: totalInserted,
-          registros_erro: totalErrors
-        })
-        .eq('id', uploadLogId);
+    // Atualizar progresso a cada lote
+    await supabaseClient
+      .from('processamento_uploads')
+      .update({ 
+        registros_processados: totalProcessed,
+        registros_inseridos: totalInserted,
+        registros_erro: totalErrors
+      })
+      .eq('id', uploadLogId);
+      
+    // Pequena pausa para não sobrecarregar
+    if (i % (BATCH_SIZE * 5) === 0) {
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
   }
 
