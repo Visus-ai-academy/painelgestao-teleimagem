@@ -513,6 +513,7 @@ serve(async (req) => {
           message: `Processamento concluído. ${jsonData.length} registros processados (arquivo grande - limitado a primeiras linhas)`,
           upload_log_id: uploadLog.id,
           limited_processing: true,
+          file_path: file_path, // Retornar o caminho do arquivo para processamento completo
           file_size: fileData.size,
           stats: {
             total_limitado: jsonData.length,

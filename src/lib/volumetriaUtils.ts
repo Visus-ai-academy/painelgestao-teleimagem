@@ -455,7 +455,7 @@ export async function processVolumetriaFile(
       totalInserted: finalStatus.registros_inseridos || 0,
       errors,
       limitedProcessing: finalStatus.limited_processing || false,
-      filePath: finalStatus.limited_processing ? filePath : undefined
+      filePath: filePath // Usar o filePath real do arquivo uploadado
     };
 
   } catch (error) {
