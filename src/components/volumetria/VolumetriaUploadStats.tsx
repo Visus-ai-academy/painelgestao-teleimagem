@@ -28,156 +28,73 @@ export function VolumetriaUploadStats({ refreshTrigger }: { refreshTrigger?: num
 
   const loadStats = async () => {
     try {
-      console.log('📊 Carregando estatísticas usando consulta SQL direta...');
+      console.log('📊 Carregando estatísticas usando função do banco...');
       setLoading(true);
       
-      // SOLUÇÃO ROBUSTA: Usar consulta SQL direta com agregação
-      // Isso garante que TODOS os registros sejam contados, independente do volume
-      
+      // Usar a função do banco para estatísticas agregadas
       const { data: aggregatedStats, error: statsError } = await supabase
-        .from('volumetria_mobilemed')
-        .select(`
-          arquivo_fonte,
-          count:VALORES.count(),
-          records_with_value:VALORES.count(),
-          total_value:VALORES.sum()
-        `, { count: 'exact' })
-        .in('arquivo_fonte', [
-          'volumetria_padrao', 
-          'volumetria_fora_padrao', 
-          'volumetria_padrao_retroativo', 
-          'volumetria_fora_padrao_retroativo'
-        ]);
+        .rpc('get_volumetria_aggregated_stats');
       
       if (statsError) {
         console.error('❌ Erro ao buscar estatísticas agregadas:', statsError);
-        // Fallback para consulta manual se houver erro
+        console.log('🔄 Usando método fallback com paginação robusta...');
         await loadStatsManual();
         return;
       }
 
       console.log('✅ Estatísticas agregadas carregadas:', aggregatedStats);
       
-      // Processar dados agregados usando consultas separadas para maior precisão
-      const statsMap = new Map<string, {
-        totalRecords: number;
-        recordsWithValue: number;
-        recordsZeroed: number;
-        totalValue: number;
-      }>();
-
-      // Inicializar com zeros
-      const initStats = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-      const fontes = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+      // Processar dados agregados
+      const processedStats: UploadStats[] = [];
       
-      fontes.forEach(fonte => statsMap.set(fonte, { ...initStats }));
-
-      // Buscar estatísticas para cada fonte separadamente para máxima precisão
-      for (const fonte of fontes) {
-        // Total de registros
-        const { count: totalCount } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true })
-          .eq('arquivo_fonte', fonte);
-
-        // Registros com valores > 0
-        const { count: withValueCount } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true })
-          .eq('arquivo_fonte', fonte)
-          .gt('VALORES', 0);
-
-        // Soma total dos valores
-        const { data: sumData } = await supabase
-          .from('volumetria_mobilemed')
-          .select('VALORES')
-          .eq('arquivo_fonte', fonte);
-
-        const totalValue = sumData?.reduce((sum, record) => sum + (record.VALORES || 0), 0) || 0;
-        const recordsZeroed = (totalCount || 0) - (withValueCount || 0);
-
-        statsMap.set(fonte, {
-          totalRecords: totalCount || 0,
-          recordsWithValue: withValueCount || 0,
-          recordsZeroed: recordsZeroed,
-          totalValue: totalValue
-        });
-
-        console.log(`📊 ${fonte}: ${totalCount} total, ${withValueCount} com valores, ${totalValue} soma`);
-      }
-
-      // Buscar contagem do De-Para
-      const { count: deParaCount, error: deParaError } = await supabase
-        .from('valores_referencia_de_para')
-        .select('*', { count: 'exact', head: true });
-
-      if (deParaError) {
-        console.error('❌ Erro ao buscar contagem De-Para:', deParaError);
-      }
-
-      // Montar estatísticas finais
-      const realStats: UploadStats[] = [
-        {
-          fileName: "Volumetria Padrão",
-          totalRecords: statsMap.get('volumetria_padrao')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_padrao')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_padrao')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_padrao')?.totalValue || 0,
-          period: "Período Atual",
-          category: 'padrão'
-        },
-        {
-          fileName: "Volumetria Fora Padrão", 
-          totalRecords: statsMap.get('volumetria_fora_padrao')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_fora_padrao')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_fora_padrao')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_fora_padrao')?.totalValue || 0,
-          period: "Período Atual",
-          category: 'fora-padrão'
-        },
-        {
-          fileName: "Volumetria Padrão Retroativo",
-          totalRecords: statsMap.get('volumetria_padrao_retroativo')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_padrao_retroativo')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_padrao_retroativo')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_padrao_retroativo')?.totalValue || 0,
-          period: "Período Retroativo",
-          category: 'retroativo'
-        },
-        {
-          fileName: "Volumetria Fora Padrão Retroativo",
-          totalRecords: statsMap.get('volumetria_fora_padrao_retroativo')?.totalRecords || 0,
-          recordsWithValue: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsWithValue || 0,
-          recordsZeroed: statsMap.get('volumetria_fora_padrao_retroativo')?.recordsZeroed || 0,
-          totalValue: statsMap.get('volumetria_fora_padrao_retroativo')?.totalValue || 0,
-          period: "Período Retroativo",
-          category: 'fora-padrão'
+      if (aggregatedStats && Array.isArray(aggregatedStats)) {
+        for (const stat of aggregatedStats) {
+          processedStats.push({
+            fileName: `Dados ${stat.arquivo_fonte}`,
+            totalRecords: Number(stat.total_records) || 0,
+            recordsWithValue: Number(stat.records_with_value) || 0,
+            recordsZeroed: Number(stat.records_zeroed) || 0,
+            totalValue: Number(stat.total_value) || 0,
+            period: 'Todos os períodos',
+            category: getCategoryFromSource(stat.arquivo_fonte)
+          });
         }
+      }
+      
+      // Se não há dados, adicionar entradas vazias para todas as categorias
+      const expectedSources = [
+        'volumetria_padrao', 
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo', 
+        'volumetria_fora_padrao_retroativo'
       ];
-
-      // Adicionar De-Para se existe
-      if (deParaCount && deParaCount > 0) {
-        realStats.push({
-          fileName: "Upload De-Para Exames",
-          totalRecords: deParaCount,
-          recordsWithValue: deParaCount,
-          recordsZeroed: 0,
-          totalValue: 0,
-          period: "Processado",
-          category: 'padrão'
-        });
+      
+      for (const source of expectedSources) {
+        if (!processedStats.find(s => s.fileName.includes(source))) {
+          processedStats.push({
+            fileName: `Dados ${source}`,
+            totalRecords: 0,
+            recordsWithValue: 0,
+            recordsZeroed: 0,
+            totalValue: 0,
+            period: 'Todos os períodos',
+            category: getCategoryFromSource(source)
+          });
+        }
       }
 
-      console.log('📊 Estatísticas finais (MÉTODO ROBUSTO):', realStats);
-      setStats(realStats);
-      
-    } catch (error) {
-      console.error('❌ Erro geral ao carregar estatísticas:', error);
-      // Em caso de erro, tentar método manual como fallback
-      await loadStatsManual();
-    } finally {
+      setStats(processedStats);
       setLoading(false);
+    } catch (error) {
+      console.error('❌ Erro ao carregar estatísticas:', error);
+      await loadStatsManual();
     }
+  };
+
+  const getCategoryFromSource = (source: string): 'padrão' | 'fora-padrão' | 'retroativo' => {
+    if (source.includes('retroativo')) return 'retroativo';
+    if (source.includes('fora_padrao')) return 'fora-padrão';
+    return 'padrão';
   };
 
   // MÉTODO FALLBACK: Consulta manual robusta com paginação confiável
