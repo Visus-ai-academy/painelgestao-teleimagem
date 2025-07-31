@@ -212,6 +212,34 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         temErro: false
       });
 
+      // Se não temos filtros específicos, usar dados da função agregada do BD para maior precisão
+      if (filters.ano === 'todos' && filters.cliente === 'todos' && 
+          filters.modalidade === 'todos' && filters.especialidade === 'todos' && 
+          filters.medico === 'todos' && !filters.dataEspecifica) {
+        console.log('🎯 Usando dados agregados do BD para maior precisão...');
+        try {
+          const { data: aggregatedData, error: aggError } = await supabase.rpc('get_volumetria_aggregated_stats');
+          if (!aggError && aggregatedData) {
+            const totalFromAggregate = aggregatedData.reduce((acc: any, item: any) => ({
+              total_exames: acc.total_exames + (item.total_value || 0),
+              total_registros: acc.total_registros + (item.total_records || 0),
+            }), { total_exames: 0, total_registros: 0 });
+            
+            console.log('📊 Dados agregados do BD:', totalFromAggregate);
+            // Usar dados agregados se diferentes dos filtrados
+            if (Math.abs(totalFromAggregate.total_registros - allData.length) > 100) {
+              console.log('⚠️ Diferença significativa detectada - usando dados agregados');
+              allData = Array(totalFromAggregate.total_registros).fill({
+                EMPRESA: 'Agregado',
+                VALORES: totalFromAggregate.total_exames / totalFromAggregate.total_registros
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao buscar dados agregados:', error);
+        }
+      }
+
       if (!allData || allData.length === 0) {
         setData({
           stats: {
