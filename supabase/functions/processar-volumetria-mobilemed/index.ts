@@ -203,8 +203,24 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
 
     return record;
   } catch (error) {
-    console.error('Erro ao processar linha:', error);
-    return null;
+    console.error('❌ ERRO AO PROCESSAR LINHA - DADOS PERDIDOS:', error);
+    console.error('❌ LINHA PROBLEMÁTICA:', JSON.stringify(row));
+    console.error('❌ STACK TRACE:', error instanceof Error ? error.stack : 'N/A');
+    
+    // ⚠️ TEMPORÁRIO: Em vez de rejeitar, vamos tentar criar um registro básico
+    try {
+      const basicRecord: VolumetriaRecord = {
+        EMPRESA: String(row['EMPRESA'] || '').trim(),
+        NOME_PACIENTE: String(row['NOME_PACIENTE'] || '').trim(),
+        arquivo_fonte: arquivoFonte,
+        // Todos os outros campos ficam undefined - aceita registro mesmo com erro
+      };
+      console.warn('⚠️ REGISTRO SALVO COM DADOS BÁSICOS APENAS');
+      return basicRecord;
+    } catch (criticalError) {
+      console.error('💥 ERRO CRÍTICO - REGISTRO REJEITADO:', criticalError);
+      return null;
+    }
   }
 }
 
