@@ -312,7 +312,8 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     try {
       console.log('🔧 Aplicando regras rápidas...');
       
-      if (arquivo_fonte === 'volumetria_fora_padrao' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
+      // Aplicar de-para de valores para todos os arquivos de volumetria
+      if (arquivo_fonte.includes('volumetria')) {
         const { data: deParaResult } = await supabaseClient.rpc('aplicar_de_para_automatico', { 
           arquivo_fonte_param: arquivo_fonte 
         });
