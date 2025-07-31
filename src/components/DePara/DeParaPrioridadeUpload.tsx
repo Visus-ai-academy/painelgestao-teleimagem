@@ -54,11 +54,12 @@ export function DeParaPrioridadeUpload() {
     setStatus(prev => ({ ...prev, isUploading: true, errors: [] }));
 
     try {
+      // Criar FormData para enviar o arquivo
+      const formData = new FormData();
+      formData.append('file', file);
+
       const { data, error } = await supabase.functions.invoke('processar-prioridades', {
-        body: { 
-          file: await file.arrayBuffer(),
-          filename: file.name
-        }
+        body: formData
       });
 
       if (error) {
