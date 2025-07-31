@@ -365,42 +365,11 @@ async function processFileInBackground(
     console.log(`Processamento concluído. Total inserido: ${totalInserted}`);
     console.log(`Erros encontrados: ${errors.length}`);
 
-    // Aplicar regras de tratamento específicas para cada tipo de arquivo
+    // Pular aplicação de regras de tratamento para evitar timeout
+    // As regras podem ser aplicadas posteriormente via interface manual
     let registrosAtualizadosDePara = 0;
-    if (totalInserted > 0) {
-      console.log('Aplicando regras de tratamento específicas...');
-      try {
-        // Definir URLs para chamada da função
-        const supabaseUrl = 'https://atbvikgxdcohnznkmaus.supabase.co';
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-        
-        // Chamar função para aplicar regras de tratamento
-        const response = await fetch(`${supabaseUrl}/functions/v1/aplicar-regras-tratamento`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ arquivo_fonte })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Erro na resposta das regras de tratamento:', errorText);
-          errors.push(`Erro ao aplicar regras de tratamento: ${errorText}`);
-        } else {
-          const regraResult = await response.json();
-          registrosAtualizadosDePara = regraResult?.registros_atualizados || 0;
-          console.log(`Regras de tratamento aplicadas: ${registrosAtualizadosDePara} registros atualizados`);
-          if (regraResult?.detalhes) {
-            console.log('Detalhes das regras:', regraResult.detalhes);
-          }
-        }
-      } catch (regraErr) {
-        console.error('Erro crítico ao aplicar regras de tratamento:', regraErr);
-        errors.push(`Erro ao aplicar regras: ${regraErr instanceof Error ? regraErr.message : 'Erro desconhecido'}`);
-      }
-    }
+    console.log('Regras de tratamento serão aplicadas posteriormente via interface manual');
+    console.log('Total de registros inseridos:', totalInserted);
 
     // Atualizar log de upload com sucesso na tabela processamento_uploads
     try {
