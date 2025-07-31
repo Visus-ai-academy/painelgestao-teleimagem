@@ -166,6 +166,7 @@ export default function GerarFaturamento() {
 
   // Função para limpar dados de volumetria
   const handleLimparDadosVolumetria = async () => {
+    console.log('🗑️ Botão de limpeza clicado!');
     setIsClearing(true);
     try {
       const arquivosParaLimpar = [
@@ -175,27 +176,30 @@ export default function GerarFaturamento() {
         'volumetria_fora_padrao_retroativo'
       ];
 
-      console.log('Iniciando limpeza dos dados de volumetria...');
+      console.log('🧹 Iniciando limpeza dos dados de volumetria...', arquivosParaLimpar);
       
       const resultado = await limparDadosVolumetria(arquivosParaLimpar);
+      
+      console.log('✅ Resultado da limpeza:', resultado);
       
       toast({
         title: "Dados limpos com sucesso!",
         description: `${resultado.registros_removidos} registros de volumetria removidos`,
       });
 
-      console.log('Limpeza concluída:', resultado);
+      console.log('🔄 Atualizando status dos uploads...');
       
       // Atualizar os dados após a limpeza
       setRefreshUploadStatus(prev => prev + 1);
     } catch (error) {
-      console.error('Erro ao limpar dados:', error);
+      console.error('❌ Erro ao limpar dados:', error);
       toast({
         title: "Erro ao limpar dados",
-        description: "Ocorreu um erro ao tentar limpar os dados de volumetria",
+        description: `Ocorreu um erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
+      console.log('🏁 Finalizando processo de limpeza...');
       setIsClearing(false);
     }
   };
