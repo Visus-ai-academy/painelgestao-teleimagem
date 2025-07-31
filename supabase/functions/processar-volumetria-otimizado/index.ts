@@ -241,57 +241,98 @@ serve(async (req) => {
 
     // Processar TODOS os dados em lotes otimizados
     const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLog.id.substring(0, 8)}`;
-    const batchSize = 1000; // Lotes grandes para eficiência
+    const batchSize = arquivo_fonte.includes('retroativo') ? 500 : 1000; // Lotes menores para retroativos
     let totalInserted = 0;
     let totalErrors = 0;
 
-    console.log(`📦 Processando em lotes de ${batchSize} registros...`);
+    console.log(`📦 Processando em lotes de ${batchSize} registros (otimizado para ${arquivo_fonte})...`);
 
     for (let i = 0; i < jsonData.length; i += batchSize) {
       const batch = jsonData.slice(i, i + batchSize);
       const records: VolumetriaRecord[] = [];
 
-      console.log(`📋 Processando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(jsonData.length / batchSize)}`);
+      console.log(`📋 Processando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil(jsonData.length / batchSize)} - ${batch.length} registros`);
 
-      // Processar linhas do batch
+      // Processar linhas do batch com validação extra para retroativos
       for (const row of batch) {
         const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
-        if (record) records.push(record);
-        else totalErrors++;
-      }
-
-      // Inserir em sub-lotes de 500 para evitar timeout
-      for (let j = 0; j < records.length; j += 500) {
-        const subBatch = records.slice(j, j + 500);
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(subBatch);
-
-        if (insertError) {
-          console.error(`❌ Erro inserção lote ${i}-${j}:`, insertError.message);
-          totalErrors += subBatch.length;
+        if (record) {
+          // Para arquivos retroativos, validar se tem dados mínimos necessários
+          if (arquivo_fonte.includes('retroativo')) {
+            if (!record.EMPRESA || !record.NOME_PACIENTE) {
+              totalErrors++;
+              continue;
+            }
+          }
+          records.push(record);
         } else {
-          totalInserted += subBatch.length;
-          console.log(`✅ Sub-lote ${i}-${j}: ${subBatch.length} registros inseridos`);
+          totalErrors++;
         }
       }
 
-      // Atualizar progresso
+      console.log(`🔍 Lote processado: ${records.length} registros válidos de ${batch.length} originais`);
+
+      if (records.length === 0) {
+        console.log('⚠️ Nenhum registro válido neste lote, pulando inserção');
+        continue;
+      }
+
+      // Inserir em sub-lotes de 250 para arquivos retroativos (ainda menores)
+      const subBatchSize = arquivo_fonte.includes('retroativo') ? 250 : 500;
+      for (let j = 0; j < records.length; j += subBatchSize) {
+        const subBatch = records.slice(j, j + subBatchSize);
+        console.log(`💾 Inserindo sub-lote ${j}-${j + subBatch.length}: ${subBatch.length} registros`);
+        
+        try {
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(subBatch);
+
+          if (insertError) {
+            console.error(`❌ Erro inserção lote ${i}-${j}:`, insertError.message);
+            console.error('❌ Primeiro registro com erro:', JSON.stringify(subBatch[0], null, 2));
+            totalErrors += subBatch.length;
+          } else {
+            totalInserted += subBatch.length;
+            console.log(`✅ Sub-lote ${i}-${j}: ${subBatch.length} registros inseridos com sucesso`);
+          }
+        } catch (insertException) {
+          console.error(`❌ Exceção na inserção lote ${i}-${j}:`, insertException);
+          totalErrors += subBatch.length;
+        }
+
+        // Para arquivos retroativos, adicionar pequenas pausas para evitar timeout
+        if (arquivo_fonte.includes('retroativo') && j % 1000 === 0) {
+          console.log('⏸️ Pausa técnica para evitar timeout...');
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // Atualizar progresso com mais frequência
       const progress = Math.round(((i + batchSize) / jsonData.length) * 100);
-      await supabaseClient
-        .from('processamento_uploads')
-        .update({
-          registros_processados: Math.min(i + batchSize, jsonData.length),
-          registros_inseridos: totalInserted,
-          registros_erro: totalErrors,
-          detalhes_erro: JSON.stringify({
-            progresso: `${progress}%`,
-            lote_atual: Math.floor(i / batchSize) + 1,
-            total_lotes: Math.ceil(jsonData.length / batchSize),
-            status: 'processando'
+      console.log(`📈 Progresso: ${progress}% - ${totalInserted} inseridos, ${totalErrors} erros`);
+      
+      try {
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({
+            registros_processados: Math.min(i + batchSize, jsonData.length),
+            registros_inseridos: totalInserted,
+            registros_erro: totalErrors,
+            detalhes_erro: JSON.stringify({
+              progresso: `${progress}%`,
+              lote_atual: Math.floor(i / batchSize) + 1,
+              total_lotes: Math.ceil(jsonData.length / batchSize),
+              status: 'processando',
+              arquivo_fonte: arquivo_fonte,
+              timestamp: new Date().toISOString()
+            })
           })
-        })
-        .eq('id', uploadLog.id);
+          .eq('id', uploadLog.id);
+      } catch (updateError) {
+        console.warn('⚠️ Erro ao atualizar progresso:', updateError);
+      }
+    }
     }
 
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');

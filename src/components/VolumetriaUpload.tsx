@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
+import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
 import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
 
@@ -86,6 +87,16 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
+      // Limpar uploads travados antes de iniciar novo processamento
+      console.log('🧹 Verificando uploads travados...');
+      try {
+        await supabase.functions.invoke('limpar-uploads-travados');
+        console.log('✅ Uploads travados limpos');
+      } catch (cleanError) {
+        console.warn('⚠️ Aviso na limpeza de uploads:', cleanError);
+        // Continuar mesmo se a limpeza falhar
+      }
+
       // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
       const result = await processVolumetriaOtimizado(
         file,
