@@ -102,13 +102,15 @@ export default async function handler(req: Request): Promise<Response> {
         break;
 
       case 'volumetria_fora_padrao':
-        // Arquivo 2: Aplicar De-Para obrigatório
+        // Arquivo 2: Aplicar De-Para obrigatório especificamente para este arquivo
         const { data: deParaResult, error: deParaError } = await supabase
-          .rpc('aplicar_valores_de_para');
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivo_fonte 
+          });
         
         if (deParaError) throw deParaError;
         registrosAtualizados += deParaResult?.registros_atualizados || 0;
-        mensagens.push(`Arquivo 2: Aplicado De-Para em ${deParaResult?.registros_atualizados || 0} registros`);
+        mensagens.push(`Arquivo 2: Aplicado De-Para específico em ${deParaResult?.registros_atualizados || 0} registros`);
         break;
 
       case 'volumetria_padrao_retroativo':
@@ -152,13 +154,15 @@ export default async function handler(req: Request): Promise<Response> {
         
         if (deleteError4) throw deleteError4;
 
-        // Aplicar De-Para
+        // Aplicar De-Para especificamente para este arquivo
         const { data: deParaResult4, error: deParaError4 } = await supabase
-          .rpc('aplicar_valores_de_para');
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivo_fonte 
+          });
         
         if (deParaError4) throw deParaError4;
         registrosAtualizados += deParaResult4?.registros_atualizados || 0;
-        mensagens.push(`Arquivo 4: Aplicado De-Para em ${deParaResult4?.registros_atualizados || 0} registros`);
+        mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
         break;
 
       default:

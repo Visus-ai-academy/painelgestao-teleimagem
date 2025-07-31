@@ -87,7 +87,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
     try {
       // Usar processamento otimizado para arquivos de volumetria grandes ou retroativos
-      const useOptimized = arquivoFonte.includes('retroativo') || file.size > 10 * 1024 * 1024; // >10MB
+      const useOptimized = true; // Sempre usar processamento otimizado para evitar limitações
       
       const result = useOptimized 
         ? await processVolumetriaOtimizado(

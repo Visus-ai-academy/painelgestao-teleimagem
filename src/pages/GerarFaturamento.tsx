@@ -43,6 +43,7 @@ import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturame
 import { UploadStatusPanel } from "@/components/UploadStatusPanel";
 import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
 import LimparDadosCompleto from "@/components/LimparDadosCompleto";
+import { ReprocessarRegras } from "@/components/ReprocessarRegras";
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -1030,6 +1031,13 @@ export default function GerarFaturamento() {
                         setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
+                    
+                    <div className="mt-4">
+                      <ReprocessarRegras 
+                        arquivoFonte="volumetria_padrao"
+                        onSuccess={() => setRefreshUploadStatus(prev => prev + 1)}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1045,6 +1053,13 @@ export default function GerarFaturamento() {
                         setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
+                    
+                    <div className="mt-4">
+                      <ReprocessarRegras 
+                        arquivoFonte="volumetria_fora_padrao"
+                        onSuccess={() => setRefreshUploadStatus(prev => prev + 1)}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1060,6 +1075,13 @@ export default function GerarFaturamento() {
                         setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
+                    
+                    <div className="mt-4">
+                      <ReprocessarRegras 
+                        arquivoFonte="volumetria_padrao_retroativo"
+                        onSuccess={() => setRefreshUploadStatus(prev => prev + 1)}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1075,6 +1097,13 @@ export default function GerarFaturamento() {
                         setRefreshUploadStatus(prev => prev + 1);
                       }}
                     />
+                    
+                    <div className="mt-4">
+                      <ReprocessarRegras 
+                        arquivoFonte="volumetria_fora_padrao_retroativo"
+                        onSuccess={() => setRefreshUploadStatus(prev => prev + 1)}
+                      />
+                    </div>
                   </div>
 
                   <div>
