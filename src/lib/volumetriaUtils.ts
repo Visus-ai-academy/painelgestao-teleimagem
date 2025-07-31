@@ -98,8 +98,21 @@ export async function processVolumetriaFile(
 
     console.log(`📊 Total de linhas lidas: ${jsonData.length}`);
 
+    // LIMPAR dados antigos do mesmo arquivo_fonte para evitar duplicação
+    console.log(`🧹 Limpando dados antigos de ${arquivoFonte}...`);
+    const { error: deleteError } = await supabase
+      .from('volumetria_mobilemed')
+      .delete()
+      .eq('arquivo_fonte', arquivoFonte);
+      
+    if (deleteError) {
+      console.warn(`⚠️ Aviso ao limpar dados antigos de ${arquivoFonte}:`, deleteError);
+    } else {
+      console.log(`✅ Dados antigos de ${arquivoFonte} removidos`);
+    }
+
     if (onProgress) {
-      onProgress({ progress: 10, processed: 0, total: jsonData.length, status: 'Arquivo lido com sucesso' });
+      onProgress({ progress: 10, processed: 0, total: jsonData.length, status: 'Dados antigos limpos, processando...' });
     }
 
     // Criar log de upload
