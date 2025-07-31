@@ -107,7 +107,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       // Buscar dados do cliente específico
       const { data: clientData, error } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, VALORES, DATA_LAUDO, DATA_PRAZO, DATA_REALIZACAO')
+        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO')
         .eq('EMPRESA', clienteName);
 
       if (error) throw error;
@@ -123,10 +123,17 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
 
         clientData.forEach(row => {
-          const dataLaudo = new Date(row.DATA_LAUDO);
-          const dataPrazo = new Date(row.DATA_PRAZO);
-          const isAtrasado = dataLaudo > dataPrazo;
-          const tempoAtraso = isAtrasado ? (dataLaudo.getTime() - dataPrazo.getTime()) / (1000 * 60) : 0;
+          // Verificar se há dados válidos para calcular atraso
+          if (!row.DATA_LAUDO || !row.DATA_PRAZO || !row.HORA_LAUDO || !row.HORA_PRAZO) {
+            return; // Skip registros sem dados completos
+          }
+
+          // Combinar data e hora para comparação precisa
+          const dataLaudoCompleta = new Date(`${row.DATA_LAUDO}T${row.HORA_LAUDO}`);
+          const dataPrazoCompleta = new Date(`${row.DATA_PRAZO}T${row.HORA_PRAZO}`);
+          
+          const isAtrasado = dataLaudoCompleta > dataPrazoCompleta;
+          const tempoAtraso = isAtrasado ? (dataLaudoCompleta.getTime() - dataPrazoCompleta.getTime()) / (1000 * 60) : 0;
 
           // Processar especialidades
           const esp = row.ESPECIALIDADE || 'Não Informado';
