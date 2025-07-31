@@ -177,24 +177,37 @@ export default function GerarFaturamento() {
       ];
 
       console.log('🧹 Iniciando limpeza dos dados de volumetria...', arquivosParaLimpar);
+      console.log('📡 Fazendo chamada para edge function limpar-dados-volumetria...');
       
       const resultado = await limparDadosVolumetria(arquivosParaLimpar);
       
-      console.log('✅ Resultado da limpeza:', resultado);
+      console.log('✅ Resultado completo da limpeza:', resultado);
+      console.log('📊 Registros removidos:', resultado?.registros_removidos);
+      console.log('📁 Arquivos processados:', resultado?.arquivos_removidos);
       
-      toast({
-        title: "Dados limpos com sucesso!",
-        description: `${resultado.registros_removidos} registros de volumetria removidos`,
-      });
+      if (resultado?.success) {
+        toast({
+          title: "✅ Dados limpos com sucesso!",
+          description: `${resultado.registros_removidos || 0} registros de volumetria removidos`,
+        });
+      } else {
+        console.error('❌ Resultado indica falha:', resultado);
+        toast({
+          title: "❌ Erro ao limpar dados",
+          description: resultado?.error || 'Erro desconhecido na edge function',
+          variant: "destructive",
+        });
+      }
 
       console.log('🔄 Atualizando status dos uploads...');
       
       // Atualizar os dados após a limpeza
       setRefreshUploadStatus(prev => prev + 1);
     } catch (error) {
-      console.error('❌ Erro ao limpar dados:', error);
+      console.error('❌ Erro caught na função handleLimparDadosVolumetria:', error);
+      console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
       toast({
-        title: "Erro ao limpar dados",
+        title: "❌ Erro ao limpar dados",
         description: `Ocorreu um erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         variant: "destructive",
       });

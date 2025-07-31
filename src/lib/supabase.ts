@@ -253,26 +253,31 @@ export async function limparUploadsAntigos() {
 
 export async function limparDadosVolumetria(arquivosFonte: string[]) {
   try {
-    console.log('Limpando dados de volumetria para arquivos:', arquivosFonte)
+    console.log('📡 [supabase.ts] Limpando dados de volumetria para arquivos:', arquivosFonte)
+    console.log('📡 [supabase.ts] Chamando edge function: limpar-dados-volumetria')
     
     const { data, error } = await supabase.functions.invoke('limpar-dados-volumetria', {
       body: { arquivos_fonte: arquivosFonte }
     })
     
+    console.log('📡 [supabase.ts] Resposta da edge function - data:', data)
+    console.log('📡 [supabase.ts] Resposta da edge function - error:', error)
+    
     if (error) {
-      console.error('Erro ao chamar edge function:', error)
+      console.error('❌ [supabase.ts] Erro ao chamar edge function:', error)
       throw new Error(`Erro ao limpar dados: ${error.message}`)
     }
     
     if (data?.error) {
-      console.error('Erro retornado pela edge function:', data.error)
+      console.error('❌ [supabase.ts] Erro retornado pela edge function:', data.error)
       throw new Error(`Erro ao limpar dados: ${data.error}`)
     }
     
-    console.log('Limpeza de volumetria concluída:', data)
+    console.log('✅ [supabase.ts] Limpeza de volumetria concluída:', data)
     return data
   } catch (error) {
-    console.error('Erro na limpeza de volumetria:', error)
+    console.error('❌ [supabase.ts] Erro na limpeza de volumetria:', error)
+    console.error('❌ [supabase.ts] Stack trace:', error instanceof Error ? error.stack : 'N/A')
     throw error
   }
 }
