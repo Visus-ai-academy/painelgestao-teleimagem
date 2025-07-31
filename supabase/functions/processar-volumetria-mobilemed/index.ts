@@ -365,11 +365,43 @@ async function processFileInBackground(
     console.log(`Processamento concluído. Total inserido: ${totalInserted}`);
     console.log(`Erros encontrados: ${errors.length}`);
 
-    // Pular aplicação de regras de tratamento para evitar timeout
-    // As regras podem ser aplicadas posteriormente via interface manual
+    // Aplicar regras de tratamento diretamente no banco (mais eficiente que chamar edge function)
     let registrosAtualizadosDePara = 0;
-    console.log('Regras de tratamento serão aplicadas posteriormente via interface manual');
-    console.log('Total de registros inseridos:', totalInserted);
+    if (totalInserted > 0) {
+      console.log('Aplicando regras de De-Para diretamente no banco...');
+      try {
+        // Aplicar De-Para de valores para registros fora do padrão
+        if (arquivo_fonte === 'volumetria_fora_padrao') {
+          const { data: deParaResult, error: deParaError } = await supabaseClient
+            .rpc('aplicar_valores_de_para');
+          
+          if (deParaError) {
+            console.error('Erro ao aplicar De-Para:', deParaError);
+            errors.push(`Erro ao aplicar De-Para: ${deParaError.message}`);
+          } else {
+            registrosAtualizadosDePara = deParaResult?.registros_atualizados || 0;
+            console.log(`De-Para aplicado: ${registrosAtualizadosDePara} registros atualizados`);
+          }
+        }
+
+        // Aplicar De-Para de prioridades
+        const { data: prioridadeResult, error: prioridadeError } = await supabaseClient
+          .rpc('aplicar_de_para_prioridade');
+        
+        if (prioridadeError) {
+          console.error('Erro ao aplicar De-Para prioridade:', prioridadeError);
+          errors.push(`Erro ao aplicar De-Para prioridade: ${prioridadeError.message}`);
+        } else {
+          const registrosPrioridade = prioridadeResult?.registros_atualizados || 0;
+          registrosAtualizadosDePara += registrosPrioridade;
+          console.log(`De-Para prioridade aplicado: ${registrosPrioridade} registros atualizados`);
+        }
+        
+      } catch (regraErr) {
+        console.error('Erro ao aplicar regras de tratamento:', regraErr);
+        errors.push(`Erro ao aplicar regras: ${regraErr instanceof Error ? regraErr.message : 'Erro desconhecido'}`);
+      }
+    }
 
     // Atualizar log de upload com sucesso na tabela processamento_uploads
     try {
