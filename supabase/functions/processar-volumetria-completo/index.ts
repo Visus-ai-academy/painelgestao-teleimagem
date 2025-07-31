@@ -14,9 +14,9 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    const { file_path, arquivo_fonte, start_row = 0, batch_size = 10 } = requestBody; // Ultra pequeno: apenas 10 registros
+    const { file_path, arquivo_fonte, start_row = 0, batch_size = 1 } = requestBody; // ULTRA minimalista: apenas 1 registro
 
-    console.log(`=== PROCESSAMENTO COMPLETO - BATCH ${Math.floor(start_row / batch_size) + 1} ===`);
+    console.log(`=== PROCESSAMENTO ULTRA MINIMALISTA - BATCH ${Math.floor(start_row / batch_size) + 1} ===`);
     console.log(`📂 Arquivo: ${file_path}`);
     console.log(`📑 Fonte: ${arquivo_fonte}`);
     console.log(`📊 Linha inicial: ${start_row}, Batch size: ${batch_size}`);
