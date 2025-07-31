@@ -179,10 +179,18 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('💥 ERRO:', error);
+    console.error('💥 ERRO CRÍTICO na função de processamento completo:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      toString: error.toString()
+    });
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message || 'Erro desconhecido',
+      error_details: error.toString(),
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
