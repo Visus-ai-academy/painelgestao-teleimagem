@@ -333,7 +333,6 @@ serve(async (req) => {
         console.warn('⚠️ Erro ao atualizar progresso:', updateError);
       }
     }
-    }
 
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
     console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros`);
