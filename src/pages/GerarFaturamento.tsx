@@ -959,14 +959,10 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Dados MobileMed
-          </TabsTrigger>
-          <TabsTrigger value="de-para-prioridade" className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            De-Para Prioridade
           </TabsTrigger>
           <TabsTrigger value="relatorios-prontos" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -977,10 +973,6 @@ export default function GerarFaturamento() {
             Gerar
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="de-para-prioridade" className="space-y-4">
-          <DeParaPrioridadeUpload />
-        </TabsContent>
 
         <TabsContent value="teste-volumetria" className="space-y-4">
           <div className="grid gap-4">
@@ -1097,6 +1089,11 @@ export default function GerarFaturamento() {
                   <div>
                     {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
                     <ExamesForaPadraoUpload />
+                  </div>
+
+                  <div>
+                    {/* Upload De-Para Prioridade */}
+                    <DeParaPrioridadeUpload />
                   </div>
                 </div>
 
