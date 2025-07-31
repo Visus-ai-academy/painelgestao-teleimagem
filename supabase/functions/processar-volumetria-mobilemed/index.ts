@@ -483,40 +483,88 @@ serve(async (req) => {
     
     console.log(`✅ Dados extraídos: ${jsonData.length} linhas`);
     
-    // Para arquivos muito grandes (>2MB), usar processamento em background
-    if (fileData.size > 2000000) { // 2MB
-      console.log('🔄 Arquivo grande detectado - processamento em background');
+    // Para arquivos muito grandes, processar em chunks pequenos imediatamente
+    if (fileData.size > 2000000 || jsonData.length > 1000) { // 2MB ou >1000 registros
+      console.log(`🔄 Arquivo grande: ${fileData.size} bytes, ${jsonData.length} registros`);
       
-      // Iniciar processamento em background sem bloquear a resposta
-      EdgeRuntime.waitUntil(
-        processFileWithBatchControl(
-          jsonData, 
-          arquivo_fonte, 
-          uploadLog.id, 
-          supabaseClient, 
-          file_path, 
-          periodo
-        ).catch(error => {
-          console.error('Erro no processamento em background:', error);
-          // Atualizar status com erro
-          supabaseClient
-            .from('processamento_uploads')
-            .update({
-              status: 'erro',
-              detalhes_erro: JSON.stringify({ error: error.message })
-            })
-            .eq('id', uploadLog.id);
-        })
+      // Dividir em chunks muito pequenos para processamento imediato
+      const MEGA_CHUNK_SIZE = 100; // Apenas 100 registros por vez
+      const totalChunks = Math.ceil(jsonData.length / MEGA_CHUNK_SIZE);
+      
+      console.log(`📦 Dividindo em ${totalChunks} mega-chunks de ${MEGA_CHUNK_SIZE} registros`);
+      
+      let totalProcessedGlobal = 0;
+      let totalInsertedGlobal = 0;
+      
+      // Processar primeiro chunk para resposta rápida
+      const firstChunk = jsonData.slice(0, MEGA_CHUNK_SIZE);
+      console.log(`🚀 Processando primeiro chunk: ${firstChunk.length} registros`);
+      
+      const firstResult = await processFileWithBatchControl(
+        firstChunk, 
+        arquivo_fonte, 
+        uploadLog.id, 
+        supabaseClient, 
+        file_path, 
+        periodo
       );
+      
+      totalProcessedGlobal += firstResult.totalProcessed;
+      totalInsertedGlobal += firstResult.totalInserted;
+      
+      // Processar chunks restantes em background se houver
+      if (totalChunks > 1) {
+        EdgeRuntime.waitUntil(
+          (async () => {
+            for (let i = 1; i < totalChunks; i++) {
+              const startIdx = i * MEGA_CHUNK_SIZE;
+              const endIdx = Math.min(startIdx + MEGA_CHUNK_SIZE, jsonData.length);
+              const chunk = jsonData.slice(startIdx, endIdx);
+              
+              console.log(`📦 Processando chunk ${i + 1}/${totalChunks}: ${chunk.length} registros`);
+              
+              try {
+                await processFileWithBatchControl(
+                  chunk, 
+                  arquivo_fonte, 
+                  uploadLog.id, 
+                  supabaseClient, 
+                  `${file_path}_chunk_${i}`, 
+                  periodo
+                );
+                console.log(`✅ Chunk ${i + 1} concluído`);
+              } catch (chunkError) {
+                console.error(`❌ Erro no chunk ${i + 1}:`, chunkError);
+              }
+            }
+            
+            // Atualizar status final
+            await supabaseClient
+              .from('processamento_uploads')
+              .update({
+                status: 'concluido',
+                detalhes_erro: JSON.stringify({ 
+                  message: `Processamento em ${totalChunks} chunks concluído`,
+                  chunks_processed: totalChunks
+                })
+              })
+              .eq('id', uploadLog.id);
+          })()
+        );
+      }
 
-      // Retornar resposta imediata
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "Arquivo grande em processamento em background. Acompanhe o status.",
+          message: `Primeiro chunk processado. ${totalChunks > 1 ? `${totalChunks - 1} chunks restantes em background.` : 'Processamento concluído.'}`,
           upload_log_id: uploadLog.id,
-          background_processing: true,
-          file_size: fileData.size
+          chunked_processing: true,
+          total_chunks: totalChunks,
+          first_chunk_stats: {
+            processados: firstResult.totalProcessed,
+            inseridos: firstResult.totalInserted,
+            erros: firstResult.totalErrors
+          }
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
