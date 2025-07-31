@@ -119,6 +119,34 @@ serve(async (req) => {
     const endRow = Math.min(actualStartRow + batch_size, totalRows);
     
     console.log(`📦 Processando linhas ${actualStartRow} a ${endRow - 1}`);
+    console.log(`📊 Worksheet ref:`, worksheet['!ref']);
+    console.log(`📊 Total rows:`, totalRows);
+    console.log(`📊 Start row:`, actualStartRow);
+    console.log(`📊 End row:`, endRow);
+    
+    // Verificar se há dados para processar
+    if (actualStartRow >= endRow) {
+      console.log('⚠️ Não há dados para processar neste batch');
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Processamento concluído - não há dados neste batch",
+        batch_info: {
+          start_row,
+          end_row: actualStartRow,
+          batch_size: 0,
+          total_records: totalRows - 1,
+          inserted: 0,
+          errors: 0,
+          de_para_updated: 0,
+          progress_percent: 100,
+          has_more: false,
+          next_start_row: null
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
     
     // Extrair dados do batch linha por linha para economizar memória
     const batchData = [];
