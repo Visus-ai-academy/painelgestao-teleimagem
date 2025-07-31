@@ -164,7 +164,7 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     throw new Error('Arquivo Excel está vazio');
   }
 
-  const BATCH_SIZE = 25; // Lotes menores para evitar WORKER_LIMIT
+  const BATCH_SIZE = 500; // Lotes muito maiores para velocidade
   let totalProcessed = 0;
   let totalInserted = 0;
   let totalErrors = 0;
@@ -173,6 +173,7 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
     const batch = jsonData.slice(i, i + BATCH_SIZE);
     const validRecords: VolumetriaRecord[] = [];
     
+    // Processamento rápido sem logs excessivos
     for (const row of batch) {
       const record = processRow(row, arquivo_fonte);
       if (record) {
@@ -183,38 +184,31 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
       totalProcessed++;
     }
     
+    // Inserção em massa
     if (validRecords.length > 0) {
       try {
         const { data: insertedData, error: insertError } = await supabaseClient
           .from('volumetria_mobilemed')
-          .insert(validRecords)
-          .select('id');
+          .insert(validRecords);
 
         if (insertError) {
-          console.error(`Erro no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
           totalErrors += validRecords.length;
         } else {
-          totalInserted += insertedData?.length || validRecords.length;
+          totalInserted += validRecords.length;
         }
       } catch (batchErr) {
-        console.error(`Erro crítico no lote:`, batchErr);
         totalErrors += validRecords.length;
       }
     }
     
-    // Atualizar progresso a cada 5 lotes para reduzir IO
-    if (Math.floor(i / BATCH_SIZE) % 5 === 0) {
+    // Atualizar progresso apenas a cada 10 lotes (5000 registros)
+    if (Math.floor(i / BATCH_SIZE) % 10 === 0) {
       await supabaseClient
         .from('processamento_uploads')
         .update({ 
           registros_processados: totalProcessed,
           registros_inseridos: totalInserted,
-          registros_erro: totalErrors,
-          detalhes_erro: JSON.stringify({ 
-            status: `Processando... ${totalProcessed}/${jsonData.length}`,
-            inseridos: totalInserted,
-            erros: totalErrors
-          })
+          registros_erro: totalErrors
         })
         .eq('id', uploadLogId);
     }
@@ -222,7 +216,7 @@ async function processExcelData(jsonData: any[], arquivo_fonte: string, uploadLo
 
   console.log(`Processamento concluído: ${totalInserted} inseridos, ${totalErrors} erros`);
   
-  // Aplicar regras
+  // Aplicar regras rapidamente
   let registrosAtualizadosDePara = 0;
   if (totalInserted > 0) {
     try {
