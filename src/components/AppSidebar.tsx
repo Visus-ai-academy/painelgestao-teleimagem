@@ -130,6 +130,7 @@ const menuItems: MenuItem[] = [
       { title: "Configuração de Faturamento", url: "/configuracao/faturamento", requiredRoles: ['admin'] },
       { title: "Gerenciar Usuários", url: "/configuracao/usuarios", requiredRoles: ['admin'] },
       { title: "Logomarca", url: "/configuracao/logomarca", requiredRoles: ['admin'] },
+      { title: "Limpar Dados", url: "/limpar-dados", requiredRoles: ['admin'] },
       { title: "Estrutura de Vendas", url: "/estrutura-vendas", requiredRoles: ['admin'] },
       { title: "Configuração Importação", url: "/configuracao-importacao", requiredRoles: ['admin'] },
       { title: "Arquitetura do Projeto", url: "/arquitetura", requiredRoles: ['admin'] },
