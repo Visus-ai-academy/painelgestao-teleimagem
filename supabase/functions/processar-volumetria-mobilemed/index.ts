@@ -224,13 +224,12 @@ function processRow(row: any, arquivoFonte: 'data_laudo' | 'data_exame' | 'volum
   }
 }
 
-// Função auxiliar para processar dados do Excel
-async function processExcelData(
+// Função auxiliar otimizada para processar dados do Excel
+async function processExcelDataOptimized(
   jsonData: any[], 
-  fonte: string, 
+  arquivo_fonte: string, 
   uploadLogId: string, 
-  supabaseClient: any,
-  arquivo_fonte: string
+  supabaseClient: any
 ) {
   // Atualizar status com total de linhas encontradas
   await supabaseClient
@@ -245,127 +244,78 @@ async function processExcelData(
     throw new Error('Arquivo Excel está vazio');
   }
 
-  // Processar dados com validação rigorosa para garantir integridade
-  const errors: string[] = [];
-  const validRecords: VolumetriaRecord[] = [];
+  console.log(`🔍 INICIANDO PROCESSAMENTO OTIMIZADO DE ${jsonData.length} REGISTROS`);
+
+  // Processamento em lotes pequenos para economizar memória
+  const BATCH_SIZE = 50; // Lotes menores para economizar recursos
   let totalProcessed = 0;
-  let totalValid = 0;
-  let totalInvalid = 0;
+  let totalInserted = 0;
+  let totalErrors = 0;
 
-  console.log(`🔍 INICIANDO VALIDAÇÃO DE ${jsonData.length} REGISTROS`);
-
-  // FASE 1: Validação e processamento de todos os registros
-  for (let i = 0; i < jsonData.length; i++) {
-    const row = jsonData[i];
-    const record = processRow(row, arquivo_fonte);
+  // Processar arquivo em pequenos lotes
+  for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+    const batch = jsonData.slice(i, i + BATCH_SIZE);
+    const validRecords: VolumetriaRecord[] = [];
     
-    if (record) {
-      validRecords.push(record);
-      totalValid++;
-    } else {
-      errors.push(`Linha ${i + 2}: Dados inválidos ou incompletos - ${JSON.stringify(row).substring(0, 100)}`);
-      totalInvalid++;
+    // Processar lote atual
+    for (const row of batch) {
+      const record = processRow(row, arquivo_fonte);
+      if (record) {
+        validRecords.push(record);
+      } else {
+        totalErrors++;
+      }
+      totalProcessed++;
     }
     
-    totalProcessed++;
+    // Inserir lote se tiver registros válidos
+    if (validRecords.length > 0) {
+      try {
+        const { data: insertedData, error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(validRecords)
+          .select('id');
+
+        if (insertError) {
+          console.error(`❌ Erro no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
+          totalErrors += validRecords.length;
+        } else {
+          totalInserted += insertedData?.length || validRecords.length;
+          console.log(`✅ Lote ${Math.floor(i / BATCH_SIZE) + 1} inserido: ${validRecords.length} registros`);
+        }
+      } catch (batchErr) {
+        console.error(`💥 Erro crítico no lote ${Math.floor(i / BATCH_SIZE) + 1}:`, batchErr);
+        totalErrors += validRecords.length;
+      }
+    }
     
-    // Log de progresso a cada 500 registros para arquivos grandes
-    if (totalProcessed % 500 === 0) {
-      console.log(`🔍 Validados ${totalProcessed}/${jsonData.length} registros (${totalValid} válidos, ${totalInvalid} inválidos)`);
+    // Atualizar progresso a cada 10 lotes
+    if (Math.floor(i / BATCH_SIZE) % 10 === 0) {
+      console.log(`📥 Progresso: ${totalProcessed}/${jsonData.length} processados, ${totalInserted} inseridos`);
       
-      // Atualizar progresso no banco de forma assíncrona
-      supabaseClient
+      await supabaseClient
         .from('processamento_uploads')
         .update({ 
           registros_processados: totalProcessed,
-          registros_inseridos: totalValid,
-          registros_erro: totalInvalid,
-          detalhes_erro: JSON.stringify({ 
-            status: `Validando... ${totalProcessed}/${jsonData.length}`,
-            validos: totalValid,
-            invalidos: totalInvalid 
-          })
-        })
-        .eq('id', uploadLogId)
-        .then(() => {}) // Fire and forget
-        .catch(err => console.warn('Erro ao atualizar progresso:', err));
-    }
-  }
-
-  console.log(`✅ VALIDAÇÃO CONCLUÍDA: ${totalValid} registros válidos, ${totalInvalid} registros inválidos`);
-
-  // FASE 2: Inserção otimizada em lotes menores para evitar timeout
-  let totalInserted = 0;
-  let insertionErrors = 0;
-  const batchSize = 100; // Lotes menores para evitar timeout
-
-  console.log(`📥 INICIANDO INSERÇÃO DE ${validRecords.length} REGISTROS EM LOTES DE ${batchSize}`);
-
-  for (let i = 0; i < validRecords.length; i += batchSize) {
-    const batch = validRecords.slice(i, i + batchSize);
-    
-    try {
-      const { data: insertedData, error: insertError } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .insert(batch)
-        .select('id');
-
-      if (insertError) {
-        console.error(`❌ Erro no lote ${Math.floor(i / batchSize) + 1}:`, insertError);
-        errors.push(`Erro no lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
-        insertionErrors += batch.length;
-        
-        // Tentar inserção individual para identificar registros problemáticos
-        console.log(`🔄 Tentando inserção individual para lote com erro...`);
-        for (const record of batch) {
-          try {
-            const { error: singleError } = await supabaseClient
-              .from('volumetria_mobilemed')
-              .insert([record]);
-            
-            if (!singleError) {
-              totalInserted++;
-            } else {
-              errors.push(`Registro individual falhou: ${singleError.message} - ${JSON.stringify(record).substring(0, 100)}`);
-            }
-          } catch (singleErr) {
-            errors.push(`Erro crítico no registro: ${singleErr} - ${JSON.stringify(record).substring(0, 100)}`);
-          }
-        }
-      } else {
-        totalInserted += insertedData?.length || batch.length;
-        console.log(`✅ Lote ${Math.floor(i / batchSize) + 1} inserido: ${batch.length} registros`);
-      }
-    } catch (batchErr) {
-      console.error(`💥 Erro crítico no lote ${Math.floor(i / batchSize) + 1}:`, batchErr);
-      errors.push(`Erro crítico no lote: ${batchErr}`);
-      insertionErrors += batch.length;
-    }
-    
-    // Log de progresso e atualização assíncrona
-    const processedSoFar = Math.min(i + batchSize, validRecords.length);
-    console.log(`📥 Progresso inserção: ${processedSoFar}/${validRecords.length} processados, ${totalInserted} inseridos`);
-    
-    // Atualizar progresso no banco a cada 10 lotes
-    if (Math.floor(i / batchSize) % 10 === 0) {
-      supabaseClient
-        .from('processamento_uploads')
-        .update({ 
           registros_inseridos: totalInserted,
+          registros_erro: totalErrors,
           detalhes_erro: JSON.stringify({ 
-            status: `Inserindo... ${processedSoFar}/${validRecords.length}`,
-            inseridos: totalInserted 
+            status: `Processando... ${totalProcessed}/${jsonData.length}`,
+            inseridos: totalInserted,
+            erros: totalErrors
           })
         })
-        .eq('id', uploadLogId)
-        .then(() => {}) // Fire and forget
-        .catch(err => console.warn('Erro ao atualizar progresso inserção:', err));
+        .eq('id', uploadLogId);
     }
+    
+    // Liberar memória do lote processado
+    // @ts-ignore
+    batch.length = 0;
   }
 
-  console.log(`🎯 INSERÇÃO CONCLUÍDA: ${totalInserted} de ${validRecords.length} registros inseridos com sucesso`);
+  console.log(`🎯 PROCESSAMENTO CONCLUÍDO: ${totalInserted} inseridos, ${totalErrors} erros`);
   
-  // Aplicar regras de tratamento
+  // Aplicar regras de tratamento se houve inserções
   let registrosAtualizadosDePara = 0;
   if (totalInserted > 0) {
     console.log('Aplicando regras de De-Para...');
@@ -401,20 +351,24 @@ async function processExcelData(
       registros_processados: totalProcessed,
       registros_inseridos: totalInserted,
       registros_atualizados: registrosAtualizadosDePara,
-      registros_erro: totalInvalid + insertionErrors,
+      registros_erro: totalErrors,
       completed_at: new Date().toISOString(),
       detalhes_erro: JSON.stringify({
         status: 'Concluído',
         total_linhas_arquivo: jsonData.length,
-        registros_validos: totalValid,
         registros_inseridos: totalInserted,
         registros_atualizados_de_para: registrosAtualizadosDePara,
+        registros_erro: totalErrors,
         timestamp: new Date().toISOString()
       })
     })
     .eq('id', uploadLogId);
 
   console.log('✅ Processamento finalizado com sucesso');
+  
+  // Liberar memória
+  // @ts-ignore
+  jsonData.length = 0;
 }
 
 serve(async (req) => {
@@ -444,7 +398,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Criar log de upload na tabela processamento_uploads
+    // Criar log de upload PRIMEIRO
     const { data: uploadLog, error: logError } = await supabaseClient
       .from('processamento_uploads')
       .insert({
@@ -467,46 +421,25 @@ serve(async (req) => {
 
     console.log('Log criado:', uploadLog.id);
 
-    // Atualizar status para indicar início do download
-    await supabaseClient
-      .from('processamento_uploads')
-      .update({ 
-        registros_processados: 1,
-        detalhes_erro: JSON.stringify({ status: 'Iniciando download do arquivo...' })
-      })
-      .eq('id', uploadLog.id);
-    
-    // Baixar arquivo do storage
-    console.log('Iniciando download do arquivo:', file_path);
-    const { data: fileData, error: downloadError } = await supabaseClient.storage
-      .from('uploads')
-      .download(file_path);
+    // RETORNAR RESPOSTA IMEDIATA
+    const response = new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Processamento iniciado em background",
+        upload_log_id: uploadLog.id,
+        arquivo_fonte: arquivo_fonte,
+        status: "processing"
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
 
-    if (downloadError) {
-      throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
-    }
-
-    console.log('Arquivo baixado com sucesso, tamanho:', fileData.size);
-    
-    // Ler arquivo Excel
-    const arrayBuffer = await fileData.arrayBuffer();
-    console.log('ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
-    
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-    console.log('Workbook lido, planilhas:', workbook.SheetNames.length);
-    
-    if (!workbook.SheetNames.length) {
-      throw new Error('Arquivo Excel não possui planilhas');
-    }
-
-    // Usar EdgeRuntime.waitUntil para processamento em background
+    // FAZER TODO O PROCESSAMENTO EM BACKGROUND
     EdgeRuntime.waitUntil((async () => {
       try {
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        console.log(`Dados extraídos: ${jsonData.length} linhas`);
-        
-        await processExcelData(jsonData, arquivo_fonte, uploadLog.id, supabaseClient, arquivo_fonte);
+        await processFileInBackground(file_path, arquivo_fonte, uploadLog.id, supabaseClient);
       } catch (error) {
         console.error('Erro no processamento background:', error);
         await supabaseClient
@@ -520,20 +453,7 @@ serve(async (req) => {
       }
     })());
 
-    // Retornar resposta imediata
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Processamento iniciado em background",
-        upload_log_id: uploadLog.id,
-        arquivo_fonte: arquivo_fonte,
-        status: "processing"
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+    return response;
 
   } catch (error) {
     console.error('Erro na função processar-volumetria-mobilemed:', error);
@@ -550,6 +470,83 @@ serve(async (req) => {
     );
   }
 });
+
+// Função para processar arquivo em background com otimizações de memória
+async function processFileInBackground(
+  file_path: string, 
+  arquivo_fonte: string, 
+  uploadLogId: string, 
+  supabaseClient: any
+) {
+  // Atualizar status
+  await supabaseClient
+    .from('processamento_uploads')
+    .update({ 
+      detalhes_erro: JSON.stringify({ status: 'Baixando arquivo...' })
+    })
+    .eq('id', uploadLogId);
+  
+  // Baixar arquivo do storage
+  console.log('Iniciando download do arquivo:', file_path);
+  const { data: fileData, error: downloadError } = await supabaseClient.storage
+    .from('uploads')
+    .download(file_path);
+
+  if (downloadError) {
+    throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
+  }
+
+  console.log('Arquivo baixado, tamanho:', fileData.size);
+  
+  // Atualizar status
+  await supabaseClient
+    .from('processamento_uploads')
+    .update({ 
+      detalhes_erro: JSON.stringify({ status: 'Lendo arquivo Excel...' })
+    })
+    .eq('id', uploadLogId);
+  
+  // Ler arquivo Excel com otimização de memória
+  const arrayBuffer = await fileData.arrayBuffer();
+  console.log('ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
+  
+  const workbook = XLSX.read(new Uint8Array(arrayBuffer), { 
+    type: 'array',
+    cellDates: false, // Evita conversão automática de datas para economizar memória
+    cellNF: false, // Remove formatação numérica para economizar memória
+    cellHTML: false // Remove HTML para economizar memória
+  });
+  
+  console.log('Workbook lido, planilhas:', workbook.SheetNames.length);
+  
+  if (!workbook.SheetNames.length) {
+    throw new Error('Arquivo Excel não possui planilhas');
+  }
+
+  // Atualizar status
+  await supabaseClient
+    .from('processamento_uploads')
+    .update({ 
+      detalhes_erro: JSON.stringify({ status: 'Extraindo dados...' })
+    })
+    .eq('id', uploadLogId);
+
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+    defval: '', // Valor padrão para células vazias
+    raw: true, // Manter valores como estão para economizar processamento
+    dateNF: 'dd/mm/yyyy' // Formato de data simples
+  });
+  
+  console.log(`Dados extraídos: ${jsonData.length} linhas`);
+  
+  // Liberar memória do workbook
+  // @ts-ignore
+  workbook = null;
+  
+  // Processar dados com otimizações
+  await processExcelDataOptimized(jsonData, arquivo_fonte, uploadLogId, supabaseClient);
+}
 
 // Tratar shutdown da função
 addEventListener('beforeunload', (ev) => {
