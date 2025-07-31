@@ -430,6 +430,26 @@ export async function processVolumetriaOtimizado(
 ): Promise<{ success: boolean; message: string; stats: any }> {
   console.log('🚀 Iniciando processamento otimizado de volumetria:', arquivoFonte);
   
+  // Para volumetria_padrao_retroativo, usar o mesmo processamento direto do arquivo 1
+  if (arquivoFonte === 'volumetria_padrao_retroativo') {
+    console.log('🔄 Redirecionando para processamento direto (mesmo modelo do arquivo 1)...');
+    try {
+      const result = await processVolumetriaFile(file, arquivoFonte, onProgress, periodo);
+      return {
+        success: result.success,
+        message: result.message,
+        stats: {
+          total_rows: result.totalProcessed,
+          inserted_count: result.totalInserted,
+          error_count: result.totalProcessed - result.totalInserted
+        }
+      };
+    } catch (error) {
+      console.error('❌ Erro no processamento direto:', error);
+      throw error;
+    }
+  }
+  
   try {
     // Upload do arquivo
     if (onProgress) {
