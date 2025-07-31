@@ -433,7 +433,7 @@ export async function processVolumetriaOtimizado(
   try {
     // Upload do arquivo
     if (onProgress) {
-      onProgress({ progress: 10, processed: 0, total: 100, status: 'Fazendo upload do arquivo...' });
+      onProgress({ progress: 10, processed: 0, total: 0, status: 'Fazendo upload do arquivo...' });
     }
     
     const fileName = `volumetria_${Date.now()}_${file.name}`;
@@ -448,11 +448,16 @@ export async function processVolumetriaOtimizado(
     console.log('✅ Arquivo enviado:', fileName);
     
     if (onProgress) {
-      onProgress({ progress: 30, processed: 0, total: 100, status: 'Processando arquivo...' });
+      onProgress({ progress: 20, processed: 0, total: 0, status: 'Arquivo enviado, iniciando processamento...' });
     }
+    
+    // Adicionar timeout de segurança de 5 minutos
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout: Processamento excedeu 5 minutos')), 5 * 60 * 1000);
+    });
 
-    // Chamar edge function otimizada
-    const { data: processData, error: processError } = await supabase.functions.invoke('processar-volumetria-otimizado', {
+    // Chamar edge function otimizada com timeout
+    const processPromise = supabase.functions.invoke('processar-volumetria-otimizado', {
       body: { 
         file_path: fileName,
         arquivo_fonte: arquivoFonte,
@@ -460,23 +465,39 @@ export async function processVolumetriaOtimizado(
       }
     });
 
+    // Executar com timeout
+    const { data: processData, error: processError } = await Promise.race([
+      processPromise,
+      timeoutPromise
+    ]) as any;
+
     if (processError) {
       console.error('❌ Erro no processamento:', processError);
       throw new Error(`Erro no processamento: ${processError.message}`);
     }
 
-    if (!processData.success) {
-      throw new Error(processData.error || 'Erro no processamento');
+    if (!processData || !processData.success) {
+      throw new Error(processData?.error || 'Erro no processamento');
     }
 
     console.log('✅ Processamento otimizado concluído:', processData);
 
+    // Limpar arquivo temporário
+    try {
+      await supabase.storage.from('uploads').remove([fileName]);
+      console.log('🗑️ Arquivo temporário removido');
+    } catch (cleanupError) {
+      console.warn('⚠️ Erro ao limpar arquivo temporário:', cleanupError);
+    }
+
     if (onProgress) {
+      const totalRegistros = processData.stats?.total_rows || 0;
+      const registrosInseridos = processData.stats?.inserted_count || 0;
       onProgress({ 
         progress: 100, 
-        processed: processData.stats.inserted_count, 
-        total: processData.stats.total_rows, 
-        status: `Concluído! ${processData.stats.inserted_count} registros processados` 
+        processed: registrosInseridos, 
+        total: totalRegistros, 
+        status: `Concluído! ${registrosInseridos} de ${totalRegistros} registros processados` 
       });
     }
 

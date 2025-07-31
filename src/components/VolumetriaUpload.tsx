@@ -98,16 +98,17 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
       console.log(`🚀 Iniciando processamento para ${arquivoFonte}...`);
       
-      // SEMPRE usar processamento otimizado
+      // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
       const result = await processVolumetriaOtimizado(
         file,
         arquivoFonte,
         periodoFaturamento,
         (progressData) => {
+          console.log('📊 Progresso recebido:', progressData);
           setProgress(progressData.progress);
           setStats({ 
             processed: progressData.processed, 
-            total: progressData.total, 
+            total: progressData.total > 0 ? progressData.total : 100, // Garantir que total nunca seja 0
             inserted: progressData.processed 
           });
         }
