@@ -382,12 +382,14 @@ export async function processVolumetriaFile(
     if (arquivoFonte.includes('retroativo')) {
       console.log('🔧 Aplicando regras específicas para arquivo retroativo...');
       
+      let registrosRemovidosAntes2023 = 0;
+      let registrosRemovidosPeriodoAtual = 0;
+      
       // 1. Remover registros com data anterior a 2023-01-01
       const { error: deleteOldError } = await supabase
         .from('volumetria_mobilemed')
         .delete()
         .eq('arquivo_fonte', arquivoFonte)
-        .eq('periodo_referencia', periodoReferencia)
         .lt('data_referencia', '2023-01-01');
         
       if (deleteOldError) {
@@ -408,7 +410,6 @@ export async function processVolumetriaFile(
             .from('volumetria_mobilemed')
             .delete()
             .eq('arquivo_fonte', arquivoFonte)
-            .eq('periodo_referencia', periodoReferencia)
             .gte('data_referencia', currentPeriodData.inicio_periodo)
             .lte('data_referencia', currentPeriodData.fim_periodo);
             
