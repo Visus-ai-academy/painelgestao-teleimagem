@@ -374,6 +374,17 @@ export async function processVolumetriaFile(
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
     console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros, ${registrosAtualizados} atualizados`);
 
+    // Forçar atualização das estatísticas após processamento
+    console.log('🔄 Atualizando estatísticas...');
+    try {
+      if ((window as any).volumetriaContext?.refreshData) {
+        await (window as any).volumetriaContext.refreshData();
+        console.log('✅ Estatísticas atualizadas');
+      }
+    } catch (refreshError) {
+      console.warn('⚠️ Erro ao atualizar estatísticas:', refreshError);
+    }
+
     return {
       success: true,
       totalProcessed: jsonData.length,
