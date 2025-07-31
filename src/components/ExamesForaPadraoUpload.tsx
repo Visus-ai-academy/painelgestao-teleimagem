@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Upload, File, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, File, CheckCircle, AlertCircle, Database } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -11,6 +11,24 @@ export function ExamesForaPadraoUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [registrosCount, setRegistrosCount] = useState<number>(0);
+
+  // Buscar count de registros de-para ao carregar
+  useEffect(() => {
+    const fetchDeParaCount = async () => {
+      try {
+        const { count } = await supabase
+          .from('valores_referencia_de_para')
+          .select('*', { count: 'exact', head: true });
+        
+        setRegistrosCount(count || 0);
+      } catch (error) {
+        console.error('Erro ao buscar contagem de registros:', error);
+      }
+    };
+
+    fetchDeParaCount();
+  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -60,6 +78,9 @@ export function ExamesForaPadraoUpload() {
       setProgress(100);
       
       toast.success(`Arquivo De-Para processado com sucesso! ${data.registros_processados} registros processados.`);
+      
+      // Atualizar contagem
+      setRegistrosCount(data.registros_processados || 0);
       
       // Reset
       setSelectedFile(null);
@@ -128,6 +149,17 @@ export function ExamesForaPadraoUpload() {
               <Progress value={progress} className="w-full" />
               <div className="text-sm text-muted-foreground text-center">
                 {progress < 50 ? 'Fazendo upload...' : 'Processando arquivo...'}
+              </div>
+            </div>
+          )}
+
+          {registrosCount > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-green-700">
+                <Database className="h-4 w-4" />
+                <span className="font-medium">
+                  {registrosCount} registros de De-Para carregados na base
+                </span>
               </div>
             </div>
           )}
