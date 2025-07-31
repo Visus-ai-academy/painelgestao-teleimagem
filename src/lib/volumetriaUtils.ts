@@ -403,47 +403,63 @@ export async function processVolumetriaFile(
         console.log(`✅ ${arquivoFonte}: Dados anteriores a 2023-01-01 removidos`);
       }
       
-      // 2. REGRA CORRETA PARA RETROATIVOS: Manter apenas exames que foram:
-      // - Realizados ANTES do mês de faturamento (DATA_REALIZACAO < 2025-06-01)
-      // - E laudados NO PERÍODO de faturamento (DATA_LAUDO entre 08/06/2025 e 07/07/2025)
+      // 2. REGRA CORRETA PARA RETROATIVOS (Arquivos 3 e 4):
+      // Determinar automaticamente o mês de faturamento baseado no período atual
       try {
-        // Obter período de faturamento de junho/2025
+        // Obter período de faturamento atual
         const { data: currentPeriodData } = await supabase
-          .rpc('get_periodo_faturamento', { data_referencia: '2025-07-15' }) // Para pegar junho
+          .rpc('get_periodo_faturamento', { data_referencia: new Date().toISOString().split('T')[0] })
           .single();
           
         if (currentPeriodData) {
-          const dataLimiteRealizacao = '2025-06-01'; // Excluir realizados >= 01/06/2025
-          const inicioLaudo = currentPeriodData.inicio_periodo; // 08/06/2025
-          const fimLaudo = currentPeriodData.fim_periodo;       // 07/07/2025
+          // Extrair ano e mês do período para construir data limite
+          const anoReferencia = currentPeriodData.ano_referencia;
+          const mesReferencia = currentPeriodData.mes_referencia.includes('Junho') ? 6 : 
+                                currentPeriodData.mes_referencia.includes('Julho') ? 7 :
+                                currentPeriodData.mes_referencia.includes('Agosto') ? 8 :
+                                currentPeriodData.mes_referencia.includes('Setembro') ? 9 :
+                                currentPeriodData.mes_referencia.includes('Outubro') ? 10 :
+                                currentPeriodData.mes_referencia.includes('Novembro') ? 11 :
+                                currentPeriodData.mes_referencia.includes('Dezembro') ? 12 :
+                                currentPeriodData.mes_referencia.includes('Janeiro') ? 1 :
+                                currentPeriodData.mes_referencia.includes('Fevereiro') ? 2 :
+                                currentPeriodData.mes_referencia.includes('Março') ? 3 :
+                                currentPeriodData.mes_referencia.includes('Abril') ? 4 :
+                                currentPeriodData.mes_referencia.includes('Maio') ? 5 : 6;
+          
+          const dataLimiteRealizacao = `${anoReferencia}-${mesReferencia.toString().padStart(2, '0')}-01`;
+          const inicioLaudo = currentPeriodData.inicio_periodo; 
+          const fimLaudo = currentPeriodData.fim_periodo;       
           
           console.log(`📅 ${arquivoFonte}: Faturando ${currentPeriodData.mes_referencia}`);
-          console.log(`🔍 ${arquivoFonte}: Mantendo apenas exames:`);
-          console.log(`   - DATA_REALIZACAO < ${dataLimiteRealizacao}`);
-          console.log(`   - DATA_LAUDO entre ${inicioLaudo} e ${fimLaudo}`);
+          console.log(`🔍 ${arquivoFonte}: REGRA RETROATIVA:`);
+          console.log(`   - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+          console.log(`   - Manter DATA_LAUDO entre ${inicioLaudo} e ${fimLaudo}`);
           
-          // Contar registros válidos antes da remoção
-          const { data: validRecords } = await supabase
-            .from('volumetria_mobilemed')
-            .select('id', { count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .lt('DATA_REALIZACAO', dataLimiteRealizacao)
-            .gte('DATA_LAUDO', inicioLaudo)
-            .lte('DATA_LAUDO', fimLaudo);
-            
-          console.log(`✅ ${arquivoFonte}: ${validRecords?.length || 0} registros atendem aos critérios retroativos`);
-          
-          // Remover todos os registros que NÃO atendem aos critérios
-          const { error: deleteInvalidError } = await supabase
+          // Primeiro: Remover exames com DATA_REALIZACAO >= data limite
+          const { error: deleteRealizacaoError } = await supabase
             .from('volumetria_mobilemed')
             .delete()
             .eq('arquivo_fonte', arquivoFonte)
-            .or(`DATA_REALIZACAO.gte.${dataLimiteRealizacao},DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gt.${fimLaudo}`);
+            .gte('DATA_REALIZACAO', dataLimiteRealizacao);
             
-          if (deleteInvalidError) {
-            console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar regras retroativas:`, deleteInvalidError);
+          if (deleteRealizacaoError) {
+            console.warn(`⚠️ ${arquivoFonte}: Erro ao remover DATA_REALIZACAO >= ${dataLimiteRealizacao}:`, deleteRealizacaoError);
           } else {
-            console.log(`✅ ${arquivoFonte}: Regras retroativas aplicadas com sucesso`);
+            console.log(`✅ ${arquivoFonte}: Removidos exames com DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+          }
+          
+          // Segundo: Remover exames com DATA_LAUDO fora do período
+          const { error: deleteLaudoError } = await supabase
+            .from('volumetria_mobilemed')
+            .delete()
+            .eq('arquivo_fonte', arquivoFonte)
+            .or(`DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gt.${fimLaudo}`);
+            
+          if (deleteLaudoError) {
+            console.warn(`⚠️ ${arquivoFonte}: Erro ao filtrar período de laudo:`, deleteLaudoError);
+          } else {
+            console.log(`✅ ${arquivoFonte}: Mantidos apenas laudos entre ${inicioLaudo} e ${fimLaudo}`);
           }
         }
       } catch (periodError) {
