@@ -406,7 +406,7 @@ export async function processVolumetriaFile(
         const inserted = statusData.registros_inseridos || 0;
         
         // Estimar total baseado no progresso (se disponível)
-        const estimatedTotal = progress > 0 ? progress : 1000; // Fallback
+        const estimatedTotal = progress > 0 ? progress : 50000; // Fallback aumentado para grandes volumes
         
         // Atualizar progresso na UI
         onProgress?.(progress, estimatedTotal, inserted);

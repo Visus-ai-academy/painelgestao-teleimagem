@@ -131,7 +131,7 @@ export function useVolumetriaData(periodo: string, cliente: string) {
       const queries = [];
       let allClientes: string[] = [];
       let offset = 0;
-      const limit = 1000;
+      const limit = 50000; // Aumentado significativamente para processar grandes volumes
       
       while (true) {
         const { data, error } = await supabase

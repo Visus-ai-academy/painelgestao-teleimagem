@@ -152,7 +152,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       // Fazer query em lotes para evitar limitações
       let allData: any[] = [];
       let from = 0;
-      const batchSize = 1000;
+      const batchSize = 10000; // Aumentado para processar grandes volumes
       let hasMore = true;
 
       const { startDate, endDate } = buildDateFilter();

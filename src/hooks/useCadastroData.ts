@@ -14,7 +14,7 @@ export const useCadastroExames = () => {
       // Buscar TODOS os exames usando paginação para superar limite do Supabase
       let allExames: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000; // Aumentado para processar grandes volumes
       let hasMore = true;
 
       while (hasMore) {
@@ -99,7 +99,7 @@ export const useQuebraExames = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -149,7 +149,7 @@ export const usePrecosServicos = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -197,7 +197,7 @@ export const useRegrasExclusao = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -245,7 +245,7 @@ export const useRepasseMedico = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -296,7 +296,7 @@ export const useModalidades = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -344,7 +344,7 @@ export const useEspecialidades = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -392,7 +392,7 @@ export const useCategoriasExame = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
@@ -440,7 +440,7 @@ export const usePrioridades = () => {
       // Buscar TODOS os registros usando paginação
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000;
+      const rangeSize = 10000;
       let hasMore = true;
 
       while (hasMore) {
