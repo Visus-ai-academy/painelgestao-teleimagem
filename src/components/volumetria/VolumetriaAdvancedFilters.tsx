@@ -87,37 +87,43 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         supabase
           .from('volumetria_mobilemed')
           .select('data_referencia')
-          .not('data_referencia', 'is', null),
+          .not('data_referencia', 'is', null)
+          .limit(10000),
         
-        // Clientes únicos
+        // Clientes únicos - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
           .select('EMPRESA')
-          .not('EMPRESA', 'is', null),
+          .not('EMPRESA', 'is', null)
+          .limit(10000),
         
-        // Modalidades únicas
+        // Modalidades únicas - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
           .select('MODALIDADE')
-          .not('MODALIDADE', 'is', null),
+          .not('MODALIDADE', 'is', null)
+          .limit(1000),
         
-        // Especialidades únicas
+        // Especialidades únicas - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
           .select('ESPECIALIDADE')
-          .not('ESPECIALIDADE', 'is', null),
+          .not('ESPECIALIDADE', 'is', null)
+          .limit(1000),
         
-        // Prioridades únicas
+        // Prioridades únicas - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
           .select('PRIORIDADE')
-          .not('PRIORIDADE', 'is', null),
+          .not('PRIORIDADE', 'is', null)
+          .limit(1000),
         
-        // Médicos únicos
+        // Médicos únicos - SEM LIMITE
         supabase
           .from('volumetria_mobilemed')
           .select('MEDICO')
           .not('MEDICO', 'is', null)
+          .limit(10000)
       ]);
 
       // Processar anos únicos
