@@ -38,7 +38,7 @@ interface VolumetriaRecord {
   CODIGO_INTERNO?: number;
   DIGITADOR?: string;
   COMPLEMENTAR?: string;
-  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo';
+  arquivo_fonte: 'data_laudo' | 'data_exame' | 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
   lote_upload?: string;
   periodo_referencia?: string;
 }
@@ -389,7 +389,7 @@ serve(async (req) => {
       throw new Error('file_path e arquivo_fonte são obrigatórios');
     }
 
-    const validSources = ['data_laudo', 'data_exame', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+    const validSources = ['data_laudo', 'data_exame', 'volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
     if (!validSources.includes(arquivo_fonte)) {
       throw new Error(`arquivo_fonte deve ser um dos: ${validSources.join(', ')}`);
     }
