@@ -63,38 +63,36 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Carregando estatísticas centralizadas...');
       
-      // Usar função do Supabase para buscar dados agregados
-      const { data: aggregatedData, error } = await supabase.rpc('get_volumetria_aggregated_stats');
-      
-      if (error) {
-        console.error('❌ Erro ao buscar dados agregados:', error);
-        throw error;
-      }
-      
-      console.log('📊 Dados agregados recebidos:', aggregatedData);
-      
-      // Inicializar resultado com tipos padrão
+      // Carregar dados de volumetria diretamente da tabela
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       const statsResult: any = {};
       
-      // Inicializar com zeros
-      tiposArquivo.forEach(tipo => {
-        statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-      });
-      
-      // Processar dados retornados da função
-      if (aggregatedData && Array.isArray(aggregatedData)) {
-        aggregatedData.forEach((item: any) => {
-          const tipo = item.arquivo_fonte;
-          if (tipo) {
-            statsResult[tipo] = {
-              totalRecords: parseInt(item.total_records) || 0,
-              recordsWithValue: parseInt(item.records_with_value) || 0,
-              recordsZeroed: parseInt(item.records_zeroed) || 0,
-              totalValue: parseFloat(item.total_value) || 0
-            };
-          }
-        });
+      for (const tipo of tiposArquivo) {
+        console.log(`📊 Carregando dados para: ${tipo}`);
+        
+        const { data: volumetriaData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('VALORES')
+          .eq('arquivo_fonte', tipo);
+
+        if (!error && volumetriaData) {
+          const totalRecords = volumetriaData.length;
+          const recordsWithValue = volumetriaData.filter(item => item.VALORES && item.VALORES > 0).length;
+          const recordsZeroed = totalRecords - recordsWithValue;
+          const totalValue = volumetriaData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+
+          statsResult[tipo] = {
+            totalRecords,
+            recordsWithValue,
+            recordsZeroed,
+            totalValue
+          };
+          
+          console.log(`✅ ${tipo}: ${totalRecords} registros, ${recordsWithValue} com valores, ${totalValue} total`);
+        } else {
+          console.log(`⚠️ ${tipo}: nenhum dado encontrado`);
+          statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
+        }
       }
 
       // Carregar últimos uploads
