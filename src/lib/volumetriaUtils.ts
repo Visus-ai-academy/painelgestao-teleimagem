@@ -305,7 +305,7 @@ export function processRow(
   }
 }
 
-// Função para processar arquivo Excel utilizando a nova edge function completa
+// Função para processar arquivo Excel utilizando edge function existente com validação robusta
 export async function processVolumetriaFile(
   file: File, 
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao',
@@ -316,13 +316,13 @@ export async function processVolumetriaFile(
   const { supabase } = await import('@/integrations/supabase/client');
   
   try {
-    console.log('=== INICIANDO PROCESSAMENTO COM EDGE FUNCTION COMPLETA ===');
+    console.log('=== INICIANDO PROCESSAMENTO ROBUSTO ===');
     console.log('Arquivo:', file.name);
     console.log('Fonte:', arquivoFonte);
     console.log('Período:', periodoFaturamento);
     
     // Determinar o arquivo_fonte para a edge function baseado no tipo
-    let edgeFunctionSource: 'data_laudo' | 'data_exame';
+    let edgeFunctionSource: 'data_laudo' | 'data_exame' | 'volumetria_fora_padrao';
     
     // Mapear tipos de arquivo para fontes da edge function
     switch (arquivoFonte) {
@@ -333,7 +333,7 @@ export async function processVolumetriaFile(
         break;
       case 'volumetria_fora_padrao':
       case 'volumetria_fora_padrao_retroativo':
-        edgeFunctionSource = 'data_exame'; // Arquivo com data de exame
+        edgeFunctionSource = 'volumetria_fora_padrao'; // Arquivo fora do padrão
         break;
       default:
         throw new Error(`Tipo de arquivo não suportado: ${arquivoFonte}`);
@@ -359,22 +359,21 @@ export async function processVolumetriaFile(
 
     console.log('Arquivo enviado com sucesso, iniciando processamento...');
 
-    // Chamar a nova edge function de processamento completo
-    const { data, error } = await supabase.functions.invoke('processar-volumetria-completo', {
+    // Chamar a edge function existente de processamento
+    const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
       body: { 
         file_path: filePath,
-        arquivo_fonte: edgeFunctionSource,
-        config: {
-          arquivoFonte: arquivoFonte,
-          periodoFaturamento: periodoFaturamento,
-          validateValues: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].validateValues,
-          filterCurrentPeriod: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].filterCurrentPeriod,
-          appropriateValues: VOLUMETRIA_UPLOAD_CONFIGS[arquivoFonte].appropriateValues
-        }
+        arquivo_fonte: edgeFunctionSource
       }
     });
 
     if (error) {
+      // Limpar arquivo temporário do storage em caso de erro
+      try {
+        await supabase.storage.from('uploads').remove([filePath]);
+      } catch (cleanupError) {
+        console.warn('Erro ao limpar arquivo temporário após erro:', cleanupError);
+      }
       throw new Error(`Erro na edge function: ${error.message}`);
     }
 
