@@ -114,31 +114,21 @@ export default async function handler(req: Request): Promise<Response> {
         break;
 
       case 'volumetria_padrao_retroativo':
-        // Arquivo 3: Validar data limite e preencher especialidade
+        // Arquivo 3: Validar apenas data limite (removida regra de especialidade)
         const dataLimite = new Date(REGRAS_PADRAO.arquivo3.dataLimiteMinima);
         
         // Remover registros muito antigos
-        const { error: deleteError } = await supabase
+        const { data: deletedCount, error: deleteError } = await supabase
           .from('volumetria_mobilemed')
           .delete()
           .eq('arquivo_fonte', arquivo_fonte)
-          .lt('data_referencia', dataLimite.toISOString());
-        
-        if (deleteError) throw deleteError;
-
-        // Preencher especialidade padrão
-        const { data: updateResult3, error: error3 } = await supabase
-          .from('volumetria_mobilemed')
-          .update({
-            'ESPECIALIDADE': 'RADIOLOGIA'
-          })
-          .eq('arquivo_fonte', arquivo_fonte)
-          .is('ESPECIALIDADE', null)
+          .lt('data_referencia', dataLimite.toISOString())
           .select('id');
         
-        if (error3) throw error3;
-        registrosAtualizados += updateResult3?.length || 0;
-        mensagens.push(`Arquivo 3: ${updateResult3?.length || 0} registros com especialidade preenchida`);
+        if (deleteError) throw deleteError;
+        
+        const deletedRegistros = deletedCount?.length || 0;
+        mensagens.push(`Arquivo 3: ${deletedRegistros} registros anteriores a ${REGRAS_PADRAO.arquivo3.dataLimiteMinima} removidos`);
         break;
 
       case 'volumetria_fora_padrao_retroativo':
