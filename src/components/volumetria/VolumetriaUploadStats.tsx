@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Calendar, BarChart3, AlertCircle } from "lucide-react";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
@@ -13,7 +12,6 @@ interface UploadStats {
   recordsZeroed: number;
   totalValue: number;
   period: string;
-  category: 'padrão' | 'fora-padrão' | 'retroativo';
 }
 
 export function VolumetriaUploadStats() {
@@ -29,8 +27,7 @@ export function VolumetriaUploadStats() {
       totalValue: data.stats.volumetria_padrao.totalValue,
       period: data.lastUploads.volumetria_padrao ? 
         new Date(data.lastUploads.volumetria_padrao.created_at).toLocaleDateString('pt-BR') : 
-        "Nenhum upload",
-      category: 'padrão'
+        "Nenhum upload"
     },
     {
       fileName: "Volumetria Fora Padrão", 
@@ -40,8 +37,7 @@ export function VolumetriaUploadStats() {
       totalValue: data.stats.volumetria_fora_padrao.totalValue,
       period: data.lastUploads.volumetria_fora_padrao ?
         new Date(data.lastUploads.volumetria_fora_padrao.created_at).toLocaleDateString('pt-BR') :
-        "Nenhum upload",
-      category: 'fora-padrão'
+        "Nenhum upload"
     },
     {
       fileName: "Volumetria Padrão Retroativo",
@@ -51,8 +47,7 @@ export function VolumetriaUploadStats() {
       totalValue: data.stats.volumetria_padrao_retroativo.totalValue,
       period: data.lastUploads.volumetria_padrao_retroativo ?
         new Date(data.lastUploads.volumetria_padrao_retroativo.created_at).toLocaleDateString('pt-BR') :
-        "Nenhum upload",
-      category: 'retroativo'
+        "Nenhum upload"
     },
     {
       fileName: "Volumetria Fora Padrão Retroativo",
@@ -62,8 +57,17 @@ export function VolumetriaUploadStats() {
       totalValue: data.stats.volumetria_fora_padrao_retroativo.totalValue,
       period: data.lastUploads.volumetria_fora_padrao_retroativo ?
         new Date(data.lastUploads.volumetria_fora_padrao_retroativo.created_at).toLocaleDateString('pt-BR') :
-        "Nenhum upload",
-      category: 'fora-padrão'
+        "Nenhum upload"
+    },
+    {
+      fileName: "Volumetria Onco Padrão",
+      totalRecords: data.stats.volumetria_onco_padrao.totalRecords,
+      recordsWithValue: data.stats.volumetria_onco_padrao.recordsWithValue,
+      recordsZeroed: data.stats.volumetria_onco_padrao.recordsZeroed,
+      totalValue: data.stats.volumetria_onco_padrao.totalValue,
+      period: data.lastUploads.volumetria_onco_padrao ?
+        new Date(data.lastUploads.volumetria_onco_padrao.created_at).toLocaleDateString('pt-BR') :
+        "Nenhum upload"
     }
   ];
 
@@ -73,18 +77,6 @@ export function VolumetriaUploadStats() {
     totalValue: acc.totalValue + stat.totalValue,
   }), { totalRecords: 0, recordsWithValue: 0, totalValue: 0 });
 
-  const getCategoryColor = (category: 'padrão' | 'fora-padrão' | 'retroativo') => {
-    switch (category) {
-      case 'padrão':
-        return 'bg-blue-100 text-blue-800';
-      case 'fora-padrão':
-        return 'bg-orange-100 text-orange-800';
-      case 'retroativo':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   if (data.loading) {
     return (
@@ -157,14 +149,9 @@ export function VolumetriaUploadStats() {
           <TableBody>
             {stats.map((stat, index) => (
               <TableRow key={index}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <span>{stat.fileName}</span>
-                    <Badge className={getCategoryColor(stat.category)}>
-                      {stat.category}
-                    </Badge>
-                  </div>
-                </TableCell>
+                 <TableCell className="font-medium">
+                   <span>{stat.fileName}</span>
+                 </TableCell>
                 <TableCell className="text-center">
                   <div className="flex flex-col">
                     <span className="font-semibold text-blue-600">{stat.totalRecords}</span>

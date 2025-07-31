@@ -27,6 +27,12 @@ interface VolumetriaData {
       recordsZeroed: number;
       totalValue: number;
     };
+    volumetria_onco_padrao: {
+      totalRecords: number;
+      recordsWithValue: number;
+      recordsZeroed: number;
+      totalValue: number;
+    };
   };
   lastUploads: Record<string, any>;
   loading: boolean;
@@ -47,6 +53,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       volumetria_fora_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
       volumetria_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
       volumetria_fora_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+      volumetria_onco_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
     },
     lastUploads: {},
     loading: true
@@ -57,7 +64,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       console.log('🔄 Carregando estatísticas centralizadas...');
       
       // Carregar dados de volumetria
-      const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+      const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       const statsResult: any = {};
       
       for (const tipo of tiposArquivo) {
@@ -159,6 +166,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           volumetria_fora_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
           volumetria_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
           volumetria_fora_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
+          volumetria_onco_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
         },
         lastUploads: {},
         loading: false
