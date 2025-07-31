@@ -7,9 +7,6 @@ import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 import { VolumetriaDelayAnalysis } from '@/components/volumetria/VolumetriaDelayAnalysis';
 import { VolumetriaExecutiveSummary } from '@/components/volumetria/VolumetriaExecutiveSummary';
-import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
-import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
-import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -103,11 +100,10 @@ export default function Volumetria() {
 
           {/* Dashboard Profissional com Tabs */}
           <Tabs defaultValue="executive" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="executive">Resumo Executivo</TabsTrigger>
               <TabsTrigger value="charts">Análise de Volume</TabsTrigger>
               <TabsTrigger value="delays">Análise de Atrasos</TabsTrigger>
-              <TabsTrigger value="operational">Operacional</TabsTrigger>
             </TabsList>
 
             <TabsContent value="executive" className="mt-6">
@@ -144,13 +140,6 @@ export default function Volumetria() {
                   atrasosComTempo: atrasosComTempo
                 }}
               />
-            </TabsContent>
-
-            <TabsContent value="operational" className="mt-6">
-              <div className="grid grid-cols-1 gap-6">
-                <VolumetriaExamesNaoIdentificados />
-                <VolumetriaUploadStats />
-              </div>
             </TabsContent>
           </Tabs>
         </>
