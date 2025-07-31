@@ -123,19 +123,20 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
 
         clientData.forEach(row => {
-          // Verificar se há dados válidos para calcular atraso
-          if (!row.DATA_LAUDO || !row.DATA_PRAZO || !row.HORA_LAUDO || !row.HORA_PRAZO) {
-            return; // Skip registros sem dados completos
+          // Calcular atraso apenas se houver dados válidos
+          let isAtrasado = false;
+          let tempoAtraso = 0;
+          
+          if (row.DATA_LAUDO && row.DATA_PRAZO && row.HORA_LAUDO && row.HORA_PRAZO) {
+            // Combinar data e hora para comparação precisa
+            const dataLaudoCompleta = new Date(`${row.DATA_LAUDO}T${row.HORA_LAUDO}`);
+            const dataPrazoCompleta = new Date(`${row.DATA_PRAZO}T${row.HORA_PRAZO}`);
+            
+            isAtrasado = dataLaudoCompleta > dataPrazoCompleta;
+            tempoAtraso = isAtrasado ? (dataLaudoCompleta.getTime() - dataPrazoCompleta.getTime()) / (1000 * 60) : 0;
           }
 
-          // Combinar data e hora para comparação precisa
-          const dataLaudoCompleta = new Date(`${row.DATA_LAUDO}T${row.HORA_LAUDO}`);
-          const dataPrazoCompleta = new Date(`${row.DATA_PRAZO}T${row.HORA_PRAZO}`);
-          
-          const isAtrasado = dataLaudoCompleta > dataPrazoCompleta;
-          const tempoAtraso = isAtrasado ? (dataLaudoCompleta.getTime() - dataPrazoCompleta.getTime()) / (1000 * 60) : 0;
-
-          // Processar especialidades
+          // Processar especialidades - INCLUIR TODOS OS REGISTROS
           const esp = row.ESPECIALIDADE || 'Não Informado';
           if (!especialidadesMap.has(esp)) {
             especialidadesMap.set(esp, { total: 0, atrasados: 0, tempoTotal: 0 });
@@ -147,7 +148,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             espData.tempoTotal += tempoAtraso;
           }
 
-          // Processar categorias (usando modalidade)
+          // Processar categorias (usando modalidade) - INCLUIR TODOS OS REGISTROS
           const cat = row.MODALIDADE || 'Não Informado';
           if (!categoriasMap.has(cat)) {
             categoriasMap.set(cat, { total: 0, atrasados: 0, tempoTotal: 0 });
@@ -159,8 +160,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             catData.tempoTotal += tempoAtraso;
           }
 
-          // Processar prioridades (usando dados reais da coluna PRIORIDADE)
-          // Buscar prioridade real dos dados ou usar valor padrão
+          // Processar prioridades - INCLUIR TODOS OS REGISTROS
           const prioridade = row.PRIORIDADE || 'Não Informado';
           
           if (!prioridadesMap.has(prioridade)) {
