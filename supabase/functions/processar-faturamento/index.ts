@@ -160,14 +160,14 @@ serve(async (req) => {
     }
 
     const dadosMapeados = []
-    const maxRecords = 100
+    // ❌ REMOVIDA LIMITAÇÃO - processar TODOS os registros
     
-    console.log(`9. Processando os primeiros ${maxRecords} registros com datas corretas...`)
+    console.log(`9. Processando TODOS os ${jsonData.length} registros (limitação removida)...`)
     
     const hoje = new Date().toISOString().split('T')[0]
     const vencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    for (let i = 1; i < Math.min(jsonData.length, maxRecords + 1); i++) {
+    for (let i = 1; i < jsonData.length; i++) { // ✅ PROCESSAR TODOS
       const row = jsonData[i] as any[]
       if (!row || row.length === 0) continue
 

@@ -212,21 +212,11 @@ serve(async (req) => {
       console.log('Tipo do nome:', typeof cliente.nome)
       console.log('Tamanho do nome:', cliente.nome ? cliente.nome.length : 'undefined')
       
-      const nomeExiste = cliente.nome && cliente.nome !== undefined
-      const nomeNaoVazio = cliente.nome && cliente.nome.trim() !== ''
-      const nomeNaoUndefined = cliente.nome !== 'undefined'
-      const nomeNaoNull = cliente.nome && cliente.nome.toLowerCase() !== 'null'
+      // ❌ REMOVIDA VALIDAÇÃO RESTRITIVA - aceitar TODOS os clientes
+      // Cada linha do arquivo é um registro válido que deve ser mantido
+      console.log(`RESULTADO: Cliente ${index} SEMPRE VÁLIDO (preservando todos os registros)`)
       
-      console.log('Verificações:')
-      console.log('- Nome existe:', nomeExiste)
-      console.log('- Nome não vazio:', nomeNaoVazio)
-      console.log('- Nome não "undefined":', nomeNaoUndefined)
-      console.log('- Nome não "null":', nomeNaoNull)
-      
-      const valido = nomeExiste && nomeNaoVazio && nomeNaoUndefined && nomeNaoNull
-      console.log(`RESULTADO: Cliente ${index} é válido: ${valido}`)
-      
-      return valido
+      return true // ✅ ACEITAR TODOS OS REGISTROS
     })
 
     console.log('Clientes válidos:', clientes.length)
