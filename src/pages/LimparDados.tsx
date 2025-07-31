@@ -18,13 +18,13 @@ export default function LimparDados() {
         'volumetria_fora_padrao_retroativo'
       ];
 
-      console.log('Iniciando limpeza dos arquivos:', arquivosParaLimpar);
+      console.log('Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para...');
       
-      const resultado = await limparDadosVolumetria(arquivosParaLimpar);
+      const resultado = await limparDadosVolumetria();
       
       toast({
-        title: "Dados limpos com sucesso!",
-        description: `${resultado.registros_removidos} registros removidos`,
+        title: "Limpeza completa realizada!",
+        description: `${resultado.registros_removidos} registros removidos de todas as tabelas`,
       });
 
       console.log('Limpeza concluída:', resultado);

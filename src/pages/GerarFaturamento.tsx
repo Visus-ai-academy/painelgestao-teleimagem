@@ -166,29 +166,22 @@ export default function GerarFaturamento() {
 
   // Função para limpar dados de volumetria
   const handleLimparDadosVolumetria = async () => {
-    console.log('🗑️ Botão de limpeza clicado!');
+    console.log('🗑️ Botão de limpeza COMPLETA clicado!');
     setIsClearing(true);
     try {
-      const arquivosParaLimpar = [
-        'volumetria_padrao',
-        'volumetria_fora_padrao', 
-        'volumetria_padrao_retroativo',
-        'volumetria_fora_padrao_retroativo'
-      ];
-
-      console.log('🧹 Iniciando limpeza dos dados de volumetria...', arquivosParaLimpar);
+      console.log('🧹 Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para...');
       console.log('📡 Fazendo chamada para edge function limpar-dados-volumetria...');
       
-      const resultado = await limparDadosVolumetria(arquivosParaLimpar);
+      const resultado = await limparDadosVolumetria();
       
       console.log('✅ Resultado completo da limpeza:', resultado);
       console.log('📊 Registros removidos:', resultado?.registros_removidos);
-      console.log('📁 Arquivos processados:', resultado?.arquivos_removidos);
+      console.log('📁 Detalhes por tabela:', resultado?.detalhes_por_tabela);
       
       if (resultado?.success) {
         toast({
-          title: "✅ Dados limpos com sucesso!",
-          description: `${resultado.registros_removidos || 0} registros de volumetria removidos`,
+          title: "✅ Limpeza completa realizada!",
+          description: `${resultado.registros_removidos || 0} registros removidos de todas as tabelas de volumetria e de-para`,
         });
       } else {
         console.error('❌ Resultado indica falha:', resultado);

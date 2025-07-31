@@ -251,13 +251,13 @@ export async function limparUploadsAntigos() {
   }
 }
 
-export async function limparDadosVolumetria(arquivosFonte: string[]) {
+export async function limparDadosVolumetria() {
   try {
-    console.log('📡 [supabase.ts] Limpando dados de volumetria para arquivos:', arquivosFonte)
+    console.log('📡 [supabase.ts] Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para')
     console.log('📡 [supabase.ts] Chamando edge function: limpar-dados-volumetria')
     
     const { data, error } = await supabase.functions.invoke('limpar-dados-volumetria', {
-      body: { arquivos_fonte: arquivosFonte }
+      body: {}  // Não precisa mais de parâmetros, limpa tudo
     })
     
     console.log('📡 [supabase.ts] Resposta da edge function - data:', data)
@@ -273,7 +273,7 @@ export async function limparDadosVolumetria(arquivosFonte: string[]) {
       throw new Error(`Erro ao limpar dados: ${data.error}`)
     }
     
-    console.log('✅ [supabase.ts] Limpeza de volumetria concluída:', data)
+    console.log('✅ [supabase.ts] Limpeza COMPLETA de volumetria concluída:', data)
     return data
   } catch (error) {
     console.error('❌ [supabase.ts] Erro na limpeza de volumetria:', error)
