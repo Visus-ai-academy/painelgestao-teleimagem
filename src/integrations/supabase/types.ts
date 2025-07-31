@@ -2235,6 +2235,36 @@ export type Database = {
         }
         Relationships: []
       }
+      valores_prioridade_de_para: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          nome_final: string
+          prioridade_original: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_final: string
+          prioridade_original: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_final?: string
+          prioridade_original?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       valores_referencia_de_para: {
         Row: {
           ativo: boolean
@@ -2541,6 +2571,10 @@ export type Database = {
     }
     Functions: {
       analyze_partitioning_need: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      aplicar_de_para_prioridade: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }

@@ -1,37 +1,46 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import * as XLSX from "https://deno.land/x/sheetjs@v0.19.3/xlsx.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface PrioridadeDeParaRecord {
+  prioridade_original: string;
+  nome_final: string;
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
 
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    
     if (!file) {
-      throw new Error('Nenhum arquivo enviado')
+      return new Response(
+        JSON.stringify({ error: 'Nenhum arquivo foi enviado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log('📂 Processando prioridades:', file.name)
-    
+    console.log('Processando arquivo:', file.name);
+
     // Registrar início do upload na tabela de logs
-    const { data: uploadLog, error: logError } = await supabase
+    const { data: uploadLog, error: logError } = await supabaseClient
       .from('processamento_uploads')
       .insert({
-        tipo_arquivo: 'prioridades',
+        tipo_arquivo: 'de_para_prioridade',
         arquivo_nome: file.name,
         tipo_dados: 'incremental',
         status: 'processando',
@@ -41,146 +50,142 @@ serve(async (req) => {
         registros_erro: 0
       })
       .select()
-      .single()
+      .single();
 
     if (logError) {
-      console.error('❌ Erro ao criar log de upload:', logError)
-      throw logError
+      console.error('Erro ao criar log de upload:', logError);
+      throw logError;
     }
-    
-    // Ler arquivo (suporta Excel e CSV)
-    const arrayBuffer = await file.arrayBuffer()
-    let dataRows: string[][] = []
-    
-    if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
-      // Processar arquivo Excel
-      console.log('📊 Processando arquivo Excel')
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][]
-      
-      if (jsonData.length < 2) {
-        throw new Error('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados')
-      }
-      
-      // Pular a primeira linha (cabeçalho)
-      dataRows = jsonData.slice(1)
+
+    // Ler o arquivo Excel
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+    console.log('Total de linhas no arquivo:', jsonData.length);
+
+    let processedCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    // Primeiro, limpar registros existentes
+    const { error: deleteError } = await supabaseClient
+      .from('valores_prioridade_de_para')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+    if (deleteError) {
+      console.error('Erro ao limpar dados existentes:', deleteError);
     } else {
-      // Processar arquivo CSV
-      console.log('📄 Processando arquivo CSV')
-      const decoder = new TextDecoder('utf-8')
-      let text = decoder.decode(arrayBuffer)
-      
-      // Remover BOM se presente
-      if (text.charCodeAt(0) === 0xFEFF) {
-        text = text.slice(1)
-      }
-      
-      const lines = text.split('\n').filter(line => line.trim())
-      
-      if (lines.length < 2) {
-        throw new Error('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados')
-      }
-
-      // Pular a primeira linha (cabeçalho) e converter para array de arrays
-      dataRows = lines.slice(1).map(line => line.split(',').map(col => col.trim().replace(/"/g, '')))
+      console.log('Dados existentes removidos com sucesso');
     }
-    
-    let inseridos = 0
-    let atualizados = 0
-    let erros = 0
-    let processados = 0
-    const errosDetalhes: string[] = []
 
-    for (const row of dataRows) {
-      if (!row || row.length === 0) continue
-      
-      processados++ // Contar apenas linhas que não são vazias
-      
+    // Processar cada linha
+    for (const [index, row] of jsonData.entries()) {
       try {
-        const nome = row[0]?.toString()?.trim()
+        const record = processRow(row as any);
         
-        if (!nome) {
-          erros++
-          errosDetalhes.push(`Linha sem nome: ${row.join(',')}`)
-          continue
-        }
+        if (record) {
+          const { error: insertError } = await supabaseClient
+            .from('valores_prioridade_de_para')
+            .insert([record]);
 
-        // Verificar se prioridade já existe
-        const { data: existing } = await supabase
-          .from('prioridades')
-          .select('id')
-          .eq('nome', nome)
-          .maybeSingle()
-
-        if (existing) {
-          // Atualizar
-          const { error } = await supabase
-            .from('prioridades')
-            .update({
-              nome,
-              ativo: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existing.id)
-
-          if (error) throw error
-          atualizados++
+          if (insertError) {
+            console.error(`Erro na linha ${index + 2}:`, insertError);
+            errors.push(`Linha ${index + 2}: ${insertError.message}`);
+            errorCount++;
+          } else {
+            processedCount++;
+          }
         } else {
-          // Inserir
-          const { error } = await supabase
-            .from('prioridades')
-            .insert({
-              nome,
-              ativo: true
-            })
-
-          if (error) throw error
-          inseridos++
+          errors.push(`Linha ${index + 2}: Dados inválidos ou incompletos`);
+          errorCount++;
         }
-        
       } catch (error) {
-        console.error('❌ Erro ao processar linha:', row.join(','), error)
-        erros++
-        errosDetalhes.push(`Linha "${row.join(',')}": ${error.message}`)
+        console.error(`Erro ao processar linha ${index + 2}:`, error);
+        errors.push(`Linha ${index + 2}: ${error.message}`);
+        errorCount++;
       }
+    }
+
+    // Aplicar o De-Para aos dados existentes de volumetria
+    try {
+      const { data: applyResult, error: applyError } = await supabaseClient
+        .rpc('aplicar_de_para_prioridade');
+
+      if (applyError) {
+        console.error('Erro ao aplicar De-Para:', applyError);
+        errors.push(`Erro ao aplicar De-Para: ${applyError.message}`);
+      } else {
+        console.log('De-Para aplicado com sucesso:', applyResult);
+      }
+    } catch (error) {
+      console.error('Erro ao aplicar De-Para:', error);
+      errors.push(`Erro ao aplicar De-Para: ${error.message}`);
     }
 
     // Atualizar log com resultado final
-    await supabase
+    await supabaseClient
       .from('processamento_uploads')
       .update({
-        status: erros === processados ? 'erro' : 'concluido',
-        registros_processados: processados,
-        registros_inseridos: inseridos,
-        registros_atualizados: atualizados,
-        registros_erro: erros,
+        status: errorCount === processedCount + errorCount ? 'erro' : 'concluido',
+        registros_processados: processedCount + errorCount,
+        registros_inseridos: processedCount,
+        registros_atualizados: 0,
+        registros_erro: errorCount,
         completed_at: new Date().toISOString()
       })
-      .eq('id', uploadLog.id)
+      .eq('id', uploadLog.id);
 
-    console.log(`✅ Prioridades processadas - ${inseridos} inseridas, ${atualizados} atualizadas, ${erros} erros`)
+    console.log(`Processamento concluído: ${processedCount} sucessos, ${errorCount} erros`);
 
-
-    const response = {
-      sucesso: true,
-      processados: processados,
-      inseridos,
-      atualizados,
-      erros,
-      errosDetalhes: erros > 0 ? errosDetalhes : undefined
-    }
-
-    return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({
+        registros_processados: processedCount,
+        total_registros: jsonData.length,
+        erros: errors,
+        sucesso: processedCount > 0
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
-    console.error('❌ Erro geral:', error)
+    console.error('Erro geral:', error);
     return new Response(
-      JSON.stringify({ erro: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    )
+      JSON.stringify({ 
+        error: 'Erro interno do servidor',
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
-})
+});
+
+function processRow(row: any): PrioridadeDeParaRecord | null {
+  try {
+    // Mapear colunas do CSV
+    const prioridadeOriginal = row['PRIORIDADE_ORIGINAL'] || row['prioridade_original'] || '';
+    const nomeFinal = row['NOME_FINAL'] || row['nome_final'] || '';
+
+    if (!prioridadeOriginal || !nomeFinal) {
+      console.warn('Linha inválida: campos obrigatórios não encontrados', row);
+      return null;
+    }
+
+    return {
+      prioridade_original: String(prioridadeOriginal).trim(),
+      nome_final: String(nomeFinal).trim()
+    };
+  } catch (error) {
+    console.error('Erro ao processar linha:', error);
+    return null;
+  }
+}
