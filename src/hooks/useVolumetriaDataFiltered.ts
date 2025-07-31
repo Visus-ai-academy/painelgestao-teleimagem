@@ -56,6 +56,13 @@ interface EspecialidadeData {
   percentual_atraso?: number;
 }
 
+interface MedicoData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  percentual: number;
+}
+
 export interface VolumetriaData {
   stats: DashboardStats;
   clientes: ClienteData[];
@@ -63,6 +70,7 @@ export interface VolumetriaData {
   especialidades: EspecialidadeData[];
   categorias: ModalidadeData[];
   prioridades: ModalidadeData[];
+  medicos: MedicoData[];
   atrasoClientes: ClienteData[];
   atrasoModalidades: ModalidadeData[];
   atrasoEspecialidades: EspecialidadeData[];
@@ -92,6 +100,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     especialidades: [],
     categorias: [],
     prioridades: [],
+    medicos: [],
     atrasoClientes: [],
     atrasoModalidades: [],
     atrasoEspecialidades: [],
@@ -201,7 +210,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             total_clientes: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
             total_categorias: 0, total_prioridades: 0
           },
-          clientes: [], modalidades: [], especialidades: [], categorias: [], prioridades: [],
+          clientes: [], modalidades: [], especialidades: [], categorias: [], prioridades: [], medicos: [],
           atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoCategorias: [], atrasoPrioridades: []
         });
         return;
@@ -259,7 +268,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const especialidadesMap = new Map();
       const categoriasMap = new Map();
       const prioridadesMap = new Map();
-      const medicosSet = new Set();
+      const medicosMap = new Map();
 
       allData.forEach(item => {
         const isAtrasado = atrasados.includes(item);
@@ -291,7 +300,13 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           especialidadesMap.set(item.ESPECIALIDADE, current);
         }
 
-        if (item.MEDICO) medicosSet.add(item.MEDICO);
+        // Médicos
+        if (item.MEDICO) {
+          const current = medicosMap.get(item.MEDICO) || { total_exames: 0, total_registros: 0 };
+          current.total_exames += item.VALORES || 0;
+          current.total_registros += 1;
+          medicosMap.set(item.MEDICO, current);
+        }
       });
 
       // Converter para arrays
@@ -309,6 +324,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
+      const medicos = Array.from(medicosMap.entries()).map(([nome, data]) => ({
+        nome, ...data, percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0
+      })).sort((a, b) => b.total_exames - a.total_exames);
+
       // Categorias e prioridades vazias (não existem na tabela atual)
       const categorias: any[] = [];
       const prioridades: any[] = [];
@@ -322,11 +341,11 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           total_clientes: clientesMap.size,
           total_modalidades: modalidadesMap.size,
           total_especialidades: especialidadesMap.size,
-          total_medicos: medicosSet.size,
+          total_medicos: medicosMap.size,
           total_categorias: 0,
           total_prioridades: 0
         },
-        clientes, modalidades, especialidades, categorias, prioridades,
+        clientes, modalidades, especialidades, categorias, prioridades, medicos,
         atrasoClientes: clientes.filter(c => c.atrasados > 0),
         atrasoModalidades: modalidades.filter(m => m.atrasados && m.atrasados > 0),
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),

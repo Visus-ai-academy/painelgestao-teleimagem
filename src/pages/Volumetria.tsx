@@ -7,6 +7,7 @@ import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
 import { VolumetriaCharts } from '@/components/volumetria/VolumetriaCharts';
 import { VolumetriaDelayAnalysis } from '@/components/volumetria/VolumetriaDelayAnalysis';
 import { VolumetriaExecutiveSummary } from '@/components/volumetria/VolumetriaExecutiveSummary';
+import { VolumetriaMedicosAnalysis } from '@/components/volumetria/VolumetriaMedicosAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -38,6 +39,7 @@ export default function Volumetria() {
     especialidades, 
     categorias, 
     prioridades,
+    medicos,
     atrasoClientes,
     atrasoModalidades,
     atrasoEspecialidades,
@@ -100,9 +102,10 @@ export default function Volumetria() {
 
           {/* Dashboard Profissional com Tabs */}
           <Tabs defaultValue="executive" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="executive">Resumo Executivo</TabsTrigger>
               <TabsTrigger value="charts">Análise de Volume</TabsTrigger>
+              <TabsTrigger value="medicos">Análise de Médicos</TabsTrigger>
               <TabsTrigger value="delays">Análise de Atrasos</TabsTrigger>
             </TabsList>
 
@@ -124,6 +127,17 @@ export default function Volumetria() {
                 especialidades={especialidades}
                 categorias={categorias}
                 prioridades={prioridades}
+              />
+            </TabsContent>
+
+            <TabsContent value="medicos" className="mt-6">
+              <VolumetriaMedicosAnalysis 
+                medicos={medicos}
+                modalidades={modalidades}
+                especialidades={especialidades}
+                categorias={categorias}
+                prioridades={prioridades}
+                totalExames={stats.total_exames}
               />
             </TabsContent>
 
