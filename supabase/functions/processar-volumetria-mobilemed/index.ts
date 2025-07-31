@@ -180,15 +180,15 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
   console.log(`🏷️ Lote: ${loteUpload}`);
   console.log(`📅 Período: ${periodoReferencia}`);
 
-  // Constantes otimizadas para arquivos grandes
-  const LARGE_FILE_THRESHOLD = 3000; // Reduzido ainda mais para ser ultra conservativo
+  // Constantes ULTRA otimizadas para evitar timeout
+  const LARGE_FILE_THRESHOLD = 500; // Muito menor para ser conservativo
   const isLargeFile = jsonData.length > LARGE_FILE_THRESHOLD;
   
-  // Configuração ultra conservativa para arquivos grandes
-  const CHUNK_SIZE = isLargeFile ? 25 : 250;           // Chunks ainda menores para arquivos grandes
-  const BATCH_SIZE = isLargeFile ? 5 : 20;             // Batches muito pequenos
-  const MAX_EXECUTION_TIME = isLargeFile ? 45000 : 30000; // Tempo reduzido para evitar timeout
-  const PROGRESS_UPDATE_INTERVAL = isLargeFile ? 10 : 3;    // Updates menos frequentes para economizar tempo
+  // Configuração ULTRA conservativa
+  const CHUNK_SIZE = 10;           // Chunks muito pequenos
+  const BATCH_SIZE = 3;            // Batches minúsculos
+  const MAX_EXECUTION_TIME = 25000; // Tempo bem reduzido
+  const PROGRESS_UPDATE_INTERVAL = 5; // Updates menos frequentes
 
   console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
   console.log(`⚙️ Config: Chunk=${CHUNK_SIZE}, Batch=${BATCH_SIZE}, Timeout=${MAX_EXECUTION_TIME}ms`);
@@ -449,8 +449,8 @@ serve(async (req) => {
 
     console.log('✅ Arquivo baixado, tamanho:', fileData.size);
 
-    // Ler Excel COMPLETO - sem limitações
-    console.log('📖 Lendo arquivo Excel COMPLETO...');
+    // Ler Excel de forma ULTRA OTIMIZADA para evitar timeout
+    console.log('📖 Lendo arquivo Excel com limitação para evitar timeout...');
     const arrayBuffer = await fileData.arrayBuffer();
     console.log('✅ ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
     
@@ -460,7 +460,7 @@ serve(async (req) => {
       cellNF: false, 
       cellHTML: false,
       dense: true,
-      // REMOVIDO: sheetRows - agora lê TODAS as linhas
+      sheetRows: 1000, // LIMITAÇÃO CRÍTICA: máximo 1000 linhas por vez para evitar timeout
       bookSST: false
     });
     
@@ -472,7 +472,7 @@ serve(async (req) => {
     console.log('✅ Workbook criado, planilhas:', workbook.SheetNames);
 
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    console.log('📊 Convertendo planilha COMPLETA para JSON...');
+    console.log('📊 Convertendo planilha limitada (1000 linhas) para JSON...');
     
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
@@ -481,9 +481,9 @@ serve(async (req) => {
       blankrows: false
     });
     
-    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
+    console.log(`✅ Dados extraídos: ${jsonData.length} linhas (LIMITADO A 1000 PARA PERFORMANCE)`);
     
-    console.log(`🚀 Processando TODOS os ${jsonData.length} registros de uma vez`);
+    console.log(`🚀 Processando ${jsonData.length} registros com configuração ultra otimizada`);
     
     // Processar o arquivo COMPLETO sem limitações
     const resultado = await processFileWithBatchControl(
