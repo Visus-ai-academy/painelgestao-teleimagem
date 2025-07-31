@@ -200,95 +200,102 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       {/* Gráficos de Análise */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Clientes com Atrasos - Tabela */}
-        <Card>
+        <Card className="w-full max-w-4xl">
           <CardHeader>
             <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('nome')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Cliente
-                      {renderSortIcon('nome')}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-center cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('total_exames')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Total
-                      {renderSortIcon('total_exames')}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-center cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('atrasados')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Atrasos
-                      {renderSortIcon('atrasados')}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-center cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('percentual_atraso')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      % Atraso
-                      {renderSortIcon('percentual_atraso')}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-center cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('tempoMedioAtraso')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Tempo Médio
-                      {renderSortIcon('tempoMedioAtraso')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-center">Nível</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientesComTempoAtraso.map((cliente, index) => {
-                  const formatarTempo = (minutos: number) => {
-                    if (minutos < 60) return `${Math.round(minutos)}min`;
-                    if (minutos < 1440) return `${Math.round(minutos / 60)}h`;
-                    return `${Math.round(minutos / 1440)}d`;
-                  };
-                  
-                  return (
-                    <TableRow key={cliente.nome}>
-                      <TableCell className="font-medium">{cliente.nome}</TableCell>
-                      <TableCell className="text-center">{cliente.total_exames.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">{cliente.atrasados.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
-                          {cliente.percentual_atraso.toFixed(1)}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={
-                          cliente.nivelAtraso === 'Crítico' ? "destructive" :
-                          cliente.nivelAtraso === 'Alto' ? "secondary" :
-                          cliente.nivelAtraso === 'Médio' ? "outline" : "default"
-                        }>
-                          {cliente.nivelAtraso}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="max-h-96 overflow-y-auto">
+              <Table className="w-full min-w-[800px]">
+                <TableHeader className="sticky top-0 bg-white">
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-50 min-w-[200px]"
+                      onClick={() => handleSort('nome')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Cliente
+                        {renderSortIcon('nome')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[100px]"
+                      onClick={() => handleSort('total_exames')}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Total
+                        {renderSortIcon('total_exames')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[100px]"
+                      onClick={() => handleSort('atrasados')}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Atrasos
+                        {renderSortIcon('atrasados')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[120px]"
+                      onClick={() => handleSort('percentual_atraso')}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        % Atraso
+                        {renderSortIcon('percentual_atraso')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-gray-50 min-w-[120px]"
+                      onClick={() => handleSort('tempoMedioAtraso')}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        Tempo Médio
+                        {renderSortIcon('tempoMedioAtraso')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">Nível</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientesComTempoAtraso.slice(0, 10).map((cliente, index) => {
+                    const formatarTempo = (minutos: number) => {
+                      if (minutos < 60) return `${Math.round(minutos)}min`;
+                      if (minutos < 1440) return `${Math.round(minutos / 60)}h`;
+                      return `${Math.round(minutos / 1440)}d`;
+                    };
+                    
+                    return (
+                      <TableRow key={cliente.nome}>
+                        <TableCell className="font-medium">{cliente.nome}</TableCell>
+                        <TableCell className="text-center">{cliente.total_exames.toLocaleString()}</TableCell>
+                        <TableCell className="text-center">{cliente.atrasados.toLocaleString()}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
+                            {cliente.percentual_atraso.toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={
+                            cliente.nivelAtraso === 'Crítico' ? "destructive" :
+                            cliente.nivelAtraso === 'Alto' ? "secondary" :
+                            cliente.nivelAtraso === 'Médio' ? "outline" : "default"
+                          }>
+                            {cliente.nivelAtraso}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {clientesComTempoAtraso.length > 10 && (
+              <div className="mt-4 text-sm text-muted-foreground text-center">
+                Mostrando 10 de {clientesComTempoAtraso.length} clientes. Role para ver mais.
+              </div>
+            )}
           </CardContent>
         </Card>
 
