@@ -234,7 +234,17 @@ async function processFileInBackground(
   try {
     console.log('Iniciando processamento em background');
     
-    // Baixar arquivo do storage
+    // Atualizar status para indicar início do download
+    await supabaseClient
+      .from('processamento_uploads')
+      .update({ 
+        registros_processados: 1, // Indica que iniciou
+        detalhes_erro: JSON.stringify({ status: 'Iniciando download do arquivo...' })
+      })
+      .eq('id', uploadLogId);
+    
+    // Baixar arquivo do storage com timeout
+    console.log('Iniciando download do arquivo:', file_path);
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
@@ -243,11 +253,23 @@ async function processFileInBackground(
       throw new Error(`Erro ao baixar arquivo: ${downloadError.message}`);
     }
 
-    console.log('Arquivo baixado com sucesso');
+    console.log('Arquivo baixado com sucesso, tamanho:', fileData.size);
+    
+    // Atualizar status para indicar processamento do Excel
+    await supabaseClient
+      .from('processamento_uploads')
+      .update({ 
+        registros_processados: 2,
+        detalhes_erro: JSON.stringify({ status: 'Processando arquivo Excel...' })
+      })
+      .eq('id', uploadLogId);
 
     // Ler arquivo Excel
     const arrayBuffer = await fileData.arrayBuffer();
+    console.log('ArrayBuffer criado, tamanho:', arrayBuffer.byteLength);
+    
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    console.log('Workbook lido, planilhas:', workbook.SheetNames.length);
     
     if (!workbook.SheetNames.length) {
       throw new Error('Arquivo Excel não possui planilhas');
@@ -257,12 +279,21 @@ async function processFileInBackground(
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
     console.log(`Dados extraídos: ${jsonData.length} linhas`);
+    
+    // Atualizar status com total de linhas encontradas
+    await supabaseClient
+      .from('processamento_uploads')
+      .update({ 
+        registros_processados: jsonData.length,
+        detalhes_erro: JSON.stringify({ status: `Encontradas ${jsonData.length} linhas. Iniciando validação...` })
+      })
+      .eq('id', uploadLogId);
 
     if (jsonData.length === 0) {
       throw new Error('Arquivo Excel está vazio');
     }
 
-    // Processar todos os dados - removida limitação artificial
+    // Processar todos os dados
     let dataToProcess = jsonData;
     let isLimitedSample = false;
     
@@ -292,9 +323,24 @@ async function processFileInBackground(
       
       totalProcessed++;
       
-      // Log de progresso a cada 1000 registros
+      // Log de progresso a cada 1000 registros E atualizar banco
       if (totalProcessed % 1000 === 0) {
         console.log(`🔍 Validados ${totalProcessed}/${dataToProcess.length} registros (${totalValid} válidos, ${totalInvalid} inválidos)`);
+        
+        // Atualizar progresso no banco
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({ 
+            registros_processados: totalProcessed,
+            registros_inseridos: totalValid,
+            registros_erro: totalInvalid,
+            detalhes_erro: JSON.stringify({ 
+              status: `Validando... ${totalProcessed}/${dataToProcess.length}`,
+              validos: totalValid,
+              invalidos: totalInvalid 
+            })
+          })
+          .eq('id', uploadLogId);
       }
     }
 
