@@ -34,7 +34,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processando arquivo:', file.name);
+    console.log('Processando arquivo Excel:', file.name);
 
     // Registrar início do upload na tabela de logs
     const { data: uploadLog, error: logError } = await supabaseClient
@@ -171,7 +171,7 @@ serve(async (req) => {
 
 function processRow(row: any): PrioridadeDeParaRecord | null {
   try {
-    // Mapear colunas do CSV
+    // Mapear colunas do Excel
     const prioridadeOriginal = row['PRIORIDADE_ORIGINAL'] || row['prioridade_original'] || '';
     const nomeFinal = row['NOME_FINAL'] || row['nome_final'] || '';
 

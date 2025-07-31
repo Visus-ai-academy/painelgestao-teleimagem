@@ -97,7 +97,7 @@ export function DeParaPrioridadeUpload() {
           Upload De-Para Prioridade
         </CardTitle>
         <CardDescription>
-          Faça upload do arquivo de mapeamento de prioridades. Este arquivo será usado para padronizar 
+          Faça upload do arquivo Excel de mapeamento de prioridades. Este arquivo será usado para padronizar 
           os valores de prioridade em todos os uploads de volumetria do MobileMed.
         </CardDescription>
       </CardHeader>
@@ -124,12 +124,12 @@ export function DeParaPrioridadeUpload() {
         <div className="space-y-4">
           <div>
             <label htmlFor="file-upload" className="block text-sm font-medium mb-2">
-              Selecionar Arquivo CSV
+              Selecionar Arquivo Excel
             </label>
             <input
               id="file-upload"
               type="file"
-              accept=".csv"
+              accept=".xlsx,.xls"
               onChange={handleFileChange}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
             />
