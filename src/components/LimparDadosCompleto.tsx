@@ -34,25 +34,19 @@ export default function LimparDadosCompleto() {
   const limparDiretamente = async () => {
     setIsLoading(true);
     try {
-      console.log('Limpando dados diretamente...');
+      console.log('Limpando todos os dados de volumetria...');
       
-      // Limpar volumetria_mobilemed
+      // Limpar TODOS os dados de volumetria_mobilemed (sem filtro de arquivo_fonte)
       const { error: volumetriaError } = await supabase
         .from('volumetria_mobilemed')
         .delete()
-        .in('arquivo_fonte', [
-          'volumetria_padrao',
-          'volumetria_fora_padrao', 
-          'volumetria_padrao_retroativo',
-          'volumetria_fora_padrao_retroativo',
-          'volumetria_onco_padrao'
-        ]);
-
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Deletar todos
+        
       if (volumetriaError) {
         throw new Error(`Erro ao limpar volumetria: ${volumetriaError.message}`);
       }
 
-      // Limpar processamento_uploads
+      // Limpar TODOS os status de processamento de volumetria
       const { error: statusError } = await supabase
         .from('processamento_uploads')
         .delete()
@@ -61,16 +55,34 @@ export default function LimparDadosCompleto() {
           'volumetria_fora_padrao', 
           'volumetria_padrao_retroativo',
           'volumetria_fora_padrao_retroativo',
-          'volumetria_onco_padrao'
+          'volumetria_onco_padrao',
+          'data_laudo',
+          'data_exame'
         ]);
 
       if (statusError) {
         console.warn('Aviso ao limpar status:', statusError.message);
       }
 
+      // Limpar também import_history
+      const { error: importError } = await supabase
+        .from('import_history')
+        .delete()
+        .in('file_type', [
+          'volumetria_padrao',
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo',
+          'volumetria_fora_padrao_retroativo',
+          'volumetria_onco_padrao'
+        ]);
+
+      if (importError) {
+        console.warn('Aviso ao limpar import history:', importError.message);
+      }
+
       toast({
         title: "Limpeza completa realizada!",
-        description: "Todos os dados e status de volumetria foram removidos",
+        description: "Todos os dados duplicados foram removidos da base",
       });
 
       // Verificar novamente
