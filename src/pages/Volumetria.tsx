@@ -90,19 +90,27 @@ export default function Volumetria() {
             {stats.total_exames.toLocaleString()} laudos | 
             {stats.total_clientes} clientes ativos
           </p>
+          <p className="text-xs text-orange-600 mt-1">
+            ⚠️ Dados desatualizados - Clique em "Atualizar Dados" para carregar informações recentes
+          </p>
         </div>
-        <Button 
-          onClick={() => {
-            console.log('🔄 Refresh manual iniciado...');
-            refreshData();
-          }}
-          variant="outline" 
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Atualizar Dados
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          <span className="text-xs text-muted-foreground">
+            Última atualização: {new Date().toLocaleTimeString()}
+          </span>
+          <Button 
+            onClick={() => {
+              console.log('🔄 Refresh manual iniciado...');
+              refreshData();
+            }}
+            variant="default" 
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar Dados
+          </Button>
+        </div>
       </div>
 
       {/* Filtros Avançados */}
