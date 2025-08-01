@@ -10,20 +10,25 @@ import { format } from 'date-fns';
 
 interface CalendarioEscalaProps {
   onCriarEscala: (escala: any) => void;
-  canManage: boolean;
+  canManage?: boolean;
+  medicoId?: string;
+  // Legacy props for EscalaMedica.tsx
+  escalas?: any[];
+  onSelecionarData?: (date: Date) => void;
+  canEdit?: boolean;
 }
 
 export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
   onCriarEscala,
   canManage
 }) => {
-  const [datasSelecionadas, setDatasSelecionadas] = useState<Date[]>([]);
+  const [datasSelecionadas, setDatasSelecionadas] = useState<Date[] | undefined>(undefined);
   const [turno, setTurno] = useState<string>('');
   const [modalidade, setModalidade] = useState<string>('');
   const [especialidade, setEspecialidade] = useState<string>('');
 
   const handleCriarEscala = () => {
-    if (datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade) {
+    if (!datasSelecionadas || datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade) {
       return;
     }
 
@@ -39,7 +44,7 @@ export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
       onCriarEscala(escala);
     });
 
-    setDatasSelecionadas([]);
+    setDatasSelecionadas(undefined);
     setTurno('');
     setModalidade('');
     setEspecialidade('');
@@ -58,7 +63,7 @@ export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
           <Calendar
             mode="multiple"
             selected={datasSelecionadas}
-            onSelect={(dates) => setDatasSelecionadas(dates || [])}
+            onSelect={setDatasSelecionadas}
             className="rounded-md border"
           />
         </CardContent>
@@ -106,7 +111,7 @@ export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
 
           <Button 
             onClick={handleCriarEscala}
-            disabled={datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade}
+            disabled={!datasSelecionadas || datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade}
             className="w-full"
           >
             <CalendarDays className="h-4 w-4 mr-2" />
