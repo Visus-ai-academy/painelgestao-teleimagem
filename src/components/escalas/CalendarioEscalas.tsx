@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, differenc
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { EscalaMedicaCompleta } from '@/hooks/useEscalasMedicasCompleta';
+import { useMedicosEscala } from '@/hooks/useMedicosEscala';
+import { useMedicoData } from '@/hooks/useMedicoData';
 
 interface CalendarioEscalasProps {
   escalas: EscalaMedicaCompleta[];
@@ -41,6 +43,11 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
   medicoId
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedMedico, setSelectedMedico] = useState<string>(medicoId || '');
+  const [selectedModalidade, setSelectedModalidade] = useState<string>('');
+  const [selectedEspecialidade, setSelectedEspecialidade] = useState<string>('');
+  const [selectedCategoria, setSelectedCategoria] = useState<string>('');
+  const [selectedPrioridade, setSelectedPrioridade] = useState<string>('');
   const [selectedTurno, setSelectedTurno] = useState<string>('');
   const [selectedTipoPlantao, setSelectedTipoPlantao] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -48,6 +55,47 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
   const [diasSemana, setDiasSemana] = useState<number[]>([]);
   const [dataInicio, setDataInicio] = useState<Date | undefined>();
   const [dataFim, setDataFim] = useState<Date | undefined>();
+
+  // Hooks para buscar dados
+  const { medicos, getMedicoById } = useMedicosEscala();
+  const { 
+    modalidadesDisponiveis, 
+    especialidadesDisponiveis, 
+    categoriasMedicoDisponiveis,
+    prioridadesDisponiveis 
+  } = useMedicoData();
+
+  // Efeito para preencher automaticamente os campos quando um médico é selecionado
+  useEffect(() => {
+    if (selectedMedico) {
+      const medico = getMedicoById(selectedMedico);
+      if (medico) {
+        // Selecionar automaticamente a primeira modalidade, especialidade e categoria do médico
+        if (medico.modalidades && medico.modalidades.length > 0) {
+          setSelectedModalidade(medico.modalidades[0]);
+        }
+        if (medico.especialidades && medico.especialidades.length > 0) {
+          setSelectedEspecialidade(medico.especialidades[0]);
+        }
+        if (medico.categoria) {
+          setSelectedCategoria(medico.categoria);
+        }
+        // Selecionar primeira prioridade disponível
+        if (prioridadesDisponiveis.length > 0) {
+          setSelectedPrioridade(prioridadesDisponiveis[0]);
+        }
+      }
+    }
+  }, [selectedMedico, getMedicoById, prioridadesDisponiveis]);
+
+  // Filtrar modalidades e especialidades baseadas no médico selecionado
+  const modalidadesDisponivelsMedico = selectedMedico ? 
+    getMedicoById(selectedMedico)?.modalidades || [] : 
+    modalidadesDisponiveis;
+  
+  const especialidadesDisponivelsMedico = selectedMedico ? 
+    getMedicoById(selectedMedico)?.especialidades || [] : 
+    especialidadesDisponiveis;
 
   const escalasDoMes = escalas.filter(escala => {
     const dataEscala = new Date(escala.data);
@@ -107,6 +155,9 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
     const escalas: Partial<EscalaMedicaCompleta>[] = [];
     let dataAtual = new Date();
     
+    // Para médicos, usar o medicoId. Para gestores, usar o médico selecionado
+    const medicoEscolhido = isMedico ? (medicoId || '') : selectedMedico;
+    
     if (tipoEscala === 'periodo' && dataInicio && dataFim) {
       dataAtual = new Date(dataInicio);
       const dataLimite = new Date(dataFim);
@@ -115,12 +166,12 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
         const diaSemana = dataAtual.getDay();
         if (diasSemana.includes(diaSemana)) {
           escalas.push({
-            medico_id: medicoId || '',
+            medico_id: medicoEscolhido,
             data: format(dataAtual, 'yyyy-MM-dd'),
             turno: selectedTurno as any,
             tipo_escala: selectedTipoPlantao === 'plantao' ? 'plantao' : 'normal',
-            modalidade: '',
-            especialidade: '',
+            modalidade: selectedModalidade,
+            especialidade: selectedEspecialidade,
             status: 'pendente',
             tipo_plantao: selectedTipoPlantao as any,
             mes_referencia: dataAtual.getMonth() + 1,
@@ -138,12 +189,12 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
         const diaSemana = dataAtual.getDay();
         if (diasSemana.includes(diaSemana)) {
           escalas.push({
-            medico_id: medicoId || '',
+            medico_id: medicoEscolhido,
             data: format(dataAtual, 'yyyy-MM-dd'),
             turno: selectedTurno as any,
             tipo_escala: selectedTipoPlantao === 'plantao' ? 'plantao' : 'normal',
-            modalidade: '',
-            especialidade: '',
+            modalidade: selectedModalidade,
+            especialidade: selectedEspecialidade,
             status: 'pendente',
             tipo_plantao: selectedTipoPlantao as any,
             mes_referencia: dataAtual.getMonth() + 1,
@@ -159,7 +210,7 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
   };
 
   const handleCriarEscala = () => {
-    if (!selectedTurno) return;
+    if (!selectedTurno || !selectedModalidade || !selectedEspecialidade) return;
 
     const erroValidacao = validarPeriodo();
     if (erroValidacao) {
@@ -167,14 +218,17 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
       return;
     }
 
+    // Para médicos, usar o medicoId. Para gestores, usar o médico selecionado
+    const medicoEscolhido = isMedico ? (medicoId || '') : selectedMedico;
+
     if (tipoEscala === 'unica') {
       const novaEscala: Partial<EscalaMedicaCompleta> = {
-        medico_id: medicoId || '',
+        medico_id: medicoEscolhido,
         data: format(selectedDate, 'yyyy-MM-dd'),
         turno: selectedTurno as any,
         tipo_escala: selectedTipoPlantao === 'plantao' ? 'plantao' : 'normal',
-        modalidade: '',
-        especialidade: '',
+        modalidade: selectedModalidade,
+        especialidade: selectedEspecialidade,
         status: 'pendente',
         tipo_plantao: selectedTipoPlantao as any,
         mes_referencia: selectedDate.getMonth() + 1,
@@ -191,6 +245,13 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
   };
 
   const resetForm = () => {
+    if (!isMedico) {
+      setSelectedMedico('');
+    }
+    setSelectedModalidade('');
+    setSelectedEspecialidade('');
+    setSelectedCategoria('');
+    setSelectedPrioridade('');
     setSelectedTurno('');
     setSelectedTipoPlantao('');
     setTipoEscala('unica');
@@ -240,13 +301,12 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
             <Clock className="h-5 w-5" />
             {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
           </CardTitle>
-          {isMedico && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="mt-2">
-                  Nova Escala
-                </Button>
-              </DialogTrigger>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="mt-2">
+                Nova Escala
+              </Button>
+            </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Criar Nova Escala</DialogTitle>
@@ -361,6 +421,93 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
                     </div>
                   )}
 
+                  {/* Seleção de Médico (apenas para gestores) */}
+                  {!isMedico && (
+                    <div>
+                      <Label className="text-sm font-medium">Médico</Label>
+                      <Select value={selectedMedico} onValueChange={setSelectedMedico}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o médico" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {medicos.map((medico) => (
+                            <SelectItem key={medico.id} value={medico.id}>
+                              {medico.nome} - {medico.crm}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Modalidade */}
+                  <div>
+                    <Label className="text-sm font-medium">Modalidade</Label>
+                    <Select value={selectedModalidade} onValueChange={setSelectedModalidade}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a modalidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modalidadesDisponivelsMedico.map((modalidade) => (
+                          <SelectItem key={modalidade} value={modalidade}>
+                            {modalidade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Especialidade */}
+                  <div>
+                    <Label className="text-sm font-medium">Especialidade</Label>
+                    <Select value={selectedEspecialidade} onValueChange={setSelectedEspecialidade}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a especialidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {especialidadesDisponivelsMedico.map((especialidade) => (
+                          <SelectItem key={especialidade} value={especialidade}>
+                            {especialidade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Categoria */}
+                  <div>
+                    <Label className="text-sm font-medium">Categoria</Label>
+                    <Select value={selectedCategoria} onValueChange={setSelectedCategoria}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoriasMedicoDisponiveis.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria}>
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Prioridade */}
+                  <div>
+                    <Label className="text-sm font-medium">Prioridade</Label>
+                    <Select value={selectedPrioridade} onValueChange={setSelectedPrioridade}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {prioridadesDisponiveis.map((prioridade) => (
+                          <SelectItem key={prioridade} value={prioridade}>
+                            {prioridade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Turno */}
                   <div>
                     <Label className="text-sm font-medium">Turno</Label>
@@ -401,15 +548,21 @@ export const CalendarioEscalas: React.FC<CalendarioEscalasProps> = ({
 
                   <Button 
                     onClick={handleCriarEscala} 
-                    disabled={!selectedTurno || (tipoEscala !== 'unica' && diasSemana.length === 0) || !!validarPeriodo()}
+                    disabled={
+                      !selectedTurno || 
+                      !selectedModalidade || 
+                      !selectedEspecialidade || 
+                      (!isMedico && !selectedMedico) ||
+                      (tipoEscala !== 'unica' && diasSemana.length === 0) || 
+                      !!validarPeriodo()
+                    }
                     className="w-full"
                   >
                     {tipoEscala === 'unica' ? 'Criar Escala' : 'Criar Escalas'}
                   </Button>
                 </div>
               </DialogContent>
-            </Dialog>
-          )}
+          </Dialog>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
