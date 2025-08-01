@@ -23,7 +23,9 @@ import { CalendarioEscala } from '@/components/escalas/CalendarioEscala';
 import { GerenciadorAusencias } from '@/components/escalas/GerenciadorAusencias';
 import { EscalaMensal } from '@/components/escalas/EscalaMensal';
 import { ControlePresenca } from '@/components/escalas/ControlePresenca';
+import { SistemaCoberturas } from '@/components/escalas/SistemaCoberturas';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Escala() {
   const { toast } = useToast();
@@ -41,8 +43,34 @@ export default function Escala() {
     isMedico
   } = useEscalasAvancadas();
 
-  // Buscar ID do médico atual (simulado - seria obtido do contexto/auth)
-  const medicoAtualId = "current-medico-id"; // Aqui você pegaria do contexto de autenticação
+  // Estado para ID do médico atual
+  const [medicoAtualId, setMedicoAtualId] = useState<string | undefined>(undefined);
+
+  // Buscar ID do médico atual
+  React.useEffect(() => {
+    const buscarMedicoAtual = async () => {
+      if (isMedico) {
+        try {
+          const { data: user } = await supabase.auth.getUser();
+          if (user.user) {
+            const { data: medico } = await supabase
+              .from('medicos')
+              .select('id')
+              .eq('user_id', user.user.id)
+              .single();
+            
+            if (medico) {
+              setMedicoAtualId(medico.id);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao buscar médico atual:', error);
+        }
+      }
+    };
+
+    buscarMedicoAtual();
+  }, [isMedico]);
 
   const handleCriarEscala = async (escala: any) => {
     await criarEscala(escala);
@@ -146,7 +174,7 @@ export default function Escala() {
 
         {/* Sistema de Abas */}
         <Tabs defaultValue="calendario" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="calendario" className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4" />
               Criar Escalas
@@ -154,6 +182,10 @@ export default function Escala() {
             <TabsTrigger value="mensal" className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4" />
               Visão Mensal
+            </TabsTrigger>
+            <TabsTrigger value="coberturas" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Coberturas
             </TabsTrigger>
             <TabsTrigger value="presenca" className="flex items-center gap-2">
               <UserCheck className="h-4 w-4" />
@@ -184,6 +216,13 @@ export default function Escala() {
               escalas={escalas}
               onFetchEscalas={(mesAno: { mes: number; ano: number }) => fetchEscalas(undefined, mesAno)}
               onEnviarPorEmail={handleEnviarPorEmail}
+              canManage={canManageAll}
+            />
+          </TabsContent>
+
+          <TabsContent value="coberturas" className="space-y-6">
+            <SistemaCoberturas
+              medicoId={medicoAtualId}
               canManage={canManageAll}
             />
           </TabsContent>

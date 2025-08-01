@@ -187,8 +187,28 @@ export const useEscalasAvancadas = () => {
 
   const criarEscala = async (escalaData: Partial<EscalaAvancada> & { data: string }) => {
     try {
+      // Se medico_id não foi fornecido, buscar pelo usuário logado
+      let medicoId = escalaData.medico_id;
+      if (!medicoId) {
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+          .single();
+        
+        if (medicoError || !medico) {
+          toast({
+            title: "Erro",
+            description: "Médico não encontrado. Verifique se você está logado como médico.",
+            variant: "destructive",
+          });
+          return false;
+        }
+        medicoId = medico.id;
+      }
+
       const dataObj = {
-        medico_id: escalaData.medico_id!,
+        medico_id: medicoId,
         data: escalaData.data,
         turno: escalaData.turno || 'manha',
         tipo_escala: escalaData.tipo_escala || 'normal',
