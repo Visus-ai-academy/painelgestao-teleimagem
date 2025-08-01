@@ -162,7 +162,7 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
                         <SelectValue placeholder="Selecione o turno" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Dia Inteiro</SelectItem>
+                        <SelectItem value="dia_inteiro">Dia Inteiro</SelectItem>
                         <SelectItem value="manha">Manhã</SelectItem>
                         <SelectItem value="tarde">Tarde</SelectItem>
                         <SelectItem value="noite">Noite</SelectItem>
