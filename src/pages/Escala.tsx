@@ -22,6 +22,8 @@ import { useEscalasAvancadas } from '@/hooks/useEscalasAvancadas';
 import { CalendarioEscala } from '@/components/escalas/CalendarioEscala';
 import { GerenciadorAusencias } from '@/components/escalas/GerenciadorAusencias';
 import { EscalaMensal } from '@/components/escalas/EscalaMensal';
+import { ControlePresencaMedico } from '@/components/presenca/ControlePresencaMedico';
+import { MonitorPresencaGeral } from '@/components/presenca/MonitorPresencaGeral';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Escala() {
@@ -145,7 +147,7 @@ export default function Escala() {
 
         {/* Sistema de Abas */}
         <Tabs defaultValue="calendario" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="calendario" className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4" />
               Criar Escalas
@@ -153,6 +155,10 @@ export default function Escala() {
             <TabsTrigger value="mensal" className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4" />
               Visão Mensal
+            </TabsTrigger>
+            <TabsTrigger value="presenca" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Presença
             </TabsTrigger>
             <TabsTrigger value="ausencias" className="flex items-center gap-2">
               <UserX className="h-4 w-4" />
@@ -181,6 +187,16 @@ export default function Escala() {
               onEnviarPorEmail={handleEnviarPorEmail}
               canManage={canManageAll}
             />
+          </TabsContent>
+
+          <TabsContent value="presenca" className="space-y-6">
+            {isMedico ? (
+              <div className="flex justify-center">
+                <ControlePresencaMedico />
+              </div>
+            ) : (
+              <MonitorPresencaGeral />
+            )}
           </TabsContent>
 
           <TabsContent value="ausencias" className="space-y-6">
