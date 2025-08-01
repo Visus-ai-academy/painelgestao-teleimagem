@@ -2899,6 +2899,10 @@ export type Database = {
         }
         Returns: string
       }
+      enviar_escala_mensal: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_clientes_com_volumetria: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3011,6 +3015,16 @@ export type Database = {
       refresh_volumetria_dashboard: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      replicar_escala_medico: {
+        Args: {
+          p_medico_id: string
+          p_mes_origem: number
+          p_ano_origem: number
+          p_mes_destino: number
+          p_ano_destino: number
+        }
+        Returns: Json
       }
       update_custom_metrics: {
         Args: Record<PropertyKey, never>

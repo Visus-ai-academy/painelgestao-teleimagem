@@ -3,30 +3,37 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useHasPermission } from './useUserPermissions';
 
-export interface EscalaCompleta {
+export interface EscalaAvancada {
   id: string;
   medico_id: string;
   data: string;
   turno: 'manha' | 'tarde' | 'noite' | 'plantao';
   tipo_escala: 'normal' | 'plantao' | 'extra' | 'backup';
-  tipo_plantao?: 'noturno' | 'feriado' | 'final_semana' | 'normal';
   modalidade: string;
   especialidade: string;
   status: 'confirmada' | 'pendente' | 'ausencia' | 'cancelada';
+  observacoes?: string;
+  motivo_ausencia?: string;
+  data_ausencia?: string;
+  cliente_id?: string;
+  capacidade_maxima_exames: number;
+  preferencias_clientes: string[];
+  exclusoes_clientes: string[];
   horario_inicio?: string;
   horario_fim?: string;
-  dias_semana?: number[];
-  capacidade_maxima_exames?: number;
-  preferencias_clientes?: string[];
-  exclusoes_clientes?: string[];
+  dias_semana: number[];
+  tipo_plantao?: 'noturno' | 'feriado' | 'final_semana' | 'normal';
   mes_referencia?: number;
   ano_referencia?: number;
   escala_replicada_de?: string;
-  observacoes?: string;
   medico?: {
     nome: string;
     crm: string;
     especialidade: string;
+    email: string;
+  };
+  cliente?: {
+    nome: string;
   };
 }
 
@@ -44,24 +51,41 @@ export interface AusenciaMedica {
   tipo_ausencia_id: string;
   data_inicio: string;
   data_fim: string;
-  turno?: 'manha' | 'tarde' | 'noite' | 'dia_inteiro';
+  turno?: string;
   motivo?: string;
   aprovado: boolean;
   aprovado_por?: string;
   aprovado_em?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
   tipo_ausencia?: TipoAusencia;
 }
 
+// Alias para compatibilidade
+export type EscalaCompleta = EscalaAvancada;
+
+export interface ConfiguracaoEscala {
+  id: string;
+  dia_envio_email: number;
+  meses_antecipacao: number;
+  capacidade_default_exames: number;
+  horario_padrao_inicio: string;
+  horario_padrao_fim: string;
+  ativo: boolean;
+}
+
 export const useEscalasAvancadas = () => {
-  const [escalas, setEscalas] = useState<EscalaCompleta[]>([]);
+  const [escalas, setEscalas] = useState<EscalaAvancada[]>([]);
   const [tiposAusencia, setTiposAusencia] = useState<TipoAusencia[]>([]);
   const [ausencias, setAusencias] = useState<AusenciaMedica[]>([]);
+  const [configuracao, setConfiguracao] = useState<ConfiguracaoEscala | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { hasPermission } = useHasPermission(['admin', 'manager']);
   const isMedico = useHasPermission(['medico']).hasPermission;
 
-  const fetchEscalas = async (mesAno?: { mes: number; ano: number }) => {
+  const fetchEscalas = async (medicoId?: string, mesAno?: { mes: number; ano: number }) => {
     try {
       setLoading(true);
       
@@ -69,9 +93,14 @@ export const useEscalasAvancadas = () => {
         .from('escalas_medicas')
         .select(`
           *,
-          medico:medicos(nome, crm, especialidade)
+          medico:medicos(nome, crm, especialidade, email),
+          cliente:clientes(nome)
         `)
         .order('data', { ascending: true });
+
+      if (medicoId) {
+        query = query.eq('medico_id', medicoId);
+      }
 
       if (mesAno) {
         query = query
@@ -91,7 +120,7 @@ export const useEscalasAvancadas = () => {
         return;
       }
 
-      setEscalas((data || []) as EscalaCompleta[]);
+      setEscalas((data || []) as EscalaAvancada[]);
     } catch (error) {
       console.error('Erro ao buscar escalas:', error);
       toast({
@@ -112,20 +141,16 @@ export const useEscalasAvancadas = () => {
         .eq('ativo', true)
         .order('nome');
 
-      if (error) {
-        console.error('Erro ao buscar tipos de ausência:', error);
-        return;
-      }
-
+      if (error) throw error;
       setTiposAusencia(data || []);
     } catch (error) {
       console.error('Erro ao buscar tipos de ausência:', error);
     }
   };
 
-  const fetchAusencias = async () => {
+  const fetchAusencias = async (medicoId?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('ausencias_medicas')
         .select(`
           *,
@@ -133,25 +158,61 @@ export const useEscalasAvancadas = () => {
         `)
         .order('data_inicio', { ascending: false });
 
-      if (error) {
-        console.error('Erro ao buscar ausências:', error);
-        return;
+      if (medicoId) {
+        query = query.eq('medico_id', medicoId);
       }
 
-      setAusencias((data || []) as AusenciaMedica[]);
+      const { data, error } = await query;
+      if (error) throw error;
+      setAusencias(data || []);
     } catch (error) {
       console.error('Erro ao buscar ausências:', error);
     }
   };
 
-  const criarEscala = async (escala: any) => {
+  const fetchConfiguracao = async () => {
     try {
+      const { data, error } = await supabase
+        .from('configuracoes_escala')
+        .select('*')
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      setConfiguracao(data);
+    } catch (error) {
+      console.error('Erro ao buscar configuração:', error);
+    }
+  };
+
+  const criarEscala = async (escalaData: Partial<EscalaAvancada> & { data: string }) => {
+    try {
+      const dataObj = {
+        medico_id: escalaData.medico_id!,
+        data: escalaData.data,
+        turno: escalaData.turno || 'manha',
+        tipo_escala: escalaData.tipo_escala || 'normal',
+        modalidade: escalaData.modalidade || '',
+        especialidade: escalaData.especialidade || '',
+        status: escalaData.status || 'confirmada',
+        mes_referencia: new Date(escalaData.data).getMonth() + 1,
+        ano_referencia: new Date(escalaData.data).getFullYear(),
+        capacidade_maxima_exames: escalaData.capacidade_maxima_exames || 50,
+        preferencias_clientes: escalaData.preferencias_clientes || [],
+        exclusoes_clientes: escalaData.exclusoes_clientes || [],
+        dias_semana: escalaData.dias_semana || [],
+        observacoes: escalaData.observacoes,
+        horario_inicio: escalaData.horario_inicio,
+        horario_fim: escalaData.horario_fim,
+        tipo_plantao: escalaData.tipo_plantao,
+        cliente_id: escalaData.cliente_id
+      };
+
       const { error } = await supabase
         .from('escalas_medicas')
-        .insert(escala);
+        .insert(dataObj);
 
       if (error) {
-        console.error('Erro ao criar escala:', error);
         toast({
           title: "Erro ao criar escala",
           description: error.message,
@@ -169,56 +230,20 @@ export const useEscalasAvancadas = () => {
       return true;
     } catch (error) {
       console.error('Erro ao criar escala:', error);
-      toast({
-        title: "Erro ao criar escala",
-        description: "Erro inesperado ao criar escala",
-        variant: "destructive",
-      });
       return false;
     }
   };
 
-  const replicarEscala = async (escalaId: string, mesesParaReplicar: number) => {
+  const atualizarEscala = async (id: string, dados: Partial<EscalaAvancada>) => {
     try {
-      // Buscar a escala original
-      const { data: escalaOriginal, error: fetchError } = await supabase
-        .from('escalas_medicas')
-        .select('*')
-        .eq('id', escalaId)
-        .single();
-
-      if (fetchError || !escalaOriginal) {
-        throw new Error('Escala não encontrada');
-      }
-
-      const escalasParaInserir = [];
-      const dataOriginal = new Date(escalaOriginal.data);
-      
-      for (let i = 1; i <= mesesParaReplicar; i++) {
-        const novaData = new Date(dataOriginal);
-        novaData.setMonth(novaData.getMonth() + i);
-        
-        escalasParaInserir.push({
-          ...escalaOriginal,
-          id: undefined,
-          data: novaData.toISOString().split('T')[0],
-          mes_referencia: novaData.getMonth() + 1,
-          ano_referencia: novaData.getFullYear(),
-          escala_replicada_de: escalaId,
-          status: 'pendente',
-          created_at: undefined,
-          updated_at: undefined
-        });
-      }
-
       const { error } = await supabase
         .from('escalas_medicas')
-        .insert(escalasParaInserir);
+        .update(dados)
+        .eq('id', id);
 
       if (error) {
-        console.error('Erro ao replicar escala:', error);
         toast({
-          title: "Erro ao replicar escala",
+          title: "Erro ao atualizar escala",
           description: error.message,
           variant: "destructive",
         });
@@ -226,33 +251,34 @@ export const useEscalasAvancadas = () => {
       }
 
       toast({
-        title: "Escala replicada",
-        description: `Escala replicada para ${mesesParaReplicar} meses`,
+        title: "Escala atualizada",
+        description: "Escala atualizada com sucesso",
       });
 
       await fetchEscalas();
       return true;
     } catch (error) {
-      console.error('Erro ao replicar escala:', error);
-      toast({
-        title: "Erro ao replicar escala",
-        description: "Erro inesperado ao replicar escala",
-        variant: "destructive",
-      });
+      console.error('Erro ao atualizar escala:', error);
       return false;
     }
   };
 
-  const criarAusencia = async (ausencia: any) => {
+  const criarAusencia = async (ausenciaData: { 
+    medico_id: string; 
+    tipo_ausencia_id: string; 
+    data_inicio: string; 
+    data_fim: string; 
+    turno?: string; 
+    motivo?: string;
+  }) => {
     try {
       const { error } = await supabase
         .from('ausencias_medicas')
-        .insert(ausencia);
+        .insert(ausenciaData);
 
       if (error) {
-        console.error('Erro ao criar ausência:', error);
         toast({
-          title: "Erro ao criar ausência",
+          title: "Erro ao registrar ausência",
           description: error.message,
           variant: "destructive",
         });
@@ -260,35 +286,29 @@ export const useEscalasAvancadas = () => {
       }
 
       toast({
-        title: "Ausência criada",
-        description: "Ausência registrada com sucesso",
+        title: "Ausência registrada",
+        description: "Ausência registrada com sucesso e aguarda aprovação",
       });
 
       await fetchAusencias();
       return true;
     } catch (error) {
       console.error('Erro ao criar ausência:', error);
-      toast({
-        title: "Erro ao criar ausência",
-        description: "Erro inesperado ao criar ausência",
-        variant: "destructive",
-      });
       return false;
     }
   };
 
-  const aprovarAusencia = async (ausenciaId: string) => {
+  const aprovarAusencia = async (id: string, aprovado: boolean) => {
     try {
       const { error } = await supabase
         .from('ausencias_medicas')
         .update({
-          aprovado: true,
+          aprovado,
           aprovado_em: new Date().toISOString()
         })
-        .eq('id', ausenciaId);
+        .eq('id', id);
 
       if (error) {
-        console.error('Erro ao aprovar ausência:', error);
         toast({
           title: "Erro ao aprovar ausência",
           description: error.message,
@@ -298,41 +318,97 @@ export const useEscalasAvancadas = () => {
       }
 
       toast({
-        title: "Ausência aprovada",
-        description: "Ausência aprovada com sucesso",
+        title: aprovado ? "Ausência aprovada" : "Ausência rejeitada",
+        description: `Ausência ${aprovado ? 'aprovada' : 'rejeitada'} com sucesso`,
       });
 
       await fetchAusencias();
       return true;
     } catch (error) {
       console.error('Erro ao aprovar ausência:', error);
-      toast({
-        title: "Erro ao aprovar ausência",
-        description: "Erro inesperado ao aprovar ausência",
-        variant: "destructive",
-      });
       return false;
     }
   };
 
+  const replicarEscala = async (
+    medicoId: string,
+    mesOrigem: number,
+    anoOrigem: number,
+    mesDestino: number,
+    anoDestino: number
+  ) => {
+    try {
+      const { data, error } = await supabase.rpc('replicar_escala_medico', {
+        p_medico_id: medicoId,
+        p_mes_origem: mesOrigem,
+        p_ano_origem: anoOrigem,
+        p_mes_destino: mesDestino,
+        p_ano_destino: anoDestino
+      });
+
+      if (error) {
+        toast({
+          title: "Erro ao replicar escala",
+          description: error.message,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const result = data as any;
+      toast({
+        title: "Escala replicada",
+        description: `${result.escalas_replicadas || 0} escalas replicadas com sucesso`,
+      });
+
+      await fetchEscalas();
+      return true;
+    } catch (error) {
+      console.error('Erro ao replicar escala:', error);
+      return false;
+    }
+  };
+
+  const calcularCapacidadeProdutiva = async (medicoId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('calcular_capacidade_produtiva', {
+        p_medico_id: medicoId
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Erro ao calcular capacidade:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    fetchEscalas();
-    fetchTiposAusencia();
-    fetchAusencias();
+    const initializeData = async () => {
+      await Promise.all([
+        fetchEscalas(),
+        fetchTiposAusencia(),
+        fetchAusencias(),
+        fetchConfiguracao()
+      ]);
+    };
+
+    initializeData();
   }, []);
 
   return {
     escalas,
     tiposAusencia,
     ausencias,
+    configuracao,
     loading,
+    fetchEscalas,
     criarEscala,
-    replicarEscala,
+    atualizarEscala,
     criarAusencia,
     aprovarAusencia,
-    fetchEscalas,
-    fetchTiposAusencia,
-    fetchAusencias,
+    replicarEscala,
+    calcularCapacidadeProdutiva,
     canManageAll: hasPermission,
     isMedico
   };
