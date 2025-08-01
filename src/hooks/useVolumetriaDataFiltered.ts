@@ -151,10 +151,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       console.log('🎯 [DASHBOARD] Ano selecionado:', filters.ano);
       console.log('🏢 [DASHBOARD] Cliente selecionado:', filters.cliente);
       
-      // Fazer query em lotes para evitar limitações
+      // Fazer query em lotes para carregar TODOS os dados sem limitação
       let allData: any[] = [];
       let from = 0;
-      const batchSize = 10000; // Aumentado para processar grandes volumes
+      const batchSize = 5000; // Reduzido para melhor performance
       let hasMore = true;
 
       const { startDate, endDate } = buildDateFilter();
@@ -162,7 +162,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
 
       while (hasMore) {
         let query = supabase.from('volumetria_mobilemed').select(`
-          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
+          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE,
           VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
         `).range(from, from + batchSize - 1);
         
@@ -187,6 +187,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           query = query.eq('ESPECIALIDADE', filters.especialidade);
           console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
         }
+        if (filters.prioridade !== 'todos') {
+          query = query.eq('PRIORIDADE', filters.prioridade);
+          console.log('⚡ Filtro prioridade aplicado:', filters.prioridade);
+        }
         if (filters.medico !== 'todos') {
           query = query.eq('MEDICO', filters.medico);
           console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
@@ -200,11 +204,19 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           allData = allData.concat(batchData);
           from += batchSize;
           
+          console.log(`📦 [DASHBOARD] Lote ${Math.floor(from/batchSize)}: ${batchData.length} registros, total: ${allData.length}`);
+          
           // Se recebeu menos que o batchSize, não há mais dados
           if (batchData.length < batchSize) {
             hasMore = false;
           }
         } else {
+          hasMore = false;
+        }
+        
+        // Timeout de segurança para evitar loops infinitos
+        if (from > 1000000) {
+          console.log('⚠️ [DASHBOARD] Limite de segurança atingido: 1M registros');
           hasMore = false;
         }
       }
@@ -230,9 +242,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             console.log('📊 [DASHBOARD] Dados agregados do BD:', totalFromAggregate);
             console.log('📊 [DASHBOARD] Dados da query atual:', { registros: allData.length });
             
-            // Se a query retornou menos dados que o esperado, buscar todos
-            if (totalFromAggregate.total_registros > allData.length && totalFromAggregate.total_registros <= 50000) {
-              console.log('⚠️ [DASHBOARD] Query limitada detectada - buscando TODOS os dados...');
+            // Se há discrepância significativa, buscar todos os dados
+            if (totalFromAggregate.total_registros > allData.length * 1.1) {
+              console.log('⚠️ [DASHBOARD] Discrepância detectada - buscando TODOS os dados...');
+              console.log(`📊 BD indica ${totalFromAggregate.total_registros} registros, query retornou ${allData.length}`);
               
               // Buscar TODOS os dados sem limitação de range
               let allDataComplete: any[] = [];
@@ -240,7 +253,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
               const batchSize = 5000;
               let hasMore = true;
 
-              while (hasMore && offset < totalFromAggregate.total_registros + 5000) { // Limite baseado no total real
+              while (hasMore) { // Removido limitador artificial
                 const { data: batchData, error } = await supabase
                   .from('volumetria_mobilemed')
                   .select(`
@@ -265,6 +278,12 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
                   hasMore = false;
                 } else {
                   offset += batchSize;
+                }
+                
+                // Timeout de segurança para evitar loops infinitos (2 minutos)
+                if (offset > 500000) {
+                  console.log('⚠️ [DASHBOARD] Limite de segurança atingido: 500k registros');
+                  hasMore = false;
                 }
               }
               
@@ -339,16 +358,16 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       });
 
       // Agrupar dados
-      const clientesMap = new Map();
-      const modalidadesMap = new Map();
-      const especialidadesMap = new Map();
-      const categoriasMap = new Map();
-      const prioridadesMap = new Map();
-      const medicosMap = new Map();
+      const clientesMap = new Map<string, any>();
+      const modalidadesMap = new Map<string, any>();
+      const especialidadesMap = new Map<string, any>();
+      const categoriasMap = new Map<string, any>();
+      const prioridadesMap = new Map<string, any>();
+      const medicosMap = new Map<string, any>();
       
       // Maps para rastrear médicos únicos por segmento
-      const modalidadeMedicosMap = new Map();
-      const especialidadeMedicosMap = new Map();
+      const modalidadeMedicosMap = new Map<string, Set<string>>();
+      const especialidadeMedicosMap = new Map<string, Set<string>>();
 
       allData.forEach(item => {
         const isAtrasado = atrasados.includes(item);
@@ -370,13 +389,13 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           if (isAtrasado) current.atrasados += 1;
           modalidadesMap.set(item.MODALIDADE, current);
           
-          // Rastrear médicos únicos por modalidade
-          if (item.MEDICO) {
-            if (!modalidadeMedicosMap.has(item.MODALIDADE)) {
-              modalidadeMedicosMap.set(item.MODALIDADE, new Set());
-            }
-            modalidadeMedicosMap.get(item.MODALIDADE).add(item.MEDICO);
-          }
+           // Rastrear médicos únicos por modalidade
+           if (item.MEDICO) {
+             if (!modalidadeMedicosMap.has(item.MODALIDADE)) {
+               modalidadeMedicosMap.set(item.MODALIDADE, new Set<string>());
+             }
+             modalidadeMedicosMap.get(item.MODALIDADE)?.add(item.MEDICO);
+           }
         }
 
         // Especialidades apenas
@@ -387,13 +406,13 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           if (isAtrasado) current.atrasados += 1;
           especialidadesMap.set(item.ESPECIALIDADE, current);
           
-          // Rastrear médicos únicos por especialidade
-          if (item.MEDICO) {
-            if (!especialidadeMedicosMap.has(item.ESPECIALIDADE)) {
-              especialidadeMedicosMap.set(item.ESPECIALIDADE, new Set());
-            }
-            especialidadeMedicosMap.get(item.ESPECIALIDADE).add(item.MEDICO);
-          }
+           // Rastrear médicos únicos por especialidade
+           if (item.MEDICO) {
+             if (!especialidadeMedicosMap.has(item.ESPECIALIDADE)) {
+               especialidadeMedicosMap.set(item.ESPECIALIDADE, new Set<string>());
+             }
+             especialidadeMedicosMap.get(item.ESPECIALIDADE)?.add(item.MEDICO);
+           }
         }
 
         // Prioridades
@@ -451,11 +470,11 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       });
 
       // Converter para arrays
-      const clientes = Array.from(clientesMap.entries()).map(([nome, data]) => ({
+      const clientes = Array.from(clientesMap.entries()).map(([nome, data]: [string, any]) => ({
         nome, ...data, percentual_atraso: data.total_registros > 0 ? (data.atrasados / data.total_registros) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      const modalidades = Array.from(modalidadesMap.entries()).map(([nome, data]) => ({
+      const modalidades = Array.from(modalidadesMap.entries()).map(([nome, data]: [string, any]) => ({
         nome, 
         ...data, 
         percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
@@ -463,7 +482,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         total_medicos: modalidadeMedicosMap.get(nome)?.size || 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      const especialidades = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
+      const especialidades = Array.from(especialidadesMap.entries()).map(([nome, data]: [string, any]) => ({
         nome, 
         ...data, 
         percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
@@ -471,7 +490,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         total_medicos: especialidadeMedicosMap.get(nome)?.size || 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      const medicos = Array.from(medicosMap.entries()).map(([nome, data]) => ({
+      const medicos = Array.from(medicosMap.entries()).map(([nome, data]: [string, any]) => ({
         nome, 
         total_exames: data.total_exames,
         total_registros: data.total_registros,
@@ -488,7 +507,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const categorias: any[] = [];
       
       // Prioridades processadas
-      const prioridades = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
+      const prioridades = Array.from(prioridadesMap.entries()).map(([nome, data]: [string, any]) => ({
         nome, 
         ...data, 
         percentual: totalLaudos > 0 ? (data.total_exames / totalLaudos) * 100 : 0,
