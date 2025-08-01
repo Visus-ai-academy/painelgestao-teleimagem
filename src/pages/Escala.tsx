@@ -47,16 +47,16 @@ export default function Escala() {
     await criarEscala(escala);
   };
 
-  const handleReplicarEscala = async (escalaId: string, meses: number) => {
-    await replicarEscala(escalaId, meses);
+  const handleReplicarEscala = async (medicoId: string, mesOrigem: number, anoOrigem: number, mesDestino: number, anoDestino: number) => {
+    await replicarEscala(medicoId, mesOrigem, anoOrigem, mesDestino, anoDestino);
   };
 
   const handleCriarAusencia = async (ausencia: any) => {
     await criarAusencia(ausencia);
   };
 
-  const handleAprovarAusencia = async (ausenciaId: string) => {
-    await aprovarAusencia(ausenciaId);
+  const handleAprovarAusencia = async (ausenciaId: string, aprovado: boolean) => {
+    await aprovarAusencia(ausenciaId, aprovado);
   };
 
   const handleEnviarPorEmail = async (mesAno: { mes: number; ano: number }) => {
@@ -177,7 +177,7 @@ export default function Escala() {
           <TabsContent value="mensal" className="space-y-6">
             <EscalaMensal
               escalas={escalas}
-              onFetchEscalas={fetchEscalas}
+              onFetchEscalas={(mesAno: { mes: number; ano: number }) => fetchEscalas(undefined, mesAno)}
               onEnviarPorEmail={handleEnviarPorEmail}
               canManage={canManageAll}
             />

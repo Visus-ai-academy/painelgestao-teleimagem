@@ -27,7 +27,7 @@ interface GerenciadorAusenciasProps {
   ausencias: AusenciaMedica[];
   tiposAusencia: TipoAusencia[];
   onCriarAusencia: (ausencia: any) => void;
-  onAprovarAusencia: (ausenciaId: string) => void;
+  onAprovarAusencia: (ausenciaId: string, aprovado: boolean) => void;
   canApprove: boolean;
   medicoId?: string;
 }
@@ -284,13 +284,23 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
                       {getStatusBadge(ausencia)}
                       
                       {canApprove && !ausencia.aprovado && (
-                        <Button
-                          size="sm"
-                          onClick={() => onAprovarAusencia(ausencia.id)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Aprovar
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onAprovarAusencia(ausencia.id, false)}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Rejeitar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => onAprovarAusencia(ausencia.id, true)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Aprovar
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
