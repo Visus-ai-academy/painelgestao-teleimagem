@@ -114,45 +114,24 @@ export default async function handler(req: Request): Promise<Response> {
         break;
 
       case 'volumetria_padrao_retroativo':
-        // Arquivo 3: Validar apenas data limite (removida regra de especialidade)
-        const dataLimite = new Date(REGRAS_PADRAO.arquivo3.dataLimiteMinima);
-        
-        // Remover registros muito antigos
-        const { data: deletedCount, error: deleteError } = await supabase
-          .from('volumetria_mobilemed')
-          .delete()
-          .eq('arquivo_fonte', arquivo_fonte)
-          .lt('data_referencia', dataLimite.toISOString())
-          .select('id');
-        
-        if (deleteError) throw deleteError;
-        
-        const deletedRegistros = deletedCount?.length || 0;
-        mensagens.push(`Arquivo 3: ${deletedRegistros} registros anteriores a ${REGRAS_PADRAO.arquivo3.dataLimiteMinima} removidos`);
+        // Arquivo 3: Regras aplicadas durante processamento - apenas log
+        mensagens.push(`Arquivo 3: Regras retroativas aplicadas durante processamento`);
         break;
 
       case 'volumetria_fora_padrao_retroativo':
-        // Arquivo 4: Combinar regras 2 e 3
-        const dataLimite4 = new Date(REGRAS_PADRAO.arquivo3.dataLimiteMinima);
-        
-        // Remover registros muito antigos
-        const { error: deleteError4 } = await supabase
-          .from('volumetria_mobilemed')
-          .delete()
-          .eq('arquivo_fonte', arquivo_fonte)
-          .lt('data_referencia', dataLimite4.toISOString());
-        
-        if (deleteError4) throw deleteError4;
-
-        // Aplicar De-Para especificamente para este arquivo
+        // Arquivo 4: Aplicar De-Para otimizado especificamente para este arquivo
         const { data: deParaResult4, error: deParaError4 } = await supabase
           .rpc('aplicar_de_para_automatico', { 
             arquivo_fonte_param: arquivo_fonte 
           });
         
-        if (deParaError4) throw deParaError4;
-        registrosAtualizados += deParaResult4?.registros_atualizados || 0;
-        mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
+        if (deParaError4) {
+          console.log(`⚠️ De-Para falhou: ${deParaError4.message}`);
+          mensagens.push(`Arquivo 4: De-Para não aplicado - ${deParaError4.message}`);
+        } else {
+          registrosAtualizados += deParaResult4?.registros_atualizados || 0;
+          mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
+        }
         break;
 
       default:
