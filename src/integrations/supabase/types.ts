@@ -62,6 +62,69 @@ export type Database = {
         }
         Relationships: []
       }
+      ausencias_medicas: {
+        Row: {
+          aprovado: boolean | null
+          aprovado_em: string | null
+          aprovado_por: string | null
+          created_at: string
+          created_by: string | null
+          data_fim: string
+          data_inicio: string
+          id: string
+          medico_id: string
+          motivo: string | null
+          tipo_ausencia_id: string
+          turno: string | null
+          updated_at: string
+        }
+        Insert: {
+          aprovado?: boolean | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim: string
+          data_inicio: string
+          id?: string
+          medico_id: string
+          motivo?: string | null
+          tipo_ausencia_id: string
+          turno?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aprovado?: boolean | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          medico_id?: string
+          motivo?: string | null
+          tipo_ausencia_id?: string
+          turno?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ausencias_medicas_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ausencias_medicas_tipo_ausencia_id_fkey"
+            columns: ["tipo_ausencia_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_ausencia"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backup_logs: {
         Row: {
           backup_location: string | null
@@ -189,6 +252,50 @@ export type Database = {
             columns: ["prioridade_id"]
             isOneToOne: false
             referencedRelation: "prioridades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      capacidade_produtiva_medico: {
+        Row: {
+          capacidade_sugerida: number
+          created_at: string
+          data_calculo: string
+          id: string
+          media_diaria: number
+          medico_id: string
+          periodo_fim: string
+          periodo_inicio: string
+          total_laudos: number
+        }
+        Insert: {
+          capacidade_sugerida?: number
+          created_at?: string
+          data_calculo?: string
+          id?: string
+          media_diaria?: number
+          medico_id: string
+          periodo_fim: string
+          periodo_inicio: string
+          total_laudos?: number
+        }
+        Update: {
+          capacidade_sugerida?: number
+          created_at?: string
+          data_calculo?: string
+          id?: string
+          media_diaria?: number
+          medico_id?: string
+          periodo_fim?: string
+          periodo_inicio?: string
+          total_laudos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capacidade_produtiva_medico_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
             referencedColumns: ["id"]
           },
         ]
@@ -348,6 +455,42 @@ export type Database = {
           id?: string
           permite_dados_futuros?: boolean
           permite_edicao_historico?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracoes_escala: {
+        Row: {
+          ativo: boolean
+          capacidade_default_exames: number | null
+          created_at: string
+          dia_envio_email: number | null
+          horario_padrao_fim: string | null
+          horario_padrao_inicio: string | null
+          id: string
+          meses_antecipacao: number | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          capacidade_default_exames?: number | null
+          created_at?: string
+          dia_envio_email?: number | null
+          horario_padrao_fim?: string | null
+          horario_padrao_inicio?: string | null
+          id?: string
+          meses_antecipacao?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          capacidade_default_exames?: number | null
+          created_at?: string
+          dia_envio_email?: number | null
+          horario_padrao_fim?: string | null
+          horario_padrao_inicio?: string | null
+          id?: string
+          meses_antecipacao?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -759,54 +902,101 @@ export type Database = {
       }
       escalas_medicas: {
         Row: {
+          ano_referencia: number | null
+          capacidade_maxima_exames: number | null
+          cliente_id: string | null
           created_at: string
           created_by: string | null
           data: string
           data_ausencia: string | null
+          dias_semana: number[] | null
+          escala_replicada_de: string | null
           especialidade: string
+          exclusoes_clientes: Json | null
+          horario_fim: string | null
+          horario_inicio: string | null
           id: string
           medico_id: string
+          mes_referencia: number | null
           modalidade: string
           motivo_ausencia: string | null
           observacoes: string | null
+          preferencias_clientes: Json | null
           status: string
           tipo_escala: string
+          tipo_plantao: string | null
           turno: string
           updated_at: string
         }
         Insert: {
+          ano_referencia?: number | null
+          capacidade_maxima_exames?: number | null
+          cliente_id?: string | null
           created_at?: string
           created_by?: string | null
           data: string
           data_ausencia?: string | null
+          dias_semana?: number[] | null
+          escala_replicada_de?: string | null
           especialidade: string
+          exclusoes_clientes?: Json | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           medico_id: string
+          mes_referencia?: number | null
           modalidade: string
           motivo_ausencia?: string | null
           observacoes?: string | null
+          preferencias_clientes?: Json | null
           status?: string
           tipo_escala: string
+          tipo_plantao?: string | null
           turno: string
           updated_at?: string
         }
         Update: {
+          ano_referencia?: number | null
+          capacidade_maxima_exames?: number | null
+          cliente_id?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
           data_ausencia?: string | null
+          dias_semana?: number[] | null
+          escala_replicada_de?: string | null
           especialidade?: string
+          exclusoes_clientes?: Json | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           medico_id?: string
+          mes_referencia?: number | null
           modalidade?: string
           motivo_ausencia?: string | null
           observacoes?: string | null
+          preferencias_clientes?: Json | null
           status?: string
           tipo_escala?: string
+          tipo_plantao?: string | null
           turno?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "escalas_medicas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalas_medicas_escala_replicada_de_fkey"
+            columns: ["escala_replicada_de"]
+            isOneToOne: false
+            referencedRelation: "escalas_medicas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "escalas_medicas_medico_id_fkey"
             columns: ["medico_id"]
@@ -2079,6 +2269,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tipos_ausencia: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       upload_logs: {
         Row: {
           created_at: string
@@ -2644,6 +2864,10 @@ export type Database = {
       archive_old_volumetria_data: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      calcular_capacidade_produtiva: {
+        Args: { p_medico_id: string; p_dias?: number }
+        Returns: Json
       }
       calculate_custom_metric: {
         Args: { metric_name: string }
