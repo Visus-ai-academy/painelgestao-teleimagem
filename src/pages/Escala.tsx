@@ -22,8 +22,7 @@ import { useEscalasAvancadas } from '@/hooks/useEscalasAvancadas';
 import { CalendarioEscala } from '@/components/escalas/CalendarioEscala';
 import { GerenciadorAusencias } from '@/components/escalas/GerenciadorAusencias';
 import { EscalaMensal } from '@/components/escalas/EscalaMensal';
-import { ControlePresencaMedico } from '@/components/presenca/ControlePresencaMedico';
-import { MonitorPresencaGeral } from '@/components/presenca/MonitorPresencaGeral';
+import { ControlePresenca } from '@/components/escalas/ControlePresenca';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Escala() {
@@ -190,13 +189,7 @@ export default function Escala() {
           </TabsContent>
 
           <TabsContent value="presenca" className="space-y-6">
-            {isMedico ? (
-              <div className="flex justify-center">
-                <ControlePresencaMedico />
-              </div>
-            ) : (
-              <MonitorPresencaGeral />
-            )}
+            <ControlePresenca />
           </TabsContent>
 
           <TabsContent value="ausencias" className="space-y-6">
