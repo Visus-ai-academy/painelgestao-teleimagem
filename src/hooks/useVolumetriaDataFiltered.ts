@@ -552,5 +552,5 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     await loadData();
   }, [loadData]);
 
-  return { ...data, loading, refreshData: loadData };
+  return { ...data, loading, refreshData };
 }

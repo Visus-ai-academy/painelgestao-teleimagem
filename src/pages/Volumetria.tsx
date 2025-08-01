@@ -90,9 +90,6 @@ export default function Volumetria() {
             {stats.total_exames.toLocaleString()} laudos | 
             {stats.total_clientes} clientes ativos
           </p>
-          <p className="text-xs text-orange-600 mt-1">
-            ⚠️ Dados desatualizados - Clique em "Atualizar Dados" para carregar informações recentes
-          </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="text-xs text-muted-foreground">
