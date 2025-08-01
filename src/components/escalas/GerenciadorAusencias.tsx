@@ -116,25 +116,25 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <UserX className="h-5 w-5" />
-            Gerenciar Ausências
+            Gerenciar Inatividades
           </CardTitle>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <CalendarX className="h-4 w-4 mr-2" />
-                Nova Ausência
+                Nova Inatividade
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Registrar Ausência</DialogTitle>
+                <DialogTitle>Registrar Inatividade</DialogTitle>
               </DialogHeader>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="tipo_ausencia">Tipo de Ausência</Label>
+                    <Label htmlFor="tipo_ausencia">Tipo de Inatividade</Label>
                     <Select value={tipoAusenciaId} onValueChange={setTipoAusenciaId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
@@ -176,7 +176,7 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
                       id="motivo"
                       value={motivo}
                       onChange={(e) => setMotivo(e.target.value)}
-                      placeholder="Descreva o motivo da ausência..."
+                      placeholder="Descreva o motivo da inatividade..."
                       rows={4}
                     />
                   </div>
@@ -243,7 +243,7 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
                     disabled={!tipoAusenciaId || !dataInicio || !dataFim}
                     className="w-full"
                   >
-                    Registrar Ausência
+                    Registrar Inatividade
                   </Button>
                 </div>
               </div>
@@ -256,7 +256,7 @@ export const GerenciadorAusencias: React.FC<GerenciadorAusenciasProps> = ({
             {ausencias.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <UserX className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhuma ausência registrada</p>
+                <p>Nenhuma inatividade registrada</p>
               </div>
             ) : (
               ausencias.map((ausencia) => (

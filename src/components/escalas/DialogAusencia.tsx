@@ -90,7 +90,7 @@ export const DialogAusencia = ({
         {trigger || (
           <Button variant="outline" className="flex items-center gap-2">
             <CalendarOff className="h-4 w-4" />
-            Informar Ausência
+            Informar Inatividade
           </Button>
         )}
       </DialogTrigger>
@@ -99,7 +99,7 @@ export const DialogAusencia = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarOff className="h-5 w-5" />
-            Informar Ausência
+            Informar Inatividade
           </DialogTitle>
         </DialogHeader>
 
@@ -109,7 +109,7 @@ export const DialogAusencia = ({
             <CardContent className="p-4">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Período da Ausência
+                 Período da Inatividade
               </h3>
               
               <div className="space-y-4">
@@ -150,13 +150,13 @@ export const DialogAusencia = ({
               <CardContent className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Detalhes da Ausência
+                   Detalhes da Inatividade
                 </h3>
                 
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">
-                      Tipo de Ausência
+                      Tipo de Inatividade
                     </label>
                     <Select value={tipoAusenciaId} onValueChange={setTipoAusenciaId}>
                       <SelectTrigger>
@@ -202,7 +202,7 @@ export const DialogAusencia = ({
                     <Textarea
                       value={motivo}
                       onChange={(e) => setMotivo(e.target.value)}
-                      placeholder="Descreva o motivo da ausência..."
+                      placeholder="Descreva o motivo da inatividade..."
                       rows={3}
                     />
                   </div>
@@ -214,7 +214,7 @@ export const DialogAusencia = ({
             {dataInicio && dataFim && tipoAusenciaId && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="p-4">
-                  <h4 className="font-medium mb-3">Resumo da Ausência</h4>
+                  <h4 className="font-medium mb-3">Resumo da Inatividade</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Período:</span>
@@ -252,7 +252,7 @@ export const DialogAusencia = ({
                 onClick={handleSubmit}
                 disabled={!dataInicio || !dataFim || !tipoAusenciaId || loading}
               >
-                {loading ? 'Registrando...' : 'Registrar Ausência'}
+                {loading ? 'Registrando...' : 'Registrar Inatividade'}
               </Button>
             </div>
           </div>

@@ -81,7 +81,7 @@ export const EscalaMensal: React.FC<EscalaMensalProps> = ({
     const statusMap = {
       confirmada: { icon: CheckCircle, color: 'bg-green-500', label: 'Confirmada' },
       pendente: { icon: AlertCircle, color: 'bg-yellow-500', label: 'Pendente' },
-      ausencia: { icon: AlertCircle, color: 'bg-red-500', label: 'Ausência' },
+      ausencia: { icon: AlertCircle, color: 'bg-red-500', label: 'Inatividade' },
       cancelada: { icon: AlertCircle, color: 'bg-gray-500', label: 'Cancelada' }
     };
 
@@ -201,7 +201,7 @@ export const EscalaMensal: React.FC<EscalaMensalProps> = ({
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-red-500" />
             <div>
-              <p className="text-sm text-muted-foreground">Ausências</p>
+              <p className="text-sm text-muted-foreground">Inatividades</p>
               <p className="text-2xl font-bold">{estatisticas.ausencias}</p>
             </div>
           </div>
