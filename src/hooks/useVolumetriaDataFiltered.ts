@@ -211,6 +211,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       
       console.log('📈 [DASHBOARD] Resultado total da query paginada:', {
         totalRegistros: allData.length,
+        totalLaudos: allData.reduce((sum, item) => sum + (item.VALORES || 0), 0),
         temErro: false
       });
 
@@ -230,49 +231,23 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             console.log('📊 [DASHBOARD] Dados agregados do BD:', totalFromAggregate);
             console.log('📊 [DASHBOARD] Dados da query atual:', { registros: allData.length });
             
-            // Se há discrepância significativa, buscar todos os dados
+            // Se há discrepância significativa, buscar todos os dados SEM LIMITAÇÃO
             if (totalFromAggregate.total_registros > allData.length * 1.1) {
-              console.log('⚠️ [DASHBOARD] Discrepância detectada - buscando TODOS os dados...');
+              console.log('⚠️ [DASHBOARD] Discrepância detectada - buscando TODOS os dados SEM LIMITAÇÃO...');
               console.log(`📊 BD indica ${totalFromAggregate.total_registros} registros, query retornou ${allData.length}`);
               
-              // Buscar TODOS os dados sem limitação de range
-              let allDataComplete: any[] = [];
-              let offset = 0;
-              const batchSize = 5000;
-              let hasMore = true;
+              // Usar query sem range para garantir TODOS os dados
+              const { data: allDataComplete, error } = await supabase
+                .from('volumetria_mobilemed')
+                .select(`
+                  EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
+                  VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
+                `);
 
-              while (hasMore) { // Removido limitador artificial
-                const { data: batchData, error } = await supabase
-                  .from('volumetria_mobilemed')
-                  .select(`
-                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
-                    VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
-                  `)
-                  .range(offset, offset + batchSize - 1);
-
-                if (error) {
-                  console.error('❌ [DASHBOARD] Erro na query completa:', error);
-                  break;
-                }
-
-                if (!batchData || batchData.length === 0) {
-                  break;
-                }
-
-                allDataComplete = [...allDataComplete, ...batchData];
-                console.log(`📦 [DASHBOARD] Lote ${Math.floor(offset/batchSize) + 1}: ${batchData.length} registros, total: ${allDataComplete.length}`);
-                
-                if (batchData.length < batchSize) {
-                  hasMore = false;
-                } else {
-                  offset += batchSize;
-                }
-                
-                // Removido limitador artificial - carregará todos os dados disponíveis
-              }
-              
-              if (allDataComplete.length > allData.length) {
-                console.log(`✅ [DASHBOARD] Dados completos carregados: ${allDataComplete.length} registros`);
+              if (error) {
+                console.error('❌ [DASHBOARD] Erro na query completa sem limitação:', error);
+              } else if (allDataComplete && allDataComplete.length > allData.length) {
+                console.log(`✅ [DASHBOARD] Dados completos carregados SEM LIMITAÇÃO: ${allDataComplete.length} registros`);
                 allData = allDataComplete;
               }
             }
