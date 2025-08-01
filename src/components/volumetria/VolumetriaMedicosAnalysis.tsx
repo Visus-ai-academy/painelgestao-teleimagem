@@ -16,7 +16,6 @@ interface MedicoData {
   detalhes?: {
     modalidades: { [key: string]: { exames: number; registros: number } };
     especialidades: { [key: string]: { exames: number; registros: number } };
-    categorias: { [key: string]: { exames: number; registros: number } };
     prioridades: { [key: string]: { exames: number; registros: number } };
   };
 }

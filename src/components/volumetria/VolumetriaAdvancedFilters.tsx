@@ -23,7 +23,6 @@ export interface VolumetriaFilters {
   cliente: string;
   modalidade: string;
   especialidade: string;
-  categoria: string;
   prioridade: string;
   medico: string;
 }
@@ -174,7 +173,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       cliente: 'todos',
       modalidade: 'todos',
       especialidade: 'todos',
-      categoria: 'todos',
       prioridade: 'todos',
       medico: 'todos'
     });
@@ -211,7 +209,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         return [
           filters.modalidade !== 'todos' ? `Modalidade: ${filters.modalidade}` : null,
           filters.especialidade !== 'todos' ? `Especialidade: ${filters.especialidade}` : null,
-          filters.categoria !== 'todos' ? `Categoria: ${filters.categoria}` : null,
           filters.prioridade !== 'todos' ? `Prioridade: ${filters.prioridade}` : null
         ].filter(Boolean);
       case 'medico':
@@ -555,7 +552,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
                     <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
@@ -582,21 +579,6 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                         {options.especialidades.map(especialidade => (
                           <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                    <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 bg-background border">
-                        <SelectItem value="todos">Todas</SelectItem>
-                        <SelectItem value="Normal">Normal</SelectItem>
-                        <SelectItem value="Urgente">Urgente</SelectItem>
-                        <SelectItem value="Emergência">Emergência</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

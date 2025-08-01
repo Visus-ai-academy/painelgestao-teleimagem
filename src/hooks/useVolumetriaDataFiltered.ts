@@ -12,7 +12,6 @@ export interface VolumetriaFilters {
   cliente: string;
   modalidade: string;
   especialidade: string;
-  categoria: string;
   prioridade: string;
   medico: string;
 }
@@ -26,7 +25,6 @@ interface DashboardStats {
   total_modalidades: number;
   total_especialidades: number;
   total_medicos: number;
-  total_categorias: number;
   total_prioridades: number;
 }
 
@@ -66,7 +64,6 @@ interface MedicoData {
   detalhes?: {
     modalidades: { [key: string]: { exames: number; registros: number } };
     especialidades: { [key: string]: { exames: number; registros: number } };
-    categorias: { [key: string]: { exames: number; registros: number } };
     prioridades: { [key: string]: { exames: number; registros: number } };
   };
 }
@@ -76,13 +73,11 @@ export interface VolumetriaData {
   clientes: ClienteData[];
   modalidades: ModalidadeData[];
   especialidades: EspecialidadeData[];
-  categorias: ModalidadeData[];
   prioridades: ModalidadeData[];
   medicos: MedicoData[];
   atrasoClientes: ClienteData[];
   atrasoModalidades: ModalidadeData[];
   atrasoEspecialidades: EspecialidadeData[];
-  atrasoCategorias: ModalidadeData[];
   atrasoPrioridades: ModalidadeData[];
   atrasosComTempo?: Array<{ tempoAtrasoMinutos: number; EMPRESA: string; [key: string]: any }>;
 }
@@ -100,19 +95,16 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       total_modalidades: 0,
       total_especialidades: 0,
       total_medicos: 0,
-      total_categorias: 0,
       total_prioridades: 0
     },
     clientes: [],
     modalidades: [],
     especialidades: [],
-    categorias: [],
     prioridades: [],
     medicos: [],
     atrasoClientes: [],
     atrasoModalidades: [],
     atrasoEspecialidades: [],
-    atrasoCategorias: [],
     atrasoPrioridades: []
   });
 
@@ -257,7 +249,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
                 const { data: batchData, error } = await supabase
                   .from('volumetria_mobilemed')
                   .select(`
-                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO,
+                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE,
                     VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
                   `)
                   .range(offset, offset + batchSize - 1);
@@ -303,10 +295,10 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           stats: {
             total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
             total_clientes: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
-            total_categorias: 0, total_prioridades: 0
+            total_prioridades: 0
           },
-          clientes: [], modalidades: [], especialidades: [], categorias: [], prioridades: [], medicos: [],
-          atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoCategorias: [], atrasoPrioridades: []
+          clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
+          atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoPrioridades: []
         });
         return;
       }
@@ -361,7 +353,6 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       const clientesMap = new Map<string, any>();
       const modalidadesMap = new Map<string, any>();
       const especialidadesMap = new Map<string, any>();
-      const categoriasMap = new Map<string, any>();
       const prioridadesMap = new Map<string, any>();
       const medicosMap = new Map<string, any>();
       
@@ -431,7 +422,6 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             total_registros: 0,
             modalidades: {},
             especialidades: {},
-            categorias: {},
             prioridades: {}
           };
           
@@ -498,7 +488,6 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         detalhes: {
           modalidades: data.modalidades,
           especialidades: data.especialidades,
-          categorias: data.categorias,
           prioridades: data.prioridades
         }
       })).sort((a, b) => b.total_exames - a.total_exames);
@@ -525,14 +514,12 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           total_modalidades: modalidadesMap.size,
           total_especialidades: especialidadesMap.size,
           total_medicos: medicosMap.size,
-          total_categorias: 0,
           total_prioridades: prioridadesMap.size
         },
-        clientes, modalidades, especialidades, categorias, prioridades, medicos,
+        clientes, modalidades, especialidades, prioridades, medicos,
         atrasoClientes: clientes.filter(c => c.atrasados > 0),
         atrasoModalidades: modalidades.filter(m => m.atrasados && m.atrasados > 0),
         atrasoEspecialidades: especialidades.filter(e => e.atrasados && e.atrasados > 0),
-        atrasoCategorias: [],
         atrasoPrioridades: prioridades.filter(p => p.atrasados && p.atrasados > 0),
         atrasosComTempo
       });

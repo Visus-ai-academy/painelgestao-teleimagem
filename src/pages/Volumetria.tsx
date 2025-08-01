@@ -24,7 +24,6 @@ const getDefaultFilters = (): VolumetriaFilters => {
     cliente: 'todos',
     modalidade: 'todos',
     especialidade: 'todos',
-    categoria: 'todos',
     prioridade: 'todos',
     medico: 'todos'
   };
@@ -38,17 +37,15 @@ export default function Volumetria() {
     clientes, 
     modalidades, 
     especialidades, 
-    categorias, 
     prioridades,
     medicos,
     atrasoClientes,
     atrasoModalidades,
     atrasoEspecialidades,
-    atrasoCategorias,
     atrasoPrioridades,
     atrasosComTempo,
     loading, 
-    refreshData 
+    refreshData
   } = useVolumetriaDataFiltered(filters);
   
   // Forçar refresh após mudanças no código
@@ -145,41 +142,41 @@ export default function Volumetria() {
               />
             </TabsContent>
 
-            <TabsContent value="charts" className="mt-6">
-              <VolumetriaCharts 
-                clientes={clientes}
-                modalidades={modalidades}
-                especialidades={especialidades}
-                categorias={categorias}
-                prioridades={prioridades}
-              />
-            </TabsContent>
+             <TabsContent value="charts" className="mt-6">
+               <VolumetriaCharts 
+                 clientes={clientes}
+                 modalidades={modalidades}
+                 especialidades={especialidades}
+                 categorias={[]}
+                 prioridades={prioridades}
+               />
+             </TabsContent>
 
-            <TabsContent value="medicos" className="mt-6">
-              <VolumetriaMedicosAnalysis 
-                medicos={medicos}
-                modalidades={modalidades}
-                especialidades={especialidades}
-                categorias={categorias}
-                prioridades={prioridades}
-                totalExames={stats.total_exames}
-              />
-            </TabsContent>
+             <TabsContent value="medicos" className="mt-6">
+               <VolumetriaMedicosAnalysis 
+                 medicos={medicos}
+                 modalidades={modalidades}
+                 especialidades={especialidades}
+                 categorias={[]}
+                 prioridades={prioridades}
+                 totalExames={stats.total_exames}
+               />
+             </TabsContent>
 
-            <TabsContent value="delays" className="mt-6">
-              <VolumetriaDelayAnalysis 
-                data={{
-                  clientes: atrasoClientes,
-                  modalidades: atrasoModalidades.map(m => ({...m, atrasados: m.atrasados || 0, percentual_atraso: m.percentual_atraso || 0})),
-                  especialidades: atrasoEspecialidades.map(e => ({...e, atrasados: e.atrasados || 0, percentual_atraso: e.percentual_atraso || 0})),
-                  categorias: atrasoCategorias.map(c => ({...c, atrasados: c.atrasados || 0, percentual_atraso: c.percentual_atraso || 0})),
-                  prioridades: atrasoPrioridades.map(p => ({...p, atrasados: p.atrasados || 0, percentual_atraso: p.percentual_atraso || 0})),
-                  totalAtrasados: stats.total_atrasados,
-                  percentualAtrasoGeral: stats.percentual_atraso,
-                  atrasosComTempo: atrasosComTempo
-                }}
-              />
-            </TabsContent>
+             <TabsContent value="delays" className="mt-6">
+               <VolumetriaDelayAnalysis 
+                 data={{
+                   clientes: atrasoClientes,
+                   modalidades: atrasoModalidades.map(m => ({...m, atrasados: m.atrasados || 0, percentual_atraso: m.percentual_atraso || 0})),
+                   especialidades: atrasoEspecialidades.map(e => ({...e, atrasados: e.atrasados || 0, percentual_atraso: e.percentual_atraso || 0})),
+                   categorias: [],
+                   prioridades: atrasoPrioridades.map(p => ({...p, atrasados: p.atrasados || 0, percentual_atraso: p.percentual_atraso || 0})),
+                   totalAtrasados: stats.total_atrasados,
+                   percentualAtrasoGeral: stats.percentual_atraso,
+                   atrasosComTempo: atrasosComTempo
+                 }}
+               />
+             </TabsContent>
           </Tabs>
         </>
       )}
