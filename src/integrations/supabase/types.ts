@@ -429,6 +429,82 @@ export type Database = {
         }
         Relationships: []
       }
+      coberturas_escala: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_aceite: string | null
+          data_disponibilizacao: string
+          data_fim_cobertura: string
+          data_inicio_cobertura: string
+          escala_original_id: string
+          id: string
+          medico_aceitou_id: string | null
+          medico_ofereceu_id: string
+          motivo_oferecimento: string | null
+          observacoes: string | null
+          status: string
+          tipo_cobertura: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_aceite?: string | null
+          data_disponibilizacao?: string
+          data_fim_cobertura: string
+          data_inicio_cobertura: string
+          escala_original_id: string
+          id?: string
+          medico_aceitou_id?: string | null
+          medico_ofereceu_id: string
+          motivo_oferecimento?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo_cobertura?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_aceite?: string | null
+          data_disponibilizacao?: string
+          data_fim_cobertura?: string
+          data_inicio_cobertura?: string
+          escala_original_id?: string
+          id?: string
+          medico_aceitou_id?: string | null
+          medico_ofereceu_id?: string
+          motivo_oferecimento?: string | null
+          observacoes?: string | null
+          status?: string
+          tipo_cobertura?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coberturas_escala_escala_original_id_fkey"
+            columns: ["escala_original_id"]
+            isOneToOne: false
+            referencedRelation: "escalas_medicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coberturas_escala_medico_aceitou_id_fkey"
+            columns: ["medico_aceitou_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coberturas_escala_medico_ofereceu_id_fkey"
+            columns: ["medico_ofereceu_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracao_protecao: {
         Row: {
           created_at: string
@@ -2841,6 +2917,10 @@ export type Database = {
       }
     }
     Functions: {
+      aceitar_cobertura_escala: {
+        Args: { p_cobertura_id: string; p_medico_aceitou_id: string }
+        Returns: Json
+      }
       analyze_partitioning_need: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -2900,6 +2980,10 @@ export type Database = {
         Returns: string
       }
       enviar_escala_mensal: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      expirar_coberturas_automaticamente: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -2983,6 +3067,21 @@ export type Database = {
           arquivos_processados: string[]
         }[]
       }
+      listar_coberturas_disponiveis: {
+        Args: { p_medico_id: string }
+        Returns: {
+          cobertura_id: string
+          escala_id: string
+          medico_ofereceu_nome: string
+          data_inicio: string
+          data_fim: string
+          turno: string
+          especialidade: string
+          modalidade: string
+          motivo: string
+          dias_restantes_aceite: number
+        }[]
+      }
       log_audit_event: {
         Args: {
           p_table_name: string
@@ -3003,6 +3102,17 @@ export type Database = {
           p_classification?: string
         }
         Returns: string
+      }
+      oferecer_escala_cobertura: {
+        Args: {
+          p_escala_id: string
+          p_medico_id: string
+          p_data_inicio: string
+          p_data_fim: string
+          p_motivo?: string
+          p_tipo_cobertura?: string
+        }
+        Returns: Json
       }
       prepare_partition_structure: {
         Args: { table_name: string; partition_date: string }
