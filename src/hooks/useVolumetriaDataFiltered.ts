@@ -143,77 +143,69 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       console.log('🎯 [DASHBOARD] Ano selecionado:', filters.ano);
       console.log('🏢 [DASHBOARD] Cliente selecionado:', filters.cliente);
       
-      // Fazer query em lotes para carregar TODOS os dados sem limitação
-      let allData: any[] = [];
-      let from = 0;
-      const batchSize = 5000; // Reduzido para melhor performance
-      let hasMore = true;
+      // FORÇAR CARREGAMENTO DIRETO SEM RANGE PARA DEBUG
+      console.log('🚀 [DASHBOARD] FORÇANDO QUERY DIRETA SEM LIMITAÇÃO...');
+      let query = supabase.from('volumetria_mobilemed').select(`
+        EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
+        VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
+      `);
 
       const { startDate, endDate } = buildDateFilter();
       console.log('📊 Período selecionado:', { startDate, endDate });
 
-      while (hasMore) {
-        let query = supabase.from('volumetria_mobilemed').select(`
-          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
-          VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
-        `).range(from, from + batchSize - 1);
-        
-        // Só aplicar filtro de data se AMBOS startDate E endDate existirem E não forem 'todos'
-        if (startDate && endDate && filters.ano !== 'todos') {
-          // Usar data_referencia ao invés de DATA_REALIZACAO para melhor cobertura
-          query = query.gte('data_referencia', startDate).lte('data_referencia', endDate);
-          console.log('🎯 Filtro de data aplicado na data_referencia:', startDate, 'até', endDate);
-        } else {
-          console.log('📊 BUSCANDO TODOS OS REGISTROS (sem filtro de data)');
-        }
-
-        if (filters.cliente !== 'todos') {
-          query = query.eq('EMPRESA', filters.cliente);
-          console.log('🏢 Filtro cliente aplicado:', filters.cliente);
-        }
-        if (filters.modalidade !== 'todos') {
-          query = query.eq('MODALIDADE', filters.modalidade);
-          console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
-        }
-        if (filters.especialidade !== 'todos') {
-          query = query.eq('ESPECIALIDADE', filters.especialidade);
-          console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
-        }
-        if (filters.prioridade !== 'todos') {
-          query = query.eq('PRIORIDADE', filters.prioridade);
-          console.log('⚡ Filtro prioridade aplicado:', filters.prioridade);
-        }
-        if (filters.medico !== 'todos') {
-          query = query.eq('MEDICO', filters.medico);
-          console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
-        }
-
-        const { data: batchData, error } = await query;
-        
-        if (error) throw error;
-
-        if (batchData && batchData.length > 0) {
-          allData = allData.concat(batchData);
-          from += batchSize;
-          
-          console.log(`📦 [DASHBOARD] Lote ${Math.floor(from/batchSize)}: ${batchData.length} registros, total: ${allData.length}`);
-          
-          // Se recebeu menos que o batchSize, não há mais dados
-          if (batchData.length < batchSize) {
-            hasMore = false;
-          }
-        } else {
-          hasMore = false;
-        }
-        
-        // Removido limitador artificial - carregará todos os dados disponíveis
+      // Aplicar filtros se necessário
+      if (startDate && endDate && filters.ano !== 'todos') {
+        query = query.gte('data_referencia', startDate).lte('data_referencia', endDate);
+        console.log('🎯 Filtro de data aplicado na data_referencia:', startDate, 'até', endDate);
+      } else {
+        console.log('📊 BUSCANDO TODOS OS REGISTROS (sem filtro de data)');
       }
-      
-      console.log('📈 [DASHBOARD] Resultado total da query paginada:', {
-        totalRegistros: allData.length,
-        totalLaudos: allData.reduce((sum, item) => sum + (item.VALORES || 0), 0),
-        temErro: false
-      });
+
+      if (filters.cliente !== 'todos') {
+        query = query.eq('EMPRESA', filters.cliente);
+        console.log('🏢 Filtro cliente aplicado:', filters.cliente);
+      }
+      if (filters.modalidade !== 'todos') {
+        query = query.eq('MODALIDADE', filters.modalidade);
+        console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
+      }
+      if (filters.especialidade !== 'todos') {
+        query = query.eq('ESPECIALIDADE', filters.especialidade);
+        console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
+      }
+      if (filters.prioridade !== 'todos') {
+        query = query.eq('PRIORIDADE', filters.prioridade);
+        console.log('⚡ Filtro prioridade aplicado:', filters.prioridade);
+      }
+      if (filters.medico !== 'todos') {
+        query = query.eq('MEDICO', filters.medico);
+        console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
+      }
+
+      const { data: queryResult, error } = await query;
+      let allData = queryResult || [];
+
+      if (error) {
+        console.error('❌ [DASHBOARD] Erro na query direta:', error);
+        throw error;
+      }
+
+      if (!allData || allData.length === 0) {
+        console.log('⚠️ [DASHBOARD] Nenhum dado retornado');
+        setData({
+          stats: {
+            total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
+            total_clientes: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
+            total_prioridades: 0
+          },
+          clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
+          atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoPrioridades: []
+        });
+        return;
+      }
+
+      console.log('✅ [DASHBOARD] Query direta retornou:', allData.length, 'registros');
+      console.log('📈 [DASHBOARD] Total de laudos:', allData.reduce((sum, item) => sum + (item.VALORES || 0), 0));
 
       // Se não temos filtros específicos, usar dados da função agregada do BD para maior precisão
       if (filters.ano === 'todos' && filters.cliente === 'todos' && 
