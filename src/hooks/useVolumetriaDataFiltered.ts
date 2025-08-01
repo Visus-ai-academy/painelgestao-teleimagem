@@ -206,11 +206,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
           hasMore = false;
         }
         
-        // Timeout de segurança para evitar loops infinitos
-        if (from > 1000000) {
-          console.log('⚠️ [DASHBOARD] Limite de segurança atingido: 1M registros');
-          hasMore = false;
-        }
+        // Removido limitador artificial - carregará todos os dados disponíveis
       }
       
       console.log('📈 [DASHBOARD] Resultado total da query paginada:', {
@@ -272,11 +268,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
                   offset += batchSize;
                 }
                 
-                // Timeout de segurança para evitar loops infinitos (2 minutos)
-                if (offset > 500000) {
-                  console.log('⚠️ [DASHBOARD] Limite de segurança atingido: 500k registros');
-                  hasMore = false;
-                }
+                // Removido limitador artificial - carregará todos os dados disponíveis
               }
               
               if (allDataComplete.length > allData.length) {

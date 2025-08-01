@@ -114,11 +114,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             offset += limit;
           }
 
-          // Limite de segurança para evitar loops infinitos
-          if (offset > 100000) {
-            console.log(`⚠️ ${tipo}: Limite de segurança atingido (100k registros)`);
-            hasMoreData = false;
-          }
+          // Removido limitador artificial - carregará todos os dados disponíveis
         }
 
         if (allData.length > 0) {
