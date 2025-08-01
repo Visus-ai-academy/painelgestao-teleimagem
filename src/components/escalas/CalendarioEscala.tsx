@@ -9,7 +9,7 @@ import { CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface CalendarioEscalaProps {
-  onCriarEscala: (escala: any) => void;
+  onCriarEscala: ((escala: any) => void) | ((data: Date, turno: string, tipo: string) => void);
   canManage?: boolean;
   medicoId?: string;
   // Legacy props for EscalaMedica.tsx
@@ -28,20 +28,26 @@ export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
   const [especialidade, setEspecialidade] = useState<string>('');
 
   const handleCriarEscala = () => {
-    if (!datasSelecionadas || datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade) {
+    if (!datasSelecionadas?.length || !turno || !modalidade || !especialidade) {
       return;
     }
 
     datasSelecionadas.forEach(data => {
-      const escala = {
-        data: format(data, 'yyyy-MM-dd'),
-        turno,
-        modalidade,
-        especialidade,
-        tipo_escala: 'normal',
-        status: 'pendente'
-      };
-      onCriarEscala(escala);
+      // Check if onCriarEscala expects 3 parameters (legacy interface)
+      if (onCriarEscala.length === 3) {
+        (onCriarEscala as (data: Date, turno: string, tipo: string) => void)(data, turno, 'normal');
+      } else {
+        // New interface with escala object
+        const escala = {
+          data: format(data, 'yyyy-MM-dd'),
+          turno,
+          modalidade,
+          especialidade,
+          tipo_escala: 'normal',
+          status: 'pendente'
+        };
+        (onCriarEscala as (escala: any) => void)(escala);
+      }
     });
 
     setDatasSelecionadas(undefined);
@@ -111,7 +117,7 @@ export const CalendarioEscala: React.FC<CalendarioEscalaProps> = ({
 
           <Button 
             onClick={handleCriarEscala}
-            disabled={!datasSelecionadas || datasSelecionadas.length === 0 || !turno || !modalidade || !especialidade}
+            disabled={!datasSelecionadas?.length || !turno || !modalidade || !especialidade}
             className="w-full"
           >
             <CalendarDays className="h-4 w-4 mr-2" />
