@@ -22,7 +22,7 @@ import { useEscalasAvancadas } from '@/hooks/useEscalasAvancadas';
 import { CalendarioEscala } from '@/components/escalas/CalendarioEscala';
 import { GerenciadorAusencias } from '@/components/escalas/GerenciadorAusencias';
 import { EscalaMensal } from '@/components/escalas/EscalaMensal';
-import { ControlePresenca } from '@/components/escalas/ControlePresenca';
+import { ControleAtivacao } from '@/components/escalas/ControleAtivacao';
 import { SistemaCoberturas } from '@/components/escalas/SistemaCoberturas';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -187,9 +187,9 @@ export default function Escala() {
               <Users className="h-4 w-4" />
               Coberturas
             </TabsTrigger>
-            <TabsTrigger value="presenca" className="flex items-center gap-2">
+            <TabsTrigger value="ativacao" className="flex items-center gap-2">
               <UserCheck className="h-4 w-4" />
-              Presença
+              Ativação
             </TabsTrigger>
             <TabsTrigger value="ausencias" className="flex items-center gap-2">
               <UserX className="h-4 w-4" />
@@ -227,8 +227,8 @@ export default function Escala() {
             />
           </TabsContent>
 
-          <TabsContent value="presenca" className="space-y-6">
-            <ControlePresenca />
+          <TabsContent value="ativacao" className="space-y-6">
+            <ControleAtivacao />
           </TabsContent>
 
           <TabsContent value="ausencias" className="space-y-6">

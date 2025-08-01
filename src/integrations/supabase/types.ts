@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      ativacao_medico: {
+        Row: {
+          alerta_ativo: boolean | null
+          checkout_automatico: boolean | null
+          created_at: string
+          data_ativacao: string
+          dispositivo_info: Json | null
+          escala_id: string
+          horario_checkin: string | null
+          horario_checkout: string | null
+          id: string
+          ip_address: unknown | null
+          medico_id: string
+          observacoes: string | null
+          status_ativacao: string
+          updated_at: string
+        }
+        Insert: {
+          alerta_ativo?: boolean | null
+          checkout_automatico?: boolean | null
+          created_at?: string
+          data_ativacao: string
+          dispositivo_info?: Json | null
+          escala_id: string
+          horario_checkin?: string | null
+          horario_checkout?: string | null
+          id?: string
+          ip_address?: unknown | null
+          medico_id: string
+          observacoes?: string | null
+          status_ativacao?: string
+          updated_at?: string
+        }
+        Update: {
+          alerta_ativo?: boolean | null
+          checkout_automatico?: boolean | null
+          created_at?: string
+          data_ativacao?: string
+          dispositivo_info?: Json | null
+          escala_id?: string
+          horario_checkin?: string | null
+          horario_checkout?: string | null
+          id?: string
+          ip_address?: unknown | null
+          medico_id?: string
+          observacoes?: string | null
+          status_ativacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presenca_medico_escala_id_fkey"
+            columns: ["escala_id"]
+            isOneToOne: false
+            referencedRelation: "escalas_medicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           id: string
@@ -1518,43 +1577,43 @@ export type Database = {
         }
         Relationships: []
       }
-      logs_presenca: {
+      logs_ativacao: {
         Row: {
           acao: string
+          ativacao_id: string
           id: string
           ip_address: unknown | null
           medico_id: string
           observacoes: string | null
-          presenca_id: string
           timestamp_acao: string
           user_agent: string | null
         }
         Insert: {
           acao: string
+          ativacao_id: string
           id?: string
           ip_address?: unknown | null
           medico_id: string
           observacoes?: string | null
-          presenca_id: string
           timestamp_acao?: string
           user_agent?: string | null
         }
         Update: {
           acao?: string
+          ativacao_id?: string
           id?: string
           ip_address?: unknown | null
           medico_id?: string
           observacoes?: string | null
-          presenca_id?: string
           timestamp_acao?: string
           user_agent?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "logs_presenca_presenca_id_fkey"
-            columns: ["presenca_id"]
+            foreignKeyName: "logs_ativacao_ativacao_id_fkey"
+            columns: ["ativacao_id"]
             isOneToOne: false
-            referencedRelation: "presenca_medico"
+            referencedRelation: "ativacao_medico"
             referencedColumns: ["id"]
           },
         ]
@@ -2027,65 +2086,6 @@ export type Database = {
             columns: ["prioridade_id"]
             isOneToOne: false
             referencedRelation: "prioridades"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      presenca_medico: {
-        Row: {
-          alerta_ativo: boolean | null
-          checkout_automatico: boolean | null
-          created_at: string
-          data_presenca: string
-          dispositivo_info: Json | null
-          escala_id: string
-          horario_checkin: string | null
-          horario_checkout: string | null
-          id: string
-          ip_address: unknown | null
-          medico_id: string
-          observacoes: string | null
-          status_presenca: string
-          updated_at: string
-        }
-        Insert: {
-          alerta_ativo?: boolean | null
-          checkout_automatico?: boolean | null
-          created_at?: string
-          data_presenca: string
-          dispositivo_info?: Json | null
-          escala_id: string
-          horario_checkin?: string | null
-          horario_checkout?: string | null
-          id?: string
-          ip_address?: unknown | null
-          medico_id: string
-          observacoes?: string | null
-          status_presenca?: string
-          updated_at?: string
-        }
-        Update: {
-          alerta_ativo?: boolean | null
-          checkout_automatico?: boolean | null
-          created_at?: string
-          data_presenca?: string
-          dispositivo_info?: Json | null
-          escala_id?: string
-          horario_checkin?: string | null
-          horario_checkout?: string | null
-          id?: string
-          ip_address?: unknown | null
-          medico_id?: string
-          observacoes?: string | null
-          status_presenca?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "presenca_medico_escala_id_fkey"
-            columns: ["escala_id"]
-            isOneToOne: false
-            referencedRelation: "escalas_medicas"
             referencedColumns: ["id"]
           },
         ]
@@ -3087,7 +3087,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      fazer_checkin_presenca: {
+      fazer_checkin_ativacao: {
         Args: {
           p_escala_id: string
           p_ip_address?: unknown
@@ -3095,8 +3095,8 @@ export type Database = {
         }
         Returns: Json
       }
-      fazer_checkout_presenca: {
-        Args: { p_presenca_id: string; p_observacoes?: string }
+      fazer_checkout_ativacao: {
+        Args: { p_ativacao_id: string; p_observacoes?: string }
         Returns: Json
       }
       get_clientes_com_volumetria: {
@@ -3215,17 +3215,17 @@ export type Database = {
         }
         Returns: string
       }
-      obter_status_presenca_atual: {
+      obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
-          presenca_id: string
+          ativacao_id: string
           medico_id: string
           medico_nome: string
           escala_id: string
-          data_presenca: string
+          data_ativacao: string
           horario_checkin: string
           horario_checkout: string
-          status_presenca: string
+          status_ativacao: string
           alerta_ativo: boolean
           tempo_online: unknown
         }[]

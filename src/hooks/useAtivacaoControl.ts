@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-export interface PresencaStatus {
-  presenca_id: string;
+export interface AtivacaoStatus {
+  ativacao_id: string;
   medico_id: string;
   medico_nome: string;
   escala_id: string;
-  data_presenca: string;
+  data_ativacao: string;
   horario_checkin: string | null;
   horario_checkout: string | null;
-  status_presenca: string;
+  status_ativacao: string;
   alerta_ativo: boolean;
   tempo_online: unknown;
 }
@@ -18,7 +18,7 @@ export interface PresencaStatus {
 interface CheckinResponse {
   sucesso: boolean;
   erro?: string;
-  presenca_id?: string;
+  ativacao_id?: string;
   horario_checkin?: string;
   status?: string;
 }
@@ -31,25 +31,25 @@ interface CheckoutResponse {
   alerta_ativo?: boolean;
 }
 
-export const usePresencaControl = () => {
-  const [presencaAtual, setPresencaAtual] = useState<PresencaStatus | null>(null);
-  const [statusGeral, setStatusGeral] = useState<PresencaStatus[]>([]);
+export const useAtivacaoControl = () => {
+  const [ativacaoAtual, setAtivacaoAtual] = useState<AtivacaoStatus | null>(null);
+  const [statusGeral, setStatusGeral] = useState<AtivacaoStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Buscar status atual de presença
-  const fetchPresencaStatus = useCallback(async () => {
+  // Buscar status atual de ativação
+  const fetchAtivacaoStatus = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('obter_status_presenca_atual');
+      const { data, error } = await supabase.rpc('obter_status_ativacao_atual');
       
       if (error) {
-        console.error('Erro ao buscar status de presença:', error);
+        console.error('Erro ao buscar status de ativação:', error);
         return;
       }
 
       setStatusGeral(data || []);
       
-      // Encontrar presença do usuário atual
+      // Encontrar ativação do usuário atual
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: medicoData } = await supabase
@@ -59,12 +59,12 @@ export const usePresencaControl = () => {
           .single();
         
         if (medicoData) {
-          const presencaUsuario = data?.find(p => p.medico_id === medicoData.id);
-          setPresencaAtual(presencaUsuario || null);
+          const ativacaoUsuario = data?.find((a: AtivacaoStatus) => a.medico_id === medicoData.id);
+          setAtivacaoAtual(ativacaoUsuario || null);
         }
       }
     } catch (err) {
-      console.error('Erro ao buscar presença:', err);
+      console.error('Erro ao buscar ativação:', err);
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ export const usePresencaControl = () => {
   // Fazer check-in
   const fazerCheckin = async (escalaId: string) => {
     try {
-      const { data, error } = await supabase.rpc('fazer_checkin_presenca', {
+      const { data, error } = await supabase.rpc('fazer_checkin_ativacao', {
         p_escala_id: escalaId,
         p_ip_address: null, // Poderia capturar IP real
         p_dispositivo_info: {
@@ -89,9 +89,9 @@ export const usePresencaControl = () => {
       if (response.sucesso) {
         toast({
           title: "Check-in realizado",
-          description: "Você está presente e pronto para receber exames!",
+          description: "Você está ativo e pronto para receber exames!",
         });
-        await fetchPresencaStatus();
+        await fetchAtivacaoStatus();
         return { success: true, data: response };
       } else {
         toast({
@@ -113,10 +113,10 @@ export const usePresencaControl = () => {
   };
 
   // Fazer check-out manual
-  const fazerCheckout = async (presencaId: string, observacoes?: string) => {
+  const fazerCheckout = async (ativacaoId: string, observacoes?: string) => {
     try {
-      const { data, error } = await supabase.rpc('fazer_checkout_presenca', {
-        p_presenca_id: presencaId,
+      const { data, error } = await supabase.rpc('fazer_checkout_ativacao', {
+        p_ativacao_id: ativacaoId,
         p_observacoes: observacoes
       });
 
@@ -130,7 +130,7 @@ export const usePresencaControl = () => {
           description: "Você saiu do turno. Alerta ativo para a equipe.",
           variant: "destructive", // Alerta vermelho
         });
-        await fetchPresencaStatus();
+        await fetchAtivacaoStatus();
         return { success: true, data: response };
       } else {
         toast({
@@ -184,40 +184,40 @@ export const usePresencaControl = () => {
 
   // Setup realtime subscriptions
   useEffect(() => {
-    fetchPresencaStatus();
+    fetchAtivacaoStatus();
 
     // Subscription para mudanças em tempo real
     const channel = supabase
-      .channel('presenca-changes')
+      .channel('ativacao-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'presenca_medico'
+          table: 'ativacao_medico'
         },
         () => {
-          fetchPresencaStatus();
+          fetchAtivacaoStatus();
         }
       )
       .subscribe();
 
     // Atualizar status periodicamente (para checkout automático)
-    const interval = setInterval(fetchPresencaStatus, 60000); // A cada minuto
+    const interval = setInterval(fetchAtivacaoStatus, 60000); // A cada minuto
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [fetchPresencaStatus]);
+  }, [fetchAtivacaoStatus]);
 
   return {
-    presencaAtual,
+    ativacaoAtual,
     statusGeral,
     loading,
     fazerCheckin,
     fazerCheckout,
     verificarEscalaHoje,
-    refetch: fetchPresencaStatus
+    refetch: fetchAtivacaoStatus
   };
 };
