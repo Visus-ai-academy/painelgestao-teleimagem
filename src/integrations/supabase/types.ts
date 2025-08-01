@@ -2344,6 +2344,7 @@ export type Database = {
         Row: {
           ACCESSION_NUMBER: string | null
           arquivo_fonte: string
+          CATEGORIA: string | null
           CODIGO_INTERNO: number | null
           CODIGO_PACIENTE: string | null
           COMPLEMENTAR: string | null
@@ -2387,6 +2388,7 @@ export type Database = {
         Insert: {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte: string
+          CATEGORIA?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
@@ -2430,6 +2432,7 @@ export type Database = {
         Update: {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte?: string
+          CATEGORIA?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
@@ -2619,6 +2622,10 @@ export type Database = {
     }
     Functions: {
       analyze_partitioning_need: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      aplicar_categorias_volumetria: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }

@@ -154,7 +154,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
 
       while (hasMore) {
         let query = supabase.from('volumetria_mobilemed').select(`
-          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE,
+          EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
           VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
         `).range(from, from + batchSize - 1);
         
@@ -249,7 +249,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
                 const { data: batchData, error } = await supabase
                   .from('volumetria_mobilemed')
                   .select(`
-                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE,
+                    EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
                     VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
                   `)
                   .range(offset, offset + batchSize - 1);
