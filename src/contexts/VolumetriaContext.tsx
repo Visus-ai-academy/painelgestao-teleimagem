@@ -64,9 +64,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   const lastLoadTime = useRef(0);
 
   const loadStats = useCallback(async () => {
-    // Evitar chamadas duplicadas e muito frequentes
+    // Evitar chamadas duplicadas mas permitir forçar reload
     const now = Date.now();
-    if (isLoadingRef.current || (now - lastLoadTime.current < 2000)) {
+    if (isLoadingRef.current) {
       return;
     }
     
@@ -173,6 +173,8 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = useCallback(async () => {
+    console.log('🔄 Forçando refresh dos dados...');
+    lastLoadTime.current = 0; // Invalidar cache
     setData(prev => ({ ...prev, loading: true }));
     await loadStats();
   }, [loadStats]);
@@ -254,12 +256,32 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'volumetria_mobilemed'
         },
         () => {
-          console.log('🔄 Dados alterados - programando atualização...');
-          // Debounce de 3 segundos para evitar múltiplas atualizações
+          console.log('🔄 Dados de volumetria alterados - atualizando imediatamente...');
+          // Invalidar cache e recarregar imediatamente
+          lastLoadTime.current = 0;
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             loadStats();
-          }, 3000);
+          }, 1000); // Reduzido para 1 segundo
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'processamento_uploads'
+        },
+        (payload) => {
+          console.log('🔄 Status de upload alterado - atualizando...', payload);
+          // Invalidar cache e recarregar quando upload finaliza
+          if (payload.new && (payload.new as any).status === 'concluido') {
+            lastLoadTime.current = 0;
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              loadStats();
+            }, 2000);
+          }
         }
       )
       .subscribe();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
@@ -84,13 +85,27 @@ export default function Volumetria() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
-        <p className="text-muted-foreground mt-1">
-          Análise executiva completa de volumetria - 
-          {stats.total_exames.toLocaleString()} laudos | 
-          {stats.total_clientes} clientes ativos
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard Volumetria</h1>
+          <p className="text-muted-foreground mt-1">
+            Análise executiva completa de volumetria - 
+            {stats.total_exames.toLocaleString()} laudos | 
+            {stats.total_clientes} clientes ativos
+          </p>
+        </div>
+        <Button 
+          onClick={() => {
+            console.log('🔄 Refresh manual iniciado...');
+            refreshData();
+          }}
+          variant="outline" 
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Atualizar Dados
+        </Button>
       </div>
 
       {/* Filtros Avançados */}
