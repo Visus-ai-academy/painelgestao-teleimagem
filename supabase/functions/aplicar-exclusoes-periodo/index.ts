@@ -8,6 +8,8 @@ const corsHeaders = {
 
 // Função para calcular datas do período de faturamento
 function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
+  console.log(`🗓️ Calculando datas para período: ${periodoReferencia}`);
+  
   const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
   
   const meses = {
@@ -32,18 +34,28 @@ function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
     throw new Error(`Período inválido: ${periodoReferencia}`);
   }
   
-  // Data limite para DATA_REALIZACAO (EXCLUIR a partir de 01/XX/2025 INCLUSIVE)
+  console.log(`📅 Mês: ${mes}, Ano: ${ano}`);
+  
+  // Data limite para DATA_REALIZACAO: 01 do mês especificado (INCLUSIVE)
+  // Para Jun/25 = 01/06/2025 (excluir >= 01/06/2025)
   const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
   
-  // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
+  // Período de faturamento: dia 8 do mês ANTERIOR ao especificado até dia 7 do mês especificado
+  // Para Jun/25: 08/05/2025 a 07/06/2025
   const inicioFaturamento = new Date(ano, mes - 2, 8);
   const fimFaturamento = new Date(ano, mes - 1, 7);
   
-  return {
+  const result = {
     dataLimiteRealizacao: dataLimiteRealizacao.toISOString().split('T')[0],
     inicioFaturamento: inicioFaturamento.toISOString().split('T')[0],
     fimFaturamento: fimFaturamento.toISOString().split('T')[0]
   };
+  
+  console.log(`📊 Datas calculadas:`);
+  console.log(`   - Excluir DATA_REALIZACAO >= ${result.dataLimiteRealizacao}`);
+  console.log(`   - Manter DATA_LAUDO entre ${result.inicioFaturamento} e ${result.fimFaturamento}`);
+  
+  return result;
 }
 
 export default async function handler(req: Request): Promise<Response> {
