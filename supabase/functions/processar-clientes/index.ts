@@ -70,6 +70,16 @@ serve(async (req) => {
     console.log('=== ANÁLISE DETALHADA DOS DADOS ===')
     console.log('Dados extraídos do Excel:', jsonData.length, 'linhas')
     
+    // CONTAGEM ESPECÍFICA DOS CAMPOS DO USUÁRIO
+    const nomeMobileMedCount = jsonData.filter(row => row['Contagem de Cliente (Nome Fantasia)'] || row['NOME_MOBILEMED']).length;
+    const nomeFantasiaCount = jsonData.filter(row => row['Nome_Fantasia'] || row['nome']).length;
+    const cnpjCount = jsonData.filter(row => row['cnpj'] && row['cnpj'].toString().trim() !== '').length;
+    
+    console.log('=== CONTAGEM ESPECÍFICA DOS CAMPOS ===')
+    console.log('Registros com NOME_MOBILEMED/Nome Fantasia:', nomeMobileMedCount)
+    console.log('Registros com Nome_Fantasia:', nomeFantasiaCount)
+    console.log('Registros com CNPJ válido:', cnpjCount)
+    
     if (jsonData.length > 0) {
       console.log('Primeira linha de exemplo:', JSON.stringify(jsonData[0], null, 2))
       console.log('Cabeçalhos disponíveis:', Object.keys(jsonData[0] || {}))
