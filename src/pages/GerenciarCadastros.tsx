@@ -6,12 +6,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleFileUpload } from '@/components/SimpleFileUpload';
 import { CadastroDataTable } from '@/components/CadastroDataTable';
-import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle } from "lucide-react";
+import { ValoresReferenciaTable } from '@/components/ValoresReferenciaTable';
+import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CompactUploadStatus } from '@/components/CompactUploadStatus';
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { 
   useCadastroExames, 
   useQuebraExames, 
@@ -53,6 +55,7 @@ export default function GerenciarCadastros() {
   const especialidadesData = useEspecialidades();
   const categoriasData = useCategoriasExame();
   const prioridadesData = usePrioridades();
+  const valoresReferenciaData = useValoresReferencia();
 
   // Handler para limpar cadastros (individualizado)
   const handleClearCadastros = async () => {
@@ -353,6 +356,37 @@ export default function GerenciarCadastros() {
     setRefreshStatusPanel(prev => prev + 1);
   };
 
+  // Handler para valores de referência de-para
+  const handleUploadValoresReferencia = async (file: File) => {
+    console.log('🔄 Iniciando upload de valores de referência:', file.name);
+    
+    // Primeiro, fazer upload do arquivo para o storage
+    const fileName = `de-para-${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      throw new Error(`Erro no upload: ${uploadError.message}`);
+    }
+
+    // Processar o arquivo
+    const { data, error } = await supabase.functions.invoke('processar-valores-de-para', {
+      body: { fileName }
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Valores De-Para Processados!",
+      description: `${data.valores_inseridos} valores cadastrados com sucesso`,
+    });
+    
+    // Recarregar dados e status
+    valoresReferenciaData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
+  };
+
   // Handler para dados legados
   const handleUploadLegado = async (file: File, tipoArquivo: string, periodoReferencia: string, descricao?: string) => {
     console.log('🔄 Iniciando upload de dados legados:', file.name);
@@ -401,12 +435,13 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-11">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
+          <TabsTrigger value="de-para">De-Para</TabsTrigger>
           <TabsTrigger value="legado">Legado</TabsTrigger>
           <TabsTrigger value="modalidades">Modalidades</TabsTrigger>
           <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
@@ -589,6 +624,36 @@ export default function GerenciarCadastros() {
                   type="repasse"
                   title="Valores de Repasse Cadastrados"
                 />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* De-Para Exames */}
+        <TabsContent value="de-para">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                De-Para Exames (Valores de Referência)
+              </CardTitle>
+              <CardDescription>
+                Upload de planilha com valores de referência para exames fora de padrão. Estes valores são aplicados automaticamente quando detectados exames com valores zerados.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <SimpleFileUpload
+                    title="Upload De-Para Exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    onUpload={handleUploadValoresReferencia}
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-8">
+                <ValoresReferenciaTable />
               </div>
             </CardContent>
           </Card>
