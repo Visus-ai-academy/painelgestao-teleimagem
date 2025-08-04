@@ -8,20 +8,32 @@ const corsHeaders = {
 };
 
 interface ParametroRow {
-  cliente_nome?: string;
-  tipo_cliente?: string;
-  aplicar_franquia?: boolean;
-  volume_franquia?: number;
-  valor_franquia?: number;
-  valor_acima_franquia?: number;
-  aplicar_adicional_urgencia?: boolean;
-  percentual_adicional_urgencia?: number;
-  cobrar_integracao?: boolean;
-  valor_integracao?: number;
-  dia_fechamento?: number;
-  forma_cobranca?: string;
-  data_aniversario_contrato?: string;
-  observacoes?: string;
+  "Nome Empresa"?: string;
+  "Cliente Consolidado"?: string;
+  "Status"?: string;
+  "Impostos abMin"?: string;
+  "Simples"?: string;
+  "Tipo métrica convênio"?: string;
+  "Valor convênio"?: number;
+  "Tipo métrica URGÊNCIA"?: string;
+  "Valor URGÊNCIA"?: number;
+  "Tipo Desconto / Acréscimo"?: string;
+  "Desconto / Acréscimo"?: number;
+  "Integração"?: string;
+  "Data Início Integração"?: string;
+  "Portal de Laudos"?: string;
+  "% ISS"?: number;
+  "Possui Franquia"?: string;
+  "Valor Franquia"?: number;
+  "Frequencia Contínua"?: string;
+  "Frequência por volume"?: string;
+  "Volume"?: number;
+  "R$ Valor Franquia Acima Volume"?: number;
+  "Data Início Franquia"?: string;
+  "Cobrar URGÊNCIA como ROTINA"?: string;
+  "Incluir Empresa Origem"?: string;
+  "Incluir Acces Number"?: string;
+  "Incluir Médico Solicitante"?: string;
 }
 
 serve(async (req) => {
@@ -67,31 +79,43 @@ serve(async (req) => {
       processados++;
 
       try {
-        if (!row.cliente_nome) {
-          throw new Error('Campo cliente_nome é obrigatório');
+        if (!row["Nome Empresa"]) {
+          throw new Error('Campo "Nome Empresa" é obrigatório');
         }
 
         // Preparar dados do parâmetro
         const parametroData = {
-          cliente_id: clienteMap.get(row.cliente_nome.toLowerCase().trim()),
-          tipo_cliente: row.tipo_cliente?.trim() || 'CO',
-          aplicar_franquia: row.aplicar_franquia !== false,
-          volume_franquia: row.volume_franquia ? Number(row.volume_franquia) : null,
-          valor_franquia: row.valor_franquia ? Number(row.valor_franquia) : null,
-          valor_acima_franquia: row.valor_acima_franquia ? Number(row.valor_acima_franquia) : null,
-          aplicar_adicional_urgencia: row.aplicar_adicional_urgencia !== false,
-          percentual_adicional_urgencia: row.percentual_adicional_urgencia ? Number(row.percentual_adicional_urgencia) : 50,
-          cobrar_integracao: row.cobrar_integracao !== false,
-          valor_integracao: row.valor_integracao ? Number(row.valor_integracao) : null,
-          dia_fechamento: row.dia_fechamento ? Number(row.dia_fechamento) : 7,
-          forma_cobranca: row.forma_cobranca?.trim() || 'mensal',
-          data_aniversario_contrato: row.data_aniversario_contrato ? new Date(row.data_aniversario_contrato).toISOString().split('T')[0] : null,
-          observacoes: row.observacoes?.trim() || null,
+          cliente_id: clienteMap.get(row["Nome Empresa"].toLowerCase().trim()),
+          cliente_consolidado: row["Cliente Consolidado"]?.trim() || null,
+          status: row["Status"]?.trim() || 'ativo',
+          impostos_abmin: row["Impostos abMin"]?.trim() || null,
+          simples: row["Simples"]?.trim() || null,
+          tipo_metrica_convenio: row["Tipo métrica convênio"]?.trim() || null,
+          valor_convenio: row["Valor convênio"] ? Number(row["Valor convênio"]) : null,
+          tipo_metrica_urgencia: row["Tipo métrica URGÊNCIA"]?.trim() || null,
+          valor_urgencia: row["Valor URGÊNCIA"] ? Number(row["Valor URGÊNCIA"]) : null,
+          tipo_desconto_acrescimo: row["Tipo Desconto / Acréscimo"]?.trim() || null,
+          desconto_acrescimo: row["Desconto / Acréscimo"] ? Number(row["Desconto / Acréscimo"]) : null,
+          integracao: row["Integração"]?.trim() || null,
+          data_inicio_integracao: row["Data Início Integração"] ? new Date(row["Data Início Integração"]).toISOString().split('T')[0] : null,
+          portal_laudos: row["Portal de Laudos"]?.trim() || null,
+          percentual_iss: row["% ISS"] ? Number(row["% ISS"]) : null,
+          possui_franquia: row["Possui Franquia"]?.trim()?.toLowerCase() === 'sim',
+          valor_franquia: row["Valor Franquia"] ? Number(row["Valor Franquia"]) : null,
+          frequencia_continua: row["Frequencia Contínua"]?.trim() || null,
+          frequencia_por_volume: row["Frequência por volume"]?.trim() || null,
+          volume: row["Volume"] ? Number(row["Volume"]) : null,
+          valor_franquia_acima_volume: row["R$ Valor Franquia Acima Volume"] ? Number(row["R$ Valor Franquia Acima Volume"]) : null,
+          data_inicio_franquia: row["Data Início Franquia"] ? new Date(row["Data Início Franquia"]).toISOString().split('T')[0] : null,
+          cobrar_urgencia_como_rotina: row["Cobrar URGÊNCIA como ROTINA"]?.trim()?.toLowerCase() === 'sim',
+          incluir_empresa_origem: row["Incluir Empresa Origem"]?.trim()?.toLowerCase() === 'sim',
+          incluir_access_number: row["Incluir Acces Number"]?.trim()?.toLowerCase() === 'sim',
+          incluir_medico_solicitante: row["Incluir Médico Solicitante"]?.trim()?.toLowerCase() === 'sim',
           ativo: true
         };
 
         if (!parametroData.cliente_id) {
-          throw new Error(`Cliente não encontrado: ${row.cliente_nome}`);
+          throw new Error(`Cliente não encontrado: ${row["Nome Empresa"]}`);
         }
 
         // Verificar se já existe
@@ -120,7 +144,7 @@ serve(async (req) => {
           inseridos++;
         }
 
-        console.log(`Linha ${i + 1}: Processada com sucesso - ${row.cliente_nome}`);
+        console.log(`Linha ${i + 1}: Processada com sucesso - ${row["Nome Empresa"]}`);
 
       } catch (error: any) {
         erros++;
