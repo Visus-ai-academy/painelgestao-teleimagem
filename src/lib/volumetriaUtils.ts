@@ -543,9 +543,15 @@ export async function processVolumetriaOtimizado(
   onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
 ): Promise<{ success: boolean; message: string; stats: any }> {
   console.log('🚀 Iniciando processamento otimizado de volumetria:', arquivoFonte);
+  console.log('📅 Período para processamento:', periodo);
   
-  // Para todos os arquivos, usar o processamento direto e robusto
   try {
+    // Para arquivos retroativos, SEMPRE usar o edge function que aplica exclusões por período
+    if (arquivoFonte.includes('retroativo') && periodo) {
+      return await processVolumetriaComEdgeFunction(file, arquivoFonte, periodo, onProgress);
+    }
+    
+    // Para outros arquivos, usar processamento local
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     return {
       success: result.success,
@@ -559,5 +565,58 @@ export async function processVolumetriaOtimizado(
   } catch (error) {
     console.error(`❌ Erro no processamento de ${arquivoFonte}:`, error);
     throw error;
+  }
+}
+
+// Função para processar através do edge function otimizado (aplica exclusões por período)
+async function processVolumetriaComEdgeFunction(
+  file: File,
+  arquivoFonte: string,
+  periodo: { ano: number; mes: number },
+  onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
+): Promise<{ success: boolean; message: string; stats: any }> {
+  console.log('🔧 Usando edge function para processamento com exclusões por período...');
+  
+  // Preparar FormData para envio
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('arquivo_fonte', arquivoFonte);
+  formData.append('periodo', JSON.stringify(periodo));
+  
+  // Simular progresso durante upload
+  if (onProgress) {
+    onProgress({ progress: 10, processed: 0, total: 100, status: 'Enviando arquivo...' });
+  }
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
+      body: formData
+    });
+    
+    if (error) {
+      console.error('❌ Erro no edge function:', error);
+      throw new Error(`Erro no processamento: ${error.message}`);
+    }
+    
+    if (onProgress) {
+      onProgress({ progress: 100, processed: 100, total: 100, status: 'Processamento concluído!' });
+    }
+    
+    console.log('✅ Resultado do edge function:', data);
+    
+    return {
+      success: data.success,
+      message: data.message || 'Processamento concluído com aplicação de regras',
+      stats: {
+        total_rows: data.stats?.total_rows_arquivo || 0,
+        inserted_count: data.stats?.registros_FINAIS_banco || 0,
+        error_count: data.stats?.error_count || 0,
+        excluded_count: data.stats?.registros_FISICAMENTE_excluidos || 0,
+        updated_count: data.stats?.registros_dados_tratados || 0
+      }
+    };
+  } catch (error) {
+    console.error('💥 Erro crítico no edge function:', error);
+    throw new Error(`Falha no processamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
   }
 }
