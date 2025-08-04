@@ -135,30 +135,30 @@ export async function processContratosFile(file: File) {
 }
 
 export async function processClientesFile(file: File) {
+  console.log('📁 Processando arquivo de clientes (versão simples):', file.name);
+  
   try {
-    console.log('Iniciando processamento de clientes para arquivo:', file.name)
-    
     const fileName = `clientes_${Date.now()}_${file.name}`
-    console.log('Fazendo upload do arquivo:', fileName)
+    console.log('📤 Fazendo upload do arquivo:', fileName)
     
     await uploadFile(file, 'uploads', fileName)
-    console.log('Upload concluído, chamando edge function...')
+    console.log('✅ Upload concluído, chamando edge function simples...')
 
-    const { data, error } = await supabase.functions.invoke('processar-importacao-inteligente', {
+    const { data, error } = await supabase.functions.invoke('processar-clientes-simples', {
       body: { fileName }
     })
 
-    console.log('Resposta da edge function processar-importacao-inteligente:', { data, error })
+    console.log('📊 Resposta da edge function processar-clientes-simples:', { data, error })
 
     if (error) {
-      console.error('Erro da edge function processar-importacao-inteligente:', error)
+      console.error('❌ Erro da edge function processar-clientes-simples:', error)
       throw new Error(`Erro ao processar clientes: ${error.message}`)
     }
 
-    console.log('Processamento de clientes concluído com sucesso')
+    console.log('✅ Processamento de clientes concluído com sucesso')
     return data
   } catch (error) {
-    console.error('Erro no processamento de clientes:', error)
+    console.error('❌ Erro no processamento de clientes:', error)
     throw error
   }
 }
