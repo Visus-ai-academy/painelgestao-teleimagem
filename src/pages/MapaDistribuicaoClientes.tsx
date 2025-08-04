@@ -17,6 +17,7 @@ interface ClienteVolumetria {
   status: string;
   ativo: boolean;
   email?: string;
+  tipo_cliente?: string;
   volume_exames: number;
   total_registros: number;
   // Remover valor_total pois não há preços configurados ainda
@@ -80,6 +81,7 @@ export default function MapaDistribuicaoClientes() {
   const [filtroModalidade, setFiltroModalidade] = useState<string>('todas');
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>('todas');
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>('todas');
+  const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
   const [filtroMes, setFiltroMes] = useState<string>('todos');
   const [filtroAno, setFiltroAno] = useState<string>('2025');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
@@ -93,7 +95,7 @@ export default function MapaDistribuicaoClientes() {
       // Buscar clientes ativos
       const { data: clientes, error: clientesError } = await supabase
         .from('clientes')
-        .select('id, nome, endereco, cidade, estado, status, ativo, email')
+        .select('id, nome, endereco, cidade, estado, status, ativo, email, tipo_cliente')
         .eq('ativo', true)
         .eq('status', 'Ativo');
 
@@ -202,6 +204,12 @@ export default function MapaDistribuicaoClientes() {
     // Filtrar clientes baseado nos filtros selecionados
     let clientesFiltrados = clientes;
 
+    if (filtroTipoCliente !== 'todos') {
+      clientesFiltrados = clientesFiltrados.filter(c => 
+        c.tipo_cliente === filtroTipoCliente
+      );
+    }
+
     if (filtroModalidade !== 'todas') {
       clientesFiltrados = clientesFiltrados.filter(c => 
         c.modalidades.includes(filtroModalidade)
@@ -282,7 +290,7 @@ export default function MapaDistribuicaoClientes() {
     if (clientesVolumetria.length > 0) {
       processarEstatisticas(clientesVolumetria);
     }
-  }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, clientesVolumetria]);
+  }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, filtroTipoCliente, clientesVolumetria]);
 
   // Recarregar dados quando filtros de data mudarem
   useEffect(() => {
@@ -297,6 +305,7 @@ export default function MapaDistribuicaoClientes() {
   const modalidadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.modalidades))];
   const especialidadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.especialidades))];
   const prioridadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.prioridades))];
+  const tiposClienteUnicos = [...new Set(clientesVolumetria.map(c => c.tipo_cliente).filter(Boolean))];
 
   const totalGeral = {
     clientes: clientesVolumetria.length,
@@ -340,7 +349,24 @@ export default function MapaDistribuicaoClientes() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo Cliente</label>
+              <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="CO">CO - Cooperado</SelectItem>
+                  <SelectItem value="NC">NC - Não Cooperado</SelectItem>
+                  {tiposClienteUnicos.filter(tipo => tipo && !['CO', 'NC'].includes(tipo)).map(tipo => (
+                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Ano</label>
               <Select value={filtroAno} onValueChange={setFiltroAno}>
