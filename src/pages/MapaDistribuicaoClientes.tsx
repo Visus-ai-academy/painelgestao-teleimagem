@@ -347,7 +347,8 @@ export default function MapaDistribuicaoClientes() {
           email,
           cnpj
         `)
-        .eq('ativo', true);
+        .eq('ativo', true)
+        .order('nome');
       
       if (supabaseError) {
         throw supabaseError;
