@@ -29,7 +29,13 @@ export function useValoresReferencia() {
 
       if (fetchError) throw fetchError;
 
-      setData(valores || []);
+      // Limpar códigos X1-X9 e XE dos nomes dos exames
+      const cleanedValores = valores?.map(valor => ({
+        ...valor,
+        estudo_descricao: valor.estudo_descricao.replace(/\b(X[1-9]|XE)\b/g, '').replace(/\s+/g, ' ').trim()
+      })) || [];
+
+      setData(cleanedValores);
     } catch (err: any) {
       console.error('Erro ao buscar valores de referência:', err);
       setError(err.message);

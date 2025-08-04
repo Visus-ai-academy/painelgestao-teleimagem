@@ -438,7 +438,7 @@ export default function GerenciarCadastros() {
         <TabsList className="grid w-full grid-cols-4 lg:grid-cols-11">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
-          <TabsTrigger value="de-para">De-Para</TabsTrigger>
+          <TabsTrigger value="de-para">Exames Fora Padrão</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
@@ -527,7 +527,7 @@ export default function GerenciarCadastros() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
-                De-Para Exames (Valores de Referência)
+                Exames Fora Padrão (Valores de Referência)
               </CardTitle>
               <CardDescription>
                 Upload de planilha com valores de referência para exames fora de padrão. Estes valores são aplicados automaticamente quando detectados exames com valores zerados.

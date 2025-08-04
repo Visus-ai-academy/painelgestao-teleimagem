@@ -88,7 +88,7 @@ export function ValoresReferenciaTable() {
         <div>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Valores De-Para Exames ({data.length} registros)
+            Exames Fora Padrão ({data.length} registros)
           </CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
             Tabela de referência para aplicação automática de valores em exames fora de padrão
