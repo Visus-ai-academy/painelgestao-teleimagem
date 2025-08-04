@@ -374,6 +374,24 @@ serve(async (req) => {
       }
     }
 
+    // 🔧 APLICAR REGRAS DE TRATAMENTO (para todos os arquivos)
+    if (totalInserted > 0) {
+      console.log('⚙️ Aplicando regras de tratamento...');
+      try {
+        const { data: regrasResult, error: regrasError } = await supabaseClient.functions.invoke('aplicar-regras-tratamento', {
+          body: { lote_upload: loteUpload }
+        });
+        
+        if (regrasError) {
+          console.warn('⚠️ Erro ao aplicar regras:', regrasError);
+        } else if (regrasResult) {
+          console.log('✅ Regras aplicadas:', regrasResult);
+        }
+      } catch (regrasException) {
+        console.warn('⚠️ Exceção ao aplicar regras:', regrasException);
+      }
+    }
+
     // Finalizar log
     await supabaseClient
       .from('processamento_uploads')
