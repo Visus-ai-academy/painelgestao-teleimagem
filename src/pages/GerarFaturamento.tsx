@@ -30,6 +30,7 @@ import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadS
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { AnaliseDiscrepanciaZerados } from '@/components/AnaliseDiscrepanciaZerados';
+import { AnaliseRegrasQuebraProblemas } from '@/components/AnaliseRegrasQuebraProblemas';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
@@ -1116,6 +1117,9 @@ export default function GerarFaturamento() {
                 </div>
 
                 
+                {/* 🚨 PROBLEMA CRÍTICO - Análise de Regras de Quebra */}
+                <AnaliseRegrasQuebraProblemas />
+
                 {/* Análise de Discrepância */}
                 <AnaliseDiscrepanciaZerados />
                 
