@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface RegraValidacao {
   campo: string;
-  tipo: 'data_minima' | 'data_maxima' | 'obrigatorio' | 'valor_padrao' | 'formato' | 'buscar_de_para_quebra';
+  tipo: 'data_minima' | 'data_maxima' | 'obrigatorio' | 'valor_padrao' | 'formato' | 'buscar_de_para_quebra' | 'exclusao_periodo_faturamento';
   valor: any;
   aplicar_em: string[];
   ativo: boolean;
@@ -34,156 +34,171 @@ interface ValidacaoResult {
   modificacoes: string[];
 }
 
+// Função para calcular datas do período de faturamento
+function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
+  // Formato esperado: "junho/2025", "jun/25", etc.
+  const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
+  
+  const meses = {
+    'janeiro': 1, 'jan': 1,
+    'fevereiro': 2, 'fev': 2,
+    'março': 3, 'mar': 3,
+    'abril': 4, 'abr': 4,
+    'maio': 5, 'mai': 5,
+    'junho': 6, 'jun': 6,
+    'julho': 7, 'jul': 7,
+    'agosto': 8, 'ago': 8,
+    'setembro': 9, 'set': 9,
+    'outubro': 10, 'out': 10,
+    'novembro': 11, 'nov': 11,
+    'dezembro': 12, 'dez': 12
+  };
+  
+  const mes = meses[mesStr];
+  const ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr);
+  
+  if (!mes || !ano) {
+    throw new Error(`Período inválido: ${periodoReferencia}`);
+  }
+  
+  // Data limite para DATA_REALIZACAO (primeiro dia do mês do período)
+  const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
+  
+  // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
+  const inicioFaturamento = new Date(ano, mes - 2, 8); // mês anterior, dia 8
+  const fimFaturamento = new Date(ano, mes - 1, 7); // mês atual, dia 7
+  
+  return {
+    dataLimiteRealizacao,
+    inicioFaturamento,
+    fimFaturamento
+  };
+}
+
 // Regras específicas por tipo de arquivo
-const REGRAS_POR_ARQUIVO: Record<string, RegraValidacao[]> = {
-  'volumetria_padrao': [
-    {
-      campo: 'VALORES',
-      tipo: 'valor_padrao',
-      valor: 1,
-      aplicar_em: ['volumetria_padrao'],
-      ativo: true
-    },
-    {
-      campo: 'MODALIDADE',
-      tipo: 'valor_padrao',
-      valor: 'CR',
-      aplicar_em: ['volumetria_padrao'],
-      ativo: true
-    }
-  ],
-  'volumetria_fora_padrao': [
-    {
-      campo: 'VALORES',
-      tipo: 'obrigatorio',
-      valor: null,
-      aplicar_em: ['volumetria_fora_padrao'],
-      ativo: true
-    }
-  ],
-  'volumetria_padrao_retroativo': [
-    {
-      campo: 'DATA_REALIZACAO',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'DATA_LAUDO',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'data_referencia',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'data_referencia',
-      tipo: 'data_maxima',
-      valor: new Date().toISOString().split('T')[0], // Hoje
-      aplicar_em: ['volumetria_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'ESPECIALIDADE',
-      tipo: 'obrigatorio',
-      valor: null,
-      aplicar_em: ['volumetria_padrao_retroativo'],
-      ativo: true
-    }
-  ],
-  'volumetria_fora_padrao_retroativo': [
-    {
-      campo: 'DATA_REALIZACAO',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_fora_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'DATA_LAUDO',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_fora_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'data_referencia',
-      tipo: 'data_minima',
-      valor: '2023-01-01',
-      aplicar_em: ['volumetria_fora_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'data_referencia',
-      tipo: 'data_maxima',
-      valor: new Date().toISOString().split('T')[0], // Hoje
-      aplicar_em: ['volumetria_fora_padrao_retroativo'],
-      ativo: true
-    },
-    {
-      campo: 'VALORES',
-      tipo: 'obrigatorio',
-      valor: null,
-      aplicar_em: ['volumetria_fora_padrao_retroativo'],
-      ativo: true
-    }
-  ],
-  'data_laudo': [
-    {
-      campo: 'DATA_LAUDO',
-      tipo: 'obrigatorio',
-      valor: null,
-      aplicar_em: ['data_laudo'],
-      ativo: true
-    },
-    {
-      campo: 'DATA_LAUDO',
-      tipo: 'data_maxima',
-      valor: new Date().toISOString().split('T')[0], // Hoje
-      aplicar_em: ['data_laudo'],
-      ativo: true
-    }
-  ],
-  'data_exame': [
-    {
-      campo: 'DATA_REALIZACAO',
-      tipo: 'obrigatorio',
-      valor: null,
-      aplicar_em: ['data_exame'],
-      ativo: true
-    },
-    {
-      campo: 'DATA_REALIZACAO',
-      tipo: 'data_maxima',
-      valor: new Date().toISOString().split('T')[0], // Hoje
-      aplicar_em: ['data_exame'],
-      ativo: true
-    }
-  ],
-  'volumetria_onco_padrao': [
-    {
-      campo: 'CATEGORIA',
-      tipo: 'valor_padrao',
-      valor: 'Onco',
-      aplicar_em: ['volumetria_onco_padrao'],
-      ativo: true
-    },
-    {
-      campo: 'VALORES',
-      tipo: 'buscar_de_para_quebra',
-      valor: null,
-      aplicar_em: ['volumetria_onco_padrao'],
-      ativo: true
-    }
-  ]
-};
+function gerarRegrasPorArquivo(periodoReferencia?: string): Record<string, RegraValidacao[]> {
+  return {
+    'volumetria_padrao': [
+      {
+        campo: 'VALORES',
+        tipo: 'valor_padrao',
+        valor: 1,
+        aplicar_em: ['volumetria_padrao'],
+        ativo: true
+      },
+      {
+        campo: 'MODALIDADE',
+        tipo: 'valor_padrao',
+        valor: 'CR',
+        aplicar_em: ['volumetria_padrao'],
+        ativo: true
+      }
+    ],
+    'volumetria_fora_padrao': [
+      {
+        campo: 'VALORES',
+        tipo: 'obrigatorio',
+        valor: null,
+        aplicar_em: ['volumetria_fora_padrao'],
+        ativo: true
+      }
+    ],
+    'volumetria_padrao_retroativo': [
+      {
+        campo: 'DATA_REALIZACAO',
+        tipo: 'exclusao_periodo_faturamento',
+        valor: periodoReferencia,
+        aplicar_em: ['volumetria_padrao_retroativo'],
+        ativo: true
+      },
+      {
+        campo: 'DATA_LAUDO',
+        tipo: 'exclusao_periodo_faturamento',
+        valor: periodoReferencia,
+        aplicar_em: ['volumetria_padrao_retroativo'],
+        ativo: true
+      },
+      {
+        campo: 'ESPECIALIDADE',
+        tipo: 'obrigatorio',
+        valor: null,
+        aplicar_em: ['volumetria_padrao_retroativo'],
+        ativo: true
+      }
+    ],
+    'volumetria_fora_padrao_retroativo': [
+      {
+        campo: 'DATA_REALIZACAO',
+        tipo: 'exclusao_periodo_faturamento',
+        valor: periodoReferencia,
+        aplicar_em: ['volumetria_fora_padrao_retroativo'],
+        ativo: true
+      },
+      {
+        campo: 'DATA_LAUDO',
+        tipo: 'exclusao_periodo_faturamento',
+        valor: periodoReferencia,
+        aplicar_em: ['volumetria_fora_padrao_retroativo'],
+        ativo: true
+      },
+      {
+        campo: 'VALORES',
+        tipo: 'obrigatorio',
+        valor: null,
+        aplicar_em: ['volumetria_fora_padrao_retroativo'],
+        ativo: true
+      }
+    ],
+    'data_laudo': [
+      {
+        campo: 'DATA_LAUDO',
+        tipo: 'obrigatorio',
+        valor: null,
+        aplicar_em: ['data_laudo'],
+        ativo: true
+      },
+      {
+        campo: 'DATA_LAUDO',
+        tipo: 'data_maxima',
+        valor: new Date().toISOString().split('T')[0], // Hoje
+        aplicar_em: ['data_laudo'],
+        ativo: true
+      }
+    ],
+    'data_exame': [
+      {
+        campo: 'DATA_REALIZACAO',
+        tipo: 'obrigatorio',
+        valor: null,
+        aplicar_em: ['data_exame'],
+        ativo: true
+      },
+      {
+        campo: 'DATA_REALIZACAO',
+        tipo: 'data_maxima',
+        valor: new Date().toISOString().split('T')[0], // Hoje
+        aplicar_em: ['data_exame'],
+        ativo: true
+      }
+    ],
+    'volumetria_onco_padrao': [
+      {
+        campo: 'CATEGORIA',
+        tipo: 'valor_padrao',
+        valor: 'Onco',
+        aplicar_em: ['volumetria_onco_padrao'],
+        ativo: true
+      },
+      {
+        campo: 'VALORES',
+        tipo: 'buscar_de_para_quebra',
+        valor: null,
+        aplicar_em: ['volumetria_onco_padrao'],
+        ativo: true
+      }
+    ]
+  };
+}
 
 function converterParaData(valor: any): Date | null {
   if (!valor) return null;
@@ -259,66 +274,96 @@ function validarRegra(registro: VolumetriaRecord, regra: RegraValidacao): { vali
       break;
       
     case 'buscar_de_para_quebra':
-      // Esta validação será tratada de forma assíncrona na função principal
-      return { valido: true };
+      // Esta regra será processada externamente
+      return { valido: true, modificacao: `Campo ${regra.campo} será processado via De-Para/Quebra` };
+    
+    case 'exclusao_periodo_faturamento':
+      if (!regra.valor) {
+        return { valido: true }; // Sem período definido, não aplica exclusão
+      }
+      
+      try {
+        const { dataLimiteRealizacao, inicioFaturamento, fimFaturamento } = calcularDatasPeriodoFaturamento(regra.valor);
+        
+        if (regra.campo === 'DATA_REALIZACAO') {
+          const dataRealizacao = converterParaData(registro.DATA_REALIZACAO);
+          if (dataRealizacao && dataRealizacao > dataLimiteRealizacao) {
+            return { valido: false, erro: `DATA_REALIZACAO (${dataRealizacao.toLocaleDateString('pt-BR')}) posterior ao período de faturamento (${dataLimiteRealizacao.toLocaleDateString('pt-BR')})` };
+          }
+        }
+        
+        if (regra.campo === 'DATA_LAUDO') {
+          const dataLaudo = converterParaData(registro.DATA_LAUDO);
+          if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento)) {
+            return { valido: false, erro: `DATA_LAUDO (${dataLaudo.toLocaleDateString('pt-BR')}) fora do período de faturamento (${inicioFaturamento.toLocaleDateString('pt-BR')} a ${fimFaturamento.toLocaleDateString('pt-BR')})` };
+          }
+        }
+        
+        return { valido: true };
+      } catch (error) {
+        return { valido: false, erro: `Erro ao processar período: ${error.message}` };
+      }
+    
+    default:
+      return { valido: false, erro: `Tipo de regra não reconhecido: ${regra.tipo}` };
   }
   
   return { valido: true };
 }
 
-function aplicarValidacoes(registro: VolumetriaRecord): ValidacaoResult {
-  const resultado: ValidacaoResult = {
-    valido: true,
-    registro: { ...registro },
-    erros: [],
-    modificacoes: []
-  };
-  
-  // Buscar regras aplicáveis para este tipo de arquivo
-  const regrasAplicaveis = REGRAS_POR_ARQUIVO[registro.arquivo_fonte] || [];
-  
-  console.log(`🔍 Aplicando ${regrasAplicaveis.length} regras para arquivo ${registro.arquivo_fonte}`);
-  
-  for (const regra of regrasAplicaveis) {
+function aplicarValidacoes(registro: VolumetriaRecord, periodoReferencia?: string): ValidacaoResult {
+  const regrasPorArquivo = gerarRegrasPorArquivo(periodoReferencia);
+  const regras = regrasPorArquivo[registro.arquivo_fonte] || [];
+  const erros: string[] = [];
+  const modificacoes: string[] = [];
+  let registroModificado = { ...registro };
+
+  for (const regra of regras) {
     if (!regra.ativo) continue;
     
-    const validacao = validarRegra(resultado.registro!, regra);
+    const validacao = validarRegra(registroModificado, regra);
     
     if (!validacao.valido) {
-      resultado.valido = false;
-      resultado.erros.push(validacao.erro!);
-      console.log(`❌ Regra falhou: ${validacao.erro}`);
+      erros.push(validacao.erro!);
     } else if (validacao.modificacao) {
-      resultado.modificacoes.push(validacao.modificacao);
-      console.log(`✏️ Modificação aplicada: ${validacao.modificacao}`);
+      modificacoes.push(validacao.modificacao);
     }
   }
-  
-  return resultado;
+
+  return {
+    valido: erros.length === 0,
+    registro: registroModificado,
+    erros,
+    modificacoes
+  };
 }
 
 export default async function handler(req: Request): Promise<Response> {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { registros, arquivo_fonte } = await req.json();
+    const { records, arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log(`🔧 Iniciando validação de ${registros.length} registros para ${arquivo_fonte}`);
+    console.log(`🔧 Iniciando validação de ${records.length} registros para ${arquivo_fonte}`);
+    if (periodo_referencia) {
+      console.log(`📅 Período de referência: ${periodo_referencia}`);
+    }
     
     const resultados = {
       registros_validos: [],
       registros_rejeitados: [],
-      total_processado: registros.length,
+      total_processado: records.length,
       total_valido: 0,
       total_rejeitado: 0,
       modificacoes_aplicadas: 0,
-      regras_aplicadas: REGRAS_POR_ARQUIVO[arquivo_fonte]?.length || 0
+      periodo_aplicado: periodo_referencia || null
     };
     
-    for (let i = 0; i < registros.length; i++) {
-      const registro = { ...registros[i], arquivo_fonte };
+    for (let i = 0; i < records.length; i++) {
+      const registro = { ...records[i], arquivo_fonte };
       
       // Tratamento especial para arquivos ONCO
       if (arquivo_fonte === 'volumetria_onco_padrao') {
@@ -358,18 +403,19 @@ export default async function handler(req: Request): Promise<Response> {
         }
       }
       
-      const validacao = aplicarValidacoes(registro);
+      // Aplicar validações
+      const resultado = aplicarValidacoes(registro, periodo_referencia);
       
-      if (validacao.valido) {
-        resultados.registros_validos.push(validacao.registro);
+      if (resultado.valido) {
+        resultados.registros_validos.push(resultado.registro);
         resultados.total_valido++;
-        if (validacao.modificacoes.length > 0) {
+        if (resultado.modificacoes.length > 0) {
           resultados.modificacoes_aplicadas++;
         }
       } else {
         resultados.registros_rejeitados.push({
           registro_original: registro,
-          erros: validacao.erros,
+          erros: resultado.erros,
           linha: i + 1
         });
         resultados.total_rejeitado++;
