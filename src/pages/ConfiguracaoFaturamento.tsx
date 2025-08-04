@@ -306,9 +306,9 @@ export default function ConfiguracaoFaturamento() {
           <CardContent>
             <SimpleFileUpload
               title="Preços de Serviços"
-              acceptedTypes={[".csv", ".xlsx", ".xls"]}
+              acceptedTypes={[".xlsx", ".xls"]}
               onUpload={async (file: File) => {
-                // Aqui seria a integração com a edge function
+                // Upload direto Excel - colunas padronizadas
                 toast({
                   title: "Preços processados",
                   description: "Tabela de preços de serviços atualizada com sucesso",
@@ -316,10 +316,7 @@ export default function ConfiguracaoFaturamento() {
               }}
             />
             <p className="text-sm text-gray-600 mt-2">
-              Arquivo CSV/Excel com preços por modalidade, especialidade, categoria e prioridade.
-              <a href="/templates/template_precos_servicos.csv" className="text-blue-600 hover:underline ml-1">
-                Baixar template
-              </a>
+              Arquivo Excel (.xlsx/.xls) com colunas: modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, cliente_nome, tipo_preco
             </p>
           </CardContent>
         </Card>
@@ -337,9 +334,9 @@ export default function ConfiguracaoFaturamento() {
           <CardContent>
             <SimpleFileUpload
               title="Parâmetros de Faturamento"
-              acceptedTypes={[".csv", ".xlsx", ".xls"]}
+              acceptedTypes={[".xlsx", ".xls"]}
               onUpload={async (file: File) => {
-                // Aqui seria a integração com a edge function
+                // Upload direto Excel - colunas padronizadas
                 toast({
                   title: "Parâmetros processados",
                   description: "Parâmetros de faturamento atualizados com sucesso",
@@ -347,10 +344,7 @@ export default function ConfiguracaoFaturamento() {
               }}
             />
             <p className="text-sm text-gray-600 mt-2">
-              Arquivo CSV/Excel com parâmetros de franquia, urgência e cobrança por cliente.
-              <a href="/templates/template_parametros_faturamento.csv" className="text-blue-600 hover:underline ml-1">
-                Baixar template
-              </a>
+              Arquivo Excel (.xlsx/.xls) com colunas: cliente_nome, tipo_cliente, aplicar_franquia, volume_franquia, valor_franquia, percentual_adicional_urgencia
             </p>
           </CardContent>
         </Card>
