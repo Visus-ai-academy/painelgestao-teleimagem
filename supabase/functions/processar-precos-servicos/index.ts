@@ -8,14 +8,17 @@ const corsHeaders = {
 };
 
 interface PrecoRow {
+  cliente: string;
   modalidade: string;
   especialidade: string;
-  categoria: string;
   prioridade: string;
+  categoria: string;
+  valor: number;
+  vol_inicial?: number;
+  vol_final?: number;
+  volume_total?: number;
+  considera_plantao?: string;
   codigo_servico?: string;
-  valor_base: number;
-  valor_urgencia?: number;
-  cliente_nome?: string;
   tipo_preco?: string;
   data_inicio_vigencia?: string;
   data_fim_vigencia?: string;
@@ -78,14 +81,14 @@ serve(async (req) => {
 
       try {
         // ✅ VALIDAÇÃO: Ignorar registros com valores zerados ou nulos
-        if (!row.valor_base || Number(row.valor_base) <= 0) {
-          console.log(`Linha ${i + 1}: Valor zerado ou inválido (${row.valor_base}) - registro ignorado`);
+        if (!row.valor || Number(row.valor) <= 0) {
+          console.log(`Linha ${i + 1}: Valor zerado ou inválido (${row.valor}) - registro ignorado`);
           ignorados++;
           continue; // Pula para próxima iteração
         }
 
-        if (!row.modalidade || !row.especialidade || !row.categoria || !row.prioridade) {
-          throw new Error('Campos obrigatórios em branco: modalidade, especialidade, categoria, prioridade');
+        if (!row.cliente || !row.modalidade || !row.especialidade || !row.categoria || !row.prioridade) {
+          throw new Error('Campos obrigatórios em branco: cliente, modalidade, especialidade, categoria, prioridade');
         }
 
         // Preparar dados do preço
@@ -99,9 +102,13 @@ serve(async (req) => {
           categoria_exame_id: categoriaMap.get(row.categoria.toLowerCase().trim()),
           prioridade_id: prioridadeMap.get(row.prioridade.toLowerCase().trim()),
           codigo_servico: row.codigo_servico?.trim() || null,
-          valor_base: Number(row.valor_base),
-          valor_urgencia: row.valor_urgencia ? Number(row.valor_urgencia) : Number(row.valor_base),
-          cliente_id: row.cliente_nome ? clienteMap.get(row.cliente_nome.toLowerCase().trim()) : null,
+          valor_base: Number(row.valor),
+          valor_urgencia: Number(row.valor), // Usar o mesmo valor
+          cliente_id: clienteMap.get(row.cliente.toLowerCase().trim()),
+          volume_inicial: row.vol_inicial ? Number(row.vol_inicial) : null,
+          volume_final: row.vol_final ? Number(row.vol_final) : null,
+          volume_total: row.volume_total ? Number(row.volume_total) : null,
+          considera_prioridade_plantao: row.considera_plantao?.toLowerCase() === 'sim',
           tipo_preco: row.tipo_preco?.toLowerCase() || 'padrao',
           data_inicio_vigencia: row.data_inicio_vigencia ? new Date(row.data_inicio_vigencia).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           data_fim_vigencia: row.data_fim_vigencia ? new Date(row.data_fim_vigencia).toISOString().split('T')[0] : null,
@@ -111,10 +118,10 @@ serve(async (req) => {
           ativo: true
         };
 
-        // Verificar se já existe
-        const whereClause = row.cliente_nome
-          ? `modalidade.eq.${precoData.modalidade},especialidade.eq.${precoData.especialidade},categoria.eq.${precoData.categoria},prioridade.eq.${precoData.prioridade},cliente_id.eq.${precoData.cliente_id}`
-          : `modalidade.eq.${precoData.modalidade},especialidade.eq.${precoData.especialidade},categoria.eq.${precoData.categoria},prioridade.eq.${precoData.prioridade},cliente_id.is.null`;
+        // Verificar se já existe (incluindo volume na verificação)
+        const whereClause = `modalidade.eq.${precoData.modalidade},especialidade.eq.${precoData.especialidade},categoria.eq.${precoData.categoria},prioridade.eq.${precoData.prioridade},cliente_id.eq.${precoData.cliente_id}` + 
+          (precoData.volume_inicial ? `,volume_inicial.eq.${precoData.volume_inicial}` : ',volume_inicial.is.null') +
+          (precoData.volume_final ? `,volume_final.eq.${precoData.volume_final}` : ',volume_final.is.null');
 
         let { data: existente } = await supabase
           .from('precos_servicos')

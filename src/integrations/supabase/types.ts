@@ -2078,6 +2078,7 @@ export type Database = {
           categoria_exame_id: string | null
           cliente_id: string | null
           codigo_servico: string | null
+          considera_prioridade_plantao: boolean | null
           created_at: string
           created_by: string | null
           data_fim_vigencia: string | null
@@ -2095,6 +2096,9 @@ export type Database = {
           updated_at: string
           valor_base: number
           valor_urgencia: number
+          volume_final: number | null
+          volume_inicial: number | null
+          volume_total: number | null
         }
         Insert: {
           aplicar_incremental?: boolean
@@ -2104,6 +2108,7 @@ export type Database = {
           categoria_exame_id?: string | null
           cliente_id?: string | null
           codigo_servico?: string | null
+          considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
           data_fim_vigencia?: string | null
@@ -2121,6 +2126,9 @@ export type Database = {
           updated_at?: string
           valor_base?: number
           valor_urgencia?: number
+          volume_final?: number | null
+          volume_inicial?: number | null
+          volume_total?: number | null
         }
         Update: {
           aplicar_incremental?: boolean
@@ -2130,6 +2138,7 @@ export type Database = {
           categoria_exame_id?: string | null
           cliente_id?: string | null
           codigo_servico?: string | null
+          considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
           data_fim_vigencia?: string | null
@@ -2147,6 +2156,9 @@ export type Database = {
           updated_at?: string
           valor_base?: number
           valor_urgencia?: number
+          volume_final?: number | null
+          volume_inicial?: number | null
+          volume_total?: number | null
         }
         Relationships: [
           {

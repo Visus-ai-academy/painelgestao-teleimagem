@@ -1,4 +1,4 @@
-tipo_preco,modalidade,especialidade,categoria,prioridade,valor_base,valor_urgencia,cliente_id,data_inicio_vigencia,data_fim_vigencia,aplicar_legado,aplicar_incremental,codigo_servico,descricao
-"padrao","MR","NE","Normal","Rotina",450.00,675.00,"","2025-01-01","2025-12-31",true,true,"MR_NE_001","Preço padrão RM Neurologia Normal Rotina"
-"padrao","CT","RA","Normal","Urgente",320.00,480.00,"","2025-01-01","2025-12-31",true,true,"CT_RA_002","Preço padrão TC Radiologia Normal Urgente"
-"cliente_especifico","US","AB","Normal","Rotina",200.00,300.00,"550e8400-e29b-41d4-a716-446655440001","2025-01-01","2025-12-31",true,true,"US_AB_003","Preço específico US Abdome para Cliente Especial"
+CLIENTE,MODALIDADE,ESPECIALIDADE,PRIORIDADE,CATEGORIA,VALOR,VOL INICIAL,VOL FINAL,VOLUME TOTAL,CONSIDERA PLANTAO
+"Hospital ABC","MR","NE","Rotina","Normal",450.00,1,50,100,"SIM"
+"Clinica XYZ","CT","RA","Urgente","Normal",320.00,51,100,150,"NAO"
+"Hospital DEF","US","AB","Rotina","Normal",200.00,101,,200,"SIM"
