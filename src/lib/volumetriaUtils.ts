@@ -546,10 +546,17 @@ export async function processVolumetriaOtimizado(
   console.log('📅 Período para processamento:', periodo);
   
   try {
+    console.log('🔍 Verificando condições para edge function...');
+    console.log('📋 arquivoFonte.includes("retroativo"):', arquivoFonte.includes('retroativo'));
+    console.log('📋 periodo existe:', !!periodo);
+    
     // Para arquivos retroativos, SEMPRE usar o edge function que aplica exclusões por período
     if (arquivoFonte.includes('retroativo') && periodo) {
+      console.log('✅ USANDO EDGE FUNCTION para arquivo retroativo');
       return await processVolumetriaComEdgeFunction(file, arquivoFonte, periodo, onProgress);
     }
+    
+    console.log('⚠️ USANDO PROCESSAMENTO LOCAL (não é retroativo)');
     
     // Para outros arquivos, usar processamento local
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
