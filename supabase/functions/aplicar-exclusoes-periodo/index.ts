@@ -40,10 +40,10 @@ function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
   // Para Jun/25 = 01/06/2025 (excluir >= 01/06/2025)
   const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
   
-  // Período de faturamento: dia 8 do mês ANTERIOR ao especificado até dia 7 do mês especificado
-  // Para Jun/25: 08/05/2025 a 07/06/2025
-  const inicioFaturamento = new Date(ano, mes - 2, 8);
-  const fimFaturamento = new Date(ano, mes - 1, 7);
+  // Período de faturamento: dia 8 do mês especificado até dia 7 do mês SEGUINTE
+  // Para Jun/25: 08/06/2025 a 07/07/2025
+  const inicioFaturamento = new Date(ano, mes - 1, 8);
+  const fimFaturamento = new Date(ano, mes, 7);
   
   const result = {
     dataLimiteRealizacao: dataLimiteRealizacao.toISOString().split('T')[0],
