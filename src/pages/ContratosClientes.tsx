@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,105 +138,103 @@ interface NovoCliente {
   valorSuporte: number;
 }
 
-const contratosData: ContratoCliente[] = [
-  {
-    id: "1",
-    cliente: "Hospital São Lucas",
-    cnpj: "12.345.678/0001-90",
-    dataInicio: "2024-01-01",
-    dataFim: "2024-12-31",
-    status: "Ativo",
-    servicos: [
-      { modalidade: "MR", especialidade: "NE", categoria: "Angio", prioridade: "Urgente", valor: 450.00 },
-      { modalidade: "CT", especialidade: "CA", categoria: "Contrastado", prioridade: "Rotina", valor: 380.00 },
-    ],
-    valorTotal: 830.00,
-    diasParaVencer: 120,
-    indiceReajuste: "IPCA",
-    endereco: "Rua das Flores, 123 - Centro",
-    telefone: "(11) 3456-7890",
-    emailFinanceiro: "financeiro@saolucas.com.br",
-    emailOperacional: "operacional@saolucas.com.br",
-    site: "www.saolucas.com.br",
-    responsavel: "Dr. João Silva",
-    telefoneResponsavel: "(11) 9876-5432",
-    emailResponsavel: "joao.silva@saolucas.com.br",
-    cobrancaIntegracao: true,
-    valorIntegracao: 500.00,
-    cobrancaSuporte: true,
-    termosAditivos: [],
-    documentos: [
-      {
-        id: "doc1",
-        tipo_documento: 'contrato',
-        nome_arquivo: 'contrato_hospital_sao_lucas.pdf',
-        status_documento: 'assinado',
-        data_assinatura: '2024-01-01T10:00:00Z'
-      }
-    ]
-  },
-  {
-    id: "2",
-    cliente: "Clínica Vida Plena",
-    dataInicio: "2023-06-01",
-    dataFim: "2024-05-31",
-    status: "A Vencer",
-    servicos: [
-      { modalidade: "DO", especialidade: "ME", categoria: "Mastoide", prioridade: "Rotina", valor: 220.00 },
-      { modalidade: "MG", especialidade: "MI", categoria: "Score", prioridade: "Rotina", valor: 180.00 },
-    ],
-    valorTotal: 400.00,
-    diasParaVencer: 45,
-    indiceReajuste: "IGP-M",
-    percentualUltimos12Meses: 5.45,
-    cnpj: "98.765.432/0001-10",
-    cobrancaIntegracao: false,
-    cobrancaSuporte: true,
-    valorSuporte: 200.00,
-    termosAditivos: [],
-    documentos: [
-      {
-        id: "doc2",
-        tipo_documento: 'contrato',
-        nome_arquivo: 'contrato_vida_plena.pdf',
-        status_documento: 'assinatura_pendente',
-        data_envio_assinatura: '2024-05-15T09:00:00Z'
-      }
-    ]
-  },
-  {
-    id: "3",
-    cliente: "Centro Médico Norte",
-    dataInicio: "2023-01-01",
-    dataFim: "2023-12-31",
-    status: "Vencido",
-    servicos: [
-      { modalidade: "RX", especialidade: "MA", categoria: "Prostata", prioridade: "Plantão", valor: 120.00 },
-    ],
-    valorTotal: 120.00,
-    diasParaVencer: -30,
-    indiceReajuste: "INPC",
-    cnpj: "11.222.333/0001-44",
-    cobrancaIntegracao: false,
-    cobrancaSuporte: false,
-    termosAditivos: [],
-    documentos: [
-      {
-        id: "doc3",
-        tipo_documento: 'contrato',
-        nome_arquivo: 'contrato_centro_norte.pdf',
-        status_documento: 'pendente'
-      }
-    ]
-  },
-];
+// Dados serão carregados do Supabase
 
 export default function ContratosClientes() {
-  const [contratos, setContratos] = useState<ContratoCliente[]>(contratosData);
+  const [contratos, setContratos] = useState<ContratoCliente[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showNovoContrato, setShowNovoContrato] = useState(false);
   const [showEditarContrato, setShowEditarContrato] = useState(false);
   const [contratoEditando, setContratoEditando] = useState<ContratoCliente | null>(null);
   const { toast } = useToast();
+
+  // Carregar dados dos contratos do Supabase
+  const carregarContratos = async () => {
+    try {
+      setLoading(true);
+      
+      // Buscar contratos com dados dos clientes
+      const { data: contratosData, error } = await supabase
+        .from('contratos_clientes')
+        .select(`
+          *,
+          clientes (
+            id,
+            nome,
+            cnpj,
+            endereco,
+            telefone,
+            email,
+            contato,
+            status,
+            ativo
+          )
+        `)
+        .eq('clientes.ativo', true);
+
+      if (error) {
+        console.error('Erro ao carregar contratos:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados dos contratos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Transformar dados do Supabase para o formato da interface
+      const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
+        const cliente = contrato.clientes;
+        const hoje = new Date();
+        const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
+        const diasParaVencer = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let status: "Ativo" | "Vencido" | "A Vencer" = "Ativo";
+        if (diasParaVencer < 0) {
+          status = "Vencido";
+        } else if (diasParaVencer <= 60) {
+          status = "A Vencer";
+        }
+
+        return {
+          id: contrato.id,
+          cliente: cliente?.nome || 'Cliente não encontrado',
+          cnpj: cliente?.cnpj || '',
+          dataInicio: contrato.data_inicio || '',
+          dataFim: contrato.data_fim || contrato.data_inicio || '',
+          status,
+          servicos: [], // Será implementado quando houver tabela de serviços
+          valorTotal: Number(contrato.valor_mensal || 0),
+          diasParaVencer,
+          indiceReajuste: "IPCA" as const, // Valor padrão, pode ser configurado
+          endereco: cliente?.endereco || '',
+          telefone: cliente?.telefone || '',
+          emailFinanceiro: cliente?.email || '',
+          emailOperacional: cliente?.email || '',
+          responsavel: cliente?.contato || '',
+          cobrancaIntegracao: false,
+          cobrancaSuporte: false,
+          termosAditivos: [],
+          documentos: []
+        };
+      });
+
+      setContratos(contratosFormatados);
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro inesperado ao carregar os contratos.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarContratos();
+  }, []);
   
   const [novoCliente, setNovoCliente] = useState<NovoCliente>({
     cnpj: "",
@@ -318,71 +316,110 @@ export default function ContratosClientes() {
     return valorServicos + valorIntegracao + valorSuporte;
   };
 
-  const salvarCliente = () => {
-    if (!novoCliente.cnpj || !novoCliente.nome || !novoCliente.dataInicio || !novoCliente.dataFim || novoCliente.servicos.length === 0) {
+  const salvarCliente = async () => {
+    if (!novoCliente.cnpj || !novoCliente.nome || !novoCliente.dataInicio || !novoCliente.dataFim) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha CNPJ, nome, datas e adicione pelo menos um serviço.",
+        description: "Preencha CNPJ, nome e datas.",
         variant: "destructive",
       });
       return;
     }
 
-    const novoContrato: ContratoCliente = {
-      id: Date.now().toString(),
-      cliente: novoCliente.nome,
-      cnpj: novoCliente.cnpj,
-      dataInicio: novoCliente.dataInicio,
-      dataFim: novoCliente.dataFim,
-      status: "Ativo",
-      servicos: novoCliente.servicos,
-      valorTotal: calcularValorTotal(),
-      diasParaVencer: Math.ceil((new Date(novoCliente.dataFim).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
-      indiceReajuste: novoCliente.indiceReajuste,
-      endereco: novoCliente.endereco,
-      telefone: novoCliente.telefone,
-      emailFinanceiro: novoCliente.emailFinanceiro,
-      emailOperacional: novoCliente.emailOperacional,
-      site: novoCliente.site,
-      responsavel: novoCliente.responsavel,
-      telefoneResponsavel: novoCliente.telefoneResponsavel,
-      emailResponsavel: novoCliente.emailResponsavel,
-      cobrancaIntegracao: novoCliente.cobrancaIntegracao,
-      valorIntegracao: novoCliente.valorIntegracao,
-      cobrancaSuporte: novoCliente.cobrancaSuporte,
-      valorSuporte: novoCliente.valorSuporte,
-      termosAditivos: [],
-    };
+    try {
+      // Primeiro, criar/atualizar o cliente na tabela clientes
+      const { data: clienteData, error: clienteError } = await supabase
+        .from('clientes')
+        .upsert({
+          nome: novoCliente.nome,
+          cnpj: novoCliente.cnpj,
+          endereco: novoCliente.endereco,
+          telefone: novoCliente.telefone,
+          email: novoCliente.emailFinanceiro,
+          contato: novoCliente.responsavel,
+          status: 'Ativo',
+          ativo: true
+        }, {
+          onConflict: 'cnpj'
+        })
+        .select()
+        .single();
 
-    setContratos(prev => [...prev, novoContrato]);
-    setShowNovoContrato(false);
-    
-    // Reset form
-    setNovoCliente({
-      cnpj: "",
-      nome: "",
-      endereco: "",
-      telefone: "",
-      emailFinanceiro: "",
-      emailOperacional: "",
-      site: "",
-      responsavel: "",
-      telefoneResponsavel: "",
-      emailResponsavel: "",
-      dataInicio: "",
-      dataFim: "",
-      indiceReajuste: "IPCA",
-      servicos: [],
-      cobrancaIntegracao: false,
-      valorIntegracao: 0,
-      cobrancaSuporte: false,
-      valorSuporte: 0,
-    });
+      if (clienteError) {
+        console.error('Erro ao salvar cliente:', clienteError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível salvar os dados do cliente.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    toast({
-      title: "Cliente cadastrado",
-      description: `Cliente ${novoContrato.cliente} cadastrado com sucesso!`,
-    });
+      // Depois, criar o contrato
+      const { data: contratoData, error: contratoError } = await supabase
+        .from('contratos_clientes')
+        .insert({
+          cliente_id: clienteData.id,
+          numero_contrato: `CONT-${Date.now()}`,
+          data_inicio: novoCliente.dataInicio,
+          data_fim: novoCliente.dataFim,
+          valor_mensal: calcularValorTotal(),
+          status: 'ativo',
+          modalidades: [], // Será implementado quando houver serviços
+          especialidades: [] // Será implementado quando houver serviços
+        })
+        .select()
+        .single();
+
+      if (contratoError) {
+        console.error('Erro ao salvar contrato:', contratoError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível salvar o contrato.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Recarregar a lista de contratos
+      await carregarContratos();
+      setShowNovoContrato(false);
+      
+      // Reset form
+      setNovoCliente({
+        cnpj: "",
+        nome: "",
+        endereco: "",
+        telefone: "",
+        emailFinanceiro: "",
+        emailOperacional: "",
+        site: "",
+        responsavel: "",
+        telefoneResponsavel: "",
+        emailResponsavel: "",
+        dataInicio: "",
+        dataFim: "",
+        indiceReajuste: "IPCA",
+        servicos: [],
+        cobrancaIntegracao: false,
+        valorIntegracao: 0,
+        cobrancaSuporte: false,
+        valorSuporte: 0,
+      });
+
+      toast({
+        title: "Cliente cadastrado",
+        description: `Cliente ${novoCliente.nome} e contrato cadastrados com sucesso!`,
+      });
+
+    } catch (error) {
+      console.error('Erro inesperado:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro inesperado ao salvar os dados.",
+        variant: "destructive",
+      });
+    }
   };
 
   const gerarTermoAditivo = (contrato: ContratoCliente, servicosAlterados: any[]) => {
@@ -1038,7 +1075,23 @@ export default function ContratosClientes() {
           <CardTitle>Lista de Contratos</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">Carregando contratos...</p>
+              </div>
+            </div>
+          ) : contratos.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Nenhum contrato encontrado</p>
+                <p className="text-xs text-muted-foreground">Cadastre um novo cliente para começar</p>
+              </div>
+            </div>
+          ) : (
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
@@ -1148,6 +1201,7 @@ export default function ContratosClientes() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
       
