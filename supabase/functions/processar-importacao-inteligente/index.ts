@@ -169,7 +169,7 @@ serve(async (req) => {
         const processedRow: Record<string, any> = {}
         
         try {
-          mappings.forEach(mapping => {
+          for (const mapping of mappings) {
             const columnIndex = columnMapping[mapping.target_field]
             let value = null
             
@@ -189,7 +189,7 @@ serve(async (req) => {
                 // Para campos não obrigatórios, deixar null
                 processedRow[mapping.target_field] = null
               }
-              return // return aqui apenas pula este campo específico, não toda a iteração
+              continue // Agora funciona corretamente com for...of
             }
             
             // Converter tipo de dados
@@ -262,13 +262,13 @@ serve(async (req) => {
                       processedRow['status'] = 'Ativo'
                       console.log(`Status PADRÃO (ativo) para valor não reconhecido: ${stringValue}`)
                     }
-                    // Não processar mais este campo pois já tratamos
-                    return
+                     // Não processar mais este campo pois já tratamos
+                     continue
                   }
                  
-                 processedRow[mapping.target_field] = stringValue
+                  processedRow[mapping.target_field] = stringValue
             }
-          })
+          }
           
           processedData.push(processedRow)
         } catch (error) {
