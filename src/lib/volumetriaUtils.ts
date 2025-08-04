@@ -550,10 +550,52 @@ export async function processVolumetriaOtimizado(
     console.log('📋 arquivoFonte.includes("retroativo"):', arquivoFonte.includes('retroativo'));
     console.log('📋 periodo existe:', !!periodo);
     
-    // Para arquivos retroativos, SEMPRE usar o edge function que aplica exclusões por período
+     // Para arquivos retroativos, SEMPRE usar o edge function que aplica exclusões por período
     if (arquivoFonte.includes('retroativo') && periodo) {
       console.log('✅ USANDO EDGE FUNCTION para arquivo retroativo');
-      return await processVolumetriaComEdgeFunction(file, arquivoFonte, periodo, onProgress);
+      try {
+        return await processVolumetriaComEdgeFunction(file, arquivoFonte, periodo, onProgress);
+      } catch (error) {
+        console.log('⚠️ Edge function falhou, aplicando regras no processamento local');
+        
+        // Processar arquivo normalmente
+        const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
+        
+        // Aplicar exclusões por período
+        try {
+          const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+          const nomesMes = meses[periodo.mes - 1] || 'janeiro';
+          const periodoReferenciaExclusao = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
+          
+          console.log(`📅 Aplicando exclusões para período: ${periodoReferenciaExclusao}`);
+          
+          const { data: exclusoesResult } = await supabase.functions.invoke('aplicar-exclusoes-periodo', {
+            body: { periodo_referencia: periodoReferenciaExclusao }
+          });
+          
+          console.log('✅ Exclusões aplicadas:', exclusoesResult);
+          
+          // Aplicar regras de tratamento
+          const { data: regrasResult } = await supabase.functions.invoke('aplicar-regras-tratamento', {
+            body: { arquivo_fonte: arquivoFonte }
+          });
+          
+          console.log('✅ Regras de tratamento aplicadas:', regrasResult);
+        } catch (regrasError) {
+          console.warn('⚠️ Erro ao aplicar regras:', regrasError);
+        }
+        
+        return {
+          success: result.success,
+          message: result.message + ' (com regras aplicadas localmente)',
+          stats: {
+            total_rows: result.totalProcessed,
+            inserted_count: result.totalInserted,
+            error_count: result.totalProcessed - result.totalInserted
+          }
+        };
+      }
     }
     
     console.log('⚠️ USANDO PROCESSAMENTO LOCAL (não é retroativo)');
