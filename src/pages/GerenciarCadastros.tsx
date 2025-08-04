@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleFileUpload } from '@/components/SimpleFileUpload';
 import { CadastroDataTable } from '@/components/CadastroDataTable';
 import { ValoresReferenciaTable } from '@/components/ValoresReferenciaTable';
+import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
 import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -447,6 +448,7 @@ export default function GerenciarCadastros() {
           <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
           <TabsTrigger value="categorias">Categorias</TabsTrigger>
           <TabsTrigger value="prioridades">Prioridades</TabsTrigger>
+          <TabsTrigger value="de-para-prioridade">De-Para Prioridade</TabsTrigger>
         </TabsList>
 
         {/* Cadastro de Exames */}
@@ -842,6 +844,25 @@ export default function GerenciarCadastros() {
                   title="Prioridades Cadastradas"
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* De-Para Prioridade */}
+        <TabsContent value="de-para-prioridade">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                De-Para Prioridade
+              </CardTitle>
+              <CardDescription>
+                Upload de mapeamento de prioridades originais para nomes finais do sistema. 
+                Este mapeamento é aplicado automaticamente durante o processamento dos dados de volumetria.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeParaPrioridadeUpload />
             </CardContent>
           </Card>
         </TabsContent>

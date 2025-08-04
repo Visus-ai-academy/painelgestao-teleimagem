@@ -1095,10 +1095,7 @@ export default function GerarFaturamento() {
 
                   {/* Upload De-Para removido - usar apenas em Gerenciar Cadastros */}
 
-                  <div>
-                    {/* Upload De-Para Prioridade */}
-                    <DeParaPrioridadeUpload />
-                  </div>
+                  {/* Upload De-Para Prioridade movido para Gerenciar Cadastros */}
                 </div>
 
 
