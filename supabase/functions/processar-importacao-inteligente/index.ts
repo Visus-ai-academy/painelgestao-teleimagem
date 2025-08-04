@@ -321,11 +321,25 @@ serve(async (req) => {
             
             if (insertError) {
               console.error('Erro ao inserir lote:', insertError)
-              errors.push({
-                line: `Lote ${Math.floor(i / batchSize) + 1}`,
-                error: insertError.message,
-                data: batch
-              })
+              
+              // Se há erro no lote, tentar inserir individualmente
+              for (const record of batch) {
+                const { data: singleResult, error: singleError } = await supabaseClient
+                  .from(targetTable)
+                  .insert([record])
+                
+                if (singleError) {
+                  console.error('Erro ao inserir registro individual:', singleError, record)
+                  errors.push({
+                    line: `Registro individual - ${record.nome || 'sem nome'}`,
+                    error: singleError.message,
+                    data: record
+                  })
+                } else {
+                  console.log('Registro inserido individualmente:', record.nome || 'sem nome')
+                  insertedCount++
+                }
+              }
             } else {
               insertedCount += batch.length
             }
