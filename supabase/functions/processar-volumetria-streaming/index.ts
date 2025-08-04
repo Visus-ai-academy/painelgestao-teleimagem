@@ -129,6 +129,21 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       return String(value).trim() || undefined;
     };
 
+    // Função para limpar códigos X1-X9 dos nomes de exames
+    const cleanExameName = (value: any): string | undefined => {
+      if (value === null || value === undefined || value === '') return undefined;
+      
+      let cleanName = String(value).trim();
+      // Remove códigos X1, X2, X4, X5, X6, X7, X8, X9 (preserva X3 se necessário)
+      cleanName = cleanName.replace(/\s+X[124-9]\b/gi, '');
+      // Remove códigos XE também
+      cleanName = cleanName.replace(/\s+XE\b/gi, '');
+      // Remove múltiplos espaços que podem ter sobrado
+      cleanName = cleanName.replace(/\s+/g, ' ').trim();
+      
+      return cleanName || undefined;
+    };
+
     const record: VolumetriaRecord = {
       EMPRESA: String(empresa).trim(),
       NOME_PACIENTE: String(nomePaciente).trim(),
@@ -137,7 +152,7 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       periodo_referencia: periodoReferencia,
       
       CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
-      ESTUDO_DESCRICAO: safeString(row['ESTUDO_DESCRICAO']),
+      ESTUDO_DESCRICAO: cleanExameName(row['ESTUDO_DESCRICAO']),
       ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
       MODALIDADE: safeString(row['MODALIDADE']),
       PRIORIDADE: safeString(row['PRIORIDADE']),
