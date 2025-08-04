@@ -11,22 +11,55 @@ export const useVolumetriaSimple = () => {
       setLoading(true);
       console.log('🔍 Buscando dados de volumetria...');
       
-      const { data: volumetriaData, error: volumetriaError } = await supabase
-        .from('volumetria_mobilemed')
-        .select(`
-          "EMPRESA",
-          "MODALIDADE",
-          "ESPECIALIDADE", 
-          "PRIORIDADE",
-          "VALORES",
-          data_referencia
-        `);
+      // Carregar todos os dados com paginação para garantir que não perca nenhum registro
+      let allData: any[] = [];
+      let offset = 0;
+      const limit = 1000;
+      let hasMoreData = true;
 
-      if (volumetriaError) throw volumetriaError;
+      while (hasMoreData) {
+        console.log(`📦 Carregando lote offset ${offset}...`);
+        
+        const { data: batchData, error: batchError } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            "EMPRESA",
+            "MODALIDADE",
+            "ESPECIALIDADE", 
+            "PRIORIDADE",
+            "VALORES",
+            data_referencia
+          `)
+          .range(offset, offset + limit - 1)
+          .order('created_at', { ascending: true });
 
-      console.log('✅ Dados de volumetria carregados:', volumetriaData?.length || 0);
+        if (batchError) throw batchError;
+
+        if (!batchData || batchData.length === 0) {
+          hasMoreData = false;
+          break;
+        }
+
+        allData = [...allData, ...batchData];
+        console.log(`✅ Lote carregado: ${batchData.length} registros, total acumulado: ${allData.length}`);
+        
+        if (batchData.length < limit) {
+          hasMoreData = false;
+        } else {
+          offset += limit;
+        }
+
+        // Limite de segurança para evitar loops infinitos
+        if (offset > 1000000) {
+          console.log('⚠️ Limite de segurança atingido - finalizando...');
+          hasMoreData = false;
+        }
+      }
+
+      console.log('✅ Dados de volumetria carregados:', allData.length);
+      console.log('📊 Total de valores:', allData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0));
       
-      setData(volumetriaData || []);
+      setData(allData);
     } catch (err: any) {
       console.error('❌ Erro ao carregar volumetria:', err);
       setError(err.message);
