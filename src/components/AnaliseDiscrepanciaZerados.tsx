@@ -210,8 +210,24 @@ export function AnaliseDiscrepanciaZerados() {
         </div>
 
         {/* Explicação da Diferença */}
+        <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-green-800 dark:text-green-200">
+              <strong>✅ Status: A diferença é NORMAL e ESPERADA</strong><br/><br/>
+              Os dois painéis medem coisas diferentes:<br/>
+              • <strong>"Análise de Uploads"</strong>: Todos os registros com VALORES = 0 ou nulos<br/>
+              • <strong>"Exames Não Identificados"</strong>: Apenas registros zerados que NÃO foram encontrados no De Para nem nas Regras de Quebra<br/><br/>
+              <strong>A diferença de {analise.diferenca} registros representa:</strong><br/>
+              • Registros zerados que FORAM encontrados na tabela "De Para"<br/>
+              • Registros zerados que FORAM encontrados nas "Regras de Quebra"<br/>
+              • Registros com problemas de processamento (ESTUDO_DESCRICAO vazio)
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">🔍 Motivos da Diferença:</h3>
+          <h3 className="text-lg font-semibold">🔍 Detalhamento da Diferença:</h3>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -221,7 +237,7 @@ export function AnaliseDiscrepanciaZerados() {
               </div>
               <div className="text-2xl font-bold text-yellow-900">{analise.registros_na_quebra}</div>
               <div className="text-xs text-yellow-700">
-                Zerados que estão nas regras de quebra (não aparecem na lista)
+                Zerados que foram identificados nas regras de quebra
               </div>
             </div>
 

@@ -1127,8 +1127,11 @@ export default function GerarFaturamento() {
                   <AplicarExclusoesPeriodo />
                 </div>
                 
-                {/* Exames Não Identificados no "De Para" */}
+                {/* Exames Não Identificados - Fora do Padrão */}
                 <VolumetriaExamesNaoIdentificados />
+
+                {/* Análise de Discrepância entre os dois painéis acima */}
+                <AnaliseDiscrepanciaZerados />
 
                 </VolumetriaProvider>
               </CardContent>
