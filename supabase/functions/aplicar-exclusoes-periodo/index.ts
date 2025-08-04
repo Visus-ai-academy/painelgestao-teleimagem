@@ -78,70 +78,70 @@ export default async function handler(req: Request): Promise<Response> {
     console.log(`🗂️ Processando Arquivo 3 (volumetria_padrao_retroativo)...`);
     
     // Excluir registros com DATA_REALIZACAO posterior ao período
-    const { data: exclusoes3_realizacao, error: error3_realizacao } = await supabase
+    const { error: error3_realizacao, count: count3_realizacao } = await supabase
       .from('volumetria_mobilemed')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
       .gt('DATA_REALIZACAO', dataLimiteRealizacao);
 
     if (error3_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 3):', error3_realizacao);
     } else {
-      const count3_realizacao = exclusoes3_realizacao?.length || 0;
-      totalExcluidos += count3_realizacao;
-      detalhes.push(`Arquivo 3: ${count3_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
-      console.log(`✅ Arquivo 3: ${count3_realizacao} registros excluídos por DATA_REALIZACAO`);
+      const deletedCount3_realizacao = count3_realizacao || 0;
+      totalExcluidos += deletedCount3_realizacao;
+      detalhes.push(`Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
+      console.log(`✅ Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO`);
     }
 
     // Excluir registros com DATA_LAUDO fora do período de faturamento
-    const { data: exclusoes3_laudo, error: error3_laudo } = await supabase
+    const { error: error3_laudo, count: count3_laudo } = await supabase
       .from('volumetria_mobilemed')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
       .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
 
     if (error3_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 3):', error3_laudo);
     } else {
-      const count3_laudo = exclusoes3_laudo?.length || 0;
-      totalExcluidos += count3_laudo;
-      detalhes.push(`Arquivo 3: ${count3_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento}`);
-      console.log(`✅ Arquivo 3: ${count3_laudo} registros excluídos por DATA_LAUDO`);
+      const deletedCount3_laudo = count3_laudo || 0;
+      totalExcluidos += deletedCount3_laudo;
+      detalhes.push(`Arquivo 3: ${deletedCount3_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento}`);
+      console.log(`✅ Arquivo 3: ${deletedCount3_laudo} registros excluídos por DATA_LAUDO`);
     }
 
     // Arquivo 4: volumetria_fora_padrao_retroativo
     console.log(`🗂️ Processando Arquivo 4 (volumetria_fora_padrao_retroativo)...`);
     
     // Excluir registros com DATA_REALIZACAO posterior ao período
-    const { data: exclusoes4_realizacao, error: error4_realizacao } = await supabase
+    const { error: error4_realizacao, count: count4_realizacao } = await supabase
       .from('volumetria_mobilemed')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
       .gt('DATA_REALIZACAO', dataLimiteRealizacao);
 
     if (error4_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 4):', error4_realizacao);
     } else {
-      const count4_realizacao = exclusoes4_realizacao?.length || 0;
-      totalExcluidos += count4_realizacao;
-      detalhes.push(`Arquivo 4: ${count4_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
-      console.log(`✅ Arquivo 4: ${count4_realizacao} registros excluídos por DATA_REALIZACAO`);
+      const deletedCount4_realizacao = count4_realizacao || 0;
+      totalExcluidos += deletedCount4_realizacao;
+      detalhes.push(`Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
+      console.log(`✅ Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO`);
     }
 
     // Excluir registros com DATA_LAUDO fora do período de faturamento
-    const { data: exclusoes4_laudo, error: error4_laudo } = await supabase
+    const { error: error4_laudo, count: count4_laudo } = await supabase
       .from('volumetria_mobilemed')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
       .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
 
     if (error4_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 4):', error4_laudo);
     } else {
-      const count4_laudo = exclusoes4_laudo?.length || 0;
-      totalExcluidos += count4_laudo;
-      detalhes.push(`Arquivo 4: ${count4_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento}`);
-      console.log(`✅ Arquivo 4: ${count4_laudo} registros excluídos por DATA_LAUDO`);
+      const deletedCount4_laudo = count4_laudo || 0;
+      totalExcluidos += deletedCount4_laudo;
+      detalhes.push(`Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento}`);
+      console.log(`✅ Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO`);
     }
 
     console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
