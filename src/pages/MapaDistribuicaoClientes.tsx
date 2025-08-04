@@ -215,6 +215,7 @@ export default function MapaDistribuicaoClientes() {
       console.log(`📝 Filtro Tipo Cliente (${filtroTipoCliente}): ${antes} → ${clientesFiltrados.length}`);
     }
 
+    // Aplicar filtros baseados na volumetria real de cada cliente
     if (filtroModalidade !== 'todas') {
       const antes = clientesFiltrados.length;
       clientesFiltrados = clientesFiltrados.filter(c => 
@@ -249,7 +250,7 @@ export default function MapaDistribuicaoClientes() {
       const estado = cliente.estado || 'NI';
       const regiao = getRegiaoByEstado(estado);
 
-      // Estatísticas por região
+      // Estatísticas por região - mostrar exames e clientes, não estados
       if (!regioesMap.has(regiao)) {
         regioesMap.set(regiao, {
           regiao,
@@ -298,15 +299,17 @@ export default function MapaDistribuicaoClientes() {
     setEstadosEstatisticas(Array.from(estadosMap.values()));
   };
 
-  // Reprocessar quando filtros mudarem
+  // Reprocessar quando filtros mudarem - corrigido para reagir às mudanças
   useEffect(() => {
     if (clientesVolumetria.length > 0) {
+      console.log('🔄 Reprocessando estatísticas devido a mudança nos filtros');
       processarEstatisticas(clientesVolumetria);
     }
-  }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, filtroTipoCliente, clientesVolumetria]);
+  }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, filtroTipoCliente]);
 
   // Recarregar dados quando filtros de data mudarem
   useEffect(() => {
+    console.log('📅 Recarregando dados devido a mudança de data');
     carregarDadosVolumetria();
   }, [filtroMes, filtroAno]);
 
@@ -321,8 +324,8 @@ export default function MapaDistribuicaoClientes() {
   const tiposClienteUnicos = [...new Set(clientesVolumetria.map(c => c.tipo_cliente).filter(Boolean))];
 
   const totalGeral = {
-    clientes: clientesVolumetria.length,
-    volume: clientesVolumetria.reduce((sum, c) => sum + c.volume_exames, 0)
+    clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
+    volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
   };
 
   if (carregando) {
@@ -527,9 +530,6 @@ export default function MapaDistribuicaoClientes() {
                         <p className="text-sm">{regiao.total_clientes} clientes</p>
                         <p className="text-sm">{regiao.volume_total.toLocaleString()} exames</p>
                       </div>
-                      <Badge variant="secondary" className="mt-2 text-xs">
-                        {regiao.estados.length} estados
-                      </Badge>
                     </div>
                   </div>
                 );
@@ -578,7 +578,7 @@ export default function MapaDistribuicaoClientes() {
       {visualizacao === 'cidades' && (
         <Card>
           <CardHeader>
-            <CardTitle>Distribuição por Cidade</CardTitle>
+            <CardTitle>Mapa de Calor - Distribuição por Cidade</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
