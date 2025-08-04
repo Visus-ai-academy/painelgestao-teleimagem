@@ -647,6 +647,9 @@ export type Database = {
           numero_contrato: string
           observacoes: string | null
           status: string
+          tem_parametros_configurados: boolean | null
+          tem_precos_configurados: boolean | null
+          tipo_cliente: string | null
           updated_at: string
           valor_mensal: number
         }
@@ -666,6 +669,9 @@ export type Database = {
           numero_contrato: string
           observacoes?: string | null
           status?: string
+          tem_parametros_configurados?: boolean | null
+          tem_precos_configurados?: boolean | null
+          tipo_cliente?: string | null
           updated_at?: string
           valor_mensal?: number
         }
@@ -685,6 +691,9 @@ export type Database = {
           numero_contrato?: string
           observacoes?: string | null
           status?: string
+          tem_parametros_configurados?: boolean | null
+          tem_precos_configurados?: boolean | null
+          tipo_cliente?: string | null
           updated_at?: string
           valor_mensal?: number
         }
@@ -1799,6 +1808,93 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "medicos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      parametros_faturamento: {
+        Row: {
+          aplicar_adicional_urgencia: boolean | null
+          aplicar_franquia: boolean | null
+          ativo: boolean
+          cliente_id: string | null
+          cobrar_integracao: boolean | null
+          created_at: string
+          created_by: string | null
+          data_aniversario_contrato: string | null
+          frequencia_continua: boolean | null
+          frequencia_por_volume: boolean | null
+          id: string
+          indice_reajuste: string | null
+          percentual_reajuste_fixo: number | null
+          percentual_urgencia: number | null
+          periodicidade_reajuste: string | null
+          tipo_cliente: string | null
+          updated_at: string
+          valor_acima_franquia: number | null
+          valor_franquia: number | null
+          valor_integracao: number | null
+          volume_franquia: number | null
+        }
+        Insert: {
+          aplicar_adicional_urgencia?: boolean | null
+          aplicar_franquia?: boolean | null
+          ativo?: boolean
+          cliente_id?: string | null
+          cobrar_integracao?: boolean | null
+          created_at?: string
+          created_by?: string | null
+          data_aniversario_contrato?: string | null
+          frequencia_continua?: boolean | null
+          frequencia_por_volume?: boolean | null
+          id?: string
+          indice_reajuste?: string | null
+          percentual_reajuste_fixo?: number | null
+          percentual_urgencia?: number | null
+          periodicidade_reajuste?: string | null
+          tipo_cliente?: string | null
+          updated_at?: string
+          valor_acima_franquia?: number | null
+          valor_franquia?: number | null
+          valor_integracao?: number | null
+          volume_franquia?: number | null
+        }
+        Update: {
+          aplicar_adicional_urgencia?: boolean | null
+          aplicar_franquia?: boolean | null
+          ativo?: boolean
+          cliente_id?: string | null
+          cobrar_integracao?: boolean | null
+          created_at?: string
+          created_by?: string | null
+          data_aniversario_contrato?: string | null
+          frequencia_continua?: boolean | null
+          frequencia_por_volume?: boolean | null
+          id?: string
+          indice_reajuste?: string | null
+          percentual_reajuste_fixo?: number | null
+          percentual_urgencia?: number | null
+          periodicidade_reajuste?: string | null
+          tipo_cliente?: string | null
+          updated_at?: string
+          valor_acima_franquia?: number | null
+          valor_franquia?: number | null
+          valor_integracao?: number | null
+          volume_franquia?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parametros_faturamento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parametros_faturamento_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
