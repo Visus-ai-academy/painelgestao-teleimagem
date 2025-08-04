@@ -593,6 +593,29 @@ serve(async (req) => {
 
     console.log('✅ Processamento concluído:', resultado);
 
+    // Aplicar regras de exclusão automaticamente para arquivos 3 e 4
+    if (arquivo_fonte === 'volumetria_padrao_retroativo' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
+      console.log('🔧 Aplicando regras de exclusão por período automaticamente...');
+      
+      const periodoReferencia = periodo ? `${getNomesMeses()[periodo.mes - 1]}/${periodo.ano.toString().slice(-2)}` : null;
+      
+      if (periodoReferencia) {
+        try {
+          const { data: exclusaoResult, error: exclusaoError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
+            body: { periodo_referencia: periodoReferencia }
+          });
+          
+          if (exclusaoError) {
+            console.error('❌ Erro ao aplicar exclusões:', exclusaoError);
+          } else if (exclusaoResult?.success) {
+            console.log(`✅ Exclusões aplicadas automaticamente: ${exclusaoResult.total_excluidos} registros removidos`);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao invocar função de exclusões:', error);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -642,3 +665,11 @@ serve(async (req) => {
     );
   }
 });
+
+// Função auxiliar para obter nomes dos meses
+function getNomesMeses(): string[] {
+  return [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ];
+}
