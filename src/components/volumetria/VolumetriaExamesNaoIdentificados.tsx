@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 interface ExameNaoIdentificado {
   estudo_descricao: string;
   quantidade: number;
+  arquivo_fonte: string;
 }
 
 export function VolumetriaExamesNaoIdentificados() {
@@ -73,18 +74,21 @@ export function VolumetriaExamesNaoIdentificados() {
       console.log('🔍 Total de exames zerados:', volumetriaData?.length);
       console.log('🔍 Exames não encontrados no De Para:', estudosNaoEncontrados.length);
 
-      // 4. Agrupar apenas por nome do estudo (sem cliente)
+      // 4. Agrupar por nome do estudo e arquivo fonte
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
       estudosNaoEncontrados.forEach((item) => {
         // Usar apenas ESTUDO_DESCRICAO - se for NULL, indica problema no processamento
         const nomeEstudo = item.ESTUDO_DESCRICAO || `[ERRO PROCESSAMENTO] - ${item.arquivo_fonte}`;
+        const arquivoFonte = item.arquivo_fonte || 'Desconhecido';
+        const key = `${nomeEstudo}_${arquivoFonte}`;
         
-        if (agrupados[nomeEstudo]) {
-          agrupados[nomeEstudo].quantidade += 1;
+        if (agrupados[key]) {
+          agrupados[key].quantidade += 1;
         } else {
-          agrupados[nomeEstudo] = {
+          agrupados[key] = {
             estudo_descricao: nomeEstudo,
+            arquivo_fonte: arquivoFonte,
             quantidade: 1
           };
         }
@@ -105,6 +109,7 @@ export function VolumetriaExamesNaoIdentificados() {
     const data = examesNaoIdentificados.map((exame, index) => ({
       'Posição': index + 1,
       'Nome do Exame': exame.estudo_descricao,
+      'Arquivo de Origem': exame.arquivo_fonte,
       'Quantidade Zerada': exame.quantidade
     }));
 
@@ -178,6 +183,9 @@ export function VolumetriaExamesNaoIdentificados() {
               <div className="flex-1">
                 <div className="font-medium text-sm">
                   {exame.estudo_descricao || '(Sem descrição do estudo)'}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Arquivo: {exame.arquivo_fonte}
                 </div>
               </div>
               <Badge variant="destructive" className="ml-2">
