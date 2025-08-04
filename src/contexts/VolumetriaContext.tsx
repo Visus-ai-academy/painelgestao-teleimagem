@@ -122,56 +122,8 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           const recordsWithValue = allData.filter(item => item.VALORES && item.VALORES > 0).length;
           const totalValue = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
 
-          // Calcular zerados corretos: apenas aqueles que não foram identificados nas regras
-          let recordsZeroed = 0;
-          
-          // Buscar dados de De Para e Regras de Quebra apenas uma vez para este tipo
-          if (tipo.includes('fora_padrao') || tipo.includes('onco')) {
-            const registrosZerados = allData.filter(item => !item.VALORES || item.VALORES === 0);
-            
-            if (registrosZerados.length > 0) {
-              // Buscar estudos no De Para
-              const { data: deParaData } = await supabase
-                .from('valores_referencia_de_para')
-                .select('estudo_descricao')
-                .eq('ativo', true);
-
-              const estudosNoDePara = new Set(deParaData?.map(item => 
-                item.estudo_descricao?.toUpperCase().trim()
-              ).filter(Boolean) || []);
-
-              // Buscar regras de quebra
-              const { data: regrasQuebra } = await supabase
-                .from('regras_quebra_exames')
-                .select('exame_original, exame_quebrado')
-                .eq('ativo', true);
-
-              // Contar apenas zerados que NÃO foram identificados
-              recordsZeroed = registrosZerados.filter(item => {
-                // Se ESTUDO_DESCRICAO é NULL ou vazio, contar como zerado
-                if (!item.ESTUDO_DESCRICAO?.trim()) {
-                  return true;
-                }
-                
-                const estudoNormalizado = item.ESTUDO_DESCRICAO.toUpperCase().trim();
-                
-                // Se não está no De Para, verificar se está nas regras de quebra
-                if (!estudosNoDePara.has(estudoNormalizado)) {
-                  const existeNasRegras = regrasQuebra?.some(regra => 
-                    regra.exame_original === item.ESTUDO_DESCRICAO || 
-                    regra.exame_quebrado === item.ESTUDO_DESCRICAO
-                  );
-                  
-                  return !existeNasRegras; // Só contar se NÃO está nas regras
-                }
-                
-                return false; // Se está no De Para, não contar como zerado
-              }).length;
-            }
-          } else {
-            // Para outros tipos, manter lógica simples
-            recordsZeroed = allData.filter(item => !item.VALORES || item.VALORES === 0).length;
-          }
+          // Calcular zerados: usar lógica simples e consistente
+          const recordsZeroed = allData.filter(item => !item.VALORES || item.VALORES === 0).length;
 
           statsResult[tipo] = {
             totalRecords,

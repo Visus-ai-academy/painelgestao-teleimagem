@@ -407,8 +407,28 @@ serve(async (req) => {
     console.log('✅ PROCESSAMENTO CONCLUÍDO!');
     console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
 
-    // Aplicar regras específicas para arquivos retroativos
+    // Aplicar regras específicas e exclusões por período automaticamente
     let registrosAtualizados = 0;
+    
+    // Para arquivos 3 e 4 (retroativos), aplicar automaticamente as exclusões por período
+    if (arquivo_fonte.includes('retroativo') && periodo) {
+      console.log('🔧 Aplicando exclusões por período automaticamente...');
+      try {
+        const periodoReferencia = `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(periodo.ano, periodo.mes - 1))}/${periodo.ano.toString().slice(-2)}`;
+        
+        const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
+          body: { periodo_referencia: periodoReferencia }
+        });
+        
+        if (exclusoesError) {
+          console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+        } else if (exclusoesResult) {
+          console.log('✅ Exclusões por período aplicadas:', exclusoesResult);
+        }
+      } catch (exclusoesError) {
+        console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+      }
+    }
     
     if (arquivo_fonte.includes('retroativo')) {
       console.log('🔧 Aplicando regras específicas para retroativo...');
