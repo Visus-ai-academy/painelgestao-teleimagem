@@ -553,21 +553,67 @@ export async function processVolumetriaOtimizado(
     // Aplicar regras específicas APÓS o upload para arquivos retroativos
     if (arquivoFonte.includes('retroativo') && periodo) {
       console.log('📅 Aplicando regras de exclusão por data para arquivo retroativo...');
+      
+      // Aplicar exclusões de datas diretamente no banco
+      const mes = periodo.mes;
+      const ano = periodo.ano;
+      const dataLimiteRealizacao = `${ano}-${mes.toString().padStart(2, '0')}-01`;
+      const inicioFaturamento = `${ano}-${mes.toString().padStart(2, '0')}-08`;
+      
+      // Calcular próximo mês para fim do faturamento
+      let proximoMes = mes + 1;
+      let proximoAno = ano;
+      if (proximoMes > 12) {
+        proximoMes = 1;
+        proximoAno = ano + 1;
+      }
+      const fimFaturamento = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-07`;
+      
+      console.log(`📊 Exclusões para período Jun/25:`);
+      console.log(`   - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+      console.log(`   - Manter DATA_LAUDO entre ${inicioFaturamento} e ${fimFaturamento}`);
+      
       try {
-        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-                      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-        const nomesMes = meses[periodo.mes - 1] || 'janeiro';
-        const periodoReferenciaExclusao = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
+        // 1. Excluir registros com DATA_REALIZACAO >= data limite
+        const { error: errorRealizacao, count: countRealizacao } = await supabase
+          .from('volumetria_mobilemed')
+          .delete({ count: 'exact' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .gte('DATA_REALIZACAO', dataLimiteRealizacao);
         
-        await supabase.functions.invoke('aplicar-exclusoes-periodo', {
-          body: { periodo_referencia: periodoReferenciaExclusao }
-        });
+        if (errorRealizacao) {
+          console.error('❌ Erro ao excluir por DATA_REALIZACAO:', errorRealizacao);
+        } else {
+          console.log(`✅ Excluídos ${countRealizacao || 0} registros por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+        }
         
-        await supabase.functions.invoke('aplicar-regras-tratamento', {
-          body: { arquivo_fonte: arquivoFonte }
-        });
+        // 2. Excluir registros com DATA_LAUDO fora do período
+        const { error: errorLaudo, count: countLaudo } = await supabase
+          .from('volumetria_mobilemed')
+          .delete({ count: 'exact' })
+          .eq('arquivo_fonte', arquivoFonte)
+          .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
         
-        console.log('✅ Regras de exclusão e tratamento aplicadas');
+        if (errorLaudo) {
+          console.error('❌ Erro ao excluir por DATA_LAUDO:', errorLaudo);
+        } else {
+          console.log(`✅ Excluídos ${countLaudo || 0} registros por DATA_LAUDO fora do período`);
+        }
+        
+        // 3. Aplicar De-Para para valores zerados
+        const { data: deParaResult, error: deParaError } = await supabase
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivoFonte 
+          });
+        
+        if (deParaError) {
+          console.log(`⚠️ De-Para falhou: ${deParaError.message}`);
+        } else {
+          const registrosAtualizados = (deParaResult as any)?.registros_atualizados || 0;
+          console.log(`✅ De-Para aplicado em ${registrosAtualizados} registros`);
+        }
+        
+        console.log('✅ Regras de exclusão e tratamento aplicadas diretamente');
       } catch (error) {
         console.warn('⚠️ Erro ao aplicar regras:', error);
       }
