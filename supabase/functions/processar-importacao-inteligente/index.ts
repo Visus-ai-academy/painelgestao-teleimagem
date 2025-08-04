@@ -182,15 +182,14 @@ serve(async (req) => {
             // Tratar valores undefined ou vazios
             if (value === undefined || value === null || value === '' || value === 'undefined') {
               if (mapping.is_required) {
-                // ❌ REMOVIDA VALIDAÇÃO RESTRITIVA - aceitar registros mesmo com campos obrigatórios vazios
-                console.warn(`Campo obrigatório '${mapping.source_field}' está vazio na linha ${i + 1} - PRESERVANDO REGISTRO`)
+                // Campo obrigatório vazio - definir como null mas CONTINUAR processando outros campos
+                console.warn(`Campo obrigatório '${mapping.source_field}' está vazio na linha ${i + 1} - DEFININDO COMO NULL`)
                 processedRow[mapping.target_field] = null
-                return
               } else {
-                // Para campos não obrigatórios, deixar null em vez de "undefined"
+                // Para campos não obrigatórios, deixar null
                 processedRow[mapping.target_field] = null
-                return
               }
+              return // return aqui apenas pula este campo específico, não toda a iteração
             }
             
             // Converter tipo de dados
