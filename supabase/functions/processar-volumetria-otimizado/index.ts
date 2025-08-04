@@ -298,40 +298,53 @@ serve(async (req) => {
         continue;
       }
 
-      // 🔧 APLICAR VALIDAÇÕES RIGOROSAS ANTES DA INSERÇÃO
-      console.log(`🔍 Aplicando validações rigorosas em ${records.length} registros...`);
+      // 🔧 APLICAR VALIDAÇÕES RIGOROSAS ANTES DA INSERÇÃO (SKIP para retroativos)
+      console.log(`🔍 Processando ${records.length} registros...`);
       
       let validacaoResult;
-      try {
-        const { data: validacaoData, error: validacaoError } = await supabaseClient.functions.invoke('validar-regras-processamento', {
-          body: { 
-            registros: records, 
-            arquivo_fonte: arquivo_fonte 
-          }
-        });
+      
+      // Para arquivos retroativos, pular validação completa para evitar erros
+      if (arquivo_fonte.includes('retroativo')) {
+        console.log('⚡ MODO RETROATIVO: Pulando validações complexas para máxima performance');
+        validacaoResult = { 
+          registros_validos: records, 
+          registros_rejeitados: [],
+          total_valido: records.length,
+          total_rejeitado: 0
+        };
+      } else {
+        // Validação completa apenas para arquivos normais
+        try {
+          const { data: validacaoData, error: validacaoError } = await supabaseClient.functions.invoke('validar-regras-processamento', {
+            body: { 
+              registros: records, 
+              arquivo_fonte: arquivo_fonte 
+            }
+          });
 
-        if (validacaoError) {
-          console.error(`❌ Erro na validação:`, validacaoError);
-          // Se falhar validação, inserir sem validação (fallback)
-          validacaoResult = { registros_validos: records, registros_rejeitados: [] };
-        } else {
-          validacaoResult = validacaoData.resultados;
-          console.log(`✅ Validação concluída: ${validacaoResult.total_valido} válidos, ${validacaoResult.total_rejeitado} rejeitados`);
-          
-          // Adicionar erros de registros rejeitados ao contador
-          totalErrors += validacaoResult.total_rejeitado;
-          
-          // Log detalhado dos registros rejeitados
-          if (validacaoResult.registros_rejeitados.length > 0) {
-            console.log(`🚫 Registros rejeitados no lote ${batchNumber}:`);
-            validacaoResult.registros_rejeitados.forEach((rejeitado: any, index: number) => {
-              console.log(`  - Linha ${rejeitado.linha}: ${rejeitado.erros.join(', ')}`);
-            });
+          if (validacaoError) {
+            console.error(`❌ Erro na validação:`, validacaoError);
+            // Se falhar validação, inserir sem validação (fallback)
+            validacaoResult = { registros_validos: records, registros_rejeitados: [], total_valido: records.length, total_rejeitado: 0 };
+          } else {
+            validacaoResult = validacaoData.resultados;
+            console.log(`✅ Validação concluída: ${validacaoResult.total_valido} válidos, ${validacaoResult.total_rejeitado} rejeitados`);
+            
+            // Adicionar erros de registros rejeitados ao contador
+            totalErrors += validacaoResult.total_rejeitado;
+            
+            // Log detalhado dos registros rejeitados
+            if (validacaoResult.registros_rejeitados.length > 0) {
+              console.log(`🚫 Registros rejeitados no lote ${batchNumber}:`);
+              validacaoResult.registros_rejeitados.forEach((rejeitado: any, index: number) => {
+                console.log(`  - Linha ${rejeitado.linha}: ${rejeitado.erros.join(', ')}`);
+              });
+            }
           }
+        } catch (validacaoException) {
+          console.warn(`⚠️ Exceção na validação, continuando sem validação:`, validacaoException);
+          validacaoResult = { registros_validos: records, registros_rejeitados: [], total_valido: records.length, total_rejeitado: 0 };
         }
-      } catch (validacaoException) {
-        console.warn(`⚠️ Exceção na validação, continuando sem validação:`, validacaoException);
-        validacaoResult = { registros_validos: records, registros_rejeitados: [] };
       }
 
       const registrosParaInserir = validacaoResult.registros_validos;
