@@ -358,8 +358,8 @@ export default function MapaDistribuicaoClientes() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="CO">CO - Cooperado</SelectItem>
-                  <SelectItem value="NC">NC - Não Cooperado</SelectItem>
+                  <SelectItem value="CO">CO - Consolidado</SelectItem>
+                  <SelectItem value="NC">NC - Não Consolidado</SelectItem>
                   {tiposClienteUnicos.filter(tipo => tipo && !['CO', 'NC'].includes(tipo)).map(tipo => (
                     <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                   ))}
