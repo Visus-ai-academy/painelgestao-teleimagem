@@ -31,6 +31,7 @@ import { VolumetriaClientesComparison } from '@/components/volumetria/Volumetria
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { AnaliseDiscrepanciaZerados } from '@/components/AnaliseDiscrepanciaZerados';
 import { AnaliseRegrasQuebraProblemas } from '@/components/AnaliseRegrasQuebraProblemas';
+import { AplicarExclusoesPeriodo } from "@/components/AplicarExclusoesPeriodo";
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
@@ -1120,8 +1121,11 @@ export default function GerarFaturamento() {
                 {/* 🚨 PROBLEMA CRÍTICO - Análise de Regras de Quebra */}
                 <AnaliseRegrasQuebraProblemas />
 
-                {/* Análise de Discrepância */}
-                <AnaliseDiscrepanciaZerados />
+                {/* Análise de Discrepância e Aplicar Exclusões */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <AnaliseDiscrepanciaZerados />
+                  <AplicarExclusoesPeriodo />
+                </div>
                 
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />

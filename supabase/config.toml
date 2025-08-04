@@ -66,3 +66,6 @@ verify_jwt = false  # External webhook needs to validate signature
 
 [functions.ativar-regua-cobranca]
 verify_jwt = false  # Legacy - should be secured in future update
+
+[functions.aplicar-exclusoes-periodo]
+verify_jwt = false
