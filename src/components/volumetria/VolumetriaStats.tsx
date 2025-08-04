@@ -6,7 +6,8 @@ interface DashboardStats {
   total_registros: number;
   total_atrasados: number;
   percentual_atraso: number;
-  total_clientes: number;
+  total_clientes: number; // Total de clientes cadastrados
+  total_clientes_volumetria: number; // Clientes únicos com volumetria
 }
 
 interface VolumetriaStatsProps {
@@ -36,7 +37,7 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Clientes Ativos</span>
+            <span className="text-sm text-muted-foreground">Clientes</span>
             <Users className="h-4 w-4 text-green-500" />
           </div>
         </CardHeader>
@@ -45,8 +46,16 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
             {stats.total_clientes}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Clientes únicos no período
+            Total cadastrados
           </p>
+          <div className="mt-2 pt-2 border-t border-border">
+            <div className="text-lg font-semibold text-blue-600">
+              {stats.total_clientes_volumetria}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Com volumetria no período
+            </p>
+          </div>
         </CardContent>
       </Card>
 

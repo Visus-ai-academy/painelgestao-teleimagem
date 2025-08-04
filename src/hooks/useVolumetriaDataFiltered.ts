@@ -21,7 +21,8 @@ interface DashboardStats {
   total_registros: number;
   total_atrasados: number;
   percentual_atraso: number;
-  total_clientes: number;
+  total_clientes: number; // Total de clientes cadastrados
+  total_clientes_volumetria: number; // Clientes únicos com volumetria
   total_modalidades: number;
   total_especialidades: number;
   total_medicos: number;
@@ -92,6 +93,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       total_atrasados: 0,
       percentual_atraso: 0,
       total_clientes: 0,
+      total_clientes_volumetria: 0,
       total_modalidades: 0,
       total_especialidades: 0,
       total_medicos: 0,
@@ -224,15 +226,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
 
       if (!allData || allData.length === 0) {
         console.log('⚠️ [DASHBOARD] Nenhum dado retornado');
-        setData({
-          stats: {
-            total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
-            total_clientes: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
-            total_prioridades: 0
-          },
-          clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
-          atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoPrioridades: []
-        });
+         setData({
+           stats: {
+             total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
+             total_clientes: 0, total_clientes_volumetria: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
+             total_prioridades: 0
+           },
+           clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
+           atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoPrioridades: []
+         });
         return;
       }
 
@@ -324,7 +326,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         setData({
           stats: {
             total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
-            total_clientes: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
+            total_clientes: 0, total_clientes_volumetria: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
             total_prioridades: 0
           },
           clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
@@ -534,13 +536,27 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         total_medicos: 0 // TODO: implementar contagem de médicos por prioridade se necessário
       })).sort((a, b) => b.total_exames - a.total_exames);
 
+      // Buscar total de clientes cadastrados
+      let totalClientesCadastrados = 0;
+      try {
+        const { count: totalClientes } = await supabase
+          .from('clientes')
+          .select('*', { count: 'exact', head: true })
+          .eq('ativo', true);
+        totalClientesCadastrados = totalClientes || 0;
+        console.log('👥 [DASHBOARD] Total de clientes cadastrados:', totalClientesCadastrados);
+      } catch (error) {
+        console.warn('⚠️ [DASHBOARD] Erro ao buscar total de clientes:', error);
+      }
+
       setData({
         stats: {
           total_exames: totalLaudos,
           total_registros: totalRegistros, // Corrigido: usar a contagem real de registros
           total_atrasados: totalAtrasados,
           percentual_atraso: percentualAtraso,
-          total_clientes: clientesMap.size,
+          total_clientes: totalClientesCadastrados, // Total de clientes cadastrados
+          total_clientes_volumetria: clientesMap.size, // Clientes únicos com volumetria
           total_modalidades: modalidadesMap.size,
           total_especialidades: especialidadesMap.size,
           total_medicos: medicosMap.size,

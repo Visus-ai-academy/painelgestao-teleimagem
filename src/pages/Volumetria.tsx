@@ -81,7 +81,8 @@ export default function Volumetria() {
           <p className="text-muted-foreground mt-1">
             Análise executiva completa de volumetria - 
             {stats.total_exames.toLocaleString()} laudos | 
-            {stats.total_clientes} clientes ativos
+            {stats.total_clientes} clientes cadastrados | 
+            {stats.total_clientes_volumetria} com dados no período
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
