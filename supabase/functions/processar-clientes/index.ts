@@ -212,6 +212,19 @@ serve(async (req) => {
     console.log('Total de clientes após processamento:', clientes.length)
     
     // Filtrar clientes com nome válido
+    console.log('=== ANÁLISE DE FILTROS ===')
+    console.log('Total clientes antes do filtro:', clientes.length)
+    
+    // Identificar registros sem nome
+    const clientesSemNome = clientes.filter(c => !c.nome || c.nome.trim() === '');
+    console.log('Clientes SEM nome válido:', clientesSemNome.length)
+    if (clientesSemNome.length > 0) {
+      console.log('Primeiros 5 registros sem nome:')
+      clientesSemNome.slice(0, 5).forEach((cliente, index) => {
+        console.log(`Cliente ${index + 1} sem nome:`, JSON.stringify(cliente, null, 2))
+      })
+    }
+    
     const clientesComNome = clientes.filter(c => c.nome && c.nome.trim() !== '');
     console.log('Clientes com nome válido:', clientesComNome.length)
     
