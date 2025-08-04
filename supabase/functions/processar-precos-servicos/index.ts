@@ -72,50 +72,41 @@ serve(async (req) => {
     let registrosProcessados = 0
     let registrosErro = 0
     const erros: string[] = []
-    const BATCH_SIZE = 100 // Processar em lotes de 100
+    const BATCH_SIZE = 50 // Reduzido para 50 para evitar timeout
+    const MAX_TIMEOUT = 240000 // 4 minutos máximo
+
+    const startTime = Date.now()
 
     // 4. Processar em lotes para otimizar performance
     for (let batchStart = 1; batchStart < jsonData.length; batchStart += BATCH_SIZE) {
+      // Verificar timeout
+      if (Date.now() - startTime > MAX_TIMEOUT) {
+        console.log('Timeout atingido, parando processamento')
+        erros.push(`Timeout: processamento interrompido após ${Math.floor((Date.now() - startTime) / 1000)}s`)
+        break
+      }
+
       const batchEnd = Math.min(batchStart + BATCH_SIZE, jsonData.length)
       const batchData: any[] = []
       
       console.log(`Processando lote ${Math.floor(batchStart / BATCH_SIZE) + 1}: linhas ${batchStart} a ${batchEnd - 1}`)
       
+      // Preparar dados do lote
       for (let i = batchStart; i < batchEnd; i++) {
         try {
           const row = jsonData[i] as any[]
           
-          if (!row || row.length < headers.length) {
-            console.log(`Linha ${i + 1} ignorada - dados insuficientes`)
+          if (!row || row.length < 2) {
             continue
           }
 
-          // Mapear campos do Excel (procurar por diferentes variações de nomes)
-          const clienteIdx = headers.findIndex(h => 
-            h && (h.toLowerCase().includes('cliente') || h.toLowerCase().includes('client'))
-          )
-          const modalidadeIdx = headers.findIndex(h => 
-            h && h.toLowerCase().includes('modalidade')
-          )
-          const especialidadeIdx = headers.findIndex(h => 
-            h && h.toLowerCase().includes('especialidade')
-          )
-          const categoriaIdx = headers.findIndex(h => 
-            h && h.toLowerCase().includes('categoria')
-          )
-          const prioridadeIdx = headers.findIndex(h => 
-            h && h.toLowerCase().includes('prioridade')
-          )
-          const valorIdx = headers.findIndex(h => 
-            h && h.toLowerCase().includes('valor')
-          )
-
-          const cliente = row[clienteIdx] || row[0]
-          const modalidade = row[modalidadeIdx] || row[1]
-          const especialidade = row[especialidadeIdx] || row[2]
-          const categoria = row[categoriaIdx] || row[3] || 'Normal'
-          const prioridade = row[prioridadeIdx] || row[4] || 'Rotina'
-          const valorStr = row[valorIdx] || row[5]
+          // Mapear campos do Excel de forma mais flexível
+          const cliente = String(row[0] || '').trim()
+          const modalidade = String(row[1] || '').trim()
+          const especialidade = String(row[2] || '').trim()
+          const categoria = String(row[3] || 'Normal').trim()
+          const prioridade = String(row[4] || 'Rotina').trim()
+          const valorStr = row[5] || row[6] || row[7] // Tentar várias colunas para o valor
 
           // Validações básicas
           if (!cliente || !modalidade || !especialidade || !valorStr) {
@@ -132,33 +123,19 @@ serve(async (req) => {
             valor = parseFloat(String(valorStr).replace(/[R$\s]/g, '').replace(',', '.'))
           }
           
-          if (isNaN(valor)) {
+          if (isNaN(valor) || valor <= 0) {
             erros.push(`Linha ${i + 1}: valor inválido - ${valorStr}`)
             registrosErro++
             continue
           }
 
-          // Buscar cliente_id pelo nome
-          const { data: clienteData, error: clienteError } = await supabaseClient
-            .from('clientes')
-            .select('id')
-            .eq('nome', String(cliente).trim())
-            .single()
-
-          if (clienteError || !clienteData) {
-            erros.push(`Linha ${i + 1}: Cliente "${cliente}" não encontrado`)
-            registrosErro++
-            continue
-          }
-
           batchData.push({
-            cliente_id: clienteData.id,
-            modalidade: String(modalidade).trim(),
-            especialidade: String(especialidade).trim(),
-            categoria: String(categoria).trim(),
-            prioridade: String(prioridade).trim(),
-            valor: valor,
-            ativo: true
+            cliente_nome: cliente,
+            modalidade,
+            especialidade,
+            categoria,
+            prioridade,
+            valor
           })
 
         } catch (error) {
@@ -167,25 +144,79 @@ serve(async (req) => {
         }
       }
 
-      // Inserir lote no banco
+      // Processar lote: buscar clientes e inserir preços
       if (batchData.length > 0) {
-        const { error: insertError } = await supabaseClient
-          .from('precos_servicos')
-          .upsert(batchData, {
-            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
+        try {
+          // Buscar todos os clientes do lote de uma vez
+          const clientesNomes = [...new Set(batchData.map(item => item.cliente_nome))]
+          const { data: clientesData, error: clientesError } = await supabaseClient
+            .from('clientes')
+            .select('id, nome')
+            .in('nome', clientesNomes)
+
+          if (clientesError) {
+            console.error('Erro ao buscar clientes:', clientesError.message)
+            erros.push(`Erro ao buscar clientes: ${clientesError.message}`)
+            registrosErro += batchData.length
+            continue
+          }
+
+          // Criar mapa de clientes
+          const clientesMap = new Map()
+          clientesData?.forEach(cliente => {
+            clientesMap.set(cliente.nome, cliente.id)
           })
 
-        if (insertError) {
-          console.error('Erro ao inserir lote:', insertError.message)
-          erros.push(`Erro no lote: ${insertError.message}`)
+          // Preparar dados para inserção
+          const dadosParaInserir = []
+          for (const item of batchData) {
+            const clienteId = clientesMap.get(item.cliente_nome)
+            if (!clienteId) {
+              erros.push(`Cliente "${item.cliente_nome}" não encontrado`)
+              registrosErro++
+              continue
+            }
+
+            dadosParaInserir.push({
+              cliente_id: clienteId,
+              modalidade: item.modalidade,
+              especialidade: item.especialidade,
+              categoria: item.categoria,
+              prioridade: item.prioridade,
+              valor: item.valor,
+              ativo: true
+            })
+          }
+
+          // Inserir no banco
+          if (dadosParaInserir.length > 0) {
+            const { error: insertError } = await supabaseClient
+              .from('precos_servicos')
+              .upsert(dadosParaInserir, {
+                onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
+              })
+
+            if (insertError) {
+              console.error('Erro ao inserir lote:', insertError.message)
+              erros.push(`Erro no lote: ${insertError.message}`)
+              registrosErro += dadosParaInserir.length
+            } else {
+              registrosProcessados += dadosParaInserir.length
+            }
+          }
+
+        } catch (error) {
+          console.error('Erro no processamento do lote:', error.message)
+          erros.push(`Erro no lote: ${error.message}`)
           registrosErro += batchData.length
-        } else {
-          registrosProcessados += batchData.length
         }
       }
 
       // Log de progresso
       console.log(`Lote processado: ${registrosProcessados} sucessos, ${registrosErro} erros`)
+      
+      // Pausa pequena para evitar sobrecarga
+      await new Promise(resolve => setTimeout(resolve, 10))
     }
 
     // 5. Atualizar flags nos contratos dos clientes
