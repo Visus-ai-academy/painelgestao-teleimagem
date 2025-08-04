@@ -6,12 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Calendar, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { toast } from 'sonner';
 
 export function AplicarExclusoesPeriodo() {
   const [periodoReferencia, setPeriodoReferencia] = useState('');
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
+  const { refreshData } = useVolumetria();
 
   const handleAplicarExclusoes = async () => {
     if (!periodoReferencia) {
@@ -36,6 +38,9 @@ export function AplicarExclusoesPeriodo() {
       if (data.success) {
         setResultado(data);
         toast.success(`Exclusões aplicadas! ${data.total_excluidos} registros removidos`);
+        
+        // Forçar atualização do painel de análise dos uploads
+        await refreshData();
       } else {
         throw new Error(data.error || 'Erro desconhecido');
       }
