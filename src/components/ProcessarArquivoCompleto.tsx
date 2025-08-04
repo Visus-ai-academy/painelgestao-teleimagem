@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Play, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useVolumetria } from '@/contexts/VolumetriaContext';
 
 interface ProcessarArquivoCompletoProps {
   filePath: string;
@@ -26,6 +27,7 @@ export function ProcessarArquivoCompleto({
     totalErrors: 0,
     totalDeParaUpdated: 0
   });
+  const { refreshData } = useVolumetria();
 
   const startProcessing = async () => {
     setIsProcessing(true);
@@ -85,6 +87,9 @@ export function ProcessarArquivoCompleto({
           title: "Processamento concluído!",
           description: `${insertedCount} registros inseridos, ${deParaCount} de-para aplicados`,
         });
+        
+        // Atualizar automaticamente a "Análise dos Uploads Realizados" e "Exames Não Identificados"
+        await refreshData();
       }
       
       onComplete?.();

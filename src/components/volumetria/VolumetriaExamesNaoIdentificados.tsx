@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, FileX, Download } from 'lucide-react';
+import { useVolumetria } from '@/contexts/VolumetriaContext';
 import * as XLSX from 'xlsx';
 
 interface ExameNaoIdentificado {
@@ -15,10 +16,18 @@ interface ExameNaoIdentificado {
 export function VolumetriaExamesNaoIdentificados() {
   const [examesNaoIdentificados, setExamesNaoIdentificados] = useState<ExameNaoIdentificado[]>([]);
   const [loading, setLoading] = useState(true);
+  const { data } = useVolumetria();
 
   useEffect(() => {
     loadExamesNaoIdentificados();
   }, []);
+
+  // Atualizar automaticamente quando houver mudanças no contexto de volumetria
+  useEffect(() => {
+    if (data) {
+      loadExamesNaoIdentificados();
+    }
+  }, [data]);
 
   const loadExamesNaoIdentificados = async () => {
     try {
@@ -164,7 +173,7 @@ export function VolumetriaExamesNaoIdentificados() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-600">
             <FileX className="h-5 w-5" />
-            Exames Não Identificados no "De Para"
+            Exames Não Identificados - Fora do Padrão
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -183,7 +192,7 @@ export function VolumetriaExamesNaoIdentificados() {
           <div>
             <CardTitle className="flex items-center gap-2 text-orange-600">
               <AlertTriangle className="h-5 w-5" />
-              Exames Não Identificados no "De Para"
+              Exames Não Identificados - Fora do Padrão
             </CardTitle>
             <div className="text-sm text-muted-foreground mt-1">
               Total de {totalExamesNaoIdentificados} exames zerados não encontrados na tabela "De Para"

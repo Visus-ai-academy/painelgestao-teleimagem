@@ -3,6 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
@@ -27,6 +28,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
   const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
   const [isLimitedProcessing, setIsLimitedProcessing] = useState(false);
   const { toast } = useToast();
+  const { refreshData } = useVolumetria();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -120,6 +122,10 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
           title: "Upload concluído!",
           description: `${insertedCount} registros inseridos com sucesso.`,
         });
+        
+        // Atualizar automaticamente a "Análise dos Uploads Realizados" e "Exames Não Identificados"
+        await refreshData();
+        
         onSuccess?.();
       } else {
         toast({
