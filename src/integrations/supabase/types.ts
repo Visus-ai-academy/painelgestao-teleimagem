@@ -634,6 +634,8 @@ export type Database = {
         Row: {
           acrescimo_percentual: number | null
           cliente_id: string
+          configuracoes_franquia: Json | null
+          configuracoes_integracao: Json | null
           created_at: string
           created_by: string | null
           data_fim: string | null
@@ -646,16 +648,20 @@ export type Database = {
           modalidades: string[] | null
           numero_contrato: string
           observacoes: string | null
+          observacoes_contratuais: string | null
+          servicos_contratados: Json | null
           status: string
+          tabela_precos: Json | null
           tem_parametros_configurados: boolean | null
           tem_precos_configurados: boolean | null
           tipo_cliente: string | null
           updated_at: string
-          valor_mensal: number
         }
         Insert: {
           acrescimo_percentual?: number | null
           cliente_id: string
+          configuracoes_franquia?: Json | null
+          configuracoes_integracao?: Json | null
           created_at?: string
           created_by?: string | null
           data_fim?: string | null
@@ -668,16 +674,20 @@ export type Database = {
           modalidades?: string[] | null
           numero_contrato: string
           observacoes?: string | null
+          observacoes_contratuais?: string | null
+          servicos_contratados?: Json | null
           status?: string
+          tabela_precos?: Json | null
           tem_parametros_configurados?: boolean | null
           tem_precos_configurados?: boolean | null
           tipo_cliente?: string | null
           updated_at?: string
-          valor_mensal?: number
         }
         Update: {
           acrescimo_percentual?: number | null
           cliente_id?: string
+          configuracoes_franquia?: Json | null
+          configuracoes_integracao?: Json | null
           created_at?: string
           created_by?: string | null
           data_fim?: string | null
@@ -690,12 +700,14 @@ export type Database = {
           modalidades?: string[] | null
           numero_contrato?: string
           observacoes?: string | null
+          observacoes_contratuais?: string | null
+          servicos_contratados?: Json | null
           status?: string
+          tabela_precos?: Json | null
           tem_parametros_configurados?: boolean | null
           tem_precos_configurados?: boolean | null
           tipo_cliente?: string | null
           updated_at?: string
-          valor_mensal?: number
         }
         Relationships: [
           {

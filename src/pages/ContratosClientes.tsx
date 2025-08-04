@@ -195,6 +195,22 @@ export default function ContratosClientes() {
           status = "A Vencer";
         }
 
+        // Calcular valor estimado baseado nos serviços contratados (se houver)
+        let valorEstimado = 0;
+        const servicosContratados = Array.isArray(contrato.servicos_contratados) ? contrato.servicos_contratados : [];
+        const configuracoesFranquia = (typeof contrato.configuracoes_franquia === 'object' && contrato.configuracoes_franquia) ? contrato.configuracoes_franquia as any : {};
+        const configuracoesIntegracao = (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
+
+        // Valor da franquia (se configurada)
+        if (configuracoesFranquia.tem_franquia) {
+          valorEstimado += Number(configuracoesFranquia.valor_franquia || 0);
+        }
+
+        // Valor da integração (se configurada)
+        if (configuracoesIntegracao.cobra_integracao) {
+          valorEstimado += Number(configuracoesIntegracao.valor_integracao || 0);
+        }
+
         return {
           id: contrato.id,
           cliente: cliente?.nome || 'Cliente não encontrado',
@@ -202,16 +218,24 @@ export default function ContratosClientes() {
           dataInicio: contrato.data_inicio || '',
           dataFim: contrato.data_fim || contrato.data_inicio || '',
           status,
-          servicos: [], // Será implementado quando houver tabela de serviços
-          valorTotal: Number(contrato.valor_mensal || 0),
+          servicos: servicosContratados.map((s: any) => ({
+            id: s.id,
+            modalidade: s.modalidade,
+            especialidade: s.especialidade,
+            categoria: s.categoria,
+            prioridade: s.prioridade,
+            valor: Number(s.valor || 0)
+          })) as ServicoContratado[],
+          valorTotal: valorEstimado, // Valor estimado baseado em franquia/integração
           diasParaVencer,
-          indiceReajuste: "IPCA" as const, // Valor padrão, pode ser configurado
+          indiceReajuste: "IPCA" as const,
           endereco: cliente?.endereco || '',
           telefone: cliente?.telefone || '',
           emailFinanceiro: cliente?.email || '',
           emailOperacional: cliente?.email || '',
           responsavel: cliente?.contato || '',
-          cobrancaIntegracao: false,
+          cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
+          valorIntegracao: Number(configuracoesIntegracao.valor_integracao || 0),
           cobrancaSuporte: false,
           termosAditivos: [],
           documentos: []
