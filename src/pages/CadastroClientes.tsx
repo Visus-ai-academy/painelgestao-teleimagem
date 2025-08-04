@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { FileUpload } from "@/components/FileUpload";
-import { Users, Upload, Plus, Search, Edit, Trash2, Filter, ArrowUpDown, ArrowUp, ArrowDown, FileText, Building, Mail } from "lucide-react";
+import { Users, Upload, Plus, Edit, FileText, Building, Mail, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useClienteStats } from "@/hooks/useClienteStats";
+import { CadastroDataTable } from "@/components/CadastroDataTable";
 
 interface Cliente {
   id: string;
@@ -43,13 +44,6 @@ export default function CadastroClientes() {
   // Hook para estatísticas detalhadas
   const { stats, loading: loadingStats, refreshStats } = useClienteStats();
   
-  // Estados para busca, filtro e ordenação
-  const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [ordenacao, setOrdenacao] = useState<{campo: keyof Cliente, direcao: 'asc' | 'desc'}>({
-    campo: 'nome',
-    direcao: 'asc'
-  });
   
   const [clienteData, setClienteData] = useState({
     nome: "",
@@ -244,71 +238,6 @@ export default function CadastroClientes() {
     }
   };
 
-  // Função para alterar ordenação
-  const handleOrdenacao = (campo: keyof Cliente) => {
-    setOrdenacao(prev => ({
-      campo,
-      direcao: prev.campo === campo && prev.direcao === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  // Clientes filtrados e ordenados
-  const clientesFiltrados = useMemo(() => {
-    let resultado = [...clientes];
-
-    // Aplicar busca
-    if (busca.trim()) {
-      const buscaLower = busca.toLowerCase().trim();
-      resultado = resultado.filter(cliente =>
-        cliente.nome?.toLowerCase().includes(buscaLower) ||
-        cliente.email?.toLowerCase().includes(buscaLower) ||
-        cliente.cnpj?.toLowerCase().includes(buscaLower) ||
-        cliente.cod_cliente?.toLowerCase().includes(buscaLower) ||
-        cliente.contato?.toLowerCase().includes(buscaLower)
-      );
-    }
-
-    // Aplicar filtro de status
-    if (filtroStatus !== 'todos') {
-      if (filtroStatus === 'ativo') {
-        resultado = resultado.filter(cliente => cliente.ativo === true);
-      } else if (filtroStatus === 'inativo') {
-        resultado = resultado.filter(cliente => cliente.ativo === false);
-      }
-    }
-
-    // Aplicar ordenação
-    resultado.sort((a, b) => {
-      let valorA = a[ordenacao.campo];
-      let valorB = b[ordenacao.campo];
-
-      // Tratar valores nulos/undefined
-      if (valorA === null || valorA === undefined) valorA = '';
-      if (valorB === null || valorB === undefined) valorB = '';
-
-      // Converter para string para comparação
-      const strA = String(valorA).toLowerCase();
-      const strB = String(valorB).toLowerCase();
-
-      if (ordenacao.direcao === 'asc') {
-        return strA.localeCompare(strB);
-      } else {
-        return strB.localeCompare(strA);
-      }
-    });
-
-    return resultado;
-  }, [clientes, busca, filtroStatus, ordenacao]);
-
-  // Função para renderizar ícone de ordenação
-  const renderIconeOrdenacao = (campo: keyof Cliente) => {
-    if (ordenacao.campo !== campo) {
-      return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
-    }
-    return ordenacao.direcao === 'asc' ? 
-      <ArrowUp className="h-4 w-4 text-primary" /> : 
-      <ArrowDown className="h-4 w-4 text-primary" />;
-  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -361,7 +290,7 @@ export default function CadastroClientes() {
 
               // 2. Chamar edge function para processar
               const { data, error: processError } = await supabase.functions
-                .invoke('processar-importacao-inteligente', {
+                .invoke('processar-clientes-simples', {
                   body: { fileName }
                 });
 
@@ -619,218 +548,13 @@ export default function CadastroClientes() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Controles de Busca e Filtro */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Buscar por nome, email, CNPJ ou código..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os clientes</SelectItem>
-                  <SelectItem value="ativo">Apenas ativos</SelectItem>
-                  <SelectItem value="inativo">Apenas inativos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Estatísticas */}
-          <div className="mb-4 text-sm text-muted-foreground">
-            Exibindo {clientesFiltrados.length} de {clientes.length} clientes
-            {busca && ` | Busca: "${busca}"`}
-            {filtroStatus !== 'todos' && ` | Filtro: ${filtroStatus === 'ativo' ? 'Ativos' : 'Inativos'}`}
-          </div>
-
-          {loading ? (
-            <div className="text-center text-muted-foreground py-8">
-              <p>Carregando clientes...</p>
-            </div>
-          ) : clientes.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              <p>Nenhum cliente cadastrado ainda.</p>
-              <p className="text-sm">Use o upload de clientes ou cadastre manualmente.</p>
-            </div>
-          ) : clientesFiltrados.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              <p>Nenhum cliente encontrado com os filtros aplicados.</p>
-              <p className="text-sm">Tente alterar os critérios de busca ou filtro.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('nome')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Nome Mobilemed
-                      {renderIconeOrdenacao('nome')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('cnpj')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      CNPJ
-                      {renderIconeOrdenacao('cnpj')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('email')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      E-mail Envio NF
-                      {renderIconeOrdenacao('email')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('contato')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Nome Fantasia
-                      {renderIconeOrdenacao('contato')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('cidade')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Cidade
-                      {renderIconeOrdenacao('cidade')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('estado')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Estado
-                      {renderIconeOrdenacao('estado')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('tipo_cliente')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Tipo Cliente
-                      {renderIconeOrdenacao('tipo_cliente')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleOrdenacao('status')}
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                    >
-                      Status
-                      {renderIconeOrdenacao('status')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientesFiltrados.map((cliente) => (
-                   <TableRow key={cliente.id}>
-                     <TableCell className="font-medium">{cliente.nome}</TableCell>
-                     <TableCell>{cliente.cnpj}</TableCell>
-                     <TableCell>{cliente.email}</TableCell>
-                     <TableCell>{cliente.contato || "-"}</TableCell>
-                     <TableCell>{cliente.cidade || "-"}</TableCell>
-                     <TableCell>{cliente.estado || "-"}</TableCell>
-                     <TableCell>
-                       <Badge 
-                         variant={cliente.tipo_cliente === 'CO' ? "default" : "secondary"}
-                         className={
-                           cliente.tipo_cliente === 'CO'
-                             ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200" 
-                             : "bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200"
-                         }
-                       >
-                         {cliente.tipo_cliente || "-"}
-                       </Badge>
-                     </TableCell>
-                     <TableCell>
-                      <Badge 
-                        variant={cliente.ativo ? "default" : "destructive"}
-                        className={
-                          cliente.ativo 
-                            ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200" 
-                            : "bg-red-100 text-red-800 border-red-300 hover:bg-red-200"
-                        }
-                      >
-                        {cliente.status || (cliente.ativo ? "Ativo" : "Inativo")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditarCliente(cliente)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant={cliente.ativo ? "destructive" : "default"}
-                              className="h-8 px-2 text-xs"
-                            >
-                              {cliente.ativo ? "Inativar" : "Ativar"}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirmar {cliente.ativo ? "Inativação" : "Ativação"}</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja {cliente.ativo ? "inativar" : "ativar"} o cliente "{cliente.nome}"?
-                                {cliente.ativo && " Esta ação pode afetar contratos e faturamentos ativos."}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleInativarCliente(cliente)}>
-                                Confirmar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <CadastroDataTable
+            data={clientes}
+            loading={loading}
+            error={null}
+            type="clientes"
+            title=""
+          />
         </CardContent>
 
         {/* Dialog para editar cliente */}

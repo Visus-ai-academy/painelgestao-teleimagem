@@ -10,7 +10,7 @@ interface CadastroDataTableProps {
   data: any[];
   loading: boolean;
   error: string | null;
-  type: 'exames' | 'quebra' | 'precos' | 'regras' | 'repasse' | 'modalidades' | 'especialidades' | 'categorias' | 'prioridades';
+  type: 'exames' | 'quebra' | 'precos' | 'regras' | 'repasse' | 'modalidades' | 'especialidades' | 'categorias' | 'prioridades' | 'clientes';
   title: string;
 }
 
@@ -69,6 +69,17 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
           { key: 'prioridade', label: 'Prioridade', filterable: true },
           { key: 'valor', label: 'Valor', filterable: false },
           { key: 'created_at', label: 'Criado em', filterable: false }
+        ];
+      case 'clientes':
+        return [
+          { key: 'nome', label: 'Nome Mobilemed', filterable: true },
+          { key: 'cnpj', label: 'CNPJ', filterable: true },
+          { key: 'email', label: 'E-mail Envio NF', filterable: true },
+          { key: 'contato', label: 'Nome Fantasia', filterable: true },
+          { key: 'cidade', label: 'Cidade', filterable: true },
+          { key: 'estado', label: 'Estado', filterable: true },
+          { key: 'tipo_cliente', label: 'Tipo Cliente', filterable: true },
+          { key: 'ativo', label: 'Status', filterable: true }
         ];
       default:
         return [
