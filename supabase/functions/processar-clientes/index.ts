@@ -174,8 +174,8 @@ serve(async (req) => {
         console.log(`Cliente ${index} após mapeamento:`, JSON.stringify(clienteData, null, 2))
       }
       
-      // Campos obrigatórios mapeados dinamicamente - TRATAR NOMES VAZIOS
-      const nome = clienteData.nome || `CLIENTE_${index + 1}`; // Nome padrão se vazio
+      // Campos obrigatórios mapeados dinamicamente
+      const nome = clienteData.nome || '';
       const email = clienteData.email || '';
       const telefone = clienteData.telefone || null;
       const endereco = clienteData.endereco || null;
