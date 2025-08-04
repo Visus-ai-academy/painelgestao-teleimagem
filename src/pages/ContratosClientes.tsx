@@ -491,7 +491,7 @@ export default function ContratosClientes() {
                   <TableHead>Status</TableHead>
                   <TableHead>Data Início</TableHead>
                   <TableHead>Data Fim</TableHead>
-                  <TableHead>Valor Mensal</TableHead>
+                  <TableHead>Serviços Contratados</TableHead>
                   <TableHead>Dias para Vencer</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -504,7 +504,26 @@ export default function ContratosClientes() {
                     <TableCell>{getStatusBadge(contrato.status, contrato.diasParaVencer)}</TableCell>
                     <TableCell>{new Date(contrato.dataInicio).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell>{new Date(contrato.dataFim).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell>R$ {contrato.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {contrato.servicos.length > 0 ? (
+                          contrato.servicos.slice(0, 3).map((servico, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {servico.modalidade}-{servico.especialidade}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Não configurado
+                          </Badge>
+                        )}
+                        {contrato.servicos.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{contrato.servicos.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className={contrato.diasParaVencer <= 30 ? 'text-red-600 font-semibold' : 
                                      contrato.diasParaVencer <= 60 ? 'text-yellow-600 font-medium' : 'text-green-600'}>
