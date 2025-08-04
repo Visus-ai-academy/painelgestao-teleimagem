@@ -577,20 +577,34 @@ async function processVolumetriaComEdgeFunction(
 ): Promise<{ success: boolean; message: string; stats: any }> {
   console.log('🔧 Usando edge function para processamento com exclusões por período...');
   
-  // Preparar FormData para envio
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('arquivo_fonte', arquivoFonte);
-  formData.append('periodo', JSON.stringify(periodo));
-  
-  // Simular progresso durante upload
+  // Primeiro, fazer upload do arquivo para o storage
   if (onProgress) {
     onProgress({ progress: 10, processed: 0, total: 100, status: 'Enviando arquivo...' });
   }
   
+  const fileName = `${arquivoFonte}_${Date.now()}_${Math.random().toString(36).substring(7)}.xlsx`;
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('uploads')
+    .upload(fileName, file, { 
+      cacheControl: '3600',
+      upsert: false 
+    });
+
+  if (uploadError) {
+    throw new Error(`Erro no upload: ${uploadError.message}`);
+  }
+
+  if (onProgress) {
+    onProgress({ progress: 30, processed: 0, total: 100, status: 'Processando arquivo...' });
+  }
+  
   try {
     const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
-      body: formData
+      body: {
+        file_path: uploadData.path,
+        arquivo_fonte: arquivoFonte,
+        periodo: periodo
+      }
     });
     
     if (error) {
