@@ -228,27 +228,23 @@ serve(async (req) => {
     // Identificar registros sem nome
     const clientesSemNome = clientes.filter(c => !c.nome || c.nome.trim() === '');
     console.log('Clientes SEM nome válido:', clientesSemNome.length)
-    if (clientesSemNome.length > 0) {
-      console.log('Primeiros 5 registros sem nome:')
-      clientesSemNome.slice(0, 5).forEach((cliente, index) => {
-        console.log(`Cliente ${index + 1} sem nome:`, JSON.stringify(cliente, null, 2))
-      })
-    }
     
     const clientesComNome = clientes.filter(c => c.nome && c.nome.trim() !== '');
     console.log('Clientes com nome válido:', clientesComNome.length)
     
-    // Verificar se há duplicatas por nome
-    const nomesUnicos = new Set(clientesComNome.map(c => c.nome));
-    console.log('Nomes únicos:', nomesUnicos.size)
+    // ANÁLISE DETALHADA DOS REGISTROS PERDIDOS
+    console.log('=== REGISTROS SEM NOME VÁLIDO ===')
+    console.log('Total sem nome:', clientesSemNome.length)
     
-    if (clientesComNome.length > 0) {
-      console.log('Primeiro cliente processado:', JSON.stringify(clientesComNome[0], null, 2))
-      console.log('Último cliente processado:', JSON.stringify(clientesComNome[clientesComNome.length - 1], null, 2))
+    if (clientesSemNome.length > 0) {
+      console.log('TODOS os registros sem nome:')
+      clientesSemNome.forEach((cliente, index) => {
+        console.log(`Registro ${index + 1} sem nome:`, JSON.stringify(cliente, null, 2))
+      })
     }
     
-    // Usar apenas clientes com nome válido para inserção
-    const clientesParaInserir = clientesComNome;
+    // USAR TODOS OS REGISTROS, MESMO OS SEM NOME (para não perder dados)
+    const clientesParaInserir = clientes; // Processar TODOS, não apenas os com nome
 
     // Clear existing clients
     console.log('=== LIMPANDO CLIENTES EXISTENTES ===')
