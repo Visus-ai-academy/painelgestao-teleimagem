@@ -31,7 +31,7 @@ import { VolumetriaClientesComparison } from '@/components/volumetria/Volumetria
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
-import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
+// ExamesForaPadraoUpload removido - usar apenas em Gerenciar Cadastros
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
 import { Speedometer } from "@/components/Speedometer";
 import { processContratosFile, processEscalasFile, processFinanceiroFile, processClientesFile, processFaturamentoFile, limparUploadsAntigos, limparDadosVolumetria } from "@/lib/supabase";
@@ -1093,10 +1093,7 @@ export default function GerarFaturamento() {
                     />
                   </div>
 
-                  <div>
-                    {/* Upload Arquivo De-Para - Exames Fora de Padrão */}
-                    <ExamesForaPadraoUpload />
-                  </div>
+                  {/* Upload De-Para removido - usar apenas em Gerenciar Cadastros */}
 
                   <div>
                     {/* Upload De-Para Prioridade */}
