@@ -602,20 +602,13 @@ async function processVolumetriaComEdgeFunction(
     console.log('📞 Chamando edge function processar-volumetria-otimizado...');
     console.log('📋 Parâmetros:', { file_path: uploadData.path, arquivo_fonte: arquivoFonte, periodo });
     
-    // Adicionar timeout de 5 minutos
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout: Edge function demorou mais de 5 minutos')), 5 * 60 * 1000);
-    });
-    
-    const functionPromise = supabase.functions.invoke('processar-volumetria-otimizado', {
+    const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
       body: {
         file_path: uploadData.path,
         arquivo_fonte: arquivoFonte,
         periodo: periodo
       }
     });
-    
-    const { data, error } = await Promise.race([functionPromise, timeoutPromise]) as any;
     
     console.log('📨 Resposta da edge function recebida');
     console.log('✅ Data:', data);
