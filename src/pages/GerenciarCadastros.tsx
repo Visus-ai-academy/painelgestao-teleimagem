@@ -196,9 +196,9 @@ export default function GerenciarCadastros() {
     setRefreshStatusPanel(prev => prev + 1);
   };
 
-  // Handler para preços de serviços
+  // Handler para preços de serviços (Preco_Clientes)
   const handleUploadPrecos = async (file: File) => {
-    console.log('🔄 Iniciando upload de preços de serviços:', file.name);
+    console.log('🔄 Iniciando upload de preços de clientes:', file.name);
     
     const formData = new FormData();
     formData.append('file', file);
@@ -210,12 +210,34 @@ export default function GerenciarCadastros() {
     if (error) throw error;
     
     toast({
-      title: "Preços de Serviços Processados!",
-      description: `${data.inseridos} preços cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
+      title: "Preços de Clientes Processados!",
+      description: `${data.inseridos} preços cadastrados, ${data.atualizados} atualizados, ${data.ignorados} ignorados (zerados), ${data.erros} erros`,
     });
     
     // Recarregar dados e status
     precosData.refetch();
+    setRefreshStatusPanel(prev => prev + 1);
+  };
+
+  // Handler para parâmetros de clientes (Parametros_Clientes)
+  const handleUploadParametros = async (file: File) => {
+    console.log('🔄 Iniciando upload de parâmetros de clientes:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { data, error } = await supabase.functions.invoke('processar-parametros-faturamento', {
+      body: formData
+    });
+
+    if (error) throw error;
+    
+    toast({
+      title: "Parâmetros de Clientes Processados!",
+      description: `${data.inseridos} parâmetros cadastrados, ${data.atualizados} atualizados, ${data.erros} erros`,
+    });
+    
+    // Atualizar status
     setRefreshStatusPanel(prev => prev + 1);
   };
 
@@ -555,38 +577,79 @@ export default function GerenciarCadastros() {
 
         {/* Preços de Serviços */}
         <TabsContent value="precos">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Preços de Serviços
-              </CardTitle>
-              <CardDescription>
-                Upload de tabela de preços por modalidade, especialidade, categoria, prioridade e cliente específico
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <SimpleFileUpload
-                    title="Upload Preços de Serviços"
-                    acceptedTypes={['.csv', '.xlsx', '.xls']}
-                    onUpload={handleUploadPrecos}
-                  />
+          <div className="space-y-6">
+            {/* Upload Preço Clientes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Preços de Clientes (Preco_Clientes)
+                </CardTitle>
+                <CardDescription>
+                  Upload do arquivo Excel "Preco_Clientes" com preços por modalidade, especialidade, categoria, prioridade e volume. 
+                  Inclui controle de volume inicial/final e configuração "Considera Plantão".
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <SimpleFileUpload
+                      title="Upload Preco_Clientes (Excel)"
+                      acceptedTypes={['.xlsx', '.xls']}
+                      onUpload={handleUploadPrecos}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p><strong>Colunas esperadas:</strong> CLIENTE, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, VALOR, VOL INICIAL, VOL FINAL, VOLUME TOTAL, CONSIDERA PLANTAO</p>
+                    <p><strong>Nota:</strong> Registros com valores zerados serão automaticamente ignorados</p>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="mt-8">
+              </CardContent>
+            </Card>
+
+            {/* Upload Parâmetros Clientes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Parâmetros de Clientes (Parametros_Clientes)
+                </CardTitle>
+                <CardDescription>
+                  Upload do arquivo Excel "Parametros_Clientes" com parâmetros específicos de faturamento por cliente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <SimpleFileUpload
+                      title="Upload Parametros_Clientes (Excel)"
+                      acceptedTypes={['.xlsx', '.xls']}
+                      onUpload={handleUploadParametros}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p><strong>Nota:</strong> Arquivo Excel com parâmetros de faturamento específicos por cliente</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tabela de Preços Cadastrados */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Preços de Serviços Cadastrados</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <CadastroDataTable
                   data={precosData.data}
                   loading={precosData.loading}
                   error={precosData.error}
                   type="precos"
-                  title="Preços de Serviços Cadastrados"
+                  title="Preços Cadastrados"
                 />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Regras de Exclusão */}
