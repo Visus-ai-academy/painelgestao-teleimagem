@@ -117,16 +117,12 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       return String(value).trim() || undefined;
     };
 
-    // Função para limpar códigos X1-X9 dos nomes de exames
     const cleanExameName = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
       
       let cleanName = String(value).trim();
-      // Remove códigos X1, X2, X3, X4, X5, X6, X7, X8, X9
       cleanName = cleanName.replace(/\s+X[1-9]\b/gi, '');
-      // Remove códigos XE também
       cleanName = cleanName.replace(/\s+XE\b/gi, '');
-      // Remove múltiplos espaços que podem ter sobrado
       cleanName = cleanName.replace(/\s+/g, ' ').trim();
       
       return cleanName || undefined;
@@ -178,7 +174,6 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     } else if (arquivoFonte === 'data_exame') {
       record.data_referencia = record.DATA_REALIZACAO;
     } else {
-      // Para arquivos padrão, usar DATA_LAUDO ou DATA_REALIZACAO como fallback
       record.data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
     }
 
@@ -195,27 +190,27 @@ serve(async (req) => {
   }
 
   try {
-    console.log('📨 Recebendo dados:', req.method);
+    console.log('🚀 PROCESSAMENTO OTIMIZADO INICIADO');
     
     const requestData = await req.json();
     console.log('📦 Dados recebidos:', JSON.stringify(requestData));
     
     const { file_path, arquivo_fonte, periodo } = requestData;
     
-    console.log('🚀 PROCESSAMENTO OTIMIZADO INICIADO');
+    if (!file_path || !arquivo_fonte) {
+      throw new Error('Parâmetros obrigatórios: file_path, arquivo_fonte');
+    }
+    
     console.log('📁 Arquivo:', file_path);
     console.log('🏷️ Fonte:', arquivo_fonte);
     console.log('🗓️ Período:', periodo);
-    
-    // Log especial para arquivos retroativos
-    if (arquivo_fonte.includes('retroativo')) {
-      console.log('⚠️ ARQUIVO RETROATIVO DETECTADO - Processamento ultra-otimizado ativado');
-    }
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    console.log('✅ Cliente Supabase criado');
 
     // Criar log de upload
     const { data: uploadLog, error: logError } = await supabaseClient
@@ -234,10 +229,17 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (logError) throw new Error(`Erro ao criar log: ${logError.message}`);
+    if (logError) {
+      console.error('❌ Erro ao criar log:', logError);
+      throw new Error(`Erro ao criar log: ${logError.message}`);
+    }
+
+    console.log('✅ Log de upload criado:', uploadLog.id);
 
     // Baixar arquivo
     const cleanFilePath = file_path.replace(/^uploads\//, '');
+    console.log('📥 Baixando arquivo:', cleanFilePath);
+    
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(cleanFilePath);
@@ -247,6 +249,8 @@ serve(async (req) => {
       throw new Error(`Arquivo não encontrado: ${cleanFilePath}`);
     }
 
+    console.log('✅ Arquivo baixado com sucesso');
+
     // Processar Excel
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
@@ -255,36 +259,45 @@ serve(async (req) => {
 
     console.log(`📊 Total de linhas no arquivo: ${jsonData.length}`);
 
+    if (jsonData.length === 0) {
+      throw new Error('Arquivo Excel vazio ou sem dados válidos');
+    }
+
     // Limpar dados anteriores do mesmo tipo de arquivo
     const periodoReferencia = periodo ? `${periodo.ano}-${periodo.mes.toString().padStart(2, '0')}` : new Date().toISOString().substring(0, 7);
     
     console.log('🧹 Limpando dados anteriores...');
-    await supabaseClient
+    const { error: deleteError } = await supabaseClient
       .from('volumetria_mobilemed')
       .delete()
       .eq('arquivo_fonte', arquivo_fonte)
       .eq('periodo_referencia', periodoReferencia);
 
-    // Configuração específica para arquivos retroativos grandes
+    if (deleteError) {
+      console.warn('⚠️ Erro ao limpar dados anteriores:', deleteError);
+    } else {
+      console.log('✅ Dados anteriores limpos');
+    }
+
+    // Processar registros
     const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLog.id.substring(0, 8)}`;
-    const batchSize = arquivo_fonte.includes('retroativo') ? 100 : 1000; // Lotes muito pequenos para retroativos
-    const subBatchSize = arquivo_fonte.includes('retroativo') ? 50 : 500; // Sub-lotes minúsculos
+    const batchSize = 500; // Lote menor para teste
     let totalInserted = 0;
     let totalErrors = 0;
 
-    console.log(`📦 PROCESSAMENTO ULTRA-OTIMIZADO: ${jsonData.length} registros em lotes de ${batchSize}/${subBatchSize}`);
+    console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}`);
 
-    // Processar em chunks ultra-pequenos para retroativos
+    // Processar em chunks
     for (let i = 0; i < jsonData.length; i += batchSize) {
       const batch = jsonData.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(jsonData.length / batchSize);
       
-      console.log(`📋 Lote ${batchNumber}/${totalBatches} (${i + 1}-${Math.min(i + batchSize, jsonData.length)})`);
+      console.log(`📋 Processando lote ${batchNumber}/${totalBatches} (${i + 1}-${Math.min(i + batchSize, jsonData.length)})`);
 
       const records: VolumetriaRecord[] = [];
 
-      // Processar registros com validação básica
+      // Processar registros
       for (const row of batch) {
         try {
           const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
@@ -294,6 +307,7 @@ serve(async (req) => {
             totalErrors++;
           }
         } catch (rowError) {
+          console.error('❌ Erro ao processar linha:', rowError);
           totalErrors++;
         }
       }
@@ -303,247 +317,83 @@ serve(async (req) => {
         continue;
       }
 
-      // 🔧 APLICAR VALIDAÇÕES RIGOROSAS ANTES DA INSERÇÃO
-      console.log(`🔍 Aplicando validações rigorosas em ${records.length} registros...`);
-      
-      let validacaoResult;
+      console.log(`✅ Lote ${batchNumber}: ${records.length} registros preparados para inserção`);
+
+      // Inserir registros
       try {
-        const { data: validacaoData, error: validacaoError } = await supabaseClient.functions.invoke('validar-regras-processamento', {
-          body: { 
-            registros: records, 
-            arquivo_fonte: arquivo_fonte 
-          }
-        });
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(records);
 
-        if (validacaoError) {
-          console.error(`❌ Erro na validação:`, validacaoError);
-          // Se falhar validação, inserir sem validação (fallback)
-          validacaoResult = { registros_validos: records, registros_rejeitados: [], total_valido: records.length, total_rejeitado: 0 };
+        if (insertError) {
+          console.error(`❌ Erro ao inserir lote ${batchNumber}:`, insertError);
+          totalErrors += records.length;
         } else {
-          validacaoResult = validacaoData.resultados;
-          console.log(`✅ Validação concluída: ${validacaoResult.total_valido} válidos, ${validacaoResult.total_rejeitado} rejeitados`);
-          
-          // Adicionar erros de registros rejeitados ao contador
-          totalErrors += validacaoResult.total_rejeitado;
-          
-          // Log detalhado dos registros rejeitados
-          if (validacaoResult.registros_rejeitados && validacaoResult.registros_rejeitados.length > 0) {
-            console.log(`🚫 Registros rejeitados no lote ${batchNumber}:`);
-            validacaoResult.registros_rejeitados.forEach((rejeitado: any, index: number) => {
-              console.log(`  - Linha ${rejeitado.linha}: ${rejeitado.erros.join(', ')}`);
-            });
-          }
+          totalInserted += records.length;
+          console.log(`✅ Lote ${batchNumber}: ${records.length} registros inseridos`);
         }
-      } catch (validacaoException) {
-        console.warn(`⚠️ Exceção na validação, continuando sem validação:`, validacaoException);
-        validacaoResult = { registros_validos: records, registros_rejeitados: [], total_valido: records.length, total_rejeitado: 0 };
+      } catch (insertException) {
+        console.error(`❌ Exceção ao inserir lote ${batchNumber}:`, insertException);
+        totalErrors += records.length;
       }
 
-      const registrosParaInserir = validacaoResult.registros_validos;
-
-      if (registrosParaInserir.length === 0) {
-        console.log(`⚠️ Lote ${batchNumber}: Sem registros válidos após validação`);
-        continue;
-      }
-
-      // Inserir em sub-lotes ultra-pequenos usando apenas registros validados
-      for (let j = 0; j < registrosParaInserir.length; j += subBatchSize) {
-        const subBatch = registrosParaInserir.slice(j, j + subBatchSize);
-        const subBatchNumber = Math.floor(j / subBatchSize) + 1;
-        
-        try {
-          const { error: insertError } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(subBatch);
-
-          if (insertError) {
-            console.error(`❌ Erro ${batchNumber}.${subBatchNumber}:`, insertError.message);
-            totalErrors += subBatch.length;
-          } else {
-            totalInserted += subBatch.length;
-            console.log(`✅ ${batchNumber}.${subBatchNumber}: ${subBatch.length} registros OK`);
-          }
-        } catch (insertException) {
-          console.error(`❌ Exceção ${batchNumber}.${subBatchNumber}:`, insertException);
-          totalErrors += subBatch.length;
-        }
-
-        // Pausa obrigatória entre cada sub-lote para arquivos retroativos
-        if (arquivo_fonte.includes('retroativo')) {
-          await new Promise(resolve => setTimeout(resolve, 25));
-        }
-      }
-
-      // Atualizar progresso a cada lote
+      // Atualizar progresso
       const processedCount = Math.min(i + batchSize, jsonData.length);
       const progress = Math.min(Math.round((processedCount / jsonData.length) * 100), 100);
       
-      console.log(`📈 ${progress}% (${processedCount}/${jsonData.length}) - ${totalInserted} inseridos, ${totalErrors} erros`);
-      
-      // Atualizar log de progresso no banco
-      try {
-        await supabaseClient
-          .from('processamento_uploads')
-          .update({
-            registros_processados: processedCount,
-            registros_inseridos: totalInserted,
-            registros_erro: totalErrors,
-            detalhes_erro: JSON.stringify({
-              progresso: `${progress}%`,
-              lote_atual: batchNumber,
-              total_lotes: totalBatches,
-              status: progress === 100 ? 'finalizando' : 'processando',
-              arquivo_fonte: arquivo_fonte,
-              timestamp: new Date().toISOString()
-            })
-          })
-          .eq('id', uploadLog.id);
-      } catch (updateError) {
-        console.warn('⚠️ Erro ao atualizar progresso:', updateError);
-      }
-
-      // Pausa preventiva a cada 10 lotes para retroativos
-      if (arquivo_fonte.includes('retroativo') && batchNumber % 10 === 0) {
-        console.log('⏸️ Pausa preventiva...');
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      console.log(`📈 Progresso: ${progress}% (${processedCount}/${jsonData.length}) - ${totalInserted} inseridos, ${totalErrors} erros`);
     }
 
-    console.log('✅ PROCESSAMENTO CONCLUÍDO!');
+    console.log('✅ PROCESSAMENTO BÁSICO CONCLUÍDO!');
     console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
 
-    // 🔧 APLICAR TODAS AS REGRAS DE FORMA DEFINITIVA NO BANCO DE DADOS
-    console.log('🔧 Aplicando regras de processamento DEFINITIVAMENTE no banco...');
-    let registrosAtualizados = 0;
-    let registrosExcluidos = 0;
-    
-    // 1. PRIMEIRO: Para arquivos 3 e 4 (retroativos), EXCLUIR FISICAMENTE registros por período
+    // 🔧 APLICAR EXCLUSÕES POR PERÍODO (APENAS para arquivos retroativos)
     if (arquivo_fonte.includes('retroativo') && periodo) {
-      console.log('🗑️ EXCLUINDO FISICAMENTE registros por período (NÃO farão parte da volumetria)...');
+      console.log('🗑️ Aplicando exclusões por período...');
       try {
-        // Mapear nomes dos meses em português
         const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
                       'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
         const nomesMes = meses[periodo.mes - 1] || 'janeiro';
-        const periodoReferencia = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
+        const periodoReferenciaExclusao = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
         
-        console.log(`📅 Período de referência para exclusão: ${periodoReferencia}`);
-        
-        // Contar registros ANTES da exclusão para relatório
-        const { count: countAntes } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true })
-          .in('arquivo_fonte', ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo']);
+        console.log(`📅 Período para exclusão: ${periodoReferenciaExclusao}`);
         
         const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
-          body: { periodo_referencia: periodoReferencia }
+          body: { periodo_referencia: periodoReferenciaExclusao }
         });
         
         if (exclusoesError) {
-          console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+          console.warn('⚠️ Erro nas exclusões por período:', exclusoesError);
         } else if (exclusoesResult) {
-          console.log('✅ Registros FISICAMENTE EXCLUÍDOS do banco:', exclusoesResult);
-          registrosExcluidos = exclusoesResult.total_deletados || exclusoesResult.total_excluidos || 0;
-          
-          // Contar registros DEPOIS da exclusão
-          const { count: countDepois } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .select('*', { count: 'exact', head: true })
-            .in('arquivo_fonte', ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo']);
-          
-          console.log(`📊 Exclusão física: ${countAntes} → ${countDepois} registros (${registrosExcluidos} excluídos)`);
-          totalInserted = Math.max(0, totalInserted - registrosExcluidos); // Ajustar contagem
+          console.log('✅ Exclusões aplicadas:', exclusoesResult);
+          const registrosExcluidos = exclusoesResult.total_deletados || exclusoesResult.total_excluidos || 0;
+          totalInserted = Math.max(0, totalInserted - registrosExcluidos);
         }
-      } catch (exclusoesError) {
-        console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+      } catch (exclusoesException) {
+        console.warn('⚠️ Exceção nas exclusões:', exclusoesException);
       }
     }
-    
-    
-    // 2. SEGUNDO: Aplicar regras de tratamento PERMANENTEMENTE no banco
-    console.log('💰 Aplicando regras de tratamento PERMANENTEMENTE no banco...');
-    try {
-      const { data: regrasResult, error: regrasError } = await supabaseClient.functions.invoke('aplicar-regras-tratamento', {
-        body: { arquivo_fonte: arquivo_fonte }
-      });
-      
-      if (regrasError) {
-        console.warn('⚠️ Erro regras de tratamento:', regrasError);
-      } else if (regrasResult) {
-        console.log('✅ Regras de tratamento aplicadas PERMANENTEMENTE:', regrasResult);
-        registrosAtualizados += regrasResult.registros_atualizados || 0;
-        console.log(`📝 ${registrosAtualizados} registros com dados PERMANENTEMENTE atualizados no banco`);
-      }
-    } catch (regrasError) {
-      console.warn('⚠️ Erro regras de tratamento:', regrasError);
-    }
 
-    // Aplicar regras gerais de De-Para com validação de erro
-    console.log('🔧 Aplicando regras de De-Para...');
-    try {
-      if (arquivo_fonte.includes('volumetria')) {
-        const { data: deParaResult, error: deParaError } = await supabaseClient.rpc('aplicar_de_para_automatico', { 
-          arquivo_fonte_param: arquivo_fonte 
-        });
-        
-        if (deParaError) {
-          console.warn('⚠️ Erro De-Para automático:', deParaError.message);
-        } else if (deParaResult) {
-          const atualizados = deParaResult?.registros_atualizados || 0;
-          registrosAtualizados += atualizados;
-          console.log(`✅ De-Para automático: ${atualizados} atualizados`);
-        }
-      }
-
-      const { data: prioridadeResult, error: prioridadeError } = await supabaseClient.rpc('aplicar_de_para_prioridade');
-      
-      if (prioridadeError) {
-        console.warn('⚠️ Erro De-Para prioridade:', prioridadeError.message);
-      } else if (prioridadeResult) {
-        const atualizados = prioridadeResult?.registros_atualizados || 0;
-        registrosAtualizados += atualizados;
-        console.log(`✅ De-Para prioridade: ${atualizados} atualizados`);
-      }
-    } catch (rulesError) {
-      console.warn('⚠️ Erro nas regras De-Para:', rulesError);
-    }
-
-    // Finalizar log de processamento COM DADOS DEFINITIVOS DO BANCO
+    // Finalizar log
     await supabaseClient
       .from('processamento_uploads')
       .update({
-        status: 'concluido',
-        registros_inseridos: totalInserted, // Quantidade FINAL que permanece no banco após exclusões
-        registros_atualizados: registrosAtualizados, // Registros com dados tratados permanentemente
-        completed_at: new Date().toISOString(),
-        detalhes_erro: JSON.stringify({
-          status: 'Processamento Concluído - Dados Definitivos no Banco',
-          total_processado: jsonData.length,
-          registros_inseridos_inicial: totalInserted + registrosExcluidos,
-          registros_FISICAMENTE_excluidos: registrosExcluidos,
-          registros_FINAIS_no_banco: totalInserted, // VALOR REAL no banco
-          registros_dados_tratados: registrosAtualizados,
-          total_erros: totalErrors,
-          arquivo_fonte: arquivo_fonte,
-          observacao: 'Dados tratados estão PERMANENTEMENTE salvos no banco'
-        })
+        status: totalInserted > 0 ? 'concluido' : 'erro',
+        registros_processados: jsonData.length,
+        registros_inseridos: totalInserted,
+        registros_erro: totalErrors,
+        detalhes_erro: totalInserted === 0 ? JSON.stringify({ erro: 'Nenhum registro foi inserido' }) : null
       })
       .eq('id', uploadLog.id);
 
+    console.log('🎯 PROCESSAMENTO FINALIZADO!');
+
     return new Response(JSON.stringify({
       success: true,
-      message: 'Processamento concluído - Dados definitivos salvos no banco!',
-      stats: {
-        total_rows_arquivo: jsonData.length,
-        registros_inseridos_inicial: totalInserted + registrosExcluidos,
-        registros_FISICAMENTE_excluidos: registrosExcluidos,
-        registros_FINAIS_banco: totalInserted, // VALOR DEFINITIVO que está no banco
-        registros_dados_tratados: registrosAtualizados, // Registros com De-Para aplicado permanentemente
-        error_count: totalErrors,
-        arquivo_fonte: arquivo_fonte,
-        observacao_importante: 'Registros excluídos foram REMOVIDOS do banco. Dados tratados estão PERMANENTEMENTE aplicados.',
-        regras_aplicadas: ['exclusoes_fisicas_periodo', 'de_para_permanente', 'validacoes']
-      }
+      total_registros: jsonData.length,
+      registros_inseridos: totalInserted,
+      registros_erro: totalErrors,
+      upload_id: uploadLog.id
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -553,11 +403,11 @@ serve(async (req) => {
     
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      details: error.stack
+      error: error.message || 'Erro interno do servidor',
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-})
+});
