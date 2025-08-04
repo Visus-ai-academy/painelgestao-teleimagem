@@ -29,6 +29,12 @@ export function VolumetriaExamesNaoIdentificados() {
     }
   }, [data]);
 
+  // Função para limpar termos X1-X9 e XE
+  const limparTermosX = (estudo: string): string => {
+    if (!estudo) return estudo;
+    return estudo.replace(/\s*X[1-9E]\s*$/i, '').trim();
+  };
+
   const loadExamesNaoIdentificados = async () => {
     try {
       // Buscar TODOS os exames zerados (sem limitação)
@@ -47,11 +53,12 @@ export function VolumetriaExamesNaoIdentificados() {
 
       if (deParaError) throw deParaError;
 
+      // Criar Set com estudos do De Para, aplicando limpeza de termos X
       const estudosNoDePara = new Set(deParaData?.map(item => 
-        item.estudo_descricao?.toUpperCase().trim()
+        limparTermosX(item.estudo_descricao?.toUpperCase().trim() || '')
       ).filter(Boolean) || []);
 
-      console.log('📋 Estudos no De Para:', estudosNoDePara.size);
+      console.log('📋 Estudos no De Para (após limpeza X):', estudosNoDePara.size);
       console.log('📋 Lista De Para:', Array.from(estudosNoDePara));
       console.log('📊 Total registros volumetria zerados:', volumetriaData?.length || 0);
 
@@ -69,13 +76,14 @@ export function VolumetriaExamesNaoIdentificados() {
           return true;
         }
         
-        // Normalizar para comparação (uppercase e trim)
-        const estudoNormalizado = item.ESTUDO_DESCRICAO.toUpperCase().trim();
+        // Normalizar e limpar termos X para comparação
+        const estudoOriginal = item.ESTUDO_DESCRICAO.toUpperCase().trim();
+        const estudoLimpo = limparTermosX(estudoOriginal);
         
-        // Se tem ESTUDO_DESCRICAO mas não está no De Para, incluir
-        const naoEncontrado = !estudosNoDePara.has(estudoNormalizado);
+        // Verificar se existe no De Para (após limpeza de ambos os lados)
+        const naoEncontrado = !estudosNoDePara.has(estudoLimpo);
         
-        console.log(`🔍 Verificando "${estudoNormalizado}": ${naoEncontrado ? 'NÃO ENCONTRADO' : 'ENCONTRADO'} no De Para`);
+        console.log(`🔍 Verificando "${estudoOriginal}" -> "${estudoLimpo}": ${naoEncontrado ? 'NÃO ENCONTRADO' : 'ENCONTRADO'} no De Para`);
         
         return naoEncontrado;
       }) || [];
@@ -92,14 +100,17 @@ export function VolumetriaExamesNaoIdentificados() {
       // Filtrar estudos que realmente não estão identificados
       const estudosRealmenteNaoIdentificados = estudosNaoEncontrados.filter(item => {
         const nomeEstudo = item.ESTUDO_DESCRICAO;
+        const nomeEstudoLimpo = limparTermosX(nomeEstudo?.toUpperCase().trim() || '');
         
-        // Verificar se o exame existe nas regras de quebra (como exame original ou quebrado)
-        const existeNasRegras = regrasQuebra?.some(regra => 
-          regra.exame_original === nomeEstudo || regra.exame_quebrado === nomeEstudo
-        );
+        // Verificar se o exame existe nas regras de quebra (aplicando limpeza também)
+        const existeNasRegras = regrasQuebra?.some(regra => {
+          const originalLimpo = limparTermosX(regra.exame_original?.toUpperCase().trim() || '');
+          const quebradoLimpo = limparTermosX(regra.exame_quebrado?.toUpperCase().trim() || '');
+          return originalLimpo === nomeEstudoLimpo || quebradoLimpo === nomeEstudoLimpo;
+        });
         
         if (existeNasRegras) {
-          console.log(`⚠️ Exame "${nomeEstudo}" encontrado nas regras de quebra, mas não processado corretamente`);
+          console.log(`⚠️ Exame "${nomeEstudo}" (limpo: "${nomeEstudoLimpo}") encontrado nas regras de quebra, mas não processado corretamente`);
         }
         
         return !existeNasRegras; // Só incluir se NÃO está nas regras
