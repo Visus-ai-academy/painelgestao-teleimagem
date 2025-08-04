@@ -77,10 +77,10 @@ export function ExamesForaPadraoUpload() {
 
       setProgress(100);
       
-      toast.success(`Arquivo De-Para processado com sucesso! ${data.registros_processados} registros processados.`);
+      toast.success(`Arquivo De-Para processado com sucesso! ${data.valores_inseridos} registros processados.`);
       
       // Atualizar contagem
-      setRegistrosCount(data.registros_processados || 0);
+      setRegistrosCount(data.valores_inseridos || 0);
       
       // Reset
       setSelectedFile(null);
