@@ -599,6 +599,9 @@ async function processVolumetriaComEdgeFunction(
   }
   
   try {
+    console.log('📞 Chamando edge function processar-volumetria-otimizado...');
+    console.log('📋 Parâmetros:', { file_path: uploadData.path, arquivo_fonte: arquivoFonte, periodo });
+    
     const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
       body: {
         file_path: uploadData.path,
@@ -606,6 +609,10 @@ async function processVolumetriaComEdgeFunction(
         periodo: periodo
       }
     });
+    
+    console.log('📨 Resposta da edge function recebida');
+    console.log('✅ Data:', data);
+    console.log('❌ Error:', error);
     
     if (error) {
       console.error('❌ Erro no edge function:', error);
