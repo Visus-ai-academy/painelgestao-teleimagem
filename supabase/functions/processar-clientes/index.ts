@@ -207,10 +207,25 @@ serve(async (req) => {
       return clienteFinal;
     })
 
-    console.log('Clientes válidos:', clientes.length)
-    if (clientes.length > 0) {
-      console.log('Primeiro cliente processado:', JSON.stringify(clientes[0], null, 2))
+    console.log('=== ANÁLISE FINAL DOS DADOS ===')
+    console.log('Total de linhas do arquivo original:', jsonData.length)
+    console.log('Total de clientes após processamento:', clientes.length)
+    
+    // Filtrar clientes com nome válido
+    const clientesComNome = clientes.filter(c => c.nome && c.nome.trim() !== '');
+    console.log('Clientes com nome válido:', clientesComNome.length)
+    
+    // Verificar se há duplicatas por nome
+    const nomesUnicos = new Set(clientesComNome.map(c => c.nome));
+    console.log('Nomes únicos:', nomesUnicos.size)
+    
+    if (clientesComNome.length > 0) {
+      console.log('Primeiro cliente processado:', JSON.stringify(clientesComNome[0], null, 2))
+      console.log('Último cliente processado:', JSON.stringify(clientesComNome[clientesComNome.length - 1], null, 2))
     }
+    
+    // Usar apenas clientes com nome válido para inserção
+    const clientesParaInserir = clientesComNome;
 
     // Clear existing clients
     console.log('=== LIMPANDO CLIENTES EXISTENTES ===')
@@ -228,9 +243,11 @@ serve(async (req) => {
 
     // Insert new clients
     console.log('=== INSERINDO NOVOS CLIENTES ===')
+    console.log('Total de clientes para inserir:', clientesParaInserir.length)
+    
     const { data: insertData, error: insertError } = await supabaseClient
       .from('clientes')
-      .insert(clientes)
+      .insert(clientesParaInserir)
       .select()
 
     if (insertError) {
@@ -245,18 +262,24 @@ serve(async (req) => {
       .from('upload_logs')
       .update({
         status: 'completed',
-        records_processed: clientes.length
+        records_processed: clientesParaInserir.length
       })
       .eq('id', logEntry.id)
 
-    console.log('Processamento concluído:', clientes.length, 'clientes')
+    console.log('Processamento concluído:', clientesParaInserir.length, 'clientes')
+    console.log('=== RESUMO FINAL ===')
+    console.log('- Arquivo original:', jsonData.length, 'linhas')
+    console.log('- Clientes processados:', clientesParaInserir.length)
+    console.log('- Clientes inseridos:', insertData?.length || 0)
 
     return new Response(
       JSON.stringify({
         success: true,
-        registros_processados: clientes.length,
+        arquivo_original_linhas: jsonData.length,
+        registros_processados: clientesParaInserir.length,
+        registros_inseridos: insertData?.length || 0,
         registros_duplicados: 0,
-        mensagem: `${clientes.length} clientes processados com sucesso`
+        mensagem: `${clientesParaInserir.length} de ${jsonData.length} clientes processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

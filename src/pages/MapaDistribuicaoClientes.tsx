@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
+import { useClienteData } from '@/hooks/useClienteData';
+import { useVolumetriaSimple } from '@/hooks/useVolumetriaSimple';
 import { toast } from "sonner";
 import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "lucide-react";
 
@@ -20,7 +21,6 @@ interface ClienteVolumetria {
   tipo_cliente?: string;
   volume_exames: number;
   total_registros: number;
-  // Remover valor_total pois não há preços configurados ainda
   modalidades: string[];
   especialidades: string[];
   prioridades: string[];
@@ -31,9 +31,8 @@ interface RegiaoEstatistica {
   estados: string[];
   total_clientes: number;
   volume_total: number;
-  // Remover valor_total pois não há preços configurados ainda
   clientes: ClienteVolumetria[];
-  cor_intensidade: number; // 0-100 para determinar a cor do heat map
+  cor_intensidade: number;
 }
 
 interface EstadoEstatistica {
@@ -41,7 +40,6 @@ interface EstadoEstatistica {
   regiao: string;
   total_clientes: number;
   volume_total: number;
-  // Remover valor_total pois não há preços configurados ainda
   cidades: { [cidade: string]: ClienteVolumetria[] };
 }
 
@@ -72,185 +70,104 @@ const getCorIntensidade = (volume: number, maxVolume: number): string => {
 };
 
 export default function MapaDistribuicaoClientes() {
-  const [carregando, setCarregando] = useState(true);
-  const [clientesVolumetria, setClientesVolumetria] = useState<ClienteVolumetria[]>([]);
   const [regioesEstatisticas, setRegioesEstatisticas] = useState<RegiaoEstatistica[]>([]);
   const [estadosEstatisticas, setEstadosEstatisticas] = useState<EstadoEstatistica[]>([]);
+  
+  // Hooks para carregar dados
+  const { data: clientesData, loading: loadingClientes, stats: clienteStats, refetch: refetchClientes } = useClienteData();
+  const { data: volumetriaData, loading: loadingVolumetria } = useVolumetriaSimple();
   
   // Filtros
   const [filtroModalidade, setFiltroModalidade] = useState<string>('todas');
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>('todas');
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>('todas');
   const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
-  const [filtroMes, setFiltroMes] = useState<string>('todos');
-  const [filtroAno, setFiltroAno] = useState<string>('2025');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
-  // Carregar dados da volumetria real
-  const carregarDadosVolumetria = async () => {
-    setCarregando(true);
-    try {
-      console.log('Carregando dados de volumetria real...');
+  // Processar dados para o mapa
+  const dadosProcessados = useMemo(() => {
+    if (!clientesData || !volumetriaData) return [];
+    
+    console.log('🔍 Processando estatísticas para', clientesData.length, 'clientes');
+    console.log('📊 Filtros ativos:', {
+      filtroTipoCliente,
+      filtroModalidade,
+      filtroEspecialidade,
+      filtroPrioridade
+    });
 
-      // Buscar clientes ativos
-      const { data: clientes, error: clientesError } = await supabase
-        .from('clientes')
-        .select('id, nome, endereco, cidade, estado, status, ativo, email, tipo_cliente')
-        .eq('ativo', true)
-        .eq('status', 'Ativo');
-
-      if (clientesError) throw clientesError;
-
-      // Buscar dados de volumetria com filtros de data
-      let query = supabase
-        .from('volumetria_mobilemed')
-        .select(`
-          "EMPRESA",
-          "MODALIDADE",
-          "ESPECIALIDADE", 
-          "PRIORIDADE",
-          "VALORES",
-          data_referencia
-        `);
-
-      // Aplicar filtros de data se especificados
-      if (filtroAno !== 'todos') {
-        const anoNum = parseInt(filtroAno);
-        if (filtroMes !== 'todos') {
-          const mesNum = parseInt(filtroMes);
-          const dataInicio = new Date(anoNum, mesNum - 1, 1);
-          const dataFim = new Date(anoNum, mesNum, 0);
-          query = query.gte('data_referencia', dataInicio.toISOString().split('T')[0])
-                      .lte('data_referencia', dataFim.toISOString().split('T')[0]);
-        } else {
-          const dataInicio = new Date(anoNum, 0, 1);
-          const dataFim = new Date(anoNum, 11, 31);
-          query = query.gte('data_referencia', dataInicio.toISOString().split('T')[0])
-                      .lte('data_referencia', dataFim.toISOString().split('T')[0]);
-        }
+    // Primeiro aplicar filtros na volumetria
+    const volumetriaFiltrada = volumetriaData.filter(item => {
+      if (filtroTipoCliente !== 'todos') {
+        const cliente = clientesData.find(c => c.nome === item["EMPRESA"]);
+        if (cliente?.tipo_cliente !== filtroTipoCliente) return false;
       }
+      if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
+      if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
+      if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
+      return true;
+    });
 
-      const { data: volumetriaData, error: volumetriaError } = await query;
+    // Agrupar por empresa e calcular estatísticas
+    const clientesComVolumetria = volumetriaFiltrada.reduce((acc, item) => {
+      const empresa = item["EMPRESA"];
+      if (!empresa) return acc;
+      
+      const cliente = clientesData.find(c => c.nome === empresa);
+      if (!cliente) return acc;
 
-      if (volumetriaError) throw volumetriaError;
-
-      console.log('Dados de volumetria carregados:', volumetriaData?.length);
-
-      // Agrupar volumetria por empresa (cliente) - contando registros reais
-      const volumetriaPorEmpresa = new Map<string, {
-        volume_exames: number;
-        total_registros: number;
-        modalidades: Set<string>;
-        especialidades: Set<string>;
-        prioridades: Set<string>;
-      }>();
-
-      volumetriaData?.forEach(item => {
-        const empresa = item.EMPRESA || 'Não identificado';
-        
-        if (!volumetriaPorEmpresa.has(empresa)) {
-          volumetriaPorEmpresa.set(empresa, {
-            volume_exames: 0,
-            total_registros: 0,
-            modalidades: new Set(),
-            especialidades: new Set(),
-            prioridades: new Set()
-          });
-        }
-
-        const stats = volumetriaPorEmpresa.get(empresa)!;
-        stats.total_registros += 1;
-        // Volume = soma dos valores (que representa quantidade de exames)
-        stats.volume_exames += item.VALORES || 1;
-        
-        if (item.MODALIDADE) stats.modalidades.add(item.MODALIDADE);
-        if (item.ESPECIALIDADE) stats.especialidades.add(item.ESPECIALIDADE);
-        if (item.PRIORIDADE) stats.prioridades.add(item.PRIORIDADE);
-      });
-
-      // Combinar dados de clientes com volumetria
-      const clientesComVolumetria: ClienteVolumetria[] = clientes?.map(cliente => {
-        const volumetria = volumetriaPorEmpresa.get(cliente.nome) || {
+      if (!acc[empresa]) {
+        acc[empresa] = {
+          id: cliente.id,
+          nome: empresa,
+          endereco: cliente.endereco,
+          cidade: cliente.cidade || 'N/A',
+          estado: cliente.estado || 'N/A',
+          status: cliente.status,
+          ativo: cliente.ativo,
+          email: cliente.email,
+          tipo_cliente: cliente.tipo_cliente,
           volume_exames: 0,
           total_registros: 0,
-          modalidades: new Set(),
-          especialidades: new Set(),
-          prioridades: new Set()
+          modalidades: [] as string[],
+          especialidades: [] as string[],
+          prioridades: [] as string[]
         };
+      }
+      acc[empresa].volume_exames += Number(item["VALORES"]) || 0;
+      acc[empresa].total_registros += 1;
+      
+      // Adicionar modalidades, especialidades e prioridades únicas
+      if (item["MODALIDADE"] && !acc[empresa].modalidades.includes(item["MODALIDADE"])) {
+        acc[empresa].modalidades.push(item["MODALIDADE"]);
+      }
+      if (item["ESPECIALIDADE"] && !acc[empresa].especialidades.includes(item["ESPECIALIDADE"])) {
+        acc[empresa].especialidades.push(item["ESPECIALIDADE"]);
+      }
+      if (item["PRIORIDADE"] && !acc[empresa].prioridades.includes(item["PRIORIDADE"])) {
+        acc[empresa].prioridades.push(item["PRIORIDADE"]);
+      }
+      return acc;
+    }, {} as Record<string, ClienteVolumetria>);
 
-        return {
-          ...cliente,
-          volume_exames: volumetria.volume_exames,
-          total_registros: volumetria.total_registros,
-          modalidades: Array.from(volumetria.modalidades),
-          especialidades: Array.from(volumetria.especialidades),
-          prioridades: Array.from(volumetria.prioridades)
-        };
-      }) || [];
-
-      setClientesVolumetria(clientesComVolumetria);
-      processarEstatisticas(clientesComVolumetria);
-
-    } catch (error: any) {
-      console.error('Erro ao carregar volumetria:', error);
-      toast.error('Erro ao carregar dados de volumetria');
-    } finally {
-      setCarregando(false);
-    }
-  };
+    const clientesFiltrados = Object.values(clientesComVolumetria);
+    console.log('✅ Clientes após filtros:', clientesFiltrados.length);
+    
+    return clientesFiltrados;
+  }, [clientesData, volumetriaData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Processar estatísticas por região e estado
-  const processarEstatisticas = (clientes: ClienteVolumetria[]) => {
-    console.log('🔍 Processando estatísticas para', clientes.length, 'clientes');
-    console.log('📊 Filtros ativos:', { filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade });
-    
-    // Filtrar clientes baseado nos filtros selecionados
-    let clientesFiltrados = clientes;
+  const processarEstatisticas = useMemo(() => {
+    if (!dadosProcessados.length) return { regioes: [], estados: [] };
 
-    if (filtroTipoCliente !== 'todos') {
-      const antes = clientesFiltrados.length;
-      clientesFiltrados = clientesFiltrados.filter(c => 
-        c.tipo_cliente === filtroTipoCliente
-      );
-      console.log(`📝 Filtro Tipo Cliente (${filtroTipoCliente}): ${antes} → ${clientesFiltrados.length}`);
-    }
-
-    // Aplicar filtros baseados na volumetria real de cada cliente
-    if (filtroModalidade !== 'todas') {
-      const antes = clientesFiltrados.length;
-      clientesFiltrados = clientesFiltrados.filter(c => 
-        c.modalidades.includes(filtroModalidade)
-      );
-      console.log(`📝 Filtro Modalidade (${filtroModalidade}): ${antes} → ${clientesFiltrados.length}`);
-    }
-
-    if (filtroEspecialidade !== 'todas') {
-      const antes = clientesFiltrados.length;
-      clientesFiltrados = clientesFiltrados.filter(c => 
-        c.especialidades.includes(filtroEspecialidade)
-      );
-      console.log(`📝 Filtro Especialidade (${filtroEspecialidade}): ${antes} → ${clientesFiltrados.length}`);
-    }
-
-    if (filtroPrioridade !== 'todas') {
-      const antes = clientesFiltrados.length;
-      clientesFiltrados = clientesFiltrados.filter(c => 
-        c.prioridades.includes(filtroPrioridade)
-      );
-      console.log(`📝 Filtro Prioridade (${filtroPrioridade}): ${antes} → ${clientesFiltrados.length}`);
-    }
-
-    console.log('✅ Clientes após filtros:', clientesFiltrados.length);
-
-    // Agrupar por região
     const regioesMap = new Map<string, RegiaoEstatistica>();
     const estadosMap = new Map<string, EstadoEstatistica>();
 
-    clientesFiltrados.forEach(cliente => {
+    dadosProcessados.forEach((cliente: ClienteVolumetria) => {
       const estado = cliente.estado || 'NI';
       const regiao = getRegiaoByEstado(estado);
 
-      // Estatísticas por região - mostrar exames e clientes, não estados
+      // Estatísticas por região
       if (!regioesMap.has(regiao)) {
         regioesMap.set(regiao, {
           regiao,
@@ -295,38 +212,29 @@ export default function MapaDistribuicaoClientes() {
       regiao.cor_intensidade = regiao.volume_total > 0 ? (regiao.volume_total / maxVolume) * 100 : 0;
     });
 
-    setRegioesEstatisticas(Array.from(regioesMap.values()));
-    setEstadosEstatisticas(Array.from(estadosMap.values()));
-  };
-
-  // Reprocessar quando filtros mudarem - corrigido para reagir às mudanças
-  useEffect(() => {
-    if (clientesVolumetria.length > 0) {
-      console.log('🔄 Reprocessando estatísticas devido a mudança nos filtros');
-      processarEstatisticas(clientesVolumetria);
-    }
-  }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, filtroTipoCliente]);
-
-  // Recarregar dados quando filtros de data mudarem
-  useEffect(() => {
-    console.log('📅 Recarregando dados devido a mudança de data');
-    carregarDadosVolumetria();
-  }, [filtroMes, filtroAno]);
+    return {
+      regioes: Array.from(regioesMap.values()),
+      estados: Array.from(estadosMap.values())
+    };
+  }, [dadosProcessados]);
 
   useEffect(() => {
-    carregarDadosVolumetria();
-  }, []);
+    setRegioesEstatisticas(processarEstatisticas.regioes);
+    setEstadosEstatisticas(processarEstatisticas.estados);
+  }, [processarEstatisticas]);
 
   // Obter listas únicas para filtros
-  const modalidadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.modalidades))];
-  const especialidadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.especialidades))];
-  const prioridadesUnicas = [...new Set(clientesVolumetria.flatMap(c => c.prioridades))];
-  const tiposClienteUnicos = [...new Set(clientesVolumetria.map(c => c.tipo_cliente).filter(Boolean))];
+  const modalidadesUnicas = [...new Set(volumetriaData?.map(v => v["MODALIDADE"]).filter(Boolean) || [])];
+  const especialidadesUnicas = [...new Set(volumetriaData?.map(v => v["ESPECIALIDADE"]).filter(Boolean) || [])];
+  const prioridadesUnicas = [...new Set(volumetriaData?.map(v => v["PRIORIDADE"]).filter(Boolean) || [])];
+  const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
 
   const totalGeral = {
     clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
     volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
   };
+
+  const carregando = loadingClientes || loadingVolumetria;
 
   if (carregando) {
     return (
@@ -348,8 +256,12 @@ export default function MapaDistribuicaoClientes() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Mapa de Distribuição de Clientes</h1>
           <p className="text-gray-600 mt-1">Distribuição geográfica com dados reais de volumetria</p>
+          <div className="mt-2">
+            <p className="text-muted-foreground">Clientes Cadastrados: {clienteStats.total}</p>
+            <p className="text-muted-foreground">CNPJs Únicos: {clienteStats.cnpjsUnicos}</p>
+          </div>
         </div>
-        <Button onClick={carregarDadosVolumetria} disabled={carregando}>
+        <Button onClick={refetchClientes} disabled={carregando}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Atualizar
         </Button>
@@ -364,7 +276,7 @@ export default function MapaDistribuicaoClientes() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Tipo Cliente</label>
               <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
@@ -375,48 +287,9 @@ export default function MapaDistribuicaoClientes() {
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="CO">CO - Consolidado</SelectItem>
                   <SelectItem value="NC">NC - Não Consolidado</SelectItem>
-                  {tiposClienteUnicos.filter(tipo => tipo && !['CO', 'NC'].includes(tipo)).map(tipo => (
-                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  {tiposClienteUnicos.filter(tipo => tipo && !['CO', 'NC'].includes(tipo as string)).map(tipo => (
+                    <SelectItem key={String(tipo)} value={String(tipo)}>{String(tipo)}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Ano</label>
-              <Select value={filtroAno} onValueChange={setFiltroAno}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Mês</label>
-              <Select value={filtroMes} onValueChange={setFiltroMes}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="1">Janeiro</SelectItem>
-                  <SelectItem value="2">Fevereiro</SelectItem>
-                  <SelectItem value="3">Março</SelectItem>
-                  <SelectItem value="4">Abril</SelectItem>
-                  <SelectItem value="5">Maio</SelectItem>
-                  <SelectItem value="6">Junho</SelectItem>
-                  <SelectItem value="7">Julho</SelectItem>
-                  <SelectItem value="8">Agosto</SelectItem>
-                  <SelectItem value="9">Setembro</SelectItem>
-                  <SelectItem value="10">Outubro</SelectItem>
-                  <SelectItem value="11">Novembro</SelectItem>
-                  <SelectItem value="12">Dezembro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -430,7 +303,7 @@ export default function MapaDistribuicaoClientes() {
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
                   {modalidadesUnicas.map(modalidade => (
-                    <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
+                    <SelectItem key={String(modalidade)} value={String(modalidade)}>{String(modalidade)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -445,7 +318,7 @@ export default function MapaDistribuicaoClientes() {
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
                   {especialidadesUnicas.map(especialidade => (
-                    <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
+                    <SelectItem key={String(especialidade)} value={String(especialidade)}>{String(especialidade)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -460,7 +333,7 @@ export default function MapaDistribuicaoClientes() {
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
                   {prioridadesUnicas.map(prioridade => (
-                    <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
+                    <SelectItem key={String(prioridade)} value={String(prioridade)}>{String(prioridade)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -539,7 +412,7 @@ export default function MapaDistribuicaoClientes() {
         </Card>
       )}
 
-      {/* Tabela por Estados */}
+      {/* Mapa de Calor por Estados */}
       {visualizacao === 'estados' && (
         <Card>
           <CardHeader>
@@ -574,7 +447,7 @@ export default function MapaDistribuicaoClientes() {
         </Card>
       )}
 
-      {/* Visualização por Cidades */}
+      {/* Mapa de Calor por Cidades */}
       {visualizacao === 'cidades' && (
         <Card>
           <CardHeader>
@@ -627,44 +500,6 @@ export default function MapaDistribuicaoClientes() {
           </CardContent>
         </Card>
       )}
-
-      {/* Tabela Detalhada (opcional) */}
-      {visualizacao === 'estados' && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Dados Detalhados por Estado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">Estado</th>
-                    <th className="text-left py-3 px-4">Região</th>
-                    <th className="text-right py-3 px-4">Clientes</th>
-                    <th className="text-right py-3 px-4">Volume</th>
-                    <th className="text-right py-3 px-4">Cidades</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {estadosEstatisticas
-                    .sort((a, b) => b.volume_total - a.volume_total)
-                    .map((estado, index) => (
-                    <tr key={estado.estado} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                      <td className="py-3 px-4 font-medium">{estado.estado}</td>
-                      <td className="py-3 px-4">{estado.regiao}</td>
-                      <td className="py-3 px-4 text-right">{estado.total_clientes}</td>
-                      <td className="py-3 px-4 text-right">{estado.volume_total.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right">{Object.keys(estado.cidades).length}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
     </div>
   );
 }
