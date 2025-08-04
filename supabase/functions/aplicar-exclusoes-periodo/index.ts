@@ -149,7 +149,8 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(JSON.stringify({
       success: true,
       periodo_referencia,
-      total_excluidos: totalExcluidos,
+      total_deletados: totalExcluidos, // Usar chave consistente
+      total_excluidos: totalExcluidos, // Manter compatibilidade
       detalhes,
       datas_aplicadas: {
         data_limite_realizacao: dataLimiteRealizacao,

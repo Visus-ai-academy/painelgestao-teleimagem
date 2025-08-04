@@ -407,12 +407,14 @@ serve(async (req) => {
     console.log('✅ PROCESSAMENTO CONCLUÍDO!');
     console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
 
-    // Aplicar regras específicas e exclusões por período automaticamente
+    // 🔧 APLICAR TODAS AS REGRAS IMEDIATAMENTE APÓS INSERÇÃO
+    console.log('🔧 Aplicando regras de processamento automaticamente...');
     let registrosAtualizados = 0;
+    let registrosExcluidos = 0;
     
-    // Para arquivos 3 e 4 (retroativos), aplicar automaticamente as exclusões por período
+    // 1. PRIMEIRO: Para arquivos 3 e 4 (retroativos), aplicar exclusões por período IMEDIATAMENTE
     if (arquivo_fonte.includes('retroativo') && periodo) {
-      console.log('🔧 Aplicando exclusões por período automaticamente...');
+      console.log('🧹 Aplicando exclusões por período automaticamente ANTES da análise...');
       try {
         const periodoReferencia = `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(periodo.ano, periodo.mes - 1))}/${periodo.ano.toString().slice(-2)}`;
         
@@ -424,6 +426,8 @@ serve(async (req) => {
           console.warn('⚠️ Erro exclusões por período:', exclusoesError);
         } else if (exclusoesResult) {
           console.log('✅ Exclusões por período aplicadas:', exclusoesResult);
+          registrosExcluidos = exclusoesResult.total_deletados || 0;
+          totalInserted = Math.max(0, totalInserted - registrosExcluidos); // Ajustar contagem
         }
       } catch (exclusoesError) {
         console.warn('⚠️ Erro exclusões por período:', exclusoesError);
@@ -478,17 +482,20 @@ serve(async (req) => {
       console.warn('⚠️ Erro nas regras De-Para:', rulesError);
     }
 
-    // Finalizar log de processamento
+    // Finalizar log de processamento COM DADOS CORRETOS APÓS REGRAS
     await supabaseClient
       .from('processamento_uploads')
       .update({
         status: 'concluido',
+        registros_inseridos: totalInserted, // Já ajustado pelas exclusões
         registros_atualizados: registrosAtualizados,
         completed_at: new Date().toISOString(),
         detalhes_erro: JSON.stringify({
           status: 'Processamento Concluído',
           total_processado: jsonData.length,
-          total_inserido: totalInserted,
+          registros_inseridos_inicial: totalInserted + registrosExcluidos,
+          registros_excluidos_por_periodo: registrosExcluidos,
+          registros_finais_volumetria: totalInserted, // VALOR FINAL após todas as regras
           total_erros: totalErrors,
           regras_aplicadas: registrosAtualizados,
           arquivo_fonte: arquivo_fonte
@@ -501,10 +508,13 @@ serve(async (req) => {
       message: 'Processamento ultra-otimizado concluído!',
       stats: {
         total_rows: jsonData.length,
-        inserted_count: totalInserted,
+        registros_inseridos_inicial: totalInserted + registrosExcluidos,
+        registros_excluidos_por_periodo: registrosExcluidos,
+        final_count_volumetria: totalInserted, // VALOR FINAL que será mostrado na interface
         error_count: totalErrors,
         rules_applied: registrosAtualizados,
-        arquivo_fonte: arquivo_fonte
+        arquivo_fonte: arquivo_fonte,
+        regras_aplicadas: ['exclusoes_periodo', 'de_para_automatico', 'validacoes']
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

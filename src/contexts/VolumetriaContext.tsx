@@ -74,7 +74,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🔄 Carregando estatísticas centralizadas...');
+      console.log('🔄 Carregando estatísticas da volumetria (APÓS aplicação de regras)...');
       
       // Carregar dados de volumetria diretamente da tabela
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
@@ -132,7 +132,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             totalValue
           };
           
-          console.log(`✅ ${tipo}: ${totalRecords} registros, ${recordsWithValue} com valores, ${recordsZeroed} zerados não identificados, ${totalValue} total`);
+          console.log(`✅ ${tipo}: ${totalRecords} registros FINAIS (após regras), ${recordsWithValue} com valores, ${recordsZeroed} zerados não identificados, ${totalValue} total`);
         } else {
           console.log(`⚠️ ${tipo}: nenhum dado encontrado`);
           statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
@@ -160,7 +160,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         loading: false
       });
 
-      console.log('✅ Estatísticas carregadas:', statsResult);
+      console.log('✅ Estatísticas FINAIS carregadas (pós-regras):', statsResult);
       
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas centralizadas:', error);
@@ -271,14 +271,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'processamento_uploads'
         },
         (payload) => {
-          console.log('🔄 Status de upload alterado - atualizando...', payload);
+          console.log('🔄 Status de upload alterado - atualizando APÓS regras aplicadas...', payload);
           // Invalidar cache e recarregar quando upload finaliza
           if (payload.new && (payload.new as any).status === 'concluido') {
             lastLoadTime.current = 0;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-              loadStats();
-            }, 2000);
+              loadStats(); // Carregará dados já processados com todas as regras aplicadas
+            }, 3000); // Aumentar delay para garantir que regras foram aplicadas
           }
         }
       )
