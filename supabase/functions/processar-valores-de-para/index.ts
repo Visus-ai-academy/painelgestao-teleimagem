@@ -69,9 +69,25 @@ serve(async (req) => {
     let linhasProcessadas = 0
     let linhasComErro = 0
 
+    // Função para limpar códigos X1-X9 dos nomes de exames
+    const cleanExameName = (value: any): string | undefined => {
+      if (value === null || value === undefined || value === '') return undefined;
+      
+      let cleanName = String(value).trim();
+      // Remove códigos X1, X2, X3, X4, X5, X6, X7, X8, X9
+      cleanName = cleanName.replace(/\s+X[1-9]\b/gi, '');
+      // Remove códigos XE também
+      cleanName = cleanName.replace(/\s+XE\b/gi, '');
+      // Remove múltiplos espaços que podem ter sobrado
+      cleanName = cleanName.replace(/\s+/g, ' ').trim();
+      
+      return cleanName || undefined;
+    };
+
     for (const row of rows) {
       try {
-        const estudoDescricao = row[estudoIndex]?.toString()?.trim()
+        const estudoDescricaoRaw = row[estudoIndex]?.toString()?.trim()
+        const estudoDescricao = cleanExameName(estudoDescricaoRaw)
         const valores = parseFloat(row[valoresIndex])
 
         if (estudoDescricao && !isNaN(valores)) {
