@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -422,6 +422,51 @@ export default function ContratosClientes() {
     }
   };
 
+  const criarContratosAutomaticamente = async () => {
+    try {
+      console.log('Criando contratos automaticamente...');
+      
+      const { data, error } = await supabase.rpc('criar_contratos_clientes_automatico');
+      
+      if (error) {
+        console.error('Erro ao criar contratos:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível criar os contratos automaticamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Resultado:', data);
+      
+      const resultado = data as { contratos_criados: number; sucesso: boolean };
+      
+      if (resultado.contratos_criados > 0) {
+        toast({
+          title: "Contratos criados",
+          description: `${resultado.contratos_criados} contratos foram criados automaticamente.`,
+        });
+        
+        // Recarregar a lista de contratos
+        await carregarContratos();
+      } else {
+        toast({
+          title: "Info",
+          description: "Todos os clientes já possuem contratos.",
+        });
+      }
+      
+    } catch (error) {
+      console.error('Erro inesperado:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro inesperado ao criar os contratos.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const gerarTermoAditivo = (contrato: ContratoCliente, servicosAlterados: any[]) => {
     const termoAditivo: TermoAditivo = {
       id: Date.now().toString(),
@@ -641,6 +686,49 @@ export default function ContratosClientes() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Informações sobre Upload de Dados */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-blue-600" />
+            Upload de Dados de Contratos
+          </CardTitle>
+          <CardDescription>
+            Para que os contratos tenham preços e parâmetros configurados, faça upload dos seguintes arquivos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-medium text-sm text-gray-900 mb-2">1. Preços de Serviços</h3>
+              <p className="text-xs text-gray-600 mb-3">
+                Arquivo "Preco_Clientes.xlsx" contendo preços por cliente, modalidade, especialidade e categoria
+              </p>
+              <Button size="sm" variant="outline" asChild>
+                <a href="/gerenciar/cadastros">Fazer Upload de Preços</a>
+              </Button>
+            </div>
+            
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-medium text-sm text-gray-900 mb-2">2. Parâmetros de Faturamento</h3>
+              <p className="text-xs text-gray-600 mb-3">
+                Arquivo "Parametro_Clientes.xlsx" contendo parâmetros específicos de faturamento por cliente
+              </p>
+              <Button size="sm" variant="outline" asChild>
+                <a href="/gerenciar/cadastros">Fazer Upload de Parâmetros</a>
+              </Button>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-sm text-blue-800">
+              <strong>Nota:</strong> Após o upload desses arquivos, os flags "tem_precos_configurados" e "tem_parametros_configurados" 
+              serão automaticamente atualizados nos contratos correspondentes.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Ações Principais */}
       <div className="flex gap-4">
@@ -651,6 +739,15 @@ export default function ContratosClientes() {
               Novo Contrato
             </Button>
           </DialogTrigger>
+        
+        <Button 
+          variant="outline" 
+          onClick={criarContratosAutomaticamente}
+          disabled={loading}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Criar Contratos Automático
+        </Button>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Cadastrar Novo Cliente</DialogTitle>

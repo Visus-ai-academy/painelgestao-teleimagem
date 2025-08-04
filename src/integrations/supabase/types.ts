@@ -3187,6 +3187,10 @@ export type Database = {
         }
         Returns: string
       }
+      criar_contratos_clientes_automatico: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enviar_escala_mensal: {
         Args: Record<PropertyKey, never>
         Returns: undefined
