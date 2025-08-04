@@ -606,13 +606,19 @@ serve(async (req) => {
           });
           
           if (exclusaoError) {
-            console.error('❌ Erro ao aplicar exclusões:', exclusaoError);
+            console.error('❌ Erro ao aplicar exclusões por período:', exclusaoError);
+            resultado.alertas.push(`Erro ao aplicar exclusões por período: ${exclusaoError.message}`);
           } else if (exclusaoResult?.success) {
-            console.log(`✅ Exclusões aplicadas automaticamente: ${exclusaoResult.total_excluidos} registros removidos`);
+            console.log(`✅ Exclusões por período aplicadas: ${exclusaoResult.total_excluidos} registros removidos`);
+            resultado.observacoes.push(`Exclusões por período: ${exclusaoResult.total_excluidos} registros removidos automaticamente`);
           }
         } catch (error) {
-          console.error('❌ Erro ao invocar função de exclusões:', error);
+          console.error('❌ Erro ao invocar função de exclusões por período:', error);
+          resultado.alertas.push(`Erro na função de exclusões: ${error.message}`);
         }
+      } else {
+        console.warn('⚠️ Período de referência não identificado para aplicar exclusões');
+        resultado.alertas.push('Período de referência não identificado - exclusões por período não aplicadas');
       }
     }
 

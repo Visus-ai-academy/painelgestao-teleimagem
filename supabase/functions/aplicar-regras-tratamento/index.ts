@@ -94,20 +94,19 @@ export default async function handler(req: Request): Promise<Response> {
     // Aplicar regras específicas baseadas no tipo de arquivo
     switch (arquivo_fonte) {
       case 'volumetria_padrao':
-        // Arquivo 1: Preencher campos obrigatórios
-        const { data: updateResult1, error: error1 } = await supabase
-          .from('volumetria_mobilemed')
-          .update({
-            'VALORES': REGRAS_PADRAO.arquivo1.valorPadraoValores,
-            'MODALIDADE': REGRAS_PADRAO.arquivo1.modalidadePadrao
-          })
-          .eq('arquivo_fonte', arquivo_fonte)
-          .or('VALORES.is.null,VALORES.eq.0')
-          .select('id');
+        // Arquivo 1: Aplicar De-Para automático para valores zerados
+        const { data: deParaResult1, error: deParaError1 } = await supabase
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivo_fonte 
+          });
         
-        if (error1) throw error1;
-        registrosAtualizados += updateResult1?.length || 0;
-        mensagens.push(`Arquivo 1: ${updateResult1?.length || 0} registros com valores zerados corrigidos`);
+        if (deParaError1) {
+          console.log(`⚠️ De-Para Arquivo 1 falhou: ${deParaError1.message}`);
+          mensagens.push(`Arquivo 1: De-Para não aplicado - ${deParaError1.message}`);
+        } else {
+          registrosAtualizados += deParaResult1?.registros_atualizados || 0;
+          mensagens.push(`Arquivo 1: De-Para aplicado em ${deParaResult1?.registros_atualizados || 0} registros com valores zerados`);
+        }
         break;
 
       case 'volumetria_fora_padrao':
@@ -123,8 +122,19 @@ export default async function handler(req: Request): Promise<Response> {
         break;
 
       case 'volumetria_padrao_retroativo':
-        // Arquivo 3: Regras aplicadas durante processamento - apenas log
-        mensagens.push(`Arquivo 3: Regras retroativas aplicadas durante processamento`);
+        // Arquivo 3: Aplicar De-Para automático para valores zerados
+        const { data: deParaResult3, error: deParaError3 } = await supabase
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivo_fonte 
+          });
+        
+        if (deParaError3) {
+          console.log(`⚠️ De-Para Arquivo 3 falhou: ${deParaError3.message}`);
+          mensagens.push(`Arquivo 3: De-Para não aplicado - ${deParaError3.message}`);
+        } else {
+          registrosAtualizados += deParaResult3?.registros_atualizados || 0;
+          mensagens.push(`Arquivo 3: De-Para aplicado em ${deParaResult3?.registros_atualizados || 0} registros com valores zerados`);
+        }
         break;
 
       case 'volumetria_fora_padrao_retroativo':
