@@ -122,8 +122,8 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       if (value === null || value === undefined || value === '') return undefined;
       
       let cleanName = String(value).trim();
-      // Remove códigos X1, X2, X4, X5, X6, X7, X8, X9 (preserva X3 se necessário)
-      cleanName = cleanName.replace(/\s+X[124-9]\b/gi, '');
+      // Remove códigos X1, X2, X3, X4, X5, X6, X7, X8, X9
+      cleanName = cleanName.replace(/\s+X[1-9]\b/gi, '');
       // Remove códigos XE também
       cleanName = cleanName.replace(/\s+XE\b/gi, '');
       // Remove múltiplos espaços que podem ter sobrado
