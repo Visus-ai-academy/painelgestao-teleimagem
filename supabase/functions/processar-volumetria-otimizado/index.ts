@@ -416,7 +416,13 @@ serve(async (req) => {
     if (arquivo_fonte.includes('retroativo') && periodo) {
       console.log('🗑️ EXCLUINDO FISICAMENTE registros por período (NÃO farão parte da volumetria)...');
       try {
-        const periodoReferencia = `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(periodo.ano, periodo.mes - 1))}/${periodo.ano.toString().slice(-2)}`;
+        // Mapear nomes dos meses em português
+        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+        const nomesMes = meses[periodo.mes - 1] || 'janeiro';
+        const periodoReferencia = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
+        
+        console.log(`📅 Período de referência para exclusão: ${periodoReferencia}`);
         
         // Contar registros ANTES da exclusão para relatório
         const { count: countAntes } = await supabaseClient
