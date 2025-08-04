@@ -19,7 +19,7 @@ interface ClienteVolumetria {
   email?: string;
   volume_exames: number;
   total_registros: number;
-  valor_total: number;
+  // Remover valor_total pois não há preços configurados ainda
   modalidades: string[];
   especialidades: string[];
   prioridades: string[];
@@ -30,7 +30,7 @@ interface RegiaoEstatistica {
   estados: string[];
   total_clientes: number;
   volume_total: number;
-  valor_total: number;
+  // Remover valor_total pois não há preços configurados ainda
   clientes: ClienteVolumetria[];
   cor_intensidade: number; // 0-100 para determinar a cor do heat map
 }
@@ -40,7 +40,7 @@ interface EstadoEstatistica {
   regiao: string;
   total_clientes: number;
   volume_total: number;
-  valor_total: number;
+  // Remover valor_total pois não há preços configurados ainda
   cidades: { [cidade: string]: ClienteVolumetria[] };
 }
 
@@ -80,6 +80,8 @@ export default function MapaDistribuicaoClientes() {
   const [filtroModalidade, setFiltroModalidade] = useState<string>('todas');
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>('todas');
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>('todas');
+  const [filtroMes, setFiltroMes] = useState<string>('todos');
+  const [filtroAno, setFiltroAno] = useState<string>('2025');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
   // Carregar dados da volumetria real
@@ -97,26 +99,45 @@ export default function MapaDistribuicaoClientes() {
 
       if (clientesError) throw clientesError;
 
-      // Buscar dados de volumetria agrupados por cliente
-      const { data: volumetriaData, error: volumetriaError } = await supabase
+      // Buscar dados de volumetria com filtros de data
+      let query = supabase
         .from('volumetria_mobilemed')
         .select(`
           "EMPRESA",
           "MODALIDADE",
           "ESPECIALIDADE", 
           "PRIORIDADE",
-          "VALORES"
+          "VALORES",
+          data_referencia
         `);
+
+      // Aplicar filtros de data se especificados
+      if (filtroAno !== 'todos') {
+        const anoNum = parseInt(filtroAno);
+        if (filtroMes !== 'todos') {
+          const mesNum = parseInt(filtroMes);
+          const dataInicio = new Date(anoNum, mesNum - 1, 1);
+          const dataFim = new Date(anoNum, mesNum, 0);
+          query = query.gte('data_referencia', dataInicio.toISOString().split('T')[0])
+                      .lte('data_referencia', dataFim.toISOString().split('T')[0]);
+        } else {
+          const dataInicio = new Date(anoNum, 0, 1);
+          const dataFim = new Date(anoNum, 11, 31);
+          query = query.gte('data_referencia', dataInicio.toISOString().split('T')[0])
+                      .lte('data_referencia', dataFim.toISOString().split('T')[0]);
+        }
+      }
+
+      const { data: volumetriaData, error: volumetriaError } = await query;
 
       if (volumetriaError) throw volumetriaError;
 
       console.log('Dados de volumetria carregados:', volumetriaData?.length);
 
-      // Agrupar volumetria por empresa (cliente)
+      // Agrupar volumetria por empresa (cliente) - contando registros reais
       const volumetriaPorEmpresa = new Map<string, {
         volume_exames: number;
         total_registros: number;
-        valor_total: number;
         modalidades: Set<string>;
         especialidades: Set<string>;
         prioridades: Set<string>;
@@ -129,7 +150,6 @@ export default function MapaDistribuicaoClientes() {
           volumetriaPorEmpresa.set(empresa, {
             volume_exames: 0,
             total_registros: 0,
-            valor_total: 0,
             modalidades: new Set(),
             especialidades: new Set(),
             prioridades: new Set()
@@ -138,8 +158,8 @@ export default function MapaDistribuicaoClientes() {
 
         const stats = volumetriaPorEmpresa.get(empresa)!;
         stats.total_registros += 1;
-        stats.volume_exames += item.VALORES || 0;
-        stats.valor_total += item.VALORES || 0;
+        // Volume = soma dos valores (que representa quantidade de exames)
+        stats.volume_exames += item.VALORES || 1;
         
         if (item.MODALIDADE) stats.modalidades.add(item.MODALIDADE);
         if (item.ESPECIALIDADE) stats.especialidades.add(item.ESPECIALIDADE);
@@ -151,7 +171,6 @@ export default function MapaDistribuicaoClientes() {
         const volumetria = volumetriaPorEmpresa.get(cliente.nome) || {
           volume_exames: 0,
           total_registros: 0,
-          valor_total: 0,
           modalidades: new Set(),
           especialidades: new Set(),
           prioridades: new Set()
@@ -161,7 +180,6 @@ export default function MapaDistribuicaoClientes() {
           ...cliente,
           volume_exames: volumetria.volume_exames,
           total_registros: volumetria.total_registros,
-          valor_total: volumetria.valor_total,
           modalidades: Array.from(volumetria.modalidades),
           especialidades: Array.from(volumetria.especialidades),
           prioridades: Array.from(volumetria.prioridades)
@@ -217,7 +235,6 @@ export default function MapaDistribuicaoClientes() {
           estados: REGIOES_BRASIL[regiao as keyof typeof REGIOES_BRASIL] || [],
           total_clientes: 0,
           volume_total: 0,
-          valor_total: 0,
           clientes: [],
           cor_intensidade: 0
         });
@@ -226,7 +243,6 @@ export default function MapaDistribuicaoClientes() {
       const estatRegiao = regioesMap.get(regiao)!;
       estatRegiao.total_clientes++;
       estatRegiao.volume_total += cliente.volume_exames;
-      estatRegiao.valor_total += cliente.valor_total;
       estatRegiao.clientes.push(cliente);
 
       // Estatísticas por estado
@@ -236,7 +252,6 @@ export default function MapaDistribuicaoClientes() {
           regiao,
           total_clientes: 0,
           volume_total: 0,
-          valor_total: 0,
           cidades: {}
         });
       }
@@ -244,7 +259,6 @@ export default function MapaDistribuicaoClientes() {
       const estatEstado = estadosMap.get(estado)!;
       estatEstado.total_clientes++;
       estatEstado.volume_total += cliente.volume_exames;
-      estatEstado.valor_total += cliente.valor_total;
 
       const cidade = cliente.cidade || 'Não informado';
       if (!estatEstado.cidades[cidade]) {
@@ -270,6 +284,11 @@ export default function MapaDistribuicaoClientes() {
     }
   }, [filtroModalidade, filtroEspecialidade, filtroPrioridade, clientesVolumetria]);
 
+  // Recarregar dados quando filtros de data mudarem
+  useEffect(() => {
+    carregarDadosVolumetria();
+  }, [filtroMes, filtroAno]);
+
   useEffect(() => {
     carregarDadosVolumetria();
   }, []);
@@ -282,7 +301,7 @@ export default function MapaDistribuicaoClientes() {
   const totalGeral = {
     clientes: clientesVolumetria.length,
     volume: clientesVolumetria.reduce((sum, c) => sum + c.volume_exames, 0),
-    valor: clientesVolumetria.reduce((sum, c) => sum + c.valor_total, 0)
+    registros: clientesVolumetria.reduce((sum, c) => sum + c.total_registros, 0)
   };
 
   if (carregando) {
@@ -321,7 +340,46 @@ export default function MapaDistribuicaoClientes() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ano</label>
+              <Select value={filtroAno} onValueChange={setFiltroAno}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="2025">2025</SelectItem>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2023">2023</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mês</label>
+              <Select value={filtroMes} onValueChange={setFiltroMes}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="1">Janeiro</SelectItem>
+                  <SelectItem value="2">Fevereiro</SelectItem>
+                  <SelectItem value="3">Março</SelectItem>
+                  <SelectItem value="4">Abril</SelectItem>
+                  <SelectItem value="5">Maio</SelectItem>
+                  <SelectItem value="6">Junho</SelectItem>
+                  <SelectItem value="7">Julho</SelectItem>
+                  <SelectItem value="8">Agosto</SelectItem>
+                  <SelectItem value="9">Setembro</SelectItem>
+                  <SelectItem value="10">Outubro</SelectItem>
+                  <SelectItem value="11">Novembro</SelectItem>
+                  <SelectItem value="12">Dezembro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Modalidade</label>
               <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
@@ -414,10 +472,10 @@ export default function MapaDistribuicaoClientes() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-2xl font-bold">R$ {totalGeral.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="text-sm font-medium text-gray-600">Total Registros</p>
+                <p className="text-2xl font-bold">{totalGeral.registros.toLocaleString()}</p>
               </div>
-              <Zap className="h-8 w-8 text-purple-600" />
+              <BarChart3 className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -442,7 +500,6 @@ export default function MapaDistribuicaoClientes() {
                       <div className="mt-3 space-y-1">
                         <p className="text-sm">{regiao.total_clientes} clientes</p>
                         <p className="text-sm">{regiao.volume_total.toLocaleString()} exames</p>
-                        <p className="text-xs">R$ {regiao.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </div>
                       <Badge variant="secondary" className="mt-2 text-xs">
                         {regiao.estados.length} estados
@@ -471,7 +528,6 @@ export default function MapaDistribuicaoClientes() {
                     <th className="text-left py-3 px-4">Região</th>
                     <th className="text-right py-3 px-4">Clientes</th>
                     <th className="text-right py-3 px-4">Volume</th>
-                    <th className="text-right py-3 px-4">Valor</th>
                     <th className="text-right py-3 px-4">Cidades</th>
                   </tr>
                 </thead>
@@ -484,7 +540,6 @@ export default function MapaDistribuicaoClientes() {
                       <td className="py-3 px-4">{estado.regiao}</td>
                       <td className="py-3 px-4 text-right">{estado.total_clientes}</td>
                       <td className="py-3 px-4 text-right">{estado.volume_total.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right">R$ {estado.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                       <td className="py-3 px-4 text-right">{Object.keys(estado.cidades).length}</td>
                     </tr>
                   ))}
