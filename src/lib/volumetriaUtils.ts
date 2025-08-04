@@ -68,10 +68,10 @@ export const VOLUMETRIA_UPLOAD_CONFIGS = {
   },
   volumetria_onco_padrao: {
     label: 'Arquivo 5: Volumetria Onco Padrão',
-    description: 'Upload para dados oncológicos - valores obrigatórios para faturamento',
+    description: 'Upload oncológico com aplicação automática de valores - De-Para aplicado para valores zerados',
     validateValues: true,
     filterCurrentPeriod: false,
-    appropriateValues: false
+    appropriateValues: true // Aplicar De-Para automaticamente para valores zerados
   }
 } as const;
 
