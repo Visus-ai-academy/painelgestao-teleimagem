@@ -29,8 +29,6 @@ import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPer
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
-import { AnaliseDiscrepanciaZerados } from '@/components/AnaliseDiscrepanciaZerados';
-import { AnaliseRegrasQuebraProblemas } from '@/components/AnaliseRegrasQuebraProblemas';
 import { AplicarExclusoesPeriodo } from "@/components/AplicarExclusoesPeriodo";
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
@@ -1118,20 +1116,11 @@ export default function GerarFaturamento() {
                 </div>
 
                 
-                {/* 🚨 PROBLEMA CRÍTICO - Análise de Regras de Quebra */}
-                <AnaliseRegrasQuebraProblemas />
-
-                {/* Análise de Discrepância e Aplicar Exclusões */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <AnaliseDiscrepanciaZerados />
-                  <AplicarExclusoesPeriodo />
-                </div>
+                {/* Aplicar Exclusões */}
+                <AplicarExclusoesPeriodo />
                 
                 {/* Exames Não Identificados - Fora do Padrão */}
                 <VolumetriaExamesNaoIdentificados />
-
-                {/* Análise de Discrepância entre os dois painéis acima */}
-                <AnaliseDiscrepanciaZerados />
 
                 </VolumetriaProvider>
               </CardContent>
