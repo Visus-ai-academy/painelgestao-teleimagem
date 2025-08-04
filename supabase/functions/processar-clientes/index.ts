@@ -67,6 +67,24 @@ serve(async (req) => {
     const worksheet = workbook.Sheets[sheetName]
     const jsonData = XLSX.utils.sheet_to_json(worksheet)
 
+    console.log('=== ANÁLISE CRÍTICA DO ARQUIVO ===')
+    console.log('ARQUIVO ORIGINAL - Total de linhas extraídas:', jsonData.length)
+    console.log('USUÁRIO REPORTA - Deveria ter 211 registros')
+    console.log('DIFERENÇA:', 211 - jsonData.length, 'registros')
+    
+    // Verificar se há linhas vazias no final que não estão sendo lidas
+    const ultimasLinhas = jsonData.slice(-5);
+    console.log('Últimas 5 linhas do arquivo:')
+    ultimasLinhas.forEach((linha, index) => {
+      console.log(`Linha ${jsonData.length - 5 + index}:`, JSON.stringify(linha, null, 2))
+    })
+    
+    // Verificar se há cabeçalhos ou linhas em branco
+    const primeiraLinhaVazia = jsonData.find(linha => !linha || Object.keys(linha).length === 0);
+    if (primeiraLinhaVazia) {
+      console.log('ENCONTRADA linha vazia:', JSON.stringify(primeiraLinhaVazia, null, 2))
+    }
+
     console.log('=== ANÁLISE DETALHADA DOS DADOS ===')
     console.log('Dados extraídos do Excel:', jsonData.length, 'linhas')
     
