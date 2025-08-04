@@ -623,7 +623,22 @@ async function processVolumetriaComEdgeFunction(
     
     if (error) {
       console.error('❌ Erro no edge function:', error);
-      throw new Error(`Erro no processamento: ${error.message}`);
+      console.error('❌ Tipo do erro:', typeof error);
+      console.error('❌ Message:', error.message);
+      console.error('❌ Details:', JSON.stringify(error));
+      
+      // Se a edge function falhar, usar processamento local
+      console.log('🔄 Fallback: usando processamento local devido ao erro na edge function');
+      const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
+      return {
+        success: result.success,
+        message: result.message + ' (processado localmente após erro na edge function)',
+        stats: {
+          total_rows: result.totalProcessed,
+          inserted_count: result.totalInserted,
+          error_count: result.totalProcessed - result.totalInserted
+        }
+      };
     }
     
     if (onProgress) {
@@ -636,15 +651,26 @@ async function processVolumetriaComEdgeFunction(
       success: data.success,
       message: data.message || 'Processamento concluído com aplicação de regras',
       stats: {
-        total_rows: data.stats?.total_rows_arquivo || 0,
-        inserted_count: data.stats?.registros_FINAIS_banco || 0,
-        error_count: data.stats?.error_count || 0,
-        excluded_count: data.stats?.registros_FISICAMENTE_excluidos || 0,
-        updated_count: data.stats?.registros_dados_tratados || 0
+        total_rows: data.total_registros || 0,
+        inserted_count: data.registros_inseridos || 0,
+        error_count: data.registros_erro || 0
       }
     };
   } catch (error) {
     console.error('💥 Erro crítico no edge function:', error);
-    throw new Error(`Falha no processamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    console.error('💥 Stack:', error instanceof Error ? error.stack : 'No stack');
+    
+    // Fallback para processamento local
+    console.log('🔄 Fallback: usando processamento local devido ao erro crítico');
+    const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
+    return {
+      success: result.success,
+      message: result.message + ' (processado localmente após erro crítico)',
+      stats: {
+        total_rows: result.totalProcessed,
+        inserted_count: result.totalInserted,
+        error_count: result.totalProcessed - result.totalInserted
+      }
+    };
   }
 }
