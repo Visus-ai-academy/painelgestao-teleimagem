@@ -1,0 +1,434 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { 
+  FileSpreadsheet, 
+  Download, 
+  Search, 
+  Filter,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  Calendar,
+  FileText
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ClienteFaturamento {
+  id: string;
+  nome: string;
+  email: string;
+  total_exames: number;
+  valor_bruto: number;
+  valor_liquido: number;
+  periodo: string;
+  status_pagamento: 'pendente' | 'pago' | 'vencido';
+  data_vencimento: string;
+  observacoes?: string;
+}
+
+export default function DemonstrativoFaturamento() {
+  const { toast } = useToast();
+  const [clientes, setClientes] = useState<ClienteFaturamento[]>([]);
+  const [clientesFiltrados, setClientesFiltrados] = useState<ClienteFaturamento[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [filtroNome, setFiltroNome] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [periodo, setPeriodo] = useState("2025-07");
+
+  // Carregar dados de faturamento
+  const carregarDados = async () => {
+    setCarregando(true);
+    try {
+      console.log('Carregando demonstrativo de faturamento...');
+      
+      // Buscar dados de faturamento agrupados por cliente
+      const { data: dadosFaturamento, error } = await supabase
+        .from('faturamento')
+        .select(`
+          cliente_id,
+          cliente_nome,
+          cliente_email,
+          valor,
+          valor_bruto,
+          quantidade,
+          data_emissao,
+          data_vencimento,
+          periodo_referencia
+        `)
+        .like('periodo_referencia', `%${periodo}%`)
+        .order('cliente_nome');
+
+      if (error) {
+        console.error('Erro ao carregar faturamento:', error);
+        throw error;
+      }
+
+      // Agrupar por cliente
+      const clientesMap = new Map<string, ClienteFaturamento>();
+      
+      dadosFaturamento?.forEach(item => {
+        const clienteId = item.cliente_id || item.cliente_nome;
+        
+        if (clientesMap.has(clienteId)) {
+          const cliente = clientesMap.get(clienteId)!;
+          cliente.total_exames += item.quantidade || 1;
+          cliente.valor_bruto += item.valor_bruto || item.valor || 0;
+          cliente.valor_liquido += item.valor || 0;
+        } else {
+          // Determinar status de pagamento baseado na data de vencimento
+          const dataVencimento = new Date(item.data_vencimento);
+          const hoje = new Date();
+          let status: 'pendente' | 'pago' | 'vencido' = 'pendente';
+          
+          if (dataVencimento < hoje) {
+            status = 'vencido';
+          }
+          
+          clientesMap.set(clienteId, {
+            id: clienteId,
+            nome: item.cliente_nome || 'Cliente não identificado',
+            email: item.cliente_email || '',
+            total_exames: item.quantidade || 1,
+            valor_bruto: item.valor_bruto || item.valor || 0,
+            valor_liquido: item.valor || 0,
+            periodo: item.periodo_referencia || periodo,
+            status_pagamento: status,
+            data_vencimento: item.data_vencimento,
+          });
+        }
+      });
+
+      const clientesArray = Array.from(clientesMap.values());
+      setClientes(clientesArray);
+      setClientesFiltrados(clientesArray);
+
+      console.log('Dados carregados:', clientesArray.length, 'clientes');
+
+    } catch (error: any) {
+      console.error('Erro ao carregar dados:', error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // Aplicar filtros
+  useEffect(() => {
+    let filtrados = [...clientes];
+
+    if (filtroNome) {
+      filtrados = filtrados.filter(cliente => 
+        cliente.nome.toLowerCase().includes(filtroNome.toLowerCase())
+      );
+    }
+
+    if (filtroStatus !== "todos") {
+      filtrados = filtrados.filter(cliente => 
+        cliente.status_pagamento === filtroStatus
+      );
+    }
+
+    setClientesFiltrados(filtrados);
+  }, [clientes, filtroNome, filtroStatus]);
+
+  // Carregar dados ao montar o componente
+  useEffect(() => {
+    carregarDados();
+  }, [periodo]);
+
+  // Calcular totais
+  const totais = clientesFiltrados.reduce((acc, cliente) => ({
+    exames: acc.exames + cliente.total_exames,
+    valorBruto: acc.valorBruto + cliente.valor_bruto,
+    valorLiquido: acc.valorLiquido + cliente.valor_liquido,
+  }), { exames: 0, valorBruto: 0, valorLiquido: 0 });
+
+  const statusCounts = {
+    pendente: clientesFiltrados.filter(c => c.status_pagamento === 'pendente').length,
+    pago: clientesFiltrados.filter(c => c.status_pagamento === 'pago').length,
+    vencido: clientesFiltrados.filter(c => c.status_pagamento === 'vencido').length,
+  };
+
+  const exportarCSV = () => {
+    const headers = ['Cliente', 'Email', 'Total Exames', 'Valor Bruto', 'Valor Líquido', 'Status', 'Vencimento'];
+    const csvContent = [
+      headers.join(','),
+      ...clientesFiltrados.map(cliente => [
+        `"${cliente.nome}"`,
+        `"${cliente.email}"`,
+        cliente.total_exames,
+        cliente.valor_bruto.toFixed(2),
+        cliente.valor_liquido.toFixed(2),
+        cliente.status_pagamento,
+        cliente.data_vencimento
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `demonstrativo_faturamento_${periodo}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Arquivo exportado",
+      description: "Demonstrativo de faturamento exportado com sucesso",
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Demonstrativo de Faturamento</h2>
+        <p className="text-gray-600 mt-1">Visualize e analise o faturamento por cliente</p>
+      </div>
+
+      {/* Controles e Filtros */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtros e Controles
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="periodo">Período</Label>
+              <Select value={periodo} onValueChange={setPeriodo}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2025-07">Julho/2025</SelectItem>
+                  <SelectItem value="2025-06">Junho/2025</SelectItem>
+                  <SelectItem value="2025-05">Maio/2025</SelectItem>
+                  <SelectItem value="2025-04">Abril/2025</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-nome">Buscar Cliente</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="filtro-nome"
+                  placeholder="Nome do cliente..."
+                  value={filtroNome}
+                  onChange={(e) => setFiltroNome(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-status">Status</Label>
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="vencido">Vencido</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ações</Label>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={carregarDados} 
+                  disabled={carregando}
+                  size="sm"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  {carregando ? 'Carregando...' : 'Atualizar'}
+                </Button>
+                <Button 
+                  onClick={exportarCSV}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cards de Resumo */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Clientes</p>
+                <p className="text-2xl font-bold">{clientesFiltrados.length}</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Exames</p>
+                <p className="text-2xl font-bold">{totais.exames.toLocaleString()}</p>
+              </div>
+              <FileText className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Bruto</p>
+                <p className="text-2xl font-bold">R$ {totais.valorBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Líquido</p>
+                <p className="text-2xl font-bold">R$ {totais.valorLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status das Faturas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status das Faturas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Pendentes</p>
+                <p className="text-xl font-bold text-blue-900">{statusCounts.pendente}</p>
+              </div>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                {((statusCounts.pendente / clientesFiltrados.length) * 100 || 0).toFixed(1)}%
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-green-700">Pagas</p>
+                <p className="text-xl font-bold text-green-900">{statusCounts.pago}</p>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {((statusCounts.pago / clientesFiltrados.length) * 100 || 0).toFixed(1)}%
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-red-700">Vencidas</p>
+                <p className="text-xl font-bold text-red-900">{statusCounts.vencido}</p>
+              </div>
+              <Badge variant="secondary" className="bg-red-100 text-red-800">
+                {((statusCounts.vencido / clientesFiltrados.length) * 100 || 0).toFixed(1)}%
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabela de Clientes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Faturamento por Cliente</CardTitle>
+          <CardDescription>
+            {clientesFiltrados.length} de {clientes.length} clientes
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {carregando ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Carregando dados...</p>
+            </div>
+          ) : clientesFiltrados.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Nenhum cliente encontrado</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4">Cliente</th>
+                    <th className="text-left py-3 px-4">Email</th>
+                    <th className="text-right py-3 px-4">Exames</th>
+                    <th className="text-right py-3 px-4">Valor Bruto</th>
+                    <th className="text-right py-3 px-4">Valor Líquido</th>
+                    <th className="text-center py-3 px-4">Status</th>
+                    <th className="text-center py-3 px-4">Vencimento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientesFiltrados.map((cliente, index) => (
+                    <tr key={cliente.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                      <td className="py-3 px-4 font-medium">{cliente.nome}</td>
+                      <td className="py-3 px-4 text-gray-600">{cliente.email}</td>
+                      <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge 
+                          variant={
+                            cliente.status_pagamento === 'pago' ? 'default' :
+                            cliente.status_pagamento === 'vencido' ? 'destructive' : 'secondary'
+                          }
+                        >
+                          {cliente.status_pagamento}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-center text-sm">
+                        {new Date(cliente.data_vencimento).toLocaleDateString('pt-BR')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

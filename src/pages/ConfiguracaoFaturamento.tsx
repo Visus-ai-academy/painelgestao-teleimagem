@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
+import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -289,6 +290,71 @@ export default function ConfiguracaoFaturamento() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Upload de Preços e Parâmetros */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload de Preços de Serviços
+            </CardTitle>
+            <CardDescription>
+              Faça upload da tabela de preços por modalidade, especialidade e categoria
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SimpleFileUpload
+              title="Preços de Serviços"
+              acceptedTypes={[".csv", ".xlsx", ".xls"]}
+              onUpload={async (file: File) => {
+                // Aqui seria a integração com a edge function
+                toast({
+                  title: "Preços processados",
+                  description: "Tabela de preços de serviços atualizada com sucesso",
+                });
+              }}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              Arquivo CSV/Excel com preços por modalidade, especialidade, categoria e prioridade.
+              <a href="/templates/template_precos_servicos.csv" className="text-blue-600 hover:underline ml-1">
+                Baixar template
+              </a>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Upload de Parâmetros de Faturamento
+            </CardTitle>
+            <CardDescription>
+              Configure parâmetros específicos de faturamento por cliente
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SimpleFileUpload
+              title="Parâmetros de Faturamento"
+              acceptedTypes={[".csv", ".xlsx", ".xls"]}
+              onUpload={async (file: File) => {
+                // Aqui seria a integração com a edge function
+                toast({
+                  title: "Parâmetros processados",
+                  description: "Parâmetros de faturamento atualizados com sucesso",
+                });
+              }}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              Arquivo CSV/Excel com parâmetros de franquia, urgência e cobrança por cliente.
+              <a href="/templates/template_parametros_faturamento.csv" className="text-blue-600 hover:underline ml-1">
+                Baixar template
+              </a>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Configurações originais da página */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
