@@ -86,7 +86,7 @@ export default function MapaDistribuicaoClientes() {
 
   // Processar dados para o mapa
   const dadosProcessados = useMemo(() => {
-    if (!clientesData || !volumetriaData) return [];
+    if (!clientesData) return [];
     
     console.log('🔍 Processando estatísticas para', clientesData.length, 'clientes');
     console.log('📊 Filtros ativos:', {
@@ -96,64 +96,87 @@ export default function MapaDistribuicaoClientes() {
       filtroPrioridade
     });
 
-    // Primeiro aplicar filtros na volumetria
-    const volumetriaFiltrada = volumetriaData.filter(item => {
-      if (filtroTipoCliente !== 'todos') {
-        const cliente = clientesData.find(c => c.nome === item["EMPRESA"]);
-        if (cliente?.tipo_cliente !== filtroTipoCliente) return false;
-      }
-      if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
-      if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
-      if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
+    // Primeiro aplicar filtro de tipo de cliente nos clientes
+    let clientesFiltrados = clientesData.filter(cliente => {
+      if (filtroTipoCliente !== 'todos' && cliente.tipo_cliente !== filtroTipoCliente) return false;
       return true;
     });
 
-    // Agrupar por empresa e calcular estatísticas
-    const clientesComVolumetria = volumetriaFiltrada.reduce((acc, item) => {
+    // Aplicar filtros de volumetria se houver dados e filtros específicos
+    if (volumetriaData && (filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas')) {
+      const volumetriaFiltrada = volumetriaData.filter(item => {
+        if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
+        if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
+        if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
+        return true;
+      });
+      
+      // Filtrar apenas clientes que têm volumetria com os filtros aplicados
+      const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item["EMPRESA"]));
+      clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
+    }
+
+    // Criar mapa de volumetria por empresa para cálculos
+    const volumetriaPorEmpresa = volumetriaData ? volumetriaData.reduce((acc, item) => {
       const empresa = item["EMPRESA"];
       if (!empresa) return acc;
       
-      const cliente = clientesData.find(c => c.nome === empresa);
-      if (!cliente) return acc;
+      // Aplicar filtros de volumetria
+      if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return acc;
+      if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return acc;
+      if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return acc;
 
       if (!acc[empresa]) {
         acc[empresa] = {
-          id: cliente.id,
-          nome: empresa,
-          endereco: cliente.endereco,
-          cidade: cliente.cidade || 'N/A',
-          estado: cliente.estado || 'N/A',
-          status: cliente.status,
-          ativo: cliente.ativo,
-          email: cliente.email,
-          tipo_cliente: cliente.tipo_cliente,
           volume_exames: 0,
           total_registros: 0,
-          modalidades: [] as string[],
-          especialidades: [] as string[],
-          prioridades: [] as string[]
+          modalidades: new Set<string>(),
+          especialidades: new Set<string>(),
+          prioridades: new Set<string>()
         };
       }
+      
       acc[empresa].volume_exames += Number(item["VALORES"]) || 0;
       acc[empresa].total_registros += 1;
       
-      // Adicionar modalidades, especialidades e prioridades únicas
-      if (item["MODALIDADE"] && !acc[empresa].modalidades.includes(item["MODALIDADE"])) {
-        acc[empresa].modalidades.push(item["MODALIDADE"]);
-      }
-      if (item["ESPECIALIDADE"] && !acc[empresa].especialidades.includes(item["ESPECIALIDADE"])) {
-        acc[empresa].especialidades.push(item["ESPECIALIDADE"]);
-      }
-      if (item["PRIORIDADE"] && !acc[empresa].prioridades.includes(item["PRIORIDADE"])) {
-        acc[empresa].prioridades.push(item["PRIORIDADE"]);
-      }
+      if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
+      if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
+      if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
+      
       return acc;
-    }, {} as Record<string, ClienteVolumetria>);
+    }, {} as Record<string, any>) : {};
 
-    const clientesFiltrados = Object.values(clientesComVolumetria);
-    console.log('✅ Clientes após filtros:', clientesFiltrados.length);
+    // Processar todos os clientes filtrados
+    const clientesProcessados = clientesFiltrados.map(cliente => {
+      const volumetria = volumetriaPorEmpresa[cliente.nome] || {
+        volume_exames: 0,
+        total_registros: 0,
+        modalidades: new Set(),
+        especialidades: new Set(),
+        prioridades: new Set()
+      };
+
+      return {
+        id: cliente.id,
+        nome: cliente.nome,
+        endereco: cliente.endereco,
+        cidade: cliente.cidade || 'N/A',
+        estado: cliente.estado || 'N/A',
+        status: cliente.status,
+        ativo: cliente.ativo,
+        email: cliente.email,
+        tipo_cliente: cliente.tipo_cliente,
+        volume_exames: volumetria.volume_exames,
+        total_registros: volumetria.total_registros,
+        modalidades: Array.from(volumetria.modalidades) as string[],
+        especialidades: Array.from(volumetria.especialidades) as string[],
+        prioridades: Array.from(volumetria.prioridades) as string[]
+      } as ClienteVolumetria;
+    });
     
-    return clientesFiltrados;
+    console.log('✅ Clientes processados:', clientesProcessados.length);
+    
+    return clientesProcessados;
   }, [clientesData, volumetriaData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Processar estatísticas por região e estado
