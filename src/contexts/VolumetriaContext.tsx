@@ -74,16 +74,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🔄 Carregando estatísticas da volumetria (APÓS aplicação de regras)...');
+      console.log('🔄 Carregando estatísticas FINAIS da volumetria (dados DEFINITIVOS do banco após regras aplicadas)...');
       
       // Carregar dados de volumetria diretamente da tabela
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       const statsResult: any = {};
       
       for (const tipo of tiposArquivo) {
-        console.log(`📊 Carregando dados para: ${tipo}`);
+        console.log(`📊 Carregando dados DEFINITIVOS do banco para: ${tipo}`);
         
-        // Carregar TODOS os dados em batches para contornar limitação de 1000 registros
+        // Carregar APENAS os dados que PERMANECERAM no banco após todas as regras
         let allData: any[] = [];
         let offset = 0;
         const limit = 1000;
@@ -106,7 +106,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           }
 
           allData = [...allData, ...batchData];
-          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros no lote (offset: ${offset}), total: ${allData.length}`);
+          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros DEFINITIVOS do banco (lote offset: ${offset}), total: ${allData.length}`);
           
           if (batchData.length < limit) {
             hasMoreData = false;
@@ -132,7 +132,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             totalValue
           };
           
-          console.log(`✅ ${tipo}: ${totalRecords} registros FINAIS (após regras), ${recordsWithValue} com valores, ${recordsZeroed} zerados não identificados, ${totalValue} total`);
+          console.log(`✅ ${tipo}: ${totalRecords} registros DEFINITIVOS no banco (após exclusões físicas), ${recordsWithValue} com valores, ${recordsZeroed} zerados não identificados, ${totalValue} total`);
         } else {
           console.log(`⚠️ ${tipo}: nenhum dado encontrado`);
           statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
@@ -160,7 +160,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         loading: false
       });
 
-      console.log('✅ Estatísticas FINAIS carregadas (pós-regras):', statsResult);
+      console.log('✅ Estatísticas DEFINITIVAS carregadas (dados físicos do banco):', statsResult);
       
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas centralizadas:', error);
@@ -171,14 +171,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = useCallback(async () => {
-    console.log('🔄 Forçando refresh dos dados...');
+    console.log('🔄 Forçando refresh dos dados DEFINITIVOS do banco...');
     lastLoadTime.current = 0; // Invalidar cache
     setData(prev => ({ ...prev, loading: true }));
     await loadStats();
   }, [loadStats]);
 
   const clearData = async () => {
-    console.log('🧹 Limpando dados centralizados...');
+    console.log('🧹 Limpando dados DEFINITIVOS do banco...');
     
     try {
       // Limpar dados de volumetria
@@ -225,7 +225,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         loading: false
       });
       
-      console.log('✅ Limpeza centralizada concluída');
+      console.log('✅ Limpeza FÍSICA do banco concluída');
       
     } catch (error) {
       console.error('❌ Erro na limpeza centralizada:', error);
@@ -254,7 +254,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'volumetria_mobilemed'
         },
         () => {
-          console.log('🔄 Dados de volumetria alterados - atualizando imediatamente...');
+          console.log('🔄 Dados de volumetria alterados FISICAMENTE no banco - atualizando imediatamente...');
           // Invalidar cache e recarregar imediatamente
           lastLoadTime.current = 0;
           clearTimeout(debounceTimer);
@@ -271,13 +271,13 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'processamento_uploads'
         },
         (payload) => {
-          console.log('🔄 Status de upload alterado - atualizando APÓS regras aplicadas...', payload);
+          console.log('🔄 Status de upload alterado - dados DEFINITIVOS sendo atualizados...', payload);
           // Invalidar cache e recarregar quando upload finaliza
           if (payload.new && (payload.new as any).status === 'concluido') {
             lastLoadTime.current = 0;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-              loadStats(); // Carregará dados já processados com todas as regras aplicadas
+              loadStats(); // Carregará dados DEFINITIVOS do banco após todas as regras
             }, 3000); // Aumentar delay para garantir que regras foram aplicadas
           }
         }
