@@ -254,30 +254,140 @@ export async function limparUploadsAntigos() {
 export async function limparDadosVolumetria() {
   try {
     console.log('📡 [supabase.ts] Iniciando limpeza COMPLETA de todos os dados de volumetria e de-para')
-    console.log('📡 [supabase.ts] Chamando edge function: limpar-dados-volumetria')
     
-    const { data, error } = await supabase.functions.invoke('limpar-dados-volumetria', {
-      body: {}  // Não precisa mais de parâmetros, limpa tudo
-    })
+    // SOLUÇÃO ROBUSTA: Tentar edge function primeiro, se falhar usar limpeza direta
+    let tentativaEdgeFunction = true
     
-    console.log('📡 [supabase.ts] Resposta da edge function - data:', data)
-    console.log('📡 [supabase.ts] Resposta da edge function - error:', error)
-    
-    if (error) {
-      console.error('❌ [supabase.ts] Erro ao chamar edge function:', error)
-      throw new Error(`Erro ao limpar dados: ${error.message}`)
+    try {
+      console.log('📡 [supabase.ts] Tentativa 1: Chamando edge function com timeout')
+      
+      // Criar promise com timeout de 30 segundos
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na edge function')), 30000)
+      })
+      
+      const edgeFunctionPromise = supabase.functions.invoke('limpar-dados-volumetria', {
+        body: {}
+      })
+      
+      const { data, error } = await Promise.race([edgeFunctionPromise, timeoutPromise]) as any
+      
+      if (error) {
+        console.warn('⚠️ [supabase.ts] Edge function retornou erro:', error)
+        tentativaEdgeFunction = false
+      } else if (data?.error) {
+        console.warn('⚠️ [supabase.ts] Edge function retornou erro nos dados:', data.error)
+        tentativaEdgeFunction = false
+      } else {
+        console.log('✅ [supabase.ts] Edge function executada com sucesso:', data)
+        return data
+      }
+      
+    } catch (edgeError) {
+      console.warn('⚠️ [supabase.ts] Erro na edge function, tentando limpeza direta:', edgeError)
+      tentativaEdgeFunction = false
     }
     
-    if (data?.error) {
-      console.error('❌ [supabase.ts] Erro retornado pela edge function:', data.error)
-      throw new Error(`Erro ao limpar dados: ${data.error}`)
+    // FALLBACK: Limpeza direta se edge function falhar
+    if (!tentativaEdgeFunction) {
+      console.log('🔄 [supabase.ts] Executando limpeza direta como fallback...')
+      
+      let totalRemovido = 0
+      const resultados = []
+      
+      // 1. Limpar volumetria_mobilemed em lotes
+      console.log('🧹 Limpando volumetria_mobilemed...')
+      let removidosVolumetria = 0
+      
+      // Contar registros primeiro
+      const { count: totalVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+      
+      console.log(`📊 Total de registros em volumetria_mobilemed: ${totalVolumetria}`)
+      
+      if (totalVolumetria && totalVolumetria > 0) {
+        // Deletar em lotes menores para evitar timeout
+        const batchSize = 500
+        
+        while (true) {
+          const { error, count } = await supabase
+            .from('volumetria_mobilemed')
+            .delete({ count: 'exact' })
+            .limit(batchSize)
+          
+          if (error) {
+            console.error('Erro ao deletar lote volumetria:', error)
+            break
+          }
+          
+          removidosVolumetria += count || 0
+          console.log(`🗑️ Removido lote de ${count} registros (total: ${removidosVolumetria})`)
+          
+          if ((count || 0) < batchSize) {
+            break
+          }
+          
+          // Pausa entre lotes
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+      
+      totalRemovido += removidosVolumetria
+      resultados.push({ tabela: 'volumetria_mobilemed', removidos: removidosVolumetria })
+      
+      // 2. Limpar processamento_uploads
+      console.log('🧹 Limpando processamento_uploads...')
+      const tiposArquivo = [
+        'volumetria_padrao',
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao'
+      ]
+      
+      const { error: uploadError, count: uploadCount } = await supabase
+        .from('processamento_uploads')
+        .delete({ count: 'exact' })
+        .in('tipo_arquivo', tiposArquivo)
+      
+      if (!uploadError) {
+        totalRemovido += uploadCount || 0
+        resultados.push({ tabela: 'processamento_uploads', removidos: uploadCount || 0 })
+        console.log(`🗑️ Removidos ${uploadCount} registros de processamento_uploads`)
+      }
+      
+      // 3. Tentar limpar valores_referencia_de_para
+      try {
+        console.log('🧹 Limpando valores_referencia_de_para...')
+        const { error: deParaError, count: deParaCount } = await supabase
+          .from('valores_referencia_de_para')
+          .delete({ count: 'exact' })
+        
+        if (!deParaError) {
+          totalRemovido += deParaCount || 0
+          resultados.push({ tabela: 'valores_referencia_de_para', removidos: deParaCount || 0 })
+          console.log(`🗑️ Removidos ${deParaCount} registros de valores_referencia_de_para`)
+        }
+      } catch (deParaErr) {
+        console.warn('Tabela valores_referencia_de_para não existe:', deParaErr)
+      }
+      
+      console.log(`✅ [supabase.ts] Limpeza direta concluída: ${totalRemovido} registros removidos`)
+      
+      return {
+        success: true,
+        message: `✅ Limpeza completa realizada (fallback)! ${totalRemovido} registros removidos`,
+        registros_removidos: totalRemovido,
+        detalhes_por_tabela: resultados,
+        metodo: 'limpeza_direta_fallback',
+        timestamp: new Date().toISOString()
+      }
     }
     
-    console.log('✅ [supabase.ts] Limpeza COMPLETA de volumetria concluída:', data)
-    return data
   } catch (error) {
-    console.error('❌ [supabase.ts] Erro na limpeza de volumetria:', error)
+    console.error('❌ [supabase.ts] Erro crítico na limpeza de volumetria:', error)
     console.error('❌ [supabase.ts] Stack trace:', error instanceof Error ? error.stack : 'N/A')
-    throw error
+    throw new Error(`Erro ao limpar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
   }
 }

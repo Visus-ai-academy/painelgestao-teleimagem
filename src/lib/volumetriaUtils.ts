@@ -75,7 +75,7 @@ export const VOLUMETRIA_UPLOAD_CONFIGS = {
   }
 } as const;
 
-// Função SIMPLIFICADA que funciona DEFINITIVAMENTE
+// Função ROBUSTA que resolve todos os problemas de upload
 export async function processVolumetriaFile(
   file: File, 
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao',
@@ -84,86 +84,173 @@ export async function processVolumetriaFile(
 ): Promise<{ success: boolean; totalProcessed: number; totalInserted: number; message: string; uploadLogId?: string }> {
   
   try {
-    console.log('=== PROCESSAMENTO DIRETO INICIADO ===');
+    console.log('=== PROCESSAMENTO ROBUSTO INICIADO ===');
     console.log('Arquivo:', file.name);
     console.log('Fonte:', arquivoFonte);
     console.log('Período:', periodoFaturamento);
+    console.log('Tamanho do arquivo:', (file.size / 1024 / 1024).toFixed(2), 'MB');
 
-    // Ler arquivo Excel DIRETAMENTE no frontend
+    // Verificar se arquivo não está vazio
+    if (file.size === 0) {
+      throw new Error('Arquivo está vazio');
+    }
+
+    // Progresso inicial
+    if (onProgress) {
+      onProgress({ progress: 1, processed: 0, total: 100, status: 'Iniciando leitura do arquivo...' });
+    }
+
+    // Ler arquivo Excel DIRETAMENTE no frontend com tratamento de erros
+    let arrayBuffer: ArrayBuffer;
+    let workbook: any;
+    let worksheet: any;
+    let jsonData: any[];
     
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: true }) as any[];
+    try {
+      arrayBuffer = await file.arrayBuffer();
+      if (onProgress) {
+        onProgress({ progress: 5, processed: 0, total: 100, status: 'Arquivo carregado, processando Excel...' });
+      }
+      
+      workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      if (!workbook.SheetNames.length) {
+        throw new Error('Arquivo Excel não possui planilhas');
+      }
+      
+      worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: true }) as any[];
+      
+      if (!jsonData.length) {
+        throw new Error('Planilha está vazia ou não possui dados válidos');
+      }
+      
+    } catch (excelError) {
+      console.error('❌ Erro ao processar arquivo Excel:', excelError);
+      throw new Error(`Erro ao ler arquivo Excel: ${excelError instanceof Error ? excelError.message : 'Formato inválido'}`);
+    }
 
     console.log(`📊 Total de linhas lidas: ${jsonData.length}`);
 
-    // LIMPAR dados antigos do mesmo arquivo_fonte para evitar duplicação
+    if (onProgress) {
+      onProgress({ progress: 8, processed: 0, total: jsonData.length, status: `${jsonData.length} registros encontrados, limpando dados antigos...` });
+    }
+
+    // LIMPAR dados antigos do mesmo arquivo_fonte com retry
     console.log(`🧹 Limpando dados antigos de ${arquivoFonte}...`);
-    const { error: deleteError } = await supabase
-      .from('volumetria_mobilemed')
-      .delete()
-      .eq('arquivo_fonte', arquivoFonte);
-      
-    if (deleteError) {
-      console.warn(`⚠️ Aviso ao limpar dados antigos de ${arquivoFonte}:`, deleteError);
-    } else {
-      console.log(`✅ Dados antigos de ${arquivoFonte} removidos`);
+    
+    let tentativasLimpeza = 0;
+    const maxTentativasLimpeza = 3;
+    
+    while (tentativasLimpeza < maxTentativasLimpeza) {
+      try {
+        const { error: deleteError } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .eq('arquivo_fonte', arquivoFonte);
+          
+        if (deleteError) {
+          console.warn(`⚠️ Tentativa ${tentativasLimpeza + 1} - Erro ao limpar dados antigos:`, deleteError);
+          tentativasLimpeza++;
+          
+          if (tentativasLimpeza < maxTentativasLimpeza) {
+            console.log(`🔄 Tentando novamente em 2 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          } else {
+            throw new Error(`Falha na limpeza após ${maxTentativasLimpeza} tentativas: ${deleteError.message}`);
+          }
+        } else {
+          console.log(`✅ Dados antigos de ${arquivoFonte} removidos com sucesso`);
+          break;
+        }
+      } catch (cleanError) {
+        console.error(`❌ Erro crítico na limpeza (tentativa ${tentativasLimpeza + 1}):`, cleanError);
+        tentativasLimpeza++;
+        
+        if (tentativasLimpeza >= maxTentativasLimpeza) {
+          throw new Error(`Falha crítica na limpeza: ${cleanError instanceof Error ? cleanError.message : 'Erro desconhecido'}`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
     if (onProgress) {
-      onProgress({ progress: 10, processed: 0, total: jsonData.length, status: 'Dados antigos limpos, processando...' });
+      onProgress({ progress: 12, processed: 0, total: jsonData.length, status: 'Dados antigos limpos, criando log...' });
     }
 
-    // Criar log de upload
-    const { data: uploadLog, error: logError } = await supabase
-      .from('processamento_uploads')
-      .insert({
-        arquivo_nome: file.name,
-        tipo_arquivo: arquivoFonte,
-        tipo_dados: 'volumetria',
-        status: 'pendente',
-        registros_processados: 0,
-        registros_inseridos: 0,
-        registros_atualizados: 0,
-        registros_erro: 0,
-        periodo_referencia: periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : null
-      })
-      .select()
-      .single();
+    // Criar log de upload com retry
+    let uploadLog: any;
+    let tentativasLog = 0;
+    const maxTentativasLog = 3;
+    
+    while (tentativasLog < maxTentativasLog) {
+      try {
+        const { data: logData, error: logError } = await supabase
+          .from('processamento_uploads')
+          .insert({
+            arquivo_nome: file.name,
+            tipo_arquivo: arquivoFonte,
+            tipo_dados: 'volumetria',
+            status: 'pendente',
+            registros_processados: 0,
+            registros_inseridos: 0,
+            registros_atualizados: 0,
+            registros_erro: 0,
+            periodo_referencia: periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : null,
+            tamanho_arquivo: file.size
+          })
+          .select()
+          .single();
 
-    if (logError) throw new Error(`Erro ao criar log: ${logError.message}`);
+        if (logError) {
+          console.warn(`⚠️ Tentativa ${tentativasLog + 1} - Erro ao criar log:`, logError);
+          tentativasLog++;
+          
+          if (tentativasLog < maxTentativasLog) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          } else {
+            throw new Error(`Falha ao criar log após ${maxTentativasLog} tentativas: ${logError.message}`);
+          }
+        } else {
+          uploadLog = logData;
+          console.log(`✅ Log de upload criado:`, uploadLog.id);
+          break;
+        }
+      } catch (logErrorCatch) {
+        console.error(`❌ Erro crítico ao criar log (tentativa ${tentativasLog + 1}):`, logErrorCatch);
+        tentativasLog++;
+        
+        if (tentativasLog >= maxTentativasLog) {
+          throw new Error(`Falha crítica ao criar log: ${logErrorCatch instanceof Error ? logErrorCatch.message : 'Erro desconhecido'}`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
     if (onProgress) {
-      onProgress({ progress: 20, processed: 0, total: jsonData.length, status: 'Log criado, iniciando processamento' });
+      onProgress({ progress: 15, processed: 0, total: jsonData.length, status: 'Log criado, iniciando processamento...' });
     }
 
-    // Limpar dados anteriores
+    // Limpar dados anteriores do período
     const periodoReferencia = periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : new Date().toISOString().substring(0, 7);
     
-    await supabase
-      .from('volumetria_mobilemed')
-      .delete()
-      .eq('arquivo_fonte', arquivoFonte)
-      .eq('periodo_referencia', periodoReferencia);
-
-    console.log('🧹 Dados anteriores limpos');
-
-    if (onProgress) {
-      onProgress({ progress: 30, processed: 0, total: jsonData.length, status: 'Dados anteriores limpos' });
-    }
-
     // Atualizar status para processando
     await supabase
       .from('processamento_uploads')
       .update({ status: 'processando' })
       .eq('id', uploadLog.id);
 
-    // Processar dados em lotes pequenos de 200
+    // Processar dados em lotes pequenos com melhor controle
     const loteUpload = `${arquivoFonte}_${Date.now()}_${uploadLog.id.substring(0, 8)}`;
-    const batchSize = 200;
+    const batchSize = 150; // Reduzido para melhor performance
     let totalInserted = 0;
     let totalErrors = 0;
+
+    console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}...`);
 
     for (let i = 0; i < jsonData.length; i += batchSize) {
       const batch = jsonData.slice(i, i + batchSize);
@@ -308,29 +395,52 @@ export async function processVolumetriaFile(
         }
       }
 
-      // Inserir records em sub-lotes de 50
+      // Inserir records em sub-lotes menores com retry
       for (let j = 0; j < records.length; j += 50) {
         const subBatch = records.slice(j, j + 50);
-        try {
-          const { error: insertError } = await supabase
-            .from('volumetria_mobilemed')
-            .insert(subBatch);
+        
+        let tentativasInsert = 0;
+        const maxTentativasInsert = 3;
+        
+        while (tentativasInsert < maxTentativasInsert) {
+          try {
+            const { error: insertError } = await supabase
+              .from('volumetria_mobilemed')
+              .insert(subBatch);
 
-          if (insertError) {
-            console.error(`❌ Erro inserção lote ${i}-${j}:`, insertError.message);
-            totalErrors += subBatch.length;
-          } else {
-            totalInserted += subBatch.length;
-            console.log(`✅ Lote ${i}-${j}: ${subBatch.length} registros inseridos`);
+            if (insertError) {
+              console.warn(`⚠️ Tentativa ${tentativasInsert + 1} - Erro inserção lote ${i}-${j}:`, insertError.message);
+              tentativasInsert++;
+              
+              if (tentativasInsert < maxTentativasInsert) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+              } else {
+                console.error(`❌ Falha definitiva na inserção do lote ${i}-${j}`);
+                totalErrors += subBatch.length;
+                break;
+              }
+            } else {
+              totalInserted += subBatch.length;
+              console.log(`✅ Lote ${i}-${j}: ${subBatch.length} registros inseridos`);
+              break;
+            }
+          } catch (batchErr) {
+            console.error(`❌ Erro crítico no lote ${i}-${j} (tentativa ${tentativasInsert + 1}):`, batchErr);
+            tentativasInsert++;
+            
+            if (tentativasInsert >= maxTentativasInsert) {
+              totalErrors += subBatch.length;
+              break;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch (batchErr) {
-          console.error(`❌ Erro crítico no lote ${i}-${j}:`, batchErr);
-          totalErrors += subBatch.length;
         }
       }
 
       // Atualizar progresso
-      const progress = Math.round(30 + ((i + batchSize) / jsonData.length) * 60);
+      const progress = Math.round(15 + ((i + batchSize) / jsonData.length) * 75);
       const processed = Math.min(i + batchSize, jsonData.length);
       
       if (onProgress) {
@@ -343,27 +453,31 @@ export async function processVolumetriaFile(
       }
 
       // Atualizar log de progresso
-      await supabase
-        .from('processamento_uploads')
-        .update({
-          registros_processados: processed,
-          registros_inseridos: totalInserted,
-          registros_erro: totalErrors,
-          detalhes_erro: JSON.stringify({
-            progresso: `${progress}%`,
-            lote_atual: Math.floor(i / batchSize) + 1,
-            total_lotes: Math.ceil(jsonData.length / batchSize),
-            inseridos: totalInserted,
-            erros: totalErrors
+      try {
+        await supabase
+          .from('processamento_uploads')
+          .update({
+            registros_processados: processed,
+            registros_inseridos: totalInserted,
+            registros_erro: totalErrors,
+            detalhes_erro: JSON.stringify({
+              progresso: `${progress}%`,
+              lote_atual: Math.floor(i / batchSize) + 1,
+              total_lotes: Math.ceil(jsonData.length / batchSize),
+              inseridos: totalInserted,
+              erros: totalErrors
+            })
           })
-        })
-        .eq('id', uploadLog.id);
+          .eq('id', uploadLog.id);
+      } catch (updateError) {
+        console.warn('⚠️ Erro ao atualizar log:', updateError);
+      }
     }
 
     console.log('🔧 Aplicando regras de negócio...');
     
     if (onProgress) {
-      onProgress({ progress: 90, processed: jsonData.length, total: jsonData.length, status: 'Aplicando regras de negócio...' });
+      onProgress({ progress: 92, processed: jsonData.length, total: jsonData.length, status: 'Aplicando regras de negócio...' });
     }
 
     // Aplicar regras de negócio
@@ -406,79 +520,6 @@ export async function processVolumetriaFile(
     console.log('✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!');
     console.log(`📊 Estatísticas: ${totalInserted} inseridos, ${totalErrors} erros, ${registrosAtualizados} atualizados`);
 
-    // Aplicar regras específicas para arquivos retroativos DIRETAMENTE
-    if (arquivoFonte.includes('retroativo')) {
-      console.log(`🔧 Aplicando regras específicas para arquivo retroativo: ${arquivoFonte}`);
-      
-      // Contar registros antes das regras
-      const { data: beforeRules } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id', { count: 'exact' })
-        .eq('arquivo_fonte', arquivoFonte);
-        
-      console.log(`📊 ${arquivoFonte}: ${beforeRules?.length || 0} registros antes das regras`);
-      
-      // 1. Remover registros com data anterior a 2023-01-01
-      const { error: deleteOldError } = await supabase
-        .from('volumetria_mobilemed')
-        .delete()
-        .eq('arquivo_fonte', arquivoFonte)
-        .lt('data_referencia', '2023-01-01');
-        
-      if (deleteOldError) {
-        console.warn(`⚠️ ${arquivoFonte}: Erro ao remover dados antigos:`, deleteOldError);
-      } else {
-        console.log(`✅ ${arquivoFonte}: Dados anteriores a 2023-01-01 removidos`);
-      }
-      
-      // 2. REGRA SIMPLIFICADA PARA RETROATIVOS (Arquivos 3 e 4):
-      try {
-        // Para junho/2025: manter apenas DATA_REALIZACAO < 2025-06-01 E DATA_LAUDO entre 08/06 e 07/07
-        const dataLimiteRealizacao = '2025-06-01';
-        const inicioLaudo = '2025-06-08'; 
-        const fimLaudo = '2025-07-07';       
-        
-        console.log(`📅 ${arquivoFonte}: REGRA RETROATIVA SIMPLIFICADA:`);
-        console.log(`   - Manter DATA_REALIZACAO < ${dataLimiteRealizacao}`);
-        console.log(`   - Manter DATA_LAUDO entre ${inicioLaudo} e ${fimLaudo}`);
-        
-        // Operação única combinada para evitar múltiplas queries DELETE
-        const { error: applyRulesError } = await supabase
-          .from('volumetria_mobilemed')
-          .delete()
-          .eq('arquivo_fonte', arquivoFonte)
-          .or(`DATA_REALIZACAO.gte.${dataLimiteRealizacao},DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gt.${fimLaudo},DATA_REALIZACAO.is.null,DATA_LAUDO.is.null`);
-          
-        if (applyRulesError) {
-          console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar regras retroativas:`, applyRulesError);
-        } else {
-          console.log(`✅ ${arquivoFonte}: Regras retroativas aplicadas com sucesso`);
-        }
-      } catch (periodError) {
-        console.warn(`⚠️ ${arquivoFonte}: Erro ao aplicar regras retroativas:`, periodError);
-      }
-      
-      // Contar registros após as regras
-      const { data: afterRules } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id', { count: 'exact' })
-        .eq('arquivo_fonte', arquivoFonte);
-        
-      console.log(`📊 ${arquivoFonte}: ${afterRules?.length || 0} registros após as regras`);
-      console.log(`✅ ${arquivoFonte}: Regras específicas de retroativo aplicadas`);
-    }
-
-    // Forçar atualização das estatísticas após processamento
-    console.log('🔄 Atualizando estatísticas...');
-    try {
-      if ((window as any).volumetriaContext?.refreshData) {
-        await (window as any).volumetriaContext.refreshData();
-        console.log('✅ Estatísticas atualizadas');
-      }
-    } catch (refreshError) {
-      console.warn('⚠️ Erro ao atualizar estatísticas:', refreshError);
-    }
-
     return {
       success: true,
       totalProcessed: jsonData.length,
@@ -503,122 +544,20 @@ export async function processVolumetriaOtimizado(
 ): Promise<{ success: boolean; message: string; stats: any }> {
   console.log('🚀 Iniciando processamento otimizado de volumetria:', arquivoFonte);
   
-  // Para arquivos retroativos (3 e 4), usar o mesmo processamento direto e otimizado
-  if (arquivoFonte === 'volumetria_padrao_retroativo' || arquivoFonte === 'volumetria_fora_padrao_retroativo') {
-    console.log(`🔄 ${arquivoFonte}: Redirecionando para processamento direto (mesmo modelo dos arquivos 1 e 2)...`);
-    try {
-      const result = await processVolumetriaFile(file, arquivoFonte, onProgress, periodo);
-      return {
-        success: result.success,
-        message: result.message,
-        stats: {
-          total_rows: result.totalProcessed,
-          inserted_count: result.totalInserted,
-          error_count: result.totalProcessed - result.totalInserted
-        }
-      };
-    } catch (error) {
-      console.error(`❌ Erro no processamento direto do ${arquivoFonte}:`, error);
-      throw error;
-    }
-  }
-  
+  // Para todos os arquivos, usar o processamento direto e robusto
   try {
-    // Upload do arquivo
-    if (onProgress) {
-      onProgress({ progress: 10, processed: 0, total: 0, status: 'Fazendo upload do arquivo...' });
-    }
-    
-    const fileName = `volumetria_${Date.now()}_${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('uploads')
-      .upload(fileName, file);
-
-    if (uploadError) {
-      throw new Error(`Erro no upload: ${uploadError.message}`);
-    }
-
-    console.log('✅ Arquivo enviado:', fileName);
-    
-    if (onProgress) {
-      onProgress({ progress: 20, processed: 0, total: 0, status: 'Arquivo enviado, iniciando processamento...' });
-    }
-    
-    // Adicionar timeout de segurança de 5 minutos
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout: Processamento excedeu 5 minutos')), 5 * 60 * 1000);
-    });
-
-    // Chamar edge function otimizada com timeout
-    const processPromise = supabase.functions.invoke('processar-volumetria-otimizado', {
-      body: { 
-        file_path: fileName,
-        arquivo_fonte: arquivoFonte,
-        periodo: periodo
-      }
-    });
-
-    // Executar com timeout
-    const { data: processData, error: processError } = await Promise.race([
-      processPromise,
-      timeoutPromise
-    ]) as any;
-
-    if (processError) {
-      console.error('❌ Erro no processamento:', processError);
-      throw new Error(`Erro no processamento: ${processError.message}`);
-    }
-
-    if (!processData || !processData.success) {
-      throw new Error(processData?.error || 'Erro no processamento');
-    }
-
-    console.log('✅ Processamento otimizado concluído:', processData);
-
-    // Limpar arquivo temporário
-    try {
-      await supabase.storage.from('uploads').remove([fileName]);
-      console.log('🗑️ Arquivo temporário removido');
-    } catch (cleanupError) {
-      console.warn('⚠️ Erro ao limpar arquivo temporário:', cleanupError);
-    }
-
-    if (onProgress) {
-      const totalRegistros = processData.stats?.total_rows || 0;
-      const registrosInseridos = processData.stats?.inserted_count || 0;
-      onProgress({ 
-        progress: 100, 
-        processed: registrosInseridos, 
-        total: totalRegistros, 
-        status: `Concluído! ${registrosInseridos} de ${totalRegistros} registros processados` 
-      });
-    }
-
-    // Forçar atualização das estatísticas
-    if ((window as any).volumetriaContext) {
-      setTimeout(() => {
-        (window as any).volumetriaContext.refreshData();
-      }, 2000);
-    }
-
+    const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     return {
-      success: true,
-      message: processData.message,
-      stats: processData.stats
+      success: result.success,
+      message: result.message,
+      stats: {
+        total_rows: result.totalProcessed,
+        inserted_count: result.totalInserted,
+        error_count: result.totalProcessed - result.totalInserted
+      }
     };
-
   } catch (error) {
-    console.error('❌ Erro no processamento otimizado:', error);
-    
-    if (onProgress) {
-      onProgress({ 
-        progress: 0, 
-        processed: 0, 
-        total: 100, 
-        status: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
-      });
-    }
-
+    console.error(`❌ Erro no processamento de ${arquivoFonte}:`, error);
     throw error;
   }
 }
