@@ -57,14 +57,7 @@ export default function Volumetria() {
     return () => clearTimeout(timer);
   }, [refreshData]);
 
-  // Forçar atualização a cada 30 segundos para garantir dados atualizados
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 [VOLUMETRIA PAGE] Refresh automático...');
-      refreshData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [refreshData]);
+  // Auto-refresh removido - atualização apenas via realtime e ações manuais
   
   const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
   const hasNoData = stats.total_exames === 0;

@@ -288,30 +288,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     };
   }, [loadStats]);
 
-  // Auto-refresh muito mais conservador - só quando necessário
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      // Verificar se há uploads em andamento antes de atualizar
-      try {
-        const { data: activeUploads } = await supabase
-          .from('processamento_uploads')
-          .select('status')
-          .in('status', ['processando', 'iniciado'])
-          .limit(1);
-        
-        if (!activeUploads || activeUploads.length === 0) {
-          console.log('🔄 Auto-refresh das estatísticas (nenhum upload ativo)...');
-          loadStats();
-        } else {
-          console.log('⏸️ Auto-refresh pausado - upload em andamento');
-        }
-      } catch (error) {
-        console.error('❌ Erro ao verificar uploads ativos:', error);
-      }
-    }, 60000); // Aumentado para 60 segundos
-
-    return () => clearInterval(interval);
-  }, [loadStats]);
+  // Auto-refresh removido - atualização apenas via realtime e upload manual
 
   return (
     <VolumetriaContext.Provider value={{ data, refreshData, clearData }}>

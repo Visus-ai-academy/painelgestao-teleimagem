@@ -146,13 +146,11 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       )
       .subscribe();
 
-    // Polling adicional a cada 30 segundos para garantir atualizações
-    const interval = setInterval(fetchStatus, 30000);
+    // Polling removido - atualização apenas via realtime
 
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(volumetriaChannel);
-      clearInterval(interval);
     };
   }, [fileType]);
 
