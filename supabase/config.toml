@@ -60,6 +60,9 @@ verify_jwt = true
 [functions.buscar-valor-onco]
 verify_jwt = true
 
+[functions.processar-volumetria-otimizado]
+verify_jwt = true
+
 # Public endpoints (use with extreme caution)
 [functions.webhook-clicksign]
 verify_jwt = false  # External webhook needs to validate signature
