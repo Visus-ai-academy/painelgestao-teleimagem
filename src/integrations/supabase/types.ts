@@ -2599,32 +2599,38 @@ export type Database = {
         Row: {
           created_at: string
           error_message: string | null
+          file_size: number | null
           file_type: string
           filename: string
           id: string
           records_processed: number | null
           status: string
           updated_at: string
+          uploader: string | null
         }
         Insert: {
           created_at?: string
           error_message?: string | null
+          file_size?: number | null
           file_type: string
           filename: string
           id?: string
           records_processed?: number | null
           status?: string
           updated_at?: string
+          uploader?: string | null
         }
         Update: {
           created_at?: string
           error_message?: string | null
+          file_size?: number | null
           file_type?: string
           filename?: string
           id?: string
           records_processed?: number | null
           status?: string
           updated_at?: string
+          uploader?: string | null
         }
         Relationships: []
       }
