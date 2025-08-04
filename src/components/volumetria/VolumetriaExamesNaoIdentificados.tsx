@@ -74,10 +74,34 @@ export function VolumetriaExamesNaoIdentificados() {
       console.log('🔍 Total de exames zerados:', volumetriaData?.length);
       console.log('🔍 Exames não encontrados no De Para:', estudosNaoEncontrados.length);
 
-      // 4. Agrupar por nome do estudo e arquivo fonte
+      // 4. Verificar se algum dos estudos não encontrados existe nas regras de quebra
+      const { data: regrasQuebra } = await supabase
+        .from('regras_quebra_exames')
+        .select('exame_original, exame_quebrado')
+        .eq('ativo', true);
+
+      // Filtrar estudos que realmente não estão identificados
+      const estudosRealmenteNaoIdentificados = estudosNaoEncontrados.filter(item => {
+        const nomeEstudo = item.ESTUDO_DESCRICAO;
+        
+        // Verificar se o exame existe nas regras de quebra (como exame original ou quebrado)
+        const existeNasRegras = regrasQuebra?.some(regra => 
+          regra.exame_original === nomeEstudo || regra.exame_quebrado === nomeEstudo
+        );
+        
+        if (existeNasRegras) {
+          console.log(`⚠️ Exame "${nomeEstudo}" encontrado nas regras de quebra, mas não processado corretamente`);
+        }
+        
+        return !existeNasRegras; // Só incluir se NÃO está nas regras
+      });
+
+      console.log('🔍 Exames realmente não identificados:', estudosRealmenteNaoIdentificados.length);
+
+      // 5. Agrupar por nome do estudo e arquivo fonte
       const agrupados: Record<string, ExameNaoIdentificado> = {};
       
-      estudosNaoEncontrados.forEach((item) => {
+      estudosRealmenteNaoIdentificados.forEach((item) => {
         // Usar apenas ESTUDO_DESCRICAO - se for NULL, indica problema no processamento
         const nomeEstudo = item.ESTUDO_DESCRICAO || `[ERRO PROCESSAMENTO] - ${item.arquivo_fonte}`;
         const arquivoFonte = item.arquivo_fonte || 'Desconhecido';
