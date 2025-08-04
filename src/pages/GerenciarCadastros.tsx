@@ -438,10 +438,10 @@ export default function GerenciarCadastros() {
         <TabsList className="grid w-full grid-cols-4 lg:grid-cols-11">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
+          <TabsTrigger value="de-para">De-Para</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
-          <TabsTrigger value="de-para">De-Para</TabsTrigger>
           <TabsTrigger value="legado">Legado</TabsTrigger>
           <TabsTrigger value="modalidades">Modalidades</TabsTrigger>
           <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
@@ -516,6 +516,36 @@ export default function GerenciarCadastros() {
                   type="quebra"
                   title="Regras de Quebra Cadastradas"
                 />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* De-Para Exames */}
+        <TabsContent value="de-para">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                De-Para Exames (Valores de Referência)
+              </CardTitle>
+              <CardDescription>
+                Upload de planilha com valores de referência para exames fora de padrão. Estes valores são aplicados automaticamente quando detectados exames com valores zerados.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <SimpleFileUpload
+                    title="Upload De-Para Exames"
+                    acceptedTypes={['.csv', '.xlsx', '.xls']}
+                    onUpload={handleUploadValoresReferencia}
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-8">
+                <ValoresReferenciaTable />
               </div>
             </CardContent>
           </Card>
@@ -624,36 +654,6 @@ export default function GerenciarCadastros() {
                   type="repasse"
                   title="Valores de Repasse Cadastrados"
                 />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* De-Para Exames */}
-        <TabsContent value="de-para">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                De-Para Exames (Valores de Referência)
-              </CardTitle>
-              <CardDescription>
-                Upload de planilha com valores de referência para exames fora de padrão. Estes valores são aplicados automaticamente quando detectados exames com valores zerados.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <SimpleFileUpload
-                    title="Upload De-Para Exames"
-                    acceptedTypes={['.csv', '.xlsx', '.xls']}
-                    onUpload={handleUploadValoresReferencia}
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-8">
-                <ValoresReferenciaTable />
               </div>
             </CardContent>
           </Card>
