@@ -32,7 +32,7 @@ function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
     throw new Error(`Período inválido: ${periodoReferencia}`);
   }
   
-  // Data limite para DATA_REALIZACAO (primeiro dia do mês do período)
+  // Data limite para DATA_REALIZACAO (EXCLUIR a partir de 01/XX/2025 INCLUSIVE)
   const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
   
   // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
@@ -77,19 +77,19 @@ export default async function handler(req: Request): Promise<Response> {
     // Arquivo 3: volumetria_padrao_retroativo
     console.log(`🗂️ Processando Arquivo 3 (volumetria_padrao_retroativo)...`);
     
-    // Excluir registros com DATA_REALIZACAO posterior ao período
+    // Excluir registros com DATA_REALIZACAO a partir de 01/XX/2025 (INCLUSIVE)
     const { error: error3_realizacao, count: count3_realizacao } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-      .gt('DATA_REALIZACAO', dataLimiteRealizacao);
+      .gte('DATA_REALIZACAO', dataLimiteRealizacao);
 
     if (error3_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 3):', error3_realizacao);
     } else {
       const deletedCount3_realizacao = count3_realizacao || 0;
       totalExcluidos += deletedCount3_realizacao;
-      detalhes.push(`Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
+      detalhes.push(`Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
       console.log(`✅ Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO`);
     }
 
@@ -112,19 +112,19 @@ export default async function handler(req: Request): Promise<Response> {
     // Arquivo 4: volumetria_fora_padrao_retroativo
     console.log(`🗂️ Processando Arquivo 4 (volumetria_fora_padrao_retroativo)...`);
     
-    // Excluir registros com DATA_REALIZACAO posterior ao período
+    // Excluir registros com DATA_REALIZACAO a partir de 01/XX/2025 (INCLUSIVE)
     const { error: error4_realizacao, count: count4_realizacao } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-      .gt('DATA_REALIZACAO', dataLimiteRealizacao);
+      .gte('DATA_REALIZACAO', dataLimiteRealizacao);
 
     if (error4_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 4):', error4_realizacao);
     } else {
       const deletedCount4_realizacao = count4_realizacao || 0;
       totalExcluidos += deletedCount4_realizacao;
-      detalhes.push(`Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO > ${dataLimiteRealizacao}`);
+      detalhes.push(`Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
       console.log(`✅ Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO`);
     }
 
