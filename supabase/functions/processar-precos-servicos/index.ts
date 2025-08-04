@@ -56,6 +56,7 @@ serve(async (req) => {
     let inseridos = 0;
     let atualizados = 0;
     let erros = 0;
+    let ignorados = 0; // ✅ Contador para valores zerados ignorados
     const detalhesErros: any[] = [];
 
     // Buscar entidades relacionadas
@@ -76,8 +77,15 @@ serve(async (req) => {
       processados++;
 
       try {
-        if (!row.modalidade || !row.especialidade || !row.categoria || !row.prioridade || !row.valor_base) {
-          throw new Error('Campos obrigatórios em branco: modalidade, especialidade, categoria, prioridade, valor_base');
+        // ✅ VALIDAÇÃO: Ignorar registros com valores zerados ou nulos
+        if (!row.valor_base || Number(row.valor_base) <= 0) {
+          console.log(`Linha ${i + 1}: Valor zerado ou inválido (${row.valor_base}) - registro ignorado`);
+          ignorados++;
+          continue; // Pula para próxima iteração
+        }
+
+        if (!row.modalidade || !row.especialidade || !row.categoria || !row.prioridade) {
+          throw new Error('Campos obrigatórios em branco: modalidade, especialidade, categoria, prioridade');
         }
 
         // Preparar dados do preço
@@ -174,6 +182,7 @@ serve(async (req) => {
       inseridos,
       atualizados,
       erros,
+      ignorados, // ✅ Inclui contador de registros ignorados
       detalhes_erros: detalhesErros
     };
 
