@@ -89,7 +89,8 @@ export function MonitorValidacaoRegras() {
       'volumetria_padrao_retroativo': 5,
       'volumetria_fora_padrao_retroativo': 6,
       'data_laudo': 2,
-      'data_exame': 2
+      'data_exame': 2,
+      'volumetria_onco_padrao': 2 // Categoria + Busca De-Para/Quebra
     };
     return regrasMap[arquivo] || 0;
   };

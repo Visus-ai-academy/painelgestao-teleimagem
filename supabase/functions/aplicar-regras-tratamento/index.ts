@@ -28,6 +28,11 @@ interface RegrasTratamento {
     validarDataLimite: boolean;
     zerarSemDePara: boolean;
   };
+  arquivo5: {
+    // Volumetria Onco Padrão - regras específicas para oncologia
+    aplicarCategoriaOnco: boolean;
+    buscarValorDeParaQuebra: boolean;
+  };
 }
 
 const REGRAS_PADRAO: RegrasTratamento = {
@@ -49,6 +54,10 @@ const REGRAS_PADRAO: RegrasTratamento = {
     aplicarDePara: true,
     validarDataLimite: true,
     zerarSemDePara: true
+  },
+  arquivo5: {
+    aplicarCategoriaOnco: true,
+    buscarValorDeParaQuebra: true
   }
 };
 
@@ -131,6 +140,41 @@ export default async function handler(req: Request): Promise<Response> {
         } else {
           registrosAtualizados += deParaResult4?.registros_atualizados || 0;
           mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
+        }
+        break;
+
+      case 'volumetria_onco_padrao':
+        // Arquivo 5: Aplicar categoria Onco e buscar valores
+        console.log('🩺 Processando arquivo ONCO - Aplicando categoria e buscando valores...');
+        
+        // 1. Aplicar categoria "Onco" a todos os registros
+        const { data: updateOncoCategoria, error: errorOncoCategoria } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 'CATEGORIA': 'Onco' })
+          .eq('arquivo_fonte', arquivo_fonte)
+          .select('id');
+        
+        if (errorOncoCategoria) {
+          console.error('❌ Erro ao aplicar categoria Onco:', errorOncoCategoria);
+          mensagens.push(`Arquivo 5: Erro ao aplicar categoria - ${errorOncoCategoria.message}`);
+        } else {
+          const categoriasAplicadas = updateOncoCategoria?.length || 0;
+          mensagens.push(`Arquivo 5: Categoria "Onco" aplicada em ${categoriasAplicadas} registros`);
+        }
+        
+        // 2. Aplicar De-Para específico para valores zerados
+        const { data: deParaOnco, error: deParaOncoError } = await supabase
+          .rpc('aplicar_de_para_automatico', { 
+            arquivo_fonte_param: arquivo_fonte 
+          });
+        
+        if (deParaOncoError) {
+          console.log(`⚠️ De-Para ONCO falhou: ${deParaOncoError.message}`);
+          mensagens.push(`Arquivo 5: De-Para não aplicado - ${deParaOncoError.message}`);
+        } else {
+          const valoresAtualizados = deParaOnco?.registros_atualizados || 0;
+          registrosAtualizados += valoresAtualizados;
+          mensagens.push(`Arquivo 5: De-Para ONCO aplicado em ${valoresAtualizados} registros`);
         }
         break;
 

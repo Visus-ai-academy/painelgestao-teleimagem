@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface RegraValidacao {
   campo: string;
-  tipo: 'data_minima' | 'data_maxima' | 'obrigatorio' | 'valor_padrao' | 'formato';
+  tipo: 'data_minima' | 'data_maxima' | 'obrigatorio' | 'valor_padrao' | 'formato' | 'buscar_de_para_quebra';
   valor: any;
   aplicar_em: string[];
   ativo: boolean;
@@ -166,6 +166,22 @@ const REGRAS_POR_ARQUIVO: Record<string, RegraValidacao[]> = {
       aplicar_em: ['data_exame'],
       ativo: true
     }
+  ],
+  'volumetria_onco_padrao': [
+    {
+      campo: 'CATEGORIA',
+      tipo: 'valor_padrao',
+      valor: 'Onco',
+      aplicar_em: ['volumetria_onco_padrao'],
+      ativo: true
+    },
+    {
+      campo: 'VALORES',
+      tipo: 'buscar_de_para_quebra',
+      valor: null,
+      aplicar_em: ['volumetria_onco_padrao'],
+      ativo: true
+    }
   ]
 };
 
@@ -241,6 +257,10 @@ function validarRegra(registro: VolumetriaRecord, regra: RegraValidacao): { vali
         return { valido: true, modificacao: `${regra.campo} preenchido com valor padrão: ${regra.valor}` };
       }
       break;
+      
+    case 'buscar_de_para_quebra':
+      // Esta validação será tratada de forma assíncrona na função principal
+      return { valido: true };
   }
   
   return { valido: true };
@@ -299,6 +319,45 @@ export default async function handler(req: Request): Promise<Response> {
     
     for (let i = 0; i < registros.length; i++) {
       const registro = { ...registros[i], arquivo_fonte };
+      
+      // Tratamento especial para arquivos ONCO
+      if (arquivo_fonte === 'volumetria_onco_padrao') {
+        console.log(`🩺 Processando registro ONCO: "${registro.ESTUDO_DESCRICAO}"`);
+        
+        // 1. Aplicar categoria "Onco" automaticamente
+        registro.CATEGORIA = 'Onco';
+        
+        // 2. Buscar valor se VALORES estiver zerado
+        if (!registro.VALORES || registro.VALORES === 0) {
+          try {
+            console.log(`🔍 Buscando valor para exame: "${registro.ESTUDO_DESCRICAO}"`);
+            
+            const response = await fetch(Deno.env.get('SUPABASE_URL') + '/functions/v1/buscar-valor-onco', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+              },
+              body: JSON.stringify({
+                estudo_descricao: registro.ESTUDO_DESCRICAO
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.resultado.encontrado) {
+                registro.VALORES = data.resultado.valor_encontrado;
+                console.log(`✅ Valor encontrado para "${registro.ESTUDO_DESCRICAO}": ${registro.VALORES} (fonte: ${data.resultado.fonte})`);
+              } else {
+                console.log(`⚠️ Valor não encontrado para "${registro.ESTUDO_DESCRICAO}"`);
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Erro ao buscar valor para "${registro.ESTUDO_DESCRICAO}":`, error);
+          }
+        }
+      }
+      
       const validacao = aplicarValidacoes(registro);
       
       if (validacao.valido) {
