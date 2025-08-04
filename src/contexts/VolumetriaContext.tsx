@@ -74,16 +74,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🔄 Carregando estatísticas FINAIS da volumetria (dados DEFINITIVOS do banco após regras aplicadas)...');
+      console.log('🔄 Carregando estatísticas DEFINITIVAS da volumetria (SOMENTE dados que restaram no banco APÓS todas as exclusões físicas)...');
       
       // Carregar dados de volumetria diretamente da tabela
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       const statsResult: any = {};
       
       for (const tipo of tiposArquivo) {
-        console.log(`📊 Carregando dados DEFINITIVOS do banco para: ${tipo}`);
+        console.log(`📊 Carregando dados FÍSICOS REMANESCENTES no banco para: ${tipo} (após exclusões de período)`);
         
-        // Carregar APENAS os dados que PERMANECERAM no banco após todas as regras
+        // Carregar APENAS os dados que PERMANECERAM FISICAMENTE no banco após todas as regras de exclusão
         let allData: any[] = [];
         let offset = 0;
         const limit = 1000;
@@ -106,7 +106,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           }
 
           allData = [...allData, ...batchData];
-          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros DEFINITIVOS do banco (lote offset: ${offset}), total: ${allData.length}`);
+          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros FÍSICOS REMANESCENTES (após exclusões) no banco (lote offset: ${offset}), total: ${allData.length}`);
           
           if (batchData.length < limit) {
             hasMoreData = false;
