@@ -205,18 +205,6 @@ serve(async (req) => {
       }
       
       return clienteFinal;
-    }).filter((cliente, index) => {
-      console.log(`=== VALIDAÇÃO CLIENTE ${index} ===`)
-      console.log('Cliente completo:', JSON.stringify(cliente, null, 2))
-      console.log('Nome do cliente:', `"${cliente.nome}"`)
-      console.log('Tipo do nome:', typeof cliente.nome)
-      console.log('Tamanho do nome:', cliente.nome ? cliente.nome.length : 'undefined')
-      
-      // ❌ REMOVIDA VALIDAÇÃO RESTRITIVA - aceitar TODOS os clientes
-      // Cada linha do arquivo é um registro válido que deve ser mantido
-      console.log(`RESULTADO: Cliente ${index} SEMPRE VÁLIDO (preservando todos os registros)`)
-      
-      return true // ✅ ACEITAR TODOS OS REGISTROS
     })
 
     console.log('Clientes válidos:', clientes.length)

@@ -30,12 +30,13 @@ export function useClienteStats() {
         .from('clientes')
         .select('*', { count: 'exact', head: true });
 
-      // Total com NOME_MOBILEMED preenchido (usando nome como proxy)
+      // Total com NOME_MOBILEMED preenchido 
       const { count: totalNomeMobilemed } = await supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .not('nome', 'is', null)
-        .neq('nome', '');
+        .neq('nome', '')
+        .neq('nome', 'undefined');
 
       // Total de CNPJs únicos (não nulos/vazios)
       const { data: cnpjData } = await supabase

@@ -20,8 +20,32 @@ serve(async (req) => {
 
     console.log('🧹 Limpando uploads travados...');
 
-    // Limpar uploads que estão em "processando" há mais de 10 minutos (tempo mais curto)
+    // Limpar uploads que estão em "processing" há mais de 10 minutos
     const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    
+    // Primeiro limpar upload_logs
+    const { data: uplogsAntigos, error: selectUplogsError } = await supabaseClient
+      .from('upload_logs')
+      .select('*')
+      .eq('status', 'processing')
+      .lt('created_at', cutoffTime);
+
+    if (uplogsAntigos && uplogsAntigos.length > 0) {
+      const { error: updateUplogsError } = await supabaseClient
+        .from('upload_logs')
+        .update({
+          status: 'failed',
+          error_message: 'Upload travado - limpeza automática após timeout'
+        })
+        .eq('status', 'processing')
+        .lt('created_at', cutoffTime);
+
+      if (updateUplogsError) {
+        console.error('❌ Erro ao atualizar upload_logs:', updateUplogsError);
+      } else {
+        console.log(`✅ ${uplogsAntigos.length} upload_logs marcados como failed`);
+      }
+    }
     
     const { data: uploadsAntigos, error: selectError } = await supabaseClient
       .from('processamento_uploads')
