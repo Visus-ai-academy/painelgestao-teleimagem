@@ -29,6 +29,7 @@ import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPer
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaClientesComparison } from '@/components/volumetria/VolumetriaClientesComparison';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
+import { AnaliseDiscrepanciaZerados } from '@/components/AnaliseDiscrepanciaZerados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { ExamesForaPadraoUpload } from '@/components/ExamesForaPadraoUpload';
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
@@ -1114,6 +1115,9 @@ export default function GerarFaturamento() {
                   </ul>
                 </div>
 
+                
+                {/* Análise de Discrepância */}
+                <AnaliseDiscrepanciaZerados />
                 
                 {/* Exames Não Identificados no "De Para" */}
                 <VolumetriaExamesNaoIdentificados />
