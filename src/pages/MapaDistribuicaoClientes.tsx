@@ -62,13 +62,13 @@ const getRegiaoByEstado = (estado: string): string => {
 };
 
 const getCorIntensidade = (volume: number, maxVolume: number): string => {
-  if (volume === 0) return 'bg-gray-100';
+  if (volume === 0) return 'bg-gray-200 text-gray-600';
   const intensidade = (volume / maxVolume) * 100;
-  if (intensidade < 20) return 'bg-blue-200';
-  if (intensidade < 40) return 'bg-blue-300';
-  if (intensidade < 60) return 'bg-blue-400';
-  if (intensidade < 80) return 'bg-blue-500';
-  return 'bg-blue-600';
+  if (intensidade < 20) return 'bg-red-400 text-white';
+  if (intensidade < 40) return 'bg-red-500 text-white';
+  if (intensidade < 60) return 'bg-red-600 text-white';
+  if (intensidade < 80) return 'bg-red-700 text-white';
+  return 'bg-red-800 text-white';
 };
 
 export default function MapaDistribuicaoClientes() {
@@ -201,32 +201,45 @@ export default function MapaDistribuicaoClientes() {
 
   // Processar estatísticas por região e estado
   const processarEstatisticas = (clientes: ClienteVolumetria[]) => {
+    console.log('🔍 Processando estatísticas para', clientes.length, 'clientes');
+    console.log('📊 Filtros ativos:', { filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade });
+    
     // Filtrar clientes baseado nos filtros selecionados
     let clientesFiltrados = clientes;
 
     if (filtroTipoCliente !== 'todos') {
+      const antes = clientesFiltrados.length;
       clientesFiltrados = clientesFiltrados.filter(c => 
         c.tipo_cliente === filtroTipoCliente
       );
+      console.log(`📝 Filtro Tipo Cliente (${filtroTipoCliente}): ${antes} → ${clientesFiltrados.length}`);
     }
 
     if (filtroModalidade !== 'todas') {
+      const antes = clientesFiltrados.length;
       clientesFiltrados = clientesFiltrados.filter(c => 
         c.modalidades.includes(filtroModalidade)
       );
+      console.log(`📝 Filtro Modalidade (${filtroModalidade}): ${antes} → ${clientesFiltrados.length}`);
     }
 
     if (filtroEspecialidade !== 'todas') {
+      const antes = clientesFiltrados.length;
       clientesFiltrados = clientesFiltrados.filter(c => 
         c.especialidades.includes(filtroEspecialidade)
       );
+      console.log(`📝 Filtro Especialidade (${filtroEspecialidade}): ${antes} → ${clientesFiltrados.length}`);
     }
 
     if (filtroPrioridade !== 'todas') {
+      const antes = clientesFiltrados.length;
       clientesFiltrados = clientesFiltrados.filter(c => 
         c.prioridades.includes(filtroPrioridade)
       );
+      console.log(`📝 Filtro Prioridade (${filtroPrioridade}): ${antes} → ${clientesFiltrados.length}`);
     }
+
+    console.log('✅ Clientes após filtros:', clientesFiltrados.length);
 
     // Agrupar por região
     const regioesMap = new Map<string, RegiaoEstatistica>();
@@ -309,8 +322,7 @@ export default function MapaDistribuicaoClientes() {
 
   const totalGeral = {
     clientes: clientesVolumetria.length,
-    volume: clientesVolumetria.reduce((sum, c) => sum + c.volume_exames, 0),
-    registros: clientesVolumetria.reduce((sum, c) => sum + c.total_registros, 0)
+    volume: clientesVolumetria.reduce((sum, c) => sum + c.volume_exames, 0)
   };
 
   if (carregando) {
@@ -469,7 +481,7 @@ export default function MapaDistribuicaoClientes() {
       </Card>
 
       {/* Resumo Geral */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -486,22 +498,10 @@ export default function MapaDistribuicaoClientes() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Volume Total</p>
+                <p className="text-sm font-medium text-gray-600">Volume Total de Laudos/Exames</p>
                 <p className="text-2xl font-bold">{totalGeral.volume.toLocaleString()}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Registros</p>
-                <p className="text-2xl font-bold">{totalGeral.registros.toLocaleString()}</p>
-              </div>
-              <BarChart3 className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -520,8 +520,8 @@ export default function MapaDistribuicaoClientes() {
                 const corClasse = getCorIntensidade(regiao.volume_total, maxVolume);
                 
                 return (
-                  <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105`}>
-                    <div className="text-center text-white">
+                  <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer`}>
+                    <div className="text-center">
                       <h3 className="font-bold text-lg">{regiao.regiao}</h3>
                       <div className="mt-3 space-y-1">
                         <p className="text-sm">{regiao.total_clientes} clientes</p>
@@ -543,7 +543,96 @@ export default function MapaDistribuicaoClientes() {
       {visualizacao === 'estados' && (
         <Card>
           <CardHeader>
-            <CardTitle>Distribuição por Estado</CardTitle>
+            <CardTitle>Mapa de Calor - Distribuição por Estado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {estadosEstatisticas
+                .sort((a, b) => b.volume_total - a.volume_total)
+                .map(estado => {
+                  const maxVolume = Math.max(...estadosEstatisticas.map(e => e.volume_total));
+                  const corClasse = getCorIntensidade(estado.volume_total, maxVolume);
+                  
+                  return (
+                    <div key={estado.estado} className={`p-4 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer`}>
+                      <div className="text-center">
+                        <h3 className="font-bold text-lg">{estado.estado}</h3>
+                        <p className="text-xs opacity-80">{estado.regiao}</p>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-sm">{estado.total_clientes} clientes</p>
+                          <p className="text-sm">{estado.volume_total.toLocaleString()} exames</p>
+                        </div>
+                        <Badge variant="secondary" className="mt-2 text-xs">
+                          {Object.keys(estado.cidades).length} cidades
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Visualização por Cidades */}
+      {visualizacao === 'cidades' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição por Cidade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {estadosEstatisticas
+                .filter(estado => estado.total_clientes > 0)
+                .sort((a, b) => b.volume_total - a.volume_total)
+                .map(estado => (
+                  <div key={estado.estado} className="border rounded-lg p-4">
+                    <h3 className="font-bold text-lg mb-3 text-blue-600">
+                      {estado.estado} - {estado.regiao}
+                      <span className="text-sm font-normal text-gray-600 ml-2">
+                        ({estado.total_clientes} clientes, {estado.volume_total.toLocaleString()} exames)
+                      </span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {Object.entries(estado.cidades)
+                        .sort(([,a], [,b]) => {
+                          const volumeA = a.reduce((sum, c) => sum + c.volume_exames, 0);
+                          const volumeB = b.reduce((sum, c) => sum + c.volume_exames, 0);
+                          return volumeB - volumeA;
+                        })
+                        .map(([cidade, clientesCidade]) => {
+                          const volumeCidade = clientesCidade.reduce((sum, c) => sum + c.volume_exames, 0);
+                          const maxVolumeCidades = Math.max(...Object.values(estado.cidades).map(cidades => 
+                            cidades.reduce((sum, c) => sum + c.volume_exames, 0)
+                          ));
+                          const corClasse = getCorIntensidade(volumeCidade, maxVolumeCidades);
+                          
+                          return (
+                            <div key={`${estado.estado}-${cidade}`} className={`p-3 rounded ${corClasse} transition-all hover:scale-105`}>
+                              <div className="text-center">
+                                <h4 className="font-medium text-sm">{cidade}</h4>
+                                <div className="mt-1 space-y-1">
+                                  <p className="text-xs">{clientesCidade.length} clientes</p>
+                                  <p className="text-xs">{volumeCidade.toLocaleString()} exames</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabela Detalhada (opcional) */}
+      {visualizacao === 'estados' && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Dados Detalhados por Estado</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -576,43 +665,6 @@ export default function MapaDistribuicaoClientes() {
         </Card>
       )}
 
-      {/* Lista detalhada por cidade */}
-      {visualizacao === 'cidades' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuição por Cidade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {estadosEstatisticas.map(estado => (
-                <div key={estado.estado} className="border rounded-lg p-4">
-                  <h3 className="font-bold text-lg mb-3">{estado.estado} - {estado.regiao}</h3>
-                  <div className="grid gap-3">
-                    {Object.entries(estado.cidades).map(([cidade, clientesCidade]) => (
-                      <div key={cidade} className="p-3 bg-gray-50 rounded">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{cidade}</span>
-                          <div className="flex gap-4 text-sm text-gray-600">
-                            <span>{clientesCidade.length} clientes</span>
-                            <span>{clientesCidade.reduce((sum, c) => sum + c.volume_exames, 0).toLocaleString()} exames</span>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {clientesCidade.map(cliente => (
-                            <Badge key={cliente.id} variant="outline" className="text-xs">
-                              {cliente.nome}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
