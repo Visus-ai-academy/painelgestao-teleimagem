@@ -331,7 +331,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             <Clock className="h-4 w-4" />
             <AlertDescription>
               <strong>{safeData.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
-              ({safeData.totalAtrasados.toLocaleString()} de {(safeData.totalAtrasados / (safeData.percentualAtrasoGeral/100)).toLocaleString()} laudos)
+              ({safeData.totalAtrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_registros.toLocaleString()} laudos)
               {safeData.percentualAtrasoGeral >= 15 && (
                 <span className="block mt-2 text-red-600 font-medium">
                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
