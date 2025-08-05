@@ -8,6 +8,7 @@ import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, A
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { useVolumetriaProcessedData } from "@/hooks/useVolumetriaProcessedData";
 
 interface DelayData {
   nome: string;
@@ -89,18 +90,49 @@ const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: nu
 };
 
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
-  // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTAS DIRETAS
+  // USAR DADOS PROCESSADOS CORRETOS
   const { data: volumetriaData } = useVolumetria();
+  const processedData = useVolumetriaProcessedData();
   
-  // GARANTIR QUE OS DADOS SEMPRE SEJAM ARRAYS VÁLIDOS
+  // USAR DADOS PROCESSADOS CORRETOS EM VEZ DE PROPS (com conversão de tipos)
   const safeData = {
-    clientes: data.clientes || [],
-    modalidades: data.modalidades || [],
-    especialidades: data.especialidades || [],
-    categorias: data.categorias || [],
-    prioridades: data.prioridades || [],
-    totalAtrasados: data.totalAtrasados || 0,
-    percentualAtrasoGeral: data.percentualAtrasoGeral || 0,
+    clientes: processedData.clientes.map(c => ({
+      nome: c.nome,
+      total_exames: c.total_exames,
+      atrasados: c.atrasados,
+      percentual_atraso: c.percentual_atraso,
+      tempo_medio_atraso: 0
+    })) as DelayData[],
+    modalidades: processedData.modalidades.map(m => ({
+      nome: m.nome,
+      total_exames: m.total_exames,
+      atrasados: m.atrasados || 0,
+      percentual_atraso: m.percentual_atraso || 0,
+      tempo_medio_atraso: 0
+    })) as DelayData[],
+    especialidades: processedData.especialidades.map(e => ({
+      nome: e.nome,
+      total_exames: e.total_exames,
+      atrasados: e.atrasados || 0,
+      percentual_atraso: e.percentual_atraso || 0,
+      tempo_medio_atraso: 0
+    })) as DelayData[],
+    categorias: processedData.categorias.map(c => ({
+      nome: c.nome,
+      total_exames: c.total_exames,
+      atrasados: 0,
+      percentual_atraso: 0,
+      tempo_medio_atraso: 0
+    })) as DelayData[],
+    prioridades: processedData.prioridades.map(p => ({
+      nome: p.nome,
+      total_exames: p.total_exames,
+      atrasados: 0,
+      percentual_atraso: 0,
+      tempo_medio_atraso: 0
+    })) as DelayData[],
+    totalAtrasados: processedData.totalAtrasados || 0,
+    percentualAtrasoGeral: processedData.percentualAtraso || 0,
     atrasosComTempo: data.atrasosComTempo || []
   };
   
@@ -331,7 +363,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             <Clock className="h-4 w-4" />
             <AlertDescription>
               <strong>{safeData.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
-              ({safeData.totalAtrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
+              ({safeData.totalAtrasados.toLocaleString()} de {processedData.totalExames.toLocaleString()} laudos)
               {safeData.percentualAtrasoGeral >= 15 && (
                 <span className="block mt-2 text-red-600 font-medium">
                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
