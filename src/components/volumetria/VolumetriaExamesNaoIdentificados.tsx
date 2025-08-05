@@ -71,7 +71,15 @@ export function VolumetriaExamesNaoIdentificados() {
       const estudosNaoEncontrados = volumetriaData?.filter(item => {
         // Se ESTUDO_DESCRICAO é NULL ou vazio, incluir sempre
         if (!item.ESTUDO_DESCRICAO?.trim()) {
-          console.log(`🚨 ESTUDO_DESCRICAO vazio/nulo no arquivo: ${item.arquivo_fonte}`);
+          console.log(`🚨 ESTUDO_DESCRICAO vazio/nulo no arquivo: ${item.arquivo_fonte || 'arquivo_fonte_indefinido'}`);
+          console.log(`🚨 Dados do registro problemático:`, {
+            id: item.id,
+            arquivo_fonte: item.arquivo_fonte,
+            EMPRESA: item.EMPRESA,
+            MODALIDADE: item.MODALIDADE,
+            ESPECIALIDADE: item.ESPECIALIDADE,
+            VALORES: item.VALORES
+          });
           return true;
         }
         
@@ -122,8 +130,17 @@ export function VolumetriaExamesNaoIdentificados() {
       
       estudosRealmenteNaoIdentificados.forEach((item) => {
         // Usar apenas ESTUDO_DESCRICAO - se for NULL, indica problema no processamento
-        const nomeEstudo = item.ESTUDO_DESCRICAO || `[ERRO PROCESSAMENTO] - ${item.arquivo_fonte}`;
-        const arquivoFonte = item.arquivo_fonte || 'Desconhecido';
+        let nomeEstudo;
+        let arquivoFonte = item.arquivo_fonte || 'Arquivo não identificado';
+        
+        if (!item.ESTUDO_DESCRICAO?.trim()) {
+          // Para registros sem ESTUDO_DESCRICAO, criar descrição mais informativa
+          nomeEstudo = `[ERRO: Estudo sem descrição] - ${item.MODALIDADE || 'Modalidade?'} / ${item.ESPECIALIDADE || 'Especialidade?'}`;
+          console.log(`🚨 Registro sem ESTUDO_DESCRICAO encontrado:`, item);
+        } else {
+          nomeEstudo = item.ESTUDO_DESCRICAO;
+        }
+        
         const key = `${nomeEstudo}_${arquivoFonte}`;
         
         if (agrupados[key]) {
