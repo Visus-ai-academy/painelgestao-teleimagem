@@ -21,14 +21,10 @@ export function VolumetriaExamesNaoIdentificados() {
   const { data } = useVolumetria();
 
   useEffect(() => {
-    // Só carregar quando dados estiverem disponíveis no contexto
-    if (!data.loading && data.detailedData.length > 0) {
-      console.log('🚀 INICIANDO loadExamesNaoIdentificados com', data.detailedData.length, 'registros');
-      loadExamesNaoIdentificados();
-    } else {
-      console.log('⏳ Aguardando dados completos. Loading:', data.loading, 'Registros:', data.detailedData.length);
-    }
-  }, [data.loading, data.detailedData]);
+    // Carregar diretamente, independente do contexto que não está funcionando
+    console.log('⏳ Iniciando carregamento direto dos dados zerados');
+    loadExamesNaoIdentificados();
+  }, []);
 
   // Função para limpar termos X1-X9 e XE
   const limparTermosX = (estudo: string): string => {
@@ -38,31 +34,30 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // USAR DADOS DO CONTEXTO CENTRALIZADO EM VEZ DE QUERY DIRETA
-      const volumetriaDataCompleta = data.detailedData;
-      
       console.log('🚀 INICIANDO loadExamesNaoIdentificados');
-      console.log('📊 data.loading:', data.loading);
-      console.log('📊 volumetriaDataCompleta.length:', volumetriaDataCompleta?.length || 0);
-      console.log('📊 Primeiro registro exemplo:', volumetriaDataCompleta?.[0]);
       
-      if (!volumetriaDataCompleta || volumetriaDataCompleta.length === 0) {
-        console.log('📊 Aguardando dados do contexto centralizado...');
+      // BUSCAR DIRETAMENTE DO BANCO TODOS OS REGISTROS ZERADOS
+      // O contexto não está fornecendo os dados completos
+      const { data: volumetriaData, error: volumetriaError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('ESTUDO_DESCRICAO, MODALIDADE, ESPECIALIDADE, arquivo_fonte, VALORES')
+        .or('VALORES.eq.0,VALORES.is.null')
+        .limit(10000);
+
+      if (volumetriaError) {
+        console.error('❌ Erro ao buscar volumetria:', volumetriaError);
+        throw volumetriaError;
+      }
+      
+      console.log('📊 REGISTROS ZERADOS ENCONTRADOS:', volumetriaData?.length || 0);
+      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData?.slice(0, 5));
+      
+      
+      if (!volumetriaData || volumetriaData.length === 0) {
+        console.log('📊 Nenhum registro zerado encontrado');
         setLoading(false);
         return;
       }
-      
-      console.log('📊 USANDO DADOS COMPLETOS DO CONTEXTO:', volumetriaDataCompleta.length, 'registros');
-      
-      // Filtrar apenas registros zerados usando dados completos do contexto
-      const volumetriaData = volumetriaDataCompleta.filter(item => 
-        item.VALORES === 0 || item.VALORES === null || item.VALORES === undefined
-      );
-      
-      console.log('📊 REGISTROS ZERADOS FILTRADOS:', volumetriaData.length);
-      console.log('📊 VALORES únicos encontrados:', [...new Set(volumetriaDataCompleta.map(item => item.VALORES))].slice(0, 20));
-      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData.slice(0, 5));
-      console.log('📊 EXEMPLO DE REGISTROS COM VALOR:', volumetriaDataCompleta.filter(item => item.VALORES > 0).slice(0, 3));
 
       // 2. Buscar estudos existentes no De Para (COM LIMITE EXPLÍCITO ALTO)
       const { data: deParaData, error: deParaError } = await supabase
