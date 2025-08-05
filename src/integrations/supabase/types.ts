@@ -3264,6 +3264,43 @@ export type Database = {
           total_value: number
         }[]
       }
+      get_volumetria_complete_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          MEDICO: string
+          PRIORIDADE: string
+          CATEGORIA: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+        }[]
+      }
+      get_volumetria_dashboard_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_exames: number
+          total_registros: number
+          total_atrasados: number
+          percentual_atraso: number
+          total_clientes: number
+          total_clientes_volumetria: number
+          total_modalidades: number
+          total_especialidades: number
+          total_medicos: number
+          total_prioridades: number
+          clientes_unicos: string[]
+          modalidades_unicas: string[]
+          especialidades_unicas: string[]
+          prioridades_unicas: string[]
+          medicos_unicos: string[]
+        }[]
+      }
       get_volumetria_stats: {
         Args: {
           p_empresa?: string

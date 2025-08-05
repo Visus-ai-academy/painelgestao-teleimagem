@@ -105,12 +105,10 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   const lastLoadTime = useRef(0);
 
   const loadStats = useCallback(async () => {
-    // Forçar limpeza completa do estado para debugging
-    console.log('🔥🔥🔥 FORÇANDO CARREGAMENTO TOTAL DOS DADOS - VERSÃO DEFINITIVA 🔥🔥🔥');
-    console.log('🔄 Evitar chamadas duplicadas mas permitir forçar reload');
+    console.log('🔥🔥🔥 CARREGAMENTO DEFINITIVO INICIADO - USANDO FUNÇÕES RPC 🔥🔥🔥');
     const now = Date.now();
-    if (isLoadingRef.current && (now - lastLoadTime.current) < 30000) {
-      console.log('⏳ Carregamento em andamento ou muito recente, aguardando...');
+    if (isLoadingRef.current && (now - lastLoadTime.current) < 5000) {
+      console.log('⏳ Carregamento recente, aguardando...');
       return;
     }
     
@@ -118,169 +116,55 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🔄 Carregando estatísticas DEFINITIVAS da volumetria (TODOS OS DADOS)...');
+      console.log('🚀 FASE 1: Carregando estatísticas dashboard via RPC...');
       
-      // Carregar dados de volumetria diretamente da tabela SEM LIMITAÇÕES
-      const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
+      // CARREGAR ESTATÍSTICAS COMPLETAS VIA RPC
+      const { data: dashboardData, error: dashboardError } = await supabase.rpc('get_volumetria_dashboard_stats');
+      
+      if (dashboardError) {
+        throw new Error(`Erro no dashboard stats: ${dashboardError.message}`);
+      }
+      
+      const dashboardStats = dashboardData[0];
+      console.log('✅ Dashboard stats carregadas:', dashboardStats);
+      
+      console.log('🚀 FASE 2: Carregando TODOS os dados detalhados via RPC...');
+      
+      // CARREGAR TODOS OS DADOS DETALHADOS VIA RPC (SEM LIMITAÇÃO)
+      const { data: detailedData, error: detailedError } = await supabase.rpc('get_volumetria_complete_data');
+      
+      if (detailedError) {
+        throw new Error(`Erro nos dados detalhados: ${detailedError.message}`);
+      }
+      
+      console.log(`🎉🔥 DADOS COMPLETOS CARREGADOS VIA RPC: ${detailedData.length} registros 🔥🎉`);
+      console.log(`📊 Total exames somados: ${detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0)}`);
+      
+      // Carregar dados de arquivos agregados
+      const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
+      
+      if (aggregateError) {
+        console.warn('⚠️ Erro ao carregar agregados:', aggregateError.message);
+      }
+      
+      // Processar estatísticas por tipo de arquivo
       const statsResult: any = {};
+      const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       
-      for (const tipo of tiposArquivo) {
-        console.log(`📊 Carregando TODOS os dados para: ${tipo}`);
-        
-        // SOLUÇÃO DEFINITIVA: Usar a função RPC que retorna dados corretos
-        const { data: aggregateStats, error } = await supabase.rpc('get_volumetria_aggregated_stats');
-        
-        if (error) {
-          console.error(`❌ Erro na função RPC:`, error);
-          // Fallback para contagem manual se RPC falhar
-          const { count: totalRecordsCount } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*', { count: 'exact', head: true })
-            .eq('arquivo_fonte', tipo);
-            
+      tiposArquivo.forEach(tipo => {
+        const tipoStats = aggregateStats?.find((stat: any) => stat.arquivo_fonte === tipo);
+        if (tipoStats) {
           statsResult[tipo] = {
-            totalRecords: totalRecordsCount || 0,
-            recordsWithValue: 0,
-            recordsZeroed: 0,
-            totalValue: 0
+            totalRecords: Number(tipoStats.total_records),
+            recordsWithValue: Number(tipoStats.records_with_value),
+            recordsZeroed: Number(tipoStats.records_zeroed),
+            totalValue: Number(tipoStats.total_value)
           };
         } else {
-          // Encontrar dados para este tipo específico
-          const tipoStats = aggregateStats?.find((stat: any) => stat.arquivo_fonte === tipo);
-          
-          if (tipoStats) {
-            statsResult[tipo] = {
-              totalRecords: Number(tipoStats.total_records),
-              recordsWithValue: Number(tipoStats.records_with_value),
-              recordsZeroed: Number(tipoStats.records_zeroed),
-              totalValue: Number(tipoStats.total_value)
-            };
-            
-            console.log(`✅ ${tipo} (via RPC): ${tipoStats.total_records} registros, ${tipoStats.records_with_value} com valores, ${tipoStats.records_zeroed} zerados, ${tipoStats.total_value} TOTAL EXAMES`);
-          } else {
-            console.log(`⚠️ ${tipo}: Não encontrado na função RPC`);
-            statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-          }
-        }
-      }
-
-      console.log('📊 DADOS FINAIS DE STATS:', statsResult);
-
-      // Carregar dados detalhados para análises - SEM LIMITAÇÕES DE FORMA ALGUMA
-      console.log('📋 Carregando TODOS os dados detalhados SEM QUALQUER LIMITAÇÃO...');
-      let allDetailedData: any[] = [];
-      
-      try {
-        console.log('🚀🚀🚀 EXECUTANDO QUERY COMPLETA DEFINITIVA - FORÇANDO TODOS OS DADOS 🚀🚀🚀');
-        console.log('🎯 META: Carregar TODOS os 35.337 registros sem limitação alguma');
-        
-        // SOLUÇÃO DEFINITIVA: Usar contagem e depois carregar tudo de uma vez
-        console.log('📊 Fase 1: Contando registros totais no banco...');
-        const { count: totalCount } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true });
-          
-        console.log(`📊🔥 TOTAL DE REGISTROS NO BANCO CONFIRMADO: ${totalCount} 🔥📊`);
-        
-        if (totalCount === 0) {
-          console.log('⚠️ ERRO: Nenhum registro encontrado na volumetria - banco vazio?');
-          allDetailedData = [];
-        } else {
-          console.log(`🎯 INICIANDO CARREGAMENTO DEFINITIVO DE ${totalCount} REGISTROS EM LOTES`);
-          // PAGINAÇÃO DEFINITIVA FORÇADA PARA CARREGAR TODOS OS DADOS
-          let offset = 0;
-          const batchSize = 10000;
-          let hasMoreData = true;
-          
-          while (hasMoreData && allDetailedData.length < totalCount) {
-            console.log(`📦🔥 [LOTE ${Math.floor(offset/batchSize) + 1}] Carregando registros ${offset} a ${offset + batchSize - 1} de ${totalCount} total 🔥📦`);
-            console.log(`📊 Progresso atual: ${allDetailedData.length}/${totalCount} (${((allDetailedData.length/totalCount)*100).toFixed(1)}%)`);
-            
-            const { data: batchData, error: batchError } = await supabase
-              .from('volumetria_mobilemed')
-              .select(`
-                "EMPRESA",
-                "MODALIDADE", 
-                "ESPECIALIDADE",
-                "MEDICO",
-                "PRIORIDADE",
-                "CATEGORIA",
-                "VALORES",
-                "DATA_LAUDO",
-                "HORA_LAUDO", 
-                "DATA_PRAZO",
-                "HORA_PRAZO",
-                data_referencia
-              `)
-              .range(offset, offset + batchSize - 1)
-              .order('id');
-              
-            if (batchError) {
-              console.error('❌ Erro ao carregar lote:', batchError);
-              break;
-            }
-            
-            if (!batchData || batchData.length === 0) {
-              console.log('✅ Fim dos dados alcançado (lote vazio)');
-              break;
-            }
-            
-            allDetailedData = [...allDetailedData, ...batchData];
-            console.log(`✅🔥 LOTE ${Math.floor(offset/batchSize) + 1} CARREGADO: ${batchData.length} registros, TOTAL ACUMULADO: ${allDetailedData.length}/${totalCount} 🔥✅`);
-            
-            // Verificação dupla para garantir que todos os dados foram carregados
-            if (batchData.length < batchSize || allDetailedData.length >= totalCount) {
-              console.log(`🎯🔥 CARREGAMENTO COMPLETO ALCANÇADO: ${allDetailedData.length}/${totalCount} registros 🔥🎯`);
-              hasMoreData = false;
-            } else {
-              offset += batchSize;
-            }
-            
-            // Proteção contra loop infinito
-            if (offset > totalCount + batchSize) {
-              console.log('⚠️ Proteção contra loop infinito ativada');
-              break;
-            }
-          }
-        }
-        
-        console.log(`🎉🔥🔥🔥 CARREGAMENTO DEFINITIVO 100% COMPLETO: ${allDetailedData.length} registros de ${totalCount} total 🔥🔥🔥🎉`);
-        console.log(`💯🔥 PERCENTUAL FINAL CARREGADO: ${totalCount > 0 ? ((allDetailedData.length / totalCount) * 100).toFixed(1) : 0}% 🔥💯`);
-        console.log(`🎯 TOTAL DE EXAMES SOMADOS: ${allDetailedData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0)} exames`);
-      } catch (error) {
-        console.error('❌ Erro crítico ao carregar dados detalhados:', error);
-        allDetailedData = [];
-      }
-
-      // Processar listas únicas e estatísticas
-      const clientesUnicos = [...new Set(allDetailedData.map(item => item.EMPRESA).filter(Boolean))];
-      const modalidadesUnicas = [...new Set(allDetailedData.map(item => item.MODALIDADE).filter(Boolean))];
-      const especialidadesUnicas = [...new Set(allDetailedData.map(item => item.ESPECIALIDADE).filter(Boolean))];
-      const prioridadesUnicas = [...new Set(allDetailedData.map(item => item.PRIORIDADE).filter(Boolean))];
-      const medicosUnicos = [...new Set(allDetailedData.map(item => item.MEDICO).filter(Boolean))];
-
-      // Calcular atrasos
-      const atrasados = allDetailedData.filter(item => {
-        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
-        try {
-          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-          return dataLaudo > dataPrazo;
-        } catch {
-          return false;
+          statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
         }
       });
-
-      const totalExamesCalculado = allDetailedData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
-      const totalRegistrosCalculado = allDetailedData.length;
-      const totalAtrasadosCalculado = atrasados.length;
-      const percentualAtrasoCalculado = totalRegistrosCalculado > 0 ? (totalAtrasadosCalculado / totalRegistrosCalculado) * 100 : 0;
-
-      console.log('✅ Dados detalhados carregados:', allDetailedData.length);
-      console.log('📊 Total calculado:', totalExamesCalculado, 'exames');
-      console.log('👥 Clientes únicos:', clientesUnicos.length);
-      console.log('⏰ Atrasos:', totalAtrasadosCalculado, `(${percentualAtrasoCalculado.toFixed(1)}%)`);
-
+      
       // Carregar últimos uploads
       const lastUploadsResult: Record<string, any> = {};
       for (const tipo of tiposArquivo) {
@@ -296,45 +180,41 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('🔄 Atualizando estado do contexto...');
+      console.log('🔄 Atualizando estado do contexto com dados RPC...');
       setData({
         stats: statsResult,
         lastUploads: lastUploadsResult,
-        detailedData: allDetailedData,
-        clientes: clientesUnicos,
-        modalidades: modalidadesUnicas,
-        especialidades: especialidadesUnicas,
-        prioridades: prioridadesUnicas,
-        medicos: medicosUnicos,
+        detailedData: detailedData,
+        clientes: dashboardStats.clientes_unicos || [],
+        modalidades: dashboardStats.modalidades_unicas || [],
+        especialidades: dashboardStats.especialidades_unicas || [],
+        prioridades: dashboardStats.prioridades_unicas || [],
+        medicos: dashboardStats.medicos_unicos || [],
         dashboardStats: {
-          total_exames: totalExamesCalculado,
-          total_registros: totalRegistrosCalculado,
-          total_atrasados: totalAtrasadosCalculado,
-          percentual_atraso: percentualAtrasoCalculado,
-          total_clientes: clientesUnicos.length,
-          total_clientes_volumetria: clientesUnicos.length,
-          total_modalidades: modalidadesUnicas.length,
-          total_especialidades: especialidadesUnicas.length,
-          total_medicos: medicosUnicos.length,
-          total_prioridades: prioridadesUnicas.length
+          total_exames: Number(dashboardStats.total_exames),
+          total_registros: Number(dashboardStats.total_registros),
+          total_atrasados: Number(dashboardStats.total_atrasados),
+          percentual_atraso: Number(dashboardStats.percentual_atraso),
+          total_clientes: Number(dashboardStats.total_clientes),
+          total_clientes_volumetria: Number(dashboardStats.total_clientes_volumetria),
+          total_modalidades: Number(dashboardStats.total_modalidades),
+          total_especialidades: Number(dashboardStats.total_especialidades),
+          total_medicos: Number(dashboardStats.total_medicos),
+          total_prioridades: Number(dashboardStats.total_prioridades)
         },
         loading: false
       });
       
-      console.log('✅ CONTEXTO ATUALIZADO COM SUCESSO!');
-      console.log('📈 Resumo dos totais:');
-      Object.entries(statsResult).forEach(([tipo, dados]: [string, any]) => {
-        console.log(`- ${tipo}: ${dados.totalValue} exames`);
-      });
-
-      console.log('✅ Estatísticas DEFINITIVAS carregadas (dados físicos do banco):', statsResult);
+      console.log('✅🔥 CONTEXTO ATUALIZADO COM SUCESSO VIA RPC! 🔥✅');
+      console.log(`📈 Resumo final: ${Number(dashboardStats.total_exames)} exames, ${Number(dashboardStats.total_registros)} registros`);
       
     } catch (error) {
-      console.error('❌ Erro ao carregar estatísticas centralizadas:', error);
+      console.error('❌ Erro ao carregar estatísticas via RPC:', error);
       setData(prev => ({ ...prev, loading: false }));
     } finally {
       isLoadingRef.current = false;
     }
+
   }, []);
 
   const refreshData = useCallback(async () => {
