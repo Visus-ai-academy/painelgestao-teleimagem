@@ -126,8 +126,8 @@ export const LaudosAtrasadosDetalhado = () => {
     return filtered;
   }, [laudosAtrasados, searchTerm, sortField, sortDirection]);
 
-  // REMOVER PAGINAÇÃO - EXIBIR TODOS OS REGISTROS
-  const displayData = filteredAndSortedData; // TODOS os dados sem paginação
+  // EXIBIR TODOS OS REGISTROS - SEM LIMITAÇÃO
+  const displayData = filteredAndSortedData;
 
   // Função para alterar ordenação
   const handleSort = (field: SortField) => {
@@ -274,9 +274,9 @@ export const LaudosAtrasadosDetalhado = () => {
           </div>
         </div>
 
-        {/* Tabela de laudos atrasados */}
+        {/* Tabela de laudos atrasados - SEM LIMITAÇÃO DE ALTURA */}
         <div className="border rounded-lg overflow-hidden">
-          <div className="max-h-96 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: 'none' }}>
             <Table>
               <TableHeader className="sticky top-0 bg-white z-10">
                 <TableRow className="bg-muted/50">

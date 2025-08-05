@@ -259,7 +259,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       if (data) {
         const tempoMap = new Map();
         data.forEach((item: any) => {
-          tempoMap.set(item.EMPRESA, item.tempo_medio_atraso_minutos);
+          tempoMap.set(item.empresa, item.tempo_medio_atraso_horas);
         });
         setTempoMedioClientes(tempoMap);
       }
@@ -267,11 +267,13 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     carregarTempoMedio();
   }, []);
 
-  // Calcular dados de clientes com tempo médio de atraso - CORRIGIR INCONSISTÊNCIAS
+  // Calcular dados de clientes com tempo médio de atraso - EXIBIR APENAS CLIENTES COM ATRASOS
   const clientesComTempoAtraso = safeData.clientes
+    .filter(cliente => cliente.atrasados > 0) // FILTRAR APENAS CLIENTES COM ATRASOS
     .map(cliente => {
-      // USAR APENAS TEMPO MÉDIO SE CLIENTE REALMENTE TEM ATRASOS
-      const tempoMedioAtraso = cliente.atrasados > 0 ? (tempoMedioClientes.get(cliente.nome) || 0) : 0;
+      // CONVERTER DE HORAS PARA MINUTOS (RPC retorna em horas)
+      const tempoMedioAtrasoHoras = tempoMedioClientes.get(cliente.nome) || 0;
+      const tempoMedioAtraso = tempoMedioAtrasoHoras * 60; // Converter para minutos
       
       const nivelAtraso = cliente.percentual_atraso >= 20 ? 'Crítico' :
                          cliente.percentual_atraso >= 10 ? 'Alto' :
