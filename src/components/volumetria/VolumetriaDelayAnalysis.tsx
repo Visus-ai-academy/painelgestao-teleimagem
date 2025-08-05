@@ -250,14 +250,28 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     }
   };
 
-  // Calcular tempo médio de atraso por cliente
+  // Buscar tempo médio de atraso por cliente
+  const [tempoMedioClientes, setTempoMedioClientes] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const carregarTempoMedio = async () => {
+      const { data } = await supabase.rpc('get_tempo_medio_atraso_clientes');
+      if (data) {
+        const tempoMap = new Map();
+        data.forEach((item: any) => {
+          tempoMap.set(item.EMPRESA, item.tempo_medio_atraso_minutos);
+        });
+        setTempoMedioClientes(tempoMap);
+      }
+    };
+    carregarTempoMedio();
+  }, []);
+
+  // Calcular dados de clientes com tempo médio de atraso
   const clientesComTempoAtraso = safeData.clientes
     .filter(c => c.atrasados > 0)
     .map(cliente => {
-      const atrasosCliente = safeData.atrasosComTempo?.filter(atraso => atraso.EMPRESA === cliente.nome) || [];
-      const tempoMedioAtraso = atrasosCliente.length > 0
-        ? atrasosCliente.reduce((sum, atraso) => sum + atraso.tempoAtrasoMinutos, 0) / atrasosCliente.length 
-        : 0;
+      const tempoMedioAtraso = tempoMedioClientes.get(cliente.nome) || 0;
       
       const nivelAtraso = cliente.percentual_atraso >= 20 ? 'Crítico' :
                          cliente.percentual_atraso >= 10 ? 'Alto' :
@@ -309,11 +323,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             <Clock className="h-4 w-4" />
             <AlertDescription>
               <strong>{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</strong> dos laudos estão atrasados 
-              ({volumetriaData.dashboardStats.total_atrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
-              {volumetriaData.dashboardStats.percentual_atraso >= 10 && (
-                <span className="block mt-2 text-red-600 font-medium">
-                  ⚠️ Atenção: Taxa de atraso acima do limite aceitável (10%)
-                </span>
+               ({volumetriaData.dashboardStats.total_atrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
+               {volumetriaData.dashboardStats.percentual_atraso >= 15 && (
+                 <span className="block mt-2 text-red-600 font-medium">
+                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
+                 </span>
               )}
             </AlertDescription>
           </Alert>

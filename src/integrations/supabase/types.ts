@@ -3269,6 +3269,14 @@ export type Database = {
           ano_referencia: number
         }[]
       }
+      get_tempo_medio_atraso_clientes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          tempo_medio_atraso_minutos: number
+          total_laudos_atrasados: number
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
