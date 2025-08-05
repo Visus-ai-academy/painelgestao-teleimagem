@@ -67,7 +67,32 @@ serve(async (req) => {
     // 3. Processar header e dados
     const headers = jsonData[0] as string[]
     console.log('Headers encontrados:', headers)
-    console.log(`Total de linhas: ${jsonData.length - 1}`)
+    console.log('Total de linhas:', jsonData.length - 1)
+    console.log('Primeiras linhas de exemplo:', jsonData.slice(0, 5))
+
+    // Mapear índices das colunas de forma mais inteligente
+    const getColumnIndex = (searchTerms: string[]) => {
+      return headers.findIndex(header => {
+        const headerLower = String(header || '').toLowerCase().trim()
+        return searchTerms.some(term => headerLower.includes(term.toLowerCase()))
+      })
+    }
+
+    const clienteIdx = getColumnIndex(['cliente', 'client', 'empresa', 'razao'])
+    const modalidadeIdx = getColumnIndex(['modalidade', 'modal'])
+    const especialidadeIdx = getColumnIndex(['especialidade', 'esp'])
+    const categoriaIdx = getColumnIndex(['categoria', 'cat'])
+    const prioridadeIdx = getColumnIndex(['prioridade', 'prior'])
+    const valorIdx = getColumnIndex(['valor', 'preco', 'price', 'vl'])
+
+    console.log('Índices encontrados:', {
+      cliente: clienteIdx,
+      modalidade: modalidadeIdx, 
+      especialidade: especialidadeIdx,
+      categoria: categoriaIdx,
+      prioridade: prioridadeIdx,
+      valor: valorIdx
+    })
 
     let registrosProcessados = 0
     let registrosErro = 0
@@ -100,34 +125,73 @@ serve(async (req) => {
             continue
           }
 
-          // Mapear campos do Excel de forma mais flexível
-          const cliente = String(row[0] || '').trim()
-          const modalidade = String(row[1] || '').trim()
-          const especialidade = String(row[2] || '').trim()
-          const categoria = String(row[3] || 'Normal').trim()
-          const prioridade = String(row[4] || 'Rotina').trim()
-          const valorStr = row[5] || row[6] || row[7] // Tentar várias colunas para o valor
+          // Mapear campos usando os índices encontrados
+          const cliente = String(row[clienteIdx >= 0 ? clienteIdx : 0] || '').trim()
+          const modalidade = String(row[modalidadeIdx >= 0 ? modalidadeIdx : 1] || '').trim()
+          const especialidade = String(row[especialidadeIdx >= 0 ? especialidadeIdx : 2] || '').trim()
+          const categoria = String(row[categoriaIdx >= 0 ? categoriaIdx : 3] || 'Normal').trim()
+          const prioridade = String(row[prioridadeIdx >= 0 ? prioridadeIdx : 4] || 'Rotina').trim()
+          
+          // Tentar várias colunas para o valor
+          let valorStr
+          if (valorIdx >= 0) {
+            valorStr = row[valorIdx]
+          } else {
+            // Fallback: tentar várias colunas
+            valorStr = row[5] || row[6] || row[7] || row[8] || row[9]
+          }
 
-          // Validações básicas
-          if (!cliente || !modalidade || !especialidade || !valorStr) {
-            erros.push(`Linha ${i + 1}: campos obrigatórios faltando`)
+          console.log(`Linha ${i + 1}: cliente="${cliente}", modalidade="${modalidade}", especialidade="${especialidade}", valor="${valorStr}"`)
+
+          // Validações básicas melhoradas
+          if (!cliente || cliente === 'undefined' || cliente.length < 2) {
+            erros.push(`Linha ${i + 1}: cliente inválido ou vazio - "${cliente}"`)
             registrosErro++
             continue
           }
 
-          // Converter valor
+          if (!modalidade || modalidade === 'undefined' || modalidade.length < 1) {
+            erros.push(`Linha ${i + 1}: modalidade inválida ou vazia - "${modalidade}"`)
+            registrosErro++
+            continue
+          }
+
+          if (!especialidade || especialidade === 'undefined' || especialidade.length < 1) {
+            erros.push(`Linha ${i + 1}: especialidade inválida ou vazia - "${especialidade}"`)
+            registrosErro++
+            continue
+          }
+
+          if (!valorStr || valorStr === 'undefined') {
+            erros.push(`Linha ${i + 1}: valor não encontrado`)
+            registrosErro++
+            continue
+          }
+
+          // Converter valor com mais robustez
           let valor: number
           if (typeof valorStr === 'number') {
             valor = valorStr
+          } else if (typeof valorStr === 'string') {
+            // Limpar string e converter
+            const valorLimpo = valorStr
+              .replace(/[R$\s]/g, '')  // Remove R$ e espaços
+              .replace(/\./g, '')      // Remove pontos de milhares
+              .replace(',', '.')       // Converte vírgula decimal para ponto
+              .trim()
+            
+            valor = parseFloat(valorLimpo)
           } else {
-            valor = parseFloat(String(valorStr).replace(/[R$\s]/g, '').replace(',', '.'))
+            valor = NaN
           }
           
           if (isNaN(valor) || valor <= 0) {
-            erros.push(`Linha ${i + 1}: valor inválido - ${valorStr}`)
+            erros.push(`Linha ${i + 1}: valor inválido - "${valorStr}" (convertido: ${valor})`)
             registrosErro++
             continue
           }
+
+          console.log(`Linha ${i + 1}: valor convertido ${valorStr} -> ${valor}`)
 
           batchData.push({
             cliente_nome: cliente,
