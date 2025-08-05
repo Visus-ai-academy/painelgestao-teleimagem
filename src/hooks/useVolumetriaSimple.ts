@@ -9,57 +9,27 @@ export const useVolumetriaSimple = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Buscando dados de volumetria...');
+      console.log('🔍 Buscando TODOS os dados de volumetria SEM LIMITAÇÃO...');
       
-      // Carregar todos os dados com paginação para garantir que não perca nenhum registro
-      let allData: any[] = [];
-      let offset = 0;
-      const limit = 50000; // Aumentado para volumes altos
-      let hasMoreData = true;
+      // CARREGAMENTO DIRETO SEM PAGINAÇÃO - TODOS OS DADOS
+      const { data: allData, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          "EMPRESA",
+          "MODALIDADE",
+          "ESPECIALIDADE", 
+          "PRIORIDADE",
+          "VALORES",
+          data_referencia
+        `);
+        // REMOVIDO COMPLETAMENTE: .range(), .order(), .limit() - SEM LIMITAÇÃO!
 
-      while (hasMoreData) {
-        console.log(`📦 Carregando lote offset ${offset}...`);
-        
-        const { data: batchData, error: batchError } = await supabase
-          .from('volumetria_mobilemed')
-          .select(`
-            "EMPRESA",
-            "MODALIDADE",
-            "ESPECIALIDADE", 
-            "PRIORIDADE",
-            "VALORES",
-            data_referencia
-          `)
-          .range(offset, offset + limit - 1)
-          .order('created_at', { ascending: true });
+      if (error) throw error;
 
-        if (batchError) throw batchError;
-
-        if (!batchData || batchData.length === 0) {
-          hasMoreData = false;
-          break;
-        }
-
-        allData = [...allData, ...batchData];
-        console.log(`✅ Lote carregado: ${batchData.length} registros, total acumulado: ${allData.length}`);
-        
-        if (batchData.length < limit) {
-          hasMoreData = false;
-        } else {
-          offset += limit;
-        }
-
-        // Limite de segurança para evitar loops infinitos
-        if (offset > 1000000) {
-          console.log('⚠️ Limite de segurança atingido - finalizando...');
-          hasMoreData = false;
-        }
-      }
-
-      console.log('✅ Dados de volumetria carregados:', allData.length);
-      console.log('📊 Total de valores:', allData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0));
+      console.log('✅ TODOS os dados de volumetria carregados SEM LIMITAÇÃO:', allData?.length || 0);
+      console.log('📊 Total de valores:', (allData || []).reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0));
       
-      setData(allData);
+      setData(allData || []);
     } catch (err: any) {
       console.error('❌ Erro ao carregar volumetria:', err);
       setError(err.message);

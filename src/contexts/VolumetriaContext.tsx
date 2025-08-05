@@ -115,9 +115,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🔄 Carregando estatísticas DEFINITIVAS da volumetria (SOMENTE dados que restaram no banco APÓS todas as exclusões físicas)...');
+      console.log('🔄 Carregando estatísticas DEFINITIVAS da volumetria (TODOS OS DADOS)...');
       
-      // Carregar dados de volumetria diretamente da tabela
+      // Carregar dados de volumetria diretamente da tabela SEM LIMITAÇÕES
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       const statsResult: any = {};
       
@@ -163,63 +163,41 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 DADOS FINAIS DE STATS:', statsResult);
 
-      // Carregar dados detalhados para análises
-      console.log('📋 Carregando dados detalhados para análises...');
+      // Carregar dados detalhados para análises - SEM LIMITAÇÕES DE FORMA ALGUMA
+      console.log('📋 Carregando TODOS os dados detalhados SEM QUALQUER LIMITAÇÃO...');
       let allDetailedData: any[] = [];
       
       try {
-        let offset = 0;
-        const limit = 50000;
-        let hasMoreData = true;
+        console.log('🚀 Executando query COMPLETA sem limitações...');
         
-        while (hasMoreData) {
-          console.log(`📦 Carregando dados detalhados offset ${offset}...`);
-          
-          const { data: detailedBatch, error: detailedError } = await supabase
-            .from('volumetria_mobilemed')
-            .select(`
-              "EMPRESA",
-              "MODALIDADE", 
-              "ESPECIALIDADE",
-              "MEDICO",
-              "PRIORIDADE",
-              "CATEGORIA",
-              "VALORES",
-              "DATA_LAUDO",
-              "HORA_LAUDO", 
-              "DATA_PRAZO",
-              "HORA_PRAZO",
-              data_referencia
-            `)
-            .range(offset, offset + limit - 1)
-            .order('created_at', { ascending: true });
+        const { data: detailedData, error: detailedError } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            "EMPRESA",
+            "MODALIDADE", 
+            "ESPECIALIDADE",
+            "MEDICO",
+            "PRIORIDADE",
+            "CATEGORIA",
+            "VALORES",
+            "DATA_LAUDO",
+            "HORA_LAUDO", 
+            "DATA_PRAZO",
+            "HORA_PRAZO",
+            data_referencia
+          `);
+          // REMOVIDO COMPLETAMENTE: .range(), .order(), .limit() - TUDO SEM LIMITAÇÃO!
 
-          if (detailedError) {
-            console.error('❌ Erro ao carregar dados detalhados:', detailedError);
-            break;
-          }
-
-          if (!detailedBatch || detailedBatch.length === 0) {
-            break;
-          }
-
-          allDetailedData = [...allDetailedData, ...detailedBatch];
-          console.log(`✅ Batch detalhado carregado: ${detailedBatch.length} registros, total: ${allDetailedData.length}`);
-          
-          if (detailedBatch.length < limit) {
-            hasMoreData = false;
-          } else {
-            offset += limit;
-          }
-
-          // Limite de segurança
-          if (offset > 1000000) {
-            console.log('⚠️ Limite de segurança atingido - finalizando carregamento detalhado...');
-            hasMoreData = false;
-          }
+        if (detailedError) {
+          console.error('❌ Erro ao carregar dados detalhados:', detailedError);
+          allDetailedData = [];
+        } else {
+          allDetailedData = detailedData || [];
+          console.log(`✅ TODOS os dados detalhados carregados SEM LIMITAÇÃO: ${allDetailedData.length} registros`);
         }
       } catch (error) {
-        console.warn('⚠️ Erro ao carregar dados detalhados:', error);
+        console.error('❌ Erro crítico ao carregar dados detalhados:', error);
+        allDetailedData = [];
       }
 
       // Processar listas únicas e estatísticas

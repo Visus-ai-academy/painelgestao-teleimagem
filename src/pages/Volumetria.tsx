@@ -114,7 +114,8 @@ export default function Volumetria() {
             Análise executiva completa de volumetria - 
             {stats.total_exames.toLocaleString()} laudos | 
             {stats.total_clientes} clientes cadastrados | 
-            {stats.total_clientes_volumetria} com dados{hasActiveFilters ? ' (filtrado)' : ''}
+            {stats.total_clientes_volumetria} com dados{hasActiveFilters ? ' (filtrado)' : ''} |
+            <span className="text-blue-600 font-medium"> Carregamento completo sem limitações</span>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -178,6 +179,7 @@ export default function Volumetria() {
                 clientes={[]}
                 modalidades={[]}
                 especialidades={[]}
+                categorias={[]}
                 prioridades={[]}
               />
             </TabsContent>
@@ -187,16 +189,24 @@ export default function Volumetria() {
                 medicos={[]}
                 modalidades={[]}
                 especialidades={[]}
+                categorias={[]}
+                prioridades={[]}
+                totalExames={stats.total_exames}
               />
             </TabsContent>
 
             <TabsContent value="delays" className="mt-6">
               <VolumetriaDelayAnalysis 
-                atrasoClientes={[]}
-                atrasoModalidades={[]}
-                atrasoEspecialidades={[]}
-                atrasoPrioridades={[]}
-                atrasosComTempo={[]}
+                data={{
+                  clientes: [],
+                  modalidades: [],
+                  especialidades: [],
+                  categorias: [],
+                  prioridades: [],
+                  totalAtrasados: stats.total_atrasados,
+                  percentualAtrasoGeral: stats.percentual_atraso,
+                  atrasosComTempo: []
+                }}
               />
             </TabsContent>
           </Tabs>
