@@ -83,68 +83,41 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       for (const tipo of tiposArquivo) {
         console.log(`📊 Carregando TODOS os dados para: ${tipo}`);
         
-        // SOLUÇÃO DEFINITIVA: Usar agregação manual completa sem limitações
-        const [countResult, valueCountResult] = await Promise.all([
-          // Total de registros usando count exato
-          supabase
+        // SOLUÇÃO DEFINITIVA: Usar a função RPC que retorna dados corretos
+        const { data: aggregateStats, error } = await supabase.rpc('get_volumetria_aggregated_stats');
+        
+        if (error) {
+          console.error(`❌ Erro na função RPC:`, error);
+          // Fallback para contagem manual se RPC falhar
+          const { count: totalRecordsCount } = await supabase
             .from('volumetria_mobilemed')
             .select('*', { count: 'exact', head: true })
-            .eq('arquivo_fonte', tipo),
-          
-          // Registros com valores > 0 usando count exato
-          supabase
-            .from('volumetria_mobilemed')
-            .select('*', { count: 'exact', head: true })
-            .eq('arquivo_fonte', tipo)
-            .gt('VALORES', 0)
-        ]);
-
-        const totalRecordsCount = countResult.count || 0;
-        const recordsWithValueCount = valueCountResult.count || 0;
-        const recordsZeroed = totalRecordsCount - recordsWithValueCount;
-        
-        // Carregar TODOS os valores em lotes grandes para calcular soma correta
-        let totalValue = 0;
-        let offset = 0;
-        const batchSize = 50000; // Lotes grandes para eficiência
-        
-        console.log(`📊 ${tipo}: Carregando ${totalRecordsCount} registros para soma...`);
-        
-        while (offset < totalRecordsCount) {
-          const { data: batch } = await supabase
-            .from('volumetria_mobilemed')
-            .select('VALORES')
-            .eq('arquivo_fonte', tipo)
-            .range(offset, offset + batchSize - 1);
+            .eq('arquivo_fonte', tipo);
             
-          if (!batch || batch.length === 0) {
-            console.log(`📦 ${tipo}: Nenhum dado no offset ${offset}, finalizando...`);
-            break;
+          statsResult[tipo] = {
+            totalRecords: totalRecordsCount || 0,
+            recordsWithValue: 0,
+            recordsZeroed: 0,
+            totalValue: 0
+          };
+        } else {
+          // Encontrar dados para este tipo específico
+          const tipoStats = aggregateStats?.find((stat: any) => stat.arquivo_fonte === tipo);
+          
+          if (tipoStats) {
+            statsResult[tipo] = {
+              totalRecords: Number(tipoStats.total_records),
+              recordsWithValue: Number(tipoStats.records_with_value),
+              recordsZeroed: Number(tipoStats.records_zeroed),
+              totalValue: Number(tipoStats.total_value)
+            };
+            
+            console.log(`✅ ${tipo} (via RPC): ${tipoStats.total_records} registros, ${tipoStats.records_with_value} com valores, ${tipoStats.records_zeroed} zerados, ${tipoStats.total_value} TOTAL EXAMES`);
+          } else {
+            console.log(`⚠️ ${tipo}: Não encontrado na função RPC`);
+            statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
           }
-          
-          const batchSum = batch.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0);
-          totalValue += batchSum;
-          offset += batch.length;
-          
-          console.log(`📦 ${tipo}: Lote de ${batch.length} registros, soma do lote: ${batchSum}, soma total: ${totalValue}, progresso: ${offset}/${totalRecordsCount}`);
-          
-          // Se carregou menos que o lote completo, terminou
-          if (batch.length < batchSize) break;
         }
-
-        console.log(`🔍 RESULTADO FINAL ${tipo}:`);
-        console.log(`- Total registros: ${totalRecordsCount}`);
-        console.log(`- Com valores: ${recordsWithValueCount}`);
-        console.log(`- Soma total: ${totalValue}`);
-
-        statsResult[tipo] = {
-          totalRecords: totalRecordsCount,
-          recordsWithValue: recordsWithValueCount,
-          recordsZeroed,
-          totalValue
-        };
-        
-        console.log(`✅ ${tipo}: ${totalRecordsCount} registros, ${recordsWithValueCount} com valores, ${recordsZeroed} zerados, ${totalValue} TOTAL EXAMES`);
       }
 
       console.log('📊 DADOS FINAIS DE STATS:', statsResult);
