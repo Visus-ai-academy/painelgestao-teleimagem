@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from "recharts";
 import { TrendingUp, TrendingDown, Award, AlertCircle, Users, Activity } from "lucide-react";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
 interface ClienteData {
   nome: string;
@@ -43,40 +44,102 @@ interface VolumetriaExecutiveSummaryProps {
 }
 
 export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryProps) {
-  // Top 5 clientes por volume
-  const topClientesVolume = data.clientes
+  // USAR DADOS DO CONTEXTO CENTRALIZADO EM VEZ DOS PROPS VAZIOS
+  const { data: volumetriaData } = useVolumetria();
+  
+  console.log('📊 [ExecutiveSummary] Dados do contexto:', volumetriaData.detailedData.length);
+  
+  // Processar dados dos clientes a partir do contexto
+  const clientesProcessados = volumetriaData.detailedData.reduce((acc: Record<string, any>, item) => {
+    const cliente = item.EMPRESA;
+    if (!cliente) return acc;
+    
+    if (!acc[cliente]) {
+      acc[cliente] = {
+        nome: cliente,
+        total_exames: 0,
+        total_registros: 0,
+        atrasados: 0,
+        percentual_atraso: 0
+      };
+    }
+    
+    acc[cliente].total_exames += Number(item.VALORES) || 0;
+    acc[cliente].total_registros += 1;
+    
+    // Calcular atrasos
+    if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
+      try {
+        const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+        const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+        if (dataLaudo > dataPrazo) {
+          acc[cliente].atrasados += 1;
+        }
+      } catch {}
+    }
+    
+    return acc;
+  }, {});
+  
+  // Calcular percentual de atraso para cada cliente
+  Object.values(clientesProcessados).forEach((cliente: any) => {
+    cliente.percentual_atraso = cliente.total_registros > 0 ? 
+      (cliente.atrasados / cliente.total_registros) * 100 : 0;
+  });
+  
+  const clientesArray = Object.values(clientesProcessados) as ClienteData[];
+  const topClientesVolume = clientesArray
     .sort((a, b) => b.total_exames - a.total_exames)
     .slice(0, 5);
 
   // Top 5 clientes por performance (menor atraso)
-  const topClientesPerformance = data.clientes
+  const topClientesPerformance = clientesArray
     .filter(c => c.total_exames > 100) // Somente clientes com volume significativo
     .sort((a, b) => a.percentual_atraso - b.percentual_atraso)
     .slice(0, 5);
 
   // Análise de concentração de volume
-  const volumeConcentration = data.clientes.reduce((acc, cliente, index) => {
-    const participacao = (cliente.total_exames / data.stats.total_exames) * 100;
+  const volumeConcentration = clientesArray.reduce((acc, cliente, index) => {
+    const participacao = (cliente.total_exames / volumetriaData.dashboardStats.total_exames) * 100;
     if (index < 5) acc.top5 += participacao;
     if (index < 10) acc.top10 += participacao;
     if (index < 20) acc.top20 += participacao;
     return acc;
   }, { top5: 0, top10: 0, top20: 0 });
 
-  // Distribuição por modalidade
-  const modalidadeDistribution = data.modalidades
-    .sort((a, b) => b.total_exames - a.total_exames)
+  // Processar modalidades do contexto 
+  const modalidadesProcessadas = volumetriaData.detailedData.reduce((acc: Record<string, any>, item) => {
+    const modalidade = item.MODALIDADE;
+    if (!modalidade) return acc;
+    
+    if (!acc[modalidade]) {
+      acc[modalidade] = {
+        nome: modalidade,
+        total_exames: 0,
+        total_registros: 0,
+        percentual: 0
+      };
+    }
+    
+    acc[modalidade].total_exames += Number(item.VALORES) || 0;
+    acc[modalidade].total_registros += 1;
+    
+    return acc;
+  }, {});
+
+  const modalidadeDistribution = Object.values(modalidadesProcessadas)
+    .sort((a: any, b: any) => b.total_exames - a.total_exames)
     .slice(0, 8)
-    .map(m => ({
+    .map((m: any) => ({
       ...m,
-      participacao: ((m.total_exames / data.stats.total_exames) * 100).toFixed(1)
+      participacao: ((m.total_exames / volumetriaData.dashboardStats.total_exames) * 100).toFixed(1)
     }));
 
   // Análise de performance geral
   const performanceLevel = 
-    data.stats.percentual_atraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
-    data.stats.percentual_atraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
-    data.stats.percentual_atraso <= 15 ? { label: 'Regular', color: 'text-yellow-600', bgColor: 'bg-yellow-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 15 ? { label: 'Regular', color: 'text-yellow-600', bgColor: 'bg-yellow-100' } :
     { label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-100' };
 
   return (
@@ -88,7 +151,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Volume Total</p>
-                <p className="text-2xl font-bold text-primary">{data.stats.total_exames.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-primary">{volumetriaData.dashboardStats.total_exames.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">Laudos processados</p>
               </div>
               <Activity className="h-8 w-8 text-primary" />
@@ -102,14 +165,14 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
               <div>
                 <p className="text-sm text-muted-foreground">Performance</p>
                 <p className={`text-2xl font-bold ${performanceLevel.color}`}>
-                  {data.stats.percentual_atraso.toFixed(1)}%
+                  {volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%
                 </p>
                 <Badge className={`text-xs ${performanceLevel.bgColor} ${performanceLevel.color}`}>
                   {performanceLevel.label}
                 </Badge>
               </div>
-              {data.stats.percentual_atraso <= 10 ? 
-                <TrendingUp className="h-8 w-8 text-green-500" /> : 
+              {volumetriaData.dashboardStats.percentual_atraso <= 10 ? 
+                <TrendingUp className="h-8 w-8 text-green-500" /> :
                 <TrendingDown className="h-8 w-8 text-red-500" />
               }
             </div>
@@ -121,7 +184,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Base de Clientes</p>
-                <p className="text-2xl font-bold text-green-600">{data.stats.total_clientes}</p>
+                <p className="text-2xl font-bold text-green-600">{volumetriaData.dashboardStats.total_clientes}</p>
                 <p className="text-xs text-muted-foreground">Clientes ativos</p>
               </div>
               <Users className="h-8 w-8 text-green-500" />
@@ -134,7 +197,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Diversificação</p>
-                <p className="text-2xl font-bold text-blue-600">{data.stats.total_modalidades}</p>
+                <p className="text-2xl font-bold text-blue-600">{volumetriaData.dashboardStats.total_modalidades}</p>
                 <p className="text-xs text-muted-foreground">Modalidades ativas</p>
               </div>
               <Award className="h-8 w-8 text-blue-500" />
@@ -179,11 +242,11 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
 
             <div className="col-span-2">
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={data.clientes.slice(0, 20).map((c, i) => ({
+                <AreaChart data={clientesArray.slice(0, 20).map((c, i) => ({
                   posicao: i + 1,
-                  participacao: (c.total_exames / data.stats.total_exames) * 100,
-                  acumulado: data.clientes.slice(0, i + 1).reduce((acc, client) => 
-                    acc + (client.total_exames / data.stats.total_exames) * 100, 0)
+                  participacao: (c.total_exames / volumetriaData.dashboardStats.total_exames) * 100,
+                  acumulado: clientesArray.slice(0, i + 1).reduce((acc, client) => 
+                    acc + (client.total_exames / volumetriaData.dashboardStats.total_exames) * 100, 0)
                 }))}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="posicao" />
@@ -243,7 +306,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
                         <div>
                           <div className="font-medium">{cliente.nome}</div>
                           <div className="text-sm text-muted-foreground">
-                            {((cliente.total_exames / data.stats.total_exames) * 100).toFixed(1)}% do volume total
+                            {((cliente.total_exames / volumetriaData.dashboardStats.total_exames) * 100).toFixed(1)}% do volume total
                           </div>
                         </div>
                       </div>

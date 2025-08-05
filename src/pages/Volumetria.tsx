@@ -25,6 +25,28 @@ interface VolumetriaFilters {
   medico: string;
 }
 
+interface ClienteData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  atrasados: number;
+  percentual_atraso: number;
+}
+
+interface ModalidadeData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  percentual?: number;
+}
+
+interface EspecialidadeData {
+  nome: string;
+  total_exames: number;
+  total_registros: number;
+  percentual?: number;
+}
+
 // Função para obter filtros padrão - SEM FILTRO DE DATA
 const getDefaultFilters = (): VolumetriaFilters => {
   return {
@@ -47,6 +69,15 @@ export default function Volumetria() {
   
   // Usar apenas dados do contexto centralizado
   const { data: contextData, refreshData, getFilteredData } = useVolumetria();
+  
+  // Logs de debug para identificar inconsistências
+  console.log('🔥 [Volumetria] Dados completos do contexto:', contextData);
+  console.log('📊 [Volumetria] Detalhes:', { 
+    totalRegistros: contextData.detailedData?.length, 
+    loading: contextData.loading,
+    totalExames: contextData.dashboardStats.total_exames
+  });
+  console.log('📊 [Volumetria] Stats detalhadas:', contextData.stats);
   
   // Verificar se há filtros ativos
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
@@ -93,6 +124,62 @@ export default function Volumetria() {
   
   const loading = contextData.loading;
   const hasNoData = stats.total_exames === 0;
+  
+  // Processar dados agregados para os componentes
+  const clientesArray = Object.values(currentData.reduce((acc: Record<string, ClienteData>, item) => {
+    const cliente = item.EMPRESA;
+    if (!cliente) return acc;
+    if (!acc[cliente]) {
+      acc[cliente] = { nome: cliente, total_exames: 0, total_registros: 0, atrasados: 0, percentual_atraso: 0 };
+    }
+    acc[cliente].total_exames += Number(item.VALORES) || 0;
+    acc[cliente].total_registros += 1;
+    return acc;
+  }, {})) as ClienteData[];
+  
+  const modalidadesArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
+    const modalidade = item.MODALIDADE;
+    if (!modalidade) return acc;
+    if (!acc[modalidade]) {
+      acc[modalidade] = { nome: modalidade, total_exames: 0, total_registros: 0 };
+    }
+    acc[modalidade].total_exames += Number(item.VALORES) || 0;
+    acc[modalidade].total_registros += 1;
+    return acc;
+  }, {})) as ModalidadeData[];
+  
+  const especialidadesArray = Object.values(currentData.reduce((acc: Record<string, EspecialidadeData>, item) => {
+    const especialidade = item.ESPECIALIDADE;
+    if (!especialidade) return acc;
+    if (!acc[especialidade]) {
+      acc[especialidade] = { nome: especialidade, total_exames: 0, total_registros: 0 };
+    }
+    acc[especialidade].total_exames += Number(item.VALORES) || 0;
+    acc[especialidade].total_registros += 1;
+    return acc;
+  }, {})) as EspecialidadeData[];
+  
+  const categoriasArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
+    const categoria = item.CATEGORIA;
+    if (!categoria) return acc;
+    if (!acc[categoria]) {
+      acc[categoria] = { nome: categoria, total_exames: 0, total_registros: 0 };
+    }
+    acc[categoria].total_exames += Number(item.VALORES) || 0;
+    acc[categoria].total_registros += 1;
+    return acc;
+  }, {})) as ModalidadeData[];
+  
+  const prioridadesArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
+    const prioridade = item.PRIORIDADE;
+    if (!prioridade) return acc;
+    if (!acc[prioridade]) {
+      acc[prioridade] = { nome: prioridade, total_exames: 0, total_registros: 0 };
+    }
+    acc[prioridade].total_exames += Number(item.VALORES) || 0;
+    acc[prioridade].total_registros += 1;
+    return acc;
+  }, {})) as ModalidadeData[];
 
   if (loading) {
     return (
@@ -167,20 +254,20 @@ export default function Volumetria() {
               <VolumetriaExecutiveSummary 
                 data={{
                   stats,
-                  clientes: [], // Será processado internamente no componente
-                  modalidades: [], // Será processado internamente no componente
-                  especialidades: [] // Será processado internamente no componente
+                  clientes: [], // Processado internamente no componente usando contexto
+                  modalidades: [], // Processado internamente no componente usando contexto
+                  especialidades: [] // Processado internamente no componente usando contexto
                 }}
               />
             </TabsContent>
 
             <TabsContent value="charts" className="mt-6">
               <VolumetriaCharts 
-                clientes={[]}
-                modalidades={[]}
-                especialidades={[]}
-                categorias={[]}
-                prioridades={[]}
+                clientes={clientesArray as any}
+                modalidades={modalidadesArray as any}
+                especialidades={especialidadesArray as any}
+                categorias={categoriasArray as any}
+                prioridades={prioridadesArray as any}
               />
             </TabsContent>
 

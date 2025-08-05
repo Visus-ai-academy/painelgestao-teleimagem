@@ -19,15 +19,11 @@ export function VolumetriaExamesNaoIdentificados() {
   const { data } = useVolumetria();
 
   useEffect(() => {
-    loadExamesNaoIdentificados();
-  }, []);
-
-  // Atualizar automaticamente quando houver mudanças no contexto de volumetria
-  useEffect(() => {
-    if (data) {
+    // Só carregar quando dados estiverem disponíveis no contexto
+    if (!data.loading && data.detailedData.length > 0) {
       loadExamesNaoIdentificados();
     }
-  }, [data]);
+  }, [data.loading, data.detailedData]);
 
   // Função para limpar termos X1-X9 e XE
   const limparTermosX = (estudo: string): string => {
@@ -37,19 +33,28 @@ export function VolumetriaExamesNaoIdentificados() {
 
   const loadExamesNaoIdentificados = async () => {
     try {
-      // Buscar TODOS os exames zerados (sem limitação)
-      const { data: volumetriaData, error: volumetriaError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('ESTUDO_DESCRICAO, MODALIDADE, EMPRESA, arquivo_fonte')
-        .or('VALORES.eq.0,VALORES.is.null');
+      // USAR DADOS DO CONTEXTO CENTRALIZADO EM VEZ DE QUERY DIRETA
+      const volumetriaDataCompleta = data.detailedData;
+      
+      if (!volumetriaDataCompleta || volumetriaDataCompleta.length === 0) {
+        console.log('📊 Aguardando dados do contexto centralizado...');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('📊 USANDO DADOS COMPLETOS DO CONTEXTO:', volumetriaDataCompleta.length, 'registros');
+      
+      // Filtrar apenas registros zerados usando dados completos do contexto
+      const volumetriaData = volumetriaDataCompleta.filter(item => 
+        item.VALORES === 0 || item.VALORES === null || item.VALORES === undefined
+      );
 
-      if (volumetriaError) throw volumetriaError;
-
-      // 2. Buscar estudos existentes no De Para (sem limitação)
+      // 2. Buscar estudos existentes no De Para (COM LIMITE EXPLÍCITO ALTO)
       const { data: deParaData, error: deParaError } = await supabase
         .from('valores_referencia_de_para')
         .select('estudo_descricao')
-        .eq('ativo', true);
+        .eq('ativo', true)
+        .limit(50000);
 
       if (deParaError) throw deParaError;
 
@@ -59,14 +64,7 @@ export function VolumetriaExamesNaoIdentificados() {
       ).filter(Boolean) || []);
 
       console.log('📋 Estudos no De Para (após limpeza X):', estudosNoDePara.size);
-      console.log('📋 Lista De Para:', Array.from(estudosNoDePara));
-      console.log('📊 Total registros volumetria zerados:', volumetriaData?.length || 0);
-
-      // Debug: listar os registros zerados
-      console.log('📊 Registros zerados:', volumetriaData?.map(item => ({
-        estudo: item.ESTUDO_DESCRICAO,
-        arquivo: item.arquivo_fonte
-      })));
+      console.log('📊 Total registros volumetria zerados (do contexto completo):', volumetriaData?.length || 0);
 
       // 3. Filtrar registros zerados que não estão no De Para
       const estudosNaoEncontrados = volumetriaData?.filter(item => {
@@ -82,8 +80,6 @@ export function VolumetriaExamesNaoIdentificados() {
         
         // Verificar se existe no De Para (após limpeza de ambos os lados)
         const naoEncontrado = !estudosNoDePara.has(estudoLimpo);
-        
-        console.log(`🔍 Verificando "${estudoOriginal}" -> "${estudoLimpo}": ${naoEncontrado ? 'NÃO ENCONTRADO' : 'ENCONTRADO'} no De Para`);
         
         return naoEncontrado;
       }) || [];
