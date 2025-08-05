@@ -92,6 +92,18 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTAS DIRETAS
   const { data: volumetriaData } = useVolumetria();
   
+  // GARANTIR QUE OS DADOS SEMPRE SEJAM ARRAYS VÁLIDOS
+  const safeData = {
+    clientes: data.clientes || [],
+    modalidades: data.modalidades || [],
+    especialidades: data.especialidades || [],
+    categorias: data.categorias || [],
+    prioridades: data.prioridades || [],
+    totalAtrasados: data.totalAtrasados || 0,
+    percentualAtrasoGeral: data.percentualAtrasoGeral || 0,
+    atrasosComTempo: data.atrasosComTempo || []
+  };
+  
   // Estado para controle de ordenação
   const [sortField, setSortField] = useState<'nome' | 'total_exames' | 'atrasados' | 'percentual_atraso' | 'tempoMedioAtraso'>('atrasados');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -244,11 +256,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   };
 
   // Calcular tempo médio de atraso por cliente
-  const clientesComTempoAtraso = data.clientes
+  const clientesComTempoAtraso = safeData.clientes
     .filter(c => c.atrasados > 0)
     .map(cliente => {
-      const atrasosCliente = data.atrasosComTempo?.filter(atraso => atraso.EMPRESA === cliente.nome) || [];
-      const tempoMedioAtraso = atrasosCliente.length > 0 
+      const atrasosCliente = safeData.atrasosComTempo?.filter(atraso => atraso.EMPRESA === cliente.nome) || [];
+      const tempoMedioAtraso = atrasosCliente.length > 0
         ? atrasosCliente.reduce((sum, atraso) => sum + atraso.tempoAtrasoMinutos, 0) / atrasosCliente.length 
         : 0;
       
@@ -288,21 +300,21 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   };
 
   // Top 5 modalidades com mais atrasos
-  const topDelayModalidades = data.modalidades
+  const topDelayModalidades = safeData.modalidades
     .filter(m => m.atrasados > 0)
     .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
     .slice(0, 5);
 
   // Top 5 especialidades com mais atrasos
-  const topDelayEspecialidades = data.especialidades
+  const topDelayEspecialidades = safeData.especialidades
     .filter(e => e.atrasados > 0)
     .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
     .slice(0, 5);
 
   // Segmentação por tempo de atraso
-  const clienteSegments = createDelaySegments(data.clientes);
-  const modalidadeSegments = createDelaySegments(data.modalidades);
-  const timeDelaySegments = createTimeDelaySegments(data.atrasosComTempo);
+  const clienteSegments = createDelaySegments(safeData.clientes);
+  const modalidadeSegments = createDelaySegments(safeData.modalidades);
+  const timeDelaySegments = createTimeDelaySegments(safeData.atrasosComTempo);
 
   return (
     <div className="space-y-6">
@@ -315,12 +327,12 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert className={`${data.percentualAtrasoGeral >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
+          <Alert className={`${safeData.percentualAtrasoGeral >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
             <Clock className="h-4 w-4" />
             <AlertDescription>
-              <strong>{data.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
-              ({data.totalAtrasados.toLocaleString()} de {(data.totalAtrasados / (data.percentualAtrasoGeral/100)).toLocaleString()} laudos)
-              {data.percentualAtrasoGeral >= 15 && (
+              <strong>{safeData.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
+              ({safeData.totalAtrasados.toLocaleString()} de {(safeData.totalAtrasados / (safeData.percentualAtrasoGeral/100)).toLocaleString()} laudos)
+              {safeData.percentualAtrasoGeral >= 15 && (
                 <span className="block mt-2 text-red-600 font-medium">
                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
                 </span>
@@ -330,15 +342,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-3xl font-bold text-red-600">{data.totalAtrasados.toLocaleString()}</div>
+              <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{data.clientes.filter(c => c.atrasados > 0).length}</div>
+              <div className="text-2xl font-bold text-orange-600">{safeData.clientes.filter(c => c.atrasados > 0).length}</div>
               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{data.percentualAtrasoGeral.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-yellow-600">{safeData.percentualAtrasoGeral.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">Taxa Geral de Atraso</div>
             </div>
           </div>
