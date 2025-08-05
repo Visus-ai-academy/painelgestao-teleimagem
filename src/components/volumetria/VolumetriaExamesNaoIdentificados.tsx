@@ -130,10 +130,21 @@ export function VolumetriaExamesNaoIdentificados() {
       });
 
       const examesArray = Object.values(agrupados).sort((a, b) => b.quantidade - a.quantidade);
+      
+      console.log('🔍 ANÁLISE DETALHADA DOS 73 TIPOS:');
       console.log('🔍 Total de tipos únicos de exames zerados:', examesArray.length);
-      console.log('🔍 Exames que ESTÃO no De Para:', examesArray.filter(e => e.temNoDePara).length);
-      console.log('🔍 Exames que NÃO estão no De Para:', examesArray.filter(e => !e.temNoDePara && !e.temNasRegras).length);
-      console.log('🔍 Exames que estão nas Regras de Quebra:', examesArray.filter(e => e.temNasRegras).length);
+      
+      const naoIdentificados = examesArray.filter(e => !e.temNoDePara && !e.temNasRegras);
+      const noDePara = examesArray.filter(e => e.temNoDePara);
+      const nasRegras = examesArray.filter(e => e.temNasRegras);
+      
+      console.log('🔍 CLASSIFICAÇÃO:');
+      console.log('  📋 Exames que ESTÃO no De Para:', noDePara.length);
+      console.log('  📋 Lista dos que estão no De Para:', noDePara.map(e => `${e.estudo_descricao} (${e.quantidade})`));
+      console.log('  🔧 Exames que estão nas Regras de Quebra:', nasRegras.length);
+      console.log('  🔧 Lista dos que estão nas regras:', nasRegras.map(e => `${e.estudo_descricao} (${e.quantidade})`));
+      console.log('  ❌ Exames NÃO identificados:', naoIdentificados.length);
+      console.log('  ❌ Lista dos não identificados:', naoIdentificados.map(e => `${e.estudo_descricao} (${e.quantidade})`));
       
       setExamesNaoIdentificados(examesArray);
     } catch (error) {
