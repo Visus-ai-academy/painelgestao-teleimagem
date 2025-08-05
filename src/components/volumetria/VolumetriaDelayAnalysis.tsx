@@ -377,33 +377,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
                <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
              </div>
-             <div className="text-center">
-               <div className="text-2xl font-bold text-orange-600">{(() => {
-                 const clientesComAtrasos = safeData.clientes.filter(c => c.atrasados > 0).length;
-                 
-                 // VERIFICAR SOMATÓRIO DOS ATRASOS DOS CLIENTES
-                 const totalAtrasadosClientes = safeData.clientes.reduce((sum, c) => sum + c.atrasados, 0);
-                 const totalExamesClientes = safeData.clientes.reduce((sum, c) => sum + c.total_exames, 0);
-                 
-                 console.log('🚨 [INCONSISTÊNCIA] VERIFICAÇÃO DETALHADA DOS SOMATÓRIOS:');
-                 console.log('📊 Dashboard Stats - Total geral de atrasos:', safeData.totalAtrasados.toLocaleString());
-                 console.log('📊 Soma manual dos atrasos dos clientes:', totalAtrasadosClientes.toLocaleString());
-                 console.log('📊 Dashboard Stats - Total geral de exames:', processedData.totalExames.toLocaleString());
-                 console.log('📊 Soma manual dos exames dos clientes:', totalExamesClientes.toLocaleString());
-                 console.log('📊 DIFERENÇA CRÍTICA nos atrasos:', (safeData.totalAtrasados - totalAtrasadosClientes).toLocaleString());
-                 console.log('📊 DIFERENÇA CRÍTICA nos exames:', (processedData.totalExames - totalExamesClientes).toLocaleString());
-                 console.log('📊 Percentual da diferença atrasos:', ((safeData.totalAtrasados - totalAtrasadosClientes) / safeData.totalAtrasados * 100).toFixed(2) + '%');
-                 console.log('📊 Top 10 clientes com mais atrasos:', safeData.clientes.slice(0, 10).map(c => ({ 
-                   nome: c.nome, 
-                   total_exames: c.total_exames.toLocaleString(), 
-                   atrasados: c.atrasados.toLocaleString(),
-                   percentual: c.percentual_atraso.toFixed(1) + '%'
-                 })));
-                 
-                 return clientesComAtrasos;
-               })()}</div>
-               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
-             </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{safeData.clientes.filter(c => c.atrasados > 0).length}</div>
+                <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
+              </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{safeData.percentualAtrasoGeral.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">Taxa Geral de Atraso</div>
