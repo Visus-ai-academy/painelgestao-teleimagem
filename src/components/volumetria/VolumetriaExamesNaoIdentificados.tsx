@@ -11,6 +11,8 @@ interface ExameNaoIdentificado {
   estudo_descricao: string;
   quantidade: number;
   arquivo_fonte: string;
+  temNoDePara?: boolean;
+  temNasRegras?: boolean;
 }
 
 export function VolumetriaExamesNaoIdentificados() {
@@ -78,69 +80,16 @@ export function VolumetriaExamesNaoIdentificados() {
       console.log('📊 Total registros volumetria zerados (do contexto completo):', volumetriaData?.length || 0);
       console.log('📊 Estudos únicos zerados:', new Set(volumetriaData?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
 
-      // 3. Filtrar registros zerados que não estão no De Para
-      const estudosNaoEncontrados = volumetriaData?.filter(item => {
-        // Se ESTUDO_DESCRICAO é NULL ou vazio, incluir sempre
-        if (!item.ESTUDO_DESCRICAO?.trim()) {
-          console.log(`🚨 ESTUDO_DESCRICAO vazio/nulo no arquivo: ${item.arquivo_fonte || 'arquivo_fonte_indefinido'}`);
-          console.log(`🚨 Dados do registro problemático:`, {
-            id: item.id,
-            arquivo_fonte: item.arquivo_fonte,
-            EMPRESA: item.EMPRESA,
-            MODALIDADE: item.MODALIDADE,
-            ESPECIALIDADE: item.ESPECIALIDADE,
-            VALORES: item.VALORES
-          });
-          return true;
-        }
-        
-        // Normalizar e limpar termos X para comparação
-        const estudoOriginal = item.ESTUDO_DESCRICAO.toUpperCase().trim();
-        const estudoLimpo = limparTermosX(estudoOriginal);
-        
-        // Verificar se existe no De Para (após limpeza de ambos os lados)
-        const naoEncontrado = !estudosNoDePara.has(estudoLimpo);
-        
-        return naoEncontrado;
-      }) || [];
-
-      console.log('🔍 Total de exames zerados:', volumetriaData?.length);
-      console.log('🔍 Exames não encontrados no De Para:', estudosNaoEncontrados.length);
-      console.log('🔍 Estudos únicos não encontrados:', new Set(estudosNaoEncontrados?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
-
-      // 4. Verificar se algum dos estudos não encontrados existe nas regras de quebra
+      // Buscar regras de quebra para classificação
       const { data: regrasQuebra } = await supabase
         .from('regras_quebra_exames')
         .select('exame_original, exame_quebrado')
         .eq('ativo', true);
 
-      // Filtrar estudos que realmente não estão identificados
-      const estudosRealmenteNaoIdentificados = estudosNaoEncontrados.filter(item => {
-        const nomeEstudo = item.ESTUDO_DESCRICAO;
-        const nomeEstudoLimpo = limparTermosX(nomeEstudo?.toUpperCase().trim() || '');
-        
-        // Verificar se o exame existe nas regras de quebra (aplicando limpeza também)
-        const existeNasRegras = regrasQuebra?.some(regra => {
-          const originalLimpo = limparTermosX(regra.exame_original?.toUpperCase().trim() || '');
-          const quebradoLimpo = limparTermosX(regra.exame_quebrado?.toUpperCase().trim() || '');
-          return originalLimpo === nomeEstudoLimpo || quebradoLimpo === nomeEstudoLimpo;
-        });
-        
-        if (existeNasRegras) {
-          console.log(`⚠️ Exame "${nomeEstudo}" (limpo: "${nomeEstudoLimpo}") encontrado nas regras de quebra, mas não processado corretamente`);
-        }
-        
-        return !existeNasRegras; // Só incluir se NÃO está nas regras
-      });
-
-      console.log('🔍 Exames realmente não identificados:', estudosRealmenteNaoIdentificados.length);
-      console.log('🔍 Estudos únicos realmente não identificados:', new Set(estudosRealmenteNaoIdentificados?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
-
-      // 5. Agrupar por nome do estudo e arquivo fonte
-      const agrupados: Record<string, ExameNaoIdentificado> = {};
+      // Agrupar TODOS os registros zerados por nome do estudo e arquivo fonte
+      const agrupados: Record<string, ExameNaoIdentificado & { temNoDePara: boolean; temNasRegras: boolean }> = {};
       
-      estudosRealmenteNaoIdentificados.forEach((item) => {
-        // Usar apenas ESTUDO_DESCRICAO - se for NULL, indica problema no processamento
+      volumetriaData.forEach((item) => {
         let nomeEstudo;
         let arquivoFonte = item.arquivo_fonte || 'Arquivo não identificado';
         
@@ -154,18 +103,36 @@ export function VolumetriaExamesNaoIdentificados() {
         
         const key = `${nomeEstudo}_${arquivoFonte}`;
         
+        // Verificar se está no De Para
+        const estudoLimpo = limparTermosX(nomeEstudo?.toUpperCase().trim() || '');
+        const temNoDePara = estudosNoDePara.has(estudoLimpo);
+        
+        // Verificar se está nas regras de quebra
+        const temNasRegras = regrasQuebra?.some(regra => {
+          const originalLimpo = limparTermosX(regra.exame_original?.toUpperCase().trim() || '');
+          const quebradoLimpo = limparTermosX(regra.exame_quebrado?.toUpperCase().trim() || '');
+          return originalLimpo === estudoLimpo || quebradoLimpo === estudoLimpo;
+        }) || false;
+        
         if (agrupados[key]) {
           agrupados[key].quantidade += 1;
         } else {
           agrupados[key] = {
             estudo_descricao: nomeEstudo,
             arquivo_fonte: arquivoFonte,
-            quantidade: 1
+            quantidade: 1,
+            temNoDePara,
+            temNasRegras
           };
         }
       });
 
       const examesArray = Object.values(agrupados).sort((a, b) => b.quantidade - a.quantidade);
+      console.log('🔍 Total de tipos únicos de exames zerados:', examesArray.length);
+      console.log('🔍 Exames que ESTÃO no De Para:', examesArray.filter(e => e.temNoDePara).length);
+      console.log('🔍 Exames que NÃO estão no De Para:', examesArray.filter(e => !e.temNoDePara && !e.temNasRegras).length);
+      console.log('🔍 Exames que estão nas Regras de Quebra:', examesArray.filter(e => e.temNasRegras).length);
+      
       setExamesNaoIdentificados(examesArray);
     } catch (error) {
       console.error('Erro ao carregar exames não identificados:', error);
@@ -230,10 +197,10 @@ export function VolumetriaExamesNaoIdentificados() {
           <div>
             <CardTitle className="flex items-center gap-2 text-orange-600">
               <AlertTriangle className="h-5 w-5" />
-              Exames Não Identificados - Fora do Padrão
+              Todos os Exames Zerados - Análise Completa
             </CardTitle>
             <div className="text-sm text-muted-foreground mt-1">
-              Total de {totalExamesNaoIdentificados} exames zerados não encontrados na tabela "De Para"
+              Total de {totalExamesNaoIdentificados} exames zerados de {examesNaoIdentificados.length} tipos únicos
             </div>
           </div>
           <Button 
@@ -252,8 +219,17 @@ export function VolumetriaExamesNaoIdentificados() {
           {examesNaoIdentificados.map((exame, index) => (
             <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div className="flex-1">
-                <div className="font-medium text-sm">
+                <div className="font-medium text-sm flex items-center gap-2">
                   {exame.estudo_descricao || '(Sem descrição do estudo)'}
+                  {exame.temNoDePara && (
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Na tabela De Para</span>
+                  )}
+                  {exame.temNasRegras && (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Nas Regras de Quebra</span>
+                  )}
+                  {!exame.temNoDePara && !exame.temNasRegras && (
+                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Não identificado</span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Arquivo: {exame.arquivo_fonte}
@@ -270,8 +246,9 @@ export function VolumetriaExamesNaoIdentificados() {
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-orange-800 dark:text-orange-200">
-              <strong>Ação necessária:</strong> Adicione estes tipos de exames na tabela "De Para" 
-              para que possam receber valores corretos nos próximos uploads.
+              <strong>Análise:</strong> Esta lista mostra TODOS os exames zerados. Os que estão "Na tabela De Para" 
+              deveriam ter recebido valores, mas não receberam - isso indica problema na aplicação do De Para. 
+              Os "Não identificados" precisam ser adicionados na tabela De Para.
             </div>
           </div>
         </div>
