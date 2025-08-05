@@ -63,21 +63,36 @@ serve(async (req) => {
     let registrosErro = 0
     const erros: string[] = []
 
-    // 3. Processar dados linha por linha (método simples)
-    for (let i = 1; i < Math.min(jsonData.length, 101); i++) { // Processar apenas 100 primeiras linhas para teste
+    // 3. Processar dados linha por linha (limitado para evitar timeout)
+    const maxLinhas = Math.min(jsonData.length, 51); // Processar máximo 50 linhas por vez
+    
+    for (let i = 1; i < maxLinhas; i++) {
       try {
         const row = jsonData[i] as any[]
         
-        if (!row || row.length < 3) {
-          console.log(`⚠️ Linha ${i}: dados insuficientes`)
+        if (!row || row.length < 4) {
+          console.log(`⚠️ Linha ${i}: dados insuficientes - ${row ? row.length : 0} colunas`)
           continue
         }
 
-        // Mapear campos de forma direta (assumindo ordem padrão)
+        // Mapear campos assumindo ordem: Cliente, Modalidade, Especialidade, Valor
         const cliente = String(row[0] || '').trim()
-        const modalidade = String(row[1] || '').trim()
+        const modalidade = String(row[1] || '').trim() 
         const especialidade = String(row[2] || '').trim()
-        const valor = parseFloat(String(row[3] || row[4] || row[5] || '0').replace(/[^\d,.-]/g, '').replace(',', '.'))
+        
+        // Melhor parsing do valor - buscar em múltiplas colunas
+        let valorStr = ''
+        for (let col = 3; col < Math.min(row.length, 10); col++) {
+          const cellValue = String(row[col] || '').trim()
+          if (cellValue && cellValue !== '' && cellValue !== '0') {
+            valorStr = cellValue
+            break
+          }
+        }
+        
+        // Limpar e converter valor
+        const valorLimpo = valorStr.replace(/[R$\s]/g, '').replace(',', '.')
+        const valor = parseFloat(valorLimpo)
 
         console.log(`📝 Linha ${i}: "${cliente}" | "${modalidade}" | "${especialidade}" | ${valor}`)
 
