@@ -90,10 +90,37 @@ export function useVolumetriaProcessedData() {
         try {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-          if (dataLaudo > dataPrazo) {
+          const isAtrasado = dataLaudo > dataPrazo;
+          
+          // Log detalhado para debug
+          if (cliente === 'CEDI_RJ' && clienteData.total_registros < 5) {
+            console.log(`🔍 [${cliente}] Registro ${clienteData.total_registros + 1}:`, {
+              DATA_LAUDO: item.DATA_LAUDO,
+              HORA_LAUDO: item.HORA_LAUDO,
+              DATA_PRAZO: item.DATA_PRAZO,
+              HORA_PRAZO: item.HORA_PRAZO,
+              dataLaudo: dataLaudo.toISOString(),
+              dataPrazo: dataPrazo.toISOString(),
+              isAtrasado,
+              VALORES: item.VALORES
+            });
+          }
+          
+          if (isAtrasado) {
             clienteData.atrasados += Number(item.VALORES) || 0;
           }
-        } catch {}
+        } catch (error) {
+          // Log de erros de parsing de data
+          if (cliente === 'CEDI_RJ' && clienteData.total_registros < 5) {
+            console.log(`❌ [${cliente}] Erro ao processar data:`, {
+              DATA_LAUDO: item.DATA_LAUDO,
+              HORA_LAUDO: item.HORA_LAUDO,
+              DATA_PRAZO: item.DATA_PRAZO,
+              HORA_PRAZO: item.HORA_PRAZO,
+              error
+            });
+          }
+        }
       }
     });
     
@@ -297,12 +324,17 @@ export function useVolumetriaProcessedData() {
       totalRegistros: data.detailedData.length
     };
 
+    // Calcular total de atrasos para debug
+    const totalAtrasadosCalculado = result.clientes.reduce((sum, cliente) => sum + cliente.atrasados, 0);
+    
     console.log('✅ [useVolumetriaProcessedData] Dados processados:', {
       clientes: result.clientes.length,
       modalidades: result.modalidades.length,
       especialidades: result.especialidades.length,
       totalExames: result.totalExames,
-      totalRegistros: result.totalRegistros
+      totalRegistros: result.totalRegistros,
+      totalAtrasadosCalculado,
+      clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length
     });
 
     return result;
