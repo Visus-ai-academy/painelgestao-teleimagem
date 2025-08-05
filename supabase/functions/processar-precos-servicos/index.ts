@@ -7,6 +7,102 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função para processamento em background
+async function processarLotesBackground(
+  supabaseClient: any,
+  dadosRestantes: any[],
+  logId: string,
+  processedSoFar: number,
+  errorsSoFar: number
+) {
+  const LOTE_SIZE = 20
+  let registrosProcessados = processedSoFar
+  let registrosErro = errorsSoFar
+  const erros: string[] = []
+
+  console.log(`🔄 Processando ${dadosRestantes.length} registros em background...`)
+
+  for (let loteIndex = 0; loteIndex < dadosRestantes.length; loteIndex += LOTE_SIZE) {
+    const lote = dadosRestantes.slice(loteIndex, loteIndex + LOTE_SIZE)
+    
+    // Processar lote
+    for (const item of lote) {
+      try {
+        const { linha, cliente, modalidade, especialidade, valor } = item
+
+        // Buscar cliente no banco
+        const { data: clienteData, error: clienteError } = await supabaseClient
+          .from('clientes')
+          .select('id')
+          .ilike('nome', `%${cliente}%`)
+          .limit(1)
+          .single()
+
+        if (clienteError || !clienteData) {
+          erros.push(`Linha ${linha}: Cliente "${cliente}" não encontrado`)
+          registrosErro++
+          continue
+        }
+
+        // Inserir preço
+        const { error: insertError } = await supabaseClient
+          .from('precos_servicos')
+          .upsert({
+            cliente_id: clienteData.id,
+            modalidade: modalidade,
+            especialidade: especialidade,
+            categoria: 'Normal',
+            prioridade: 'Rotina',
+            valor: valor,
+            ativo: true
+          }, {
+            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
+          })
+
+        if (insertError) {
+          erros.push(`Linha ${linha}: Erro ao inserir - ${insertError.message}`)
+          registrosErro++
+          continue
+        }
+
+        registrosProcessados++
+
+      } catch (error) {
+        erros.push(`Linha ${item.linha}: ${error.message}`)
+        registrosErro++
+      }
+    }
+
+    // Log de progresso
+    console.log(`✅ Lote processado: ${registrosProcessados} sucessos, ${registrosErro} erros`)
+    
+    // Pequena pausa entre lotes para evitar sobrecarga
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // Atualizar contratos
+  console.log('🔄 Atualizando status dos contratos...')
+  try {
+    await supabaseClient.rpc('atualizar_status_configuracao_contrato')
+  } catch (error) {
+    console.error('❌ Erro ao atualizar contratos:', error.message)
+  }
+
+  // Finalizar log
+  const status = registrosErro > registrosProcessados ? 'failed' : 'success'
+  await supabaseClient
+    .from('upload_logs')
+    .update({
+      status: status,
+      records_processed: registrosProcessados,
+      error_count: registrosErro,
+      error_details: erros.slice(0, 10).join('; ')
+    })
+    .eq('id', logId)
+
+  console.log(`🎉 Processamento final: ${registrosProcessados} sucessos, ${registrosErro} erros`)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -59,14 +155,12 @@ serve(async (req) => {
     console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
     console.log(`🏷️ Headers: ${JSON.stringify(jsonData[0])}`)
 
-    let registrosProcessados = 0
-    let registrosErro = 0
-    const erros: string[] = []
+    // 3. Validar e preparar dados (processamento rápido)
+    const dadosValidados = []
+    const errosIniciais: string[] = []
+    const PRIMEIRAS_LINHAS = 15 // Processar apenas as primeiras 15 linhas de forma síncrona
 
-    // 3. Processar dados linha por linha (limitado para evitar timeout)
-    const maxLinhas = Math.min(jsonData.length, 51); // Processar máximo 50 linhas por vez
-    
-    for (let i = 1; i < maxLinhas; i++) {
+    for (let i = 1; i < Math.min(jsonData.length, PRIMEIRAS_LINHAS + 1); i++) {
       try {
         const row = jsonData[i] as any[]
         
@@ -84,7 +178,6 @@ serve(async (req) => {
         let valorStr = ''
         for (let col = 3; col < row.length; col++) {
           const cellValue = String(row[col] || '').trim()
-          // Procurar por números (com ou sem formatação)
           if (cellValue && /[\d,.]/.test(cellValue)) {
             valorStr = cellValue
             break
@@ -93,44 +186,102 @@ serve(async (req) => {
         
         // Se não encontrou valor, pular linha
         if (!valorStr) {
-          console.log(`⚠️ Linha ${i}: Valor não encontrado`)
-          registrosErro++
+          errosIniciais.push(`Linha ${i}: Valor não encontrado`)
           continue
         }
         
-        // Limpar valor: remover R$, espaços, manter apenas números, vírgula e ponto
+        // Limpar valor
         const valorLimpo = valorStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        // Converter vírgula para ponto se for o separador decimal
         const valorFinal = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
           valorLimpo.replace(',', '.') : valorLimpo
         const valor = parseFloat(valorFinal)
 
-        console.log(`📝 Linha ${i}: "${cliente}" | "${modalidade}" | "${especialidade}" | "${valorStr}" => ${valor}`)
-
         // Validar dados essenciais
         if (!cliente || cliente.length < 2) {
-          erros.push(`Linha ${i}: Cliente inválido - "${cliente}"`)
-          registrosErro++
+          errosIniciais.push(`Linha ${i}: Cliente inválido - "${cliente}"`)
           continue
         }
 
         if (!modalidade || modalidade.length < 1) {
-          erros.push(`Linha ${i}: Modalidade inválida - "${modalidade}"`)
-          registrosErro++
+          errosIniciais.push(`Linha ${i}: Modalidade inválida - "${modalidade}"`)
           continue
         }
 
         if (!especialidade || especialidade.length < 1) {
-          erros.push(`Linha ${i}: Especialidade inválida - "${especialidade}"`)
-          registrosErro++
+          errosIniciais.push(`Linha ${i}: Especialidade inválida - "${especialidade}"`)
           continue
         }
 
         if (isNaN(valor) || valor <= 0) {
-          erros.push(`Linha ${i}: Valor inválido - "${valorStr}" => ${valor}`)
-          registrosErro++
+          errosIniciais.push(`Linha ${i}: Valor inválido - "${valorStr}" => ${valor}`)
           continue
         }
+
+        dadosValidados.push({
+          linha: i,
+          cliente,
+          modalidade,
+          especialidade,
+          valor
+        })
+
+      } catch (error) {
+        errosIniciais.push(`Linha ${i}: ${error.message}`)
+      }
+    }
+
+    // 4. Preparar dados restantes para processamento em background
+    const dadosRestantes = []
+    for (let i = PRIMEIRAS_LINHAS + 1; i < jsonData.length; i++) {
+      try {
+        const row = jsonData[i] as any[]
+        
+        if (!row || row.length < 4) continue
+
+        const cliente = String(row[0] || '').trim()
+        const modalidade = String(row[1] || '').trim() 
+        const especialidade = String(row[2] || '').trim()
+        
+        let valorStr = ''
+        for (let col = 3; col < row.length; col++) {
+          const cellValue = String(row[col] || '').trim()
+          if (cellValue && /[\d,.]/.test(cellValue)) {
+            valorStr = cellValue
+            break
+          }
+        }
+        
+        if (!valorStr) continue
+        
+        const valorLimpo = valorStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        const valorFinal = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
+          valorLimpo.replace(',', '.') : valorLimpo
+        const valor = parseFloat(valorFinal)
+
+        if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(valor) || valor <= 0) {
+          continue
+        }
+
+        dadosRestantes.push({
+          linha: i,
+          cliente,
+          modalidade,
+          especialidade,
+          valor
+        })
+
+      } catch (error) {
+        console.log(`Erro preparando linha ${i}:`, error.message)
+      }
+    }
+
+    // 5. Processar primeiras linhas sincronamente
+    let registrosProcessados = 0
+    let registrosErro = errosIniciais.length
+
+    for (const item of dadosValidados) {
+      try {
+        const { linha, cliente, modalidade, especialidade, valor } = item
 
         // Buscar cliente no banco
         const { data: clienteData, error: clienteError } = await supabaseClient
@@ -141,7 +292,6 @@ serve(async (req) => {
           .single()
 
         if (clienteError || !clienteData) {
-          erros.push(`Linha ${i}: Cliente "${cliente}" não encontrado`)
           registrosErro++
           continue
         }
@@ -162,53 +312,55 @@ serve(async (req) => {
           })
 
         if (insertError) {
-          erros.push(`Linha ${i}: Erro ao inserir - ${insertError.message}`)
           registrosErro++
           continue
         }
 
         registrosProcessados++
-        
-        if (registrosProcessados % 10 === 0) {
-          console.log(`✅ Processados: ${registrosProcessados}, Erros: ${registrosErro}`)
-        }
 
       } catch (error) {
-        erros.push(`Linha ${i}: ${error.message}`)
         registrosErro++
       }
     }
 
-    // 4. Atualizar contratos
-    console.log('🔄 Atualizando status dos contratos...')
-    const { error: updateError } = await supabaseClient
-      .rpc('atualizar_status_configuracao_contrato')
-
-    if (updateError) {
-      console.error('❌ Erro ao atualizar contratos:', updateError.message)
+    // 6. Iniciar processamento em background para dados restantes
+    if (dadosRestantes.length > 0) {
+      console.log(`🚀 Iniciando processamento em background de ${dadosRestantes.length} registros...`)
+      
+      // Usar waitUntil para processamento em background
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(
+          processarLotesBackground(
+            supabaseClient,
+            dadosRestantes,
+            logEntry.id,
+            registrosProcessados,
+            registrosErro
+          )
+        )
+      } else {
+        // Fallback se EdgeRuntime não estiver disponível
+        processarLotesBackground(
+          supabaseClient,
+          dadosRestantes,
+          logEntry.id,
+          registrosProcessados,
+          registrosErro
+        ).catch(err => console.error('Erro no processamento background:', err))
+      }
     }
 
-    // 5. Finalizar log
-    const status = registrosErro > registrosProcessados ? 'failed' : 'success'
-    const { error: updateLogError } = await supabaseClient
-      .from('upload_logs')
-      .update({
-        status: status,
-        records_processed: registrosProcessados,
-        error_count: registrosErro,
-        error_details: erros.slice(0, 10).join('; ')
-      })
-      .eq('id', logEntry.id)
+    console.log(`✅ Processamento inicial: ${registrosProcessados} sucessos, ${registrosErro} erros`)
+    console.log(`🔄 ${dadosRestantes.length} registros sendo processados em background`)
 
-    console.log(`🎉 Processamento concluído: ${registrosProcessados} sucessos, ${registrosErro} erros`)
-
+    // 7. Retornar resposta imediata
     return new Response(
       JSON.stringify({
         success: true,
         registros_processados: registrosProcessados,
         registros_erro: registrosErro,
-        erros: erros.slice(0, 10),
-        mensagem: `Processados ${registrosProcessados} preços de serviços`
+        processamento_background: dadosRestantes.length,
+        mensagem: `${registrosProcessados} preços processados. ${dadosRestantes.length} sendo processados em background.`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
