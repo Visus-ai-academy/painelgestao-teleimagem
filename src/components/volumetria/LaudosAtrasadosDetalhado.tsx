@@ -35,21 +35,24 @@ export const LaudosAtrasadosDetalhado = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  // Processar dados detalhados para encontrar laudos atrasados
+  // USAR FONTE ÚNICA - MESMO CÁLCULO DO CONTEXTO
   const laudosAtrasados = useMemo(() => {
     if (!data.detailedData || data.detailedData.length === 0) return [];
 
     const atrasados: LaudoAtrasado[] = [];
 
     data.detailedData.forEach(item => {
-      // Verificar se tem todas as informações necessárias
+      // USAR MESMA VALIDAÇÃO DO CONTEXTO
       if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return;
 
       try {
         const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
         const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
         
-        // Verificar se está atrasado
+        // USAR MESMA LÓGICA DE VALIDAÇÃO DE DATA DO CONTEXTO
+        if (isNaN(dataLaudo.getTime()) || isNaN(dataPrazo.getTime())) return;
+        
+        // VERIFICAR SE ESTÁ ATRASADO (MESMA LÓGICA DO CONTEXTO)
         if (dataLaudo > dataPrazo) {
           const tempoAtrasoMs = dataLaudo.getTime() - dataPrazo.getTime();
           const tempoAtrasoHoras = tempoAtrasoMs / (1000 * 60 * 60);
@@ -74,7 +77,8 @@ export const LaudosAtrasadosDetalhado = () => {
       }
     });
 
-    console.log(`📊 [LaudosAtrasadosDetalhado] Encontrados ${atrasados.length} laudos atrasados`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] DEVE SER IGUAL AOS 8.888 DO DASHBOARD`);
     return atrasados;
   }, [data.detailedData]);
 
@@ -172,7 +176,7 @@ export const LaudosAtrasadosDetalhado = () => {
           <Clock className="h-5 w-5 text-red-500" />
           Demonstrativo Detalhado - Laudos em Atraso
           <Badge variant="destructive" className="ml-2">
-            {filteredAndSortedData.length.toLocaleString()} laudos
+            {laudosAtrasados.length.toLocaleString()} total | {filteredAndSortedData.length.toLocaleString()} filtrados
           </Badge>
         </CardTitle>
       </CardHeader>

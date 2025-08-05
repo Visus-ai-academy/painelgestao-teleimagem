@@ -79,9 +79,9 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
 
   // Análise de performance geral usando dados corretos
   const performanceLevel = 
-    processedData.percentualAtraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
-    processedData.percentualAtraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
-    processedData.percentualAtraso <= 15 ? { label: 'Regular', color: 'text-yellow-600', bgColor: 'bg-yellow-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
+    volumetriaData.dashboardStats.percentual_atraso <= 15 ? { label: 'Regular', color: 'text-yellow-600', bgColor: 'bg-yellow-100' } :
     { label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-100' };
 
   return (
@@ -107,13 +107,13 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
               <div>
                 <p className="text-sm text-muted-foreground">Performance</p>
                 <p className={`text-2xl font-bold ${performanceLevel.color}`}>
-                  {processedData.percentualAtraso.toFixed(1)}%
+                  {volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%
                 </p>
                 <Badge className={`text-xs ${performanceLevel.bgColor} ${performanceLevel.color}`}>
                   {performanceLevel.label}
                 </Badge>
               </div>
-              {processedData.percentualAtraso <= 10 ? 
+              {volumetriaData.dashboardStats.percentual_atraso <= 10 ? 
                 <TrendingUp className="h-8 w-8 text-green-500" /> :
                 <TrendingDown className="h-8 w-8 text-red-500" />
               }

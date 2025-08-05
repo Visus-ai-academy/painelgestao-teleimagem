@@ -363,9 +363,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           <Alert className={`${safeData.percentualAtrasoGeral >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
             <Clock className="h-4 w-4" />
             <AlertDescription>
-              <strong>{safeData.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
-              ({safeData.totalAtrasados.toLocaleString()} de {processedData.totalExames.toLocaleString()} laudos)
-              {safeData.percentualAtrasoGeral >= 15 && (
+              <strong>{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</strong> dos laudos estão atrasados 
+              ({volumetriaData.dashboardStats.total_atrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
+              {volumetriaData.dashboardStats.percentual_atraso >= 15 && (
                 <span className="block mt-2 text-red-600 font-medium">
                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
                 </span>
@@ -375,15 +375,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div className="text-center">
-               <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
+               <div className="text-3xl font-bold text-red-600">{volumetriaData.dashboardStats.total_atrasados.toLocaleString()}</div>
                <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
              </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{safeData.clientes.filter(c => c.atrasados > 0).length}</div>
+                <div className="text-2xl font-bold text-orange-600">{processedData.clientes.filter(c => c.atrasados > 0).length}</div>
                 <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
               </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{safeData.percentualAtrasoGeral.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-yellow-600">{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">Taxa Geral de Atraso</div>
             </div>
           </div>
