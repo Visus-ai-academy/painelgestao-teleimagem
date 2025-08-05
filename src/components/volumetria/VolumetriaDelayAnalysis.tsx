@@ -44,20 +44,20 @@ const DELAY_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
 
 // Função para categorizar tempo de atraso
 const categorizeDelay = (percentual: number) => {
-  if (percentual >= 20) return { label: 'Crítico', color: '#ef4444', bgColor: 'bg-red-100' };
-  if (percentual >= 10) return { label: 'Alto', color: '#f97316', bgColor: 'bg-orange-100' };
-  if (percentual >= 5) return { label: 'Médio', color: '#eab308', bgColor: 'bg-yellow-100' };
-  if (percentual > 0) return { label: 'Baixo', color: '#22c55e', bgColor: 'bg-green-100' };
+  if (percentual > 10) return { label: 'Emergencial', color: '#ef4444', bgColor: 'bg-red-100' };
+  if (percentual >= 5) return { label: 'Crítico', color: '#f97316', bgColor: 'bg-orange-100' };
+  if (percentual >= 3) return { label: 'Atenção', color: '#eab308', bgColor: 'bg-yellow-100' };
+  if (percentual > 0) return { label: 'Monitorar', color: '#22c55e', bgColor: 'bg-green-100' };
   return { label: 'Sem Atraso', color: '#3b82f6', bgColor: 'bg-blue-100' };
 };
 
 // Função para criar segmentação por tempo de atraso
 const createDelaySegments = (data: DelayData[]) => {
   const segments = {
-    'Crítico (>20%)': data.filter(item => item.percentual_atraso >= 20).length,
-    'Alto (10-20%)': data.filter(item => item.percentual_atraso >= 10 && item.percentual_atraso < 20).length,
-    'Médio (5-10%)': data.filter(item => item.percentual_atraso >= 5 && item.percentual_atraso < 10).length,
-    'Baixo (1-5%)': data.filter(item => item.percentual_atraso > 0 && item.percentual_atraso < 5).length,
+    'Emergencial (>10%)': data.filter(item => item.percentual_atraso > 10).length,
+    'Crítico (5-10%)': data.filter(item => item.percentual_atraso >= 5 && item.percentual_atraso <= 10).length,
+    'Atenção (3-5%)': data.filter(item => item.percentual_atraso >= 3 && item.percentual_atraso < 5).length,
+    'Monitorar (<3%)': data.filter(item => item.percentual_atraso > 0 && item.percentual_atraso < 3).length,
     'Sem Atraso': data.filter(item => item.percentual_atraso === 0).length
   };
 
