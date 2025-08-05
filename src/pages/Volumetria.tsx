@@ -152,18 +152,11 @@ export default function Volumetria() {
       ) : (
         <>
           {/* Métricas Principais */}
-          {(() => {
-            const totalAtrasadosCorreto = (processedData.clientes as any).reduce((sum: number, cliente: any) => sum + (cliente.atrasados || 0), 0);
-            const percentualAtrasoCorreto = stats.total_exames > 0 ? (totalAtrasadosCorreto / stats.total_exames) * 100 : 0;
-            
-            return (
-              <VolumetriaStats 
-                stats={stats} 
-                totalAtrasadosCorreto={totalAtrasadosCorreto}
-                percentualAtrasoCorreto={percentualAtrasoCorreto}
-              />
-            );
-          })()}
+          <VolumetriaStats 
+            stats={stats} 
+            totalAtrasadosCorreto={stats.total_atrasados}
+            percentualAtrasoCorreto={stats.percentual_atraso}
+          />
 
           {/* Dashboard Profissional com Tabs */}
           <Tabs defaultValue="executive" className="w-full">
@@ -207,32 +200,18 @@ export default function Volumetria() {
             </TabsContent>
 
             <TabsContent value="delays" className="mt-6">
-              {(() => {
-                const totalAtrasadosCalculado = (processedData.clientes as any).reduce((sum: number, cliente: any) => sum + (cliente.atrasados || 0), 0);
-                const percentualCalculado = stats.total_exames > 0 ? (totalAtrasadosCalculado / stats.total_exames) * 100 : 0;
-                console.log('🎯 [Volumetria] Cálculo correto de atrasos:', {
-                  totalAtrasadosCalculado,
-                  percentualCalculado,
-                  totalExames: stats.total_exames,
-                  totalAtrasadosAntigo: stats.total_atrasados,
-                  percentualAntigo: stats.percentual_atraso
-                });
-                
-                return (
-                  <VolumetriaDelayAnalysis 
-                    data={{
-                      clientes: processedData.clientes as any,
-                      modalidades: processedData.modalidades as any,
-                      especialidades: processedData.especialidades as any,
-                      categorias: processedData.categorias as any,
-                      prioridades: processedData.prioridades as any,
-                      totalAtrasados: totalAtrasadosCalculado,
-                      percentualAtrasoGeral: percentualCalculado,
-                      atrasosComTempo: []
-                    }}
-                  />
-                );
-              })()}
+              <VolumetriaDelayAnalysis 
+                data={{
+                  clientes: processedData.clientes as any,
+                  modalidades: processedData.modalidades as any,
+                  especialidades: processedData.especialidades as any,
+                  categorias: processedData.categorias as any,
+                  prioridades: processedData.prioridades as any,
+                  totalAtrasados: stats.total_atrasados,
+                  percentualAtrasoGeral: stats.percentual_atraso,
+                  atrasosComTempo: []
+                }}
+              />
             </TabsContent>
           </Tabs>
         </>
