@@ -57,7 +57,7 @@ async function processarLotesBackground(
             valor_urgencia: valor, // Por enquanto igual ao valor_base
             volume_inicial: item.volInicial,
             volume_final: item.volFinal,
-            volume_total: item.volumeTotal,
+            volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
             considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
           }, {
@@ -174,8 +174,8 @@ serve(async (req) => {
           continue
         }
 
-        // Mapear campos conforme estrutura do Excel
-        // CLIENTE | DT INÍCIO VIGÊNCIA | DT FIM VIGÊNCIA | MODALIDADE | ESPECIALIDADE | PRIORIDADE | CATEGORIA | VALOR | VOL INICIAL | VOL FINAL | VOLUME TOTAL | CONSIDERA PLANTAO | TEM ADITIVO
+        // Mapear campos conforme estrutura atualizada do Excel
+        // CLIENTE | DT INÍCIO VIGÊNCIA | DT FIM VIGÊNCIA | MODALIDADE | ESPECIALIDADE | PRIORIDADE | CATEGORIA | PREÇO | VOL INICIAL | VOL FINAL | COND. VOLUME | CONSIDERA PLANTAO | TEM ADITIVO
         const cliente = String(row[0] || '').trim()
         const dtInicioVigencia = String(row[1] || '').trim()
         const dtFimVigencia = String(row[2] || '').trim()
@@ -183,36 +183,37 @@ serve(async (req) => {
         const especialidade = String(row[4] || '').trim()
         const prioridade = String(row[5] || '').trim()
         const categoria = String(row[6] || '').trim()
-        const valorStr = String(row[7] || '').trim()
+        const precoStr = String(row[7] || '').trim() // Agora é "PREÇO" em vez de "VALOR"
         const volInicial = String(row[8] || '').trim()
         const volFinal = String(row[9] || '').trim()
-        const volumeTotal = String(row[10] || '').trim()
+        const condVolume = String(row[10] || '').trim() // Agora é "COND. VOLUME" em vez de "VOLUME TOTAL"
         const consideraPlantao = String(row[11] || '').trim()
         const temAditivo = String(row[12] || '').trim()
         
-        // Se não encontrou valor na posição esperada, buscar em outras colunas
-        let valorFinal = valorStr
-        if (!valorFinal || !(/[\d,.]/.test(valorFinal))) {
+        // Se não encontrou preço na posição esperada, buscar em outras colunas
+        // Se não encontrou preço na posição esperada, buscar em outras colunas
+        let precoFinal = precoStr
+        if (!precoFinal || !(/[\d,.]/.test(precoFinal))) {
           for (let col = 7; col < row.length; col++) {
             const cellValue = String(row[col] || '').trim()
             if (cellValue && /[\d,.]/.test(cellValue)) {
-              valorFinal = cellValue
+              precoFinal = cellValue
               break
             }
           }
         }
         
-        // Se não encontrou valor, pular linha
-        if (!valorFinal) {
-          errosIniciais.push(`Linha ${i}: Valor não encontrado`)
+        // Se não encontrou preço, pular linha
+        if (!precoFinal) {
+          errosIniciais.push(`Linha ${i}: Preço não encontrado`)
           continue
         }
         
-        // Limpar e converter valor
-        const valorLimpo = valorFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorConvertido = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
-          valorLimpo.replace(',', '.') : valorLimpo
-        const valor = parseFloat(valorConvertido)
+        // Limpar e converter preço
+        const precoLimpo = precoFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
+          precoLimpo.replace(',', '.') : precoLimpo
+        const preco = parseFloat(precoConvertido)
 
         // Validar dados essenciais
         if (!cliente || cliente.length < 2) {
@@ -230,8 +231,8 @@ serve(async (req) => {
           continue
         }
 
-        if (isNaN(valor) || valor <= 0) {
-          errosIniciais.push(`Linha ${i}: Valor inválido ou zerado - "${valorFinal}" => ${valor}`)
+        if (isNaN(preco) || preco <= 0) {
+          errosIniciais.push(`Linha ${i}: Preço inválido ou zerado - "${precoFinal}" => ${preco}`)
           continue
         }
 
@@ -244,10 +245,10 @@ serve(async (req) => {
           especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valor,
+          valor: preco, // Mantém "valor" internamente
           volInicial: volInicial ? parseInt(volInicial) || null : null,
           volFinal: volFinal ? parseInt(volFinal) || null : null,
-          volumeTotal: volumeTotal ? parseInt(volumeTotal) || null : null,
+          condVolume: condVolume, // Agora é COND. VOLUME
           consideraPlantao: consideraPlantao.toLowerCase() === 'sim' || consideraPlantao.toLowerCase() === 'true',
           temAditivo: temAditivo.toLowerCase() === 'sim' || temAditivo.toLowerCase() === 'true'
         })
@@ -270,33 +271,33 @@ serve(async (req) => {
         const especialidade = String(row[4] || '').trim()
         const prioridade = String(row[5] || '').trim()
         const categoria = String(row[6] || '').trim()
-        const valorStr = String(row[7] || '').trim()
+        const precoStr = String(row[7] || '').trim() // Agora é "PREÇO"
         const volInicial = String(row[8] || '').trim()
         const volFinal = String(row[9] || '').trim()
-        const volumeTotal = String(row[10] || '').trim()
+        const condVolume = String(row[10] || '').trim() // Agora é "COND. VOLUME"
         const consideraPlantao = String(row[11] || '').trim()
         
-        // Se não encontrou valor na posição esperada, buscar em outras colunas
-        let valorFinal = valorStr
-        if (!valorFinal || !(/[\d,.]/.test(valorFinal))) {
+        // Se não encontrou preço na posição esperada, buscar em outras colunas
+        let precoFinal = precoStr
+        if (!precoFinal || !(/[\d,.]/.test(precoFinal))) {
           for (let col = 7; col < row.length; col++) {
             const cellValue = String(row[col] || '').trim()
             if (cellValue && /[\d,.]/.test(cellValue)) {
-              valorFinal = cellValue
+              precoFinal = cellValue
               break
             }
           }
         }
         
-        if (!valorFinal) continue
+        if (!precoFinal) continue
         
-        const valorLimpo = valorFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorConvertido = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
-          valorLimpo.replace(',', '.') : valorLimpo
-        const valor = parseFloat(valorConvertido)
+        const precoLimpo = precoFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
+          precoLimpo.replace(',', '.') : precoLimpo
+        const preco = parseFloat(precoConvertido)
 
-        // Ignorar registros com valor zerado automaticamente
-        if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(valor) || valor <= 0) {
+        // Ignorar registros com preço zerado automaticamente
+        if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(preco) || preco <= 0) {
           continue
         }
 
@@ -307,10 +308,10 @@ serve(async (req) => {
           especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valor,
+          valor: preco, // Mantém "valor" internamente
           volInicial: volInicial ? parseInt(volInicial) || null : null,
           volFinal: volFinal ? parseInt(volFinal) || null : null,
-          volumeTotal: volumeTotal ? parseInt(volumeTotal) || null : null,
+          condVolume: condVolume, // Agora é COND. VOLUME
           consideraPlantao: consideraPlantao.toLowerCase() === 'sim' || consideraPlantao.toLowerCase() === 'true'
         })
 
@@ -353,7 +354,7 @@ serve(async (req) => {
             valor_urgencia: valor, // Por enquanto igual ao valor_base
             volume_inicial: item.volInicial,
             volume_final: item.volFinal,
-            volume_total: item.volumeTotal,
+            volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
             considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
           }, {
