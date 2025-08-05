@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
 interface DelayData {
   nome: string;
@@ -88,6 +89,9 @@ const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: nu
 };
 
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
+  // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTAS DIRETAS
+  const { data: volumetriaData } = useVolumetria();
+  
   // Estado para controle de ordenação
   const [sortField, setSortField] = useState<'nome' | 'total_exames' | 'atrasados' | 'percentual_atraso' | 'tempoMedioAtraso'>('atrasados');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -97,22 +101,19 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   const [clientDetails, setClientDetails] = useState<Map<string, ClienteDetalhe>>(new Map());
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
 
-  // Função para buscar detalhes de um cliente específico
+  // Função para buscar detalhes de um cliente específico USANDO CONTEXTO
   const fetchClientDetails = async (clienteName: string) => {
     if (clientDetails.has(clienteName) || loadingDetails.has(clienteName)) return;
     
     setLoadingDetails(prev => new Set(prev).add(clienteName));
     
     try {
-      // Buscar dados do cliente específico
-      const { data: clientData, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA, ESPECIALIDADE, MODALIDADE, PRIORIDADE, VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO')
-        .eq('EMPRESA', clienteName);
+      // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTA DIRETA
+      const clientData = volumetriaData.detailedData.filter(item => item.EMPRESA === clienteName);
+      
+      console.log(`🎯 [DelayAnalysis] Processando ${clientData.length} registros para cliente ${clienteName}`);
 
-      if (error) throw error;
-
-      if (clientData) {
+      if (clientData && clientData.length > 0) {
         // Processar especialidades
         const especialidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
         

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
 export interface VolumetriaFilters {
   ano: string;
@@ -85,6 +86,7 @@ export interface VolumetriaData {
 
 export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
   const { toast } = useToast();
+  const { data: contextoData, getFilteredData } = useVolumetria();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<VolumetriaData>({
     stats: {
@@ -136,92 +138,54 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
   }, [filters]);
 
   const loadData = useCallback(async () => {
-    if (!supabase) return;
+    if (contextoData.loading) {
+      console.log('⏳ [useVolumetriaDataFiltered] Aguardando contexto...');
+      return;
+    }
     
     setLoading(true);
     try {
-      console.log('🔍 [DASHBOARD] Iniciando carregamento de dados volumetria');
-      console.log('📅 [DASHBOARD] Filtros aplicados:', filters);
-      console.log('🎯 [DASHBOARD] Ano selecionado:', filters.ano);
-      console.log('🏢 [DASHBOARD] Cliente selecionado:', filters.cliente);
+      console.log('🔍 [useVolumetriaDataFiltered] Usando dados do contexto');
+      console.log('📅 [useVolumetriaDataFiltered] Filtros aplicados:', filters);
+      console.log('🎯 [useVolumetriaDataFiltered] Total de dados do contexto:', contextoData.detailedData.length);
       
-      // FORÇAR CARREGAMENTO DIRETO SEM RANGE PARA DEBUG
-      console.log('🚀 [DASHBOARD] FORÇANDO QUERY DIRETA SEM LIMITAÇÃO...');
+      // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTAS DIRETAS
+      let allData = contextoData.detailedData;
       
-      // CARREGAR DADOS EM BATCHES PARA GARANTIR TODOS OS REGISTROS
-      let allData: any[] = [];
-      let offset = 0;
-      const limit = 50000; // Aumentado significativamente para volumes altos
-      let hasMoreData = true;
+      // Aplicar filtros nos dados do contexto
+      if (filters.cliente !== 'todos') {
+        allData = allData.filter(item => item.EMPRESA === filters.cliente);
+        console.log(`🏢 Filtro cliente aplicado: ${filters.cliente}, restaram ${allData.length} registros`);
+      }
       
+      if (filters.modalidade !== 'todos') {
+        allData = allData.filter(item => item.MODALIDADE === filters.modalidade);
+        console.log(`🔬 Filtro modalidade aplicado: ${filters.modalidade}, restaram ${allData.length} registros`);
+      }
+      
+      if (filters.especialidade !== 'todos') {
+        allData = allData.filter(item => item.ESPECIALIDADE === filters.especialidade);
+        console.log(`👨‍⚕️ Filtro especialidade aplicado: ${filters.especialidade}, restaram ${allData.length} registros`);
+      }
+      
+      if (filters.prioridade !== 'todos') {
+        allData = allData.filter(item => item.PRIORIDADE === filters.prioridade);
+        console.log(`⚡ Filtro prioridade aplicado: ${filters.prioridade}, restaram ${allData.length} registros`);
+      }
+      
+      if (filters.medico !== 'todos') {
+        allData = allData.filter(item => item.MEDICO === filters.medico);
+        console.log(`👩‍⚕️ Filtro médico aplicado: ${filters.medico}, restaram ${allData.length} registros`);
+      }
+      
+      // Aplicar filtros de data se necessário
       const { startDate, endDate } = buildDateFilter();
-      console.log('📊 Período selecionado:', { startDate, endDate });
-      
-      while (hasMoreData) {
-        console.log(`📦 [DASHBOARD] Carregando batch offset ${offset}...`);
-        
-        let query = supabase
-          .from('volumetria_mobilemed')
-          .select(`
-            EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
-            VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
-          `)
-          .range(offset, offset + limit - 1);
-
-        // Aplicar filtros se necessário
-        if (startDate && endDate && filters.ano !== 'todos') {
-          query = query.gte('data_referencia', startDate).lte('data_referencia', endDate);
-          console.log('🎯 Filtro de data aplicado na data_referencia:', startDate, 'até', endDate);
-        } else {
-          console.log('📊 BUSCANDO TODOS OS REGISTROS (sem filtro de data)');
-        }
-
-        if (filters.cliente !== 'todos') {
-          query = query.eq('EMPRESA', filters.cliente);
-          console.log('🏢 Filtro cliente aplicado:', filters.cliente);
-        }
-        if (filters.modalidade !== 'todos') {
-          query = query.eq('MODALIDADE', filters.modalidade);
-          console.log('🔬 Filtro modalidade aplicado:', filters.modalidade);
-        }
-        if (filters.especialidade !== 'todos') {
-          query = query.eq('ESPECIALIDADE', filters.especialidade);
-          console.log('👨‍⚕️ Filtro especialidade aplicado:', filters.especialidade);
-        }
-        if (filters.prioridade !== 'todos') {
-          query = query.eq('PRIORIDADE', filters.prioridade);
-          console.log('⚡ Filtro prioridade aplicado:', filters.prioridade);
-        }
-        if (filters.medico !== 'todos') {
-          query = query.eq('MEDICO', filters.medico);
-          console.log('👩‍⚕️ Filtro médico aplicado:', filters.medico);
-        }
-
-        const { data: batchData, error } = await query;
-        
-        if (error) {
-          console.error('❌ [DASHBOARD] Erro na query do batch:', error);
-          throw error;
-        }
-
-        if (!batchData || batchData.length === 0) {
-          break;
-        }
-
-        allData = [...allData, ...batchData];
-        console.log(`✅ [DASHBOARD] Batch carregado: ${batchData.length} registros, total acumulado: ${allData.length}`);
-        
-        if (batchData.length < limit) {
-          hasMoreData = false;
-        } else {
-          offset += limit;
-        }
-
-        // Limite de segurança para evitar loops infinitos
-        if (offset > 1000000) {
-          console.log('⚠️ [DASHBOARD] Limite de segurança atingido - finalizando...');
-          hasMoreData = false;
-        }
+      if (startDate && endDate && filters.ano !== 'todos') {
+        allData = allData.filter(item => {
+          if (!item.data_referencia) return false;
+          return item.data_referencia >= startDate && item.data_referencia <= endDate;
+        });
+        console.log(`📅 Filtro de data aplicado: ${startDate} - ${endDate}, restaram ${allData.length} registros`);
       }
 
       if (!allData || allData.length === 0) {
@@ -238,103 +202,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         return;
       }
 
-      console.log('✅ [DASHBOARD] Query direta retornou:', allData.length, 'registros');
+      console.log(`✅ [useVolumetriaDataFiltered] Processando ${allData.length} registros filtrados`);
       const totalLaudosCorreto = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-      console.log('📈 [DASHBOARD] Total de laudos:', totalLaudosCorreto);
-
-      // VERIFICAR E CARREGAR DADOS ADICIONAIS PARA GARANTIR COMPLETUDE
-      console.log('🎯 [DASHBOARD] Verificando dados agregados para validação...');
-      
-      try {
-        // Verificar total de registros reais na tabela
-        const { count, error: countError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true });
-          
-        if (!countError && count) {
-          console.log(`📊 [DASHBOARD] Total de registros na tabela: ${count}`);
-          console.log(`📊 [DASHBOARD] Registros carregados até agora: ${allData.length}`);
-          
-          // Se ainda faltam dados significativos e não temos filtros específicos
-          if (count > allData.length && filters.ano === 'todos' && filters.cliente === 'todos') {
-            console.log('⚠️ [DASHBOARD] Discrepância detectada - carregando dados adicionais...');
-            
-            // Carregar em lotes menores para garantir todos os dados
-            let additionalOffset = allData.length;
-            const smallerBatchSize = 100000; // Aumentado para volumes altos
-            
-            while (additionalOffset < count && additionalOffset < 10000000) { // Aumentado limite de segurança para 10M
-              console.log(`📦 [DASHBOARD] Carregando lote adicional offset ${additionalOffset}...`);
-              
-              let additionalQuery = supabase
-                .from('volumetria_mobilemed')
-                .select(`
-                  EMPRESA, MODALIDADE, ESPECIALIDADE, MEDICO, PRIORIDADE, CATEGORIA,
-                  VALORES, DATA_LAUDO, HORA_LAUDO, DATA_PRAZO, HORA_PRAZO, DATA_REALIZACAO, data_referencia
-                `)
-                .range(additionalOffset, additionalOffset + smallerBatchSize - 1);
-
-              // Aplicar os mesmos filtros
-              if (startDate && endDate && filters.ano !== 'todos') {
-                additionalQuery = additionalQuery.gte('data_referencia', startDate).lte('data_referencia', endDate);
-              }
-              if (filters.cliente !== 'todos') {
-                additionalQuery = additionalQuery.eq('EMPRESA', filters.cliente);
-              }
-              if (filters.modalidade !== 'todos') {
-                additionalQuery = additionalQuery.eq('MODALIDADE', filters.modalidade);
-              }
-              if (filters.especialidade !== 'todos') {
-                additionalQuery = additionalQuery.eq('ESPECIALIDADE', filters.especialidade);
-              }
-              if (filters.prioridade !== 'todos') {
-                additionalQuery = additionalQuery.eq('PRIORIDADE', filters.prioridade);
-              }
-              if (filters.medico !== 'todos') {
-                additionalQuery = additionalQuery.eq('MEDICO', filters.medico);
-              }
-
-              const { data: additionalData, error: additionalError } = await additionalQuery;
-              
-              if (additionalError) {
-                console.error('❌ [DASHBOARD] Erro ao carregar dados adicionais:', additionalError);
-                break;
-              }
-              
-              if (!additionalData || additionalData.length === 0) {
-                break;
-              }
-              
-              allData = [...allData, ...additionalData];
-              console.log(`✅ [DASHBOARD] Lote adicional carregado: ${additionalData.length} registros, total: ${allData.length}`);
-              
-              if (additionalData.length < smallerBatchSize) {
-                break;
-              }
-              
-              additionalOffset += smallerBatchSize;
-              
-              // Pequena pausa
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ [DASHBOARD] Erro ao verificar total de registros:', error);
-      }
-
-      if (!allData || allData.length === 0) {
-        setData({
-          stats: {
-            total_exames: 0, total_registros: 0, total_atrasados: 0, percentual_atraso: 0,
-            total_clientes: 0, total_clientes_volumetria: 0, total_modalidades: 0, total_especialidades: 0, total_medicos: 0,
-            total_prioridades: 0
-          },
-          clientes: [], modalidades: [], especialidades: [], prioridades: [], medicos: [],
-          atrasoClientes: [], atrasoModalidades: [], atrasoEspecialidades: [], atrasoPrioridades: []
-        });
-        return;
-      }
+      console.log(`📈 [useVolumetriaDataFiltered] Total de laudos filtrados: ${totalLaudosCorreto}`);
 
       // Calcular atrasos com tempo de atraso
       const atrasados = allData.filter(item => {
@@ -537,18 +407,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         total_medicos: 0 // TODO: implementar contagem de médicos por prioridade se necessário
       })).sort((a, b) => b.total_exames - a.total_exames);
 
-      // Buscar total de clientes cadastrados
-      let totalClientesCadastrados = 0;
-      try {
-        const { count: totalClientes } = await supabase
-          .from('clientes')
-          .select('*', { count: 'exact', head: true })
-          .eq('ativo', true);
-        totalClientesCadastrados = totalClientes || 0;
-        console.log('👥 [DASHBOARD] Total de clientes cadastrados:', totalClientesCadastrados);
-      } catch (error) {
-        console.warn('⚠️ [DASHBOARD] Erro ao buscar total de clientes:', error);
-      }
+      // Usar dados do contexto para clientes
+      const totalClientesCadastrados = contextoData.dashboardStats.total_clientes;
+      console.log('👥 [useVolumetriaDataFiltered] Total de clientes do contexto:', totalClientesCadastrados);
 
       setData({
         stats: {
@@ -586,12 +447,14 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
     } finally {
       setLoading(false);
     }
-  }, [filters, buildDateFilter, toast]);
+  }, [filters, buildDateFilter, toast, contextoData]);
 
   useEffect(() => {
-    console.log('🔄 [useVolumetriaDataFiltered] Carregando dados iniciais...');
-    loadData();
-  }, [loadData]);
+    if (!contextoData.loading && contextoData.detailedData.length > 0) {
+      console.log('🔄 [useVolumetriaDataFiltered] Contexto carregado, processando dados...');
+      loadData();
+    }
+  }, [loadData, contextoData.loading, contextoData.detailedData.length]);
 
   // Refresh manual disponível
   const refreshData = useCallback(async () => {
