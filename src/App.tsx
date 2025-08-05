@@ -74,7 +74,8 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <VolumetriaProvider>
+            <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={
@@ -86,11 +87,9 @@ const App = () => {
             } />
             <Route path="/volumetria/*" element={
               <ProtectedRoute>
-                <VolumetriaProvider>
-                  <Layout>
-                    <Volumetria />
-                  </Layout>
-                </VolumetriaProvider>
+                <Layout>
+                  <Volumetria />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="/upload-dados" element={
@@ -407,6 +406,7 @@ const App = () => {
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </VolumetriaProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
