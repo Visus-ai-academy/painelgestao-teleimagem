@@ -239,7 +239,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       }
 
       console.log('✅ [DASHBOARD] Query direta retornou:', allData.length, 'registros');
-      console.log('📈 [DASHBOARD] Total de laudos:', allData.reduce((sum, item) => sum + (item.VALORES || 0), 0));
+      const totalLaudosCorreto = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      console.log('📈 [DASHBOARD] Total de laudos:', totalLaudosCorreto);
 
       // VERIFICAR E CARREGAR DADOS ADICIONAIS PARA GARANTIR COMPLETUDE
       console.log('🎯 [DASHBOARD] Verificando dados agregados para validação...');

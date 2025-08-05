@@ -89,40 +89,23 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         const limit = 10000; // Aumentado para processar volumes maiores
         let hasMoreData = true;
         
-        while (hasMoreData) {
-          const { data: batchData, error } = await supabase
-            .from('volumetria_mobilemed')
-            .select('VALORES, ESTUDO_DESCRICAO')
-            .eq('arquivo_fonte', tipo)
-            .range(offset, offset + limit - 1);
+        // Buscar dados reais usando agregação direta do banco para ser mais eficiente
+        const { data: aggregateData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('VALORES')
+          .eq('arquivo_fonte', tipo);
 
-          if (error) {
-            console.error(`❌ Erro ao carregar ${tipo}:`, error);
-            break;
-          }
-
-          if (!batchData || batchData.length === 0) {
-            break;
-          }
-
-          allData = [...allData, ...batchData];
-          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros FÍSICOS REMANESCENTES (após exclusões) no banco (lote offset: ${offset}), total: ${allData.length}`);
-          
-          if (batchData.length < limit) {
-            hasMoreData = false;
-          } else {
-            offset += limit;
-          }
-
-          // Removido limitador artificial - carregará todos os dados disponíveis
+        if (error) {
+          console.error(`❌ Erro ao carregar ${tipo}:`, error);
+          allData = [];
+        } else {
+          allData = aggregateData || [];
         }
 
         if (allData.length > 0) {
           const totalRecords = allData.length;
           const recordsWithValue = allData.filter(item => item.VALORES && item.VALORES > 0).length;
           const totalValue = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-
-          // Calcular zerados: usar lógica simples e consistente
           const recordsZeroed = allData.filter(item => !item.VALORES || item.VALORES === 0).length;
 
           statsResult[tipo] = {
@@ -132,7 +115,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             totalValue
           };
           
-          console.log(`✅ ${tipo}: ${totalRecords} registros DEFINITIVOS no banco (após exclusões físicas), ${recordsWithValue} com valores, ${recordsZeroed} zerados não identificados, ${totalValue} total`);
+          console.log(`✅ ${tipo}: ${totalRecords} registros DEFINITIVOS, ${recordsWithValue} com valores, ${recordsZeroed} zerados, ${totalValue} total exames`);
         } else {
           console.log(`⚠️ ${tipo}: nenhum dado encontrado`);
           statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };

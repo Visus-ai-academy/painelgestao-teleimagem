@@ -37,7 +37,7 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
           'volumetria_onco_padrao'
         ])
         .order('created_at', { ascending: false })
-        .limit(1000); // Aumentado para volumes altos
+        .limit(100000); // Removida limitação - volumes altos
 
       if (error) throw error;
 
