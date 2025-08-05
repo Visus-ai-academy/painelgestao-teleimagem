@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClienteData } from '@/hooks/useClienteData';
+import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { useVolumetriaSimple } from '@/hooks/useVolumetriaSimple';
 import { toast } from "sonner";
 import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "lucide-react";
@@ -76,6 +77,7 @@ export default function MapaDistribuicaoClientes() {
   // Hooks para carregar dados
   const { data: clientesData, loading: loadingClientes, stats: clienteStats, refetch: refetchClientes } = useClienteData();
   const { data: volumetriaData, loading: loadingVolumetria } = useVolumetriaSimple();
+  const { data: contextData } = useVolumetria(); // Dados corretos do contexto
   
   // Filtros
   const [filtroModalidade, setFiltroModalidade] = useState<string>('todas');
@@ -252,6 +254,12 @@ export default function MapaDistribuicaoClientes() {
   const prioridadesUnicas = [...new Set(volumetriaData?.map(v => v["PRIORIDADE"]).filter(Boolean) || [])];
   const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
 
+  // Usar dados corretos do contexto para totais gerais
+  const totalGeralCorreto = {
+    clientes: clienteStats.total, // Total de clientes cadastrados
+    volume: Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0) // 39.035 exames corretos
+  };
+
   const totalGeral = {
     clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
     volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
@@ -386,7 +394,8 @@ export default function MapaDistribuicaoClientes() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Clientes</p>
-                <p className="text-2xl font-bold">{totalGeral.clientes}</p>
+                <p className="text-2xl font-bold">{totalGeralCorreto.clientes}</p>
+                <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.clientes}</p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
             </div>
@@ -398,7 +407,8 @@ export default function MapaDistribuicaoClientes() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Volume Total de Laudos/Exames</p>
-                <p className="text-2xl font-bold">{totalGeral.volume.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{totalGeralCorreto.volume.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.volume.toLocaleString()}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-green-600" />
             </div>
