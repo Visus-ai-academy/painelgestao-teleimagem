@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Search, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Clock, Search, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,14 +36,10 @@ export const LaudosAtrasadosDetalhado = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  // USAR FONTE ÚNICA - BUSCAR DOS DADOS CONSOLIDADOS DO CONTEXTO
+  // CALCULAR LAUDOS ATRASADOS DOS DADOS DISPONÍVEIS
   const laudosAtrasados = useMemo(() => {
-    // Usar dados consolidados que são a mesma fonte do dashboard principal
-    const totalAtrasados = data.dashboardStats?.total_atrasados || 0;
-    
-    // Se não temos dados detalhados, criar estrutura usando dados consolidados
     if (!data.detailedData || data.detailedData.length === 0) {
-      console.log(`📊 [LaudosAtrasadosDetalhado] Sem dados detalhados. Total atrasados: ${totalAtrasados}`);
+      console.log(`📊 [LaudosAtrasadosDetalhado] Sem dados detalhados disponíveis`);
       return [];
     }
 
@@ -85,10 +81,9 @@ export const LaudosAtrasadosDetalhado = () => {
       }
     });
 
-    console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados`);
-    console.log(`📊 [LaudosAtrasadosDetalhado] Dashboard Stats: ${totalAtrasados} laudos atrasados`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados detalhados`);
     return atrasados;
-  }, [data.detailedData, data.dashboardStats]);
+  }, [data.detailedData]);
 
   // Filtrar e ordenar dados
   const filteredAndSortedData = useMemo(() => {
@@ -210,11 +205,30 @@ export const LaudosAtrasadosDetalhado = () => {
           <Clock className="h-5 w-5 text-red-500" />
           Demonstrativo Detalhado - Laudos em Atraso
           <Badge variant="destructive" className="ml-2">
-            {(data.dashboardStats?.total_atrasados || laudosAtrasados.length).toLocaleString()} total | {filteredAndSortedData.length.toLocaleString()} filtrados
+            {laudosAtrasados.length.toLocaleString()} laudos detalhados
           </Badge>
+          {searchTerm && (
+            <Badge variant="outline" className="ml-2">
+              {filteredAndSortedData.length.toLocaleString()} filtrados
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Informação sobre limitação dos dados */}
+        {data.dashboardStats?.total_atrasados && laudosAtrasados.length !== data.dashboardStats.total_atrasados && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                Atenção: Este demonstrativo mostra {laudosAtrasados.length.toLocaleString()} laudos detalhados de um total de {data.dashboardStats.total_atrasados.toLocaleString()} laudos atrasados no sistema.
+              </span>
+            </div>
+            <div className="text-xs text-yellow-700 mt-1">
+              Alguns laudos podem não ter dados detalhados suficientes para exibição na tabela.
+            </div>
+          </div>
+        )}
         {/* Controles de filtro e busca */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
