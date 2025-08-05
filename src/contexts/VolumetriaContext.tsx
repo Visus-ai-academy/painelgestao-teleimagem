@@ -83,59 +83,59 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       for (const tipo of tiposArquivo) {
         console.log(`📊 Carregando TODOS os dados para: ${tipo}`);
         
-        // Usar agregação SQL direta para obter contagens corretas SEM LIMITAÇÃO
-        const [{ count: totalRecords }, { count: recordsWithValue }, { data: sumData }] = await Promise.all([
-          // Total de registros
+        // SOLUÇÃO DEFINITIVA: Usar agregação manual completa sem limitações
+        const [countResult, valueCountResult] = await Promise.all([
+          // Total de registros usando count exato
           supabase
             .from('volumetria_mobilemed')
             .select('*', { count: 'exact', head: true })
             .eq('arquivo_fonte', tipo),
           
-          // Registros com valores > 0
+          // Registros com valores > 0 usando count exato
           supabase
             .from('volumetria_mobilemed')
             .select('*', { count: 'exact', head: true })
             .eq('arquivo_fonte', tipo)
-            .gt('VALORES', 0),
-          
-          // Buscar TODOS os valores para somar corretamente - SEM LIMITAÇÃO
-          supabase
-            .from('volumetria_mobilemed')
-            .select('VALORES')
-            .eq('arquivo_fonte', tipo)
+            .gt('VALORES', 0)
         ]);
 
-        const totalRecordsCount = totalRecords || 0;
-        const recordsWithValueCount = recordsWithValue || 0;
+        const totalRecordsCount = countResult.count || 0;
+        const recordsWithValueCount = valueCountResult.count || 0;
         const recordsZeroed = totalRecordsCount - recordsWithValueCount;
         
-        // CORREÇÃO CRÍTICA: Garantir que TODOS os valores sejam carregados para soma
-        let allValues: any[] = sumData || [];
-        let offset = allValues.length;
-        const batchSize = 50000;
+        // Carregar TODOS os valores em lotes grandes para calcular soma correta
+        let totalValue = 0;
+        let offset = 0;
+        const batchSize = 50000; // Lotes grandes para eficiência
         
-        // Se a query padrão não trouxe todos os dados, carregar em lotes
-        while (allValues.length < totalRecordsCount && allValues.length > 0) {
-          const { data: moreBatch } = await supabase
+        console.log(`📊 ${tipo}: Carregando ${totalRecordsCount} registros para soma...`);
+        
+        while (offset < totalRecordsCount) {
+          const { data: batch } = await supabase
             .from('volumetria_mobilemed')
             .select('VALORES')
             .eq('arquivo_fonte', tipo)
             .range(offset, offset + batchSize - 1);
             
-          if (!moreBatch || moreBatch.length === 0) break;
-          allValues = [...allValues, ...moreBatch];
-          offset += batchSize;
-          console.log(`📦 ${tipo}: Carregados mais ${moreBatch.length} valores, total: ${allValues.length}`);
+          if (!batch || batch.length === 0) {
+            console.log(`📦 ${tipo}: Nenhum dado no offset ${offset}, finalizando...`);
+            break;
+          }
+          
+          const batchSum = batch.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0);
+          totalValue += batchSum;
+          offset += batch.length;
+          
+          console.log(`📦 ${tipo}: Lote de ${batch.length} registros, soma do lote: ${batchSum}, soma total: ${totalValue}, progresso: ${offset}/${totalRecordsCount}`);
+          
+          // Se carregou menos que o lote completo, terminou
+          if (batch.length < batchSize) break;
         }
-        
-        const totalValue = allValues.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0);
-        
-        console.log(`🔍 DEBUG ${tipo}:`);
+
+        console.log(`🔍 RESULTADO FINAL ${tipo}:`);
         console.log(`- Total registros: ${totalRecordsCount}`);
         console.log(`- Com valores: ${recordsWithValueCount}`);
-        console.log(`- Valores carregados: ${allValues.length}`);
         console.log(`- Soma total: ${totalValue}`);
-        console.log(`- Primeiros 5 valores:`, allValues.slice(0, 5).map(v => v.VALORES));
 
         statsResult[tipo] = {
           totalRecords: totalRecordsCount,
@@ -144,7 +144,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           totalValue
         };
         
-        console.log(`✅ ${tipo}: ${totalRecordsCount} registros REAIS, ${recordsWithValueCount} com valores, ${recordsZeroed} zerados, ${totalValue} total exames`);
+        console.log(`✅ ${tipo}: ${totalRecordsCount} registros, ${recordsWithValueCount} com valores, ${recordsZeroed} zerados, ${totalValue} TOTAL EXAMES`);
       }
 
       // Carregar últimos uploads
