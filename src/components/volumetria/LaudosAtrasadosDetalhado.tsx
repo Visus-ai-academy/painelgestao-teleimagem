@@ -8,6 +8,7 @@ import { Clock, Search, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown } from
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import * as XLSX from 'xlsx';
 
 interface LaudoAtrasado {
   empresa: string;
@@ -35,9 +36,16 @@ export const LaudosAtrasadosDetalhado = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  // USAR FONTE ÚNICA - MESMO CÁLCULO DO CONTEXTO
+  // USAR FONTE ÚNICA - BUSCAR DOS DADOS CONSOLIDADOS DO CONTEXTO
   const laudosAtrasados = useMemo(() => {
-    if (!data.detailedData || data.detailedData.length === 0) return [];
+    // Usar dados consolidados que são a mesma fonte do dashboard principal
+    const totalAtrasados = data.dashboardStats?.total_atrasados || 0;
+    
+    // Se não temos dados detalhados, criar estrutura usando dados consolidados
+    if (!data.detailedData || data.detailedData.length === 0) {
+      console.log(`📊 [LaudosAtrasadosDetalhado] Sem dados detalhados. Total atrasados: ${totalAtrasados}`);
+      return [];
+    }
 
     const atrasados: LaudoAtrasado[] = [];
 
@@ -59,8 +67,8 @@ export const LaudosAtrasadosDetalhado = () => {
           
           atrasados.push({
             empresa: item.EMPRESA || '',
-            paciente: item.PACIENTE || '',
-            exame: item.EXAME || '',
+            paciente: item.PACIENTE || item.ESTUDO_DESCRICAO || '', // Usar ESTUDO_DESCRICAO se PACIENTE não disponível
+            exame: item.EXAME || item.ESTUDO_DESCRICAO || '', // Usar ESTUDO_DESCRICAO como nome do exame
             modalidade: item.MODALIDADE || '',
             especialidade: item.ESPECIALIDADE || '',
             categoria: item.CATEGORIA || '',
@@ -78,9 +86,9 @@ export const LaudosAtrasadosDetalhado = () => {
     });
 
     console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados`);
-    console.log(`📊 [LaudosAtrasadosDetalhado] Total de registros atrasados deve ser ${atrasados.length}`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] Dashboard Stats: ${totalAtrasados} laudos atrasados`);
     return atrasados;
-  }, [data.detailedData]);
+  }, [data.detailedData, data.dashboardStats]);
 
   // Filtrar e ordenar dados
   const filteredAndSortedData = useMemo(() => {
@@ -169,6 +177,32 @@ export const LaudosAtrasadosDetalhado = () => {
     return `${Math.floor(horas)}h ${Math.floor((horas % 1) * 60)}min`;
   };
 
+  // Função para exportar para Excel
+  const exportarExcel = () => {
+    const dadosExport = filteredAndSortedData.map(laudo => ({
+      'Cliente': laudo.empresa,
+      'Paciente': laudo.paciente,
+      'Exame': laudo.exame,
+      'Modalidade': laudo.modalidade,
+      'Especialidade': laudo.especialidade,
+      'Categoria': laudo.categoria,
+      'Prioridade': laudo.prioridade,
+      'Médico': laudo.medico,
+      'Data Prazo': format(laudo.dataPrazo, 'dd/MM/yyyy HH:mm', { locale: ptBR }),
+      'Data Laudo': format(laudo.dataLaudo, 'dd/MM/yyyy HH:mm', { locale: ptBR }),
+      'Tempo Atraso': formatarTempoAtraso(laudo.tempoAtrasoHoras),
+      'Urgência': categorizarUrgencia(laudo.tempoAtrasoHoras).label,
+      'Valores': laudo.valores
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laudos Atrasados');
+    
+    const fileName = `laudos_atrasados_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -176,7 +210,7 @@ export const LaudosAtrasadosDetalhado = () => {
           <Clock className="h-5 w-5 text-red-500" />
           Demonstrativo Detalhado - Laudos em Atraso
           <Badge variant="destructive" className="ml-2">
-            {laudosAtrasados.length.toLocaleString()} total | {filteredAndSortedData.length.toLocaleString()} filtrados
+            {(data.dashboardStats?.total_atrasados || laudosAtrasados.length).toLocaleString()} total | {filteredAndSortedData.length.toLocaleString()} filtrados
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -197,9 +231,14 @@ export const LaudosAtrasadosDetalhado = () => {
               />
             </div>
           </div>
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2"
+            onClick={exportarExcel}
+            disabled={filteredAndSortedData.length === 0}
+          >
             <Download className="h-4 w-4" />
-            Exportar CSV
+            Exportar Excel
           </Button>
         </div>
 

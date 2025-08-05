@@ -43,11 +43,11 @@ interface VolumetriaDelayAnalysisProps {
 // Cores para os gráficos
 const DELAY_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
 
-// Função para categorizar tempo de atraso CORRIGIDA
+// Função para categorizar percentual de atraso por segmento
 const categorizeDelay = (percentual: number) => {
-  if (percentual > 10) return { label: 'Emergencial', color: '#ef4444', bgColor: 'bg-red-100' };
-  if (percentual >= 5) return { label: 'Crítico', color: '#f97316', bgColor: 'bg-orange-100' };
-  if (percentual >= 3) return { label: 'Moderado', color: '#eab308', bgColor: 'bg-yellow-100' };
+  if (percentual > 15) return { label: 'Crítico', color: '#ef4444', bgColor: 'bg-red-100' };
+  if (percentual >= 10) return { label: 'Alto', color: '#f97316', bgColor: 'bg-orange-100' };
+  if (percentual >= 5) return { label: 'Médio', color: '#eab308', bgColor: 'bg-yellow-100' };
   if (percentual > 0) return { label: 'Baixo', color: '#22c55e', bgColor: 'bg-green-100' };
   return { label: 'Sem Atraso', color: '#3b82f6', bgColor: 'bg-blue-100' };
 };
