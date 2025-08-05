@@ -506,23 +506,36 @@ export default function MapaDistribuicaoClientes() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 text-sm text-muted-foreground">
+              Regiões ordenadas por volume de exames (maior para menor)
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {regioesEstatisticas.map(regiao => {
-                const maxVolume = Math.max(...regioesEstatisticas.map(r => r.volume_total));
-                const corClasse = getCorIntensidade(regiao.volume_total, maxVolume);
-                
-                return (
-                  <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer`}>
-                    <div className="text-center">
-                      <h3 className="font-bold text-lg">{regiao.regiao}</h3>
-                      <div className="mt-3 space-y-1">
-                        <p className="text-sm">{regiao.total_clientes} clientes</p>
-                        <p className="text-sm">{regiao.volume_total.toLocaleString()} exames</p>
+              {regioesEstatisticas
+                .sort((a, b) => b.volume_total - a.volume_total)
+                .map((regiao, index) => {
+                  const maxVolume = Math.max(...regioesEstatisticas.map(r => r.volume_total));
+                  const corClasse = getCorIntensidade(regiao.volume_total, maxVolume);
+                  
+                  return (
+                    <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
+                      <div className="text-center">
+                        <div className="absolute top-2 right-2">
+                          <Badge variant="secondary" className="text-xs px-2 py-1">
+                            #{index + 1}
+                          </Badge>
+                        </div>
+                        <h3 className="font-bold text-lg">{regiao.regiao}</h3>
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm font-medium">{regiao.total_clientes} clientes</p>
+                          <p className="text-sm font-bold">{regiao.volume_total.toLocaleString()} exames</p>
+                          <Badge variant="outline" className="mt-2 text-xs">
+                            {regiao.estados.length} estados
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </CardContent>
         </Card>
