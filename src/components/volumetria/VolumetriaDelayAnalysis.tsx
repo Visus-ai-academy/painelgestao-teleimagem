@@ -346,7 +346,12 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{safeData.clientes.filter(c => c.atrasados > 0).length}</div>
+              <div className="text-2xl font-bold text-orange-600">{(() => {
+                const clientesComAtrasos = safeData.clientes.filter(c => c.atrasados > 0).length;
+                console.log('🔍 [DelayAnalysis] Clientes com atrasos:', clientesComAtrasos, 'de', safeData.clientes.length, 'total');
+                console.log('🔍 [DelayAnalysis] Amostra de clientes:', safeData.clientes.slice(0, 5).map(c => ({ nome: c.nome, atrasados: c.atrasados })));
+                return clientesComAtrasos;
+              })()}</div>
               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
             </div>
             <div className="text-center">

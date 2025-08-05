@@ -91,7 +91,7 @@ export function useVolumetriaProcessedData() {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           if (dataLaudo > dataPrazo) {
-            clienteData.atrasados += 1;
+            clienteData.atrasados += Number(item.VALORES) || 0;
           }
         } catch {}
       }
@@ -99,8 +99,8 @@ export function useVolumetriaProcessedData() {
     
     // Calcular percentuais e valores médios
     clientesMap.forEach(cliente => {
-      cliente.percentual_atraso = cliente.total_registros > 0 ? 
-        (cliente.atrasados / cliente.total_registros) * 100 : 0;
+      cliente.percentual_atraso = cliente.total_exames > 0 ? 
+        (cliente.atrasados / cliente.total_exames) * 100 : 0;
       cliente.valor_medio = cliente.total_registros > 0 ? 
         cliente.total_exames / cliente.total_registros : 0;
     });
@@ -132,7 +132,7 @@ export function useVolumetriaProcessedData() {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           if (dataLaudo > dataPrazo) {
-            modalidadeData.atrasados! += 1;
+            modalidadeData.atrasados! += Number(item.VALORES) || 0;
           }
         } catch {}
       }
@@ -165,7 +165,7 @@ export function useVolumetriaProcessedData() {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           if (dataLaudo > dataPrazo) {
-            especialidadeData.atrasados! += 1;
+            especialidadeData.atrasados! += Number(item.VALORES) || 0;
           }
         } catch {}
       }
@@ -260,14 +260,14 @@ export function useVolumetriaProcessedData() {
     
     modalidadesMap.forEach(modalidade => {
       modalidade.percentual = totalExames > 0 ? (modalidade.total_exames / totalExames) * 100 : 0;
-      modalidade.percentual_atraso = modalidade.total_registros > 0 ? 
-        ((modalidade.atrasados || 0) / modalidade.total_registros) * 100 : 0;
+      modalidade.percentual_atraso = modalidade.total_exames > 0 ? 
+        ((modalidade.atrasados || 0) / modalidade.total_exames) * 100 : 0;
     });
     
     especialidadesMap.forEach(especialidade => {
       especialidade.percentual = totalExames > 0 ? (especialidade.total_exames / totalExames) * 100 : 0;
-      especialidade.percentual_atraso = especialidade.total_registros > 0 ? 
-        ((especialidade.atrasados || 0) / especialidade.total_registros) * 100 : 0;
+      especialidade.percentual_atraso = especialidade.total_exames > 0 ? 
+        ((especialidade.atrasados || 0) / especialidade.total_exames) * 100 : 0;
     });
     
     categoriasMap.forEach(categoria => {

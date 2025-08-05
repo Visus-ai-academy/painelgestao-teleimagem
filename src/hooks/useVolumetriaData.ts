@@ -287,8 +287,8 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         }
       });
 
-      const totalAtrasados = atrasados.length;
-      const percentualAtraso = totalRegistros > 0 ? (totalAtrasados / totalRegistros) * 100 : 0;
+      const totalAtrasados = atrasados.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+      const percentualAtraso = totalExames > 0 ? (totalAtrasados / totalExames) * 100 : 0;
 
       console.log(`💰 Total de exames: ${totalExames.toLocaleString()}`);
       console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
@@ -320,13 +320,13 @@ export function useVolumetriaData(periodo: string, cliente: string) {
           a.DATA_LAUDO === item.DATA_LAUDO && 
           a.HORA_LAUDO === item.HORA_LAUDO
         )) {
-          clienteData.atrasados += 1;
+          clienteData.atrasados += Number(item.VALORES) || 0;
         }
       });
 
       const clientesArray = Array.from(clientesMap.values()).map(cliente => ({
         ...cliente,
-        percentual_atraso: cliente.total_registros > 0 ? (cliente.atrasados / cliente.total_registros) * 100 : 0
+        percentual_atraso: cliente.total_exames > 0 ? (cliente.atrasados / cliente.total_exames) * 100 : 0
       })).sort((a, b) => b.total_exames - a.total_exames);
 
       // Processar dados por modalidade
