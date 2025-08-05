@@ -2093,8 +2093,6 @@ export type Database = {
           considera_prioridade_plantao: boolean | null
           created_at: string
           created_by: string | null
-          data_fim_vigencia: string | null
-          data_inicio_vigencia: string
           descricao: string | null
           especialidade: string
           especialidade_id: string | null
@@ -2123,8 +2121,6 @@ export type Database = {
           considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
-          data_fim_vigencia?: string | null
-          data_inicio_vigencia?: string
           descricao?: string | null
           especialidade: string
           especialidade_id?: string | null
@@ -2153,8 +2149,6 @@ export type Database = {
           considera_prioridade_plantao?: boolean | null
           created_at?: string
           created_by?: string | null
-          data_fim_vigencia?: string | null
-          data_inicio_vigencia?: string
           descricao?: string | null
           especialidade?: string
           especialidade_id?: string | null
