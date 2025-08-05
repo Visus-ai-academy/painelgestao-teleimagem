@@ -21,7 +21,10 @@ export function VolumetriaExamesNaoIdentificados() {
   useEffect(() => {
     // Só carregar quando dados estiverem disponíveis no contexto
     if (!data.loading && data.detailedData.length > 0) {
+      console.log('🚀 INICIANDO loadExamesNaoIdentificados com', data.detailedData.length, 'registros');
       loadExamesNaoIdentificados();
+    } else {
+      console.log('⏳ Aguardando dados completos. Loading:', data.loading, 'Registros:', data.detailedData.length);
     }
   }, [data.loading, data.detailedData]);
 
@@ -48,6 +51,9 @@ export function VolumetriaExamesNaoIdentificados() {
       const volumetriaData = volumetriaDataCompleta.filter(item => 
         item.VALORES === 0 || item.VALORES === null || item.VALORES === undefined
       );
+      
+      console.log('📊 REGISTROS ZERADOS FILTRADOS:', volumetriaData.length);
+      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData.slice(0, 3));
 
       // 2. Buscar estudos existentes no De Para (COM LIMITE EXPLÍCITO ALTO)
       const { data: deParaData, error: deParaError } = await supabase
@@ -56,7 +62,12 @@ export function VolumetriaExamesNaoIdentificados() {
         .eq('ativo', true)
         .limit(50000);
 
-      if (deParaError) throw deParaError;
+      if (deParaError) {
+        console.error('❌ Erro ao buscar De Para:', deParaError);
+        throw deParaError;
+      }
+      
+      console.log('📋 TOTAL DE REGISTROS NO DE PARA:', deParaData?.length || 0);
 
       // Criar Set com estudos do De Para, aplicando limpeza de termos X
       const estudosNoDePara = new Set(deParaData?.map(item => 
