@@ -169,7 +169,7 @@ serve(async (req) => {
       try {
         const row = jsonData[i] as any[]
         
-        if (!row || row.length < 4) {
+        if (!row || row.length < 8) {
           console.log(`⚠️ Linha ${i}: dados insuficientes - ${row ? row.length : 0} colunas`)
           continue
         }
