@@ -19,9 +19,14 @@ export function VolumetriaUploadStats() {
 
   // Forçar uma atualização na primeira renderização para garantir que os dados sejam carregados
   useEffect(() => {
-    console.log('🔄 VolumetriaUploadStats montado - forçando refresh...');
-    refreshData();
-  }, [refreshData]);
+    console.log('🔄 VolumetriaUploadStats montado - forçando refresh IMEDIATO...');
+    
+    // Limpar qualquer cache e forçar reload completo
+    setTimeout(() => {
+      console.log('🚀 Executando refresh forçado agora...');
+      refreshData();
+    }, 100);
+  }, []);
 
   // Converter dados do contexto para o formato de stats
   const stats: UploadStats[] = [

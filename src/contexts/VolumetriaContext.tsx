@@ -147,6 +147,8 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         console.log(`✅ ${tipo}: ${totalRecordsCount} registros, ${recordsWithValueCount} com valores, ${recordsZeroed} zerados, ${totalValue} TOTAL EXAMES`);
       }
 
+      console.log('📊 DADOS FINAIS DE STATS:', statsResult);
+
       // Carregar últimos uploads
       const lastUploadsResult: Record<string, any> = {};
       for (const tipo of tiposArquivo) {
@@ -162,10 +164,17 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      console.log('🔄 Atualizando estado do contexto...');
       setData({
         stats: statsResult,
         lastUploads: lastUploadsResult,
         loading: false
+      });
+      
+      console.log('✅ CONTEXTO ATUALIZADO COM SUCESSO!');
+      console.log('📈 Resumo dos totais:');
+      Object.entries(statsResult).forEach(([tipo, dados]: [string, any]) => {
+        console.log(`- ${tipo}: ${dados.totalValue} exames`);
       });
 
       console.log('✅ Estatísticas DEFINITIVAS carregadas (dados físicos do banco):', statsResult);
