@@ -196,18 +196,32 @@ export default function Volumetria() {
             </TabsContent>
 
             <TabsContent value="delays" className="mt-6">
-              <VolumetriaDelayAnalysis 
-                data={{
-                  clientes: processedData.clientes as any,
-                  modalidades: processedData.modalidades as any,
-                  especialidades: processedData.especialidades as any,
-                  categorias: processedData.categorias as any,
-                  prioridades: processedData.prioridades as any,
-                  totalAtrasados: stats.total_atrasados,
-                  percentualAtrasoGeral: stats.percentual_atraso,
-                  atrasosComTempo: []
-                }}
-              />
+              {(() => {
+                const totalAtrasadosCalculado = (processedData.clientes as any).reduce((sum: number, cliente: any) => sum + (cliente.atrasados || 0), 0);
+                const percentualCalculado = stats.total_exames > 0 ? (totalAtrasadosCalculado / stats.total_exames) * 100 : 0;
+                console.log('🎯 [Volumetria] Cálculo correto de atrasos:', {
+                  totalAtrasadosCalculado,
+                  percentualCalculado,
+                  totalExames: stats.total_exames,
+                  totalAtrasadosAntigo: stats.total_atrasados,
+                  percentualAntigo: stats.percentual_atraso
+                });
+                
+                return (
+                  <VolumetriaDelayAnalysis 
+                    data={{
+                      clientes: processedData.clientes as any,
+                      modalidades: processedData.modalidades as any,
+                      especialidades: processedData.especialidades as any,
+                      categorias: processedData.categorias as any,
+                      prioridades: processedData.prioridades as any,
+                      totalAtrasados: totalAtrasadosCalculado,
+                      percentualAtrasoGeral: percentualCalculado,
+                      atrasosComTempo: []
+                    }}
+                  />
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </>
