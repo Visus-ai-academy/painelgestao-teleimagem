@@ -49,7 +49,8 @@ export function VolumetriaMedicosAnalysis({
 }: VolumetriaMedicosAnalysisProps) {
   const [expandedMedicos, setExpandedMedicos] = useState<Set<string>>(new Set());
   
-  const formatPercentual = (valor: number) => {
+  const formatPercentual = (valor: number | undefined) => {
+    if (valor === undefined || valor === null || isNaN(valor)) return '0.0%';
     return `${valor.toFixed(1)}%`;
   };
 
