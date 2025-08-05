@@ -63,8 +63,8 @@ export const LaudosAtrasadosDetalhado = () => {
           
           atrasados.push({
             empresa: item.EMPRESA || '',
-            paciente: item.PACIENTE || item.ESTUDO_DESCRICAO || '', // Usar ESTUDO_DESCRICAO se PACIENTE não disponível
-            exame: item.EXAME || item.ESTUDO_DESCRICAO || '', // Usar ESTUDO_DESCRICAO como nome do exame
+            paciente: item.NOME_PACIENTE || 'Não informado', // Campo correto é NOME_PACIENTE
+            exame: item.ESTUDO_DESCRICAO || 'Não informado', // Campo correto é ESTUDO_DESCRICAO
             modalidade: item.MODALIDADE || '',
             especialidade: item.ESPECIALIDADE || '',
             categoria: item.CATEGORIA || '',
