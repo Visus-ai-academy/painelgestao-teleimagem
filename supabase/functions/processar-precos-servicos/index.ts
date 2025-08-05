@@ -28,7 +28,7 @@ async function processarLotesBackground(
     // Processar lote
     for (const item of lote) {
       try {
-        const { linha, cliente, modalidade, especialidade, categoria, prioridade, valorBase, valorUrgencia } = item
+        const { linha, cliente, modalidade, especialidade, categoria, prioridade, valor } = item
 
         // Buscar cliente no banco
         const { data: clienteData, error: clienteError } = await supabaseClient
@@ -44,7 +44,7 @@ async function processarLotesBackground(
           continue
         }
 
-        // Inserir preço
+        // Inserir preço - valor_urgencia será igual ao valor_base por enquanto (parâmetros ainda não implementados)
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
           .upsert({
@@ -53,8 +53,8 @@ async function processarLotesBackground(
             especialidade: especialidade,
             categoria: categoria,
             prioridade: prioridade,
-            valor_base: valorBase,
-            valor_urgencia: valorUrgencia,
+            valor_base: valor,
+            valor_urgencia: valor, // Por enquanto igual ao valor_base
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
@@ -170,53 +170,45 @@ serve(async (req) => {
           continue
         }
 
-        // Mapear campos conforme estrutura esperada
+        // Mapear campos conforme estrutura do Excel
+        // CLIENTE | DT INÍCIO VIGÊNCIA | DT FIM VIGÊNCIA | MODALIDADE | ESPECIALIDADE | PRIORIDADE | CATEGORIA | VALOR | VOL INICIAL | VOL FINAL | VOLUME TOTAL | CONSIDERA PLANTAO | TEM ADITIVO
         const cliente = String(row[0] || '').trim()
-        const modalidade = String(row[1] || '').trim() 
-        const especialidade = String(row[2] || '').trim()
-        const categoria = String(row[3] || '').trim()
-        const prioridade = String(row[4] || '').trim()
+        const dtInicioVigencia = String(row[1] || '').trim()
+        const dtFimVigencia = String(row[2] || '').trim()
+        const modalidade = String(row[3] || '').trim() 
+        const especialidade = String(row[4] || '').trim()
+        const prioridade = String(row[5] || '').trim()
+        const categoria = String(row[6] || '').trim()
+        const valorStr = String(row[7] || '').trim()
+        const volInicial = String(row[8] || '').trim()
+        const volFinal = String(row[9] || '').trim()
+        const volumeTotal = String(row[10] || '').trim()
+        const consideraPlantao = String(row[11] || '').trim()
+        const temAditivo = String(row[12] || '').trim()
         
-        // Buscar valor_base e valor_urgencia nas próximas colunas
-        let valorBaseStr = String(row[5] || '').trim()
-        let valorUrgenciaStr = String(row[6] || '').trim()
-        
-        // Se não encontrou valores nas posições esperadas, buscar em outras colunas
-        if (!valorBaseStr || !(/[\d,.]/.test(valorBaseStr))) {
-          for (let col = 5; col < row.length; col++) {
+        // Se não encontrou valor na posição esperada, buscar em outras colunas
+        let valorFinal = valorStr
+        if (!valorFinal || !(/[\d,.]/.test(valorFinal))) {
+          for (let col = 7; col < row.length; col++) {
             const cellValue = String(row[col] || '').trim()
             if (cellValue && /[\d,.]/.test(cellValue)) {
-              valorBaseStr = cellValue
+              valorFinal = cellValue
               break
             }
           }
         }
         
-        if (!valorUrgenciaStr || !(/[\d,.]/.test(valorUrgenciaStr))) {
-          for (let col = 6; col < row.length; col++) {
-            const cellValue = String(row[col] || '').trim()
-            if (cellValue && /[\d,.]/.test(cellValue) && cellValue !== valorBaseStr) {
-              valorUrgenciaStr = cellValue
-              break
-            }
-          }
+        // Se não encontrou valor, pular linha
+        if (!valorFinal) {
+          errosIniciais.push(`Linha ${i}: Valor não encontrado`)
+          continue
         }
         
-        // Se não encontrou valor_urgencia, usar o mesmo que valor_base
-        if (!valorUrgenciaStr) {
-          valorUrgenciaStr = valorBaseStr
-        }
-        
-        // Limpar e converter valores
-        const valorBaseLimpo = valorBaseStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorBaseFinal = valorBaseLimpo.includes(',') && !valorBaseLimpo.includes('.') ? 
-          valorBaseLimpo.replace(',', '.') : valorBaseLimpo
-        const valorBase = parseFloat(valorBaseFinal)
-
-        const valorUrgenciaLimpo = valorUrgenciaStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorUrgenciaFinal = valorUrgenciaLimpo.includes(',') && !valorUrgenciaLimpo.includes('.') ? 
-          valorUrgenciaLimpo.replace(',', '.') : valorUrgenciaLimpo
-        const valorUrgencia = parseFloat(valorUrgenciaFinal)
+        // Limpar e converter valor
+        const valorLimpo = valorFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        const valorConvertido = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
+          valorLimpo.replace(',', '.') : valorLimpo
+        const valor = parseFloat(valorConvertido)
 
         // Validar dados essenciais
         if (!cliente || cliente.length < 2) {
@@ -234,25 +226,26 @@ serve(async (req) => {
           continue
         }
 
-        if (isNaN(valorBase) || valorBase <= 0) {
-          errosIniciais.push(`Linha ${i}: Valor base inválido - "${valorBaseStr}" => ${valorBase}`)
-          continue
-        }
-
-        if (isNaN(valorUrgencia) || valorUrgencia <= 0) {
-          errosIniciais.push(`Linha ${i}: Valor urgência inválido - "${valorUrgenciaStr}" => ${valorUrgencia}`)
+        if (isNaN(valor) || valor <= 0) {
+          errosIniciais.push(`Linha ${i}: Valor inválido - "${valorFinal}" => ${valor}`)
           continue
         }
 
         dadosValidados.push({
           linha: i,
           cliente,
+          dtInicioVigencia,
+          dtFimVigencia,
           modalidade,
           especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valorBase,
-          valorUrgencia
+          valor,
+          volInicial: volInicial ? parseInt(volInicial) || null : null,
+          volFinal: volFinal ? parseInt(volFinal) || null : null,
+          volumeTotal: volumeTotal ? parseInt(volumeTotal) || null : null,
+          consideraPlantao: consideraPlantao.toLowerCase() === 'sim' || consideraPlantao.toLowerCase() === 'true',
+          temAditivo: temAditivo.toLowerCase() === 'sim' || temAditivo.toLowerCase() === 'true'
         })
 
       } catch (error) {
@@ -266,57 +259,35 @@ serve(async (req) => {
       try {
         const row = jsonData[i] as any[]
         
-        if (!row || row.length < 4) continue
+        if (!row || row.length < 8) continue
 
         const cliente = String(row[0] || '').trim()
-        const modalidade = String(row[1] || '').trim() 
-        const especialidade = String(row[2] || '').trim()
-        const categoria = String(row[3] || '').trim()
-        const prioridade = String(row[4] || '').trim()
+        const modalidade = String(row[3] || '').trim() 
+        const especialidade = String(row[4] || '').trim()
+        const prioridade = String(row[5] || '').trim()
+        const categoria = String(row[6] || '').trim()
+        const valorStr = String(row[7] || '').trim()
         
-        // Buscar valor_base e valor_urgencia
-        let valorBaseStr = String(row[5] || '').trim()
-        let valorUrgenciaStr = String(row[6] || '').trim()
-        
-        // Se não encontrou valores nas posições esperadas, buscar em outras colunas
-        if (!valorBaseStr || !(/[\d,.]/.test(valorBaseStr))) {
-          for (let col = 5; col < row.length; col++) {
+        // Se não encontrou valor na posição esperada, buscar em outras colunas
+        let valorFinal = valorStr
+        if (!valorFinal || !(/[\d,.]/.test(valorFinal))) {
+          for (let col = 7; col < row.length; col++) {
             const cellValue = String(row[col] || '').trim()
             if (cellValue && /[\d,.]/.test(cellValue)) {
-              valorBaseStr = cellValue
+              valorFinal = cellValue
               break
             }
           }
         }
         
-        if (!valorUrgenciaStr || !(/[\d,.]/.test(valorUrgenciaStr))) {
-          for (let col = 6; col < row.length; col++) {
-            const cellValue = String(row[col] || '').trim()
-            if (cellValue && /[\d,.]/.test(cellValue) && cellValue !== valorBaseStr) {
-              valorUrgenciaStr = cellValue
-              break
-            }
-          }
-        }
+        if (!valorFinal) continue
         
-        // Se não encontrou valor_urgencia, usar o mesmo que valor_base
-        if (!valorUrgenciaStr) {
-          valorUrgenciaStr = valorBaseStr
-        }
-        
-        if (!valorBaseStr) continue
-        
-        const valorBaseLimpo = valorBaseStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorBaseFinal = valorBaseLimpo.includes(',') && !valorBaseLimpo.includes('.') ? 
-          valorBaseLimpo.replace(',', '.') : valorBaseLimpo
-        const valorBase = parseFloat(valorBaseFinal)
+        const valorLimpo = valorFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        const valorConvertido = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
+          valorLimpo.replace(',', '.') : valorLimpo
+        const valor = parseFloat(valorConvertido)
 
-        const valorUrgenciaLimpo = valorUrgenciaStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const valorUrgenciaFinal = valorUrgenciaLimpo.includes(',') && !valorUrgenciaLimpo.includes('.') ? 
-          valorUrgenciaLimpo.replace(',', '.') : valorUrgenciaLimpo
-        const valorUrgencia = parseFloat(valorUrgenciaFinal)
-
-        if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(valorBase) || valorBase <= 0 || isNaN(valorUrgencia) || valorUrgencia <= 0) {
+        if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(valor) || valor <= 0) {
           continue
         }
 
@@ -327,8 +298,7 @@ serve(async (req) => {
           especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valorBase,
-          valorUrgencia
+          valor
         })
 
       } catch (error) {
@@ -342,7 +312,7 @@ serve(async (req) => {
 
     for (const item of dadosValidados) {
       try {
-        const { linha, cliente, modalidade, especialidade, categoria, prioridade, valorBase, valorUrgencia } = item
+        const { linha, cliente, modalidade, especialidade, categoria, prioridade, valor } = item
 
         // Buscar cliente no banco
         const { data: clienteData, error: clienteError } = await supabaseClient
@@ -357,7 +327,7 @@ serve(async (req) => {
           continue
         }
 
-        // Inserir preço
+        // Inserir preço - valor_urgencia será igual ao valor_base por enquanto (parâmetros ainda não implementados)
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
           .upsert({
@@ -366,8 +336,8 @@ serve(async (req) => {
             especialidade: especialidade,
             categoria: categoria,
             prioridade: prioridade,
-            valor_base: valorBase,
-            valor_urgencia: valorUrgencia,
+            valor_base: valor,
+            valor_urgencia: valor, // Por enquanto igual ao valor_base
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
