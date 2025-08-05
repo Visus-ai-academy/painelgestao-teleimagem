@@ -34,8 +34,6 @@ export const LaudosAtrasadosDetalhado = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
 
   // CARREGAR TODOS OS LAUDOS ATRASADOS DIRETAMENTE DA FUNÇÃO RPC
   useEffect(() => {
@@ -128,12 +126,8 @@ export const LaudosAtrasadosDetalhado = () => {
     return filtered;
   }, [laudosAtrasados, searchTerm, sortField, sortDirection]);
 
-  // Paginação
-  const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
-  const paginatedData = filteredAndSortedData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // REMOVER PAGINAÇÃO - EXIBIR TODOS OS REGISTROS
+  const displayData = filteredAndSortedData; // TODOS os dados sem paginação
 
   // Função para alterar ordenação
   const handleSort = (field: SortField) => {
@@ -236,7 +230,6 @@ export const LaudosAtrasadosDetalhado = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
                 }}
                 className="pl-8"
               />
@@ -283,157 +276,137 @@ export const LaudosAtrasadosDetalhado = () => {
 
         {/* Tabela de laudos atrasados */}
         <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="cursor-pointer" onClick={() => handleSort('empresa')}>
-                  <div className="flex items-center gap-1">
-                    Cliente {renderSortIcon('empresa')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
-                  <div className="flex items-center gap-1">
-                    Paciente {renderSortIcon('paciente')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
-                  <div className="flex items-center gap-1">
-                    Exame {renderSortIcon('exame')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('valores')}>
-                  <div className="flex items-center gap-1">
-                    Qtd {renderSortIcon('valores')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('modalidade')}>
-                  <div className="flex items-center gap-1">
-                    Modalidade {renderSortIcon('modalidade')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('especialidade')}>
-                  <div className="flex items-center gap-1">
-                    Especialidade {renderSortIcon('especialidade')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('medico')}>
-                  <div className="flex items-center gap-1">
-                    Médico {renderSortIcon('medico')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('dataPrazo')}>
-                  <div className="flex items-center gap-1">
-                    Prazo {renderSortIcon('dataPrazo')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('dataLaudo')}>
-                  <div className="flex items-center gap-1">
-                    Laudo {renderSortIcon('dataLaudo')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('tempoAtrasoHoras')}>
-                  <div className="flex items-center gap-1">
-                    Atraso {renderSortIcon('tempoAtrasoHoras')}
-                  </div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedData.map((laudo, index) => {
-                const urgencia = categorizarUrgencia(laudo.tempoAtrasoHoras);
-                return (
-                  <TableRow key={index} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{laudo.empresa}</TableCell>
-                    <TableCell>
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate" title={laudo.paciente}>
-                          {laudo.paciente || 'Não informado'}
+          <div className="max-h-96 overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-white z-10">
+                <TableRow className="bg-muted/50">
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('empresa')}>
+                    <div className="flex items-center gap-1">
+                      Cliente {renderSortIcon('empresa')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
+                    <div className="flex items-center gap-1">
+                      Paciente {renderSortIcon('paciente')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
+                    <div className="flex items-center gap-1">
+                      Exame {renderSortIcon('exame')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('valores')}>
+                    <div className="flex items-center gap-1">
+                      Qtd {renderSortIcon('valores')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('modalidade')}>
+                    <div className="flex items-center gap-1">
+                      Modalidade {renderSortIcon('modalidade')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('especialidade')}>
+                    <div className="flex items-center gap-1">
+                      Especialidade {renderSortIcon('especialidade')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('medico')}>
+                    <div className="flex items-center gap-1">
+                      Médico {renderSortIcon('medico')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('dataPrazo')}>
+                    <div className="flex items-center gap-1">
+                      Prazo {renderSortIcon('dataPrazo')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('dataLaudo')}>
+                    <div className="flex items-center gap-1">
+                      Laudo {renderSortIcon('dataLaudo')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('tempoAtrasoHoras')}>
+                    <div className="flex items-center gap-1">
+                      Atraso {renderSortIcon('tempoAtrasoHoras')}
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayData.map((laudo, index) => {
+                  const urgencia = categorizarUrgencia(laudo.tempoAtrasoHoras);
+                  return (
+                    <TableRow key={index} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{laudo.empresa}</TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate" title={laudo.paciente}>
+                            {laudo.paciente || 'Não informado'}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate" title={laudo.exame}>
-                          {laudo.exame || 'Não informado'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate" title={laudo.exame}>
+                            {laudo.exame || 'Não informado'}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="font-semibold text-blue-600">
-                        {laudo.valores.toLocaleString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{laudo.modalidade || 'Não informado'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{laudo.especialidade || 'Não informado'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{laudo.medico || 'Não informado'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {format(laudo.dataPrazo, 'dd/MM/yyyy', { locale: ptBR })}
-                        <div className="text-xs text-muted-foreground">
-                          {format(laudo.dataPrazo, 'HH:mm')}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="font-semibold text-blue-600">
+                          {laudo.valores.toLocaleString()}
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {format(laudo.dataLaudo, 'dd/MM/yyyy', { locale: ptBR })}
-                        <div className="text-xs text-muted-foreground">
-                          {format(laudo.dataLaudo, 'HH:mm')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{laudo.modalidade || 'Não informado'}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{laudo.especialidade || 'Não informado'}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{laudo.medico || 'Não informado'}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {format(laudo.dataPrazo, 'dd/MM/yyyy', { locale: ptBR })}
+                          <div className="text-xs text-muted-foreground">
+                            {format(laudo.dataPrazo, 'HH:mm')}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge variant={urgencia.color} className="text-xs">
-                          {formatarTempoAtraso(laudo.tempoAtrasoHoras)}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {urgencia.label}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {format(laudo.dataLaudo, 'dd/MM/yyyy', { locale: ptBR })}
+                          <div className="text-xs text-muted-foreground">
+                            {format(laudo.dataLaudo, 'HH:mm')}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={urgencia.color} className="text-xs">
+                            {formatarTempoAtraso(laudo.tempoAtrasoHoras)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {urgencia.label}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
-        {/* Paginação */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-muted-foreground">
-              Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} de {filteredAndSortedData.length} laudos
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm">
-                Página {currentPage} de {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Próxima
-              </Button>
-            </div>
+        {/* Informação de total de registros */}
+        <div className="mt-6 text-center">
+          <div className="text-sm text-muted-foreground">
+            Total: <strong>{filteredAndSortedData.length.toLocaleString()} laudos atrasados</strong>
+            {searchTerm && ` (filtrados de ${laudosAtrasados.length.toLocaleString()} laudos)`}
           </div>
-        )}
+        </div>
 
         {laudosAtrasados.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">

@@ -267,9 +267,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     carregarTempoMedio();
   }, []);
 
-  // Calcular dados de clientes com tempo médio de atraso
+  // Calcular dados de clientes com tempo médio de atraso - INCLUIR TODOS OS CLIENTES
   const clientesComTempoAtraso = safeData.clientes
-    .filter(c => c.atrasados > 0)
     .map(cliente => {
       const tempoMedioAtraso = tempoMedioClientes.get(cliente.nome) || 0;
       
