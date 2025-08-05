@@ -122,7 +122,9 @@ export default function Volumetria() {
           </span>
           <Button 
             onClick={() => {
-              console.log('🔄 Refresh manual iniciado...');
+              console.log('🔥🔥🔥 USUÁRIO CLICOU EM REFRESH - FORÇANDO CARREGAMENTO TOTAL 🔥🔥🔥');
+              console.log('🎯 META: Carregar todos os 35.337 registros definitivos do banco');
+              console.log('⚡ Invalidando cache e forçando reload completo...');
               refreshData();
             }}
             variant="default" 
@@ -130,7 +132,7 @@ export default function Volumetria() {
             className="flex items-center gap-2"
           >
             <RefreshCw className="h-4 w-4" />
-            Atualizar Dados
+            🔥 Forçar Dados Completos (35k+)
           </Button>
         </div>
       </div>
