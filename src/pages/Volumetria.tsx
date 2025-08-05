@@ -10,6 +10,7 @@ import { VolumetriaExecutiveSummary } from '@/components/volumetria/VolumetriaEx
 import { VolumetriaMedicosAnalysis } from '@/components/volumetria/VolumetriaMedicosAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVolumetria } from '@/contexts/VolumetriaContext';
+import { useVolumetriaProcessedData } from '@/hooks/useVolumetriaProcessedData';
 
 interface VolumetriaFilters {
   ano: string;
@@ -67,17 +68,18 @@ const getDefaultFilters = (): VolumetriaFilters => {
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>(getDefaultFilters());
   
-  // Usar apenas dados do contexto centralizado
-  const { data: contextData, refreshData, getFilteredData } = useVolumetria();
+  // USAR DADOS PROCESSADOS CENTRALIZADOS
+  const { data: contextData, refreshData } = useVolumetria();
+  const processedData = useVolumetriaProcessedData();
   
-  // Logs de debug para identificar inconsistências
-  console.log('🔥 [Volumetria] Dados completos do contexto:', contextData);
-  console.log('📊 [Volumetria] Detalhes:', { 
-    totalRegistros: contextData.detailedData?.length, 
-    loading: contextData.loading,
-    totalExames: contextData.dashboardStats.total_exames
+  // Logs de debug para identificar inconsistências 
+  console.log('🔥 [Volumetria] Dados do contexto:', contextData.dashboardStats);
+  console.log('📊 [Volumetria] Dados processados:', {
+    clientes: processedData.clientes.length,
+    modalidades: processedData.modalidades.length,
+    totalExames: processedData.totalExames,
+    loading: processedData.loading
   });
-  console.log('📊 [Volumetria] Stats detalhadas:', contextData.stats);
   
   // Verificar se há filtros ativos
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
@@ -85,101 +87,10 @@ export default function Volumetria() {
     return value !== 'todos';
   });
   
-  // Usar dados filtrados se há filtros ativos, senão usar dados completos do contexto
-  const currentData = hasActiveFilters ? getFilteredData(filters) : contextData.detailedData;
-  
-  // Calcular estatísticas dinâmicas baseadas nos dados atuais
-  const stats = hasActiveFilters ? {
-    // Recalcular stats para dados filtrados
-    total_exames: currentData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0),
-    total_registros: currentData.length,
-    total_atrasados: currentData.filter(item => {
-      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
-      try {
-        const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-        const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-        return dataLaudo > dataPrazo;
-      } catch {
-        return false;
-      }
-    }).length,
-    percentual_atraso: currentData.length > 0 ? 
-      (currentData.filter(item => {
-        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
-        try {
-          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-          return dataLaudo > dataPrazo;
-        } catch {
-          return false;
-        }
-      }).length / currentData.length) * 100 : 0,
-    total_clientes: contextData.dashboardStats.total_clientes,
-    total_clientes_volumetria: [...new Set(currentData.map(item => item.EMPRESA).filter(Boolean))].length,
-    total_modalidades: [...new Set(currentData.map(item => item.MODALIDADE).filter(Boolean))].length,
-    total_especialidades: [...new Set(currentData.map(item => item.ESPECIALIDADE).filter(Boolean))].length,
-    total_medicos: [...new Set(currentData.map(item => item.MEDICO).filter(Boolean))].length,
-    total_prioridades: [...new Set(currentData.map(item => item.PRIORIDADE).filter(Boolean))].length
-  } : contextData.dashboardStats;
-  
-  const loading = contextData.loading;
+  // USAR DADOS PROCESSADOS EM VEZ DE REPROCESSAR
+  const stats = contextData.dashboardStats;
+  const loading = processedData.loading;
   const hasNoData = stats.total_exames === 0;
-  
-  // Processar dados agregados para os componentes
-  const clientesArray = Object.values(currentData.reduce((acc: Record<string, ClienteData>, item) => {
-    const cliente = item.EMPRESA;
-    if (!cliente) return acc;
-    if (!acc[cliente]) {
-      acc[cliente] = { nome: cliente, total_exames: 0, total_registros: 0, atrasados: 0, percentual_atraso: 0 };
-    }
-    acc[cliente].total_exames += Number(item.VALORES) || 0;
-    acc[cliente].total_registros += 1;
-    return acc;
-  }, {})) as ClienteData[];
-  
-  const modalidadesArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
-    const modalidade = item.MODALIDADE;
-    if (!modalidade) return acc;
-    if (!acc[modalidade]) {
-      acc[modalidade] = { nome: modalidade, total_exames: 0, total_registros: 0 };
-    }
-    acc[modalidade].total_exames += Number(item.VALORES) || 0;
-    acc[modalidade].total_registros += 1;
-    return acc;
-  }, {})) as ModalidadeData[];
-  
-  const especialidadesArray = Object.values(currentData.reduce((acc: Record<string, EspecialidadeData>, item) => {
-    const especialidade = item.ESPECIALIDADE;
-    if (!especialidade) return acc;
-    if (!acc[especialidade]) {
-      acc[especialidade] = { nome: especialidade, total_exames: 0, total_registros: 0 };
-    }
-    acc[especialidade].total_exames += Number(item.VALORES) || 0;
-    acc[especialidade].total_registros += 1;
-    return acc;
-  }, {})) as EspecialidadeData[];
-  
-  const categoriasArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
-    const categoria = item.CATEGORIA;
-    if (!categoria) return acc;
-    if (!acc[categoria]) {
-      acc[categoria] = { nome: categoria, total_exames: 0, total_registros: 0 };
-    }
-    acc[categoria].total_exames += Number(item.VALORES) || 0;
-    acc[categoria].total_registros += 1;
-    return acc;
-  }, {})) as ModalidadeData[];
-  
-  const prioridadesArray = Object.values(currentData.reduce((acc: Record<string, ModalidadeData>, item) => {
-    const prioridade = item.PRIORIDADE;
-    if (!prioridade) return acc;
-    if (!acc[prioridade]) {
-      acc[prioridade] = { nome: prioridade, total_exames: 0, total_registros: 0 };
-    }
-    acc[prioridade].total_exames += Number(item.VALORES) || 0;
-    acc[prioridade].total_registros += 1;
-    return acc;
-  }, {})) as ModalidadeData[];
 
   if (loading) {
     return (
@@ -263,11 +174,11 @@ export default function Volumetria() {
 
             <TabsContent value="charts" className="mt-6">
               <VolumetriaCharts 
-                clientes={clientesArray as any}
-                modalidades={modalidadesArray as any}
-                especialidades={especialidadesArray as any}
-                categorias={categoriasArray as any}
-                prioridades={prioridadesArray as any}
+                clientes={processedData.clientes as any}
+                modalidades={processedData.modalidades as any}
+                especialidades={processedData.especialidades as any}
+                categorias={processedData.categorias as any}
+                prioridades={processedData.prioridades as any}
               />
             </TabsContent>
 
