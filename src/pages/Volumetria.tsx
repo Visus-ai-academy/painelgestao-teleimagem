@@ -152,7 +152,18 @@ export default function Volumetria() {
       ) : (
         <>
           {/* Métricas Principais */}
-          <VolumetriaStats stats={stats} />
+          {(() => {
+            const totalAtrasadosCorreto = (processedData.clientes as any).reduce((sum: number, cliente: any) => sum + (cliente.atrasados || 0), 0);
+            const percentualAtrasoCorreto = stats.total_exames > 0 ? (totalAtrasadosCorreto / stats.total_exames) * 100 : 0;
+            
+            return (
+              <VolumetriaStats 
+                stats={stats} 
+                totalAtrasadosCorreto={totalAtrasadosCorreto}
+                percentualAtrasoCorreto={percentualAtrasoCorreto}
+              />
+            );
+          })()}
 
           {/* Dashboard Profissional com Tabs */}
           <Tabs defaultValue="executive" className="w-full">

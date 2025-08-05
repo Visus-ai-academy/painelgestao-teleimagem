@@ -12,9 +12,15 @@ interface DashboardStats {
 
 interface VolumetriaStatsProps {
   stats: DashboardStats;
+  // Valores corretos calculados dos dados processados
+  totalAtrasadosCorreto?: number;
+  percentualAtrasoCorreto?: number;
 }
 
-export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
+export function VolumetriaStats({ stats, totalAtrasadosCorreto, percentualAtrasoCorreto }: VolumetriaStatsProps) {
+  // Usar valores corretos se fornecidos, senão usar os do contexto
+  const totalAtrasados = totalAtrasadosCorreto ?? stats.total_atrasados;
+  const percentualAtraso = percentualAtrasoCorreto ?? stats.percentual_atraso;
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <Card>
@@ -67,12 +73,12 @@ export function VolumetriaStats({ stats }: VolumetriaStatsProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-red-600">
-            {stats.percentual_atraso.toFixed(1)}%
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            {stats.total_atrasados.toLocaleString()} laudos atrasados
-          </p>
+           <div className="text-3xl font-bold text-red-600">
+             {percentualAtraso.toFixed(1)}%
+           </div>
+           <p className="text-sm text-muted-foreground mt-1">
+             {totalAtrasados.toLocaleString()} laudos atrasados
+           </p>
         </CardContent>
       </Card>
     </div>
