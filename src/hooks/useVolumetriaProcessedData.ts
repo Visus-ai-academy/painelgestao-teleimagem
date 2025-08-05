@@ -35,6 +35,7 @@ export interface ProcessedMedicoData {
   nome: string;
   total_exames: number;
   total_registros: number;
+  percentual: number;
   atrasados: number;
   percentual_atraso: number;
   especialidades: string[];
@@ -221,6 +222,7 @@ export function useVolumetriaProcessedData() {
           nome: medico,
           total_exames: 0,
           total_registros: 0,
+          percentual: 0,
           atrasados: 0,
           percentual_atraso: 0,
           especialidades: [],
@@ -276,6 +278,7 @@ export function useVolumetriaProcessedData() {
     });
     
     medicosMap.forEach(medico => {
+      medico.percentual = totalExames > 0 ? (medico.total_exames / totalExames) * 100 : 0;
       medico.percentual_atraso = medico.total_registros > 0 ? 
         (medico.atrasados / medico.total_registros) * 100 : 0;
     });
