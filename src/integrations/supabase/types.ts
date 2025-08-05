@@ -3272,9 +3272,8 @@ export type Database = {
       get_tempo_medio_atraso_clientes: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          tempo_medio_atraso_minutos: number
-          total_laudos_atrasados: number
+          empresa: string
+          tempo_medio_atraso_horas: number
         }[]
       }
       get_user_role: {

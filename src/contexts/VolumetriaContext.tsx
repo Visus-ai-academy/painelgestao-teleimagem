@@ -218,8 +218,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = useCallback(async () => {
-    console.log('🔄 Forçando refresh dos dados DEFINITIVOS do banco...');
+    console.log('🔄 Forçando refresh COMPLETO dos dados DEFINITIVOS do banco...');
     lastLoadTime.current = 0; // Invalidar cache
+    isLoadingRef.current = false; // Reset flag de carregamento
+    
+    // LIMPAR CACHES LOCAIS
+    localStorage.removeItem('volumetria_cache');
+    sessionStorage.clear();
+    
     setData(prev => ({ ...prev, loading: true }));
     await loadStats();
   }, [loadStats]);
