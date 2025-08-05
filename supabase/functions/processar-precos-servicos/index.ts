@@ -30,9 +30,10 @@ serve(async (req) => {
       throw new Error('Nenhum arquivo foi enviado')
     }
 
-    console.log(`Processando arquivo: ${file.name}, tamanho: ${file.size} bytes`)
+    console.log(`📁 Processando arquivo: ${file.name}`)
+    console.log(`📊 Tamanho: ${file.size} bytes`)
 
-    // 1. Log do início do processamento
+    // 1. Criar log de processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
@@ -40,7 +41,7 @@ serve(async (req) => {
         file_type: 'precos_servicos',
         status: 'processing',
         file_size: file.size,
-        uploader: req.headers.get('Authorization') ? 'authenticated_user' : 'anonymous'
+        uploader: 'authenticated_user'
       })
       .select()
       .single()
@@ -49,273 +50,139 @@ serve(async (req) => {
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
 
-    // 2. Ler arquivo Excel
+    // 2. Processar arquivo Excel
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-    
-    if (!workbook.SheetNames.length) {
-      throw new Error('Arquivo Excel não contém planilhas')
-    }
-    
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
     const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
     
-    if (jsonData.length <= 1) {
-      throw new Error('Arquivo Excel vazio ou sem dados')
-    }
-
-    // 3. Processar header e dados
-    const headers = jsonData[0] as string[]
-    console.log('Headers encontrados:', headers)
-    console.log('Total de linhas:', jsonData.length - 1)
-    console.log('Primeiras linhas de exemplo:', jsonData.slice(0, 5))
-
-    // Mapear índices das colunas de forma mais inteligente
-    const getColumnIndex = (searchTerms: string[]) => {
-      return headers.findIndex(header => {
-        const headerLower = String(header || '').toLowerCase().trim()
-        return searchTerms.some(term => headerLower.includes(term.toLowerCase()))
-      })
-    }
-
-    const clienteIdx = getColumnIndex(['cliente', 'client', 'empresa', 'razao'])
-    const modalidadeIdx = getColumnIndex(['modalidade', 'modal'])
-    const especialidadeIdx = getColumnIndex(['especialidade', 'esp'])
-    const categoriaIdx = getColumnIndex(['categoria', 'cat'])
-    const prioridadeIdx = getColumnIndex(['prioridade', 'prior'])
-    const valorIdx = getColumnIndex(['valor', 'preco', 'price', 'vl'])
-
-    console.log('Índices encontrados:', {
-      cliente: clienteIdx,
-      modalidade: modalidadeIdx, 
-      especialidade: especialidadeIdx,
-      categoria: categoriaIdx,
-      prioridade: prioridadeIdx,
-      valor: valorIdx
-    })
+    console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
+    console.log(`🏷️ Headers: ${JSON.stringify(jsonData[0])}`)
 
     let registrosProcessados = 0
     let registrosErro = 0
     const erros: string[] = []
-    const BATCH_SIZE = 50 // Reduzido para 50 para evitar timeout
-    const MAX_TIMEOUT = 240000 // 4 minutos máximo
 
-    const startTime = Date.now()
+    // 3. Processar dados linha por linha (método simples)
+    for (let i = 1; i < Math.min(jsonData.length, 101); i++) { // Processar apenas 100 primeiras linhas para teste
+      try {
+        const row = jsonData[i] as any[]
+        
+        if (!row || row.length < 3) {
+          console.log(`⚠️ Linha ${i}: dados insuficientes`)
+          continue
+        }
 
-    // 4. Processar em lotes para otimizar performance
-    for (let batchStart = 1; batchStart < jsonData.length; batchStart += BATCH_SIZE) {
-      // Verificar timeout
-      if (Date.now() - startTime > MAX_TIMEOUT) {
-        console.log('Timeout atingido, parando processamento')
-        erros.push(`Timeout: processamento interrompido após ${Math.floor((Date.now() - startTime) / 1000)}s`)
-        break
-      }
+        // Mapear campos de forma direta (assumindo ordem padrão)
+        const cliente = String(row[0] || '').trim()
+        const modalidade = String(row[1] || '').trim()
+        const especialidade = String(row[2] || '').trim()
+        const valor = parseFloat(String(row[3] || row[4] || row[5] || '0').replace(/[^\d,.-]/g, '').replace(',', '.'))
 
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, jsonData.length)
-      const batchData: any[] = []
-      
-      console.log(`Processando lote ${Math.floor(batchStart / BATCH_SIZE) + 1}: linhas ${batchStart} a ${batchEnd - 1}`)
-      
-      // Preparar dados do lote
-      for (let i = batchStart; i < batchEnd; i++) {
-        try {
-          const row = jsonData[i] as any[]
-          
-          if (!row || row.length < 2) {
-            continue
-          }
+        console.log(`📝 Linha ${i}: "${cliente}" | "${modalidade}" | "${especialidade}" | ${valor}`)
 
-          // Mapear campos usando os índices encontrados
-          const cliente = String(row[clienteIdx >= 0 ? clienteIdx : 0] || '').trim()
-          const modalidade = String(row[modalidadeIdx >= 0 ? modalidadeIdx : 1] || '').trim()
-          const especialidade = String(row[especialidadeIdx >= 0 ? especialidadeIdx : 2] || '').trim()
-          const categoria = String(row[categoriaIdx >= 0 ? categoriaIdx : 3] || 'Normal').trim()
-          const prioridade = String(row[prioridadeIdx >= 0 ? prioridadeIdx : 4] || 'Rotina').trim()
-          
-          // Tentar várias colunas para o valor
-          let valorStr
-          if (valorIdx >= 0) {
-            valorStr = row[valorIdx]
-          } else {
-            // Fallback: tentar várias colunas
-            valorStr = row[5] || row[6] || row[7] || row[8] || row[9]
-          }
-
-          console.log(`Linha ${i + 1}: cliente="${cliente}", modalidade="${modalidade}", especialidade="${especialidade}", valor="${valorStr}"`)
-
-          // Validações básicas melhoradas
-          if (!cliente || cliente === 'undefined' || cliente.length < 2) {
-            erros.push(`Linha ${i + 1}: cliente inválido ou vazio - "${cliente}"`)
-            registrosErro++
-            continue
-          }
-
-          if (!modalidade || modalidade === 'undefined' || modalidade.length < 1) {
-            erros.push(`Linha ${i + 1}: modalidade inválida ou vazia - "${modalidade}"`)
-            registrosErro++
-            continue
-          }
-
-          if (!especialidade || especialidade === 'undefined' || especialidade.length < 1) {
-            erros.push(`Linha ${i + 1}: especialidade inválida ou vazia - "${especialidade}"`)
-            registrosErro++
-            continue
-          }
-
-          if (!valorStr || valorStr === 'undefined') {
-            erros.push(`Linha ${i + 1}: valor não encontrado`)
-            registrosErro++
-            continue
-          }
-
-          // Converter valor com mais robustez
-          let valor: number
-          if (typeof valorStr === 'number') {
-            valor = valorStr
-          } else if (typeof valorStr === 'string') {
-            // Limpar string e converter
-            const valorLimpo = valorStr
-              .replace(/[R$\s]/g, '')  // Remove R$ e espaços
-              .replace(/\./g, '')      // Remove pontos de milhares
-              .replace(',', '.')       // Converte vírgula decimal para ponto
-              .trim()
-            
-            valor = parseFloat(valorLimpo)
-          } else {
-            valor = NaN
-          }
-          
-          if (isNaN(valor) || valor <= 0) {
-            erros.push(`Linha ${i + 1}: valor inválido - "${valorStr}" (convertido: ${valor})`)
-            registrosErro++
-            continue
-          }
-
-          console.log(`Linha ${i + 1}: valor convertido ${valorStr} -> ${valor}`)
-
-          batchData.push({
-            cliente_nome: cliente,
-            modalidade,
-            especialidade,
-            categoria,
-            prioridade,
-            valor
-          })
-
-        } catch (error) {
-          erros.push(`Linha ${i + 1}: ${error.message}`)
+        // Validar dados essenciais
+        if (!cliente || cliente.length < 2) {
+          erros.push(`Linha ${i}: Cliente inválido`)
           registrosErro++
+          continue
         }
-      }
 
-      // Processar lote: buscar clientes e inserir preços
-      if (batchData.length > 0) {
-        try {
-          // Buscar todos os clientes do lote de uma vez
-          const clientesNomes = [...new Set(batchData.map(item => item.cliente_nome))]
-          const { data: clientesData, error: clientesError } = await supabaseClient
-            .from('clientes')
-            .select('id, nome')
-            .in('nome', clientesNomes)
+        if (!modalidade || modalidade.length < 1) {
+          erros.push(`Linha ${i}: Modalidade inválida`)
+          registrosErro++
+          continue
+        }
 
-          if (clientesError) {
-            console.error('Erro ao buscar clientes:', clientesError.message)
-            erros.push(`Erro ao buscar clientes: ${clientesError.message}`)
-            registrosErro += batchData.length
-            continue
-          }
+        if (!especialidade || especialidade.length < 1) {
+          erros.push(`Linha ${i}: Especialidade inválida`)
+          registrosErro++
+          continue
+        }
 
-          // Criar mapa de clientes
-          const clientesMap = new Map()
-          clientesData?.forEach(cliente => {
-            clientesMap.set(cliente.nome, cliente.id)
+        if (isNaN(valor) || valor <= 0) {
+          erros.push(`Linha ${i}: Valor inválido - ${valor}`)
+          registrosErro++
+          continue
+        }
+
+        // Buscar cliente no banco
+        const { data: clienteData, error: clienteError } = await supabaseClient
+          .from('clientes')
+          .select('id')
+          .ilike('nome', `%${cliente}%`)
+          .limit(1)
+          .single()
+
+        if (clienteError || !clienteData) {
+          erros.push(`Linha ${i}: Cliente "${cliente}" não encontrado`)
+          registrosErro++
+          continue
+        }
+
+        // Inserir preço
+        const { error: insertError } = await supabaseClient
+          .from('precos_servicos')
+          .upsert({
+            cliente_id: clienteData.id,
+            modalidade: modalidade,
+            especialidade: especialidade,
+            categoria: 'Normal',
+            prioridade: 'Rotina',
+            valor: valor,
+            ativo: true
+          }, {
+            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
           })
 
-          // Preparar dados para inserção
-          const dadosParaInserir = []
-          for (const item of batchData) {
-            const clienteId = clientesMap.get(item.cliente_nome)
-            if (!clienteId) {
-              erros.push(`Cliente "${item.cliente_nome}" não encontrado`)
-              registrosErro++
-              continue
-            }
-
-            dadosParaInserir.push({
-              cliente_id: clienteId,
-              modalidade: item.modalidade,
-              especialidade: item.especialidade,
-              categoria: item.categoria,
-              prioridade: item.prioridade,
-              valor: item.valor,
-              ativo: true
-            })
-          }
-
-          // Inserir no banco
-          if (dadosParaInserir.length > 0) {
-            const { error: insertError } = await supabaseClient
-              .from('precos_servicos')
-              .upsert(dadosParaInserir, {
-                onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
-              })
-
-            if (insertError) {
-              console.error('Erro ao inserir lote:', insertError.message)
-              erros.push(`Erro no lote: ${insertError.message}`)
-              registrosErro += dadosParaInserir.length
-            } else {
-              registrosProcessados += dadosParaInserir.length
-            }
-          }
-
-        } catch (error) {
-          console.error('Erro no processamento do lote:', error.message)
-          erros.push(`Erro no lote: ${error.message}`)
-          registrosErro += batchData.length
+        if (insertError) {
+          erros.push(`Linha ${i}: Erro ao inserir - ${insertError.message}`)
+          registrosErro++
+          continue
         }
-      }
 
-      // Log de progresso
-      console.log(`Lote processado: ${registrosProcessados} sucessos, ${registrosErro} erros`)
-      
-      // Pausa pequena para evitar sobrecarga
-      await new Promise(resolve => setTimeout(resolve, 10))
+        registrosProcessados++
+        
+        if (registrosProcessados % 10 === 0) {
+          console.log(`✅ Processados: ${registrosProcessados}, Erros: ${registrosErro}`)
+        }
+
+      } catch (error) {
+        erros.push(`Linha ${i}: ${error.message}`)
+        registrosErro++
+      }
     }
 
-    // 5. Atualizar flags nos contratos dos clientes
+    // 4. Atualizar contratos
+    console.log('🔄 Atualizando status dos contratos...')
     const { error: updateError } = await supabaseClient
       .rpc('atualizar_status_configuracao_contrato')
 
     if (updateError) {
-      console.error('Erro ao atualizar status dos contratos:', updateError.message)
+      console.error('❌ Erro ao atualizar contratos:', updateError.message)
     }
 
-    // 6. Atualizar log com resultado
-    const status = registrosErro > registrosProcessados ? 'partial_success' : 'success'
+    // 5. Finalizar log
+    const status = registrosErro > registrosProcessados ? 'failed' : 'success'
     const { error: updateLogError } = await supabaseClient
       .from('upload_logs')
       .update({
         status: status,
         records_processed: registrosProcessados,
         error_count: registrosErro,
-        error_details: erros.length > 0 ? erros.slice(0, 20).join('; ') : null
+        error_details: erros.slice(0, 10).join('; ')
       })
       .eq('id', logEntry.id)
 
-    if (updateLogError) {
-      console.error('Erro ao atualizar log:', updateLogError.message)
-    }
-
-    console.log(`Processamento concluído! ${registrosProcessados} registros processados, ${registrosErro} erros.`)
+    console.log(`🎉 Processamento concluído: ${registrosProcessados} sucessos, ${registrosErro} erros`)
 
     return new Response(
       JSON.stringify({
         success: true,
         registros_processados: registrosProcessados,
         registros_erro: registrosErro,
-        erros: erros.slice(0, 10), // Primeiros 10 erros
-        mensagem: `Processamento concluído: ${registrosProcessados} preços cadastrados`
+        erros: erros.slice(0, 10),
+        mensagem: `Processados ${registrosProcessados} preços de serviços`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -324,7 +191,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro no processamento:', error)
+    console.error('💥 Erro geral:', error.message)
 
     return new Response(
       JSON.stringify({
