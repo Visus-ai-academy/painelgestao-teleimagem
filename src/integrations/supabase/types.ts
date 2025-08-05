@@ -3306,6 +3306,8 @@ export type Database = {
           DATA_PRAZO: string
           HORA_PRAZO: string
           data_referencia: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
         }[]
       }
       get_volumetria_dashboard_stats: {
