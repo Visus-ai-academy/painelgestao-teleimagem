@@ -71,22 +71,20 @@ export function useVolumetriaProcessedData() {
       percentual_atraso: data.dashboardStats?.percentual_atraso
     });
     
-    // Usar os dados agregados do contexto que já calculou todos os dados corretamente
-    const totalExamesFromDashboard = data.dashboardStats?.total_exames || 0;
-    const totalAtrasadosFromDashboard = data.dashboardStats?.total_atrasados || 0;
-    const percentualAtrasoFromDashboard = data.dashboardStats?.percentual_atraso || 0;
+    // CALCULAR DADOS REAIS BASEADOS NOS DADOS PROCESSADOS
+    let totalExamesCalculado = 0;
+    let totalAtrasadosCalculado = 0;
     
-    console.log('✅ [useVolumetriaProcessedData] Usando valores corretos do dashboard:', {
-      totalExames: totalExamesFromDashboard,
-      totalAtrasados: totalAtrasadosFromDashboard,
-      percentualAtraso: percentualAtrasoFromDashboard
-    });
+    console.log('🔍 [useVolumetriaProcessedData] Calculando dados reais dos exames...');
 
-    // CLIENTES
+    // CLIENTES - Calcular dados reais
     const clientesMap = new Map<string, ProcessedClienteData>();
     data.detailedData.forEach(item => {
       const cliente = item.EMPRESA;
       if (!cliente) return;
+      
+      const valores = Number(item.VALORES) || 0;
+      totalExamesCalculado += valores;
       
       if (!clientesMap.has(cliente)) {
         clientesMap.set(cliente, {
@@ -100,7 +98,7 @@ export function useVolumetriaProcessedData() {
       }
       
       const clienteData = clientesMap.get(cliente)!;
-      clienteData.total_exames += Number(item.VALORES) || 0;
+      clienteData.total_exames += valores;
       clienteData.total_registros += 1;
       
       // Calcular atrasos
@@ -110,36 +108,25 @@ export function useVolumetriaProcessedData() {
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           const isAtrasado = dataLaudo > dataPrazo;
           
-          // Log detalhado para debug
-          if (cliente === 'CEDI_RJ' && clienteData.total_registros < 5) {
-            console.log(`🔍 [${cliente}] Registro ${clienteData.total_registros + 1}:`, {
-              DATA_LAUDO: item.DATA_LAUDO,
-              HORA_LAUDO: item.HORA_LAUDO,
-              DATA_PRAZO: item.DATA_PRAZO,
-              HORA_PRAZO: item.HORA_PRAZO,
-              dataLaudo: dataLaudo.toISOString(),
-              dataPrazo: dataPrazo.toISOString(),
-              isAtrasado,
-              VALORES: item.VALORES
-            });
-          }
-          
           if (isAtrasado) {
-            clienteData.atrasados += Number(item.VALORES) || 0;
+            const atrasadoValor = valores;
+            clienteData.atrasados += atrasadoValor;
+            totalAtrasadosCalculado += atrasadoValor;
           }
         } catch (error) {
-          // Log de erros de parsing de data
-          if (cliente === 'CEDI_RJ' && clienteData.total_registros < 5) {
-            console.log(`❌ [${cliente}] Erro ao processar data:`, {
-              DATA_LAUDO: item.DATA_LAUDO,
-              HORA_LAUDO: item.HORA_LAUDO,
-              DATA_PRAZO: item.DATA_PRAZO,
-              HORA_PRAZO: item.HORA_PRAZO,
-              error
-            });
-          }
+          console.log(`❌ Erro ao processar data para ${cliente}:`, error);
         }
       }
+    });
+    
+    const percentualAtrasoCalculado = totalExamesCalculado > 0 ? 
+      (totalAtrasadosCalculado / totalExamesCalculado) * 100 : 0;
+    
+    console.log('🔥 [useVolumetriaProcessedData] DADOS REAIS CALCULADOS:', {
+      totalExamesCalculado,
+      totalAtrasadosCalculado,
+      percentualAtrasoCalculado: percentualAtrasoCalculado.toFixed(2) + '%',
+      totalRegistrosProcessados: data.detailedData.length
     });
     
     // Calcular percentuais e valores médios
@@ -299,28 +286,27 @@ export function useVolumetriaProcessedData() {
       }
     });
 
-    // Calcular percentuais finais
-    const totalExames = data.dashboardStats.total_exames;
+    // Calcular percentuais finais usando os valores calculados
     const totalRegistros = data.detailedData.length; // Total de registros para médicos
     
     modalidadesMap.forEach(modalidade => {
-      modalidade.percentual = totalExames > 0 ? (modalidade.total_exames / totalExames) * 100 : 0;
+      modalidade.percentual = totalExamesCalculado > 0 ? (modalidade.total_exames / totalExamesCalculado) * 100 : 0;
       modalidade.percentual_atraso = modalidade.total_exames > 0 ? 
         ((modalidade.atrasados || 0) / modalidade.total_exames) * 100 : 0;
     });
     
     especialidadesMap.forEach(especialidade => {
-      especialidade.percentual = totalExames > 0 ? (especialidade.total_exames / totalExames) * 100 : 0;
+      especialidade.percentual = totalExamesCalculado > 0 ? (especialidade.total_exames / totalExamesCalculado) * 100 : 0;
       especialidade.percentual_atraso = especialidade.total_exames > 0 ? 
         ((especialidade.atrasados || 0) / especialidade.total_exames) * 100 : 0;
     });
     
     categoriasMap.forEach(categoria => {
-      categoria.percentual = totalExames > 0 ? (categoria.total_exames / totalExames) * 100 : 0;
+      categoria.percentual = totalExamesCalculado > 0 ? (categoria.total_exames / totalExamesCalculado) * 100 : 0;
     });
     
     prioridadesMap.forEach(prioridade => {
-      prioridade.percentual = totalExames > 0 ? (prioridade.total_exames / totalExames) * 100 : 0;
+      prioridade.percentual = totalExamesCalculado > 0 ? (prioridade.total_exames / totalExamesCalculado) * 100 : 0;
     });
     
     medicosMap.forEach(medico => {
@@ -338,23 +324,21 @@ export function useVolumetriaProcessedData() {
       prioridades: Array.from(prioridadesMap.values()).sort((a, b) => b.total_exames - a.total_exames),
       medicos: Array.from(medicosMap.values()).sort((a, b) => b.total_exames - a.total_exames),
       loading: data.loading,
-      totalExames: totalExames,
-      totalRegistros: data.detailedData.length
+      totalExames: totalExamesCalculado,
+      totalRegistros: data.detailedData.length,
+      totalAtrasados: totalAtrasadosCalculado,
+      percentualAtraso: percentualAtrasoCalculado
     };
-
-    // Calcular total de atrasos final para debug
-    const totalAtrasadosFinal = result.clientes.reduce((sum, cliente) => sum + cliente.atrasados, 0);
     
-    console.log('✅ [useVolumetriaProcessedData] Dados processados:', {
+    console.log('✅ [useVolumetriaProcessedData] DADOS REAIS FINAIS:', {
       clientes: result.clientes.length,
       modalidades: result.modalidades.length,
       especialidades: result.especialidades.length,
-      totalExames: result.totalExames,
+      totalExamesCalculado: result.totalExames,
+      totalAtrasadosCalculado: result.totalAtrasados,
+      percentualAtrasoCalculado: result.percentualAtraso.toFixed(2) + '%',
       totalRegistros: result.totalRegistros,
-      totalAtrasadosFromDashboard: totalAtrasadosFromDashboard,
-      totalAtrasadosFinal,
-      clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length,
-      usandoDadosDoDashboard: true
+      clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length
     });
 
     return result;

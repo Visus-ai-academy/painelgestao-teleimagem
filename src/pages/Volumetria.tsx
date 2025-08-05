@@ -154,8 +154,8 @@ export default function Volumetria() {
           {/* Métricas Principais */}
           <VolumetriaStats 
             stats={stats} 
-            totalAtrasadosCorreto={stats.total_atrasados}
-            percentualAtrasoCorreto={stats.percentual_atraso}
+            totalAtrasadosCorreto={processedData.totalAtrasados}
+            percentualAtrasoCorreto={processedData.percentualAtraso}
           />
 
           {/* Dashboard Profissional com Tabs */}
@@ -207,8 +207,8 @@ export default function Volumetria() {
                   especialidades: processedData.especialidades as any,
                   categorias: processedData.categorias as any,
                   prioridades: processedData.prioridades as any,
-                  totalAtrasados: stats.total_atrasados,
-                  percentualAtrasoGeral: stats.percentual_atraso,
+                  totalAtrasados: processedData.totalAtrasados,
+                  percentualAtrasoGeral: processedData.percentualAtraso,
                   atrasosComTempo: []
                 }}
               />
