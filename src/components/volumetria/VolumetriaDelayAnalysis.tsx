@@ -324,11 +324,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             <AlertDescription>
               <strong>{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</strong> dos laudos estão atrasados 
                ({volumetriaData.dashboardStats.total_atrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
-               {volumetriaData.dashboardStats.percentual_atraso >= 15 && (
+               {volumetriaData.dashboardStats.percentual_atraso >= 2 && (
                  <span className="block mt-2 text-red-600 font-medium">
-                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (15%)
+                   ⚠️ Atenção: Taxa de atraso acima do limite aceitável (2%)
                  </span>
-              )}
+               )}
             </AlertDescription>
           </Alert>
 
