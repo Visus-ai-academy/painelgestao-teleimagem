@@ -36,9 +36,9 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'
 
 export function VolumetriaCharts({ clientes, modalidades, especialidades, categorias, prioridades }: VolumetriaChartsProps) {
   // Filtrando apenas dados válidos
-  const topClientes = clientes.slice(0, 10);
-  const topModalidades = modalidades.slice(0, 8);
-  const topEspecialidades = especialidades.slice(0, 10);
+  const topClientes = clientes.slice(0, 50); // Aumentado para mostrar mais dados
+  const topModalidades = modalidades.slice(0, 30); // Aumentado para mostrar mais dados
+  const topEspecialidades = especialidades.slice(0, 50); // Aumentado para mostrar mais dados
 
   return (
     <div className="space-y-6">

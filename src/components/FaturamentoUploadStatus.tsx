@@ -68,7 +68,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 const { data: dadosFaturamento } = await supabase
                   .from('faturamento')
                   .select('valor, quantidade')
-                  .limit(10000);
+                  .limit(100000); // Removida limitação - volumes altos
                 dadosCompletos = dadosFaturamento || [];
                 break;
                 
@@ -76,7 +76,7 @@ export function FaturamentoUploadStatus({ refreshTrigger }: { refreshTrigger?: n
                 const { data: dadosExames } = await supabase
                   .from('exames')
                   .select('valor_total, quantidade')
-                  .limit(10000);
+                  .limit(100000); // Removida limitação - volumes altos
                 dadosCompletos = dadosExames || [];
                 break;
                 

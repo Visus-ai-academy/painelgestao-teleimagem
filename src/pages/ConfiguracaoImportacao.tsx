@@ -194,7 +194,7 @@ export default function ConfiguracaoImportacao() {
         .from("import_history")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(10000); // Aumentado para volumes altos
 
       if (historyError) throw historyError;
       setImportHistory(historyData || []);

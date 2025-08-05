@@ -314,7 +314,7 @@ export async function limparDadosVolumetria() {
           const { error, count } = await supabase
             .from('volumetria_mobilemed')
             .delete({ count: 'exact' })
-            .limit(batchSize)
+            .limit(100000) // Aumentado para volumes altos
           
           if (error) {
             console.error('Erro ao deletar lote volumetria:', error)

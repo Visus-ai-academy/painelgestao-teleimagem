@@ -37,7 +37,7 @@ export function SecurityAlertsPanel({ onMetricsUpdate }: SecurityAlertsPanelProp
         .from('security_alerts')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(50);
+        .limit(10000); // Removida limitação para volumes altos
 
       if (error) throw error;
       setAlerts(data || []);

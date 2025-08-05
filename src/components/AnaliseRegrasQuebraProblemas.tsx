@@ -133,8 +133,8 @@ export function AnaliseRegrasQuebraProblemas() {
       console.log(`🚨 Registros zerados com De-Para: ${registrosZeradosComDePara.length}`);
 
       setAnalise({
-        registros_zerados_com_quebra: registrosZeradosComQuebra.slice(0, 50), // Limitar para performance
-        registros_zerados_com_depara: registrosZeradosComDePara.slice(0, 50),
+        registros_zerados_com_quebra: registrosZeradosComQuebra, // Removida limitação
+        registros_zerados_com_depara: registrosZeradosComDePara, // Removida limitação
         total_problemas: registrosZeradosComQuebra.length + registrosZeradosComDePara.length,
         problemas_identificados: problemasIdentificados
       });
@@ -287,7 +287,7 @@ export function AnaliseRegrasQuebraProblemas() {
             </h3>
             
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {analise.registros_zerados_com_quebra.slice(0, 10).map((registro, index) => (
+              {analise.registros_zerados_com_quebra.map((registro, index) => (
                 <div key={index} className="p-3 bg-red-50 border border-red-200 rounded text-sm">
                   <div className="font-medium text-red-800">{registro.ESTUDO_DESCRICAO}</div>
                   <div className="text-red-600">
@@ -315,7 +315,7 @@ export function AnaliseRegrasQuebraProblemas() {
             </h3>
             
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {analise.registros_zerados_com_depara.slice(0, 10).map((registro, index) => (
+              {analise.registros_zerados_com_depara.map((registro, index) => (
                 <div key={index} className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
                   <div className="font-medium text-orange-800">{registro.ESTUDO_DESCRICAO}</div>
                   <div className="text-orange-600">

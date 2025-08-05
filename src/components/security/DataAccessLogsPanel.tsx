@@ -37,7 +37,7 @@ export function DataAccessLogsPanel() {
         .from('data_access_logs')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(100);
+        .limit(10000); // Removida limitação para volumes altos
 
       if (error) throw error;
       setLogs(data || []);

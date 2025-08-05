@@ -201,8 +201,8 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
   
   // Configuração ULTRA conservativa
   const CHUNK_SIZE = 10;           // Chunks muito pequenos
-  const BATCH_SIZE = 3;            // Batches minúsculos
-  const MAX_EXECUTION_TIME = 25000; // Tempo bem reduzido
+  const BATCH_SIZE = 100;            // Aumentado para volumes altos
+  const MAX_EXECUTION_TIME = 120000; // Aumentado para 2 minutos
   const PROGRESS_UPDATE_INTERVAL = 5; // Updates menos frequentes
 
   console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
@@ -517,7 +517,7 @@ serve(async (req) => {
     console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
     
     // Se arquivo muito grande, processar apenas parte e agendar continuação
-    const MAX_RECORDS_PER_EXECUTION = 1000;
+    const MAX_RECORDS_PER_EXECUTION = 100000; // Aumentado para volumes altos
     const needsMultipleExecutions = jsonData.length > MAX_RECORDS_PER_EXECUTION;
     
     if (needsMultipleExecutions) {

@@ -14,7 +14,7 @@ export const useVolumetriaSimple = () => {
       // Carregar todos os dados com paginação para garantir que não perca nenhum registro
       let allData: any[] = [];
       let offset = 0;
-      const limit = 1000;
+      const limit = 50000; // Aumentado para volumes altos
       let hasMoreData = true;
 
       while (hasMoreData) {

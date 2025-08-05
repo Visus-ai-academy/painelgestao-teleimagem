@@ -86,7 +86,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         // Carregar APENAS os dados que PERMANECERAM FISICAMENTE no banco após todas as regras de exclusão
         let allData: any[] = [];
         let offset = 0;
-        const limit = 1000;
+        const limit = 10000; // Aumentado para processar volumes maiores
         let hasMoreData = true;
         
         while (hasMoreData) {

@@ -15,7 +15,7 @@ async function processarLotesBackground(
   processedSoFar: number,
   errorsSoFar: number
 ) {
-  const LOTE_SIZE = 20
+  const LOTE_SIZE = 1000 // Aumentado significativamente para volumes altos
   let registrosProcessados = processedSoFar
   let registrosErro = errorsSoFar
   const erros: string[] = []

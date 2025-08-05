@@ -151,7 +151,7 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       // CARREGAR DADOS EM BATCHES PARA GARANTIR TODOS OS REGISTROS
       let allData: any[] = [];
       let offset = 0;
-      const limit = 1000; // Batch size menor para evitar timeout
+      const limit = 50000; // Aumentado significativamente para volumes altos
       let hasMoreData = true;
       
       const { startDate, endDate } = buildDateFilter();
@@ -260,9 +260,9 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             
             // Carregar em lotes menores para garantir todos os dados
             let additionalOffset = allData.length;
-            const smallerBatchSize = 10000;
+            const smallerBatchSize = 100000; // Aumentado para volumes altos
             
-            while (additionalOffset < count && additionalOffset < 500000) { // Limite de segurança
+            while (additionalOffset < count && additionalOffset < 10000000) { // Aumentado limite de segurança para 10M
               console.log(`📦 [DASHBOARD] Carregando lote adicional offset ${additionalOffset}...`);
               
               let additionalQuery = supabase

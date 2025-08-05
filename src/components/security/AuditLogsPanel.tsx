@@ -38,7 +38,7 @@ export function AuditLogsPanel() {
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(100);
+        .limit(10000); // Aumentado para volumes altos
 
       if (error) throw error;
       setLogs(data || []);
