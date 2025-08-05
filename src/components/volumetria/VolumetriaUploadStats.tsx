@@ -105,12 +105,13 @@ export function VolumetriaUploadStats() {
     const newAcc = {
       totalRecords: acc.totalRecords + stat.totalRecords,
       recordsWithValue: acc.recordsWithValue + stat.recordsWithValue,
+      recordsZeroed: acc.recordsZeroed + stat.recordsZeroed,
       totalValue: acc.totalValue + stat.totalValue,
     };
     
-    console.log(`  - Acumulado até agora: totalValue = ${newAcc.totalValue}`);
+    console.log(`  - Acumulado até agora: totalValue = ${newAcc.totalValue}, zerados = ${newAcc.recordsZeroed}`);
     return newAcc;
-  }, { totalRecords: 0, recordsWithValue: 0, totalValue: 0 });
+  }, { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 });
   
   console.log(`🔍 RESULTADO FINAL DA SOMA: ${totalStats.totalValue} exames`);
   console.log(`🔍 STATS ORIGINAIS DO CONTEXTO:`, data.stats);
@@ -156,7 +157,7 @@ export function VolumetriaUploadStats() {
               <div className="text-sm text-green-700">Com Valores</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-red-900">{(totalStats.totalRecords - totalStats.recordsWithValue).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-red-900">{stats.reduce((acc, stat) => acc + stat.recordsZeroed, 0).toLocaleString()}</div>
               <div className="text-sm text-red-700">Total de Zerados</div>
             </div>
             <div>

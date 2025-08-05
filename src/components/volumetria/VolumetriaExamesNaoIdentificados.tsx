@@ -65,6 +65,7 @@ export function VolumetriaExamesNaoIdentificados() {
 
       console.log('📋 Estudos no De Para (após limpeza X):', estudosNoDePara.size);
       console.log('📊 Total registros volumetria zerados (do contexto completo):', volumetriaData?.length || 0);
+      console.log('📊 Estudos únicos zerados:', new Set(volumetriaData?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
 
       // 3. Filtrar registros zerados que não estão no De Para
       const estudosNaoEncontrados = volumetriaData?.filter(item => {
@@ -86,6 +87,7 @@ export function VolumetriaExamesNaoIdentificados() {
 
       console.log('🔍 Total de exames zerados:', volumetriaData?.length);
       console.log('🔍 Exames não encontrados no De Para:', estudosNaoEncontrados.length);
+      console.log('🔍 Estudos únicos não encontrados:', new Set(estudosNaoEncontrados?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
 
       // 4. Verificar se algum dos estudos não encontrados existe nas regras de quebra
       const { data: regrasQuebra } = await supabase
@@ -113,6 +115,7 @@ export function VolumetriaExamesNaoIdentificados() {
       });
 
       console.log('🔍 Exames realmente não identificados:', estudosRealmenteNaoIdentificados.length);
+      console.log('🔍 Estudos únicos realmente não identificados:', new Set(estudosRealmenteNaoIdentificados?.map(item => item.ESTUDO_DESCRICAO).filter(Boolean)).size);
 
       // 5. Agrupar por nome do estudo e arquivo fonte
       const agrupados: Record<string, ExameNaoIdentificado> = {};
