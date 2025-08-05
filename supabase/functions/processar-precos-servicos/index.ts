@@ -85,7 +85,7 @@ async function processarLotesBackground(
             volume_final: item.volFinal,
             volume_total: item.condVolume ? parseInt(item.condVolume) || null : null,
             considera_prioridade_plantao: item.consideraPlantao,
-            tipo_preco: 'contrato',
+            tipo_preco: 'especial',
             aplicar_legado: true,
             aplicar_incremental: true,
             ativo: true
@@ -199,29 +199,29 @@ serve(async (req) => {
       try {
         const row = jsonData[i] as any[]
         
-        if (!row || row.length < 8) {
+        if (!row || row.length < 6) {
           console.log(`⚠️ Linha ${i}: dados insuficientes - ${row ? row.length : 0} colunas`)
           continue
         }
 
-        // Mapear campos do Excel
+        // Mapear campos do Excel baseado nos headers corretos
         const cliente = String(row[0] || '').trim()
-        const modalidade = String(row[3] || '').trim() 
-        const especialidade = String(row[4] || '').trim()
-        const prioridade = String(row[5] || '').trim()
-        const categoria = String(row[6] || '').trim()
-        const precoStr = String(row[7] || '').trim()
-        const volInicial = String(row[8] || '').trim()
-        const volFinal = String(row[9] || '').trim()
-        const condVolume = String(row[10] || '').trim()
-        const consideraPlantao = String(row[11] || '').trim()
+        const modalidade = String(row[1] || '').trim() 
+        const especialidade = String(row[2] || '').trim()
+        const prioridade = String(row[3] || '').trim()
+        const categoria = String(row[4] || '').trim()
+        const precoStr = String(row[5] || '').trim()
+        const volInicial = String(row[6] || '').trim()
+        const volFinal = String(row[7] || '').trim()
+        const condVolume = String(row[8] || '').trim()
+        const consideraPlantao = String(row[9] || '').trim()
         
         console.log(`📝 Linha ${i}: Cliente="${cliente}", Modalidade="${modalidade}", Preço="${precoStr}"`)
         
         // Buscar preço em múltiplas colunas se necessário
         let precoFinal = precoStr
         if (!precoFinal || !(/[\d,.]/.test(precoFinal))) {
-          for (let col = 7; col < row.length; col++) {
+          for (let col = 5; col < row.length; col++) {
             const cellValue = String(row[col] || '').trim()
             if (cellValue && /[\d,.]/.test(cellValue)) {
               precoFinal = cellValue
