@@ -429,13 +429,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, [data.detailedData]);
 
   useEffect(() => {
-    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Chamando loadStats...');
+    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Forçando carregamento DEFINITIVO...');
+    // Invalidar qualquer cache e forçar reload
+    isLoadingRef.current = false;
+    lastLoadTime.current = 0;
     loadStats();
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
     console.log('🌍 Contexto disponibilizado globalmente');
-  }, []);
+  }, [loadStats]);
 
   // Real-time subscription otimizada - com debounce
   useEffect(() => {
