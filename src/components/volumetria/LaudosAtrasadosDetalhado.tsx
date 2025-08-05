@@ -43,21 +43,21 @@ export const LaudosAtrasadosDetalhado = () => {
       return [];
     }
 
-    console.log(`📊 [LaudosAtrasadosDetalhado] Iniciando processamento de ${data.detailedData.length} registros totais`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] Iniciando processamento de ${data.detailedData.length} laudos disponíveis`);
     
     const atrasados: LaudoAtrasado[] = [];
-    let registrosProcessados = 0;
-    let registrosComDatasCompletas = 0;
+    let laudosProcessados = 0;
+    let laudosComDatasCompletas = 0;
 
     data.detailedData.forEach(item => {
-      registrosProcessados++;
+      laudosProcessados++;
       
       // USAR MESMA VALIDAÇÃO DO CONTEXTO
       if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) {
-        return; // Pular registros sem dados completos
+        return; // Pular laudos sem dados completos
       }
       
-      registrosComDatasCompletas++;
+      laudosComDatasCompletas++;
 
       try {
         const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
@@ -94,9 +94,9 @@ export const LaudosAtrasadosDetalhado = () => {
     });
 
     console.log(`📊 [LaudosAtrasadosDetalhado] ESTATÍSTICAS FINAIS:`);
-    console.log(`📊 - Total de registros disponíveis: ${data.detailedData.length}`);
-    console.log(`📊 - Registros processados: ${registrosProcessados}`);
-    console.log(`📊 - Registros com datas completas: ${registrosComDatasCompletas}`);
+    console.log(`📊 - Total de laudos disponíveis: ${data.detailedData.length}`);
+    console.log(`📊 - Laudos processados: ${laudosProcessados}`);
+    console.log(`📊 - Laudos com datas completas: ${laudosComDatasCompletas}`);
     console.log(`📊 - Laudos atrasados encontrados: ${atrasados.length}`);
     console.log(`📊 - Dashboard reporta: ${data.dashboardStats?.total_atrasados || 0} laudos atrasados`);
     
