@@ -168,33 +168,55 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       let allDetailedData: any[] = [];
       
       try {
-        console.log('🚀 Executando query COMPLETA sem limitações...');
+        console.log('🚀 Executando query COMPLETA com limite explícito muito alto...');
         
-        const { data: detailedData, error: detailedError } = await supabase
-          .from('volumetria_mobilemed')
-          .select(`
-            "EMPRESA",
-            "MODALIDADE", 
-            "ESPECIALIDADE",
-            "MEDICO",
-            "PRIORIDADE",
-            "CATEGORIA",
-            "VALORES",
-            "DATA_LAUDO",
-            "HORA_LAUDO", 
-            "DATA_PRAZO",
-            "HORA_PRAZO",
-            data_referencia
-          `);
-          // REMOVIDO COMPLETAMENTE: .range(), .order(), .limit() - TUDO SEM LIMITAÇÃO!
-
-        if (detailedError) {
-          console.error('❌ Erro ao carregar dados detalhados:', detailedError);
-          allDetailedData = [];
-        } else {
-          allDetailedData = detailedData || [];
-          console.log(`✅ TODOS os dados detalhados carregados SEM LIMITAÇÃO: ${allDetailedData.length} registros`);
+        // USAR PAGINAÇÃO FORÇADA PARA SUPERAR LIMITAÇÃO DO SUPABASE
+        let offset = 0;
+        const batchSize = 10000; // Lotes maiores para eficiência
+        let hasMoreData = true;
+        
+        while (hasMoreData) {
+          console.log(`📦 Carregando lote ${offset} - ${offset + batchSize}...`);
+          
+          const { data: batchData, error: batchError } = await supabase
+            .from('volumetria_mobilemed')
+            .select(`
+              "EMPRESA",
+              "MODALIDADE", 
+              "ESPECIALIDADE",
+              "MEDICO",
+              "PRIORIDADE",
+              "CATEGORIA",
+              "VALORES",
+              "DATA_LAUDO",
+              "HORA_LAUDO", 
+              "DATA_PRAZO",
+              "HORA_PRAZO",
+              data_referencia
+            `)
+            .range(offset, offset + batchSize - 1);
+            
+          if (batchError) {
+            console.error('❌ Erro ao carregar lote:', batchError);
+            break;
+          }
+          
+          if (!batchData || batchData.length === 0) {
+            console.log('✅ Fim dos dados alcançado');
+            break;
+          }
+          
+          allDetailedData = [...allDetailedData, ...batchData];
+          console.log(`✅ Lote carregado: ${batchData.length} registros, total acumulado: ${allDetailedData.length}`);
+          
+          if (batchData.length < batchSize) {
+            hasMoreData = false;
+          } else {
+            offset += batchSize;
+          }
         }
+        
+        console.log(`🎉 CARREGAMENTO COMPLETO: ${allDetailedData.length} registros carregados`);
       } catch (error) {
         console.error('❌ Erro crítico ao carregar dados detalhados:', error);
         allDetailedData = [];

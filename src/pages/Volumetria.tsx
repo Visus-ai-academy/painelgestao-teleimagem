@@ -115,7 +115,7 @@ export default function Volumetria() {
             {stats.total_exames.toLocaleString()} laudos | 
             {stats.total_clientes} clientes cadastrados | 
             {stats.total_clientes_volumetria} com dados{hasActiveFilters ? ' (filtrado)' : ''} |
-            <span className="text-blue-600 font-medium"> Carregamento completo sem limitações</span>
+            <span className="text-blue-600 font-medium"> Carregamento completo com paginação otimizada</span>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
