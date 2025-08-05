@@ -98,7 +98,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             .eq('arquivo_fonte', tipo)
             .gt('VALORES', 0),
           
-          // Soma total dos valores - buscar TODOS os valores para somar
+          // Buscar TODOS os valores para somar corretamente - SEM LIMITAÇÃO
           supabase
             .from('volumetria_mobilemed')
             .select('VALORES')
@@ -108,7 +108,26 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         const totalRecordsCount = totalRecords || 0;
         const recordsWithValueCount = recordsWithValue || 0;
         const recordsZeroed = totalRecordsCount - recordsWithValueCount;
-        const totalValue = sumData?.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0) || 0;
+        
+        // CORREÇÃO CRÍTICA: Garantir que TODOS os valores sejam carregados para soma
+        let allValues: any[] = sumData || [];
+        let offset = allValues.length;
+        const batchSize = 50000;
+        
+        // Se a query padrão não trouxe todos os dados, carregar em lotes
+        while (allValues.length < totalRecordsCount && allValues.length > 0) {
+          const { data: moreBatch } = await supabase
+            .from('volumetria_mobilemed')
+            .select('VALORES')
+            .eq('arquivo_fonte', tipo)
+            .range(offset, offset + batchSize - 1);
+            
+          if (!moreBatch || moreBatch.length === 0) break;
+          allValues = [...allValues, ...moreBatch];
+          offset += batchSize;
+        }
+        
+        const totalValue = allValues.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0);
 
         statsResult[tipo] = {
           totalRecords: totalRecordsCount,
