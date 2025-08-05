@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { VolumetriaProvider } from "./contexts/VolumetriaContext";
 import { useMouseLight } from "@/hooks/useMouseLight";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RoleProtectedRoute } from "./components/RoleProtectedRoute";
@@ -85,9 +86,11 @@ const App = () => {
             } />
             <Route path="/volumetria/*" element={
               <ProtectedRoute>
-                <Layout>
-                  <Volumetria />
-                </Layout>
+                <VolumetriaProvider>
+                  <Layout>
+                    <Volumetria />
+                  </Layout>
+                </VolumetriaProvider>
               </ProtectedRoute>
             } />
             <Route path="/upload-dados" element={
