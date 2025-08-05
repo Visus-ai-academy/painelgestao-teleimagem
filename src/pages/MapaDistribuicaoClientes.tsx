@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClienteData } from '@/hooks/useClienteData';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
-import { useVolumetriaSimple } from '@/hooks/useVolumetriaSimple';
 import { toast } from "sonner";
 import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "lucide-react";
 
@@ -74,10 +73,15 @@ export default function MapaDistribuicaoClientes() {
   const [regioesEstatisticas, setRegioesEstatisticas] = useState<RegiaoEstatistica[]>([]);
   const [estadosEstatisticas, setEstadosEstatisticas] = useState<EstadoEstatistica[]>([]);
   
-  // Hooks para carregar dados
+  // USAR APENAS DADOS DO CONTEXTO CENTRALIZADO - NÃO MAIS useVolumetriaSimple
   const { data: clientesData, loading: loadingClientes, stats: clienteStats, refetch: refetchClientes } = useClienteData();
-  const { data: volumetriaData, loading: loadingVolumetria } = useVolumetriaSimple();
-  const { data: contextData } = useVolumetria(); // Dados corretos do contexto
+  const { data: contextData } = useVolumetria(); // ÚNICA FONTE DE DADOS CORRETOS
+  
+  console.log('🗺️ [MapaDistribuicaoClientes] Dados do contexto:', {
+    detailedData: contextData.detailedData.length,
+    totalExames: contextData.dashboardStats.total_exames,
+    loading: contextData.loading
+  });
   
   // Filtros
   const [filtroModalidade, setFiltroModalidade] = useState<string>('todas');
@@ -120,22 +124,22 @@ export default function MapaDistribuicaoClientes() {
 
     let volumetriaPorEmpresa: Record<string, any> = {};
     
-    // Criar mapa de volumetria por empresa
-    if (volumetriaData) {
-      let volumetriaFiltrada = volumetriaData;
+    // Criar mapa de volumetria por empresa usando dados do contexto centralizado
+    if (contextData.detailedData && contextData.detailedData.length > 0) {
+      let volumetriaFiltrada = contextData.detailedData;
       
       // Se há filtros de volumetria, aplicar
       if (temFiltrosVolumetria) {
         console.log('🔧 COM FILTROS - Processando dados filtrados');
-        volumetriaFiltrada = volumetriaData.filter(item => {
-          if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
-          if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
-          if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
+        volumetriaFiltrada = contextData.detailedData.filter(item => {
+          if (filtroModalidade !== 'todas' && item.MODALIDADE !== filtroModalidade) return false;
+          if (filtroEspecialidade !== 'todas' && item.ESPECIALIDADE !== filtroEspecialidade) return false;
+          if (filtroPrioridade !== 'todas' && item.PRIORIDADE !== filtroPrioridade) return false;
           return true;
         });
         
         // Filtrar apenas clientes que têm volumetria com os filtros aplicados
-        const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item["EMPRESA"]));
+        const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item.EMPRESA));
         clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
         
         console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
@@ -143,9 +147,9 @@ export default function MapaDistribuicaoClientes() {
         console.log('🚀 SEM FILTROS - Usando dados reais');
       }
 
-      // Criar mapa de volumetria por empresa usando dados reais
+      // Criar mapa de volumetria por empresa usando dados reais do contexto
       volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
-        const empresa = item["EMPRESA"];
+        const empresa = item.EMPRESA;
         if (!empresa) return acc;
         
         if (!acc[empresa]) {
@@ -158,12 +162,12 @@ export default function MapaDistribuicaoClientes() {
           };
         }
         
-        acc[empresa].volume_exames += Number(item["VALORES"]) || 0; // Valores reais dos dados
+        acc[empresa].volume_exames += Number(item.VALORES) || 0; // Valores reais dos dados
         acc[empresa].total_registros += 1;
         
-        if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
-        if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
-        if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
+        if (item.MODALIDADE) acc[empresa].modalidades.add(item.MODALIDADE);
+        if (item.ESPECIALIDADE) acc[empresa].especialidades.add(item.ESPECIALIDADE);
+        if (item.PRIORIDADE) acc[empresa].prioridades.add(item.PRIORIDADE);
         
         return acc;
       }, {} as Record<string, any>);
@@ -202,12 +206,12 @@ export default function MapaDistribuicaoClientes() {
     console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
-  }, [clientesData, volumetriaData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, contextData.detailedData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {
     clientes: clienteStats.total, // Total de clientes cadastrados
-    volume: Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0) // 39.035 exames corretos
+    volume: contextData.dashboardStats.total_exames // DADOS CORRETOS DO CONTEXTO: 39.035 exames
   };
 
   // Verificar se há filtros realmente ativos para decidir qual total usar
@@ -288,10 +292,10 @@ export default function MapaDistribuicaoClientes() {
     setEstadosEstatisticas(processarEstatisticas.estados);
   }, [processarEstatisticas]);
 
-  // Obter listas únicas para filtros
-  const modalidadesUnicas = [...new Set(volumetriaData?.map(v => v["MODALIDADE"]).filter(Boolean) || [])];
-  const especialidadesUnicas = [...new Set(volumetriaData?.map(v => v["ESPECIALIDADE"]).filter(Boolean) || [])];
-  const prioridadesUnicas = [...new Set(volumetriaData?.map(v => v["PRIORIDADE"]).filter(Boolean) || [])];
+  // Obter listas únicas para filtros a partir do contexto centralizado
+  const modalidadesUnicas = [...new Set(contextData.detailedData?.map(v => v.MODALIDADE).filter(Boolean) || [])];
+  const especialidadesUnicas = [...new Set(contextData.detailedData?.map(v => v.ESPECIALIDADE).filter(Boolean) || [])];
+  const prioridadesUnicas = [...new Set(contextData.detailedData?.map(v => v.PRIORIDADE).filter(Boolean) || [])];
   const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
 
 
@@ -300,7 +304,7 @@ export default function MapaDistribuicaoClientes() {
     volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
   };
 
-  const carregando = loadingClientes || loadingVolumetria;
+  const carregando = loadingClientes || contextData.loading;
 
   if (carregando) {
     return (
