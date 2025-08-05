@@ -338,7 +338,13 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       {/* Análise de Nível de Atraso - USANDO DADOS CORRETOS DO CONTEXTO */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Análise de Nível de Atraso</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Análise de Nível de Atraso por Clientes
+            <Badge variant="outline" className="text-xs">
+              Quantidade de clientes em cada faixa de % de atraso
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {/* Usando dados corretos do contexto em vez de cálculos independentes */}
@@ -348,24 +354,36 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                 {processedData.clientes.filter(c => c.percentual_atraso > 15).length}
               </div>
               <div className="text-sm text-muted-foreground">Críticos (&gt;15%)</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Clientes com mais de 15% de laudos atrasados
+              </div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
                 {processedData.clientes.filter(c => c.percentual_atraso >= 10 && c.percentual_atraso <= 15).length}
               </div>
               <div className="text-sm text-muted-foreground">Altos (10-15%)</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Clientes com 10% a 15% de laudos atrasados
+              </div>
             </div>
             <div className="text-center p-4 bg-yellow-50 rounded-lg">
               <div className="text-2xl font-bold text-yellow-600">
                 {processedData.clientes.filter(c => c.percentual_atraso >= 5 && c.percentual_atraso < 10).length}
               </div>
               <div className="text-sm text-muted-foreground">Médios (5-10%)</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Clientes com 5% a 10% de laudos atrasados
+              </div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
                 {processedData.clientes.filter(c => c.percentual_atraso < 5).length}
               </div>
               <div className="text-sm text-muted-foreground">Baixos (&lt;5%)</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Clientes com menos de 5% de laudos atrasados
+              </div>
             </div>
           </div>
         </CardContent>
