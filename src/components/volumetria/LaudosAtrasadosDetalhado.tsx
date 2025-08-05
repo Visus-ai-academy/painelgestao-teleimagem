@@ -43,18 +43,30 @@ export const LaudosAtrasadosDetalhado = () => {
       return [];
     }
 
+    console.log(`📊 [LaudosAtrasadosDetalhado] Iniciando processamento de ${data.detailedData.length} registros totais`);
+    
     const atrasados: LaudoAtrasado[] = [];
+    let registrosProcessados = 0;
+    let registrosComDatasCompletas = 0;
 
     data.detailedData.forEach(item => {
+      registrosProcessados++;
+      
       // USAR MESMA VALIDAÇÃO DO CONTEXTO
-      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return;
+      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) {
+        return; // Pular registros sem dados completos
+      }
+      
+      registrosComDatasCompletas++;
 
       try {
         const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
         const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
         
         // USAR MESMA LÓGICA DE VALIDAÇÃO DE DATA DO CONTEXTO
-        if (isNaN(dataLaudo.getTime()) || isNaN(dataPrazo.getTime())) return;
+        if (isNaN(dataLaudo.getTime()) || isNaN(dataPrazo.getTime())) {
+          return; // Pular datas inválidas
+        }
         
         // VERIFICAR SE ESTÁ ATRASADO (MESMA LÓGICA DO CONTEXTO)
         if (dataLaudo > dataPrazo) {
@@ -81,9 +93,20 @@ export const LaudosAtrasadosDetalhado = () => {
       }
     });
 
-    console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados detalhados`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] ESTATÍSTICAS FINAIS:`);
+    console.log(`📊 - Total de registros disponíveis: ${data.detailedData.length}`);
+    console.log(`📊 - Registros processados: ${registrosProcessados}`);
+    console.log(`📊 - Registros com datas completas: ${registrosComDatasCompletas}`);
+    console.log(`📊 - Laudos atrasados encontrados: ${atrasados.length}`);
+    console.log(`📊 - Dashboard reporta: ${data.dashboardStats?.total_atrasados || 0} laudos atrasados`);
+    
+    // Se há discrepância significativa, reportar
+    if (data.dashboardStats?.total_atrasados && Math.abs(atrasados.length - data.dashboardStats.total_atrasados) > 100) {
+      console.warn(`⚠️ DISCREPÂNCIA DETECTADA: Dashboard=${data.dashboardStats.total_atrasados}, Detalhado=${atrasados.length}`);
+    }
+    
     return atrasados;
-  }, [data.detailedData]);
+  }, [data.detailedData, data.dashboardStats]);
 
   // Filtrar e ordenar dados
   const filteredAndSortedData = useMemo(() => {
