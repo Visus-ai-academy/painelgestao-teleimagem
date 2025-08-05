@@ -200,23 +200,38 @@ export default function GerenciarCadastros() {
   const handleUploadPrecos = async (file: File) => {
     console.log('🔄 Iniciando upload de preços de clientes:', file.name);
     
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const { data, error } = await supabase.functions.invoke('processar-precos-servicos', {
-      body: formData
-    });
+      const { data, error } = await supabase.functions.invoke('processar-precos-servicos', {
+        body: formData
+      });
 
-    if (error) throw error;
-    
-    toast({
-      title: "Preços de Clientes Processados!",
-      description: `${data.inseridos} preços cadastrados, ${data.atualizados} atualizados, ${data.ignorados} ignorados (zerados), ${data.erros} erros`,
-    });
-    
-    // Recarregar dados e status
-    precosData.refetch();
-    setRefreshStatusPanel(prev => prev + 1);
+      if (error) {
+        console.error('❌ Erro na edge function:', error);
+        throw error;
+      }
+      
+      console.log('✅ Resposta da função:', data);
+      
+      toast({
+        title: "Preços de Clientes Processados!",
+        description: `${data.registros_processados || 0} preços cadastrados, ${data.registros_erro || 0} erros`,
+      });
+      
+      // Recarregar dados e status
+      precosData.refetch();
+      setRefreshStatusPanel(prev => prev + 1);
+      
+    } catch (error) {
+      console.error('💥 Erro geral no upload:', error);
+      toast({
+        title: "Erro no Upload",
+        description: `Falha ao processar arquivo: ${error.message || 'Erro desconhecido'}`,
+        variant: "destructive",
+      });
+    }
   };
 
   // Handler para parâmetros de clientes (Parametros_Clientes)
