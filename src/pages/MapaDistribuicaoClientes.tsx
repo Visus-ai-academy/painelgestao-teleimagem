@@ -98,55 +98,115 @@ export default function MapaDistribuicaoClientes() {
       filtroPrioridade
     });
 
+    // Verificar se há filtros de volumetria ativos
+    const temFiltrosVolumetria = filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas';
+
     // Primeiro aplicar filtro de tipo de cliente nos clientes
     let clientesFiltrados = clientesData.filter(cliente => {
       if (filtroTipoCliente !== 'todos' && cliente.tipo_cliente !== filtroTipoCliente) return false;
       return true;
     });
 
-    // Aplicar filtros de volumetria se houver dados e filtros específicos
-    if (volumetriaData && (filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas')) {
-      const volumetriaFiltrada = volumetriaData.filter(item => {
-        if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
-        if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
-        if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
-        return true;
-      });
-      
-      // Filtrar apenas clientes que têm volumetria com os filtros aplicados
-      const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item["EMPRESA"]));
-      clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
-    }
+    let volumetriaPorEmpresa: Record<string, any> = {};
 
-    // Criar mapa de volumetria por empresa para cálculos
-    const volumetriaPorEmpresa = volumetriaData ? volumetriaData.reduce((acc, item) => {
-      const empresa = item["EMPRESA"];
-      if (!empresa) return acc;
+    // Se não há filtros de volumetria, usar distribuição proporcional baseada nos dados corretos do contexto
+    if (!temFiltrosVolumetria) {
+      // Volume total correto do contexto
+      const volumeTotalCorreto = Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0);
       
-      // Aplicar filtros de volumetria
-      if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return acc;
-      if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return acc;
-      if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return acc;
+      // Se temos dados de volumetria detalhados, usar para distribuição proporcional
+      if (volumetriaData && volumetriaData.length > 0) {
+        const volumetriaTemporaria = volumetriaData.reduce((acc, item) => {
+          const empresa = item["EMPRESA"];
+          if (!empresa) return acc;
+          
+          if (!acc[empresa]) {
+            acc[empresa] = {
+              volume_temporario: 0,
+              total_registros: 0,
+              modalidades: new Set<string>(),
+              especialidades: new Set<string>(),
+              prioridades: new Set<string>()
+            };
+          }
+          
+          acc[empresa].volume_temporario += Number(item["VALORES"]) || 0;
+          acc[empresa].total_registros += 1;
+          
+          if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
+          if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
+          if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
+          
+          return acc;
+        }, {} as Record<string, any>);
 
-      if (!acc[empresa]) {
-        acc[empresa] = {
-          volume_exames: 0,
-          total_registros: 0,
-          modalidades: new Set<string>(),
-          especialidades: new Set<string>(),
-          prioridades: new Set<string>()
-        };
+        // Calcular total temporário para fazer correção proporcional
+        const volumeTemporarioTotal = Object.values(volumetriaTemporaria).reduce((sum: number, emp: any) => {
+          return sum + (Number(emp.volume_temporario) || 0);
+        }, 0);
+        
+        // Aplicar correção proporcional para chegar ao total correto
+        const fatorCorrecao = Number(volumeTemporarioTotal) > 0 ? (Number(volumeTotalCorreto) / Number(volumeTemporarioTotal)) : 0;
+        
+        volumetriaPorEmpresa = Object.fromEntries(
+          Object.entries(volumetriaTemporaria).map(([empresa, dados]: [string, any]) => [
+            empresa,
+            {
+              volume_exames: Math.round(Number(dados.volume_temporario) * fatorCorrecao),
+              total_registros: Number(dados.total_registros) || 0,
+              modalidades: dados.modalidades,
+              especialidades: dados.especialidades,
+              prioridades: dados.prioridades
+            }
+          ])
+        );
+        
+        console.log('📊 Aplicada correção proporcional:', {
+          volumeTemporarioTotal,
+          volumeTotalCorreto,
+          fatorCorrecao
+        });
       }
-      
-      acc[empresa].volume_exames += Number(item["VALORES"]) || 0;
-      acc[empresa].total_registros += 1;
-      
-      if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
-      if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
-      if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
-      
-      return acc;
-    }, {} as Record<string, any>) : {};
+    } else {
+      // Com filtros de volumetria, usar dados filtrados do volumetriaData
+      if (volumetriaData) {
+        const volumetriaFiltrada = volumetriaData.filter(item => {
+          if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
+          if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
+          if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
+          return true;
+        });
+        
+        // Filtrar apenas clientes que têm volumetria com os filtros aplicados
+        const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item["EMPRESA"]));
+        clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
+
+        // Criar mapa de volumetria por empresa para cálculos
+        volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
+          const empresa = item["EMPRESA"];
+          if (!empresa) return acc;
+          
+          if (!acc[empresa]) {
+            acc[empresa] = {
+              volume_exames: 0,
+              total_registros: 0,
+              modalidades: new Set<string>(),
+              especialidades: new Set<string>(),
+              prioridades: new Set<string>()
+            };
+          }
+          
+          acc[empresa].volume_exames += Number(item["VALORES"]) || 0;
+          acc[empresa].total_registros += 1;
+          
+          if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
+          if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
+          if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
+          
+          return acc;
+        }, {} as Record<string, any>);
+      }
+    }
 
     // Processar todos os clientes filtrados
     const clientesProcessados = clientesFiltrados.map(cliente => {
@@ -177,9 +237,10 @@ export default function MapaDistribuicaoClientes() {
     });
     
     console.log('✅ Clientes processados:', clientesProcessados.length);
+    console.log('📊 Volume total dos clientes processados:', clientesProcessados.reduce((sum, c) => sum + c.volume_exames, 0));
     
     return clientesProcessados;
-  }, [clientesData, volumetriaData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, volumetriaData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Processar estatísticas por região e estado
   const processarEstatisticas = useMemo(() => {
