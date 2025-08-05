@@ -299,7 +299,8 @@ export default function MapaDistribuicaoClientes() {
   const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
 
 
-  const totalGeral = {
+  // Usar dados filtrados apenas para exibição condicional, não para totais
+  const totalFiltrado = {
     clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
     volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
   };
@@ -435,7 +436,7 @@ export default function MapaDistribuicaoClientes() {
                 <p className="text-sm font-medium text-gray-600">Total Clientes</p>
                 <p className="text-2xl font-bold">{totalGeralCorreto.clientes}</p>
                 {temFiltrosAtivosDisplay && (
-                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.clientes}</p>
+                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalFiltrado.clientes}</p>
                 )}
                 {!temFiltrosAtivosDisplay && (
                   <p className="text-xs text-green-600">✓ Sem filtros aplicados</p>
@@ -453,7 +454,7 @@ export default function MapaDistribuicaoClientes() {
                 <p className="text-sm font-medium text-gray-600">Volume Total de Laudos/Exames</p>
                 <p className="text-2xl font-bold">{totalGeralCorreto.volume.toLocaleString()}</p>
                 {temFiltrosAtivosDisplay && (
-                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.volume.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalFiltrado.volume.toLocaleString()}</p>
                 )}
                 {!temFiltrosAtivosDisplay && (
                   <p className="text-xs text-green-600">✓ Sem filtros aplicados</p>
