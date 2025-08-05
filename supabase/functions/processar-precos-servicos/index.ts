@@ -224,12 +224,12 @@ serve(async (req) => {
           continue
         }
 
-        if (!modalidade || modalidade.length < 1) {
+        if (!modalidade) {
           errosIniciais.push(`Linha ${i}: Modalidade inválida - "${modalidade}"`)
           continue
         }
 
-        if (!especialidade || especialidade.length < 1) {
+        if (!especialidade) {
           errosIniciais.push(`Linha ${i}: Especialidade inválida - "${especialidade}"`)
           continue
         }
