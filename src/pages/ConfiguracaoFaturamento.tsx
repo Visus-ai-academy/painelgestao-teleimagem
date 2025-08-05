@@ -28,9 +28,6 @@ import {
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
-import { SimpleFileUpload } from "@/components/SimpleFileUpload";
-import { PrecosClienteUpload } from "@/components/PrecosClienteUpload";
-import { ParametrosClienteUpload } from "@/components/ParametrosClienteUpload";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -293,11 +290,6 @@ export default function ConfiguracaoFaturamento() {
         </CardContent>
       </Card>
 
-      {/* Upload de Preços e Parâmetros */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PrecosClienteUpload />
-        <ParametrosClienteUpload />
-      </div>
 
       {/* Configurações originais da página */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
