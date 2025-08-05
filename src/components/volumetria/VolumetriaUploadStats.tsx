@@ -96,15 +96,24 @@ export function VolumetriaUploadStats() {
   ];
 
   const totalStats = stats.reduce((acc, stat) => {
-    console.log(`🔍 SOMA STATS - ${stat.fileName}: ${stat.totalValue} exames`);
-    return {
+    console.log(`🔍 SOMA INDIVIDUAL - ${stat.fileName}:`);
+    console.log(`  - totalRecords: ${stat.totalRecords}`);
+    console.log(`  - recordsWithValue: ${stat.recordsWithValue}`);
+    console.log(`  - recordsZeroed: ${stat.recordsZeroed}`);
+    console.log(`  - totalValue: ${stat.totalValue}`);
+    
+    const newAcc = {
       totalRecords: acc.totalRecords + stat.totalRecords,
       recordsWithValue: acc.recordsWithValue + stat.recordsWithValue,
       totalValue: acc.totalValue + stat.totalValue,
     };
+    
+    console.log(`  - Acumulado até agora: totalValue = ${newAcc.totalValue}`);
+    return newAcc;
   }, { totalRecords: 0, recordsWithValue: 0, totalValue: 0 });
   
-  console.log(`🔍 TOTAL FINAL: ${totalStats.totalValue} exames`);
+  console.log(`🔍 RESULTADO FINAL DA SOMA: ${totalStats.totalValue} exames`);
+  console.log(`🔍 STATS ORIGINAIS DO CONTEXTO:`, data.stats);
 
 
   if (data.loading) {
