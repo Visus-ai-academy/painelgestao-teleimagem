@@ -385,14 +385,20 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                  const totalAtrasadosClientes = safeData.clientes.reduce((sum, c) => sum + c.atrasados, 0);
                  const totalExamesClientes = safeData.clientes.reduce((sum, c) => sum + c.total_exames, 0);
                  
-                 console.log('🔍 [DelayAnalysis] VERIFICAÇÃO DE SOMATÓRIOS:');
-                 console.log('📊 Total geral de atrasos (dashboard):', safeData.totalAtrasados.toLocaleString());
-                 console.log('📊 Soma dos atrasos dos clientes:', totalAtrasadosClientes.toLocaleString());
-                 console.log('📊 Total geral de exames (dashboard):', processedData.totalExames.toLocaleString());
-                 console.log('📊 Soma dos exames dos clientes:', totalExamesClientes.toLocaleString());
-                 console.log('📊 Diferença nos atrasos:', (safeData.totalAtrasados - totalAtrasadosClientes).toLocaleString());
-                 console.log('📊 Diferença nos exames:', (processedData.totalExames - totalExamesClientes).toLocaleString());
-                 console.log('🔍 [DelayAnalysis] Clientes com atrasos:', clientesComAtrasos, 'de', safeData.clientes.length, 'total');
+                 console.log('🚨 [INCONSISTÊNCIA] VERIFICAÇÃO DETALHADA DOS SOMATÓRIOS:');
+                 console.log('📊 Dashboard Stats - Total geral de atrasos:', safeData.totalAtrasados.toLocaleString());
+                 console.log('📊 Soma manual dos atrasos dos clientes:', totalAtrasadosClientes.toLocaleString());
+                 console.log('📊 Dashboard Stats - Total geral de exames:', processedData.totalExames.toLocaleString());
+                 console.log('📊 Soma manual dos exames dos clientes:', totalExamesClientes.toLocaleString());
+                 console.log('📊 DIFERENÇA CRÍTICA nos atrasos:', (safeData.totalAtrasados - totalAtrasadosClientes).toLocaleString());
+                 console.log('📊 DIFERENÇA CRÍTICA nos exames:', (processedData.totalExames - totalExamesClientes).toLocaleString());
+                 console.log('📊 Percentual da diferença atrasos:', ((safeData.totalAtrasados - totalAtrasadosClientes) / safeData.totalAtrasados * 100).toFixed(2) + '%');
+                 console.log('📊 Top 10 clientes com mais atrasos:', safeData.clientes.slice(0, 10).map(c => ({ 
+                   nome: c.nome, 
+                   total_exames: c.total_exames.toLocaleString(), 
+                   atrasados: c.atrasados.toLocaleString(),
+                   percentual: c.percentual_atraso.toFixed(1) + '%'
+                 })));
                  
                  return clientesComAtrasos;
                })()}</div>
