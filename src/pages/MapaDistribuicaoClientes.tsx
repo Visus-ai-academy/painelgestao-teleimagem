@@ -86,7 +86,7 @@ export default function MapaDistribuicaoClientes() {
   const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
-  // Processar dados para o mapa
+  // Processar dados para o mapa - com verificação de filtros
   const dadosProcessados = useMemo(() => {
     if (!clientesData) return [];
     
@@ -338,6 +338,17 @@ export default function MapaDistribuicaoClientes() {
     volume: Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0) // 39.035 exames corretos
   };
 
+  // Verificar se há filtros realmente ativos para decidir qual total usar
+  const temFiltrosAtivosDisplay = Object.entries({
+    filtroTipoCliente,
+    filtroModalidade, 
+    filtroEspecialidade,
+    filtroPrioridade
+  }).some(([key, value]) => {
+    if (key === 'filtroTipoCliente') return value !== 'todos';
+    return value !== 'todas';
+  });
+
   const totalGeral = {
     clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
     volume: regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0)
@@ -473,7 +484,12 @@ export default function MapaDistribuicaoClientes() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Clientes</p>
                 <p className="text-2xl font-bold">{totalGeralCorreto.clientes}</p>
-                <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.clientes}</p>
+                {temFiltrosAtivosDisplay && (
+                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.clientes}</p>
+                )}
+                {!temFiltrosAtivosDisplay && (
+                  <p className="text-xs text-green-600">✓ Sem filtros aplicados</p>
+                )}
               </div>
               <Users className="h-8 w-8 text-blue-600" />
             </div>
@@ -486,7 +502,12 @@ export default function MapaDistribuicaoClientes() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Volume Total de Laudos/Exames</p>
                 <p className="text-2xl font-bold">{totalGeralCorreto.volume.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.volume.toLocaleString()}</p>
+                {temFiltrosAtivosDisplay && (
+                  <p className="text-xs text-muted-foreground">Com filtros aplicados: {totalGeral.volume.toLocaleString()}</p>
+                )}
+                {!temFiltrosAtivosDisplay && (
+                  <p className="text-xs text-green-600">✓ Sem filtros aplicados</p>
+                )}
               </div>
               <BarChart3 className="h-8 w-8 text-green-600" />
             </div>
