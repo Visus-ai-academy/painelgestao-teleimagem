@@ -100,17 +100,29 @@ export default function MapaDistribuicaoClientes() {
 
     // Verificar se há filtros de volumetria ativos
     const temFiltrosVolumetria = filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas';
+    const temFiltroTipoCliente = filtroTipoCliente !== 'todos';
+    const temQualquerFiltro = temFiltrosVolumetria || temFiltroTipoCliente;
 
-    // Primeiro aplicar filtro de tipo de cliente nos clientes
-    let clientesFiltrados = clientesData.filter(cliente => {
-      if (filtroTipoCliente !== 'todos' && cliente.tipo_cliente !== filtroTipoCliente) return false;
-      return true;
+    console.log('🔍 Status dos filtros:', {
+      temFiltrosVolumetria,
+      temFiltroTipoCliente,
+      temQualquerFiltro
     });
+
+    // Primeiro aplicar filtro de tipo de cliente nos clientes APENAS se houver filtro ativo
+    let clientesFiltrados = clientesData;
+    if (temFiltroTipoCliente) {
+      clientesFiltrados = clientesData.filter(cliente => {
+        if (filtroTipoCliente !== 'todos' && cliente.tipo_cliente !== filtroTipoCliente) return false;
+        return true;
+      });
+    }
 
     let volumetriaPorEmpresa: Record<string, any> = {};
 
-    // Se não há filtros de volumetria, usar distribuição proporcional baseada nos dados corretos do contexto
-    if (!temFiltrosVolumetria) {
+    // Se não há NENHUM filtro, usar distribuição proporcional baseada nos dados corretos do contexto
+    if (!temQualquerFiltro) {
+      console.log('🚀 SEM FILTROS - Usando dados corretos do contexto para distribuição');
       // Volume total correto do contexto
       const volumeTotalCorreto = Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0);
       
@@ -164,11 +176,13 @@ export default function MapaDistribuicaoClientes() {
         console.log('📊 Aplicada correção proporcional:', {
           volumeTemporarioTotal,
           volumeTotalCorreto,
-          fatorCorrecao
+          fatorCorrecao,
+          semFiltros: true
         });
       }
     } else {
-      // Com filtros de volumetria, usar dados filtrados do volumetriaData
+      // Com filtros ativos, usar dados filtrados do volumetriaData
+      console.log('🔧 COM FILTROS - Processando dados filtrados');
       if (volumetriaData) {
         const volumetriaFiltrada = volumetriaData.filter(item => {
           if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
@@ -180,6 +194,8 @@ export default function MapaDistribuicaoClientes() {
         // Filtrar apenas clientes que têm volumetria com os filtros aplicados
         const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item["EMPRESA"]));
         clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
+        
+        console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
 
         // Criar mapa de volumetria por empresa para cálculos
         volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
@@ -238,6 +254,7 @@ export default function MapaDistribuicaoClientes() {
     
     console.log('✅ Clientes processados:', clientesProcessados.length);
     console.log('📊 Volume total dos clientes processados:', clientesProcessados.reduce((sum, c) => sum + c.volume_exames, 0));
+    console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
   }, [clientesData, volumetriaData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
