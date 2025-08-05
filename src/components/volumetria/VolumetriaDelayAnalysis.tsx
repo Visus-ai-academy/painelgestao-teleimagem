@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -52,46 +52,8 @@ const categorizeDelay = (percentual: number) => {
   return { label: 'Sem Atraso', color: '#3b82f6', bgColor: 'bg-blue-100' };
 };
 
-// Função para criar segmentação por tempo de atraso
-const createDelaySegments = (data: DelayData[]) => {
-  const segments = {
-    'Emergencial (>10%)': data.filter(item => item.percentual_atraso > 10).length,
-    'Crítico (5-10%)': data.filter(item => item.percentual_atraso >= 5 && item.percentual_atraso <= 10).length,
-    'Atenção (3-5%)': data.filter(item => item.percentual_atraso >= 3 && item.percentual_atraso < 5).length,
-    'Monitorar (<3%)': data.filter(item => item.percentual_atraso > 0 && item.percentual_atraso < 3).length,
-    'Sem Atraso': data.filter(item => item.percentual_atraso === 0).length
-  };
-
-  return Object.entries(segments).map(([name, value], index) => ({
-    name,
-    value,
-    percentage: data.length > 0 ? (value / data.length) * 100 : 0,
-    color: DELAY_COLORS[index]
-  }));
-};
-
-// Função para criar segmentação por tempo de atraso em minutos/horas
-const createTimeDelaySegments = (atrasosComTempo: Array<{ tempoAtrasoMinutos: number; [key: string]: any }> = []) => {
-  const segments = {
-    'Até 30 min': atrasosComTempo.filter(item => item.tempoAtrasoMinutos <= 30).length,
-    '30 min - 1h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 30 && item.tempoAtrasoMinutos <= 60).length,
-    '1h - 2h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 60 && item.tempoAtrasoMinutos <= 120).length,
-    '2h - 5h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 120 && item.tempoAtrasoMinutos <= 300).length,
-    '5h - 12h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 300 && item.tempoAtrasoMinutos <= 720).length,
-    '12h - 24h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 720 && item.tempoAtrasoMinutos <= 1440).length,
-    'Mais de 24h': atrasosComTempo.filter(item => item.tempoAtrasoMinutos > 1440).length
-  };
-
-  return Object.entries(segments).map(([name, value], index) => ({
-    name,
-    value,
-    percentage: atrasosComTempo.length > 0 ? (value / atrasosComTempo.length) * 100 : 0,
-    color: DELAY_COLORS[index % DELAY_COLORS.length]
-  }));
-};
-
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
-  // USAR DADOS PROCESSADOS CORRETOS
+  // USAR DADOS PROCESSADOS CORRETOS - FONTE ÚNICA
   const { data: volumetriaData } = useVolumetria();
   const processedData = useVolumetriaProcessedData();
   
@@ -132,8 +94,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       percentual_atraso: 0,
       tempo_medio_atraso: 0
     })) as DelayData[],
-    totalAtrasados: processedData.totalAtrasados || 0,
-    percentualAtrasoGeral: processedData.percentualAtraso || 0,
+    totalAtrasados: volumetriaData.dashboardStats.total_atrasados || 0,
+    percentualAtrasoGeral: volumetriaData.dashboardStats.percentual_atraso || 0,
     atrasosComTempo: data.atrasosComTempo || []
   };
   
@@ -332,23 +294,6 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       : <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
-  // Top 5 modalidades com mais atrasos
-  const topDelayModalidades = safeData.modalidades
-    .filter(m => m.atrasados > 0)
-    .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
-    .slice(0, 5);
-
-  // Top 5 especialidades com mais atrasos
-  const topDelayEspecialidades = safeData.especialidades
-    .filter(e => e.atrasados > 0)
-    .sort((a, b) => b.percentual_atraso - a.percentual_atraso)
-    .slice(0, 5);
-
-  // Segmentação por tempo de atraso
-  const clienteSegments = createDelaySegments(safeData.clientes);
-  const modalidadeSegments = createDelaySegments(safeData.modalidades);
-  const timeDelaySegments = createTimeDelaySegments(safeData.atrasosComTempo);
-
   return (
     <div className="space-y-6">
       {/* Visão Geral dos Atrasos */}
@@ -360,7 +305,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert className={`${safeData.percentualAtrasoGeral >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
+          <Alert className={`${volumetriaData.dashboardStats.percentual_atraso >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
             <Clock className="h-4 w-4" />
             <AlertDescription>
               <strong>{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</strong> dos laudos estão atrasados 
@@ -390,200 +335,234 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         </CardContent>
       </Card>
 
-      {/* Gráficos de Análise */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Top Clientes com Atrasos - Tabela */}
-        <Card className="w-full">
-          <CardHeader className="bg-white border-b sticky top-0 z-40">
-            <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
-          </CardHeader>
-          
-          {/* Container fixo com altura definida e scroll interno */}
-          <div className="h-96 flex flex-col">
-            {/* Cabeçalho fixo da tabela */}
-            <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm overflow-x-auto">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead 
-                      className="cursor-pointer hover:bg-gray-200 min-w-[400px] border-r font-semibold h-12"
-                      onClick={() => handleSort('nome')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Cliente
-                        {renderSortIcon('nome')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[200px] border-r font-semibold h-12"
-                      onClick={() => handleSort('total_exames')}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        Total
-                        {renderSortIcon('total_exames')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[200px] border-r font-semibold h-12"
-                      onClick={() => handleSort('atrasados')}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        Atrasos
-                        {renderSortIcon('atrasados')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[240px] border-r font-semibold h-12"
-                      onClick={() => handleSort('percentual_atraso')}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        % Atraso
-                        {renderSortIcon('percentual_atraso')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-center cursor-pointer hover:bg-gray-200 min-w-[240px] border-r font-semibold h-12"
-                      onClick={() => handleSort('tempoMedioAtraso')}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        Tempo Médio
-                        {renderSortIcon('tempoMedioAtraso')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center min-w-[200px] font-semibold h-12">
-                      Nível
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-              </Table>
+      {/* Análise de Nível de Atraso - USANDO DADOS CORRETOS DO CONTEXTO */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Análise de Nível de Atraso</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Usando dados corretos do contexto em vez de cálculos independentes */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">
+                {processedData.clientes.filter(c => c.percentual_atraso > 15).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Críticos (&gt;15%)</div>
             </div>
-            
-            {/* Área de scroll com conteúdo da tabela */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto">
-              <Table className="w-full">
-                <TableBody>
-                  {clientesComTempoAtraso.map((cliente, index) => {
-                    const formatarTempo = (minutos: number) => {
-                      if (minutos < 60) return `${Math.round(minutos)}min`;
-                      if (minutos < 1440) return `${Math.round(minutos / 60)}h`;
-                      return `${Math.round(minutos / 1440)}d`;
-                    };
+            <div className="text-center p-4 bg-orange-50 rounded-lg">
+              <div className="text-2xl font-bold text-orange-600">
+                {processedData.clientes.filter(c => c.percentual_atraso >= 10 && c.percentual_atraso <= 15).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Altos (10-15%)</div>
+            </div>
+            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">
+                {processedData.clientes.filter(c => c.percentual_atraso >= 5 && c.percentual_atraso < 10).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Médios (5-10%)</div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {processedData.clientes.filter(c => c.percentual_atraso < 5).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Baixos (&lt;5%)</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-                    // Função específica para detalhes expandidos (sem dias)
-                    const formatarTempoDetalhes = (minutos: number) => {
-                      if (minutos < 60) return `${Math.round(minutos)}min`;
-                      return `${Math.round(minutos / 60)}h`;
-                    };
-                    
-                    const isExpanded = expandedClients.has(cliente.nome);
-                    const isLoading = loadingDetails.has(cliente.nome);
-                    const details = clientDetails.get(cliente.nome);
-                    
-                    return (
-                      <>
-                        <TableRow key={cliente.nome} className="hover:bg-gray-50 border-b">
-                          <TableCell className="font-medium border-r min-w-[400px]">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => toggleClientExpansion(cliente.nome)}
-                                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 transition-colors"
-                                disabled={isLoading}
-                              >
-                                {isLoading ? (
-                                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                ) : isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-blue-600" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                                )}
-                              </button>
-                              <span className="cursor-pointer" onClick={() => toggleClientExpansion(cliente.nome)}>
-                                {cliente.nome}
-                              </span>
+      {/* Análise de Tempo de Atraso - USANDO DADOS CORRETOS DO CONTEXTO */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Análise de Tempo de Atraso</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Calcular distribuição temporal usando dados corretos */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">
+                {volumetriaData.dashboardStats.total_atrasados.toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground">Total de Laudos Atrasados</div>
+            </div>
+            <div className="text-center p-4 bg-orange-50 rounded-lg">
+              <div className="text-2xl font-bold text-orange-600">
+                {volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%
+              </div>
+              <div className="text-sm text-muted-foreground">Taxa de Atraso</div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">
+                {processedData.clientes.filter(c => c.atrasados > 0).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Top Clientes com Atrasos - Tabela */}
+      <Card className="w-full">
+        <CardHeader className="bg-white border-b sticky top-0 z-40">
+          <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
+        </CardHeader>
+        
+        {/* Container fixo com altura definida e scroll interno */}
+        <div className="h-96 flex flex-col">
+          {/* Cabeçalho fixo da tabela */}
+          <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm overflow-x-auto">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-200 min-w-[400px] border-r font-semibold h-12"
+                    onClick={() => handleSort('nome')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Cliente
+                      {renderSortIcon('nome')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    onClick={() => handleSort('total_exames')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Total Laudos
+                      {renderSortIcon('total_exames')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    onClick={() => handleSort('atrasados')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Laudos Atrasados
+                      {renderSortIcon('atrasados')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-200 min-w-[120px] border-r text-center font-semibold h-12"
+                    onClick={() => handleSort('percentual_atraso')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      % Atraso
+                      {renderSortIcon('percentual_atraso')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="min-w-[100px] text-center font-semibold h-12">
+                    Status
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+            </Table>
+          </div>
+
+          {/* Corpo da tabela com scroll */}
+          <div className="flex-1 overflow-y-auto">
+            <Table className="w-full">
+              <TableBody>
+                {clientesComTempoAtraso.map((cliente, index) => {
+                  const category = categorizeDelay(cliente.percentual_atraso);
+                  const isExpanded = expandedClients.has(cliente.nome);
+                  const clientDetalhe = clientDetails.get(cliente.nome);
+                  const isLoading = loadingDetails.has(cliente.nome);
+
+                  return (
+                    <>
+                      <TableRow 
+                        key={cliente.nome} 
+                        className={`hover:bg-gray-50 ${category.bgColor.replace('100', '25')} cursor-pointer transition-colors`}
+                        onClick={() => toggleClientExpansion(cliente.nome)}
+                      >
+                        <TableCell className="min-w-[400px] border-r">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? 
+                              <ChevronDown className="h-4 w-4 text-gray-500" /> : 
+                              <ChevronRight className="h-4 w-4 text-gray-500" />
+                            }
+                            <div>
+                              <div className="font-medium text-sm">{cliente.nome}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Rank #{index + 1}
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center border-r min-w-[200px]">{cliente.total_exames.toLocaleString()}</TableCell>
-                          <TableCell className="text-center border-r min-w-[200px]">{cliente.atrasados.toLocaleString()}</TableCell>
-                          <TableCell className="text-center border-r min-w-[240px]">
-                            <Badge variant={cliente.percentual_atraso >= 20 ? "destructive" : cliente.percentual_atraso >= 10 ? "secondary" : "outline"}>
-                              {cliente.percentual_atraso.toFixed(1)}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center border-r min-w-[240px]">{formatarTempo(cliente.tempoMedioAtraso)}</TableCell>
-                          <TableCell className="text-center min-w-[200px]">
-                            <Badge variant={
-                              cliente.nivelAtraso === 'Crítico' ? "destructive" :
-                              cliente.nivelAtraso === 'Alto' ? "secondary" :
-                              cliente.nivelAtraso === 'Médio' ? "outline" : "default"
-                            }>
-                              {cliente.nivelAtraso}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                        
-                        {/* Linha expandida com detalhes */}
-                        {isExpanded && details && (
-                          <TableRow>
-                            <TableCell colSpan={6} className="p-0 bg-gray-50">
-                              <div className="p-6 space-y-6">
-                                <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                                  Detalhes de Atrasos - {cliente.nome}
-                                </h4>
-                                
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[140px] border-r text-center">
+                          <div className="font-medium">{cliente.total_exames.toLocaleString()}</div>
+                        </TableCell>
+                        <TableCell className="min-w-[140px] border-r text-center">
+                          <div className="font-bold text-red-600">{cliente.atrasados.toLocaleString()}</div>
+                        </TableCell>
+                        <TableCell className="min-w-[120px] border-r text-center">
+                          <div className="font-bold" style={{ color: category.color }}>
+                            {cliente.percentual_atraso.toFixed(1)}%
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-[100px] text-center">
+                          <Badge 
+                            className="text-xs font-medium px-2 py-1"
+                            style={{ 
+                              backgroundColor: category.color, 
+                              color: 'white',
+                              border: 'none'
+                            }}
+                          >
+                            {category.label}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Detalhes expandidos do cliente */}
+                      {isExpanded && (
+                        <TableRow className="bg-gray-50">
+                          <TableCell colSpan={5} className="p-0">
+                            <div className="p-4 border-l-4" style={{ borderColor: category.color }}>
+                              {isLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                  <span className="ml-2 text-sm text-muted-foreground">Carregando detalhes...</span>
+                                </div>
+                              ) : clientDetalhe ? (
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                   {/* Especialidades */}
                                   <div>
-                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
-                                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                      Especialidades
-                                    </h5>
+                                    <h4 className="font-semibold text-sm mb-3 text-blue-700">Especialidades</h4>
                                     <div className="space-y-2">
-                                      {details.especialidades.slice(0, 5).map((esp) => (
-                                        <div key={esp.nome} className="bg-white p-3 rounded-lg border">
-                                          <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium text-sm">{esp.nome}</span>
-                                            <Badge variant={esp.percentual_atraso >= 20 ? "destructive" : esp.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
-                                              {esp.percentual_atraso.toFixed(1)}%
-                                            </Badge>
+                                      {clientDetalhe.especialidades.slice(0, 5).map(esp => (
+                                        <div key={esp.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
+                                          <span className="font-medium truncate flex-1">{esp.nome}</span>
+                                          <div className="text-right ml-2">
+                                            <div className="font-bold text-red-600">{esp.atrasados}</div>
+                                            <div className="text-muted-foreground">{esp.percentual_atraso.toFixed(1)}%</div>
                                           </div>
-                                           <div className="flex justify-between text-xs text-gray-600">
-                                             <span>{esp.atrasados}/{esp.total_exames}</span>
-                                             <span>{formatarTempoDetalhes(esp.tempo_medio_atraso || 0)}</span>
-                                           </div>
                                         </div>
                                       ))}
-                                      {details.especialidades.length > 5 && (
-                                        <div className="text-xs text-gray-500 text-center">
-                                          +{details.especialidades.length - 5} outras especialidades
+                                      {clientDetalhe.especialidades.length > 5 && (
+                                        <div className="text-xs text-muted-foreground text-center py-1">
+                                          +{clientDetalhe.especialidades.length - 5} especialidades...
                                         </div>
                                       )}
                                     </div>
                                   </div>
 
-                                  {/* Categorias */}
+                                  {/* Modalidades/Categorias */}
                                   <div>
-                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
-                                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                      Categorias
-                                    </h5>
+                                    <h4 className="font-semibold text-sm mb-3 text-green-700">Modalidades</h4>
                                     <div className="space-y-2">
-                                      {details.categorias.slice(0, 5).map((cat) => (
-                                        <div key={cat.nome} className="bg-white p-3 rounded-lg border">
-                                          <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium text-sm">{cat.nome}</span>
-                                            <Badge variant={cat.percentual_atraso >= 20 ? "destructive" : cat.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
-                                              {cat.percentual_atraso.toFixed(1)}%
-                                            </Badge>
+                                      {clientDetalhe.categorias.slice(0, 5).map(cat => (
+                                        <div key={cat.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
+                                          <span className="font-medium truncate flex-1">{cat.nome}</span>
+                                          <div className="text-right ml-2">
+                                            <div className="font-bold text-red-600">{cat.atrasados}</div>
+                                            <div className="text-muted-foreground">{cat.percentual_atraso.toFixed(1)}%</div>
                                           </div>
-                                           <div className="flex justify-between text-xs text-gray-600">
-                                             <span>{cat.atrasados}/{cat.total_exames}</span>
-                                             <span>{formatarTempoDetalhes(cat.tempo_medio_atraso || 0)}</span>
-                                           </div>
                                         </div>
                                       ))}
-                                      {details.categorias.length > 5 && (
-                                        <div className="text-xs text-gray-500 text-center">
-                                          +{details.categorias.length - 5} outras categorias
+                                      {clientDetalhe.categorias.length > 5 && (
+                                        <div className="text-xs text-muted-foreground text-center py-1">
+                                          +{clientDetalhe.categorias.length - 5} modalidades...
                                         </div>
                                       )}
                                     </div>
@@ -591,233 +570,52 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
                                   {/* Prioridades */}
                                   <div>
-                                    <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center gap-2">
-                                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                                      Prioridades
-                                    </h5>
+                                    <h4 className="font-semibold text-sm mb-3 text-purple-700">Prioridades</h4>
                                     <div className="space-y-2">
-                                      {details.prioridades.map((prio) => (
-                                        <div key={prio.nome} className="bg-white p-3 rounded-lg border">
-                                          <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium text-sm">{prio.nome}</span>
-                                            <Badge variant={prio.percentual_atraso >= 20 ? "destructive" : prio.percentual_atraso >= 10 ? "secondary" : "outline"} className="text-xs">
-                                              {prio.percentual_atraso.toFixed(1)}%
-                                            </Badge>
+                                      {clientDetalhe.prioridades.slice(0, 5).map(prio => (
+                                        <div key={prio.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
+                                          <span className="font-medium truncate flex-1">{prio.nome}</span>
+                                          <div className="text-right ml-2">
+                                            <div className="font-bold text-red-600">{prio.atrasados}</div>
+                                            <div className="text-muted-foreground">{prio.percentual_atraso.toFixed(1)}%</div>
                                           </div>
-                                           <div className="flex justify-between text-xs text-gray-600">
-                                             <span>{prio.atrasados}/{prio.total_exames}</span>
-                                             <span>{formatarTempoDetalhes(prio.tempo_medio_atraso || 0)}</span>
-                                           </div>
                                         </div>
                                       ))}
+                                      {clientDetalhe.prioridades.length > 5 && (
+                                        <div className="text-xs text-muted-foreground text-center py-1">
+                                          +{clientDetalhe.prioridades.length - 5} prioridades...
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                              ) : (
+                                <div className="text-center py-4 text-sm text-muted-foreground">
+                                  Erro ao carregar detalhes do cliente
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
-          
-          <div className="p-4 border-t bg-gray-50">
-            <div className="text-sm text-muted-foreground text-center">
-              Exibindo {clientesComTempoAtraso.length} clientes com atrasos
-            </div>
+        </div>
+
+        {clientesComTempoAtraso.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">Nenhum cliente com atrasos</h3>
+            <p>Todos os clientes estão operando dentro dos prazos estabelecidos.</p>
           </div>
-        </Card>
-
-        {/* Top Modalidades com Atrasos */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Top 5 Modalidades - Maior % de Atrasos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topDelayModalidades}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nome" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    `${value.toFixed(1)}%`, 
-                    'Taxa de Atraso'
-                  ]}
-                />
-                <Bar dataKey="percentual_atraso" fill="#f97316" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Análise Detalhada */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Distribuição de Atrasos - Clientes */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuição de Atrasos - Clientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={clienteSegments}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {clienteSegments.map((entry, index) => (
-                    <Cell key={`client-cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => [`${value} clientes`, 'Quantidade']} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Resumo por Cliente */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo - Clientes Críticos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {clientesComTempoAtraso.map((cliente, index) => {
-                const category = categorizeDelay(cliente.percentual_atraso);
-                return (
-                  <div key={cliente.nome} className={`p-3 rounded-lg ${category.bgColor}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
-                        <span className="font-medium text-sm">{cliente.nome}</span>
-                      </div>
-                      <Badge style={{ backgroundColor: category.color, color: 'white' }}>
-                        {category.label}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>{cliente.atrasados} atrasados de {cliente.total_exames} laudos</span>
-                      <span className="font-bold">{cliente.percentual_atraso.toFixed(1)}%</span>
-                    </div>
-                    <Progress value={cliente.percentual_atraso} className="h-2" />
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Análise de Nível de Atraso */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Análise de Nível de Atraso</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">
-                {clienteSegments.find(s => s.name === 'Crítico (>20%)')?.value || 0}
-              </div>
-              <div className="text-sm text-muted-foreground">Clientes Críticos</div>
-              <div className="text-xs text-red-600 mt-1">&gt;20% de atraso</div>
-            </div>
-            
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {clienteSegments.find(s => s.name === 'Alto (10-20%)')?.value || 0}
-              </div>
-              <div className="text-sm text-muted-foreground">Clientes Alto Risco</div>
-              <div className="text-xs text-orange-600 mt-1">10-20% de atraso</div>
-            </div>
-            
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">
-                {clienteSegments.find(s => s.name === 'Médio (5-10%)')?.value || 0}
-              </div>
-              <div className="text-sm text-muted-foreground">Clientes Atenção</div>
-              <div className="text-xs text-yellow-600 mt-1">5-10% de atraso</div>
-            </div>
-            
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {clienteSegments.find(s => s.name === 'Sem Atraso')?.value || 0}
-              </div>
-              <div className="text-sm text-muted-foreground">Clientes OK</div>
-              <div className="text-xs text-green-600 mt-1">Sem atrasos</div>
-            </div>
-          </div>
-        </CardContent>
+        )}
       </Card>
 
-      {/* Análise de Tempo de Atraso */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Análise de Tempo de Atraso</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico de Pizza - Distribuição por Tempo */}
-            <div>
-              <h4 className="text-lg font-medium mb-4">Distribuição por Tempo de Atraso</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={timeDelaySegments}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {timeDelaySegments.map((entry, index) => (
-                      <Cell key={`time-cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => [`${value} laudos`, 'Quantidade']} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Cards de Estatísticas por Tempo */}
-            <div>
-              <h4 className="text-lg font-medium mb-4">Detalhamento por Faixa de Tempo</h4>
-              <div className="grid grid-cols-1 gap-3">
-                {timeDelaySegments.map((segment, index) => (
-                  <div key={segment.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: segment.color }}
-                      ></div>
-                      <span className="font-medium text-sm">{segment.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{segment.value}</div>
-                      <div className="text-xs text-muted-foreground">{segment.percentage.toFixed(1)}%</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Demonstrativo Detalhado de Laudos em Atraso */}
+      {/* Demonstrativo Detalhado - Laudos em Atraso */}
       <LaudosAtrasadosDetalhado />
     </div>
   );

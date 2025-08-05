@@ -78,7 +78,7 @@ export const LaudosAtrasadosDetalhado = () => {
     });
 
     console.log(`📊 [LaudosAtrasadosDetalhado] Processados ${data.detailedData.length} registros, encontrados ${atrasados.length} laudos atrasados`);
-    console.log(`📊 [LaudosAtrasadosDetalhado] DEVE SER IGUAL AOS 8.888 DO DASHBOARD`);
+    console.log(`📊 [LaudosAtrasadosDetalhado] Total de registros atrasados deve ser ${atrasados.length}`);
     return atrasados;
   }, [data.detailedData]);
 
@@ -241,16 +241,16 @@ export const LaudosAtrasadosDetalhado = () => {
                     Cliente {renderSortIcon('empresa')}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
-                  <div className="flex items-center gap-1">
-                    Paciente {renderSortIcon('paciente')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
-                  <div className="flex items-center gap-1">
-                    Exame {renderSortIcon('exame')}
-                  </div>
-                </TableHead>
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
+                   <div className="flex items-center gap-1">
+                     Paciente {renderSortIcon('paciente')}
+                   </div>
+                 </TableHead>
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
+                   <div className="flex items-center gap-1">
+                     Exame {renderSortIcon('exame')}
+                   </div>
+                 </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('modalidade')}>
                   <div className="flex items-center gap-1">
                     Modalidade {renderSortIcon('modalidade')}
@@ -283,11 +283,11 @@ export const LaudosAtrasadosDetalhado = () => {
                 const urgencia = categorizarUrgencia(laudo.tempoAtrasoHoras);
                 return (
                   <TableRow key={index} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{laudo.empresa}</TableCell>
-                    <TableCell>{laudo.paciente}</TableCell>
-                    <TableCell className="max-w-xs truncate" title={laudo.exame}>
-                      {laudo.exame}
-                    </TableCell>
+                     <TableCell className="font-medium">{laudo.empresa}</TableCell>
+                     <TableCell>{laudo.paciente || 'Não informado'}</TableCell>
+                     <TableCell className="max-w-xs truncate" title={laudo.exame}>
+                       {laudo.exame || 'Não informado'}
+                     </TableCell>
                     <TableCell>{laudo.modalidade}</TableCell>
                     <TableCell>{laudo.medico}</TableCell>
                     <TableCell>

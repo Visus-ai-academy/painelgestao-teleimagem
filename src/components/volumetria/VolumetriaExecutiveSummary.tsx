@@ -77,7 +77,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
       participacao: ((m.total_exames / processedData.totalExames) * 100).toFixed(1)
     }));
 
-  // Análise de performance geral usando dados corretos
+  // Análise de performance geral usando dados corretos - FONTE ÚNICA
   const performanceLevel = 
     volumetriaData.dashboardStats.percentual_atraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
     volumetriaData.dashboardStats.percentual_atraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
