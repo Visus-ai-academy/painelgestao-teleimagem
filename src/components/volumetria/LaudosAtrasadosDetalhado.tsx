@@ -151,11 +151,11 @@ export const LaudosAtrasadosDetalhado = () => {
       : <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
-  // Função para categorizar urgência do atraso
+  // Função para categorizar urgência do atraso CORRIGIDA
   const categorizarUrgencia = (horas: number) => {
-    if (horas > 3) return { label: 'Crítico', color: 'destructive' as const };
-    if (horas >= 2) return { label: 'Alto', color: 'secondary' as const };
-    if (horas >= 1) return { label: 'Médio', color: 'outline' as const };
+    if (horas > 3) return { label: 'Emergencial', color: 'destructive' as const };
+    if (horas >= 2) return { label: 'Crítico', color: 'secondary' as const };
+    if (horas >= 1) return { label: 'Moderado', color: 'outline' as const };
     return { label: 'Baixo', color: 'default' as const };
   };
 
@@ -203,31 +203,31 @@ export const LaudosAtrasadosDetalhado = () => {
           </Button>
         </div>
 
-        {/* Estatísticas rápidas */}
+        {/* Estatísticas rápidas CORRIGIDAS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <div className="text-2xl font-bold text-red-600">
               {filteredAndSortedData.filter(l => l.tempoAtrasoHoras > 3).length}
             </div>
-            <div className="text-sm text-muted-foreground">Críticos (&gt;3h)</div>
+            <div className="text-sm text-muted-foreground">Emergencial (&gt;3h)</div>
           </div>
           <div className="text-center p-4 bg-orange-50 rounded-lg">
             <div className="text-2xl font-bold text-orange-600">
               {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 2 && l.tempoAtrasoHoras <= 3).length}
             </div>
-            <div className="text-sm text-muted-foreground">Altos (2-3h)</div>
+            <div className="text-sm text-muted-foreground">Crítico (2-3h)</div>
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
             <div className="text-2xl font-bold text-yellow-600">
               {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 1 && l.tempoAtrasoHoras < 2).length}
             </div>
-            <div className="text-sm text-muted-foreground">Médios (1-2h)</div>
+            <div className="text-sm text-muted-foreground">Moderado (1-2h)</div>
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-600">
               {filteredAndSortedData.filter(l => l.tempoAtrasoHoras < 1).length}
             </div>
-            <div className="text-sm text-muted-foreground">Baixos (&lt;1h)</div>
+            <div className="text-sm text-muted-foreground">Baixo (&lt;1h)</div>
           </div>
         </div>
 
