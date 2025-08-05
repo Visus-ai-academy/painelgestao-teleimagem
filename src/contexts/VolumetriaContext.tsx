@@ -125,9 +125,17 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           if (!moreBatch || moreBatch.length === 0) break;
           allValues = [...allValues, ...moreBatch];
           offset += batchSize;
+          console.log(`📦 ${tipo}: Carregados mais ${moreBatch.length} valores, total: ${allValues.length}`);
         }
         
         const totalValue = allValues.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0);
+        
+        console.log(`🔍 DEBUG ${tipo}:`);
+        console.log(`- Total registros: ${totalRecordsCount}`);
+        console.log(`- Com valores: ${recordsWithValueCount}`);
+        console.log(`- Valores carregados: ${allValues.length}`);
+        console.log(`- Soma total: ${totalValue}`);
+        console.log(`- Primeiros 5 valores:`, allValues.slice(0, 5).map(v => v.VALORES));
 
         statsResult[tipo] = {
           totalRecords: totalRecordsCount,
