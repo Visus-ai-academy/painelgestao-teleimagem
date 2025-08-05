@@ -438,10 +438,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Forçando carregamento DEFINITIVO...');
-    // Invalidar qualquer cache e forçar reload
+    // FORÇAR INVALIDAÇÃO COMPLETA
     isLoadingRef.current = false;
     lastLoadTime.current = 0;
-    loadStats();
+    setData(prev => ({ ...prev, loading: true }));
+    
+    // EXECUTAR IMEDIATAMENTE sem debounce
+    setTimeout(() => {
+      console.log('🚀 TIMEOUT EXECUTADO - Chamando loadStats com força total');
+      loadStats();
+    }, 100);
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
