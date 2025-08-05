@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
+import { LimparUploads } from "@/components/LimparUploads";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -477,7 +478,9 @@ export default function ConfiguracaoFaturamento() {
         </Card>
       </div>
 
-      <div className="flex justify-end">
+      {/* Componente para limpar uploads travados */}
+      <div className="flex justify-between items-end">
+        <LimparUploads />
         <Button 
           className="flex items-center gap-2"
           onClick={() => {

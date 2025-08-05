@@ -33,7 +33,15 @@ serve(async (req) => {
     console.log(`📁 Processando arquivo: ${file.name}`)
     console.log(`📊 Tamanho: ${file.size} bytes`)
 
-    // 1. Criar log de processamento
+    // 1. Limpar uploads antigos travados
+    await supabaseClient
+      .from('upload_logs')
+      .delete()
+      .eq('file_type', 'precos_servicos')
+      .eq('status', 'processing')
+      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Mais de 5 minutos
+
+    // 2. Criar log de processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
       .insert({
@@ -47,8 +55,11 @@ serve(async (req) => {
       .single()
 
     if (logError) {
+      console.error('❌ Erro ao criar log:', logError)
       throw new Error(`Erro ao criar log: ${logError.message}`)
     }
+
+    console.log(`✅ Log criado: ${logEntry.id}`)
 
     // 2. Processar arquivo Excel
     const arrayBuffer = await file.arrayBuffer()
