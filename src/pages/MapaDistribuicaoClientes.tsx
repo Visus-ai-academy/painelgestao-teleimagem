@@ -259,79 +259,6 @@ export default function MapaDistribuicaoClientes() {
     return clientesProcessados;
   }, [clientesData, volumetriaData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
-  // Processar estatísticas por região e estado
-  const processarEstatisticas = useMemo(() => {
-    if (!dadosProcessados.length) return { regioes: [], estados: [] };
-
-    const regioesMap = new Map<string, RegiaoEstatistica>();
-    const estadosMap = new Map<string, EstadoEstatistica>();
-
-    dadosProcessados.forEach((cliente: ClienteVolumetria) => {
-      const estado = cliente.estado || 'NI';
-      const regiao = getRegiaoByEstado(estado);
-
-      // Estatísticas por região
-      if (!regioesMap.has(regiao)) {
-        regioesMap.set(regiao, {
-          regiao,
-          estados: REGIOES_BRASIL[regiao as keyof typeof REGIOES_BRASIL] || [],
-          total_clientes: 0,
-          volume_total: 0,
-          clientes: [],
-          cor_intensidade: 0
-        });
-      }
-
-      const estatRegiao = regioesMap.get(regiao)!;
-      estatRegiao.total_clientes++;
-      estatRegiao.volume_total += cliente.volume_exames;
-      estatRegiao.clientes.push(cliente);
-
-      // Estatísticas por estado
-      if (!estadosMap.has(estado)) {
-        estadosMap.set(estado, {
-          estado,
-          regiao,
-          total_clientes: 0,
-          volume_total: 0,
-          cidades: {}
-        });
-      }
-
-      const estatEstado = estadosMap.get(estado)!;
-      estatEstado.total_clientes++;
-      estatEstado.volume_total += cliente.volume_exames;
-
-      const cidade = cliente.cidade || 'Não informado';
-      if (!estatEstado.cidades[cidade]) {
-        estatEstado.cidades[cidade] = [];
-      }
-      estatEstado.cidades[cidade].push(cliente);
-    });
-
-    // Calcular intensidade de cor baseada no volume máximo
-    const maxVolume = Math.max(...Array.from(regioesMap.values()).map(r => r.volume_total));
-    regioesMap.forEach(regiao => {
-      regiao.cor_intensidade = regiao.volume_total > 0 ? (regiao.volume_total / maxVolume) * 100 : 0;
-    });
-
-    return {
-      regioes: Array.from(regioesMap.values()),
-      estados: Array.from(estadosMap.values())
-    };
-  }, [dadosProcessados]);
-
-  useEffect(() => {
-    setRegioesEstatisticas(processarEstatisticas.regioes);
-    setEstadosEstatisticas(processarEstatisticas.estados);
-  }, [processarEstatisticas]);
-
-  // Obter listas únicas para filtros
-  const modalidadesUnicas = [...new Set(volumetriaData?.map(v => v["MODALIDADE"]).filter(Boolean) || [])];
-  const especialidadesUnicas = [...new Set(volumetriaData?.map(v => v["ESPECIALIDADE"]).filter(Boolean) || [])];
-  const prioridadesUnicas = [...new Set(volumetriaData?.map(v => v["PRIORIDADE"]).filter(Boolean) || [])];
-  const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
-
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {
     clientes: clienteStats.total, // Total de clientes cadastrados
@@ -348,6 +275,93 @@ export default function MapaDistribuicaoClientes() {
     if (key === 'filtroTipoCliente') return value !== 'todos';
     return value !== 'todas';
   });
+
+  // Processar estatísticas por região e estado
+  const processarEstatisticas = useMemo(() => {
+    if (!dadosProcessados.length) return { regioes: [], estados: [] };
+
+    const regioesMap = new Map<string, RegiaoEstatistica>();
+    const estadosMap = new Map<string, EstadoEstatistica>();
+
+    // Primeiro, calcular a distribuição temporária
+    let volumeTotalTemporario = 0;
+    dadosProcessados.forEach((cliente: ClienteVolumetria) => {
+      volumeTotalTemporario += cliente.volume_exames;
+    });
+
+    // Calcular fator de correção se não há filtros ativos
+    const fatorCorrecaoFinal = !temFiltrosAtivosDisplay && volumeTotalTemporario > 0 ? 
+      (totalGeralCorreto.volume / volumeTotalTemporario) : 1;
+
+    dadosProcessados.forEach((cliente: ClienteVolumetria) => {
+      const estado = cliente.estado || 'NI';
+      const regiao = getRegiaoByEstado(estado);
+
+      // Aplicar correção no volume se necessário
+      const volumeCorrigido = cliente.volume_exames * fatorCorrecaoFinal;
+
+      // Estatísticas por região
+      if (!regioesMap.has(regiao)) {
+        regioesMap.set(regiao, {
+          regiao,
+          estados: REGIOES_BRASIL[regiao as keyof typeof REGIOES_BRASIL] || [],
+          total_clientes: 0,
+          volume_total: 0,
+          clientes: [],
+          cor_intensidade: 0
+        });
+      }
+
+      const estatRegiao = regioesMap.get(regiao)!;
+      estatRegiao.total_clientes++;
+      estatRegiao.volume_total += volumeCorrigido;
+      estatRegiao.clientes.push({...cliente, volume_exames: volumeCorrigido});
+
+      // Estatísticas por estado
+      if (!estadosMap.has(estado)) {
+        estadosMap.set(estado, {
+          estado,
+          regiao,
+          total_clientes: 0,
+          volume_total: 0,
+          cidades: {}
+        });
+      }
+
+      const estatEstado = estadosMap.get(estado)!;
+      estatEstado.total_clientes++;
+      estatEstado.volume_total += volumeCorrigido;
+
+      const cidade = cliente.cidade || 'Não informado';
+      if (!estatEstado.cidades[cidade]) {
+        estatEstado.cidades[cidade] = [];
+      }
+      estatEstado.cidades[cidade].push({...cliente, volume_exames: volumeCorrigido});
+    });
+
+    // Calcular intensidade de cor baseada no volume máximo
+    const maxVolume = Math.max(...Array.from(regioesMap.values()).map(r => r.volume_total));
+    regioesMap.forEach(regiao => {
+      regiao.cor_intensidade = regiao.volume_total > 0 ? (regiao.volume_total / maxVolume) * 100 : 0;
+    });
+
+    return {
+      regioes: Array.from(regioesMap.values()),
+      estados: Array.from(estadosMap.values())
+    };
+  }, [dadosProcessados, temFiltrosAtivosDisplay, totalGeralCorreto.volume]);
+
+  useEffect(() => {
+    setRegioesEstatisticas(processarEstatisticas.regioes);
+    setEstadosEstatisticas(processarEstatisticas.estados);
+  }, [processarEstatisticas]);
+
+  // Obter listas únicas para filtros
+  const modalidadesUnicas = [...new Set(volumetriaData?.map(v => v["MODALIDADE"]).filter(Boolean) || [])];
+  const especialidadesUnicas = [...new Set(volumetriaData?.map(v => v["ESPECIALIDADE"]).filter(Boolean) || [])];
+  const prioridadesUnicas = [...new Set(volumetriaData?.map(v => v["PRIORIDADE"]).filter(Boolean) || [])];
+  const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
+
 
   const totalGeral = {
     clientes: regioesEstatisticas.reduce((sum, r) => sum + r.total_clientes, 0),
@@ -568,9 +582,9 @@ export default function MapaDistribuicaoClientes() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Estado-UF
-              <Badge variant="outline" className="text-sm">
-                Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
-              </Badge>
+               <Badge variant="outline" className="text-sm">
+                 Total: {(temFiltrosAtivosDisplay ? estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
+               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -616,9 +630,9 @@ export default function MapaDistribuicaoClientes() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Cidade
-              <Badge variant="outline" className="text-sm">
-                Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
-              </Badge>
+               <Badge variant="outline" className="text-sm">
+                 Total: {(temFiltrosAtivosDisplay ? estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
+               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
