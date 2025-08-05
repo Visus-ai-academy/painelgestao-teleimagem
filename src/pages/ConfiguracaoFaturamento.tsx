@@ -29,6 +29,8 @@ import {
 
 import { useToast } from "@/hooks/use-toast";
 import { SimpleFileUpload } from "@/components/SimpleFileUpload";
+import { PrecosClienteUpload } from "@/components/PrecosClienteUpload";
+import { ParametrosClienteUpload } from "@/components/ParametrosClienteUpload";
 
 // Tipos para fontes de dados
 type FonteDados = 'upload' | 'mobilemed' | 'banco';
@@ -293,61 +295,8 @@ export default function ConfiguracaoFaturamento() {
 
       {/* Upload de Preços e Parâmetros */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Upload de Preços de Serviços
-            </CardTitle>
-            <CardDescription>
-              Faça upload da tabela de preços por modalidade, especialidade e categoria
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SimpleFileUpload
-              title="Preços de Serviços"
-              acceptedTypes={[".xlsx", ".xls"]}
-              onUpload={async (file: File) => {
-                // Upload direto Excel - colunas padronizadas
-                toast({
-                  title: "Preços processados",
-                  description: "Tabela de preços de serviços atualizada com sucesso",
-                });
-              }}
-            />
-            <p className="text-sm text-gray-600 mt-2">
-              Arquivo Excel (.xlsx/.xls) com colunas: modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia, cliente_nome, tipo_preco
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Upload de Parâmetros de Faturamento
-            </CardTitle>
-            <CardDescription>
-              Configure parâmetros específicos de faturamento por cliente
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SimpleFileUpload
-              title="Parâmetros de Faturamento"
-              acceptedTypes={[".xlsx", ".xls"]}
-              onUpload={async (file: File) => {
-                // Upload direto Excel - colunas padronizadas
-                toast({
-                  title: "Parâmetros processados",
-                  description: "Parâmetros de faturamento atualizados com sucesso",
-                });
-              }}
-            />
-            <p className="text-sm text-gray-600 mt-2">
-              Arquivo Excel (.xlsx/.xls) com colunas: cliente_nome, tipo_cliente, aplicar_franquia, volume_franquia, valor_franquia, percentual_adicional_urgencia
-            </p>
-          </CardContent>
-        </Card>
+        <PrecosClienteUpload />
+        <ParametrosClienteUpload />
       </div>
 
       {/* Configurações originais da página */}

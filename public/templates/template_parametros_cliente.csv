@@ -1,0 +1,3 @@
+Nome Empresa,Cliente Consolidado,Status,Impostos abMin,Simples,Tipo métrica convênio,Valor convênio,Tipo métrica URGÊNCIA,Valor URGÊNCIA,Tipo Desconto / Acréscimo,Desconto / Acréscimo,Integração,Data Início Integração,Portal de Laudos,% ISS,Possui Franquia,Valor Franquia,Frequencia Contínua,Frequência por volume,Volume,R$ Valor Franquia Acima Volume,Data Início Franquia,Cobrar URGÊNCIA como ROTINA,Incluir Empresa Origem,Incluir Acces Number,Incluir Médico Solicitante
+EXEMPLO CLIENTE LTDA,,Ativo,,Não,Valor fixo,5.00,Percentual,20,Desconto,5,,,,5,Sim,1000.00,Sim,Não,500,800.00,,Não,Sim,Não,Sim
+OUTRO CLIENTE SA,,Ativo,,Sim,Percentual,10,Valor fixo,50,Acréscimo,10,,,,3,Não,,,Sim,1000,,,Sim,Não,Sim,Não
