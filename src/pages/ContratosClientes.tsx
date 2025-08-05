@@ -46,6 +46,11 @@ import {
   CheckCircle,
   AlertCircle,
   Eye,
+  Search,
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { FilterBar } from "@/components/FilterBar";
 import { useToast } from "@/hooks/use-toast";
@@ -140,11 +145,19 @@ interface NovoCliente {
 
 export default function ContratosClientes() {
   const [contratos, setContratos] = useState<ContratoCliente[]>([]);
+  const [contratosOriginal, setContratosOriginal] = useState<ContratoCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNovoContrato, setShowNovoContrato] = useState(false);
   const [showEditarContrato, setShowEditarContrato] = useState(false);
   const [contratoEditando, setContratoEditando] = useState<ContratoCliente | null>(null);
   const [isCreatingContracts, setIsCreatingContracts] = useState(false);
+  
+  // Estados para busca, filtro e ordenação
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [sortField, setSortField] = useState<string>("cliente");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  
   const { toast } = useToast();
 
   // Carregar dados dos contratos do Supabase
@@ -243,6 +256,7 @@ export default function ContratosClientes() {
       });
 
       setContratos(contratosFormatados);
+      setContratosOriginal(contratosFormatados);
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
       toast({
@@ -307,6 +321,90 @@ export default function ContratosClientes() {
     }
   };
 
+  // Funções de filtro, busca e ordenação
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortDirection === "asc" ? 
+      <ArrowUp className="h-4 w-4 text-primary" /> : 
+      <ArrowDown className="h-4 w-4 text-primary" />;
+  };
+
+  // Aplicar filtros, busca e ordenação
+  useEffect(() => {
+    let contratosFiltrados = [...contratosOriginal];
+
+    // Filtro por termo de busca
+    if (searchTerm) {
+      contratosFiltrados = contratosFiltrados.filter(contrato =>
+        contrato.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.cnpj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.responsavel?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Filtro por status
+    if (statusFilter !== "todos") {
+      contratosFiltrados = contratosFiltrados.filter(contrato => 
+        contrato.status.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+
+    // Ordenação
+    contratosFiltrados.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortField) {
+        case "cliente":
+          aValue = a.cliente;
+          bValue = b.cliente;
+          break;
+        case "status":
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case "dataInicio":
+          aValue = new Date(a.dataInicio);
+          bValue = new Date(b.dataInicio);
+          break;
+        case "dataFim":
+          aValue = new Date(a.dataFim);
+          bValue = new Date(b.dataFim);
+          break;
+        case "diasParaVencer":
+          aValue = a.diasParaVencer;
+          bValue = b.diasParaVencer;
+          break;
+        default:
+          aValue = a.cliente;
+          bValue = b.cliente;
+      }
+
+      if (typeof aValue === "string") {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (sortDirection === "asc") {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    setContratos(contratosFiltrados);
+  }, [contratosOriginal, searchTerm, statusFilter, sortField, sortDirection]);
+
   const getStatusBadge = (status: string, diasParaVencer: number) => {
     if (status === "Ativo" && diasParaVencer <= 60) {
       return <Badge className="bg-yellow-100 text-yellow-800">A Vencer</Badge>;
@@ -323,8 +421,8 @@ export default function ContratosClientes() {
     }
   };
 
-  const contratosAVencer = contratos.filter(c => c.diasParaVencer <= 60 && c.diasParaVencer > 0);
-  const contratosAtivos = contratos.filter(c => c.status === "Ativo");
+  const contratosAVencer = contratosOriginal.filter(c => c.diasParaVencer <= 60 && c.diasParaVencer > 0);
+  const contratosAtivos = contratosOriginal.filter(c => c.status === "Ativo");
   const valorTotalAtivos = contratosAtivos.reduce((sum, c) => sum + c.valorTotal, 0);
 
   return (
@@ -472,7 +570,68 @@ export default function ContratosClientes() {
       {/* Tabela de Contratos */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Contratos</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle>Lista de Contratos</CardTitle>
+            
+            {/* Controles de busca, filtro e ordenação */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              {/* Campo de busca */}
+              <div className="relative flex-1 sm:flex-none">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por cliente, CNPJ ou responsável..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full sm:w-80"
+                />
+              </div>
+
+              {/* Filtro por status */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="a vencer">A Vencer</SelectItem>
+                  <SelectItem value="vencido">Vencido</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Ordenação */}
+              <Select value={`${sortField}-${sortDirection}`} onValueChange={(value) => {
+                const [field, direction] = value.split('-');
+                setSortField(field);
+                setSortDirection(direction as "asc" | "desc");
+              }}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="cliente-asc">Cliente (A-Z)</SelectItem>
+                  <SelectItem value="cliente-desc">Cliente (Z-A)</SelectItem>
+                  <SelectItem value="status-asc">Status (A-Z)</SelectItem>
+                  <SelectItem value="status-desc">Status (Z-A)</SelectItem>
+                  <SelectItem value="dataInicio-asc">Data Início (Antiga)</SelectItem>
+                  <SelectItem value="dataInicio-desc">Data Início (Recente)</SelectItem>
+                  <SelectItem value="dataFim-asc">Data Fim (Antiga)</SelectItem>
+                  <SelectItem value="dataFim-desc">Data Fim (Recente)</SelectItem>
+                  <SelectItem value="diasParaVencer-asc">Menos dias p/ vencer</SelectItem>
+                  <SelectItem value="diasParaVencer-desc">Mais dias p/ vencer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Contador de resultados */}
+          <div className="text-sm text-muted-foreground mt-2">
+            Mostrando {contratos.length} de {contratosOriginal.length} contratos
+            {searchTerm && ` • Filtrado por: "${searchTerm}"`}
+            {statusFilter !== "todos" && ` • Status: ${statusFilter}`}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
