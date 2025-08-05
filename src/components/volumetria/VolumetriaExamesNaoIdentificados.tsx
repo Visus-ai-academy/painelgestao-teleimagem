@@ -41,6 +41,11 @@ export function VolumetriaExamesNaoIdentificados() {
       // USAR DADOS DO CONTEXTO CENTRALIZADO EM VEZ DE QUERY DIRETA
       const volumetriaDataCompleta = data.detailedData;
       
+      console.log('🚀 INICIANDO loadExamesNaoIdentificados');
+      console.log('📊 data.loading:', data.loading);
+      console.log('📊 volumetriaDataCompleta.length:', volumetriaDataCompleta?.length || 0);
+      console.log('📊 Primeiro registro exemplo:', volumetriaDataCompleta?.[0]);
+      
       if (!volumetriaDataCompleta || volumetriaDataCompleta.length === 0) {
         console.log('📊 Aguardando dados do contexto centralizado...');
         setLoading(false);
@@ -55,7 +60,9 @@ export function VolumetriaExamesNaoIdentificados() {
       );
       
       console.log('📊 REGISTROS ZERADOS FILTRADOS:', volumetriaData.length);
-      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData.slice(0, 3));
+      console.log('📊 VALORES únicos encontrados:', [...new Set(volumetriaDataCompleta.map(item => item.VALORES))].slice(0, 20));
+      console.log('📊 EXEMPLO DE REGISTROS ZERADOS:', volumetriaData.slice(0, 5));
+      console.log('📊 EXEMPLO DE REGISTROS COM VALOR:', volumetriaDataCompleta.filter(item => item.VALORES > 0).slice(0, 3));
 
       // 2. Buscar estudos existentes no De Para (COM LIMITE EXPLÍCITO ALTO)
       const { data: deParaData, error: deParaError } = await supabase
