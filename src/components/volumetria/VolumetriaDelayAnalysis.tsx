@@ -468,6 +468,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                       {renderSortIcon('percentual_atraso')}
                     </div>
                   </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    onClick={() => handleSort('tempoMedioAtraso')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      Tempo Médio Atraso
+                      {renderSortIcon('tempoMedioAtraso')}
+                    </div>
+                  </TableHead>
                   <TableHead className="min-w-[100px] text-center font-semibold h-12">
                     Status
                   </TableHead>
@@ -518,6 +527,16 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                             {cliente.percentual_atraso.toFixed(1)}%
                           </div>
                         </TableCell>
+                        <TableCell className="min-w-[140px] border-r text-center">
+                          <div className="font-medium text-orange-600">
+                            {cliente.tempoMedioAtraso > 0 
+                              ? cliente.tempoMedioAtraso >= 60 
+                                ? `${Math.floor(cliente.tempoMedioAtraso / 60)}h ${Math.floor(cliente.tempoMedioAtraso % 60)}min`
+                                : `${Math.floor(cliente.tempoMedioAtraso)}min`
+                              : '-'
+                            }
+                          </div>
+                        </TableCell>
                         <TableCell className="min-w-[100px] text-center">
                           <Badge 
                             className="text-xs font-medium px-2 py-1"
@@ -535,7 +554,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                       {/* Detalhes expandidos do cliente */}
                       {isExpanded && (
                         <TableRow className="bg-gray-50">
-                          <TableCell colSpan={5} className="p-0">
+                          <TableCell colSpan={6} className="p-0">
                             <div className="p-4 border-l-4" style={{ borderColor: category.color }}>
                               {isLoading ? (
                                 <div className="flex items-center justify-center py-8">
