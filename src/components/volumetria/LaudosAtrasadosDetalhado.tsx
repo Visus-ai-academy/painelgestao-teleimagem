@@ -107,29 +107,29 @@ export const LaudosAtrasadosDetalhado = () => {
       );
     }
 
-    // Aplicar ordenação
-    filtered.sort((a, b) => {
-      let valueA: any = a[sortField];
-      let valueB: any = b[sortField];
+  // Aplicar ordenação
+  filtered.sort((a, b) => {
+    let valueA: any = a[sortField];
+    let valueB: any = b[sortField];
 
-      if (sortField === 'dataLaudo' || sortField === 'dataPrazo') {
-        valueA = valueA.getTime();
-        valueB = valueB.getTime();
-      }
+    if (sortField === 'dataLaudo' || sortField === 'dataPrazo') {
+      valueA = valueA.getTime();
+      valueB = valueB.getTime();
+    }
 
-      if (typeof valueA === 'string') {
-        valueA = valueA.toLowerCase();
-        valueB = valueB.toLowerCase();
-      }
+    if (typeof valueA === 'string') {
+      valueA = valueA.toLowerCase();
+      valueB = valueB.toLowerCase();
+    }
 
-      if (sortDirection === 'asc') {
-        return valueA > valueB ? 1 : -1;
-      } else {
-        return valueA < valueB ? 1 : -1;
-      }
-    });
+    if (sortDirection === 'asc') {
+      return valueA > valueB ? 1 : -1;
+    } else {
+      return valueA < valueB ? 1 : -1;
+    }
+  });
 
-    return filtered;
+  return filtered;
   }, [laudosAtrasados, searchTerm, sortField, sortDirection]);
 
   // Paginação
@@ -290,9 +290,19 @@ export const LaudosAtrasadosDetalhado = () => {
                      Exame {renderSortIcon('exame')}
                    </div>
                  </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('valores')}>
+                  <div className="flex items-center gap-1">
+                    Qtd {renderSortIcon('valores')}
+                  </div>
+                </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('modalidade')}>
                   <div className="flex items-center gap-1">
                     Modalidade {renderSortIcon('modalidade')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('especialidade')}>
+                  <div className="flex items-center gap-1">
+                    Especialidade {renderSortIcon('especialidade')}
                   </div>
                 </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('medico')}>
@@ -323,12 +333,34 @@ export const LaudosAtrasadosDetalhado = () => {
                 return (
                   <TableRow key={index} className="hover:bg-muted/50">
                      <TableCell className="font-medium">{laudo.empresa}</TableCell>
-                     <TableCell>{laudo.paciente || 'Não informado'}</TableCell>
-                     <TableCell className="max-w-xs truncate" title={laudo.exame}>
-                       {laudo.exame || 'Não informado'}
+                     <TableCell>
+                       <div className="min-w-0">
+                         <div className="font-medium text-sm truncate" title={laudo.paciente}>
+                           {laudo.paciente || 'Não informado'}
+                         </div>
+                       </div>
                      </TableCell>
-                    <TableCell>{laudo.modalidade}</TableCell>
-                    <TableCell>{laudo.medico}</TableCell>
+                     <TableCell>
+                       <div className="min-w-0">
+                         <div className="font-medium text-sm truncate" title={laudo.exame}>
+                           {laudo.exame || 'Não informado'}
+                         </div>
+                       </div>
+                     </TableCell>
+                    <TableCell className="text-center">
+                      <div className="font-semibold text-blue-600">
+                        {laudo.valores.toLocaleString()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{laudo.modalidade || 'Não informado'}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{laudo.especialidade || 'Não informado'}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{laudo.medico || 'Não informado'}</div>
+                    </TableCell>
                     <TableCell>
                       <div className="text-sm">
                         {format(laudo.dataPrazo, 'dd/MM/yyyy', { locale: ptBR })}
