@@ -186,11 +186,11 @@ export default function Volumetria() {
 
             <TabsContent value="medicos" className="mt-6">
               <VolumetriaMedicosAnalysis 
-                medicos={[]}
-                modalidades={[]}
-                especialidades={[]}
-                categorias={[]}
-                prioridades={[]}
+                medicos={processedData.medicos as any}
+                modalidades={processedData.modalidades as any}
+                especialidades={processedData.especialidades as any}
+                categorias={processedData.categorias as any}
+                prioridades={processedData.prioridades as any}
                 totalExames={stats.total_exames}
               />
             </TabsContent>
@@ -198,11 +198,11 @@ export default function Volumetria() {
             <TabsContent value="delays" className="mt-6">
               <VolumetriaDelayAnalysis 
                 data={{
-                  clientes: [],
-                  modalidades: [],
-                  especialidades: [],
-                  categorias: [],
-                  prioridades: [],
+                  clientes: processedData.clientes as any,
+                  modalidades: processedData.modalidades as any,
+                  especialidades: processedData.especialidades as any,
+                  categorias: processedData.categorias as any,
+                  prioridades: processedData.prioridades as any,
                   totalAtrasados: stats.total_atrasados,
                   percentualAtrasoGeral: stats.percentual_atraso,
                   atrasosComTempo: []
