@@ -3241,6 +3241,25 @@ export type Database = {
           total_registros: number
         }[]
       }
+      get_laudos_atrasados_completos: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          CATEGORIA: string
+          PRIORIDADE: string
+          MEDICO: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+        }[]
+      }
       get_periodo_faturamento: {
         Args: { data_referencia: string }
         Returns: {

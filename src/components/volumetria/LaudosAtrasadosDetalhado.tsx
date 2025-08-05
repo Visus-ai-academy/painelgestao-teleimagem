@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Search, Download, Filter, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
-import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { Clock, Search, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from 'xlsx';
@@ -29,54 +29,38 @@ type SortField = keyof LaudoAtrasado | 'tempoAtraso';
 type SortDirection = 'asc' | 'desc';
 
 export const LaudosAtrasadosDetalhado = () => {
-  const { data } = useVolumetria();
+  const [laudosAtrasados, setLaudosAtrasados] = useState<LaudoAtrasado[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  // CALCULAR LAUDOS ATRASADOS DOS DADOS DISPONÍVEIS
-  const laudosAtrasados = useMemo(() => {
-    if (!data.detailedData || data.detailedData.length === 0) {
-      console.log(`📊 [LaudosAtrasadosDetalhado] Sem dados detalhados disponíveis`);
-      return [];
-    }
-
-    console.log(`📊 [LaudosAtrasadosDetalhado] Iniciando processamento de ${data.detailedData.length} laudos disponíveis`);
-    
-    const atrasados: LaudoAtrasado[] = [];
-    let laudosProcessados = 0;
-    let laudosComDatasCompletas = 0;
-
-    data.detailedData.forEach(item => {
-      laudosProcessados++;
-      
-      // USAR MESMA VALIDAÇÃO DO CONTEXTO
-      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) {
-        return; // Pular laudos sem dados completos
-      }
-      
-      laudosComDatasCompletas++;
-
+  // CARREGAR TODOS OS LAUDOS ATRASADOS DIRETAMENTE DA FUNÇÃO RPC
+  useEffect(() => {
+    const carregarLaudosAtrasados = async () => {
       try {
-        const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-        const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+        console.log('🚀 Carregando TODOS os laudos atrasados via RPC...');
         
-        // USAR MESMA LÓGICA DE VALIDAÇÃO DE DATA DO CONTEXTO
-        if (isNaN(dataLaudo.getTime()) || isNaN(dataPrazo.getTime())) {
-          return; // Pular datas inválidas
+        const { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
+        
+        if (error) {
+          throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
         }
         
-        // VERIFICAR SE ESTÁ ATRASADO (MESMA LÓGICA DO CONTEXTO)
-        if (dataLaudo > dataPrazo) {
+        console.log(`✅ ${laudosAtrasadosData.length} laudos atrasados carregados diretamente via RPC`);
+        
+        const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
+          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           const tempoAtrasoMs = dataLaudo.getTime() - dataPrazo.getTime();
           const tempoAtrasoHoras = tempoAtrasoMs / (1000 * 60 * 60);
           
-          atrasados.push({
+          return {
             empresa: item.EMPRESA || '',
-            paciente: item.NOME_PACIENTE || 'Não informado', // Campo correto é NOME_PACIENTE
-            exame: item.ESTUDO_DESCRICAO || 'Não informado', // Campo correto é ESTUDO_DESCRICAO
+            paciente: item.NOME_PACIENTE || 'Não informado',
+            exame: item.ESTUDO_DESCRICAO || 'Não informado',
             modalidade: item.MODALIDADE || '',
             especialidade: item.ESPECIALIDADE || '',
             categoria: item.CATEGORIA || '',
@@ -86,27 +70,21 @@ export const LaudosAtrasadosDetalhado = () => {
             dataPrazo,
             tempoAtrasoHoras,
             valores: Number(item.VALORES) || 1
-          });
-        }
+          };
+        });
+        
+        setLaudosAtrasados(laudosProcessados);
+        console.log(`📊 Total de laudos atrasados processados: ${laudosProcessados.length}`);
       } catch (error) {
-        console.log('Erro ao processar data:', error);
+        console.error('❌ Erro ao carregar laudos atrasados:', error);
+        setLaudosAtrasados([]);
+      } finally {
+        setLoading(false);
       }
-    });
-
-    console.log(`📊 [LaudosAtrasadosDetalhado] ESTATÍSTICAS FINAIS:`);
-    console.log(`📊 - Total de laudos disponíveis: ${data.detailedData.length}`);
-    console.log(`📊 - Laudos processados: ${laudosProcessados}`);
-    console.log(`📊 - Laudos com datas completas: ${laudosComDatasCompletas}`);
-    console.log(`📊 - Laudos atrasados encontrados: ${atrasados.length}`);
-    console.log(`📊 - Dashboard reporta: ${data.dashboardStats?.total_atrasados || 0} laudos atrasados`);
+    };
     
-    // Se há discrepância significativa, reportar
-    if (data.dashboardStats?.total_atrasados && Math.abs(atrasados.length - data.dashboardStats.total_atrasados) > 100) {
-      console.warn(`⚠️ DISCREPÂNCIA DETECTADA: Dashboard=${data.dashboardStats.total_atrasados}, Detalhado=${atrasados.length}`);
-    }
-    
-    return atrasados;
-  }, [data.detailedData, data.dashboardStats]);
+    carregarLaudosAtrasados();
+  }, []);
 
   // Filtrar e ordenar dados
   const filteredAndSortedData = useMemo(() => {
@@ -125,29 +103,29 @@ export const LaudosAtrasadosDetalhado = () => {
       );
     }
 
-  // Aplicar ordenação
-  filtered.sort((a, b) => {
-    let valueA: any = a[sortField];
-    let valueB: any = b[sortField];
+    // Aplicar ordenação
+    filtered.sort((a, b) => {
+      let valueA: any = a[sortField];
+      let valueB: any = b[sortField];
 
-    if (sortField === 'dataLaudo' || sortField === 'dataPrazo') {
-      valueA = valueA.getTime();
-      valueB = valueB.getTime();
-    }
+      if (sortField === 'dataLaudo' || sortField === 'dataPrazo') {
+        valueA = valueA.getTime();
+        valueB = valueB.getTime();
+      }
 
-    if (typeof valueA === 'string') {
-      valueA = valueA.toLowerCase();
-      valueB = valueB.toLowerCase();
-    }
+      if (typeof valueA === 'string') {
+        valueA = valueA.toLowerCase();
+        valueB = valueB.toLowerCase();
+      }
 
-    if (sortDirection === 'asc') {
-      return valueA > valueB ? 1 : -1;
-    } else {
-      return valueA < valueB ? 1 : -1;
-    }
-  });
+      if (sortDirection === 'asc') {
+        return valueA > valueB ? 1 : -1;
+      } else {
+        return valueA < valueB ? 1 : -1;
+      }
+    });
 
-  return filtered;
+    return filtered;
   }, [laudosAtrasados, searchTerm, sortField, sortDirection]);
 
   // Paginação
@@ -177,7 +155,7 @@ export const LaudosAtrasadosDetalhado = () => {
       : <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
-  // Função para categorizar urgência do atraso CORRIGIDA
+  // Função para categorizar urgência do atraso
   const categorizarUrgencia = (horas: number) => {
     if (horas > 3) return { label: 'Emergencial', color: 'destructive' as const };
     if (horas >= 2) return { label: 'Crítico', color: 'secondary' as const };
@@ -221,6 +199,16 @@ export const LaudosAtrasadosDetalhado = () => {
     XLSX.writeFile(workbook, fileName);
   };
 
+  if (loading) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="p-6">
+          <div className="text-center">Carregando laudos atrasados...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -228,7 +216,7 @@ export const LaudosAtrasadosDetalhado = () => {
           <Clock className="h-5 w-5 text-red-500" />
           Demonstrativo Detalhado - Laudos em Atraso
           <Badge variant="destructive" className="ml-2">
-            {laudosAtrasados.length.toLocaleString()} laudos detalhados
+            {laudosAtrasados.length.toLocaleString()} laudos
           </Badge>
           {searchTerm && (
             <Badge variant="outline" className="ml-2">
@@ -265,7 +253,7 @@ export const LaudosAtrasadosDetalhado = () => {
           </Button>
         </div>
 
-        {/* Estatísticas rápidas CORRIGIDAS */}
+        {/* Estatísticas rápidas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <div className="text-2xl font-bold text-red-600">
@@ -303,16 +291,16 @@ export const LaudosAtrasadosDetalhado = () => {
                     Cliente {renderSortIcon('empresa')}
                   </div>
                 </TableHead>
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
-                   <div className="flex items-center gap-1">
-                     Paciente {renderSortIcon('paciente')}
-                   </div>
-                 </TableHead>
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
-                   <div className="flex items-center gap-1">
-                     Exame {renderSortIcon('exame')}
-                   </div>
-                 </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('paciente')}>
+                  <div className="flex items-center gap-1">
+                    Paciente {renderSortIcon('paciente')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('exame')}>
+                  <div className="flex items-center gap-1">
+                    Exame {renderSortIcon('exame')}
+                  </div>
+                </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('valores')}>
                   <div className="flex items-center gap-1">
                     Qtd {renderSortIcon('valores')}
@@ -355,21 +343,21 @@ export const LaudosAtrasadosDetalhado = () => {
                 const urgencia = categorizarUrgencia(laudo.tempoAtrasoHoras);
                 return (
                   <TableRow key={index} className="hover:bg-muted/50">
-                     <TableCell className="font-medium">{laudo.empresa}</TableCell>
-                     <TableCell>
-                       <div className="min-w-0">
-                         <div className="font-medium text-sm truncate" title={laudo.paciente}>
-                           {laudo.paciente || 'Não informado'}
-                         </div>
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       <div className="min-w-0">
-                         <div className="font-medium text-sm truncate" title={laudo.exame}>
-                           {laudo.exame || 'Não informado'}
-                         </div>
-                       </div>
-                     </TableCell>
+                    <TableCell className="font-medium">{laudo.empresa}</TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate" title={laudo.paciente}>
+                          {laudo.paciente || 'Não informado'}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate" title={laudo.exame}>
+                          {laudo.exame || 'Não informado'}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-center">
                       <div className="font-semibold text-blue-600">
                         {laudo.valores.toLocaleString()}
