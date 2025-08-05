@@ -372,20 +372,32 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </AlertDescription>
           </Alert>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
-              <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{(() => {
-                const clientesComAtrasos = safeData.clientes.filter(c => c.atrasados > 0).length;
-                console.log('🔍 [DelayAnalysis] Clientes com atrasos:', clientesComAtrasos, 'de', safeData.clientes.length, 'total');
-                console.log('🔍 [DelayAnalysis] Amostra de clientes:', safeData.clientes.slice(0, 5).map(c => ({ nome: c.nome, atrasados: c.atrasados })));
-                return clientesComAtrasos;
-              })()}</div>
-              <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
-            </div>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="text-center">
+               <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
+               <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
+             </div>
+             <div className="text-center">
+               <div className="text-2xl font-bold text-orange-600">{(() => {
+                 const clientesComAtrasos = safeData.clientes.filter(c => c.atrasados > 0).length;
+                 
+                 // VERIFICAR SOMATÓRIO DOS ATRASOS DOS CLIENTES
+                 const totalAtrasadosClientes = safeData.clientes.reduce((sum, c) => sum + c.atrasados, 0);
+                 const totalExamesClientes = safeData.clientes.reduce((sum, c) => sum + c.total_exames, 0);
+                 
+                 console.log('🔍 [DelayAnalysis] VERIFICAÇÃO DE SOMATÓRIOS:');
+                 console.log('📊 Total geral de atrasos (dashboard):', safeData.totalAtrasados.toLocaleString());
+                 console.log('📊 Soma dos atrasos dos clientes:', totalAtrasadosClientes.toLocaleString());
+                 console.log('📊 Total geral de exames (dashboard):', processedData.totalExames.toLocaleString());
+                 console.log('📊 Soma dos exames dos clientes:', totalExamesClientes.toLocaleString());
+                 console.log('📊 Diferença nos atrasos:', (safeData.totalAtrasados - totalAtrasadosClientes).toLocaleString());
+                 console.log('📊 Diferença nos exames:', (processedData.totalExames - totalExamesClientes).toLocaleString());
+                 console.log('🔍 [DelayAnalysis] Clientes com atrasos:', clientesComAtrasos, 'de', safeData.clientes.length, 'total');
+                 
+                 return clientesComAtrasos;
+               })()}</div>
+               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
+             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{safeData.percentualAtrasoGeral.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">Taxa Geral de Atraso</div>
