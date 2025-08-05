@@ -522,7 +522,7 @@ export default function MapaDistribuicaoClientes() {
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Região
               <Badge variant="outline" className="text-sm">
-                Total: {regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0).toLocaleString()} exames
+                Total: {(temFiltrosAtivosDisplay ? regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
               </Badge>
             </CardTitle>
           </CardHeader>
