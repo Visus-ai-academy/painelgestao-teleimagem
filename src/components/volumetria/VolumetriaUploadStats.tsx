@@ -4,6 +4,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, Calendar, BarChart3, AlertCircle } from "lucide-react";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 
+// FORÇA CACHE BUST
+const CACHE_BUSTER = Date.now();
+
 // Dados estruturados
 interface UploadStats {
   fileName: string;
@@ -17,21 +20,26 @@ interface UploadStats {
 export function VolumetriaUploadStats() {
   const { data, refreshData } = useVolumetria();
 
-  // Debug do estado atual
-  console.log('📊 VolumetriaUploadStats - Estado atual do data:', data);
+  // FORÇAR EXECUÇÃO SEMPRE QUE COMPONENTE RENDERIZAR
+  console.log('🔥 RENDERIZAÇÃO VolumetriaUploadStats - CACHE BUSTER:', CACHE_BUSTER);
+  console.log('📊 Estado atual completo:', data);
+  console.log('📊 Loading:', data.loading);
+  console.log('📊 Stats keys:', Object.keys(data.stats));
   
   // Forçar uma atualização na primeira renderização para garantir que os dados sejam carregados
   useEffect(() => {
-    console.log('🔄 VolumetriaUploadStats montado - forçando refresh IMEDIATO...');
-    console.log('📊 Data loading:', data.loading);
-    console.log('📊 Stats:', data.stats);
+    console.log('🔄 VolumetriaUploadStats useEffect EXECUTADO - Cache buster:', CACHE_BUSTER);
+    console.log('📊 Data no useEffect:', data);
     
-    // Limpar qualquer cache e forçar reload completo
+    // Forçar refresh imediato E com delay
+    console.log('🚀 Executando refresh IMEDIATO...');
+    refreshData();
+    
     setTimeout(() => {
-      console.log('🚀 Executando refresh forçado agora...');
+      console.log('🚀 Executando refresh com DELAY...');
       refreshData();
-    }, 500);
-  }, []);
+    }, 1000);
+  }, [CACHE_BUSTER]); // Dependência do cache buster força execução sempre
 
   // Converter dados do contexto para o formato de stats
   const stats: UploadStats[] = [
@@ -146,6 +154,14 @@ export function VolumetriaUploadStats() {
               <div className="text-2xl font-bold text-orange-900">{totalStats.totalValue.toLocaleString()}</div>
               <div className="text-sm text-orange-700">Total de Exames</div>
             </div>
+          </div>
+          {/* Debug info */}
+          <div className="mt-2 text-xs text-center text-muted-foreground">
+            Cache: {CACHE_BUSTER} | Debug: {JSON.stringify({
+              loading: data.loading,
+              totalValue: totalStats.totalValue,
+              hasStats: Object.keys(data.stats).length
+            })}
           </div>
           {/* Indicador de última atualização */}
           <div className="mt-2 text-xs text-center text-muted-foreground">
