@@ -74,14 +74,7 @@ export default function Volumetria() {
     refreshContext();
   };
   
-  // Forçar refresh após mudanças no código
-  useEffect(() => {
-    console.log('🔄 [VOLUMETRIA PAGE] Forçando refresh dos dados...');
-    const timer = setTimeout(() => {
-      refreshData();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [refreshData]);
+  // Remover auto-refresh que estava causando loop infinito
 
   // Auto-refresh removido - atualização apenas via realtime e ações manuais
   
