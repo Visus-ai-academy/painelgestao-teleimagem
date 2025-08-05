@@ -57,8 +57,13 @@ async function processarLotesBackground(
             valor_urgencia: valor, // Por enquanto igual ao valor_base
             volume_inicial: item.volInicial,
             volume_final: item.volFinal,
-            volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
+            volume_total: item.condVolume ? parseInt(item.condVolume) || null : null,
             considera_prioridade_plantao: item.consideraPlantao,
+            data_inicio_vigencia: item.dtInicioVigencia ? new Date(item.dtInicioVigencia).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            data_fim_vigencia: item.dtFimVigencia ? new Date(item.dtFimVigencia).toISOString().split('T')[0] : null,
+            tipo_preco: 'contrato',
+            aplicar_legado: true,
+            aplicar_incremental: true,
             ativo: true
           })
 
@@ -352,8 +357,13 @@ serve(async (req) => {
             valor_urgencia: valor, // Por enquanto igual ao valor_base
             volume_inicial: item.volInicial,
             volume_final: item.volFinal,
-            volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
+            volume_total: item.condVolume ? parseInt(item.condVolume) || null : null,
             considera_prioridade_plantao: item.consideraPlantao,
+            data_inicio_vigencia: item.dtInicioVigencia ? new Date(item.dtInicioVigencia).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            data_fim_vigencia: item.dtFimVigencia ? new Date(item.dtFimVigencia).toISOString().split('T')[0] : null,
+            tipo_preco: 'contrato',
+            aplicar_legado: true,
+            aplicar_incremental: true,
             ativo: true
           })
 
