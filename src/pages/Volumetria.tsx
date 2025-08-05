@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useVolumetriaDataFiltered, VolumetriaFilters } from '@/hooks/useVolumetriaDataFiltered';
 import { VolumetriaStats } from '@/components/volumetria/VolumetriaStats';
 import { VolumetriaAdvancedFilters } from '@/components/volumetria/VolumetriaAdvancedFilters';
 import { VolumetriaNoData } from '@/components/volumetria/VolumetriaNoData';
@@ -12,6 +11,19 @@ import { VolumetriaMedicosAnalysis } from '@/components/volumetria/VolumetriaMed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVolumetria } from '@/contexts/VolumetriaContext';
 
+interface VolumetriaFilters {
+  ano: string;
+  trimestre: string;
+  mes: string;
+  semana: string;
+  dia: string;
+  dataEspecifica?: Date | null;
+  cliente: string;
+  modalidade: string;
+  especialidade: string;
+  prioridade: string;
+  medico: string;
+}
 
 // Função para obter filtros padrão - SEM FILTRO DE DATA
 const getDefaultFilters = (): VolumetriaFilters => {
@@ -33,54 +45,53 @@ const getDefaultFilters = (): VolumetriaFilters => {
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>(getDefaultFilters());
   
-  // Usar dados do contexto para o resumo principal
-  const { data: contextData, refreshData: refreshContext } = useVolumetria();
+  // Usar apenas dados do contexto centralizado
+  const { data: contextData, refreshData, getFilteredData } = useVolumetria();
   
-  // Usar hook filtrado apenas quando há filtros ativos
+  // Verificar se há filtros ativos
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
     if (key === 'dataEspecifica') return value !== null;
     return value !== 'todos';
   });
   
-  const { 
-    stats: filteredStats, 
-    clientes, 
-    modalidades, 
-    especialidades, 
-    prioridades,
-    medicos,
-    atrasoClientes,
-    atrasoModalidades,
-    atrasoEspecialidades,
-    atrasoPrioridades,
-    atrasosComTempo,
-    loading: filteredLoading
-  } = useVolumetriaDataFiltered(filters);
-
-  // Calcular stats corretos baseados no contexto
-  const stats = hasActiveFilters ? filteredStats : {
-    total_exames: Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0),
-    total_registros: Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalRecords, 0),
-    total_atrasados: 0,
-    percentual_atraso: 0,
-    total_clientes: 211, // Valor conhecido dos logs
-    total_clientes_volumetria: 98, // Valor conhecido dos logs  
-    total_modalidades: 0,
-    total_especialidades: 0,
-    total_medicos: 0,
-    total_prioridades: 0
-  };
+  // Usar dados filtrados se há filtros ativos, senão usar dados completos do contexto
+  const currentData = hasActiveFilters ? getFilteredData(filters) : contextData.detailedData;
   
-  const loading = contextData.loading || (hasActiveFilters && filteredLoading);
+  // Calcular estatísticas dinâmicas baseadas nos dados atuais
+  const stats = hasActiveFilters ? {
+    // Recalcular stats para dados filtrados
+    total_exames: currentData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0),
+    total_registros: currentData.length,
+    total_atrasados: currentData.filter(item => {
+      if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+      try {
+        const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+        const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+        return dataLaudo > dataPrazo;
+      } catch {
+        return false;
+      }
+    }).length,
+    percentual_atraso: currentData.length > 0 ? 
+      (currentData.filter(item => {
+        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+        try {
+          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+          return dataLaudo > dataPrazo;
+        } catch {
+          return false;
+        }
+      }).length / currentData.length) * 100 : 0,
+    total_clientes: contextData.dashboardStats.total_clientes,
+    total_clientes_volumetria: [...new Set(currentData.map(item => item.EMPRESA).filter(Boolean))].length,
+    total_modalidades: [...new Set(currentData.map(item => item.MODALIDADE).filter(Boolean))].length,
+    total_especialidades: [...new Set(currentData.map(item => item.ESPECIALIDADE).filter(Boolean))].length,
+    total_medicos: [...new Set(currentData.map(item => item.MEDICO).filter(Boolean))].length,
+    total_prioridades: [...new Set(currentData.map(item => item.PRIORIDADE).filter(Boolean))].length
+  } : contextData.dashboardStats;
   
-  const refreshData = () => {
-    refreshContext();
-  };
-  
-  // Remover auto-refresh que estava causando loop infinito
-
-  // Auto-refresh removido - atualização apenas via realtime e ações manuais
-  
+  const loading = contextData.loading;
   const hasNoData = stats.total_exames === 0;
 
   if (loading) {
@@ -103,7 +114,7 @@ export default function Volumetria() {
             Análise executiva completa de volumetria - 
             {stats.total_exames.toLocaleString()} laudos | 
             {stats.total_clientes} clientes cadastrados | 
-            {stats.total_clientes_volumetria} com dados no período
+            {stats.total_clientes_volumetria} com dados{hasActiveFilters ? ' (filtrado)' : ''}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -155,53 +166,42 @@ export default function Volumetria() {
               <VolumetriaExecutiveSummary 
                 data={{
                   stats,
-                  clientes,
-                  modalidades,
-                  especialidades
+                  clientes: [], // Será processado internamente no componente
+                  modalidades: [], // Será processado internamente no componente
+                  especialidades: [] // Será processado internamente no componente
                 }}
               />
             </TabsContent>
 
-             <TabsContent value="charts" className="mt-6">
-               <VolumetriaCharts 
-                 clientes={clientes}
-                 modalidades={modalidades}
-                 especialidades={especialidades}
-                 categorias={[]}
-                 prioridades={prioridades}
-               />
-             </TabsContent>
+            <TabsContent value="charts" className="mt-6">
+              <VolumetriaCharts 
+                clientes={[]}
+                modalidades={[]}
+                especialidades={[]}
+                prioridades={[]}
+              />
+            </TabsContent>
 
-             <TabsContent value="medicos" className="mt-6">
-               <VolumetriaMedicosAnalysis 
-                 medicos={medicos}
-                 modalidades={modalidades}
-                 especialidades={especialidades}
-                 categorias={[]}
-                 prioridades={prioridades}
-                 totalExames={stats.total_exames}
-               />
-             </TabsContent>
+            <TabsContent value="medicos" className="mt-6">
+              <VolumetriaMedicosAnalysis 
+                medicos={[]}
+                modalidades={[]}
+                especialidades={[]}
+              />
+            </TabsContent>
 
-             <TabsContent value="delays" className="mt-6">
-               <VolumetriaDelayAnalysis 
-                 data={{
-                   clientes: atrasoClientes,
-                   modalidades: atrasoModalidades.map(m => ({...m, atrasados: m.atrasados || 0, percentual_atraso: m.percentual_atraso || 0})),
-                   especialidades: atrasoEspecialidades.map(e => ({...e, atrasados: e.atrasados || 0, percentual_atraso: e.percentual_atraso || 0})),
-                   categorias: [],
-                   prioridades: atrasoPrioridades.map(p => ({...p, atrasados: p.atrasados || 0, percentual_atraso: p.percentual_atraso || 0})),
-                   totalAtrasados: stats.total_atrasados,
-                   percentualAtrasoGeral: stats.percentual_atraso,
-                   atrasosComTempo: atrasosComTempo
-                 }}
-               />
-             </TabsContent>
+            <TabsContent value="delays" className="mt-6">
+              <VolumetriaDelayAnalysis 
+                atrasoClientes={[]}
+                atrasoModalidades={[]}
+                atrasoEspecialidades={[]}
+                atrasoPrioridades={[]}
+                atrasosComTempo={[]}
+              />
+            </TabsContent>
           </Tabs>
         </>
       )}
-
-    
     </div>
   );
 }

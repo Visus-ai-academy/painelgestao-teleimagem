@@ -35,6 +35,26 @@ interface VolumetriaData {
     };
   };
   lastUploads: Record<string, any>;
+  // Dados detalhados para análises
+  detailedData: any[];
+  clientes: string[];
+  modalidades: string[];
+  especialidades: string[];
+  prioridades: string[];
+  medicos: string[];
+  // Estatísticas calculadas
+  dashboardStats: {
+    total_exames: number;
+    total_registros: number;
+    total_atrasados: number;
+    percentual_atraso: number;
+    total_clientes: number;
+    total_clientes_volumetria: number;
+    total_modalidades: number;
+    total_especialidades: number;
+    total_medicos: number;
+    total_prioridades: number;
+  };
   loading: boolean;
 }
 
@@ -42,6 +62,9 @@ interface VolumetriaContextType {
   data: VolumetriaData;
   refreshData: () => Promise<void>;
   clearData: () => Promise<void>;
+  // Expor dados detalhados para componentes
+  getDetailedData: () => any[];
+  getFilteredData: (filters?: any) => any[];
 }
 
 const VolumetriaContext = createContext<VolumetriaContextType | undefined>(undefined);
@@ -56,6 +79,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       volumetria_onco_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
     },
     lastUploads: {},
+    detailedData: [],
+    clientes: [],
+    modalidades: [],
+    especialidades: [],
+    prioridades: [],
+    medicos: [],
+    dashboardStats: {
+      total_exames: 0,
+      total_registros: 0,
+      total_atrasados: 0,
+      percentual_atraso: 0,
+      total_clientes: 0,
+      total_clientes_volumetria: 0,
+      total_modalidades: 0,
+      total_especialidades: 0,
+      total_medicos: 0,
+      total_prioridades: 0
+    },
     loading: true
   });
 
@@ -122,6 +163,94 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
       console.log('📊 DADOS FINAIS DE STATS:', statsResult);
 
+      // Carregar dados detalhados para análises
+      console.log('📋 Carregando dados detalhados para análises...');
+      let allDetailedData: any[] = [];
+      
+      try {
+        let offset = 0;
+        const limit = 50000;
+        let hasMoreData = true;
+        
+        while (hasMoreData) {
+          console.log(`📦 Carregando dados detalhados offset ${offset}...`);
+          
+          const { data: detailedBatch, error: detailedError } = await supabase
+            .from('volumetria_mobilemed')
+            .select(`
+              "EMPRESA",
+              "MODALIDADE", 
+              "ESPECIALIDADE",
+              "MEDICO",
+              "PRIORIDADE",
+              "CATEGORIA",
+              "VALORES",
+              "DATA_LAUDO",
+              "HORA_LAUDO", 
+              "DATA_PRAZO",
+              "HORA_PRAZO",
+              data_referencia
+            `)
+            .range(offset, offset + limit - 1)
+            .order('created_at', { ascending: true });
+
+          if (detailedError) {
+            console.error('❌ Erro ao carregar dados detalhados:', detailedError);
+            break;
+          }
+
+          if (!detailedBatch || detailedBatch.length === 0) {
+            break;
+          }
+
+          allDetailedData = [...allDetailedData, ...detailedBatch];
+          console.log(`✅ Batch detalhado carregado: ${detailedBatch.length} registros, total: ${allDetailedData.length}`);
+          
+          if (detailedBatch.length < limit) {
+            hasMoreData = false;
+          } else {
+            offset += limit;
+          }
+
+          // Limite de segurança
+          if (offset > 1000000) {
+            console.log('⚠️ Limite de segurança atingido - finalizando carregamento detalhado...');
+            hasMoreData = false;
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao carregar dados detalhados:', error);
+      }
+
+      // Processar listas únicas e estatísticas
+      const clientesUnicos = [...new Set(allDetailedData.map(item => item.EMPRESA).filter(Boolean))];
+      const modalidadesUnicas = [...new Set(allDetailedData.map(item => item.MODALIDADE).filter(Boolean))];
+      const especialidadesUnicas = [...new Set(allDetailedData.map(item => item.ESPECIALIDADE).filter(Boolean))];
+      const prioridadesUnicas = [...new Set(allDetailedData.map(item => item.PRIORIDADE).filter(Boolean))];
+      const medicosUnicos = [...new Set(allDetailedData.map(item => item.MEDICO).filter(Boolean))];
+
+      // Calcular atrasos
+      const atrasados = allDetailedData.filter(item => {
+        if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+        try {
+          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+          return dataLaudo > dataPrazo;
+        } catch {
+          return false;
+        }
+      });
+
+      const totalExamesCalculado = allDetailedData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+      const totalRegistrosCalculado = allDetailedData.length;
+      const totalAtrasadosCalculado = atrasados.length;
+      const percentualAtrasoCalculado = totalRegistrosCalculado > 0 ? (totalAtrasadosCalculado / totalRegistrosCalculado) * 100 : 0;
+
+      console.log('✅ Dados detalhados carregados:', allDetailedData.length);
+      console.log('📊 Total calculado:', totalExamesCalculado, 'exames');
+      console.log('👥 Clientes únicos:', clientesUnicos.length);
+      console.log('⏰ Atrasos:', totalAtrasadosCalculado, `(${percentualAtrasoCalculado.toFixed(1)}%)`);
+
       // Carregar últimos uploads
       const lastUploadsResult: Record<string, any> = {};
       for (const tipo of tiposArquivo) {
@@ -141,6 +270,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       setData({
         stats: statsResult,
         lastUploads: lastUploadsResult,
+        detailedData: allDetailedData,
+        clientes: clientesUnicos,
+        modalidades: modalidadesUnicas,
+        especialidades: especialidadesUnicas,
+        prioridades: prioridadesUnicas,
+        medicos: medicosUnicos,
+        dashboardStats: {
+          total_exames: totalExamesCalculado,
+          total_registros: totalRegistrosCalculado,
+          total_atrasados: totalAtrasadosCalculado,
+          percentual_atraso: percentualAtrasoCalculado,
+          total_clientes: clientesUnicos.length,
+          total_clientes_volumetria: clientesUnicos.length,
+          total_modalidades: modalidadesUnicas.length,
+          total_especialidades: especialidadesUnicas.length,
+          total_medicos: medicosUnicos.length,
+          total_prioridades: prioridadesUnicas.length
+        },
         loading: false
       });
       
@@ -212,6 +359,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           volumetria_onco_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
         },
         lastUploads: {},
+        detailedData: [],
+        clientes: [],
+        modalidades: [],
+        especialidades: [],
+        prioridades: [],
+        medicos: [],
+        dashboardStats: {
+          total_exames: 0,
+          total_registros: 0,
+          total_atrasados: 0,
+          percentual_atraso: 0,
+          total_clientes: 0,
+          total_clientes_volumetria: 0,
+          total_modalidades: 0,
+          total_especialidades: 0,
+          total_medicos: 0,
+          total_prioridades: 0
+        },
         loading: false
       });
       
@@ -222,6 +387,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       throw error;
     }
   };
+
+  // Funções para expor dados detalhados
+  const getDetailedData = useCallback(() => {
+    return data.detailedData;
+  }, [data.detailedData]);
+
+  const getFilteredData = useCallback((filters?: any) => {
+    if (!filters) return data.detailedData;
+    
+    return data.detailedData.filter(item => {
+      if (filters.cliente && filters.cliente !== 'todos' && item.EMPRESA !== filters.cliente) return false;
+      if (filters.modalidade && filters.modalidade !== 'todos' && item.MODALIDADE !== filters.modalidade) return false;
+      if (filters.especialidade && filters.especialidade !== 'todos' && item.ESPECIALIDADE !== filters.especialidade) return false;
+      if (filters.prioridade && filters.prioridade !== 'todos' && item.PRIORIDADE !== filters.prioridade) return false;
+      if (filters.medico && filters.medico !== 'todos' && item.MEDICO !== filters.medico) return false;
+      return true;
+    });
+  }, [data.detailedData]);
 
   useEffect(() => {
     console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Chamando loadStats...');
@@ -285,7 +468,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   // Auto-refresh removido - atualização apenas via realtime e upload manual
 
   return (
-    <VolumetriaContext.Provider value={{ data, refreshData, clearData }}>
+    <VolumetriaContext.Provider value={{ data, refreshData, clearData, getDetailedData, getFilteredData }}>
       {children}
     </VolumetriaContext.Provider>
   );
