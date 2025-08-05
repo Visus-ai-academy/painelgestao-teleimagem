@@ -194,6 +194,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
               "HORA_PRAZO",
               data_referencia
             `)
+            .limit(batchSize)
             .range(offset, offset + batchSize - 1);
             
           if (batchError) {
