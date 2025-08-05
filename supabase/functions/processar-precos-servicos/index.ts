@@ -75,48 +75,59 @@ serve(async (req) => {
           continue
         }
 
-        // Mapear campos assumindo ordem: Cliente, Modalidade, Especialidade, Valor
+        // Mapear campos - usar as primeiras 4 colunas
         const cliente = String(row[0] || '').trim()
         const modalidade = String(row[1] || '').trim() 
         const especialidade = String(row[2] || '').trim()
         
-        // Melhor parsing do valor - buscar em múltiplas colunas
+        // Buscar valor nas próximas colunas disponíveis
         let valorStr = ''
-        for (let col = 3; col < Math.min(row.length, 10); col++) {
+        for (let col = 3; col < row.length; col++) {
           const cellValue = String(row[col] || '').trim()
-          if (cellValue && cellValue !== '' && cellValue !== '0') {
+          // Procurar por números (com ou sem formatação)
+          if (cellValue && /[\d,.]/.test(cellValue)) {
             valorStr = cellValue
             break
           }
         }
         
-        // Limpar e converter valor
-        const valorLimpo = valorStr.replace(/[R$\s]/g, '').replace(',', '.')
-        const valor = parseFloat(valorLimpo)
+        // Se não encontrou valor, pular linha
+        if (!valorStr) {
+          console.log(`⚠️ Linha ${i}: Valor não encontrado`)
+          registrosErro++
+          continue
+        }
+        
+        // Limpar valor: remover R$, espaços, manter apenas números, vírgula e ponto
+        const valorLimpo = valorStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+        // Converter vírgula para ponto se for o separador decimal
+        const valorFinal = valorLimpo.includes(',') && !valorLimpo.includes('.') ? 
+          valorLimpo.replace(',', '.') : valorLimpo
+        const valor = parseFloat(valorFinal)
 
-        console.log(`📝 Linha ${i}: "${cliente}" | "${modalidade}" | "${especialidade}" | ${valor}`)
+        console.log(`📝 Linha ${i}: "${cliente}" | "${modalidade}" | "${especialidade}" | "${valorStr}" => ${valor}`)
 
         // Validar dados essenciais
         if (!cliente || cliente.length < 2) {
-          erros.push(`Linha ${i}: Cliente inválido`)
+          erros.push(`Linha ${i}: Cliente inválido - "${cliente}"`)
           registrosErro++
           continue
         }
 
         if (!modalidade || modalidade.length < 1) {
-          erros.push(`Linha ${i}: Modalidade inválida`)
+          erros.push(`Linha ${i}: Modalidade inválida - "${modalidade}"`)
           registrosErro++
           continue
         }
 
         if (!especialidade || especialidade.length < 1) {
-          erros.push(`Linha ${i}: Especialidade inválida`)
+          erros.push(`Linha ${i}: Especialidade inválida - "${especialidade}"`)
           registrosErro++
           continue
         }
 
         if (isNaN(valor) || valor <= 0) {
-          erros.push(`Linha ${i}: Valor inválido - ${valor}`)
+          erros.push(`Linha ${i}: Valor inválido - "${valorStr}" => ${valor}`)
           registrosErro++
           continue
         }
