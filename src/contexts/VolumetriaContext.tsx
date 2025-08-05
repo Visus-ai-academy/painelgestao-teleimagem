@@ -81,58 +81,43 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const statsResult: any = {};
       
       for (const tipo of tiposArquivo) {
-        console.log(`📊 Carregando dados FÍSICOS REMANESCENTES no banco para: ${tipo} (após exclusões de período)`);
+        console.log(`📊 Carregando TODOS os dados para: ${tipo}`);
         
-        // Buscar TODOS os dados reais sem limitação usando múltiplas queries se necessário
-        let allData: any[] = [];
-        let offset = 0;
-        const batchSize = 50000; // Grande lote para eficiência
-        let hasMoreData = true;
-
-        while (hasMoreData) {
-          const { data: batchData, error } = await supabase
+        // Usar agregação SQL direta para obter contagens corretas SEM LIMITAÇÃO
+        const [{ count: totalRecords }, { count: recordsWithValue }, { data: sumData }] = await Promise.all([
+          // Total de registros
+          supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', tipo),
+          
+          // Registros com valores > 0
+          supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('arquivo_fonte', tipo)
+            .gt('VALORES', 0),
+          
+          // Soma total dos valores - buscar TODOS os valores para somar
+          supabase
             .from('volumetria_mobilemed')
             .select('VALORES')
             .eq('arquivo_fonte', tipo)
-            .range(offset, offset + batchSize - 1);
+        ]);
 
-          if (error) {
-            console.error(`❌ Erro ao carregar ${tipo}:`, error);
-            break;
-          }
+        const totalRecordsCount = totalRecords || 0;
+        const recordsWithValueCount = recordsWithValue || 0;
+        const recordsZeroed = totalRecordsCount - recordsWithValueCount;
+        const totalValue = sumData?.reduce((sum: number, item: any) => sum + (item.VALORES || 0), 0) || 0;
 
-          if (!batchData || batchData.length === 0) {
-            break;
-          }
-
-          allData = [...allData, ...batchData];
-          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros, total: ${allData.length}`);
-          
-          if (batchData.length < batchSize) {
-            hasMoreData = false;
-          } else {
-            offset += batchSize;
-          }
-        }
-
-        if (allData.length > 0) {
-          const totalRecords = allData.length;
-          const recordsWithValue = allData.filter(item => item.VALORES && item.VALORES > 0).length;
-          const totalValue = allData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
-          const recordsZeroed = allData.filter(item => !item.VALORES || item.VALORES === 0).length;
-
-          statsResult[tipo] = {
-            totalRecords,
-            recordsWithValue,
-            recordsZeroed,
-            totalValue
-          };
-          
-          console.log(`✅ ${tipo}: ${totalRecords} registros DEFINITIVOS, ${recordsWithValue} com valores, ${recordsZeroed} zerados, ${totalValue} total exames`);
-        } else {
-          console.log(`⚠️ ${tipo}: nenhum dado encontrado`);
-          statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
-        }
+        statsResult[tipo] = {
+          totalRecords: totalRecordsCount,
+          recordsWithValue: recordsWithValueCount,
+          recordsZeroed,
+          totalValue
+        };
+        
+        console.log(`✅ ${tipo}: ${totalRecordsCount} registros REAIS, ${recordsWithValueCount} com valores, ${recordsZeroed} zerados, ${totalValue} total exames`);
       }
 
       // Carregar últimos uploads
