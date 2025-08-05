@@ -37,7 +37,10 @@ export default function Volumetria() {
   const { data: contextData, refreshData: refreshContext } = useVolumetria();
   
   // Usar hook filtrado apenas quando há filtros ativos
-  const hasActiveFilters = Object.values(filters).some(value => value !== 'todos');
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (key === 'dataEspecifica') return value !== null;
+    return value !== 'todos';
+  });
   
   const { 
     stats: filteredStats, 
