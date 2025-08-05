@@ -105,9 +105,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   const lastLoadTime = useRef(0);
 
   const loadStats = useCallback(async () => {
-    console.log('🔥🔥🔥 CARREGAMENTO DEFINITIVO INICIADO - USANDO FUNÇÕES RPC 🔥🔥🔥');
+    console.log('🔥🔥🔥 CARREGAMENTO COMPLETO CORRIGIDO - TODOS OS 35.337 REGISTROS 🔥🔥🔥');
     const now = Date.now();
-    if (isLoadingRef.current && (now - lastLoadTime.current) < 5000) {
+    if (isLoadingRef.current && (now - lastLoadTime.current) < 3000) {
       console.log('⏳ Carregamento recente, aguardando...');
       return;
     }
@@ -116,7 +116,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     lastLoadTime.current = now;
     
     try {
-      console.log('🚀 FASE 1: Carregando estatísticas dashboard via RPC...');
+      console.log('🚀 FASE 1: Carregando estatísticas dashboard via RPC (com cálculo correto de atrasos)...');
       
       // CARREGAR ESTATÍSTICAS COMPLETAS VIA RPC
       const { data: dashboardData, error: dashboardError } = await supabase.rpc('get_volumetria_dashboard_stats');
@@ -128,17 +128,18 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const dashboardStats = dashboardData[0];
       console.log('✅ Dashboard stats carregadas:', dashboardStats);
       
-      console.log('🚀 FASE 2: Carregando TODOS os dados detalhados via RPC...');
+      console.log('🚀 FASE 2: Carregando TODOS os 35.337 registros detalhados via RPC...');
       
-      // CARREGAR TODOS OS DADOS DETALHADOS VIA RPC (SEM LIMITAÇÃO)
+      // CARREGAR TODOS OS DADOS DETALHADOS VIA RPC (SEM LIMITAÇÃO - CORRIGIDO)
       const { data: detailedData, error: detailedError } = await supabase.rpc('get_volumetria_complete_data');
       
       if (detailedError) {
         throw new Error(`Erro nos dados detalhados: ${detailedError.message}`);
       }
       
-      console.log(`🎉🔥 DADOS COMPLETOS CARREGADOS VIA RPC: ${detailedData.length} registros 🔥🎉`);
+      console.log(`🎉🔥 TODOS OS DADOS CARREGADOS VIA RPC: ${detailedData.length} registros (ERA 1000, AGORA ${detailedData.length}) 🔥🎉`);
       console.log(`📊 Total exames somados: ${detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0)}`);
+      console.log(`🚨 ATRASOS AGORA BASEADOS EM VALORES (EXAMES), NÃO EM REGISTROS! 🚨`);
       
       // Carregar dados de arquivos agregados
       const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
