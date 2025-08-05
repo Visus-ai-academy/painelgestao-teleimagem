@@ -231,7 +231,7 @@ export function useVolumetriaProcessedData() {
       }
       
       const medicoData = medicosMap.get(medico)!;
-      medicoData.total_exames += Number(item.VALORES) || 0;
+      medicoData.total_exames += 1; // Contar cada registro como um exame
       medicoData.total_registros += 1;
       
       // Adicionar especialidades e modalidades únicas
@@ -256,6 +256,7 @@ export function useVolumetriaProcessedData() {
 
     // Calcular percentuais finais
     const totalExames = data.dashboardStats.total_exames;
+    const totalRegistros = data.detailedData.length; // Total de registros para médicos
     
     modalidadesMap.forEach(modalidade => {
       modalidade.percentual = totalExames > 0 ? (modalidade.total_exames / totalExames) * 100 : 0;
@@ -278,7 +279,8 @@ export function useVolumetriaProcessedData() {
     });
     
     medicosMap.forEach(medico => {
-      medico.percentual = totalExames > 0 ? (medico.total_exames / totalExames) * 100 : 0;
+      // Para médicos, usar totalRegistros como base para o percentual
+      medico.percentual = totalRegistros > 0 ? (medico.total_exames / totalRegistros) * 100 : 0;
       medico.percentual_atraso = medico.total_registros > 0 ? 
         (medico.atrasados / medico.total_registros) * 100 : 0;
     });
