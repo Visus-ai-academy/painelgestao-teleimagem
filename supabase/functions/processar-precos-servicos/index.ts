@@ -44,7 +44,7 @@ async function processarLotesBackground(
           continue
         }
 
-        // Inserir preço - valor_urgencia será igual ao valor_base por enquanto (parâmetros ainda não implementados)
+        // Inserir preço com todos os campos de volume e plantão
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
           .upsert({
@@ -55,6 +55,10 @@ async function processarLotesBackground(
             prioridade: prioridade,
             valor_base: valor,
             valor_urgencia: valor, // Por enquanto igual ao valor_base
+            volume_inicial: item.volInicial,
+            volume_final: item.volFinal,
+            volume_total: item.volumeTotal,
+            considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
@@ -267,6 +271,10 @@ serve(async (req) => {
         const prioridade = String(row[5] || '').trim()
         const categoria = String(row[6] || '').trim()
         const valorStr = String(row[7] || '').trim()
+        const volInicial = String(row[8] || '').trim()
+        const volFinal = String(row[9] || '').trim()
+        const volumeTotal = String(row[10] || '').trim()
+        const consideraPlantao = String(row[11] || '').trim()
         
         // Se não encontrou valor na posição esperada, buscar em outras colunas
         let valorFinal = valorStr
@@ -298,7 +306,11 @@ serve(async (req) => {
           especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valor
+          valor,
+          volInicial: volInicial ? parseInt(volInicial) || null : null,
+          volFinal: volFinal ? parseInt(volFinal) || null : null,
+          volumeTotal: volumeTotal ? parseInt(volumeTotal) || null : null,
+          consideraPlantao: consideraPlantao.toLowerCase() === 'sim' || consideraPlantao.toLowerCase() === 'true'
         })
 
       } catch (error) {
@@ -327,7 +339,7 @@ serve(async (req) => {
           continue
         }
 
-        // Inserir preço - valor_urgencia será igual ao valor_base por enquanto (parâmetros ainda não implementados)
+        // Inserir preço com todos os campos de volume e plantão
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
           .upsert({
@@ -338,6 +350,10 @@ serve(async (req) => {
             prioridade: prioridade,
             valor_base: valor,
             valor_urgencia: valor, // Por enquanto igual ao valor_base
+            volume_inicial: item.volInicial,
+            volume_final: item.volFinal,
+            volume_total: item.volumeTotal,
+            considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
