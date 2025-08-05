@@ -119,6 +119,7 @@ export function useVolumetriaProcessedData() {
       }
     });
     
+    // CORREÇÃO: Calcular o percentual baseado no total de exames, não registros
     const percentualAtrasoCalculado = totalExamesCalculado > 0 ? 
       (totalAtrasadosCalculado / totalExamesCalculado) * 100 : 0;
     
@@ -126,7 +127,8 @@ export function useVolumetriaProcessedData() {
       totalExamesCalculado,
       totalAtrasadosCalculado,
       percentualAtrasoCalculado: percentualAtrasoCalculado.toFixed(2) + '%',
-      totalRegistrosProcessados: data.detailedData.length
+      totalRegistrosProcessados: data.detailedData.length,
+      validacao: `${totalAtrasadosCalculado} de ${totalExamesCalculado} = ${percentualAtrasoCalculado.toFixed(2)}%`
     });
     
     // Calcular percentuais e valores médios
