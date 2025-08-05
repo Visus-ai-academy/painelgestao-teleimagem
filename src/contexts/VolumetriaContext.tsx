@@ -83,23 +83,36 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       for (const tipo of tiposArquivo) {
         console.log(`📊 Carregando dados FÍSICOS REMANESCENTES no banco para: ${tipo} (após exclusões de período)`);
         
-        // Carregar APENAS os dados que PERMANECERAM FISICAMENTE no banco após todas as regras de exclusão
+        // Buscar TODOS os dados reais sem limitação usando múltiplas queries se necessário
         let allData: any[] = [];
         let offset = 0;
-        const limit = 10000; // Aumentado para processar volumes maiores
+        const batchSize = 50000; // Grande lote para eficiência
         let hasMoreData = true;
-        
-        // Buscar dados reais usando agregação direta do banco para ser mais eficiente
-        const { data: aggregateData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('VALORES')
-          .eq('arquivo_fonte', tipo);
 
-        if (error) {
-          console.error(`❌ Erro ao carregar ${tipo}:`, error);
-          allData = [];
-        } else {
-          allData = aggregateData || [];
+        while (hasMoreData) {
+          const { data: batchData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('VALORES')
+            .eq('arquivo_fonte', tipo)
+            .range(offset, offset + batchSize - 1);
+
+          if (error) {
+            console.error(`❌ Erro ao carregar ${tipo}:`, error);
+            break;
+          }
+
+          if (!batchData || batchData.length === 0) {
+            break;
+          }
+
+          allData = [...allData, ...batchData];
+          console.log(`📦 ${tipo}: Carregados ${batchData.length} registros, total: ${allData.length}`);
+          
+          if (batchData.length < batchSize) {
+            hasMoreData = false;
+          } else {
+            offset += batchSize;
+          }
         }
 
         if (allData.length > 0) {
