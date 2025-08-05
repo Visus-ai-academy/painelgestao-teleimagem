@@ -63,6 +63,66 @@ export function useVolumetriaProcessedData() {
     }
 
     console.log('🔄 [useVolumetriaProcessedData] Processando dados completos:', data.detailedData.length);
+    
+    // DEBUG: Verificar dados brutos para entender o problema
+    let totalExamesCalculado = 0;
+    let totalAtrasadosCalculado = 0;
+    let registrosComDatas = 0;
+    let registrosSemDatas = 0;
+    let errosParsingData = 0;
+    
+    // Primeira passagem: análise dos dados
+    data.detailedData.forEach((item, index) => {
+      const valores = Number(item.VALORES) || 0;
+      totalExamesCalculado += valores;
+      
+      if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
+        registrosComDatas++;
+        try {
+          const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+          const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+          
+          if (isNaN(dataLaudo.getTime()) || isNaN(dataPrazo.getTime())) {
+            errosParsingData++;
+            return;
+          }
+          
+          const isAtrasado = dataLaudo > dataPrazo;
+          if (isAtrasado) {
+            totalAtrasadosCalculado += valores;
+          }
+          
+          // Log de alguns registros para debug
+          if (index < 10) {
+            console.log(`🔍 [Debug] Registro ${index + 1}:`, {
+              EMPRESA: item.EMPRESA,
+              VALORES: valores,
+              DATA_LAUDO: item.DATA_LAUDO,
+              HORA_LAUDO: item.HORA_LAUDO,
+              DATA_PRAZO: item.DATA_PRAZO,
+              HORA_PRAZO: item.HORA_PRAZO,
+              dataLaudo: dataLaudo.toISOString(),
+              dataPrazo: dataPrazo.toISOString(),
+              isAtrasado
+            });
+          }
+        } catch (error) {
+          errosParsingData++;
+        }
+      } else {
+        registrosSemDatas++;
+      }
+    });
+    
+    console.log('📊 [Debug] Análise inicial dos dados:', {
+      totalRegistros: data.detailedData.length,
+      totalExamesCalculado,
+      totalAtrasadosCalculado,
+      percentualAtrasadoCalculado: totalExamesCalculado > 0 ? (totalAtrasadosCalculado / totalExamesCalculado) * 100 : 0,
+      registrosComDatas,
+      registrosSemDatas,
+      errosParsingData
+    });
 
     // CLIENTES
     const clientesMap = new Map<string, ProcessedClienteData>();
@@ -324,8 +384,8 @@ export function useVolumetriaProcessedData() {
       totalRegistros: data.detailedData.length
     };
 
-    // Calcular total de atrasos para debug
-    const totalAtrasadosCalculado = result.clientes.reduce((sum, cliente) => sum + cliente.atrasados, 0);
+    // Calcular total de atrasos final para debug
+    const totalAtrasadosFinal = result.clientes.reduce((sum, cliente) => sum + cliente.atrasados, 0);
     
     console.log('✅ [useVolumetriaProcessedData] Dados processados:', {
       clientes: result.clientes.length,
@@ -333,8 +393,10 @@ export function useVolumetriaProcessedData() {
       especialidades: result.especialidades.length,
       totalExames: result.totalExames,
       totalRegistros: result.totalRegistros,
-      totalAtrasadosCalculado,
-      clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length
+      totalAtrasadosCalculadoInicial: totalAtrasadosCalculado,
+      totalAtrasadosFinal,
+      clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length,
+      diferenca: totalAtrasadosCalculado - totalAtrasadosFinal
     });
 
     return result;
