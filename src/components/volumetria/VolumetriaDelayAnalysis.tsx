@@ -267,10 +267,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     carregarTempoMedio();
   }, []);
 
-  // Calcular dados de clientes com tempo médio de atraso - INCLUIR TODOS OS CLIENTES
+  // Calcular dados de clientes com tempo médio de atraso - CORRIGIR INCONSISTÊNCIAS
   const clientesComTempoAtraso = safeData.clientes
     .map(cliente => {
-      const tempoMedioAtraso = tempoMedioClientes.get(cliente.nome) || 0;
+      // USAR APENAS TEMPO MÉDIO SE CLIENTE REALMENTE TEM ATRASOS
+      const tempoMedioAtraso = cliente.atrasados > 0 ? (tempoMedioClientes.get(cliente.nome) || 0) : 0;
       
       const nivelAtraso = cliente.percentual_atraso >= 20 ? 'Crítico' :
                          cliente.percentual_atraso >= 10 ? 'Alto' :
@@ -282,19 +283,25 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         nivelAtraso
       };
     })
+    // ORDENAR POR LAUDOS ATRASADOS PRIMEIRO, DEPOIS POR PERCENTUAL
     .sort((a, b) => {
-      const fieldA = a[sortField];
-      const fieldB = b[sortField];
-      
-      if (typeof fieldA === 'string' && typeof fieldB === 'string') {
-        return sortDirection === 'asc' 
-          ? fieldA.localeCompare(fieldB)
-          : fieldB.localeCompare(fieldA);
+      if (sortField === 'atrasados') {
+        return sortDirection === 'asc' ? a.atrasados - b.atrasados : b.atrasados - a.atrasados;
+      }
+      if (sortField === 'percentual_atraso') {
+        return sortDirection === 'asc' ? a.percentual_atraso - b.percentual_atraso : b.percentual_atraso - a.percentual_atraso;
+      }
+      if (sortField === 'tempoMedioAtraso') {
+        return sortDirection === 'asc' ? a.tempoMedioAtraso - b.tempoMedioAtraso : b.tempoMedioAtraso - a.tempoMedioAtraso;
+      }
+      if (sortField === 'total_exames') {
+        return sortDirection === 'asc' ? a.total_exames - b.total_exames : b.total_exames - a.total_exames;
       }
       
+      // Para campo nome (string)
       return sortDirection === 'asc' 
-        ? (fieldA as number) - (fieldB as number)
-      : (fieldB as number) - (fieldA as number);
+        ? a.nome.localeCompare(b.nome)
+        : b.nome.localeCompare(a.nome);
     });
 
   // Função para renderizar ícone de ordenação
