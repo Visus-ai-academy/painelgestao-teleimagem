@@ -17,15 +17,20 @@ interface UploadStats {
 export function VolumetriaUploadStats() {
   const { data, refreshData } = useVolumetria();
 
+  // Debug do estado atual
+  console.log('📊 VolumetriaUploadStats - Estado atual do data:', data);
+  
   // Forçar uma atualização na primeira renderização para garantir que os dados sejam carregados
   useEffect(() => {
     console.log('🔄 VolumetriaUploadStats montado - forçando refresh IMEDIATO...');
+    console.log('📊 Data loading:', data.loading);
+    console.log('📊 Stats:', data.stats);
     
     // Limpar qualquer cache e forçar reload completo
     setTimeout(() => {
       console.log('🚀 Executando refresh forçado agora...');
       refreshData();
-    }, 100);
+    }, 500);
   }, []);
 
   // Converter dados do contexto para o formato de stats

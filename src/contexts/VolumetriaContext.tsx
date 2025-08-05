@@ -251,11 +251,13 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Chamando loadStats...');
     loadStats();
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
-  }, [loadStats, refreshData]);
+    console.log('🌍 Contexto disponibilizado globalmente');
+  }, []);
 
   // Real-time subscription otimizada - com debounce
   useEffect(() => {
