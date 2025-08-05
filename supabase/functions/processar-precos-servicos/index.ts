@@ -7,138 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para processamento em background
-async function processarLotesBackground(
-  supabaseClient: any,
-  dadosRestantes: any[],
-  logId: string,
-  processedSoFar: number,
-  errorsSoFar: number
-) {
-  const LOTE_SIZE = 50 // Reduzido para melhor debugging
-  let registrosProcessados = processedSoFar
-  let registrosErro = errorsSoFar
-  const erros: string[] = []
-
-  console.log(`🔄 Processando ${dadosRestantes.length} registros em background...`)
-
-  for (let loteIndex = 0; loteIndex < dadosRestantes.length; loteIndex += LOTE_SIZE) {
-    const lote = dadosRestantes.slice(loteIndex, loteIndex + LOTE_SIZE)
-    
-    // Processar lote
-    for (const item of lote) {
-      try {
-        const { linha, cliente, modalidade, especialidade, categoria, prioridade, valor } = item
-
-        console.log(`🔍 Buscando cliente: "${cliente}"`)
-
-        // Buscar cliente no banco - estratégia melhorada
-        let clienteData = null;
-        
-        // Primeiro, busca exata
-        const { data: clienteExato, error: erroExato } = await supabaseClient
-          .from('clientes')
-          .select('id, nome')
-          .eq('nome', cliente)
-          .limit(1)
-          .single()
-
-        if (!erroExato && clienteExato) {
-          clienteData = clienteExato;
-          console.log(`✅ Cliente encontrado (busca exata): ${clienteData.nome}`)
-        } else {
-          // Se não encontrou, tenta busca por like
-          const { data: clienteIlike, error: erroIlike } = await supabaseClient
-            .from('clientes')
-            .select('id, nome')
-            .ilike('nome', `%${cliente}%`)
-            .limit(1)
-            .single()
-
-          if (!erroIlike && clienteIlike) {
-            clienteData = clienteIlike;
-            console.log(`✅ Cliente encontrado (busca like): ${clienteData.nome}`)
-          } else {
-            console.log(`❌ Cliente não encontrado: "${cliente}"`)
-            console.log(`❌ Erro busca exata:`, erroExato)
-            console.log(`❌ Erro busca like:`, erroIlike)
-            erros.push(`Linha ${linha}: Cliente "${cliente}" não encontrado`)
-            registrosErro++
-            continue
-          }
-        }
-
-        console.log(`💰 Inserindo preço: Cliente=${clienteData.nome}, Modalidade=${modalidade}, Valor=${valor}`)
-
-        // Inserir preço com todos os campos de volume e plantão
-        const { error: insertError } = await supabaseClient
-          .from('precos_servicos')
-          .insert({
-            cliente_id: clienteData.id,
-            modalidade: modalidade,
-            especialidade: especialidade,
-            categoria: categoria,
-            prioridade: prioridade,
-            valor_base: valor,
-            valor_urgencia: valor, // Por enquanto igual ao valor_base
-            volume_inicial: item.volInicial,
-            volume_final: item.volFinal,
-            volume_total: item.condVolume ? parseInt(item.condVolume) || null : null,
-            considera_prioridade_plantao: item.consideraPlantao,
-            tipo_preco: 'especial',
-            aplicar_legado: true,
-            aplicar_incremental: true,
-            ativo: true
-          })
-
-        if (insertError) {
-          console.log(`❌ Erro ao inserir preço:`, insertError)
-          erros.push(`Linha ${linha}: Erro ao inserir - ${insertError.message}`)
-          registrosErro++
-          continue
-        }
-
-        console.log(`✅ Preço inserido com sucesso`)
-        registrosProcessados++
-
-      } catch (error) {
-        console.log(`❌ Erro geral na linha ${item.linha}:`, error.message)
-        erros.push(`Linha ${item.linha}: ${error.message}`)
-        registrosErro++
-      }
-    }
-
-    // Log de progresso
-    console.log(`✅ Lote processado: ${registrosProcessados} sucessos, ${registrosErro} erros`)
-    
-    // Pequena pausa entre lotes para evitar sobrecarga
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  // Atualizar contratos
-  console.log('🔄 Atualizando status dos contratos...')
-  try {
-    await supabaseClient.rpc('atualizar_status_configuracao_contrato')
-    console.log('✅ Contratos atualizados')
-  } catch (error) {
-    console.error('❌ Erro ao atualizar contratos:', error.message)
-  }
-
-  // Finalizar log
-  const status = registrosErro > registrosProcessados ? 'failed' : 'success'
-  await supabaseClient
-    .from('upload_logs')
-    .update({
-      status: status,
-      records_processed: registrosProcessados,
-      error_count: registrosErro,
-      error_details: erros.slice(0, 10).join('; ')
-    })
-    .eq('id', logId)
-
-  console.log(`🎉 Processamento final: ${registrosProcessados} sucessos, ${registrosErro} erros`)
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -191,136 +59,177 @@ serve(async (req) => {
     console.log(`📋 Total de linhas no Excel: ${jsonData.length}`)
     console.log(`🏷️ Headers: ${JSON.stringify(jsonData[0])}`)
 
-    // 3. Preparar TODOS os dados para processamento em background
-    const dadosValidados = []
-    const errosIniciais: string[] = []
+    // 3. Buscar todos os clientes uma vez para melhor performance
+    const { data: clientesData, error: clientesError } = await supabaseClient
+      .from('clientes')
+      .select('id, nome')
+      .eq('ativo', true)
+
+    if (clientesError) {
+      throw new Error(`Erro ao buscar clientes: ${clientesError.message}`)
+    }
+
+    // Criar mapa de clientes para busca rápida
+    const clientesMap = new Map()
+    clientesData.forEach(cliente => {
+      clientesMap.set(cliente.nome.toUpperCase().trim(), cliente.id)
+    })
+
+    console.log(`📋 ${clientesData.length} clientes carregados`)
+
+    // 4. Processar dados do Excel
+    const registrosParaInserir = []
+    const erros = []
+    let registrosProcessados = 0
 
     for (let i = 1; i < jsonData.length; i++) {
       try {
         const row = jsonData[i] as any[]
         
         if (!row || row.length < 6) {
-          console.log(`⚠️ Linha ${i}: dados insuficientes - ${row ? row.length : 0} colunas`)
+          erros.push(`Linha ${i + 1}: dados insuficientes - ${row ? row.length : 0} colunas`)
           continue
         }
 
         // Mapear campos do Excel baseado nos headers corretos
-        const cliente = String(row[0] || '').trim()
+        // ["CLIENTE","MODALIDADE","ESPECIALIDADE","PRIORIDADE","CATEGORIA","PREÇO","VOL INICIAL","VOL FINAL","COND. VOLUME","CONSIDERA PLANTAO","TEM ADITIVO"]
+        const clienteNome = String(row[0] || '').trim()
         const modalidade = String(row[1] || '').trim() 
         const especialidade = String(row[2] || '').trim()
         const prioridade = String(row[3] || '').trim()
         const categoria = String(row[4] || '').trim()
         const precoStr = String(row[5] || '').trim()
-        const volInicial = String(row[6] || '').trim()
-        const volFinal = String(row[7] || '').trim()
-        const condVolume = String(row[8] || '').trim()
-        const consideraPlantao = String(row[9] || '').trim()
-        
-        console.log(`📝 Linha ${i}: Cliente="${cliente}", Modalidade="${modalidade}", Preço="${precoStr}"`)
-        
-        // Buscar preço em múltiplas colunas se necessário
-        let precoFinal = precoStr
-        if (!precoFinal || !(/[\d,.]/.test(precoFinal))) {
-          for (let col = 5; col < row.length; col++) {
-            const cellValue = String(row[col] || '').trim()
-            if (cellValue && /[\d,.]/.test(cellValue)) {
-              precoFinal = cellValue
-              break
-            }
-          }
-        }
-        
-        if (!precoFinal) {
-          errosIniciais.push(`Linha ${i}: Preço não encontrado`)
-          continue
-        }
-        
-        // Limpar e converter preço
-        const precoLimpo = precoFinal.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
-        const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
-          precoLimpo.replace(',', '.') : precoLimpo
-        const preco = parseFloat(precoConvertido)
+        const volInicial = row[6] ? parseInt(String(row[6])) || null : null
+        const volFinal = row[7] ? parseInt(String(row[7])) || null : null
+        const condVolume = row[8] ? parseInt(String(row[8])) || null : null
+        const consideraPlantao = String(row[9] || '').toLowerCase() === 'sim'
 
-        // Validar dados essenciais
-        if (!cliente || cliente.length < 2) {
-          errosIniciais.push(`Linha ${i}: Cliente inválido - "${cliente}"`)
+        // Validar dados obrigatórios
+        if (!clienteNome || clienteNome.length < 2) {
+          erros.push(`Linha ${i + 1}: Cliente inválido - "${clienteNome}"`)
           continue
         }
 
         if (!modalidade) {
-          errosIniciais.push(`Linha ${i}: Modalidade inválida - "${modalidade}"`)
+          erros.push(`Linha ${i + 1}: Modalidade inválida - "${modalidade}"`)
           continue
         }
 
         if (!especialidade) {
-          errosIniciais.push(`Linha ${i}: Especialidade inválida - "${especialidade}"`)
+          erros.push(`Linha ${i + 1}: Especialidade inválida - "${especialidade}"`)
           continue
         }
 
-        if (isNaN(preco) || preco <= 0) {
-          errosIniciais.push(`Linha ${i}: Preço inválido ou zerado - "${precoFinal}" => ${preco}`)
+        // Buscar cliente
+        const clienteId = clientesMap.get(clienteNome.toUpperCase())
+        if (!clienteId) {
+          erros.push(`Linha ${i + 1}: Cliente "${clienteNome}" não encontrado no cadastro`)
           continue
         }
 
-        dadosValidados.push({
-          linha: i,
-          cliente,
-          modalidade,
-          especialidade,
+        // Limpar e converter preço
+        let preco = 0
+        if (precoStr) {
+          const precoLimpo = precoStr.replace(/[R$\s]/g, '').replace(/[^\d,.-]/g, '')
+          const precoConvertido = precoLimpo.includes(',') && !precoLimpo.includes('.') ? 
+            precoLimpo.replace(',', '.') : precoLimpo
+          preco = parseFloat(precoConvertido) || 0
+        }
+
+        if (preco <= 0) {
+          erros.push(`Linha ${i + 1}: Preço inválido ou zerado - "${precoStr}" => ${preco}`)
+          continue
+        }
+
+        // Preparar registro para inserção
+        registrosParaInserir.push({
+          cliente_id: clienteId,
+          modalidade: modalidade,
+          especialidade: especialidade,
           categoria: categoria || 'Normal',
           prioridade: prioridade || 'Rotina',
-          valor: preco,
-          volInicial: volInicial ? parseInt(volInicial) || null : null,
-          volFinal: volFinal ? parseInt(volFinal) || null : null,
-          condVolume: condVolume,
-          consideraPlantao: consideraPlantao.toLowerCase() === 'sim' || consideraPlantao.toLowerCase() === 'true'
+          valor_base: preco,
+          valor_urgencia: preco, // Por enquanto igual ao valor_base
+          volume_inicial: volInicial,
+          volume_final: volFinal,
+          volume_total: condVolume,
+          considera_prioridade_plantao: consideraPlantao,
+          tipo_preco: 'especial',
+          aplicar_legado: true,
+          aplicar_incremental: true,
+          ativo: true
         })
 
+        registrosProcessados++
+
       } catch (error) {
-        errosIniciais.push(`Linha ${i}: ${error.message}`)
+        erros.push(`Linha ${i + 1}: ${error.message}`)
       }
     }
 
-    console.log(`📊 Dados validados: ${dadosValidados.length} registros`)
-    console.log(`❌ Erros iniciais: ${errosIniciais.length}`)
+    console.log(`📊 Registros preparados: ${registrosParaInserir.length}`)
+    console.log(`❌ Erros de validação: ${erros.length}`)
 
-    // 4. Iniciar processamento em background para TODOS os dados
-    if (dadosValidados.length > 0) {
-      console.log(`🚀 Iniciando processamento em background de ${dadosValidados.length} registros...`)
+    // 5. Inserir registros no banco em lotes
+    let registrosInseridos = 0
+    let registrosComErro = 0
+    const BATCH_SIZE = 50
+
+    for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
+      const lote = registrosParaInserir.slice(i, i + BATCH_SIZE)
       
-      // Usar waitUntil para processamento em background
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-        EdgeRuntime.waitUntil(
-          processarLotesBackground(
-            supabaseClient,
-            dadosValidados,
-            logEntry.id,
-            0,
-            errosIniciais.length
-          )
-        )
-      } else {
-        // Fallback se EdgeRuntime não estiver disponível
-        processarLotesBackground(
-          supabaseClient,
-          dadosValidados,
-          logEntry.id,
-          0,
-          errosIniciais.length
-        ).catch(err => console.error('Erro no processamento background:', err))
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('precos_servicos')
+          .insert(lote)
+
+        if (insertError) {
+          console.error(`❌ Erro ao inserir lote ${Math.floor(i/BATCH_SIZE) + 1}:`, insertError)
+          registrosComErro += lote.length
+        } else {
+          registrosInseridos += lote.length
+          console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${lote.length} registros`)
+        }
+      } catch (error) {
+        console.error(`❌ Erro no lote ${Math.floor(i/BATCH_SIZE) + 1}:`, error)
+        registrosComErro += lote.length
       }
     }
 
-    console.log(`✅ Processamento iniciado: ${dadosValidados.length} registros serão processados`)
+    // 6. Atualizar contratos
+    try {
+      console.log('🔄 Atualizando status dos contratos...')
+      await supabaseClient.rpc('atualizar_status_configuracao_contrato')
+      console.log('✅ Contratos atualizados')
+    } catch (error) {
+      console.error('❌ Erro ao atualizar contratos:', error.message)
+    }
 
-    // 5. Retornar resposta imediata
+    // 7. Finalizar log
+    const status = registrosInseridos > 0 ? 'success' : 'failed'
+    const errorDetails = erros.length > 0 ? erros.slice(0, 10).join('; ') : null
+
+    await supabaseClient
+      .from('upload_logs')
+      .update({
+        status: status,
+        records_processed: registrosInseridos,
+        error_count: erros.length + registrosComErro,
+        error_message: errorDetails
+      })
+      .eq('id', logEntry.id)
+
+    console.log(`🎉 Processamento concluído: ${registrosInseridos} sucessos, ${erros.length + registrosComErro} erros`)
+
+    // 8. Retornar resposta
     return new Response(
       JSON.stringify({
-        success: true,
-        registros_processados: 0,
-        registros_erro: errosIniciais.length,
-        processamento_background: dadosValidados.length,
-        mensagem: `${dadosValidados.length} preços serão processados em background. ${errosIniciais.length} erros de validação inicial.`
+        success: registrosInseridos > 0,
+        registros_processados: registrosInseridos,
+        registros_erro: erros.length + registrosComErro,
+        total_linhas: jsonData.length - 1,
+        mensagem: `Processamento concluído. ${registrosInseridos} preços inseridos com sucesso. ${erros.length + registrosComErro} erros encontrados.`,
+        detalhes_erros: erros.slice(0, 5) // Primeiros 5 erros para debugging
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -334,7 +243,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro interno do servidor'
+        error: error.message || 'Erro interno do servidor',
+        registros_processados: 0,
+        registros_erro: 0
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
