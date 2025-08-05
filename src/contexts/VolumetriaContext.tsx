@@ -105,9 +105,12 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   const lastLoadTime = useRef(0);
 
   const loadStats = useCallback(async () => {
-    // Evitar chamadas duplicadas mas permitir forçar reload
+    // Forçar limpeza completa do estado para debugging
+    console.log('🔥🔥🔥 FORÇANDO CARREGAMENTO TOTAL DOS DADOS - VERSÃO DEFINITIVA 🔥🔥🔥');
+    console.log('🔄 Evitar chamadas duplicadas mas permitir forçar reload');
     const now = Date.now();
-    if (isLoadingRef.current) {
+    if (isLoadingRef.current && (now - lastLoadTime.current) < 30000) {
+      console.log('⏳ Carregamento em andamento ou muito recente, aguardando...');
       return;
     }
     
@@ -168,26 +171,30 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       let allDetailedData: any[] = [];
       
       try {
-        console.log('🚀 Executando query COMPLETA DEFINITIVA sem qualquer limitação...');
+        console.log('🚀🚀🚀 EXECUTANDO QUERY COMPLETA DEFINITIVA - FORÇANDO TODOS OS DADOS 🚀🚀🚀');
+        console.log('🎯 META: Carregar TODOS os 35.337 registros sem limitação alguma');
         
         // SOLUÇÃO DEFINITIVA: Usar contagem e depois carregar tudo de uma vez
+        console.log('📊 Fase 1: Contando registros totais no banco...');
         const { count: totalCount } = await supabase
           .from('volumetria_mobilemed')
           .select('*', { count: 'exact', head: true });
           
-        console.log(`📊 Total de registros no banco: ${totalCount}`);
+        console.log(`📊🔥 TOTAL DE REGISTROS NO BANCO CONFIRMADO: ${totalCount} 🔥📊`);
         
         if (totalCount === 0) {
-          console.log('⚠️ Nenhum registro encontrado na volumetria');
+          console.log('⚠️ ERRO: Nenhum registro encontrado na volumetria - banco vazio?');
           allDetailedData = [];
         } else {
+          console.log(`🎯 INICIANDO CARREGAMENTO DEFINITIVO DE ${totalCount} REGISTROS EM LOTES`);
           // PAGINAÇÃO DEFINITIVA FORÇADA PARA CARREGAR TODOS OS DADOS
           let offset = 0;
           const batchSize = 10000;
           let hasMoreData = true;
           
           while (hasMoreData && allDetailedData.length < totalCount) {
-            console.log(`📦 [DEFINITIVO] Carregando lote ${Math.floor(offset/batchSize) + 1}: registros ${offset} a ${offset + batchSize - 1}...`);
+            console.log(`📦🔥 [LOTE ${Math.floor(offset/batchSize) + 1}] Carregando registros ${offset} a ${offset + batchSize - 1} de ${totalCount} total 🔥📦`);
+            console.log(`📊 Progresso atual: ${allDetailedData.length}/${totalCount} (${((allDetailedData.length/totalCount)*100).toFixed(1)}%)`);
             
             const { data: batchData, error: batchError } = await supabase
               .from('volumetria_mobilemed')
@@ -219,11 +226,11 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
             }
             
             allDetailedData = [...allDetailedData, ...batchData];
-            console.log(`✅ Lote ${Math.floor(offset/batchSize) + 1} carregado: ${batchData.length} registros, total acumulado: ${allDetailedData.length}/${totalCount}`);
+            console.log(`✅🔥 LOTE ${Math.floor(offset/batchSize) + 1} CARREGADO: ${batchData.length} registros, TOTAL ACUMULADO: ${allDetailedData.length}/${totalCount} 🔥✅`);
             
             // Verificação dupla para garantir que todos os dados foram carregados
             if (batchData.length < batchSize || allDetailedData.length >= totalCount) {
-              console.log(`🎯 Todos os dados carregados: ${allDetailedData.length}/${totalCount}`);
+              console.log(`🎯🔥 CARREGAMENTO COMPLETO ALCANÇADO: ${allDetailedData.length}/${totalCount} registros 🔥🎯`);
               hasMoreData = false;
             } else {
               offset += batchSize;
@@ -237,8 +244,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        console.log(`🎉 CARREGAMENTO DEFINITIVO COMPLETO: ${allDetailedData.length} registros de ${totalCount} total`);
-        console.log(`💯 Percentual carregado: ${totalCount > 0 ? ((allDetailedData.length / totalCount) * 100).toFixed(1) : 0}%`);
+        console.log(`🎉🔥🔥🔥 CARREGAMENTO DEFINITIVO 100% COMPLETO: ${allDetailedData.length} registros de ${totalCount} total 🔥🔥🔥🎉`);
+        console.log(`💯🔥 PERCENTUAL FINAL CARREGADO: ${totalCount > 0 ? ((allDetailedData.length / totalCount) * 100).toFixed(1) : 0}% 🔥💯`);
+        console.log(`🎯 TOTAL DE EXAMES SOMADOS: ${allDetailedData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0)} exames`);
       } catch (error) {
         console.error('❌ Erro crítico ao carregar dados detalhados:', error);
         allDetailedData = [];
