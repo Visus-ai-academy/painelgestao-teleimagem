@@ -119,72 +119,15 @@ export default function MapaDistribuicaoClientes() {
     }
 
     let volumetriaPorEmpresa: Record<string, any> = {};
-
-    // Se não há NENHUM filtro, usar distribuição proporcional baseada nos dados corretos do contexto
-    if (!temQualquerFiltro) {
-      console.log('🚀 SEM FILTROS - Usando dados corretos do contexto para distribuição');
-      // Volume total correto do contexto
-      const volumeTotalCorreto = Object.values(contextData.stats).reduce((sum, stat) => sum + stat.totalValue, 0);
+    
+    // Criar mapa de volumetria por empresa
+    if (volumetriaData) {
+      let volumetriaFiltrada = volumetriaData;
       
-      // Se temos dados de volumetria detalhados, usar para distribuição proporcional
-      if (volumetriaData && volumetriaData.length > 0) {
-        const volumetriaTemporaria = volumetriaData.reduce((acc, item) => {
-          const empresa = item["EMPRESA"];
-          if (!empresa) return acc;
-          
-          if (!acc[empresa]) {
-            acc[empresa] = {
-              volume_temporario: 0,
-              total_registros: 0,
-              modalidades: new Set<string>(),
-              especialidades: new Set<string>(),
-              prioridades: new Set<string>()
-            };
-          }
-          
-          acc[empresa].volume_temporario += Number(item["VALORES"]) || 0;
-          acc[empresa].total_registros += 1;
-          
-          if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
-          if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
-          if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
-          
-          return acc;
-        }, {} as Record<string, any>);
-
-        // Calcular total temporário para fazer correção proporcional
-        const volumeTemporarioTotal = Object.values(volumetriaTemporaria).reduce((sum: number, emp: any) => {
-          return sum + (Number(emp.volume_temporario) || 0);
-        }, 0);
-        
-        // Aplicar correção proporcional para chegar ao total correto
-        const fatorCorrecao = Number(volumeTemporarioTotal) > 0 ? (Number(volumeTotalCorreto) / Number(volumeTemporarioTotal)) : 0;
-        
-        volumetriaPorEmpresa = Object.fromEntries(
-          Object.entries(volumetriaTemporaria).map(([empresa, dados]: [string, any]) => [
-            empresa,
-            {
-              volume_exames: Math.round(Number(dados.volume_temporario) * fatorCorrecao),
-              total_registros: Number(dados.total_registros) || 0,
-              modalidades: dados.modalidades,
-              especialidades: dados.especialidades,
-              prioridades: dados.prioridades
-            }
-          ])
-        );
-        
-        console.log('📊 Aplicada correção proporcional:', {
-          volumeTemporarioTotal,
-          volumeTotalCorreto,
-          fatorCorrecao,
-          semFiltros: true
-        });
-      }
-    } else {
-      // Com filtros ativos, usar dados filtrados do volumetriaData
-      console.log('🔧 COM FILTROS - Processando dados filtrados');
-      if (volumetriaData) {
-        const volumetriaFiltrada = volumetriaData.filter(item => {
+      // Se há filtros de volumetria, aplicar
+      if (temFiltrosVolumetria) {
+        console.log('🔧 COM FILTROS - Processando dados filtrados');
+        volumetriaFiltrada = volumetriaData.filter(item => {
           if (filtroModalidade !== 'todas' && item["MODALIDADE"] !== filtroModalidade) return false;
           if (filtroEspecialidade !== 'todas' && item["ESPECIALIDADE"] !== filtroEspecialidade) return false;
           if (filtroPrioridade !== 'todas' && item["PRIORIDADE"] !== filtroPrioridade) return false;
@@ -196,32 +139,34 @@ export default function MapaDistribuicaoClientes() {
         clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
         
         console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
-
-        // Criar mapa de volumetria por empresa para cálculos
-        volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
-          const empresa = item["EMPRESA"];
-          if (!empresa) return acc;
-          
-          if (!acc[empresa]) {
-            acc[empresa] = {
-              volume_exames: 0,
-              total_registros: 0,
-              modalidades: new Set<string>(),
-              especialidades: new Set<string>(),
-              prioridades: new Set<string>()
-            };
-          }
-          
-          acc[empresa].volume_exames += Number(item["VALORES"]) || 0;
-          acc[empresa].total_registros += 1;
-          
-          if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
-          if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
-          if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
-          
-          return acc;
-        }, {} as Record<string, any>);
+      } else {
+        console.log('🚀 SEM FILTROS - Usando dados reais');
       }
+
+      // Criar mapa de volumetria por empresa usando dados reais
+      volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
+        const empresa = item["EMPRESA"];
+        if (!empresa) return acc;
+        
+        if (!acc[empresa]) {
+          acc[empresa] = {
+            volume_exames: 0,
+            total_registros: 0,
+            modalidades: new Set<string>(),
+            especialidades: new Set<string>(),
+            prioridades: new Set<string>()
+          };
+        }
+        
+        acc[empresa].volume_exames += Number(item["VALORES"]) || 0; // Valores reais dos dados
+        acc[empresa].total_registros += 1;
+        
+        if (item["MODALIDADE"]) acc[empresa].modalidades.add(item["MODALIDADE"]);
+        if (item["ESPECIALIDADE"]) acc[empresa].especialidades.add(item["ESPECIALIDADE"]);
+        if (item["PRIORIDADE"]) acc[empresa].prioridades.add(item["PRIORIDADE"]);
+        
+        return acc;
+      }, {} as Record<string, any>);
     }
 
     // Processar todos os clientes filtrados
@@ -283,22 +228,9 @@ export default function MapaDistribuicaoClientes() {
     const regioesMap = new Map<string, RegiaoEstatistica>();
     const estadosMap = new Map<string, EstadoEstatistica>();
 
-    // Primeiro, calcular a distribuição temporária
-    let volumeTotalTemporario = 0;
-    dadosProcessados.forEach((cliente: ClienteVolumetria) => {
-      volumeTotalTemporario += cliente.volume_exames;
-    });
-
-    // Calcular fator de correção se não há filtros ativos
-    const fatorCorrecaoFinal = !temFiltrosAtivosDisplay && volumeTotalTemporario > 0 ? 
-      (totalGeralCorreto.volume / volumeTotalTemporario) : 1;
-
     dadosProcessados.forEach((cliente: ClienteVolumetria) => {
       const estado = cliente.estado || 'NI';
       const regiao = getRegiaoByEstado(estado);
-
-      // Aplicar correção no volume se necessário
-      const volumeCorrigido = cliente.volume_exames * fatorCorrecaoFinal;
 
       // Estatísticas por região
       if (!regioesMap.has(regiao)) {
@@ -314,8 +246,8 @@ export default function MapaDistribuicaoClientes() {
 
       const estatRegiao = regioesMap.get(regiao)!;
       estatRegiao.total_clientes++;
-      estatRegiao.volume_total += volumeCorrigido;
-      estatRegiao.clientes.push({...cliente, volume_exames: volumeCorrigido});
+      estatRegiao.volume_total += cliente.volume_exames; // Valor real, sem correções
+      estatRegiao.clientes.push(cliente);
 
       // Estatísticas por estado
       if (!estadosMap.has(estado)) {
@@ -330,13 +262,13 @@ export default function MapaDistribuicaoClientes() {
 
       const estatEstado = estadosMap.get(estado)!;
       estatEstado.total_clientes++;
-      estatEstado.volume_total += volumeCorrigido;
+      estatEstado.volume_total += cliente.volume_exames; // Valor real, sem correções
 
       const cidade = cliente.cidade || 'Não informado';
       if (!estatEstado.cidades[cidade]) {
         estatEstado.cidades[cidade] = [];
       }
-      estatEstado.cidades[cidade].push({...cliente, volume_exames: volumeCorrigido});
+      estatEstado.cidades[cidade].push(cliente);
     });
 
     // Calcular intensidade de cor baseada no volume máximo
@@ -349,7 +281,7 @@ export default function MapaDistribuicaoClientes() {
       regioes: Array.from(regioesMap.values()),
       estados: Array.from(estadosMap.values())
     };
-  }, [dadosProcessados, temFiltrosAtivosDisplay, totalGeralCorreto.volume]);
+  }, [dadosProcessados]);
 
   useEffect(() => {
     setRegioesEstatisticas(processarEstatisticas.regioes);
@@ -535,9 +467,9 @@ export default function MapaDistribuicaoClientes() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Região
-              <Badge variant="outline" className="text-sm">
-                Total: {(temFiltrosAtivosDisplay ? regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
-              </Badge>
+               <Badge variant="outline" className="text-sm">
+                 Total: {regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0).toLocaleString()} exames
+               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -583,7 +515,7 @@ export default function MapaDistribuicaoClientes() {
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Estado-UF
                <Badge variant="outline" className="text-sm">
-                 Total: {(temFiltrosAtivosDisplay ? estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
+                 Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
                </Badge>
             </CardTitle>
           </CardHeader>
@@ -631,7 +563,7 @@ export default function MapaDistribuicaoClientes() {
             <CardTitle className="flex justify-between items-center">
               Mapa de Calor - Distribuição por Cidade
                <Badge variant="outline" className="text-sm">
-                 Total: {(temFiltrosAtivosDisplay ? estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0) : totalGeralCorreto.volume).toLocaleString()} exames
+                 Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
                </Badge>
             </CardTitle>
           </CardHeader>
