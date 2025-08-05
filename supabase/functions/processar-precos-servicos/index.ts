@@ -193,6 +193,8 @@ serve(async (req) => {
         const consideraPlantao = String(row[11] || '').trim()
         const temAditivo = String(row[12] || '').trim()
         
+        console.log(`Processando linha ${i}: Cliente=${cliente}, Modalidade=${modalidade}, Preço=${precoStr}`)
+        
         // Se não encontrou preço na posição esperada, buscar em outras colunas
         // Se não encontrou preço na posição esperada, buscar em outras colunas
         let precoFinal = precoStr
