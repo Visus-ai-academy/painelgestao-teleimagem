@@ -53,7 +53,8 @@ async function processarLotesBackground(
             especialidade: especialidade,
             categoria: 'Normal',
             prioridade: 'Rotina',
-            valor: valor,
+            valor_base: valor,
+            valor_urgencia: valor * 1.5, // 50% a mais para urgência
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
@@ -305,7 +306,8 @@ serve(async (req) => {
             especialidade: especialidade,
             categoria: 'Normal',
             prioridade: 'Rotina',
-            valor: valor,
+            valor_base: valor,
+            valor_urgencia: valor * 1.5, // 50% a mais para urgência
             ativo: true
           }, {
             onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
