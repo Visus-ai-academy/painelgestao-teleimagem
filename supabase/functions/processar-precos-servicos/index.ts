@@ -47,7 +47,7 @@ async function processarLotesBackground(
         // Inserir preço com todos os campos de volume e plantão
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
-          .upsert({
+          .insert({
             cliente_id: clienteData.id,
             modalidade: modalidade,
             especialidade: especialidade,
@@ -60,8 +60,6 @@ async function processarLotesBackground(
             volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
             considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
-          }, {
-            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
           })
 
         if (insertError) {
@@ -344,7 +342,7 @@ serve(async (req) => {
         // Inserir preço com todos os campos de volume e plantão
         const { error: insertError } = await supabaseClient
           .from('precos_servicos')
-          .upsert({
+          .insert({
             cliente_id: clienteData.id,
             modalidade: modalidade,
             especialidade: especialidade,
@@ -357,8 +355,6 @@ serve(async (req) => {
             volume_total: item.condVolume, // Agora mapeia COND. VOLUME para volume_total
             considera_prioridade_plantao: item.consideraPlantao,
             ativo: true
-          }, {
-            onConflict: 'cliente_id,modalidade,especialidade,categoria,prioridade'
           })
 
         if (insertError) {
