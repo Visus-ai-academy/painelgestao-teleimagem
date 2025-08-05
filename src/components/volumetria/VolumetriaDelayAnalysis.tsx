@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { useVolumetriaProcessedData } from "@/hooks/useVolumetriaProcessedData";
+import { LaudosAtrasadosDetalhado } from "./LaudosAtrasadosDetalhado";
 
 interface DelayData {
   nome: string;
@@ -815,6 +816,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </div>
         </CardContent>
       </Card>
+      
+      {/* Demonstrativo Detalhado de Laudos em Atraso */}
+      <LaudosAtrasadosDetalhado />
     </div>
   );
 }
