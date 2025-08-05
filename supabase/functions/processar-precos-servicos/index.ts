@@ -231,7 +231,7 @@ serve(async (req) => {
         }
 
         if (isNaN(valor) || valor <= 0) {
-          errosIniciais.push(`Linha ${i}: Valor inválido - "${valorFinal}" => ${valor}`)
+          errosIniciais.push(`Linha ${i}: Valor inválido ou zerado - "${valorFinal}" => ${valor}`)
           continue
         }
 
@@ -295,6 +295,7 @@ serve(async (req) => {
           valorLimpo.replace(',', '.') : valorLimpo
         const valor = parseFloat(valorConvertido)
 
+        // Ignorar registros com valor zerado automaticamente
         if (!cliente || cliente.length < 2 || !modalidade || !especialidade || isNaN(valor) || valor <= 0) {
           continue
         }
