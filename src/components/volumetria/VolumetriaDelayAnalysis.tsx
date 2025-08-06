@@ -312,67 +312,22 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // GARANTIR QUE NUNCA HAVERÁ LIMITAÇÃO - MÚLTIPLAS ESTRATÉGIAS
-      let allData: any[] = [];
-      let error: any = null;
+      // USAR APENAS A FUNÇÃO UNLIMITED_FORCE - SEM FALLBACKS QUE LIMITAM
+      console.log(`🚀 [DelayAnalysis] Usando APENAS get_volumetria_unlimited_force...`);
       
-      // PRIMEIRO VERIFICAR TOTAL DE REGISTROS
-      const { data: totalCount } = await supabase.rpc('get_volumetria_total_count');
-      console.log(`🔍 [DelayAnalysis] TOTAL DE REGISTROS NO BANCO: ${totalCount || 0}`);
+      const response = await supabase.rpc('get_volumetria_unlimited_force');
       
-      try {
-        // ESTRATÉGIA 1: Nova função que força todos os dados
-        const response1 = await supabase.rpc('get_volumetria_force_complete');
-        if (response1.data && !response1.error && response1.data.length > 1000) {
-          allData = response1.data;
-          console.log(`✅ [DelayAnalysis] Função FORCE: ${allData.length} registros`);
-        } else {
-          throw new Error('Função force não retornou dados suficientes');
-        }
-      } catch (e) {
-        console.warn(`⚠️ [DelayAnalysis] Função force falhou, tentando cursor...`);
-        
-        // ESTRATÉGIA 2: Função com cursor (mais agressiva)
-        try {
-          const response2 = await supabase.rpc('get_volumetria_cursor_complete');
-          if (response2.data && !response2.error && response2.data.length > 1000) {
-            allData = response2.data;
-            console.log(`✅ [DelayAnalysis] Função CURSOR: ${allData.length} registros`);
-          } else {
-            throw new Error('Função cursor falhou');
-          }
-        } catch (e2) {
-          console.warn(`⚠️ [DelayAnalysis] Função cursor falhou, tentando função principal...`);
-          
-          // ESTRATÉGIA 3: Função principal (fallback)
-          try {
-            const response3 = await supabase.rpc('get_volumetria_complete_data');
-            if (response3.data && !response3.error) {
-              allData = response3.data;
-              console.log(`⚠️ [DelayAnalysis] Função principal (limitada): ${allData.length} registros`);
-            } else {
-              throw new Error('Função principal falhou');
-            }
-          } catch (e3) {
-            console.warn(`⚠️ [DelayAnalysis] Todas as funções falharam, tentando acesso direto...`);
-            
-            // ESTRATÉGIA 4: Acesso direto (último recurso)
-            const response4 = await supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .order('id');
-            
-            if (response4.data && !response4.error) {
-              allData = response4.data;
-              console.log(`⚠️ [DelayAnalysis] Acesso direto (limitado): ${allData.length} registros`);
-            } else {
-              error = response4.error;
-            }
-          }
-        }
+      if (response.error) {
+        console.error(`❌ [DelayAnalysis] Erro na unlimited_force:`, response.error);
+        throw response.error;
       }
       
-      if (error) throw new Error(`Erro: ${error.message}`);
+      const allData = response.data || [];
+      console.log(`✅ [DelayAnalysis] UNLIMITED_FORCE: ${allData.length} registros totais`);
+      
+      if (!allData || allData.length === 0) {
+        throw new Error('Nenhum dado retornado da função unlimited_force');
+      }
       
       console.log(`🔍 [DelayAnalysis] TOTAL GERAL de laudos retornados da API: ${allData?.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0) || 0}`);
       console.log(`🔍 [DelayAnalysis] TOTAL GERAL de registros retornados da API: ${allData?.length || 0}`);
