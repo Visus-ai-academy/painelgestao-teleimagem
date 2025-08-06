@@ -117,14 +117,52 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-  // BUSCAR TODOS OS DADOS - NUNCA USAR LIMITAÇÕES
+      // GARANTIR QUE NUNCA HAVERÁ LIMITAÇÃO - MÚLTIPLAS ESTRATÉGIAS
+      let allData: any[] = [];
+      let error: any = null;
+      
       // PRIMEIRO VERIFICAR TOTAL DE REGISTROS
       const { data: totalCount } = await supabase.rpc('get_volumetria_total_count');
       console.log(`🔍 [DelayAnalysis] TOTAL DE REGISTROS NO BANCO: ${totalCount || 0}`);
       
-      // BUSCAR TODOS OS DADOS SEM EXCEÇÃO
-      const { data: allData, error } = await supabase
-        .rpc('get_volumetria_complete_data');
+      try {
+        // ESTRATÉGIA 1: Função principal sem limitação
+        const response1 = await supabase.rpc('get_volumetria_complete_data');
+        if (response1.data && !response1.error) {
+          allData = response1.data;
+          console.log(`✅ [DelayAnalysis] Função principal: ${allData.length} registros`);
+        } else {
+          throw new Error('Função principal falhou');
+        }
+      } catch (e) {
+        console.warn(`⚠️ [DelayAnalysis] Função principal falhou, tentando backup...`);
+        
+        // ESTRATÉGIA 2: Função backup
+        try {
+          const response2 = await supabase.rpc('get_volumetria_unlimited');
+          if (response2.data && !response2.error) {
+            allData = response2.data;
+            console.log(`✅ [DelayAnalysis] Função backup: ${allData.length} registros`);
+          } else {
+            throw new Error('Função backup falhou');
+          }
+        } catch (e2) {
+          console.warn(`⚠️ [DelayAnalysis] Função backup falhou, tentando acesso direto...`);
+          
+          // ESTRATÉGIA 3: Acesso direto à tabela (SEM .limit())
+          const response3 = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .order('id');
+          
+          if (response3.data && !response3.error) {
+            allData = response3.data;
+            console.log(`✅ [DelayAnalysis] Acesso direto: ${allData.length} registros`);
+          } else {
+            error = response3.error;
+          }
+        }
+      }
       
       if (error) throw new Error(`Erro: ${error.message}`);
       
