@@ -70,6 +70,13 @@ export function useVolumetriaProcessedData() {
       percentual_atraso: data.dashboardStats?.percentual_atraso
     });
     
+    // LOG DETALHADO DO CEDI_RJ PARA DEBUG
+    const cediRegistros = data.detailedData.filter(item => item.EMPRESA === 'CEDI_RJ');
+    const cediLaudos = cediRegistros.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+    console.log('🔍 [DEBUG CEDI_RJ] Total registros CEDI_RJ no detailedData:', cediRegistros.length);
+    console.log('🔍 [DEBUG CEDI_RJ] Total laudos CEDI_RJ calculados:', cediLaudos);
+    console.log('🔍 [DEBUG CEDI_RJ] Primeiros 5 registros:', cediRegistros.slice(0, 5));
+    
     // USAR APENAS DADOS DE VOLUMES (VALORES) - DASHBOARD NÃO USA REGISTROS
     const totalExamesReal = data.dashboardStats?.total_exames || 0;
     const totalAtrasadosReal = data.dashboardStats?.total_atrasados || 0;
@@ -336,6 +343,14 @@ export function useVolumetriaProcessedData() {
       clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length,
       dadosProcessados: `${totalExamesProcessados} exames em ${data.detailedData.length} registros`
     });
+    
+    // LOG ESPECÍFICO DO CEDI_RJ PROCESSADO
+    const cediProcessado = result.clientes.find(c => c.nome === 'CEDI_RJ');
+    if (cediProcessado) {
+      console.log('🎯 [DEBUG CEDI_RJ PROCESSADO]:', cediProcessado);
+    } else {
+      console.log('❌ [DEBUG] CEDI_RJ NÃO ENCONTRADO NO RESULTADO PROCESSADO!');
+    }
 
     return result;
   }, [data.detailedData, data.dashboardStats, data.loading]);

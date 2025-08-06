@@ -141,6 +141,12 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       console.log(`📊 Total exames somados: ${detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0)}`);
       console.log(`🚨 ATRASOS AGORA BASEADOS EM VALORES (EXAMES), NÃO EM REGISTROS! 🚨`);
       
+      // DEBUG ESPECÍFICO CEDI_RJ
+      const cediRegistros = detailedData.filter((item: any) => item.EMPRESA === 'CEDI_RJ');
+      const cediLaudos = cediRegistros.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
+      console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Registros: ${cediRegistros.length}, Laudos: ${cediLaudos}`);
+      console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Primeiros 3 registros:`, cediRegistros.slice(0, 3));
+      
       // Carregar dados de arquivos agregados
       const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
       
