@@ -122,6 +122,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       
       if (error) throw new Error(`Erro: ${error.message}`);
       
+      console.log(`🔍 [DelayAnalysis] TOTAL GERAL de registros retornados da API: ${allData?.length || 0}`);
+      
       // FILTRAR APENAS O CLIENTE ESPECÍFICO
       const clientData = allData?.filter((item: any) => item.EMPRESA === clienteName) || [];
       console.log(`🔍 [DelayAnalysis] ${clientData.length} registros encontrados para ${clienteName}`);
