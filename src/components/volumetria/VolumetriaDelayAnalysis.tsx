@@ -68,43 +68,50 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        console.log('🚀 [DelayAnalysis] FAZENDO CHAMADA DIRETA SEM LIMITAÇÕES');
+        console.log('🚀 [DelayAnalysis] USANDO PAGINAÇÃO REAL PARA TODOS OS DADOS');
         
-        // FAZER CHAMADA DIRETA À TABELA SEM USAR FUNÇÕES RPC
-        const { data: allData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .range(0, 50000); // FORÇAR LIMITE ALTO
+        // IMPLEMENTAR PAGINAÇÃO REAL PARA GARANTIR TODOS OS REGISTROS
+        let allData: any[] = [];
+        let pageSize = 1000;
+        let currentPage = 0;
+        let hasMore = true;
         
-        if (error) {
-          console.error('❌ ERRO no select direto:', error);
-          setLoading(false);
-          return;
-        }
-        
-        if (!allData || allData.length === 0) {
-          console.error('❌ Select direto retornou dados vazios');
-          setLoading(false);
-          return;
-        }
-        
-        console.log(`🎯 [DelayAnalysis] SELECT DIRETO: ${allData.length} registros`);
-        
-        // VALIDAÇÃO: DEVE TER TODOS OS 35.337 REGISTROS
-        if (allData.length < 35000) {
-          console.error(`❌ CRÍTICO: Esperava ~35.337 registros, obteve apenas ${allData.length}`);
-          // Fazer nova tentativa sem range
-          const { data: allDataNoLimit, error: errorNoLimit } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*');
+        while (hasMore) {
+          console.log(`📄 [DelayAnalysis] Buscando página ${currentPage + 1} (${currentPage * pageSize} a ${(currentPage + 1) * pageSize - 1})`);
           
-          if (!errorNoLimit && allDataNoLimit && allDataNoLimit.length > allData.length) {
-            console.log(`✅ SEM RANGE: ${allDataNoLimit.length} registros obtidos`);
-            allData.length = 0;
-            allData.push(...allDataNoLimit);
+          const { data: pageData, error, count } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact' })
+            .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
+            .order('id');
+          
+          if (error) {
+            console.error(`❌ ERRO na página ${currentPage + 1}:`, error);
+            break;
           }
-        } else {
-          console.log(`✅ PERFEITO: ${allData.length} registros obtidos - dados completos!`);
+          
+          if (pageData && pageData.length > 0) {
+            allData.push(...pageData);
+            console.log(`✅ Página ${currentPage + 1}: ${pageData.length} registros (total acumulado: ${allData.length})`);
+            
+            // Se retornou menos que o page size, chegamos ao fim
+            hasMore = pageData.length === pageSize;
+            currentPage++;
+          } else {
+            hasMore = false;
+          }
+          
+          // Limite de segurança para evitar loop infinito
+          if (currentPage > 50) {
+            console.warn('⚠️ Atingido limite de páginas por segurança');
+            break;
+          }
+        }
+        
+        if (allData.length === 0) {
+          console.error('❌ Nenhum dado retornado da paginação');
+          setLoading(false);
+          return;
         }
         
         const totalLaudosRaw = allData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
@@ -309,24 +316,38 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // FAZER SELECT DIRETO NA TABELA
-      console.log(`🚀 [DelayAnalysis] Fazendo select direto para ${clienteName}...`);
+      // USAR PAGINAÇÃO REAL PARA BUSCAR TODOS OS DADOS
+      console.log(`🚀 [DelayAnalysis] Usando paginação real para ${clienteName}...`);
       
-      const { data: allData, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .range(0, 50000);
+      let allData: any[] = [];
+      let pageSize = 1000;
+      let currentPage = 0;
+      let hasMore = true;
       
-      if (error) {
-        console.error(`❌ [DelayAnalysis] Erro no select direto:`, error);
-        throw error;
+      while (hasMore) {
+        const { data: pageData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1)
+          .order('id');
+        
+        if (error) {
+          console.error(`❌ [DelayAnalysis] Erro na página ${currentPage + 1}:`, error);
+          throw error;
+        }
+        
+        if (pageData && pageData.length > 0) {
+          allData.push(...pageData);
+          hasMore = pageData.length === pageSize;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+        
+        if (currentPage > 50) break; // Limite de segurança
       }
       
-      if (!allData || allData.length === 0) {
-        throw new Error('Select direto não retornou dados');
-      }
-      
-      console.log(`✅ [DelayAnalysis] Select direto: ${allData.length} registros totais`);
+      console.log(`✅ [DelayAnalysis] Paginação completa: ${allData.length} registros totais`);
       
       if (!allData || allData.length === 0) {
         throw new Error('Nenhum dado retornado da função unlimited_force');
