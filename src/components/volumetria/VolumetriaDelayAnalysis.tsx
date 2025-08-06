@@ -455,7 +455,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 w-[200px] border-r font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[120px] border-r font-semibold h-12"
                     onClick={() => handleSort('nome')}
                   >
                     <div className="flex items-center gap-2">
@@ -507,8 +507,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </Table>
           </div>
 
-          {/* Corpo da tabela com scroll */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Corpo da tabela SEM limitação de altura */}
+          <div className="flex-1">
             <Table className="w-full table-fixed">
               <TableBody>
                 {clientesComTempoAtraso.map((cliente, index) => {
@@ -524,7 +524,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                         className={`hover:bg-gray-50 ${category.bgColor.replace('100', '25')} cursor-pointer transition-colors`}
                         onClick={() => toggleClientExpansion(cliente.nome)}
                       >
-                        <TableCell className="w-[200px] border-r">
+                        <TableCell className="w-[120px] border-r">
                           <div className="flex items-center gap-2">
                             {isExpanded ? 
                               <ChevronDown className="h-4 w-4 text-gray-500" /> : 
