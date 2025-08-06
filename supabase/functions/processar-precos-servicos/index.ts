@@ -159,10 +159,7 @@ serve(async (req) => {
           continue
         }
 
-        if (!precoStr) {
-          erros.push(`Linha ${i + 1}: Preço obrigatório não informado`)
-          continue
-        }
+        // Aceitar preços vazios (serão tratados como 0)
 
         // Buscar cliente
         const clienteId = clientesMap.get(clienteNome.toUpperCase())
