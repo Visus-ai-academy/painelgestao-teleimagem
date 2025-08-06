@@ -184,9 +184,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           prioData.tempoTotal += tempoAtraso;
         }
         
-        // DEBUG para MEDICINA INTERNA
+        // DEBUG DETALHADO
         if (especialidade === 'MEDICINA INTERNA') {
-          console.log(`📝 [DelayAnalysis] Registro: VALORES=${valores}, atrasado=${isAtrasado}`);
+          console.log(`📝 [DelayAnalysis] Registro: VALORES=${valores}, atrasado=${isAtrasado}, modalidade=${modalidade}, prioridade=${prioridade}`);
         }
       });
       
@@ -208,21 +208,31 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       });
 
       
-      const categorias: DelayData[] = Array.from(modalidadesCalc.entries()).map(([nome, data]) => ({
-        nome,
-        total_exames: data.totalLaudos,
-        atrasados: data.atrasadosLaudos,
-        percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
-        tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
-      }));
+      const categorias: DelayData[] = Array.from(modalidadesCalc.entries()).map(([nome, data]) => {
+        const resultado = {
+          nome,
+          total_exames: data.totalLaudos,
+          atrasados: data.atrasadosLaudos,
+          percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
+          tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
+        };
+        
+        console.log(`📊 [DelayAnalysis] Modalidade: ${nome}`, resultado);
+        return resultado;
+      });
       
-      const prioridades: DelayData[] = Array.from(prioridadesCalc.entries()).map(([nome, data]) => ({
-        nome,
-        total_exames: data.totalLaudos,
-        atrasados: data.atrasadosLaudos,
-        percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
-        tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
-      }));
+      const prioridades: DelayData[] = Array.from(prioridadesCalc.entries()).map(([nome, data]) => {
+        const resultado = {
+          nome,
+          total_exames: data.totalLaudos,
+          atrasados: data.atrasadosLaudos,
+          percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
+          tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
+        };
+        
+        console.log(`🎯 [DelayAnalysis] Prioridade: ${nome}`, resultado);
+        return resultado;
+      });
       
       // CRIAR DADOS FINAIS COM TODAS AS SEÇÕES
       const detalhe: ClienteDetalhe = {
@@ -614,14 +624,14 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {esp.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between items-center text-gray-600">
-                                            <span className="text-xs">{esp.atrasados} de {esp.total_exames}</span>
-                                            {esp.tempo_medio_atraso > 0 && (
-                                              <span className="text-xs text-orange-600">
-                                                {Math.round(esp.tempo_medio_atraso / 60)}h
-                                              </span>
-                                            )}
-                                          </div>
+                                           <div className="flex justify-between items-center text-gray-600">
+                                             <span className="text-xs">{esp.atrasados} de {esp.total_exames}</span>
+                                             {esp.tempo_medio_atraso > 0 && (
+                                               <span className="text-xs text-orange-600">
+                                                 {Math.round(esp.tempo_medio_atraso / 60)}h
+                                               </span>
+                                             )}
+                                           </div>
                                         </div>
                                       ))}
                                       {clientDetalhe.especialidades.length > 8 && (
@@ -644,14 +654,14 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {cat.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between items-center text-gray-600">
-                                            <span className="text-xs">{cat.atrasados} de {cat.total_exames}</span>
-                                            {cat.tempo_medio_atraso > 0 && (
-                                              <span className="text-xs text-orange-600">
-                                                {Math.round(cat.tempo_medio_atraso / 60)}h
-                                              </span>
-                                            )}
-                                          </div>
+                                           <div className="flex justify-between items-center text-gray-600">
+                                             <span className="text-xs">{cat.atrasados} de {cat.total_exames}</span>
+                                             {cat.tempo_medio_atraso > 0 && (
+                                               <span className="text-xs text-orange-600">
+                                                 {Math.round(cat.tempo_medio_atraso / 60)}h
+                                               </span>
+                                             )}
+                                           </div>
                                         </div>
                                       ))}
                                       {clientDetalhe.categorias.length > 8 && (
@@ -674,13 +684,13 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                               {prio.percentual_atraso.toFixed(1)}%
                                             </Badge>
                                           </div>
-                                          <div className="flex justify-between items-center text-gray-600">
-                                            <span className="text-xs">{prio.atrasados} de {prio.total_exames}</span>
-                                            {prio.tempo_medio_atraso > 0 && (
-                                              <span className="text-xs text-orange-600">
-                                                {Math.round(prio.tempo_medio_atraso / 60)}h
-                                              </span>
-                                            )}
+                                           <div className="flex justify-between items-center text-gray-600">
+                                             <span className="text-xs">{prio.atrasados} de {prio.total_exames}</span>
+                                             {prio.tempo_medio_atraso > 0 && (
+                                               <span className="text-xs text-orange-600">
+                                                 {Math.round(prio.tempo_medio_atraso / 60)}h
+                                               </span>
+                                             )}
                                           </div>
                                         </div>
                                       ))}
