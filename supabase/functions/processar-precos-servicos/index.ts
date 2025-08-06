@@ -147,8 +147,10 @@ serve(async (req) => {
           preco = parseFloat(precoConvertido) || 0
         }
 
-        if (preco <= 0) {
-          erros.push(`Linha ${i + 1}: Preço inválido ou zerado - "${precoStr}" => ${preco}`)
+        // Aceitar tanto preços zerados quanto não-zerados
+        // Apenas validar se não é um valor inválido/NaN
+        if (isNaN(preco)) {
+          erros.push(`Linha ${i + 1}: Preço com formato inválido - "${precoStr}"`)
           continue
         }
 
