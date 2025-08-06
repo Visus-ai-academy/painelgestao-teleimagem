@@ -160,6 +160,7 @@ const menuItems: MenuItem[] = [
     requiredRoles: ['manager', 'admin'],
     subItems: [
       { title: "Cadastros", url: "/gerenciar-cadastros", requiredRoles: ['admin'] },
+      { title: "Limpar Dados", url: "/limpar-dados", requiredRoles: ['admin'] },
     ]
   },
   { 
