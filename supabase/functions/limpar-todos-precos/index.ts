@@ -53,41 +53,45 @@ serve(async (req) => {
       )
     }
 
-    // 2. Deletar TODOS os registros em lotes para evitar timeout
-    console.log('🗑️ Iniciando deleção em lotes...')
+    // 2. Deletar TODOS os registros em lotes grandes para máxima eficiência
+    console.log('🗑️ Iniciando deleção otimizada em lotes...')
     let totalRemovido = 0
-    const BATCH_SIZE = 1000
+    const BATCH_SIZE = 10000 // Lotes maiores para ser mais rápido
 
-    // Continuar deletando até não haver mais registros
-    while (true) {
-      const { data: registrosParaRemover, error: selectError } = await supabaseClient
+    // Deletar sem consultar IDs primeiro - mais eficiente
+    while (totalRemovido < totalAntes) {
+      const { error: deleteError, count } = await supabaseClient
         .from('precos_servicos')
-        .select('id')
-        .limit(BATCH_SIZE)
+        .delete({ count: 'exact' })
+        .lte('created_at', new Date().toISOString()) // Pega qualquer registro
 
-      if (selectError) {
-        console.error('❌ Erro ao buscar registros:', selectError)
-        break
+      if (deleteError) {
+        console.error('❌ Erro ao deletar:', deleteError)
+        // Se der erro, tenta com lote menor
+        const { error: deleteError2, count: count2 } = await supabaseClient
+          .from('precos_servicos')
+          .delete({ count: 'exact' })
+          .limit(1000)
+
+        if (deleteError2) {
+          throw new Error(`Erro ao deletar: ${deleteError2.message}`)
+        }
+
+        if (!count2 || count2 === 0) break
+        totalRemovido += count2
+        continue
       }
 
-      if (!registrosParaRemover || registrosParaRemover.length === 0) {
+      if (!count || count === 0) {
         console.log('✅ Não há mais registros para remover')
         break
       }
 
-      const ids = registrosParaRemover.map(r => r.id)
-      const { error: deleteError, count } = await supabaseClient
-        .from('precos_servicos')
-        .delete({ count: 'exact' })
-        .in('id', ids)
-
-      if (deleteError) {
-        console.error('❌ Erro ao deletar lote:', deleteError)
-        throw new Error(`Erro ao deletar lote: ${deleteError.message}`)
-      }
-
-      totalRemovido += count || ids.length
-      console.log(`✅ Lote removido: ${count || ids.length} registros (Total: ${totalRemovido})`)
+      totalRemovido += count
+      console.log(`✅ Lote removido: ${count} registros (Total: ${totalRemovido})`)
+      
+      // Se removeu menos que o batch size, provavelmente acabou
+      if (count < BATCH_SIZE) break
     }
 
     // 3. Contar registros após limpeza (deve ser 0)
