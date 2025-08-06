@@ -15,6 +15,7 @@ import { CompactUploadStatus } from '@/components/CompactUploadStatus';
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
+import TempLimparTodosPrecos from '@/temp-limpar-todos-precos';
 import { 
   useCadastroExames, 
   useQuebraExames, 
@@ -593,6 +594,8 @@ export default function GerenciarCadastros() {
         {/* Preços de Serviços */}
         <TabsContent value="precos">
           <div className="space-y-6">
+            {/* Ferramenta de limpeza de preços */}
+            <TempLimparTodosPrecos />
             {/* Upload Preço Clientes */}
             <Card>
               <CardHeader>
