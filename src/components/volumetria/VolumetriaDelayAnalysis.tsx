@@ -124,8 +124,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] Carregando dados DIRETAMENTE do banco para ${clienteName}...`);
       
-      // BUSCAR LAUDOS ATRASADOS COMPLETOS - MESMA FONTE DO DEMONSTRATIVO DETALHADO
-      const { data: clientData, error } = await supabase.rpc('get_laudos_atrasados_completos');
+      // BUSCAR TODOS OS DADOS (atrasados + não atrasados) PARA CÁLCULO CORRETO
+      const { data: clientData, error } = await supabase.rpc('get_volumetria_complete_data');
       
       if (error) {
         throw new Error(`Erro ao carregar dados: ${error.message}`);
@@ -136,6 +136,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       
       console.log(`🎯 [DelayAnalysis] ${filteredData.length} registros carregados para ${clienteName}`);
       console.log(`🔥 [DelayAnalysis] Primeiros 3 registros para debug:`, filteredData.slice(0, 3));
+      
+      // CALCULAR TOTAL DE LAUDOS (soma dos VALORES)
+      const totalLaudosCliente = filteredData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 1), 0);
+      console.log(`🎯 [DelayAnalysis] TOTAL DE LAUDOS para ${clienteName}: ${totalLaudosCliente.toLocaleString()}`);
 
       if (filteredData && filteredData.length > 0) {
         // Processar especialidades
@@ -201,7 +205,16 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           }
         });
 
-        // Converter para formato DelayData
+        // LOGS DETALHADOS PARA DEBUG
+        console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA para ${clienteName}:`);
+        const medInternaData = especialidadesMap.get('MEDICINA INTERNA');
+        if (medInternaData) {
+          console.log(`   - Total laudos: ${medInternaData.total}`);
+          console.log(`   - Laudos atrasados: ${medInternaData.atrasados}`);
+          console.log(`   - % atraso: ${((medInternaData.atrasados / medInternaData.total) * 100).toFixed(1)}%`);
+        }
+
+        // Converter mapas para arrays com cálculos corretos
         const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
           nome,
           total_exames: data.total,
