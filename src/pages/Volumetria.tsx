@@ -87,9 +87,15 @@ export default function Volumetria() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <VolumetriaClientesAtrasados />
                   <VolumetriaDelayAnalysis 
-                    total_exames={stats.total_exames}
-                    total_atrasados={stats.total_atrasados}
-                    percentual_atraso={stats.percentual_atraso}
+                    data={{
+                      clientes: clientes.map(c => ({ ...c, total_registros: c.total_exames })),
+                      modalidades: modalidades.map(m => ({ ...m, total_registros: m.total_exames })),
+                      especialidades: especialidades.map(e => ({ ...e, total_registros: e.total_exames })),
+                      categorias: [],
+                      prioridades: [],
+                      totalAtrasados: stats.total_atrasados,
+                      percentualAtrasoGeral: stats.percentual_atraso
+                    }}
                   />
                 </div>
                 <VolumetriaExecutiveSummary />
