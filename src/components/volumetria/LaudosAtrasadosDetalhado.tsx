@@ -210,11 +210,11 @@ export const LaudosAtrasadosDetalhado = () => {
           <Clock className="h-5 w-5 text-red-500" />
           Demonstrativo Detalhado - Laudos em Atraso
           <Badge variant="destructive" className="ml-2">
-            {laudosAtrasados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos ({laudosAtrasados.length} registros)
+            {laudosAtrasados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos
           </Badge>
           {searchTerm && (
             <Badge variant="outline" className="ml-2">
-              {filteredAndSortedData.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos filtrados ({filteredAndSortedData.length} registros)
+              {filteredAndSortedData.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos filtrados
             </Badge>
           )}
         </CardTitle>
@@ -403,8 +403,8 @@ export const LaudosAtrasadosDetalhado = () => {
         {/* Informação de total de registros */}
         <div className="mt-6 text-center">
           <div className="text-sm text-muted-foreground">
-            Total: <strong>{filteredAndSortedData.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos atrasados</strong> em {filteredAndSortedData.length.toLocaleString()} registros
-            {searchTerm && ` (filtrados de ${laudosAtrasados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos em ${laudosAtrasados.length.toLocaleString()} registros)`}
+            Total: <strong>{filteredAndSortedData.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos atrasados</strong>
+            {searchTerm && ` (filtrados de ${laudosAtrasados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos)`}
           </div>
         </div>
 

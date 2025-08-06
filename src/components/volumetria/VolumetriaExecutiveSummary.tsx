@@ -61,7 +61,7 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
     .sort((a, b) => a.percentual_atraso - b.percentual_atraso)
     .slice(0, 5);
 
-  // Análise de concentração de volume
+  // Análise de concentração de volume - DASHBOARD USA APENAS VALORES
   const volumeConcentration = clientesArray.reduce((acc, cliente, index) => {
     const participacao = (cliente.total_exames / processedData.totalExames) * 100;
     if (index < 5) acc.top5 += participacao;

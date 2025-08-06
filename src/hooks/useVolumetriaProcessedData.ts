@@ -58,7 +58,6 @@ export function useVolumetriaProcessedData() {
         medicos: [],
         loading: data.loading,
         totalExames: data.dashboardStats?.total_exames || 0,
-        totalRegistros: data.dashboardStats?.total_registros || 0,
         totalAtrasados: data.dashboardStats?.total_atrasados || 0,
         percentualAtraso: data.dashboardStats?.percentual_atraso || 0
       };
@@ -71,17 +70,15 @@ export function useVolumetriaProcessedData() {
       percentual_atraso: data.dashboardStats?.percentual_atraso
     });
     
-    // USAR DADOS REAIS DO DASHBOARD STATS
+    // USAR APENAS DADOS DE VOLUMES (VALORES) - DASHBOARD NÃO USA REGISTROS
     const totalExamesReal = data.dashboardStats?.total_exames || 0;
-    const totalRegistrosReal = data.dashboardStats?.total_registros || 0;
     const totalAtrasadosReal = data.dashboardStats?.total_atrasados || 0;
     const percentualAtrasoReal = data.dashboardStats?.percentual_atraso || 0;
     
-    console.log('🔍 [useVolumetriaProcessedData] Usando dados reais do dashboard:', {
+    console.log('🔍 [useVolumetriaProcessedData] Dashboard usando APENAS volumes (valores):', {
       totalExamesReal,
       totalAtrasadosReal,
-      percentualAtrasoReal,
-      totalRegistrosReal
+      percentualAtrasoReal
     });
 
     // CLIENTES - Processar dados detalhados para análise granular
@@ -325,7 +322,6 @@ export function useVolumetriaProcessedData() {
       medicos: Array.from(medicosMap.values()).sort((a, b) => b.total_exames - a.total_exames),
       loading: data.loading,
       totalExames: totalExamesReal,
-      totalRegistros: totalRegistrosReal,
       totalAtrasados: totalAtrasadosReal,
       percentualAtraso: percentualAtrasoReal
     };
@@ -337,7 +333,6 @@ export function useVolumetriaProcessedData() {
       totalExamesReal: result.totalExames,
       totalAtrasadosReal: result.totalAtrasados,
       percentualAtrasoReal: result.percentualAtraso.toFixed(2) + '%',
-      totalRegistros: result.totalRegistros,
       clientesComAtrasos: result.clientes.filter(c => c.atrasados > 0).length,
       dadosProcessados: `${totalExamesProcessados} exames em ${data.detailedData.length} registros`
     });
