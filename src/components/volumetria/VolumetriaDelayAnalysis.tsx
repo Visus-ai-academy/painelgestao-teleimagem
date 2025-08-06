@@ -117,8 +117,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // BUSCAR TODOS OS DADOS DIRETAMENTE - SEM CACHE
-      const { data: allData, error } = await supabase.rpc('get_volumetria_complete_data');
+      // BUSCAR TODOS OS DADOS DIRETAMENTE - FORÇAR SEM LIMITE
+      const { data: allData, error } = await supabase
+        .rpc('get_volumetria_complete_data')
+        .limit(50000); // FORÇAR LIMITE ALTO
       
       if (error) throw new Error(`Erro: ${error.message}`);
       
