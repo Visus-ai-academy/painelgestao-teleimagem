@@ -110,161 +110,86 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
   // Função para buscar detalhes de um cliente específico DIRETAMENTE DO BANCO
   const fetchClientDetails = async (clienteName: string) => {
-    // FORÇAR LIMPEZA DO CACHE PARA RECALCULAR COM OS NOVOS DADOS
-    setClientDetails(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(clienteName);
-      return newMap;
-    });
-    
-    if (loadingDetails.has(clienteName)) return;
-    
+    // LIMPAR CACHE ANTES DE BUSCAR
+    setClientDetails(new Map());
     setLoadingDetails(prev => new Set(prev).add(clienteName));
     
     try {
-      console.log(`🎯 [DelayAnalysis] Carregando dados DIRETAMENTE do banco para ${clienteName}...`);
+      console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // BUSCAR TODOS OS DADOS (atrasados + não atrasados) PARA CÁLCULO CORRETO
-      const { data: clientData, error } = await supabase.rpc('get_volumetria_complete_data');
+      // BUSCAR TODOS OS DADOS DIRETAMENTE - SEM CACHE
+      const { data: allData, error } = await supabase.rpc('get_volumetria_complete_data');
       
-      if (error) {
-        throw new Error(`Erro ao carregar dados: ${error.message}`);
-      }
+      if (error) throw new Error(`Erro: ${error.message}`);
       
-      // Filtrar apenas o cliente específico
-      const filteredData = clientData?.filter((item: any) => item.EMPRESA === clienteName) || [];
+      // FILTRAR APENAS O CLIENTE ESPECÍFICO
+      const clientData = allData?.filter((item: any) => item.EMPRESA === clienteName) || [];
+      console.log(`🔍 [DelayAnalysis] ${clientData.length} registros encontrados para ${clienteName}`);
       
-      console.log(`🎯 [DelayAnalysis] ${filteredData.length} registros carregados para ${clienteName}`);
-      console.log(`🔥 [DelayAnalysis] Primeiros 3 registros para debug:`, filteredData.slice(0, 3));
+      // PROCESSAR DADOS DO ZERO - CALCULAR SOMAS REAIS
+      const especialidadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
       
-      // CALCULAR TOTAL DE LAUDOS (soma dos VALORES)
-      const totalLaudosCliente = filteredData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 1), 0);
-      console.log(`🎯 [DelayAnalysis] TOTAL DE LAUDOS para ${clienteName}: ${totalLaudosCliente.toLocaleString()}`);
-
-      if (filteredData && filteredData.length > 0) {
-        // Processar especialidades
-        const especialidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+      // PROCESSAR CADA REGISTRO
+      clientData.forEach(registro => {
+        const valores = Number(registro.VALORES) || 1;
+        const especialidade = registro.ESPECIALIDADE || 'Não Informado';
         
-        // Processar categorias (baseado na modalidade para simplificar)
-        const categoriasMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        // CALCULAR SE ESTÁ ATRASADO
+        let isAtrasado = false;
+        let tempoAtraso = 0;
         
-        // Processar prioridades (vamos usar uma lógica baseada no tempo de atraso)
-        const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
-
-        filteredData.forEach(row => {
-          // Calcular atraso apenas se houver dados válidos
-          let isAtrasado = false;
-          let tempoAtraso = 0;
-          
-          if (row.DATA_LAUDO && row.DATA_PRAZO && row.HORA_LAUDO && row.HORA_PRAZO) {
-            // Combinar data e hora para comparação precisa
-            const dataLaudoCompleta = new Date(`${row.DATA_LAUDO}T${row.HORA_LAUDO}`);
-            const dataPrazoCompleta = new Date(`${row.DATA_PRAZO}T${row.HORA_PRAZO}`);
-            
-            isAtrasado = dataLaudoCompleta > dataPrazoCompleta;
-            tempoAtraso = isAtrasado ? (dataLaudoCompleta.getTime() - dataPrazoCompleta.getTime()) / (1000 * 60) : 0;
-          }
-
-          const valores = Number(row.VALORES) || 1; // Usar quantidade de laudos
-          
-          // LOG DEBUG: Para MEDICINA INTERNA
-          if (row.ESPECIALIDADE === 'MEDICINA INTERNA') {
-            console.log(`🐛 [DelayAnalysis] Processando registro MEDICINA INTERNA: VALORES=${valores}, isAtrasado=${isAtrasado}`);
-          }
-
-          // Processar especialidades - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
-          const esp = row.ESPECIALIDADE || 'Não Informado';
-          if (!especialidadesMap.has(esp)) {
-            especialidadesMap.set(esp, { total: 0, atrasados: 0, tempoTotal: 0 });
-          }
-          const espData = especialidadesMap.get(esp)!;
-          espData.total += valores; // SOMAR VALORES
-          if (isAtrasado) {
-            espData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
-            espData.tempoTotal += tempoAtraso;
-          }
-
-          // Processar categorias (usando modalidade) - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
-          const cat = row.MODALIDADE || 'Não Informado';
-          if (!categoriasMap.has(cat)) {
-            categoriasMap.set(cat, { total: 0, atrasados: 0, tempoTotal: 0 });
-          }
-          const catData = categoriasMap.get(cat)!;
-          catData.total += valores; // SOMAR VALORES
-          if (isAtrasado) {
-            catData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
-            catData.tempoTotal += tempoAtraso;
-          }
-
-          // Processar prioridades - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
-          const prioridade = row.PRIORIDADE || 'Não Informado';
-          
-          if (!prioridadesMap.has(prioridade)) {
-            prioridadesMap.set(prioridade, { total: 0, atrasados: 0, tempoTotal: 0 });
-          }
-          const prioData = prioridadesMap.get(prioridade)!;
-          prioData.total += valores; // SOMAR VALORES
-          if (isAtrasado) {
-            prioData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
-            prioData.tempoTotal += tempoAtraso;
-          }
-        });
-
-        // LOGS DETALHADOS PARA DEBUG - MOSTRAR DADOS CALCULADOS
-        console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA para ${clienteName}:`);
-        const medInternaData = especialidadesMap.get('MEDICINA INTERNA');
-        if (medInternaData) {
-          console.log(`   ✅ Total laudos: ${medInternaData.total} (correto)`);
-          console.log(`   ✅ Laudos atrasados: ${medInternaData.atrasados} (correto)`);
-          console.log(`   ✅ % atraso: ${((medInternaData.atrasados / medInternaData.total) * 100).toFixed(1)}% (correto)`);
+        if (registro.DATA_LAUDO && registro.DATA_PRAZO && registro.HORA_LAUDO && registro.HORA_PRAZO) {
+          const dataLaudo = new Date(`${registro.DATA_LAUDO}T${registro.HORA_LAUDO}`);
+          const dataPrazo = new Date(`${registro.DATA_PRAZO}T${registro.HORA_PRAZO}`);
+          isAtrasado = dataLaudo > dataPrazo;
+          tempoAtraso = isAtrasado ? (dataLaudo.getTime() - dataPrazo.getTime()) / (1000 * 60) : 0;
         }
         
-        // GARANTIR QUE OS DADOS CALCULADOS SEJAM OS ÚNICOS USADOS
-        const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => {
-          const resultado = {
-            nome,
-            total_exames: data.total,
-            atrasados: data.atrasados,
-            percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
-            tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
-          };
-          
-          // LOG ESPECÍFICO PARA MEDICINA INTERNA
-          if (nome === 'MEDICINA INTERNA') {
-            console.log(`🎯 [DelayAnalysis] FINAL MEDICINA INTERNA:`, resultado);
-          }
-          
-          return resultado;
-        });
-
-        console.log(`🔥 [DelayAnalysis] Especialidades calculadas para ${clienteName}:`, especialidades);
-        console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA encontrada:`, especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
-
-        // Converter para formato DelayData
-        const categorias: DelayData[] = Array.from(categoriasMap.entries()).map(([nome, data]) => ({
+        // SOMAR LAUDOS (não contar registros)
+        if (!especialidadesCalc.has(especialidade)) {
+          especialidadesCalc.set(especialidade, { totalLaudos: 0, atrasadosLaudos: 0, tempoTotal: 0 });
+        }
+        
+        const espData = especialidadesCalc.get(especialidade)!;
+        espData.totalLaudos += valores; // SOMAR VALORES
+        
+        if (isAtrasado) {
+          espData.atrasadosLaudos += valores; // SOMAR VALORES DOS ATRASADOS
+          espData.tempoTotal += tempoAtraso;
+        }
+        
+        // DEBUG para MEDICINA INTERNA
+        if (especialidade === 'MEDICINA INTERNA') {
+          console.log(`📝 [DelayAnalysis] Registro: VALORES=${valores}, atrasado=${isAtrasado}`);
+        }
+      });
+      
+      // CONVERTER PARA FORMATO FINAL
+      const especialidades: DelayData[] = Array.from(especialidadesCalc.entries()).map(([nome, data]) => {
+        const resultado = {
           nome,
-          total_exames: data.total,
-          atrasados: data.atrasados,
-          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
-          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
-        }));
-
-        const prioridades: DelayData[] = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
-          nome,
-          total_exames: data.total,
-          atrasados: data.atrasados,
-          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
-          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
-        }));
-
-        const detalhe: ClienteDetalhe = {
-          especialidades,
-          categorias,
-          prioridades
+          total_exames: data.totalLaudos, // TOTAL DE LAUDOS
+          atrasados: data.atrasadosLaudos, // LAUDOS ATRASADOS
+          percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
+          tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
         };
+        
+        if (nome === 'MEDICINA INTERNA') {
+          console.log(`✅ [DelayAnalysis] MEDICINA INTERNA CORRETO:`, resultado);
+        }
+        
+        return resultado;
+      });
 
-        setClientDetails(prev => new Map(prev).set(clienteName, detalhe));
-      }
+      
+      // CRIAR DADOS FINAIS
+      const detalhe: ClienteDetalhe = {
+        especialidades,
+        categorias: [], // Simplificado por enquanto
+        prioridades: [] // Simplificado por enquanto
+      };
+      
+      setClientDetails(prev => new Map(prev).set(clienteName, detalhe));
     } catch (error) {
       console.error('Erro ao buscar detalhes do cliente:', error);
     } finally {
