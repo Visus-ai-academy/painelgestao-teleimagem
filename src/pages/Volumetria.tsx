@@ -165,14 +165,7 @@ export default function Volumetria() {
             </TabsList>
 
             <TabsContent value="executive" className="mt-6">
-              <VolumetriaExecutiveSummary 
-                data={{
-                  stats,
-                  clientes: [], // Processado internamente no componente usando contexto
-                  modalidades: [], // Processado internamente no componente usando contexto
-                  especialidades: [] // Processado internamente no componente usando contexto
-                }}
-              />
+              <VolumetriaExecutiveSummary />
             </TabsContent>
 
             <TabsContent value="charts" className="mt-6">

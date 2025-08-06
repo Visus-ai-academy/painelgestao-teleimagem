@@ -1,59 +1,52 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from "recharts";
-import { TrendingUp, TrendingDown, Award, AlertCircle, Users, Activity } from "lucide-react";
-import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, DollarSign, Users, Activity, Target, AlertTriangle, CheckCircle } from "lucide-react";
 import { useVolumetriaProcessedData } from "@/hooks/useVolumetriaProcessedData";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
-interface ClienteData {
-  nome: string;
-  total_exames: number;
-  total_registros: number;
-  atrasados: number;
-  percentual_atraso: number;
-}
-
-interface ModalidadeData {
-  nome: string;
-  total_exames: number;
-  total_registros: number;
-  percentual: number;
-  atrasados?: number;
-  percentual_atraso?: number;
-}
-
-interface ExecutiveSummaryData {
-  stats: {
-    total_exames: number;
-    total_registros: number;
-    total_atrasados: number;
-    percentual_atraso: number;
-    total_clientes: number;
-    total_modalidades: number;
-    total_especialidades: number;
-    total_medicos: number;
-  };
-  clientes: ClienteData[];
-  modalidades: ModalidadeData[];
-  especialidades: ModalidadeData[];
-}
-
-interface VolumetriaExecutiveSummaryProps {
-  data: ExecutiveSummaryData;
-}
-
-export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryProps) {
-  // USAR DADOS PROCESSADOS CORRETOS
-  const { data: volumetriaData } = useVolumetria();
+export function VolumetriaExecutiveSummary() {
   const processedData = useVolumetriaProcessedData();
-  
-  console.log('📊 [ExecutiveSummary] Dados do contexto:', volumetriaData.detailedData.length);
 
-  // USAR OS DADOS PROCESSADOS DO HOOK EM VEZ DE RECALCULAR
-  const clientesArray = processedData.clientes;
-  const topClientesVolume = clientesArray.slice(0, 5);
+  if (processedData.loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Garantir que temos dados para processar
+  if (!processedData.clientes || processedData.clientes.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            Nenhum dado disponível para análise executiva
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Preparar dados para análise - ordenar por volume (total_exames)
+  const clientesArray = [...processedData.clientes]
+    .filter(c => c.total_exames > 0)
+    .sort((a, b) => b.total_exames - a.total_exames);
+
+  // Análise de qualidade (menor atraso = melhor performance)
+  const clientesQualidade = [...clientesArray]
+    .filter(c => c.total_exames > 100) // Somente clientes com volume significativo
+    .sort((a, b) => a.percentual_atraso - b.percentual_atraso);
 
   // Top 5 clientes por performance (menor atraso)
   const topClientesPerformance = clientesArray
@@ -78,77 +71,98 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
     }));
 
   // Análise de performance geral usando dados corretos - FONTE ÚNICA
-  const performanceLevel = 
-    volumetriaData.dashboardStats.percentual_atraso <= 5 ? { label: 'Excelente', color: 'text-green-600', bgColor: 'bg-green-100' } :
-    volumetriaData.dashboardStats.percentual_atraso <= 10 ? { label: 'Bom', color: 'text-blue-600', bgColor: 'bg-blue-100' } :
-    volumetriaData.dashboardStats.percentual_atraso <= 15 ? { label: 'Regular', color: 'text-yellow-600', bgColor: 'bg-yellow-100' } :
-    { label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-100' };
+  const performanceMetrics = {
+    totalExames: processedData.totalExames,
+    totalAtrasados: processedData.totalAtrasados,
+    percentualAtraso: processedData.percentualAtraso,
+    clientesAnalisados: clientesArray.length,
+    clientesComExcelencia: clientesQualidade.filter(c => c.percentual_atraso < 10).length,
+    clientesComProblemas: clientesQualidade.filter(c => c.percentual_atraso > 30).length,
+    concentracaoMercado: volumeConcentration.top5.toFixed(1)
+  };
+
+  // Insights e alertas
+  const insights = [
+    {
+      tipo: volumeConcentration.top5 > 70 ? 'alerta' : 'info',
+      titulo: 'Concentração de Mercado',
+      descricao: `Top 5 clientes representam ${volumeConcentration.top5.toFixed(1)}% do volume`,
+      icone: volumeConcentration.top5 > 70 ? AlertTriangle : Target
+    },
+    {
+      tipo: processedData.percentualAtraso > 25 ? 'alerta' : 'sucesso',
+      titulo: 'Performance Temporal',
+      descricao: `${processedData.percentualAtraso.toFixed(1)}% de atraso geral`,
+      icone: processedData.percentualAtraso > 25 ? TrendingDown : TrendingUp
+    },
+    {
+      tipo: 'info',
+      titulo: 'Oportunidades',
+      descricao: `${performanceMetrics.clientesComProblemas} clientes precisam de atenção`,
+      icone: Activity
+    }
+  ];
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
   return (
     <div className="space-y-6">
-      {/* KPIs Executivos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Métricas Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Volume Total</p>
-                <p className="text-2xl font-bold text-primary">{processedData.totalExames.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Laudos processados</p>
+                <p className="text-sm font-medium text-muted-foreground">Volume Total</p>
+                <p className="text-2xl font-bold">{performanceMetrics.totalExames.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">exames processados</p>
               </div>
-              <Activity className="h-8 w-8 text-primary" />
+              <DollarSign className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Performance</p>
-                <p className={`text-2xl font-bold ${performanceLevel.color}`}>
-                  {volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%
-                </p>
-                <Badge className={`text-xs ${performanceLevel.bgColor} ${performanceLevel.color}`}>
-                  {performanceLevel.label}
-                </Badge>
+                <p className="text-sm font-medium text-muted-foreground">Performance Geral</p>
+                <p className="text-2xl font-bold">{performanceMetrics.percentualAtraso.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">taxa de atraso</p>
               </div>
-              {volumetriaData.dashboardStats.percentual_atraso <= 10 ? 
-                <TrendingUp className="h-8 w-8 text-green-500" /> :
-                <TrendingDown className="h-8 w-8 text-red-500" />
-              }
+              <Activity className="h-8 w-8 text-destructive" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Base de Clientes</p>
-                <p className="text-2xl font-bold text-green-600">{volumetriaData.dashboardStats.total_clientes}</p>
-                <p className="text-xs text-muted-foreground">Clientes ativos</p>
+                <p className="text-sm font-medium text-muted-foreground">Clientes Ativos</p>
+                <p className="text-2xl font-bold">{performanceMetrics.clientesAnalisados}</p>
+                <p className="text-xs text-muted-foreground">em atividade</p>
               </div>
-              <Users className="h-8 w-8 text-green-500" />
+              <Users className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Diversificação</p>
-                <p className="text-2xl font-bold text-blue-600">{volumetriaData.dashboardStats.total_modalidades}</p>
-                <p className="text-xs text-muted-foreground">Modalidades ativas</p>
+                <p className="text-sm font-medium text-muted-foreground">Concentração</p>
+                <p className="text-2xl font-bold">{performanceMetrics.concentracaoMercado}%</p>
+                <p className="text-xs text-muted-foreground">top 5 clientes</p>
               </div>
-              <Award className="h-8 w-8 text-blue-500" />
+              <Target className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Análise de Concentração */}
+      {/* Análise de Concentração de Volume */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -188,7 +202,8 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
                   posicao: i + 1,
                   participacao: (c.total_exames / processedData.totalExames) * 100,
                   acumulado: clientesArray.slice(0, i + 1).reduce((acc, client) => 
-                    acc + (client.total_exames / processedData.totalExames) * 100, 0)
+                    acc + (client.total_exames / processedData.totalExames) * 100, 0
+                  )
                 }))}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="posicao" />
@@ -196,11 +211,25 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
                   <Tooltip 
                     formatter={(value: number, name: string) => [
                       `${value.toFixed(1)}%`, 
-                      name === 'participacao' ? 'Participação Individual' : 'Participação Acumulada'
+                      name === 'participacao' ? 'Participação' : 'Acumulado'
                     ]}
                   />
-                  <Area type="monotone" dataKey="acumulado" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                  <Bar dataKey="participacao" fill="#10b981" />
+                  <Area 
+                    type="monotone" 
+                    dataKey="acumulado" 
+                    stackId="1" 
+                    stroke="#8884d8" 
+                    fill="#8884d8" 
+                    fillOpacity={0.6}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="participacao" 
+                    stackId="2" 
+                    stroke="#82ca9d" 
+                    fill="#82ca9d" 
+                    fillOpacity={0.8}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -208,139 +237,123 @@ export function VolumetriaExecutiveSummary({ data }: VolumetriaExecutiveSummaryP
         </CardContent>
       </Card>
 
-      {/* Tabs com Análises Detalhadas */}
-      <Tabs defaultValue="volume" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="volume">Análise de Volume</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
-        </TabsList>
+      {/* Top Clientes por Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Top 5 - Melhor Performance
+            </CardTitle>
+            <CardDescription>Clientes com menor taxa de atraso</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {topClientesPerformance.map((cliente, index) => (
+                <div key={cliente.nome} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{cliente.nome}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {cliente.total_exames.toLocaleString()} exames
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={cliente.percentual_atraso < 10 ? "default" : "secondary"}
+                    className="text-xs"
+                  >
+                    {cliente.percentual_atraso.toFixed(1)}%
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="volume" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Top 5 Clientes - Volume</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topClientesVolume}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="nome" angle={-45} textAnchor="end" height={100} />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [value.toLocaleString(), 'Laudos']} />
-                    <Bar dataKey="total_exames" fill="#3b82f6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-blue-500" />
+              Top 5 - Maior Volume
+            </CardTitle>
+            <CardDescription>Clientes com maior volume de exames</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {clientesArray.slice(0, 5).map((cliente, index) => (
+                <div key={cliente.nome} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{cliente.nome}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {((cliente.total_exames / processedData.totalExames) * 100).toFixed(1)}% do volume
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">{cliente.total_exames.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">exames</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Ranking Detalhado - Volume</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {topClientesVolume.map((cliente, index) => (
-                    <div key={cliente.nome} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">#{index + 1}</Badge>
-                        <div>
-                          <div className="font-medium">{cliente.nome}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {((cliente.total_exames / processedData.totalExames) * 100).toFixed(1)}% do volume total
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-primary">{cliente.total_exames.toLocaleString()}</div>
-                        <div className="text-sm text-muted-foreground">laudos</div>
-                      </div>
-                    </div>
+      {/* Insights e Alertas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Insights Executivos</CardTitle>
+          <CardDescription>Análise estratégica e recomendações</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {insights.map((insight, index) => {
+              const Icon = insight.icone;
+              return (
+                <div key={index} className="flex items-start space-x-3 p-4 border rounded-lg">
+                  <Icon className={`h-5 w-5 mt-0.5 ${
+                    insight.tipo === 'alerta' ? 'text-destructive' : 
+                    insight.tipo === 'sucesso' ? 'text-green-500' : 'text-blue-500'
+                  }`} />
+                  <div>
+                    <h4 className="font-medium">{insight.titulo}</h4>
+                    <p className="text-sm text-muted-foreground">{insight.descricao}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Distribuição por Modalidade */}
+      {modalidadeDistribution.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição por Modalidade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={modalidadeDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ nome, participacao }) => `${nome} (${participacao}%)`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="total_exames"
+                >
+                  {modalidadeDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Top 5 Clientes - Melhor Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topClientesPerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="nome" angle={-45} textAnchor="end" height={100} />
-                    <YAxis domain={[0, 20]} />
-                    <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, 'Taxa de Atraso']} />
-                    <Bar dataKey="percentual_atraso" fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Ranking Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {topClientesPerformance.map((cliente, index) => {
-                    const performance = cliente.percentual_atraso <= 5 ? 'Excelente' : 
-                                      cliente.percentual_atraso <= 10 ? 'Bom' : 'Regular';
-                    const color = cliente.percentual_atraso <= 5 ? 'text-green-600' : 
-                                 cliente.percentual_atraso <= 10 ? 'text-blue-600' : 'text-yellow-600';
-                    
-                    return (
-                      <div key={cliente.nome} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">#{index + 1}</Badge>
-                          <div>
-                            <div className="font-medium">{cliente.nome}</div>
-                            <Badge className={`text-xs ${color}`}>{performance}</Badge>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${color}`}>{cliente.percentual_atraso.toFixed(1)}%</div>
-                          <div className="text-sm text-muted-foreground">atraso</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="distribuicao" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Distribuição por Modalidade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={modalidadeDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="nome" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'total_exames' ? value.toLocaleString() : `${value}%`,
-                      name === 'total_exames' ? 'Volume' : 'Participação'
-                    ]}
-                  />
-                  <Bar dataKey="total_exames" fill="#8b5cf6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

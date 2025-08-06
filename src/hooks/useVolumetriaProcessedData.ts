@@ -46,7 +46,6 @@ export interface ProcessedMedicoData {
 export function useVolumetriaProcessedData() {
   const { data } = useVolumetria();
   
-  // PROCESSAR TODOS OS DADOS UMA ÚNICA VEZ
   const processedData = useMemo(() => {
     // SE TEMOS STATS COMPLETAS DOS CLIENTES, USAR ELAS EM VEZ DE PROCESSAR
     if (data.clientesStats && data.clientesStats.length > 0) {
@@ -384,7 +383,7 @@ export function useVolumetriaProcessedData() {
     }
 
     return result;
-  }, [data.detailedData, data.dashboardStats, data.loading]);
+  }, [data.detailedData, data.dashboardStats, data.loading, data.clientesStats]);
 
   return processedData;
 }
