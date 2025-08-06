@@ -312,6 +312,74 @@ export function ControleRegrasNegocio() {
       implementadaEm: '2024-01-08',
       ordem_execucao: 2,
       tipo_regra: 'negocio'
+    },
+
+    // SISTEMA - Regras de Proteção Temporal e Exclusão
+    {
+      id: 'sys001',
+      nome: 'Proteção Temporal de Dados Históricos',
+      modulo: 'sistema',
+      categoria: 'temporal',
+      criterio: 'Dados de meses anteriores são imutáveis. Não permite edição de dados com data anterior ao mês atual.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'sys002',
+      nome: 'Bloqueio de Dados Futuros',
+      modulo: 'sistema',
+      categoria: 'temporal',
+      criterio: 'Impede inserção ou edição de dados com data futura superior ao dia atual.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'sys003',
+      nome: 'Janela de Edição Mês Anterior',
+      modulo: 'sistema',
+      categoria: 'temporal',
+      criterio: 'Permite edição de dados do mês anterior apenas até o dia 5 do mês seguinte.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 3,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'sys004',
+      nome: 'Exclusão de Valores Zerados',
+      modulo: 'sistema',
+      categoria: 'exclusao',
+      criterio: 'Remove automaticamente registros com valor igual a zero ou nulo antes do processamento.',
+      status: 'ativa',
+      implementadaEm: '2024-02-01',
+      ordem_execucao: 4,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'sys005',
+      nome: 'Exclusão de Registros Cancelados',
+      modulo: 'sistema',
+      categoria: 'exclusao',
+      criterio: 'Remove registros com status "CANCELADO" ou equivalente dos dados de processamento.',
+      status: 'ativa',
+      implementadaEm: '2024-02-01',
+      ordem_execucao: 5,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'sys006',
+      nome: 'Alerta para Valores Altos',
+      modulo: 'sistema',
+      categoria: 'exclusao',
+      criterio: 'Identifica e alerta sobre valores superiores a R$ 1.000 para aprovação manual.',
+      status: 'ativa',
+      implementadaEm: '2024-02-01',
+      ordem_execucao: 6,
+      tipo_regra: 'exclusao'
     }
   ];
 
@@ -390,7 +458,7 @@ export function ControleRegrasNegocio() {
     if (nome.includes('medico') || nome.includes('médico')) return 'medicos';
     if (nome.includes('escala')) return 'escalas';
     if (nome.includes('segurança') || nome.includes('seguranca')) return 'seguranca';
-    return 'sistema';
+    if (nome.includes('sistema') || nome.includes('proteção') || nome.includes('temporal') || nome.includes('exclusão') || nome.includes('alerta')) return 'sistema';
   }
 
   const getModuleIcon = (modulo: Regra['modulo']) => {
@@ -404,6 +472,7 @@ export function ControleRegrasNegocio() {
       case 'medicos': return <Users className="h-4 w-4" />;
       case 'escalas': return <Clock className="h-4 w-4" />;
       case 'seguranca': return <CheckCircle className="h-4 w-4" />;
+      case 'sistema': return <Settings className="h-4 w-4" />;
       default: return <Settings className="h-4 w-4" />;
     }
   };
@@ -419,6 +488,7 @@ export function ControleRegrasNegocio() {
       case 'medicos': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
       case 'escalas': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'seguranca': return 'bg-red-100 text-red-800 border-red-200';
+      case 'sistema': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
