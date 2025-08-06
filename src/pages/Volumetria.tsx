@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -86,24 +85,14 @@ export default function Volumetria() {
                   prioridades={[]}
                 />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <VolumetriaClientesAtrasados 
-                    clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))} 
-                  />
+                  <VolumetriaClientesAtrasados />
                   <VolumetriaDelayAnalysis 
                     total_exames={stats.total_exames}
                     total_atrasados={stats.total_atrasados}
                     percentual_atraso={stats.percentual_atraso}
                   />
                 </div>
-                <VolumetriaExecutiveSummary 
-                  stats={{
-                    ...stats,
-                    total_clientes_volumetria: stats.total_clientes
-                  }}
-                  clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))}
-                  modalidades={modalidades.map(m => ({ ...m, total_registros: m.total_exames }))}
-                  especialidades={especialidades.map(e => ({ ...e, total_registros: e.total_exames }))}
-                />
+                <VolumetriaExecutiveSummary />
               </>
             ) : (
               <VolumetriaNoData 
