@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { SecurityDashboard } from '@/components/security/SecurityDashboard';
+import { EnhancedSecurityDashboard } from '@/components/security/EnhancedSecurityDashboard';
 
 export default function Seguranca() {
-  return <SecurityDashboard />;
+  return <EnhancedSecurityDashboard />;
 }

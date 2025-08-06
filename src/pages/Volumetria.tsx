@@ -88,9 +88,24 @@ export default function Volumetria() {
                   <VolumetriaClientesAtrasados />
                   <VolumetriaDelayAnalysis 
                     data={{
-                      clientes: clientes.map(c => ({ ...c, total_registros: c.total_exames })),
-                      modalidades: modalidades.map(m => ({ ...m, total_registros: m.total_exames })),
-                      especialidades: especialidades.map(e => ({ ...e, total_registros: e.total_exames })),
+                      clientes: clientes.map(c => ({ 
+                        nome: c.nome, 
+                        total_exames: c.total_exames, 
+                        atrasados: 0,
+                        percentual_atraso: 0
+                      })),
+                      modalidades: modalidades.map(m => ({ 
+                        nome: m.nome, 
+                        total_exames: m.total_exames, 
+                        atrasados: 0,
+                        percentual_atraso: 0
+                      })),
+                      especialidades: especialidades.map(e => ({ 
+                        nome: e.nome, 
+                        total_exames: e.total_exames, 
+                        atrasados: 0,
+                        percentual_atraso: 0
+                      })),
                       categorias: [],
                       prioridades: [],
                       totalAtrasados: stats.total_atrasados,

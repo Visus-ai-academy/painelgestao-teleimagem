@@ -3282,6 +3282,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      enhanced_security_audit: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enviar_escala_mensal: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -3557,11 +3561,19 @@ export type Database = {
           ESTUDO_DESCRICAO: string
         }[]
       }
+      has_metrics_access: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
         }
+        Returns: boolean
+      }
+      has_volumetria_access: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       hash_personal_data: {
@@ -3723,6 +3735,10 @@ export type Database = {
           user_id?: string
         }
         Returns: Json
+      }
+      validate_input_security: {
+        Args: { input_text: string }
+        Returns: boolean
       }
       validate_security_configuration: {
         Args: Record<PropertyKey, never>
