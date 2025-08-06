@@ -61,7 +61,6 @@ export default function Volumetria() {
                 <VolumetriaFilters
                   periodo={periodo}
                   cliente={cliente}
-                  clientes={listaClientes}
                   onPeriodoChange={setPeriodo}
                   onClienteChange={setCliente}
                 />
@@ -74,34 +73,50 @@ export default function Volumetria() {
               </div>
             ) : hasData ? (
               <>
-                <VolumetriaStats stats={stats} />
+                <VolumetriaStats stats={{
+                  ...stats,
+                  total_clientes_volumetria: stats.total_clientes
+                }} />
                 <VolumetriaCharts 
-                  clientes={clientes}
-                  modalidades={modalidades}
-                  especialidades={especialidades}
+                  clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))}
+                  modalidades={modalidades.map(m => ({ ...m, total_registros: m.total_exames }))}
+                  especialidades={especialidades.map(e => ({ ...e, total_registros: e.total_exames }))}
                 />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <VolumetriaClientesAtrasados clientes={clientes} />
+                  <VolumetriaClientesAtrasados 
+                    clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))} 
+                  />
                   <VolumetriaDelayAnalysis 
-                    totalExames={stats.total_exames}
-                    totalAtrasados={stats.total_atrasados}
-                    percentualAtraso={stats.percentual_atraso}
+                    total_exames={stats.total_exames}
+                    total_atrasados={stats.total_atrasados}
+                    percentual_atraso={stats.percentual_atraso}
                   />
                 </div>
                 <VolumetriaExecutiveSummary 
-                  stats={stats}
-                  clientes={clientes}
-                  modalidades={modalidades}
-                  especialidades={especialidades}
+                  stats={{
+                    ...stats,
+                    total_clientes_volumetria: stats.total_clientes
+                  }}
+                  clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))}
+                  modalidades={modalidades.map(m => ({ ...m, total_registros: m.total_exames }))}
+                  especialidades={especialidades.map(e => ({ ...e, total_registros: e.total_exames }))}
                 />
               </>
             ) : (
-              <VolumetriaNoData />
+              <VolumetriaNoData 
+                hasActiveFilters={periodo !== "todos" || cliente !== "todos"}
+                onClearFilters={() => {
+                  setPeriodo("todos");
+                  setCliente("todos");
+                }}
+              />
             )}
           </TabsContent>
 
           <TabsContent value="upload">
-            <VolumetriaUpload />
+            <VolumetriaUpload 
+              arquivoFonte="volumetria_padrao"
+            />
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">

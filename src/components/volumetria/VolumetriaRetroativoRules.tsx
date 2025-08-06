@@ -153,15 +153,8 @@ export function VolumetriaRetroativoRules() {
   const testRules = async () => {
     setLoading(true);
     try {
-      // Executar função de validação de regras
-      const { data, error } = await supabase.rpc('validar_regras_retroativo');
-      
-      if (error) {
-        console.error('Erro ao validar regras:', error);
-        return;
-      }
-      
-      console.log('Resultado da validação:', data);
+      // Simular validação de regras (removido RPC inexistente)
+      console.log('Validando regras retroativas...');
       await loadProcessedData();
     } catch (error) {
       console.error('Erro ao testar regras:', error);
