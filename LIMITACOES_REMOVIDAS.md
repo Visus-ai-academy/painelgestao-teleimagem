@@ -85,6 +85,32 @@ Se surgirem novas limitações durante o uso:
 3. Remover ou aumentar conforme necessário
 4. Documentar a alteração
 
+## 🚨 REGRA ABSOLUTA: PROIBIDO USAR QUANTIDADE DE REGISTROS
+
+**COMANDO DEFINITIVO**: SEMPRE usar `VALORES` (quantidade de exames/laudos), NUNCA usar `COUNT(*)` (quantidade de registros) em qualquer dashboard, componente, gráfico ou análise.
+
+### ❌ PROIBIDO:
+- `COUNT(*)` para contagem
+- Quantidade de registros
+- Número de linhas/rows
+- Soma de registros
+
+### ✅ OBRIGATÓRIO:
+- `SUM(VALORES)` para contagem de exames/laudos
+- Campo `VALORES` representa quantidade real de exames
+- Sempre somar VALORES, nunca contar registros
+
+### 📝 Implementação Obrigatória:
+```sql
+-- ❌ ERRADO:
+COUNT(*) as total_registros
+
+-- ✅ CORRETO:
+SUM("VALORES") as total_exames
+```
+
+**Esta regra se aplica a TODOS os componentes do dashboard de volumetria.**
+
 ---
 
 **Data da alteração**: Janeiro 2025  
