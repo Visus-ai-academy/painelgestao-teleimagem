@@ -3181,6 +3181,22 @@ export type Database = {
         }
         Relationships: []
       }
+      security_metrics_view: {
+        Row: {
+          active_consents: number | null
+          active_users_24h: number | null
+          admin_users: number | null
+          alerts_last_24h: number | null
+          encrypted_records: number | null
+          failed_logins_24h: number | null
+          manager_users: number | null
+          rls_enabled_tables: number | null
+          sensitive_access_24h: number | null
+          successful_backups_7d: number | null
+          total_policies: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       aceitar_cobertura_escala: {
@@ -3229,6 +3245,15 @@ export type Database = {
       }
       can_view_data: {
         Args: { data_referencia: string }
+        Returns: boolean
+      }
+      check_rate_limit: {
+        Args: {
+          user_id: string
+          action_type: string
+          max_attempts?: number
+          time_window_minutes?: number
+        }
         Returns: boolean
       }
       cleanup_old_audit_logs: {
@@ -3598,6 +3623,10 @@ export type Database = {
         }
         Returns: string
       }
+      log_suspicious_access: {
+        Args: { resource_type: string; access_pattern: string; metadata?: Json }
+        Returns: undefined
+      }
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
@@ -3622,6 +3651,10 @@ export type Database = {
           p_motivo?: string
           p_tipo_cobertura?: string
         }
+        Returns: Json
+      }
+      perform_security_audit: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       prepare_partition_structure: {
@@ -3681,6 +3714,23 @@ export type Database = {
       validate_cpf: {
         Args: { cpf: string }
         Returns: boolean
+      }
+      validate_file_upload: {
+        Args: {
+          file_name: string
+          file_size: number
+          file_type: string
+          user_id?: string
+        }
+        Returns: Json
+      }
+      validate_security_configuration: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          status: string
+          details: string
+        }[]
       }
     }
     Enums: {
