@@ -3394,6 +3394,14 @@ export type Database = {
           percentual_atraso: number
         }[]
       }
+      get_volumetria_total_atraso: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_laudos: number
+          total_atrasados: number
+          percentual_atraso: number
+        }[]
+      }
       get_volumetria_total_count: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -3402,6 +3410,25 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           id: string
+          EMPRESA: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          MEDICO: string
+          PRIORIDADE: string
+          CATEGORIA: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
+        }[]
+      }
+      get_volumetria_unlimited_force: {
+        Args: Record<PropertyKey, never>
+        Returns: {
           EMPRESA: string
           MODALIDADE: string
           ESPECIALIDADE: string
