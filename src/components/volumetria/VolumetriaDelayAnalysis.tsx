@@ -128,6 +128,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       
       // PROCESSAR DADOS DO ZERO - CALCULAR SOMAS REAIS
       const especialidadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
+      const modalidadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
+      const prioridadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
       
       // PROCESSAR CADA REGISTRO
       clientData.forEach(registro => {
@@ -158,6 +160,30 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           espData.tempoTotal += tempoAtraso;
         }
         
+        // PROCESSAR MODALIDADES
+        const modalidade = registro.MODALIDADE || 'Não Informado';
+        if (!modalidadesCalc.has(modalidade)) {
+          modalidadesCalc.set(modalidade, { totalLaudos: 0, atrasadosLaudos: 0, tempoTotal: 0 });
+        }
+        const modData = modalidadesCalc.get(modalidade)!;
+        modData.totalLaudos += valores;
+        if (isAtrasado) {
+          modData.atrasadosLaudos += valores;
+          modData.tempoTotal += tempoAtraso;
+        }
+        
+        // PROCESSAR PRIORIDADES
+        const prioridade = registro.PRIORIDADE || 'Não Informado';
+        if (!prioridadesCalc.has(prioridade)) {
+          prioridadesCalc.set(prioridade, { totalLaudos: 0, atrasadosLaudos: 0, tempoTotal: 0 });
+        }
+        const prioData = prioridadesCalc.get(prioridade)!;
+        prioData.totalLaudos += valores;
+        if (isAtrasado) {
+          prioData.atrasadosLaudos += valores;
+          prioData.tempoTotal += tempoAtraso;
+        }
+        
         // DEBUG para MEDICINA INTERNA
         if (especialidade === 'MEDICINA INTERNA') {
           console.log(`📝 [DelayAnalysis] Registro: VALORES=${valores}, atrasado=${isAtrasado}`);
@@ -182,11 +208,27 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       });
 
       
-      // CRIAR DADOS FINAIS
+      const categorias: DelayData[] = Array.from(modalidadesCalc.entries()).map(([nome, data]) => ({
+        nome,
+        total_exames: data.totalLaudos,
+        atrasados: data.atrasadosLaudos,
+        percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
+        tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
+      }));
+      
+      const prioridades: DelayData[] = Array.from(prioridadesCalc.entries()).map(([nome, data]) => ({
+        nome,
+        total_exames: data.totalLaudos,
+        atrasados: data.atrasadosLaudos,
+        percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
+        tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
+      }));
+      
+      // CRIAR DADOS FINAIS COM TODAS AS SEÇÕES
       const detalhe: ClienteDetalhe = {
         especialidades,
-        categorias: [], // Simplificado por enquanto
-        prioridades: [] // Simplificado por enquanto
+        categorias,
+        prioridades
       };
       
       setClientDetails(prev => new Map(prev).set(clienteName, detalhe));
