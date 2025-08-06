@@ -220,13 +220,22 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         }
         
         // GARANTIR QUE OS DADOS CALCULADOS SEJAM OS ÚNICOS USADOS
-        const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
-          nome,
-          total_exames: data.total,
-          atrasados: data.atrasados,
-          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
-          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
-        }));
+        const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => {
+          const resultado = {
+            nome,
+            total_exames: data.total,
+            atrasados: data.atrasados,
+            percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+            tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+          };
+          
+          // LOG ESPECÍFICO PARA MEDICINA INTERNA
+          if (nome === 'MEDICINA INTERNA') {
+            console.log(`🎯 [DelayAnalysis] FINAL MEDICINA INTERNA:`, resultado);
+          }
+          
+          return resultado;
+        });
 
         console.log(`🔥 [DelayAnalysis] Especialidades calculadas para ${clienteName}:`, especialidades);
         console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA encontrada:`, especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
