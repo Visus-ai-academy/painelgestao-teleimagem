@@ -235,50 +235,6 @@ export default function GerenciarCadastros() {
     }
   };
 
-  // Handler para limpar TODOS os preços
-  const handleLimparTodosPrecos = async () => {
-    if (!isAdmin) {
-      toast({
-        title: "Acesso Negado",
-        description: "Apenas administradores podem limpar preços",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!confirm("⚠️ ATENÇÃO: Esta ação irá remover TODOS os registros de preços da base de dados. Esta operação é IRREVERSÍVEL. Deseja continuar?")) {
-      return;
-    }
-
-    setIsClearing(true);
-    try {
-      console.log('🧹 Iniciando limpeza completa de todos os preços...');
-      
-      const { data, error } = await supabase.functions.invoke('limpar-todos-precos');
-
-      if (error) throw error;
-      
-      toast({
-        title: "✅ Limpeza completa realizada!",
-        description: `Todos os ${data.total_removido} registros de preços foram removidos`,
-      });
-
-      // Recarregar dados de preços
-      precosData.refetch();
-      setRefreshStatusPanel(prev => prev + 1);
-      
-    } catch (error: any) {
-      console.error('Erro na limpeza completa:', error);
-      toast({
-        title: "❌ Erro na limpeza",
-        description: error.message || "Erro desconhecido",
-        variant: "destructive",
-      });
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
   // Handler para parâmetros de clientes (Parametros_Clientes)
   const handleUploadParametros = async (file: File) => {
     console.log('🔄 Iniciando upload de parâmetros de clientes:', file.name);
@@ -691,48 +647,6 @@ export default function GerenciarCadastros() {
                     <p><strong>Nota:</strong> Arquivo Excel com parâmetros de faturamento específicos por cliente</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Limpeza Completa de Preços */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trash2 className="h-5 w-5 text-destructive" />
-                  Limpeza Completa de Preços
-                </CardTitle>
-                <CardDescription>
-                  ⚠️ Remover TODOS os registros de preços da base de dados para fazer upload em banco limpo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isAdmin ? (
-                  <div className="space-y-4">
-                    <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
-                      <div className="flex items-center gap-2 text-destructive mb-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="font-semibold">ATENÇÃO</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Esta ação irá remover TODOS os registros de preços da base de dados.
-                        Esta operação é <strong>irreversível</strong>. Use apenas quando necessário para fazer upload em banco limpo.
-                      </p>
-                    </div>
-                    <Button 
-                      variant="destructive" 
-                      onClick={handleLimparTodosPrecos}
-                      disabled={isClearing}
-                      className="w-full"
-                    >
-                      {isClearing ? "Limpando..." : "🗑️ LIMPAR TODOS OS PREÇOS"}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <Shield className="h-8 w-8 mx-auto mb-2" />
-                    <p>Apenas administradores podem limpar preços</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
