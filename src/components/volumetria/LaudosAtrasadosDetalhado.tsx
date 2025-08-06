@@ -35,30 +35,92 @@ export const LaudosAtrasadosDetalhado = () => {
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // USAR EXATAMENTE A MESMA SOLUÇÃO QUE FUNCIONOU NA LISTA DE CLIENTES
+  // USAR EXATAMENTE A MESMA ESTRATÉGIA QUE FUNCIONA NO CONTEXT - SEM RPC
   useEffect(() => {
     const carregarLaudosAtrasados = async () => {
       try {
-        console.log('🚀 [LaudosAtrasados] Usando MESMA solução que funcionou na lista de clientes...');
+        console.log('🚀 [LaudosAtrasados] Usando ESTRATÉGIA DIRETA do Context - SEM limitações...');
         
-        // USAR A FUNÇÃO RPC QUE FUNCIONA: get_laudos_atrasados_completos
-        const { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
+        // MÉTODO DIRETO: Buscar na tabela sem limitações usando múltiplas páginas
+        let todosOsDados: any[] = [];
+        let pagina = 0;
+        const tamanhoPagina = 1000;
+        let continuarCarregando = true;
         
-        if (error) {
-          console.error('❌ Erro na função RPC:', error);
-          throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
+        while (continuarCarregando) {
+          const offset = pagina * tamanhoPagina;
+          console.log(`📄 [LaudosAtrasados] Carregando página ${pagina + 1}, offset: ${offset}`);
+          
+          const { data: dadosPagina, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select(`
+              EMPRESA,
+              NOME_PACIENTE,
+              ESTUDO_DESCRICAO,
+              MODALIDADE,
+              ESPECIALIDADE,
+              CATEGORIA,
+              PRIORIDADE,
+              MEDICO,
+              VALORES,
+              DATA_LAUDO,
+              HORA_LAUDO,
+              DATA_PRAZO,
+              HORA_PRAZO
+            `)
+            .not('DATA_LAUDO', 'is', null)
+            .not('HORA_LAUDO', 'is', null)
+            .not('DATA_PRAZO', 'is', null)
+            .not('HORA_PRAZO', 'is', null)
+            .range(offset, offset + tamanhoPagina - 1);
+          
+          if (error) {
+            console.error('❌ Erro na busca direta:', error);
+            throw error;
+          }
+          
+          if (dadosPagina && dadosPagina.length > 0) {
+            todosOsDados = [...todosOsDados, ...dadosPagina];
+            console.log(`✅ [LaudosAtrasados] Página ${pagina + 1}: ${dadosPagina.length} registros. Total: ${todosOsDados.length}`);
+            
+            // Se retornou menos que uma página completa, acabaram os dados
+            if (dadosPagina.length < tamanhoPagina) {
+              continuarCarregando = false;
+            } else {
+              pagina++;
+            }
+          } else {
+            continuarCarregando = false;
+          }
+          
+          // Proteção para evitar loop infinito
+          if (pagina > 100) {
+            console.warn('⚠️ Atingiu limite de segurança de 100 páginas');
+            continuarCarregando = false;
+          }
         }
         
-        console.log(`✅ [LaudosAtrasados] FUNÇÃO RPC RETORNOU: ${laudosAtrasadosData?.length || 0} registros`);
+        console.log(`🎯 [LaudosAtrasados] TOTAL CARREGADO: ${todosOsDados.length} registros da tabela`);
         
-        if (!laudosAtrasadosData || laudosAtrasadosData.length === 0) {
-          console.warn('⚠️ [LaudosAtrasados] Nenhum dado retornado');
-          setLaudosAtrasados([]);
-          return;
-        }
+        // FILTRAR APENAS OS ATRASADOS
+        const laudosAtrasados = todosOsDados.filter(item => {
+          if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+          
+          try {
+            const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
+            const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
+            
+            return dataLaudo > dataPrazo;
+          } catch (error) {
+            console.warn('Erro ao processar data:', error);
+            return false;
+          }
+        });
         
-        // Processar os dados da MESMA FORMA que funciona na lista de clientes
-        const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
+        console.log(`🔥 [LaudosAtrasados] ATRASADOS FILTRADOS: ${laudosAtrasados.length} registros`);
+        
+        // Processar os laudos atrasados
+        const laudosProcessados: LaudoAtrasado[] = laudosAtrasados.map((item: any) => {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           const tempoAtrasoMs = dataLaudo.getTime() - dataPrazo.getTime();
