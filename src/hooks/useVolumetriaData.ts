@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
   total_exames: number;
-  total_registros: number;
   total_atrasados: number;
   percentual_atraso: number;
   total_clientes: number;
@@ -14,7 +13,6 @@ interface DashboardStats {
 interface ClienteData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   atrasados: number;
   percentual_atraso: number;
 }
@@ -22,14 +20,12 @@ interface ClienteData {
 interface ModalidadeData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   percentual: number;
 }
 
 interface EspecialidadeData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   percentual: number;
 }
 
@@ -48,7 +44,6 @@ export function useVolumetriaData(periodo: string, cliente: string) {
   const [data, setData] = useState<VolumetriaData>({
     stats: {
       total_exames: 0,
-      total_registros: 0,
       total_atrasados: 0,
       percentual_atraso: 0,
       total_clientes: 0
@@ -256,7 +251,6 @@ export function useVolumetriaData(periodo: string, cliente: string) {
           ...prev,
           stats: {
             total_exames: 0,
-            total_registros: 0,
             total_atrasados: 0,
             percentual_atraso: 0,
             total_clientes: 0
@@ -268,9 +262,8 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         return;
       }
 
-      // Calcular estatísticas principais
+      // Calcular estatísticas principais USANDO EXCLUSIVAMENTE VOLUMES
       const totalExames = allData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
-      const totalRegistros = allData.length;
       const clientesUnicos = new Set(allData.map(item => item.EMPRESA)).size;
 
       // Calcular atrasos
@@ -290,10 +283,9 @@ export function useVolumetriaData(periodo: string, cliente: string) {
       const totalAtrasados = atrasados.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
       const percentualAtraso = totalExames > 0 ? (totalAtrasados / totalExames) * 100 : 0;
 
-      console.log(`💰 Total de exames: ${totalExames.toLocaleString()}`);
-      console.log(`📋 Total de registros: ${totalRegistros.toLocaleString()}`);
+      console.log(`💰 Total de LAUDOS (volumes): ${totalExames.toLocaleString()}`);
       console.log(`👥 Total de clientes: ${clientesUnicos}`);
-      console.log(`⏰ Total atrasados: ${totalAtrasados.toLocaleString()}`);
+      console.log(`⏰ Total LAUDOS atrasados: ${totalAtrasados.toLocaleString()}`);
 
       // Processar dados por cliente
       const clientesMap = new Map<string, ClienteData>();
@@ -304,7 +296,6 @@ export function useVolumetriaData(periodo: string, cliente: string) {
           clientesMap.set(empresa, {
             nome: empresa,
             total_exames: 0,
-            total_registros: 0,
             atrasados: 0,
             percentual_atraso: 0
           });
@@ -312,7 +303,6 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         
         const clienteData = clientesMap.get(empresa)!;
         clienteData.total_exames += Number(item.VALORES) || 0;
-        clienteData.total_registros += 1;
         
         // Verificar se está atrasado
         if (atrasados.some(a => 
@@ -338,14 +328,12 @@ export function useVolumetriaData(periodo: string, cliente: string) {
           modalidadesMap.set(modalidade, {
             nome: modalidade,
             total_exames: 0,
-            total_registros: 0,
             percentual: 0
           });
         }
         
         const modalidadeData = modalidadesMap.get(modalidade)!;
         modalidadeData.total_exames += Number(item.VALORES) || 0;
-        modalidadeData.total_registros += 1;
       });
 
       const modalidadesArray = Array.from(modalidadesMap.values()).map(modalidade => ({
@@ -362,14 +350,12 @@ export function useVolumetriaData(periodo: string, cliente: string) {
           especialidadesMap.set(especialidade, {
             nome: especialidade,
             total_exames: 0,
-            total_registros: 0,
             percentual: 0
           });
         }
         
         const especialidadeData = especialidadesMap.get(especialidade)!;
         especialidadeData.total_exames += Number(item.VALORES) || 0;
-        especialidadeData.total_registros += 1;
       });
 
       const especialidadesArray = Array.from(especialidadesMap.values()).map(especialidade => ({
@@ -381,7 +367,6 @@ export function useVolumetriaData(periodo: string, cliente: string) {
         ...prev,
         stats: {
           total_exames: totalExames,
-          total_registros: totalRegistros,
           total_atrasados: totalAtrasados,
           percentual_atraso: percentualAtraso,
           total_clientes: clientesUnicos

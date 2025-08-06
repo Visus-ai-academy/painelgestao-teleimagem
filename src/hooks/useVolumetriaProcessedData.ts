@@ -5,7 +5,6 @@ import { useVolumetria } from '@/contexts/VolumetriaContext';
 export interface ProcessedClienteData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   atrasados: number;
   percentual_atraso: number;
   valor_medio: number;
@@ -16,7 +15,6 @@ export interface ProcessedClienteData {
 export interface ProcessedModalidadeData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   percentual: number;
   atrasados?: number;
   percentual_atraso?: number;
@@ -25,7 +23,6 @@ export interface ProcessedModalidadeData {
 export interface ProcessedEspecialidadeData {
   nome: string;
   total_exames: number;
-  total_registros: number;
   percentual: number;
   atrasados?: number;
   percentual_atraso?: number;
@@ -58,7 +55,6 @@ export function useVolumetriaProcessedData() {
       const clientesProcessados = data.clientesStats.map((cliente: any) => ({
         nome: cliente.empresa,
         total_exames: Number(cliente.total_laudos),
-        total_registros: Number(cliente.total_registros),
         atrasados: Number(cliente.laudos_atrasados),
         percentual_atraso: Number(cliente.percentual_atraso),
         valor_medio: Number(cliente.total_laudos) / Number(cliente.total_registros) || 0
@@ -126,20 +122,18 @@ export function useVolumetriaProcessedData() {
       
       const valores = Number(item.VALORES) || 0;
       
-      if (!clientesMap.has(cliente)) {
-        clientesMap.set(cliente, {
-          nome: cliente,
-          total_exames: 0,
-          total_registros: 0,
-          atrasados: 0,
-          percentual_atraso: 0,
-          valor_medio: 0
-        });
-      }
-      
-      const clienteData = clientesMap.get(cliente)!;
-      clienteData.total_exames += valores;
-      clienteData.total_registros += 1;
+        if (!clientesMap.has(cliente)) {
+          clientesMap.set(cliente, {
+            nome: cliente,
+            total_exames: 0,
+            atrasados: 0,
+            percentual_atraso: 0,
+            valor_medio: 0
+          });
+        }
+        
+        const clienteData = clientesMap.get(cliente)!;
+        clienteData.total_exames += valores;
       
       // Calcular atrasos baseado nos dados detalhados
       if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
@@ -161,8 +155,9 @@ export function useVolumetriaProcessedData() {
     clientesMap.forEach(cliente => {
       cliente.percentual_atraso = cliente.total_exames > 0 ? 
         (cliente.atrasados / cliente.total_exames) * 100 : 0;
-      cliente.valor_medio = cliente.total_registros > 0 ? 
-        cliente.total_exames / cliente.total_registros : 0;
+      // Para valor médio precisamos dos registros originais
+      const registrosCliente = data.detailedData.filter(item => item.EMPRESA === cliente.nome).length;
+      cliente.valor_medio = registrosCliente > 0 ? cliente.total_exames / registrosCliente : 0;
     });
 
     // MODALIDADES
@@ -171,20 +166,18 @@ export function useVolumetriaProcessedData() {
       const modalidade = item.MODALIDADE;
       if (!modalidade) return;
       
-      if (!modalidadesMap.has(modalidade)) {
-        modalidadesMap.set(modalidade, {
-          nome: modalidade,
-          total_exames: 0,
-          total_registros: 0,
-          percentual: 0,
-          atrasados: 0,
-          percentual_atraso: 0
-        });
-      }
-      
-      const modalidadeData = modalidadesMap.get(modalidade)!;
-      modalidadeData.total_exames += Number(item.VALORES) || 0;
-      modalidadeData.total_registros += 1;
+        if (!modalidadesMap.has(modalidade)) {
+          modalidadesMap.set(modalidade, {
+            nome: modalidade,
+            total_exames: 0,
+            percentual: 0,
+            atrasados: 0,
+            percentual_atraso: 0
+          });
+        }
+        
+        const modalidadeData = modalidadesMap.get(modalidade)!;
+        modalidadeData.total_exames += Number(item.VALORES) || 0;
       
       // Calcular atrasos
       if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
@@ -204,20 +197,18 @@ export function useVolumetriaProcessedData() {
       const especialidade = item.ESPECIALIDADE;
       if (!especialidade) return;
       
-      if (!especialidadesMap.has(especialidade)) {
-        especialidadesMap.set(especialidade, {
-          nome: especialidade,
-          total_exames: 0,
-          total_registros: 0,
-          percentual: 0,
-          atrasados: 0,
-          percentual_atraso: 0
-        });
-      }
-      
-      const especialidadeData = especialidadesMap.get(especialidade)!;
-      especialidadeData.total_exames += Number(item.VALORES) || 0;
-      especialidadeData.total_registros += 1;
+        if (!especialidadesMap.has(especialidade)) {
+          especialidadesMap.set(especialidade, {
+            nome: especialidade,
+            total_exames: 0,
+            percentual: 0,
+            atrasados: 0,
+            percentual_atraso: 0
+          });
+        }
+        
+        const especialidadeData = especialidadesMap.get(especialidade)!;
+        especialidadeData.total_exames += Number(item.VALORES) || 0;
       
       // Calcular atrasos
       if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
@@ -237,18 +228,16 @@ export function useVolumetriaProcessedData() {
       const categoria = item.CATEGORIA;
       if (!categoria) return;
       
-      if (!categoriasMap.has(categoria)) {
-        categoriasMap.set(categoria, {
-          nome: categoria,
-          total_exames: 0,
-          total_registros: 0,
-          percentual: 0
-        });
-      }
-      
-      const categoriaData = categoriasMap.get(categoria)!;
-      categoriaData.total_exames += Number(item.VALORES) || 0;
-      categoriaData.total_registros += 1;
+        if (!categoriasMap.has(categoria)) {
+          categoriasMap.set(categoria, {
+            nome: categoria,
+            total_exames: 0,
+            percentual: 0
+          });
+        }
+        
+        const categoriaData = categoriasMap.get(categoria)!;
+        categoriaData.total_exames += Number(item.VALORES) || 0;
     });
 
     // PRIORIDADES
@@ -257,18 +246,16 @@ export function useVolumetriaProcessedData() {
       const prioridade = item.PRIORIDADE;
       if (!prioridade) return;
       
-      if (!prioridadesMap.has(prioridade)) {
-        prioridadesMap.set(prioridade, {
-          nome: prioridade,
-          total_exames: 0,
-          total_registros: 0,
-          percentual: 0
-        });
-      }
-      
-      const prioridadeData = prioridadesMap.get(prioridade)!;
-      prioridadeData.total_exames += Number(item.VALORES) || 0;
-      prioridadeData.total_registros += 1;
+        if (!prioridadesMap.has(prioridade)) {
+          prioridadesMap.set(prioridade, {
+            nome: prioridade,
+            total_exames: 0,
+            percentual: 0
+          });
+        }
+        
+        const prioridadeData = prioridadesMap.get(prioridade)!;
+        prioridadeData.total_exames += Number(item.VALORES) || 0;
     });
 
     // MÉDICOS

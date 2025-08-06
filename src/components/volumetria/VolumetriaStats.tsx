@@ -3,7 +3,6 @@ import { BarChart3, Activity, Users, Clock } from "lucide-react";
 
 interface DashboardStats {
   total_exames: number;
-  total_registros: number;
   total_atrasados: number;
   percentual_atraso: number;
   total_clientes: number; // Total de clientes cadastrados
