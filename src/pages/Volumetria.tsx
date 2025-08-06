@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -10,8 +10,8 @@ import { VolumetriaDelayAnalysis } from "@/components/volumetria/VolumetriaDelay
 import { VolumetriaExecutiveSummary } from "@/components/volumetria/VolumetriaExecutiveSummary";
 import { VolumetriaMedicosAnalysis } from "@/components/volumetria/VolumetriaMedicosAnalysis";
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
-import { useVolumetriaData } from "@/hooks/useVolumetriaData";
-import { Upload, BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
 
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>({
@@ -28,8 +28,12 @@ export default function Volumetria() {
     medico: "todos"
   });
   
-  const { stats, clientes, modalidades, especialidades, listaClientes, loading } = useVolumetriaData("todos", "todos");
-
+  // Usar o contexto otimizado que já tem dados em cache
+  const { data } = useVolumetria();
+  
+  // Extrair dados necessários do contexto
+  const stats = data.dashboardStats;
+  const loading = data.loading;
   const hasData = stats.total_exames > 0;
 
   return (
@@ -90,12 +94,12 @@ export default function Volumetria() {
             <TabsContent value="volume" className="space-y-6">
               <VolumetriaStats stats={{
                 ...stats,
-                total_clientes_volumetria: stats.total_clientes
+                total_clientes_volumetria: stats.total_clientes_volumetria
               }} />
               <VolumetriaCharts 
-                clientes={clientes.map(c => ({ ...c, total_registros: c.total_exames }))}
-                modalidades={modalidades.map(m => ({ ...m, total_registros: m.total_exames }))}
-                especialidades={especialidades.map(e => ({ ...e, total_registros: e.total_exames }))}
+                clientes={[]}
+                modalidades={[]}
+                especialidades={[]}
                 categorias={[]}
                 prioridades={[]}
               />
@@ -104,8 +108,8 @@ export default function Volumetria() {
             <TabsContent value="medicos" className="space-y-6">
               <VolumetriaMedicosAnalysis 
                 medicos={[]}
-                modalidades={modalidades.map(m => ({ ...m, total_registros: m.total_exames, total_medicos: 0 }))}
-                especialidades={especialidades.map(e => ({ ...e, total_registros: e.total_exames, total_medicos: 0 }))}
+                modalidades={[]}
+                especialidades={[]}
                 categorias={[]}
                 prioridades={[]}
                 totalExames={stats.total_exames}
@@ -115,24 +119,9 @@ export default function Volumetria() {
             <TabsContent value="atrasos" className="space-y-6">
               <VolumetriaDelayAnalysis 
                 data={{
-                  clientes: clientes.map(c => ({ 
-                    nome: c.nome, 
-                    total_exames: c.total_exames, 
-                    atrasados: 0,
-                    percentual_atraso: 0
-                  })),
-                  modalidades: modalidades.map(m => ({ 
-                    nome: m.nome, 
-                    total_exames: m.total_exames, 
-                    atrasados: 0,
-                    percentual_atraso: 0
-                  })),
-                  especialidades: especialidades.map(e => ({ 
-                    nome: e.nome, 
-                    total_exames: e.total_exames, 
-                    atrasados: 0,
-                    percentual_atraso: 0
-                  })),
+                  clientes: [],
+                  modalidades: [],
+                  especialidades: [],
                   categorias: [],
                   prioridades: [],
                   totalAtrasados: stats.total_atrasados,
