@@ -347,30 +347,51 @@ serve(async (req) => {
     console.log('✅ PROCESSAMENTO BÁSICO CONCLUÍDO!');
     console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
 
-    // 🔧 APLICAR EXCLUSÕES POR PERÍODO (APENAS para arquivos retroativos)
-    if (arquivo_fonte.includes('retroativo') && periodo) {
-      console.log('🗑️ Aplicando exclusões por período...');
-      try {
-        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-                      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-        const nomesMes = meses[periodo.mes - 1] || 'janeiro';
-        const periodoReferenciaExclusao = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
-        
-        console.log(`📅 Período para exclusão: ${periodoReferenciaExclusao}`);
-        
-        const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
-          body: { periodo_referencia: periodoReferenciaExclusao }
-        });
-        
-        if (exclusoesError) {
-          console.warn('⚠️ Erro nas exclusões por período:', exclusoesError);
-        } else if (exclusoesResult) {
-          console.log('✅ Exclusões aplicadas:', exclusoesResult);
-          const registrosExcluidos = exclusoesResult.total_deletados || exclusoesResult.total_excluidos || 0;
-          totalInserted = Math.max(0, totalInserted - registrosExcluidos);
+    // 🔧 APLICAR EXCLUSÕES POR PERÍODO
+    if (periodo) {
+      const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+      const nomesMes = meses[periodo.mes - 1] || 'janeiro';
+      const periodoReferenciaExclusao = `${nomesMes}/${periodo.ano.toString().slice(-2)}`;
+      
+      console.log(`📅 Período para validação: ${periodoReferenciaExclusao}`);
+      
+      if (arquivo_fonte.includes('retroativo')) {
+        // Para arquivos retroativos: aplicar exclusões completas por período
+        console.log('🗑️ Aplicando exclusões por período (arquivos retroativos)...');
+        try {
+          const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
+            body: { periodo_referencia: periodoReferenciaExclusao }
+          });
+          
+          if (exclusoesError) {
+            console.warn('⚠️ Erro nas exclusões por período:', exclusoesError);
+          } else if (exclusoesResult) {
+            console.log('✅ Exclusões aplicadas:', exclusoesResult);
+            const registrosExcluidos = exclusoesResult.total_deletados || exclusoesResult.total_excluidos || 0;
+            totalInserted = Math.max(0, totalInserted - registrosExcluidos);
+          }
+        } catch (exclusoesException) {
+          console.warn('⚠️ Exceção nas exclusões:', exclusoesException);
         }
-      } catch (exclusoesException) {
-        console.warn('⚠️ Exceção nas exclusões:', exclusoesException);
+      } else {
+        // Para arquivos não-retroativos: aplicar apenas filtro de DATA_LAUDO
+        console.log('🗑️ Aplicando filtro de DATA_LAUDO (arquivos não-retroativos)...');
+        try {
+          const { data: filtroResult, error: filtroError } = await supabaseClient.functions.invoke('aplicar-filtro-data-laudo', {
+            body: { periodo_referencia: periodoReferenciaExclusao }
+          });
+          
+          if (filtroError) {
+            console.warn('⚠️ Erro no filtro de DATA_LAUDO:', filtroError);
+          } else if (filtroResult) {
+            console.log('✅ Filtro de DATA_LAUDO aplicado:', filtroResult);
+            const registrosExcluidos = filtroResult.total_excluidos || 0;
+            totalInserted = Math.max(0, totalInserted - registrosExcluidos);
+          }
+        } catch (filtroException) {
+          console.warn('⚠️ Exceção no filtro de DATA_LAUDO:', filtroException);
+        }
       }
     }
 
