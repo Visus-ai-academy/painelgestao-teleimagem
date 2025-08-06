@@ -111,7 +111,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
     // Buscar status inicial
     fetchStatus();
 
-    // Configurar realtime subscription para processamento_uploads
+    // Configurar realtime subscription apenas para processamento_uploads (removida volumetria)
     const channel = supabase
       .channel('processamento_uploads_changes')
       .on(
@@ -124,33 +124,13 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
         },
         (payload) => {
           console.log('Upload status changed:', payload);
-          fetchStatus(); // Atualizar status quando houver mudanças
+          fetchStatus(); // Atualizar status apenas quando houver mudanças no processamento
         }
       )
       .subscribe();
-
-    // Também configurar subscription para volumetria_mobilemed
-    const volumetriaChannel = supabase
-      .channel('volumetria_mobilemed_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'volumetria_mobilemed'
-        },
-        (payload) => {
-          console.log('Volumetria data changed:', payload);
-          fetchStatus(); // Atualizar status quando houver mudanças nos dados
-        }
-      )
-      .subscribe();
-
-    // Polling removido - atualização apenas via realtime
 
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(volumetriaChannel);
     };
   }, [fileType]);
 
