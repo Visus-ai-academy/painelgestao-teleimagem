@@ -102,18 +102,20 @@ serve(async (req) => {
           continue
         }
 
-        // Mapear campos do Excel baseado nos headers corretos
-        // ["CLIENTE","MODALIDADE","ESPECIALIDADE","PRIORIDADE","CATEGORIA","PREÇO","VOL INICIAL","VOL FINAL","COND. VOLUME","CONSIDERA PLANTAO","TEM ADITIVO"]
+        // Mapear campos do Excel baseado no template correto
+        // ["CLIENTE","DT INÍCIO VIGÊNCIA","DT FIM VIGÊNCIA","MODALIDADE","ESPECIALIDADE","PRIORIDADE","CATEGORIA","PREÇO","VOL INICIAL","VOL FINAL","COND. VOLUME","CONSIDERA PLANTAO","TEM ADITIVO"]
         const clienteNome = String(row[0] || '').trim()
-        const modalidade = String(row[1] || '').trim() 
-        const especialidade = String(row[2] || '').trim()
-        const prioridade = String(row[3] || '').trim()
-        const categoria = String(row[4] || '').trim()
-        const precoStr = String(row[5] || '').trim()
-        const volInicial = row[6] ? parseInt(String(row[6])) || null : null
-        const volFinal = row[7] ? parseInt(String(row[7])) || null : null
-        const condVolume = row[8] ? parseInt(String(row[8])) || null : null
-        const consideraPlantao = String(row[9] || '').toLowerCase() === 'sim'
+        const dataInicio = String(row[1] || '').trim() // DT INÍCIO VIGÊNCIA
+        const dataFim = String(row[2] || '').trim() // DT FIM VIGÊNCIA  
+        const modalidade = String(row[3] || '').trim() 
+        const especialidade = String(row[4] || '').trim()
+        const prioridade = String(row[5] || '').trim()
+        const categoria = String(row[6] || '').trim()
+        const precoStr = String(row[7] || '').trim()
+        const volInicial = row[8] ? parseInt(String(row[8])) || null : null
+        const volFinal = row[9] ? parseInt(String(row[9])) || null : null
+        const condVolume = row[10] ? parseInt(String(row[10])) || null : null
+        const consideraPlantao = String(row[11] || '').toLowerCase() === 'sim'
 
         // Validar dados obrigatórios
         if (!clienteNome || clienteNome.length < 2) {
