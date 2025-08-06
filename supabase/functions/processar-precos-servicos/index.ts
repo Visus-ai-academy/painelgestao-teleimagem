@@ -144,20 +144,14 @@ serve(async (req) => {
           continue
         }
 
-        if (!modalidade) {
-          erros.push(`Linha ${i + 1}: Modalidade obrigatória inválida - "${modalidade}"`)
-          continue
-        }
+        // Aceitar modalidade vazia
+        const modalidadeFinal = modalidade || 'N/A'
 
-        if (!especialidade) {
-          erros.push(`Linha ${i + 1}: Especialidade obrigatória inválida - "${especialidade}"`)
-          continue
-        }
+        // Aceitar especialidade vazia  
+        const especialidadeFinal = especialidade || 'N/A'
 
-        if (!prioridade) {
-          erros.push(`Linha ${i + 1}: Prioridade obrigatória inválida - "${prioridade}"`)
-          continue
-        }
+        // Aceitar prioridade vazia
+        const prioridadeFinal = prioridade || 'N/A'
 
         // Aceitar preços vazios (serão tratados como 0)
 
@@ -187,10 +181,10 @@ serve(async (req) => {
         // Preparar registro para inserção
         registrosParaInserir.push({
           cliente_id: clienteId,
-          modalidade: modalidade,
-          especialidade: especialidade,
-          categoria: categoria || null, // Pode ficar vazio conforme especificação
-          prioridade: prioridade, // Já validado como obrigatório
+          modalidade: modalidadeFinal,
+          especialidade: especialidadeFinal,
+          categoria: categoria,
+          prioridade: prioridadeFinal,
           valor_base: preco,
           valor_urgencia: preco, // Por enquanto igual ao valor_base
           volume_inicial: volInicial,
