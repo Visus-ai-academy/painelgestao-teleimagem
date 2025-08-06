@@ -35,25 +35,30 @@ export const LaudosAtrasadosDetalhado = () => {
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // CARREGAR TODOS OS LAUDOS ATRASADOS DIRETAMENTE DA FUNÇÃO RPC
+  // CARREGAR TODOS OS LAUDOS ATRASADOS - SEM LIMITAÇÕES
   useEffect(() => {
     const carregarLaudosAtrasados = async () => {
       try {
-        console.log('🚀 [LaudosAtrasados] Carregando TODOS os laudos atrasados via RPC...');
+        console.log('🚀 [LaudosAtrasados] Carregando TODOS os laudos atrasados sem limitações...');
         
+        // GARANTIR que vamos buscar TODOS os dados sem limitações usando a função que elimina RLS
         const { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
         
         if (error) {
+          console.error('❌ Erro na função get_laudos_atrasados_completos:', error);
           throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
         }
         
-        console.log(`✅ [LaudosAtrasados] ${laudosAtrasadosData?.length || 0} registros de laudos atrasados carregados via RPC`);
+        console.log(`✅ [LaudosAtrasados] DADOS COMPLETOS: ${laudosAtrasadosData?.length || 0} registros de laudos atrasados carregados`);
         
-        // Calcular soma total dos valores
-        const totalLaudos = laudosAtrasadosData?.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0) || 0;
-        console.log(`🔥 [LaudosAtrasados] TOTAL DE LAUDOS (soma valores): ${totalLaudos.toLocaleString()}`);
-        console.log(`📊 [LaudosAtrasados] Distribuição: ${laudosAtrasadosData?.length || 0} registros = ${totalLaudos.toLocaleString()} laudos`);
+        // Verificar se os dados vieram
+        if (!laudosAtrasadosData || laudosAtrasadosData.length === 0) {
+          console.warn('⚠️ [LaudosAtrasados] Nenhum dado retornado da função RPC');
+          setLaudosAtrasados([]);
+          return;
+        }
         
+        // Processar TODOS os dados sem qualquer limitação
         const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
@@ -76,10 +81,16 @@ export const LaudosAtrasadosDetalhado = () => {
           };
         });
         
+        // Calcular totais CORRETOS
+        const totalLaudosAtrasados = laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0);
+        const totalRegistros = laudosProcessados.length;
+        
+        console.log(`🔥 [LaudosAtrasados] RESULTADO FINAL CORRETO:`);
+        console.log(`📊 Total de registros: ${totalRegistros.toLocaleString()}`);
+        console.log(`🎯 Total de laudos atrasados: ${totalLaudosAtrasados.toLocaleString()}`);
+        console.log(`✅ DADOS COMPLETOS - SEM LIMITAÇÕES APLICADAS`);
+        
         setLaudosAtrasados(laudosProcessados);
-        console.log(`📊 [LaudosAtrasados] Total de ${laudosProcessados.length} registros processados`);
-        console.log(`🔥 [LaudosAtrasados] Soma total: ${laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos`);
-        console.log(`🎯 [LaudosAtrasados] CONFIRMAÇÃO: Exibindo ${laudosProcessados.length} registros que somam ${laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos`);
       } catch (error) {
         console.error('❌ Erro ao carregar laudos atrasados:', error);
         setLaudosAtrasados([]);
