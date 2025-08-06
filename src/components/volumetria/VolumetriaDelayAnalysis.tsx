@@ -144,40 +144,42 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             tempoAtraso = isAtrasado ? (dataLaudoCompleta.getTime() - dataPrazoCompleta.getTime()) / (1000 * 60) : 0;
           }
 
-          // Processar especialidades - INCLUIR TODOS OS REGISTROS
+          const valores = Number(row.VALORES) || 1; // Usar quantidade de laudos
+
+          // Processar especialidades - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
           const esp = row.ESPECIALIDADE || 'Não Informado';
           if (!especialidadesMap.has(esp)) {
             especialidadesMap.set(esp, { total: 0, atrasados: 0, tempoTotal: 0 });
           }
           const espData = especialidadesMap.get(esp)!;
-          espData.total++;
+          espData.total += valores; // SOMAR VALORES
           if (isAtrasado) {
-            espData.atrasados++;
+            espData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
             espData.tempoTotal += tempoAtraso;
           }
 
-          // Processar categorias (usando modalidade) - INCLUIR TODOS OS REGISTROS
+          // Processar categorias (usando modalidade) - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
           const cat = row.MODALIDADE || 'Não Informado';
           if (!categoriasMap.has(cat)) {
             categoriasMap.set(cat, { total: 0, atrasados: 0, tempoTotal: 0 });
           }
           const catData = categoriasMap.get(cat)!;
-          catData.total++;
+          catData.total += valores; // SOMAR VALORES
           if (isAtrasado) {
-            catData.atrasados++;
+            catData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
             catData.tempoTotal += tempoAtraso;
           }
 
-          // Processar prioridades - INCLUIR TODOS OS REGISTROS
+          // Processar prioridades - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
           const prioridade = row.PRIORIDADE || 'Não Informado';
           
           if (!prioridadesMap.has(prioridade)) {
             prioridadesMap.set(prioridade, { total: 0, atrasados: 0, tempoTotal: 0 });
           }
           const prioData = prioridadesMap.get(prioridade)!;
-          prioData.total++;
+          prioData.total += valores; // SOMAR VALORES
           if (isAtrasado) {
-            prioData.atrasados++;
+            prioData.atrasados += valores; // SOMAR VALORES DOS ATRASADOS
             prioData.tempoTotal += tempoAtraso;
           }
         });
