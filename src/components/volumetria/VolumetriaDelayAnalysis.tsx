@@ -124,8 +124,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] Carregando dados DIRETAMENTE do banco para ${clienteName}...`);
       
-      // BUSCAR DADOS DIRETAMENTE DO BANCO EM VEZ DO CONTEXTO
-      const { data: clientData, error } = await supabase.rpc('get_volumetria_complete_data');
+      // BUSCAR LAUDOS ATRASADOS COMPLETOS - MESMA FONTE DO DEMONSTRATIVO DETALHADO
+      const { data: clientData, error } = await supabase.rpc('get_laudos_atrasados_completos');
       
       if (error) {
         throw new Error(`Erro ao carregar dados: ${error.message}`);
