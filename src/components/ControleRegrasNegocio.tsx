@@ -80,18 +80,6 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'exclusao'
     },
     {
-      id: 'v004',
-      nome: 'Exclusão de laudos após 07/07/2025',
-      modulo: 'volumetria',
-      categoria: 'exclusao',
-      criterio: 'Remove TODOS os registros com DATA_LAUDO > 07/07/2025 (regra fixa de corte).',
-      status: 'ativa',
-      implementadaEm: '2024-07-01',
-      observacoes: 'Aplicada em múltiplas edge functions',
-      ordem_execucao: 4,
-      tipo_regra: 'exclusao'
-    },
-    {
       id: 'v013',
       nome: 'Validação de Formato Excel',
       modulo: 'volumetria',
@@ -99,7 +87,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.',
       status: 'ativa',
       implementadaEm: '2024-01-20',
-      ordem_execucao: 5,
+      ordem_execucao: 4,
       tipo_regra: 'negocio'
     },
     {
