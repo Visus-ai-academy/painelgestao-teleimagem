@@ -68,28 +68,41 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        console.log('🚀 [DelayAnalysis] USANDO NOVA FUNÇÃO get_all_volumetria_data');
+        console.log('🚀 [DelayAnalysis] FAZENDO CHAMADA DIRETA SEM LIMITAÇÕES');
         
-        // USAR A NOVA FUNÇÃO QUE GARANTE TODOS OS DADOS
-        const { data: allData, error } = await supabase.rpc('get_all_volumetria_data');
+        // FAZER CHAMADA DIRETA À TABELA SEM USAR FUNÇÕES RPC
+        const { data: allData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .range(0, 50000); // FORÇAR LIMITE ALTO
         
         if (error) {
-          console.error('❌ ERRO na função get_all_volumetria_data:', error);
+          console.error('❌ ERRO no select direto:', error);
           setLoading(false);
           return;
         }
         
         if (!allData || allData.length === 0) {
-          console.error('❌ Função get_all_volumetria_data retornou dados vazios');
+          console.error('❌ Select direto retornou dados vazios');
           setLoading(false);
           return;
         }
         
-        console.log(`🎯 [DelayAnalysis] NOVA FUNÇÃO: ${allData.length} registros`);
+        console.log(`🎯 [DelayAnalysis] SELECT DIRETO: ${allData.length} registros`);
         
         // VALIDAÇÃO: DEVE TER TODOS OS 35.337 REGISTROS
         if (allData.length < 35000) {
           console.error(`❌ CRÍTICO: Esperava ~35.337 registros, obteve apenas ${allData.length}`);
+          // Fazer nova tentativa sem range
+          const { data: allDataNoLimit, error: errorNoLimit } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*');
+          
+          if (!errorNoLimit && allDataNoLimit && allDataNoLimit.length > allData.length) {
+            console.log(`✅ SEM RANGE: ${allDataNoLimit.length} registros obtidos`);
+            allData.length = 0;
+            allData.push(...allDataNoLimit);
+          }
         } else {
           console.log(`✅ PERFEITO: ${allData.length} registros obtidos - dados completos!`);
         }
@@ -296,18 +309,24 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // USAR A NOVA FUNÇÃO get_all_volumetria_data
-      console.log(`🚀 [DelayAnalysis] Usando get_all_volumetria_data para ${clienteName}...`);
+      // FAZER SELECT DIRETO NA TABELA
+      console.log(`🚀 [DelayAnalysis] Fazendo select direto para ${clienteName}...`);
       
-      const response = await supabase.rpc('get_all_volumetria_data');
+      const { data: allData, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .range(0, 50000);
       
-      if (response.error) {
-        console.error(`❌ [DelayAnalysis] Erro na get_all_volumetria_data:`, response.error);
-        throw response.error;
+      if (error) {
+        console.error(`❌ [DelayAnalysis] Erro no select direto:`, error);
+        throw error;
       }
       
-      const allData = response.data || [];
-      console.log(`✅ [DelayAnalysis] get_all_volumetria_data: ${allData.length} registros totais`);
+      if (!allData || allData.length === 0) {
+        throw new Error('Select direto não retornou dados');
+      }
+      
+      console.log(`✅ [DelayAnalysis] Select direto: ${allData.length} registros totais`);
       
       if (!allData || allData.length === 0) {
         throw new Error('Nenhum dado retornado da função unlimited_force');
