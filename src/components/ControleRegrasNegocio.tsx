@@ -40,7 +40,7 @@ export function ControleRegrasNegocio() {
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
-  // Regras de negócio estáticas organizadas por ordem de execução
+  // Regras de negócio implementadas nas edge functions e banco
   const regrasNegocio: Regra[] = [
     // VOLUMETRIA - Ordem de execução
     {
@@ -51,9 +51,45 @@ export function ControleRegrasNegocio() {
       criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      observacoes: 'Configurável via tabela configuracao_protecao',
+      observacoes: 'Implementado via RLS policies can_edit_data(), can_insert_data()',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
+    },
+    {
+      id: 'v002',
+      nome: 'Exclusão por DATA_LAUDO fora do período',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Remove registros com DATA_LAUDO fora do período de faturamento (dia 8 do mês até dia 7 do mês seguinte).',
+      status: 'ativa',
+      implementadaEm: '2024-07-01',
+      observacoes: 'Edge function: aplicar-filtro-data-laudo',
+      ordem_execucao: 2,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'v003',
+      nome: 'Exclusão por DATA_REALIZACAO >= período',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Remove registros retroativos com DATA_REALIZACAO >= 01 do mês especificado.',
+      status: 'ativa',
+      implementadaEm: '2024-07-01',
+      observacoes: 'Edge function: aplicar-exclusoes-periodo',
+      ordem_execucao: 3,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'v004',
+      nome: 'Exclusão de laudos após 07/07/2025',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Remove TODOS os registros com DATA_LAUDO > 07/07/2025 (regra fixa de corte).',
+      status: 'ativa',
+      implementadaEm: '2024-07-01',
+      observacoes: 'Aplicada em múltiplas edge functions',
+      ordem_execucao: 4,
+      tipo_regra: 'exclusao'
     },
     {
       id: 'v013',
@@ -63,7 +99,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.',
       status: 'ativa',
       implementadaEm: '2024-01-20',
-      ordem_execucao: 2,
+      ordem_execucao: 5,
       tipo_regra: 'negocio'
     },
     {
@@ -74,7 +110,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.',
       status: 'ativa',
       implementadaEm: '2024-01-22',
-      ordem_execucao: 3,
+      ordem_execucao: 6,
       tipo_regra: 'negocio'
     },
     {
@@ -85,7 +121,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).',
       status: 'ativa',
       implementadaEm: '2024-01-26',
-      ordem_execucao: 4,
+      ordem_execucao: 7,
       tipo_regra: 'negocio'
     },
     {
@@ -96,7 +132,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
       status: 'ativa',
       implementadaEm: '2024-01-18',
-      ordem_execucao: 5,
+      ordem_execucao: 8,
       tipo_regra: 'negocio'
     },
     {
@@ -107,7 +143,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
       status: 'ativa',
       implementadaEm: '2024-01-28',
-      ordem_execucao: 6,
+      ordem_execucao: 9,
       tipo_regra: 'negocio'
     },
     {
@@ -118,7 +154,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      ordem_execucao: 7,
+      ordem_execucao: 10,
       tipo_regra: 'negocio'
     },
     {
@@ -129,7 +165,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
       status: 'ativa',
       implementadaEm: '2024-01-12',
-      ordem_execucao: 8,
+      ordem_execucao: 11,
       tipo_regra: 'negocio'
     },
 
