@@ -3726,11 +3726,7 @@ export type Database = {
       }
       validate_security_configuration: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          check_name: string
-          status: string
-          details: string
-        }[]
+        Returns: Json
       }
     }
     Enums: {
