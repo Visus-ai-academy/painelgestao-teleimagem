@@ -3151,6 +3151,14 @@ export type Database = {
       }
     }
     Views: {
+      mv_dashboard_summary: {
+        Row: {
+          metric: string | null
+          updated_at: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
       mv_volumetria_dashboard: {
         Row: {
           data_referencia: string | null
@@ -3222,6 +3230,10 @@ export type Database = {
       can_view_data: {
         Args: { data_referencia: string }
         Returns: boolean
+      }
+      cleanup_old_audit_logs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_old_performance_logs: {
         Args: Record<PropertyKey, never>
@@ -3334,6 +3346,20 @@ export type Database = {
       get_nome_cliente_mapeado: {
         Args: { nome_arquivo: string }
         Returns: string
+      }
+      get_paginated_data: {
+        Args: {
+          table_name: string
+          page_number?: number
+          page_size?: number
+          order_by?: string
+          filter_conditions?: string
+        }
+        Returns: {
+          data: Json
+          total_count: number
+          page_info: Json
+        }[]
       }
       get_periodo_faturamento: {
         Args: { data_referencia: string }
@@ -3609,6 +3635,10 @@ export type Database = {
       promote_user_to_admin: {
         Args: { user_email: string }
         Returns: boolean
+      }
+      refresh_dashboard_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       refresh_volumetria_dashboard: {
         Args: Record<PropertyKey, never>
