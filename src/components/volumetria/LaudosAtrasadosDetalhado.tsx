@@ -39,7 +39,7 @@ export const LaudosAtrasadosDetalhado = () => {
   useEffect(() => {
     const carregarLaudosAtrasados = async () => {
       try {
-        console.log('🚀 Carregando TODOS os laudos atrasados via RPC...');
+        console.log('🚀 [LaudosAtrasados] Carregando TODOS os laudos atrasados via RPC...');
         
         const { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
         
@@ -47,7 +47,12 @@ export const LaudosAtrasadosDetalhado = () => {
           throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
         }
         
-        console.log(`✅ ${laudosAtrasadosData.length} laudos atrasados carregados diretamente via RPC`);
+        console.log(`✅ [LaudosAtrasados] ${laudosAtrasadosData?.length || 0} registros de laudos atrasados carregados via RPC`);
+        
+        // Calcular soma total dos valores
+        const totalLaudos = laudosAtrasadosData?.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0) || 0;
+        console.log(`🔥 [LaudosAtrasados] TOTAL DE LAUDOS (soma valores): ${totalLaudos.toLocaleString()}`);
+        console.log(`📊 [LaudosAtrasados] Distribuição: ${laudosAtrasadosData?.length || 0} registros = ${totalLaudos.toLocaleString()} laudos`);
         
         const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);

@@ -447,8 +447,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           <CardTitle className="text-lg">Lista Clientes - Maior quant. ou % de Atrasos</CardTitle>
         </CardHeader>
         
-        {/* Container fixo com altura definida e scroll interno */}
-        <div className="h-96 flex flex-col">
+        {/* Container SEM limitação de altura */}
+        <div className="flex flex-col">
           {/* Cabeçalho fixo da tabela */}
           <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm overflow-x-auto">
             <Table className="w-full">
