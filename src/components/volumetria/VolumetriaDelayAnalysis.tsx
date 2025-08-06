@@ -68,46 +68,30 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        console.log('🚀 [DelayAnalysis] ACESSANDO FUNÇÃO UNLIMITED_FORCE - Meta: 10.433 laudos atrasados');
+        console.log('🚀 [DelayAnalysis] USANDO NOVA FUNÇÃO get_all_volumetria_data');
         
-        // USAR APENAS A FUNÇÃO DEFINITIVA QUE FUNCIONA
-        const { data: allData, error } = await supabase.rpc('get_volumetria_unlimited_force');
+        // USAR A NOVA FUNÇÃO QUE GARANTE TODOS OS DADOS
+        const { data: allData, error } = await supabase.rpc('get_all_volumetria_data');
         
         if (error) {
-          console.error('❌ ERRO na função unlimited_force:', error);
+          console.error('❌ ERRO na função get_all_volumetria_data:', error);
           setLoading(false);
           return;
         }
         
         if (!allData || allData.length === 0) {
-          console.error('❌ Função unlimited_force retornou dados vazios');
+          console.error('❌ Função get_all_volumetria_data retornou dados vazios');
           setLoading(false);
           return;
         }
         
-        console.log(`🎯 [DelayAnalysis] FUNÇÃO UNLIMITED_FORCE: ${allData.length} registros`);
+        console.log(`🎯 [DelayAnalysis] NOVA FUNÇÃO: ${allData.length} registros`);
         
-        // SE AINDA RETORNOU DADOS LIMITADOS, USAR ACESSO DIRETO À TABELA
+        // VALIDAÇÃO: DEVE TER TODOS OS 35.337 REGISTROS
         if (allData.length < 35000) {
-          console.warn(`⚠️ Unlimited_force retornou apenas ${allData.length}, tentando acesso direto à tabela...`);
-          
-          // ACESSO DIRETO SEM FUNÇÕES - ÚLTIMA TENTATIVA
-          const { data: directData, error: directError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*');
-            
-          if (directError) {
-            console.error('❌ Acesso direto falhou:', directError);
-            setLoading(false);
-            return;
-          }
-          
-          if (directData && directData.length > allData.length) {
-            console.log(`✅ ACESSO DIRETO: ${directData.length} registros (melhor que unlimited_force)`);
-            // Usar dados diretos
-            allData.length = 0;
-            allData.push(...directData);
-          }
+          console.error(`❌ CRÍTICO: Esperava ~35.337 registros, obteve apenas ${allData.length}`);
+        } else {
+          console.log(`✅ PERFEITO: ${allData.length} registros obtidos - dados completos!`);
         }
         
         const totalLaudosRaw = allData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
@@ -312,18 +296,18 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // USAR APENAS A FUNÇÃO UNLIMITED_FORCE - SEM FALLBACKS QUE LIMITAM
-      console.log(`🚀 [DelayAnalysis] Usando APENAS get_volumetria_unlimited_force...`);
+      // USAR A NOVA FUNÇÃO get_all_volumetria_data
+      console.log(`🚀 [DelayAnalysis] Usando get_all_volumetria_data para ${clienteName}...`);
       
-      const response = await supabase.rpc('get_volumetria_unlimited_force');
+      const response = await supabase.rpc('get_all_volumetria_data');
       
       if (response.error) {
-        console.error(`❌ [DelayAnalysis] Erro na unlimited_force:`, response.error);
+        console.error(`❌ [DelayAnalysis] Erro na get_all_volumetria_data:`, response.error);
         throw response.error;
       }
       
       const allData = response.data || [];
-      console.log(`✅ [DelayAnalysis] UNLIMITED_FORCE: ${allData.length} registros totais`);
+      console.log(`✅ [DelayAnalysis] get_all_volumetria_data: ${allData.length} registros totais`);
       
       if (!allData || allData.length === 0) {
         throw new Error('Nenhum dado retornado da função unlimited_force');

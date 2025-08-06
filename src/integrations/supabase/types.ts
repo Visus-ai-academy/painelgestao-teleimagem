@@ -3227,6 +3227,25 @@ export type Database = {
         Args: { p_ativacao_id: string; p_observacoes?: string }
         Returns: Json
       }
+      get_all_volumetria_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          MEDICO: string
+          PRIORIDADE: string
+          CATEGORIA: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
+        }[]
+      }
       get_clientes_com_volumetria: {
         Args: Record<PropertyKey, never>
         Returns: {
