@@ -3524,6 +3524,10 @@ export type Database = {
           arquivos_processados: string[]
         }[]
       }
+      limpar_todos_precos: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       listar_coberturas_disponiveis: {
         Args: { p_medico_id: string }
         Returns: {
