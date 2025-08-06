@@ -117,19 +117,29 @@ serve(async (req) => {
         const condVolume = row[10] ? parseInt(String(row[10])) || null : null
         const consideraPlantao = String(row[11] || '').toLowerCase() === 'sim'
 
-        // Validar dados obrigatórios
+        // Validar campos obrigatórios (não podem estar vazios)
         if (!clienteNome || clienteNome.length < 2) {
-          erros.push(`Linha ${i + 1}: Cliente inválido - "${clienteNome}"`)
+          erros.push(`Linha ${i + 1}: Cliente obrigatório inválido - "${clienteNome}"`)
           continue
         }
 
         if (!modalidade) {
-          erros.push(`Linha ${i + 1}: Modalidade inválida - "${modalidade}"`)
+          erros.push(`Linha ${i + 1}: Modalidade obrigatória inválida - "${modalidade}"`)
           continue
         }
 
         if (!especialidade) {
-          erros.push(`Linha ${i + 1}: Especialidade inválida - "${especialidade}"`)
+          erros.push(`Linha ${i + 1}: Especialidade obrigatória inválida - "${especialidade}"`)
+          continue
+        }
+
+        if (!prioridade) {
+          erros.push(`Linha ${i + 1}: Prioridade obrigatória inválida - "${prioridade}"`)
+          continue
+        }
+
+        if (!precoStr) {
+          erros.push(`Linha ${i + 1}: Preço obrigatório não informado`)
           continue
         }
 
@@ -161,8 +171,8 @@ serve(async (req) => {
           cliente_id: clienteId,
           modalidade: modalidade,
           especialidade: especialidade,
-          categoria: categoria || 'Normal',
-          prioridade: prioridade || 'Rotina',
+          categoria: categoria || null, // Pode ficar vazio conforme especificação
+          prioridade: prioridade, // Já validado como obrigatório
           valor_base: preco,
           valor_urgencia: preco, // Por enquanto igual ao valor_base
           volume_inicial: volInicial,
