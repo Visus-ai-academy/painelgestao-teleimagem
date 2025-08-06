@@ -108,7 +108,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   const [clientDetails, setClientDetails] = useState<Map<string, ClienteDetalhe>>(new Map());
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
 
-  // Função para buscar detalhes de um cliente específico USANDO CONTEXTO
+  // Função para buscar detalhes de um cliente específico DIRETAMENTE DO BANCO
   const fetchClientDetails = async (clienteName: string) => {
     // FORÇAR LIMPEZA DO CACHE PARA RECALCULAR COM OS NOVOS DADOS
     setClientDetails(prev => {
@@ -122,13 +122,22 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     setLoadingDetails(prev => new Set(prev).add(clienteName));
     
     try {
-      // USAR DADOS DO CONTEXTO EM VEZ DE CONSULTA DIRETA
-      const clientData = volumetriaData.detailedData.filter(item => item.EMPRESA === clienteName);
+      console.log(`🎯 [DelayAnalysis] Carregando dados DIRETAMENTE do banco para ${clienteName}...`);
       
-      console.log(`🎯 [DelayAnalysis] Processando ${clientData.length} registros para cliente ${clienteName}`);
-      console.log(`🔥 [DelayAnalysis] Primeiros 3 registros para debug:`, clientData.slice(0, 3));
+      // BUSCAR DADOS DIRETAMENTE DO BANCO EM VEZ DO CONTEXTO
+      const { data: clientData, error } = await supabase.rpc('get_volumetria_complete_data');
+      
+      if (error) {
+        throw new Error(`Erro ao carregar dados: ${error.message}`);
+      }
+      
+      // Filtrar apenas o cliente específico
+      const filteredData = clientData?.filter((item: any) => item.EMPRESA === clienteName) || [];
+      
+      console.log(`🎯 [DelayAnalysis] ${filteredData.length} registros carregados para ${clienteName}`);
+      console.log(`🔥 [DelayAnalysis] Primeiros 3 registros para debug:`, filteredData.slice(0, 3));
 
-      if (clientData && clientData.length > 0) {
+      if (filteredData && filteredData.length > 0) {
         // Processar especialidades
         const especialidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
         
@@ -138,7 +147,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         // Processar prioridades (vamos usar uma lógica baseada no tempo de atraso)
         const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
 
-        clientData.forEach(row => {
+        filteredData.forEach(row => {
           // Calcular atraso apenas se houver dados válidos
           let isAtrasado = false;
           let tempoAtraso = 0;
