@@ -30,19 +30,64 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
 
     if (countError) {
+      console.error('❌ Erro ao contar registros:', countError)
       throw new Error(`Erro ao contar registros: ${countError.message}`)
     }
 
     console.log(`📊 Total de registros antes da limpeza: ${totalAntes}`)
 
-    // 2. Deletar TODOS os registros
-    const { error: deleteError } = await supabaseClient
-      .from('precos_servicos')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Condição que sempre será verdadeira
+    if (!totalAntes || totalAntes === 0) {
+      console.log('✅ Banco já está limpo')
+      return new Response(
+        JSON.stringify({
+          success: true,
+          registros_antes: 0,
+          registros_depois: 0,
+          total_removido: 0,
+          mensagem: 'Banco já estava limpo'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
+    }
 
-    if (deleteError) {
-      throw new Error(`Erro ao deletar registros: ${deleteError.message}`)
+    // 2. Deletar TODOS os registros em lotes para evitar timeout
+    console.log('🗑️ Iniciando deleção em lotes...')
+    let totalRemovido = 0
+    const BATCH_SIZE = 1000
+
+    // Continuar deletando até não haver mais registros
+    while (true) {
+      const { data: registrosParaRemover, error: selectError } = await supabaseClient
+        .from('precos_servicos')
+        .select('id')
+        .limit(BATCH_SIZE)
+
+      if (selectError) {
+        console.error('❌ Erro ao buscar registros:', selectError)
+        break
+      }
+
+      if (!registrosParaRemover || registrosParaRemover.length === 0) {
+        console.log('✅ Não há mais registros para remover')
+        break
+      }
+
+      const ids = registrosParaRemover.map(r => r.id)
+      const { error: deleteError, count } = await supabaseClient
+        .from('precos_servicos')
+        .delete({ count: 'exact' })
+        .in('id', ids)
+
+      if (deleteError) {
+        console.error('❌ Erro ao deletar lote:', deleteError)
+        throw new Error(`Erro ao deletar lote: ${deleteError.message}`)
+      }
+
+      totalRemovido += count || ids.length
+      console.log(`✅ Lote removido: ${count || ids.length} registros (Total: ${totalRemovido})`)
     }
 
     // 3. Contar registros após limpeza (deve ser 0)
@@ -56,16 +101,16 @@ serve(async (req) => {
 
     console.log(`🎉 Limpeza completa concluída!`)
     console.log(`📊 Registros antes: ${totalAntes}`)
-    console.log(`📊 Registros depois: ${totalDepois}`)
-    console.log(`🗑️ Total removido: ${totalAntes}`)
+    console.log(`📊 Registros depois: ${totalDepois || 0}`)
+    console.log(`🗑️ Total removido: ${totalRemovido}`)
 
     return new Response(
       JSON.stringify({
         success: true,
         registros_antes: totalAntes,
         registros_depois: totalDepois || 0,
-        total_removido: totalAntes,
-        mensagem: `Limpeza completa concluída: todos os ${totalAntes} registros foram removidos`
+        total_removido: totalRemovido,
+        mensagem: `Limpeza completa concluída: ${totalRemovido} registros foram removidos`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
