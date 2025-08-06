@@ -1,7 +1,7 @@
 project_id = "atbvikgxdcohnznkmaus"
 
-# Secure functions - JWT verification enabled by default
-# Only disable JWT for truly public endpoints that validate their own authentication
+# 🔒 SECURITY ENHANCED - All functions secured with JWT verification
+# Critical security fix: No public endpoints without explicit validation
 
 [functions.processar-exames]
 verify_jwt = true
@@ -63,12 +63,12 @@ verify_jwt = true
 [functions.processar-volumetria-otimizado]
 verify_jwt = true
 
-# Public endpoints (use with extreme caution)
+# SECURED: Previously public endpoints now require JWT
 [functions.webhook-clicksign]
-verify_jwt = false  # External webhook needs to validate signature
+verify_jwt = true  # SECURITY FIX: Now requires authentication
 
 [functions.ativar-regua-cobranca]
-verify_jwt = false  # Legacy - should be secured in future update
+verify_jwt = true  # SECURITY FIX: No longer public
 
 [functions.aplicar-exclusoes-periodo]
-verify_jwt = false
+verify_jwt = true  # SECURITY FIX: No longer public
