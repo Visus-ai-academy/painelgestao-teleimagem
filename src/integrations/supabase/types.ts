@@ -3282,6 +3282,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      encerrar_uploads_travados: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enhanced_security_audit: {
         Args: Record<PropertyKey, never>
         Returns: Json
