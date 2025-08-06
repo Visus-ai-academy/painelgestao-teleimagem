@@ -3323,6 +3323,25 @@ export type Database = {
           ESTUDO_DESCRICAO: string
         }[]
       }
+      get_volumetria_cursor_complete: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          MEDICO: string
+          PRIORIDADE: string
+          CATEGORIA: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
+        }[]
+      }
       get_volumetria_dashboard_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3341,6 +3360,25 @@ export type Database = {
           especialidades_unicas: string[]
           prioridades_unicas: string[]
           medicos_unicos: string[]
+        }[]
+      }
+      get_volumetria_force_complete: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          EMPRESA: string
+          MODALIDADE: string
+          ESPECIALIDADE: string
+          MEDICO: string
+          PRIORIDADE: string
+          CATEGORIA: string
+          VALORES: number
+          DATA_LAUDO: string
+          HORA_LAUDO: string
+          DATA_PRAZO: string
+          HORA_PRAZO: string
+          data_referencia: string
+          NOME_PACIENTE: string
+          ESTUDO_DESCRICAO: string
         }[]
       }
       get_volumetria_stats: {
