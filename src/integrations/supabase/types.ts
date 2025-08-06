@@ -3510,11 +3510,11 @@ export type Database = {
         Returns: string
       }
       is_admin: {
-        Args: { _user_id?: string }
+        Args: Record<PropertyKey, never> | { _user_id?: string }
         Returns: boolean
       }
       is_manager_or_admin: {
-        Args: { _user_id?: string }
+        Args: Record<PropertyKey, never> | { _user_id?: string }
         Returns: boolean
       }
       limpar_dados_volumetria: {
