@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ export default function TempLimparTodosPrecos() {
   const { toast } = useToast();
 
   const handleLimpezaCompleta = async () => {
-    if (!confirm("⚠️ ATENÇÃO: Esta ação irá remover TODOS os 37,298 registros de preços da base de dados. Esta operação é IRREVERSÍVEL. Deseja continuar?")) {
+    if (!confirm("⚠️ ATENÇÃO: Esta ação irá remover TODOS os registros de preços da base de dados. Esta operação é IRREVERSÍVEL. Deseja continuar?")) {
       return;
     }
 

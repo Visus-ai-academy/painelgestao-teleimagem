@@ -15,6 +15,7 @@ import { CompactUploadStatus } from '@/components/CompactUploadStatus';
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
+import TempLimparTodosPrecos from '@/temp-limpar-todos-precos';
 
 import { 
   useCadastroExames, 
@@ -474,7 +475,7 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-11">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-12">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
           <TabsTrigger value="de-para">Exames Fora Padrão</TabsTrigger>
@@ -594,6 +595,9 @@ export default function GerenciarCadastros() {
         {/* Preços de Serviços */}
         <TabsContent value="precos">
           <div className="space-y-6">
+            {/* Limpeza Completa dos Preços */}
+            <TempLimparTodosPrecos />
+
             {/* Upload Preço Clientes */}
             <Card>
               <CardHeader>
