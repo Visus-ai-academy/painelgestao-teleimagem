@@ -3578,6 +3578,10 @@ export type Database = {
         }
         Returns: Json
       }
+      sincronizar_precos_servicos_contratos: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       update_custom_metrics: {
         Args: Record<PropertyKey, never>
         Returns: number

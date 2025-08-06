@@ -207,13 +207,17 @@ serve(async (req) => {
       }
     }
 
-    // 6. Atualizar contratos
+    // 6. Sincronizar preços com contratos
     try {
+      console.log('🔄 Sincronizando preços com contratos...')
+      await supabaseClient.rpc('sincronizar_precos_servicos_contratos')
+      console.log('✅ Preços sincronizados com contratos')
+      
       console.log('🔄 Atualizando status dos contratos...')
       await supabaseClient.rpc('atualizar_status_configuracao_contrato')
-      console.log('✅ Contratos atualizados')
+      console.log('✅ Status dos contratos atualizados')
     } catch (error) {
-      console.error('❌ Erro ao atualizar contratos:', error.message)
+      console.error('❌ Erro ao sincronizar preços com contratos:', error.message)
     }
 
     // 7. Finalizar log

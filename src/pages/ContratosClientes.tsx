@@ -273,6 +273,45 @@ export default function ContratosClientes() {
     carregarContratos();
   }, []);
 
+  // Função para sincronizar preços com contratos
+  const sincronizarPrecos = async () => {
+    if (!confirm('Deseja sincronizar os preços de serviços com os contratos? Esta ação atualizará os serviços contratados de todos os contratos.')) {
+      return;
+    }
+
+    setIsCreatingContracts(true);
+    
+    try {
+      console.log('🔄 Iniciando sincronização de preços...');
+      
+      const { data, error } = await supabase.rpc('sincronizar_precos_servicos_contratos');
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('✅ Sincronização concluída:', data);
+      
+      toast({
+        title: "Sincronização Concluída",
+        description: `${(data as any).contratos_atualizados} contratos foram atualizados com os preços de serviços.`,
+      });
+      
+      // Recarregar dados
+      await carregarContratos();
+      
+    } catch (error: any) {
+      console.error('❌ Erro na sincronização:', error);
+      toast({
+        title: "Erro na Sincronização",
+        description: error.message || 'Erro desconhecido',
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingContracts(false);
+    }
+  };
+
   const criarContratosAutomatico = async () => {
     try {
       setIsCreatingContracts(true);
@@ -540,6 +579,22 @@ export default function ContratosClientes() {
               </>
             ) : (
               'Criar Contratos Automático para Clientes sem Contrato'
+            )}
+          </Button>
+          
+          <Button 
+            onClick={sincronizarPrecos}
+            disabled={isCreatingContracts}
+            variant="outline"
+            className="w-full mt-2"
+          >
+            {isCreatingContracts ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                Sincronizando...
+              </>
+            ) : (
+              'Sincronizar Preços com Contratos'
             )}
           </Button>
         </CardContent>
