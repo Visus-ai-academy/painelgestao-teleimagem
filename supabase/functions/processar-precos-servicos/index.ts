@@ -41,6 +41,19 @@ serve(async (req) => {
       .eq('status', 'processing')
       .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Mais de 5 minutos
 
+    // 1.1. Limpar tabela de preços antes do novo upload
+    console.log('🧹 Limpando tabela de preços existente...')
+    const { error: deleteError } = await supabaseClient
+      .from('precos_servicos')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all records
+    
+    if (deleteError) {
+      console.error('❌ Erro ao limpar tabela:', deleteError)
+    } else {
+      console.log('✅ Tabela precos_servicos limpa')
+    }
+
     // 2. Criar log de processamento
     const { data: logEntry, error: logError } = await supabaseClient
       .from('upload_logs')
