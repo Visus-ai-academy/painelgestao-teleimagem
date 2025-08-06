@@ -450,8 +450,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
         {/* Container SEM limitação de altura */}
         <div className="flex flex-col">
           {/* Cabeçalho fixo da tabela */}
-          <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm overflow-x-auto">
-            <Table className="w-full">
+          <div className="bg-white border-b-2 border-gray-300 sticky top-0 z-30 shadow-sm">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
                   <TableHead 
@@ -509,7 +509,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
           {/* Corpo da tabela com scroll */}
           <div className="flex-1 overflow-y-auto">
-            <Table className="w-full">
+            <Table className="w-full table-fixed">
               <TableBody>
                 {clientesComTempoAtraso.map((cliente, index) => {
                   const category = categorizeDelay(cliente.percentual_atraso);
