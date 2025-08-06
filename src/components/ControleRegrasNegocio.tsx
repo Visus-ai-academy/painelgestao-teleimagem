@@ -1,517 +1,556 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings, AlertTriangle, CheckCircle, Clock, Users } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Settings, AlertTriangle, CheckCircle, Clock, Users, ChevronDown, ChevronRight, Trash2, Calculator, FileText, DollarSign, ClipboardList, BarChart3, Stethoscope } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Regra {
   id: string;
   nome: string;
-  modulo: 'volumetria' | 'faturamento' | 'clientes' | 'medicos' | 'escalas' | 'sistema' | 'seguranca';
-  categoria: 'temporal' | 'dados' | 'validacao' | 'calculo' | 'acesso' | 'integracao' | 'automacao';
+  modulo: 'volumetria' | 'faturamento' | 'clientes' | 'precos' | 'repasses' | 'exames' | 'medicos' | 'escalas' | 'sistema' | 'seguranca';
+  categoria: 'temporal' | 'dados' | 'validacao' | 'calculo' | 'acesso' | 'integracao' | 'automacao' | 'exclusao';
   criterio: string;
   status: 'ativa' | 'inativa' | 'pendente';
   implementadaEm: string;
   observacoes?: string;
+  ordem_execucao: number;
+  tipo_regra: 'exclusao' | 'negocio';
 }
 
-const regrasImplementadas: Regra[] = [
-  // VOLUMETRIA
-  {
-    id: 'v001',
-    nome: 'Proteção Temporal de Dados',
-    modulo: 'volumetria',
-    categoria: 'temporal',
-    criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros.',
-    status: 'ativa',
-    implementadaEm: '2024-01-15',
-    observacoes: 'Configurável via tabela configuracao_protecao'
-  },
-  {
-    id: 'v002',
-    nome: 'Validação de Atraso de Laudos',
-    modulo: 'volumetria',
-    categoria: 'validacao',
-    criterio: 'Identifica exames com atraso quando DATA_LAUDO > DATA_PRAZO. Calcula percentual de atraso.',
-    status: 'ativa',
-    implementadaEm: '2024-01-10'
-  },
-  {
-    id: 'v003',
-    nome: 'Filtro por Período',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Permite filtrar dados por períodos pré-definidos (Hoje, Ontem, Última Semana, etc.) ou período customizado.',
-    status: 'ativa',
-    implementadaEm: '2024-01-08'
-  },
-  {
-    id: 'v004',
-    nome: 'Segmentação por Cliente',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Filtra dados por cliente específico ou exibe todos. Lista clientes únicos disponíveis.',
-    status: 'ativa',
-    implementadaEm: '2024-01-05'
-  },
-  {
-    id: 'v005',
-    nome: 'Agregação por Modalidade',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Agrupa exames por modalidade, calcula totais e percentuais para análise comparativa.',
-    status: 'ativa',
-    implementadaEm: '2024-01-03'
-  },
-  {
-    id: 'v006',
-    nome: 'Agregação por Especialidade',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Agrupa exames por especialidade médica, calcula estatísticas de volume.',
-    status: 'ativa',
-    implementadaEm: '2024-01-03'
-  },
-  {
-    id: 'v007',
-    nome: 'Comparação entre Arquivos',
-    modulo: 'volumetria',
-    categoria: 'validacao',
-    criterio: 'Identifica clientes presentes em um arquivo mas ausentes em outro para validação de consistência.',
-    status: 'ativa',
-    implementadaEm: '2024-01-20'
-  },
-  {
-    id: 'v008',
-    nome: 'Cache de Performance',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
-    status: 'ativa',
-    implementadaEm: '2024-01-12'
-  },
-  {
-    id: 'v009',
-    nome: 'Tratamento de Arquivo 1 - Data de Exame',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Processa dados do primeiro arquivo de upload, extrai DATA_REALIZACAO e converte para formato padrão.',
-    status: 'ativa',
-    implementadaEm: '2024-01-25'
-  },
-  {
-    id: 'v010',
-    nome: 'Tratamento de Arquivo 2 - Data de Laudo',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Processa dados do segundo arquivo de upload, extrai DATA_LAUDO e DATA_PRAZO para análise de prazo.',
-    status: 'ativa',
-    implementadaEm: '2024-01-25'
-  },
-  {
-    id: 'v011',
-    nome: 'Tratamento de Arquivo 3 - Valores e Prioridades',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Processa dados do terceiro arquivo, extrai VALORES e PRIORIDADE para cálculos financeiros.',
-    status: 'ativa',
-    implementadaEm: '2024-01-25'
-  },
-  {
-    id: 'v012',
-    nome: 'Tratamento de Arquivo 4 - Dados Complementares',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Processa dados do quarto arquivo, extrai informações complementares como MEDICO, ESPECIALIDADE e STATUS.',
-    status: 'ativa',
-    implementadaEm: '2024-01-25'
-  },
-  {
-    id: 'v013',
-    nome: 'Validação de Formato Excel',
-    modulo: 'volumetria',
-    categoria: 'validacao',
-    criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.',
-    status: 'ativa',
-    implementadaEm: '2024-01-20'
-  },
-  {
-    id: 'v014',
-    nome: 'Mapeamento Dinâmico de Campos',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
-    status: 'ativa',
-    implementadaEm: '2024-01-18'
-  },
-  {
-    id: 'v015',
-    nome: 'Limpeza de Dados Duplicados',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.',
-    status: 'ativa',
-    implementadaEm: '2024-01-22'
-  },
-  {
-    id: 'v016',
-    nome: 'Processamento em Lotes',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance e evitar timeouts.',
-    status: 'ativa',
-    implementadaEm: '2024-01-15'
-  },
-  {
-    id: 'v017',
-    nome: 'Log de Upload e Auditoria',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Registra todos os uploads na tabela upload_logs com status, erros e estatísticas de processamento.',
-    status: 'ativa',
-    implementadaEm: '2024-01-10'
-  },
-  {
-    id: 'v018',
-    nome: 'Transformação de Valores Numéricos',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Converte colunas de valores para formato numérico, remove caracteres não numéricos e ajusta casas decimais.',
-    status: 'ativa',
-    implementadaEm: '2024-01-28'
-  },
-  {
-    id: 'v019',
-    nome: 'Remoção de Decimais Desnecessários',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Remove ".00" de valores monetários quando não há centavos, mantendo apenas valores inteiros limpos.',
-    status: 'ativa',
-    implementadaEm: '2024-01-28'
-  },
-  {
-    id: 'v020',
-    nome: 'Formatação Padrão CNPJ Brasil',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Aplica máscara padrão brasileira XX.XXX.XXX/XXXX-XX em colunas de CNPJ, validando formato e dígitos.',
-    status: 'ativa',
-    implementadaEm: '2024-01-28'
-  },
-  {
-    id: 'v021',
-    nome: 'Padronização de Formato de Data',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Converte todas as datas para formato padrão DD/MM/YYYY, detectando automaticamente formatos de entrada.',
-    status: 'ativa',
-    implementadaEm: '2024-01-28'
-  },
-  {
-    id: 'v022',
-    nome: 'Validação e Limpeza de Caracteres Especiais',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).',
-    status: 'ativa',
-    implementadaEm: '2024-01-26'
-  },
-  {
-    id: 'v023',
-    nome: 'Tratamento de Campos Vazios e Nulos',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Define valores padrão para campos obrigatórios vazios e converte strings vazias em NULL apropriadamente.',
-    status: 'ativa',
-    implementadaEm: '2024-01-26'
-  },
-  {
-    id: 'v024',
-    nome: 'Normalização de Nomes e Textos',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Padroniza capitalização de nomes (Title Case), remove acentos desnecessários e corrige encoding.',
-    status: 'ativa',
-    implementadaEm: '2024-01-27'
-  },
-  {
-    id: 'v025',
-    nome: 'Validação de Integridade Referencial',
-    modulo: 'volumetria',
-    categoria: 'validacao',
-    criterio: 'Verifica se códigos de cliente, médico e especialidade existem nas tabelas de referência antes da inserção.',
-    status: 'ativa',
-    implementadaEm: '2024-01-27'
-  },
-  {
-    id: 'v026',
-    nome: 'Mapeamento De Para - Valores por Estudo',
-    modulo: 'volumetria',
-    categoria: 'dados',
-    criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados nos arquivos 1, 2, 3 e 4 através de correspondência por descrição do estudo.',
-    status: 'ativa',
-    implementadaEm: '2024-01-28'
-  },
-  
-  // FATURAMENTO
-  {
-    id: 'f001',
-    nome: 'Geração Automática de Faturas',
-    modulo: 'faturamento',
-    categoria: 'automacao',
-    criterio: 'Gera faturas automaticamente baseado nos exames realizados e valores contratuais.',
-    status: 'ativa',
-    implementadaEm: '2024-01-25'
-  },
-  {
-    id: 'f002',
-    nome: 'Integração OMIE',
-    modulo: 'faturamento',
-    categoria: 'integracao',
-    criterio: 'Sincroniza dados de faturamento com sistema OMIE para controle fiscal.',
-    status: 'ativa',
-    implementadaEm: '2024-01-20'
-  },
-  
-  // CLIENTES
-  {
-    id: 'c001',
-    nome: 'Validação de CNPJ',
-    modulo: 'clientes',
-    categoria: 'validacao',
-    criterio: 'Valida formato e autenticidade do CNPJ do cliente antes do cadastro.',
-    status: 'ativa',
-    implementadaEm: '2024-01-18'
-  },
-  
-  // MÉDICOS
-  {
-    id: 'm001',
-    nome: 'Validação de CRM',
-    modulo: 'medicos',
-    categoria: 'validacao',
-    criterio: 'Valida formato do CRM e especialidade médica cadastrada.',
-    status: 'ativa',
-    implementadaEm: '2024-01-15'
-  },
-  
-  // ESCALAS
-  {
-    id: 'e001',
-    nome: 'Proteção Temporal Escalas',
-    modulo: 'escalas',
-    categoria: 'temporal',
-    criterio: 'Aplicação das mesmas regras temporais de volumetria para escalas médicas.',
-    status: 'ativa',
-    implementadaEm: '2024-01-15'
-  },
-  
-  // SEGURANÇA
-  {
-    id: 's001',
-    nome: 'Controle de Acesso por Perfil',
-    modulo: 'seguranca',
-    categoria: 'acesso',
-    criterio: 'Define permissões específicas baseadas no perfil do usuário (admin, manager, médico).',
-    status: 'ativa',
-    implementadaEm: '2024-01-10'
-  },
-  {
-    id: 's002',
-    nome: 'Auditoria de Operações',
-    modulo: 'seguranca',
-    categoria: 'acesso',
-    criterio: 'Registra todas as operações críticas com identificação do usuário, timestamp e dados alterados.',
-    status: 'ativa',
-    implementadaEm: '2024-01-08'
-  }
-];
-
-const getModuleIcon = (modulo: Regra['modulo']) => {
-  switch (modulo) {
-    case 'volumetria':
-      return <Settings className="h-4 w-4" />;
-    case 'faturamento':
-      return <Users className="h-4 w-4" />;
-    case 'clientes':
-      return <Users className="h-4 w-4" />;
-    case 'medicos':
-      return <Users className="h-4 w-4" />;
-    case 'escalas':
-      return <Clock className="h-4 w-4" />;
-    case 'sistema':
-      return <Settings className="h-4 w-4" />;
-    case 'seguranca':
-      return <CheckCircle className="h-4 w-4" />;
-    default:
-      return <Settings className="h-4 w-4" />;
-  }
-};
-
-const getCategoryIcon = (categoria: Regra['categoria']) => {
-  switch (categoria) {
-    case 'temporal':
-      return <Clock className="h-4 w-4" />;
-    case 'dados':
-      return <Settings className="h-4 w-4" />;
-    case 'validacao':
-      return <CheckCircle className="h-4 w-4" />;
-    case 'calculo':
-      return <Settings className="h-4 w-4" />;
-    case 'acesso':
-      return <Users className="h-4 w-4" />;
-    case 'integracao':
-      return <Settings className="h-4 w-4" />;
-    case 'automacao':
-      return <Settings className="h-4 w-4" />;
-    default:
-      return <Settings className="h-4 w-4" />;
-  }
-};
-
-const getStatusColor = (status: Regra['status']) => {
-  switch (status) {
-    case 'ativa':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'inativa':
-      return 'bg-red-100 text-red-800 border-red-200';
-    case 'pendente':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
-
-const getModuleColor = (modulo: Regra['modulo']) => {
-  switch (modulo) {
-    case 'volumetria':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'faturamento':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'clientes':
-      return 'bg-orange-100 text-orange-800 border-orange-200';
-    case 'medicos':
-      return 'bg-purple-100 text-purple-800 border-purple-200';
-    case 'escalas':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    case 'sistema':
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-    case 'seguranca':
-      return 'bg-red-100 text-red-800 border-red-200';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
-
-const getCategoryColor = (categoria: Regra['categoria']) => {
-  switch (categoria) {
-    case 'temporal':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'dados':
-      return 'bg-purple-100 text-purple-800 border-purple-200';
-    case 'validacao':
-      return 'bg-teal-100 text-teal-800 border-teal-200';
-    case 'calculo':
-      return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-    case 'acesso':
-      return 'bg-red-100 text-red-800 border-red-200';
-    case 'integracao':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'automacao':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
+interface RegraExclusaoBanco {
+  id: string;
+  nome_regra?: string;
+  descricao?: string;
+  criterios?: any;
+  prioridade?: number;
+  acao?: string;
+  motivo_exclusao?: string;
+  aplicar_legado?: boolean;
+  aplicar_incremental?: boolean;
+  ativo?: boolean;
+  created_at?: string;
+  // Campos adicionais que podem existir na tabela
+  [key: string]: any;
+}
 
 export function ControleRegrasNegocio() {
-  const modulosEstatisticas = regrasImplementadas.reduce((acc, regra) => {
-    acc[regra.modulo] = (acc[regra.modulo] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const [regrasExclusao, setRegrasExclusao] = useState<RegraExclusaoBanco[]>([]);
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
 
-  const statusEstatisticas = regrasImplementadas.reduce((acc, regra) => {
-    acc[regra.status] = (acc[regra.status] || 0) + 1;
+  // Regras de negócio estáticas organizadas por ordem de execução
+  const regrasNegocio: Regra[] = [
+    // VOLUMETRIA - Ordem de execução
+    {
+      id: 'v001',
+      nome: 'Proteção Temporal de Dados',
+      modulo: 'volumetria',
+      categoria: 'temporal',
+      criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      observacoes: 'Configurável via tabela configuracao_protecao',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v013',
+      nome: 'Validação de Formato Excel',
+      modulo: 'volumetria',
+      categoria: 'validacao',
+      criterio: 'Valida estrutura dos arquivos Excel antes do processamento, verifica colunas obrigatórias.',
+      status: 'ativa',
+      implementadaEm: '2024-01-20',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v015',
+      nome: 'Limpeza de Dados Duplicados',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.',
+      status: 'ativa',
+      implementadaEm: '2024-01-22',
+      ordem_execucao: 3,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v022',
+      nome: 'Validação e Limpeza de Caracteres Especiais',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).',
+      status: 'ativa',
+      implementadaEm: '2024-01-26',
+      ordem_execucao: 4,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v014',
+      nome: 'Mapeamento Dinâmico de Campos',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
+      status: 'ativa',
+      implementadaEm: '2024-01-18',
+      ordem_execucao: 5,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v026',
+      nome: 'Mapeamento De Para - Valores por Estudo',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
+      status: 'ativa',
+      implementadaEm: '2024-01-28',
+      ordem_execucao: 6,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v016',
+      nome: 'Processamento em Lotes',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 7,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v008',
+      nome: 'Cache de Performance',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
+      status: 'ativa',
+      implementadaEm: '2024-01-12',
+      ordem_execucao: 8,
+      tipo_regra: 'negocio'
+    },
+
+    // FATURAMENTO - Ordem de execução
+    {
+      id: 'f003',
+      nome: 'Aplicação de Regras de Exclusão',
+      modulo: 'faturamento',
+      categoria: 'exclusao',
+      criterio: 'Aplica regras de exclusão de valores zerados, cancelamentos e outras validações.',
+      status: 'ativa',
+      implementadaEm: '2024-02-01',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'f004',
+      nome: 'Cálculo de Valores Contratuais',
+      modulo: 'faturamento',
+      categoria: 'calculo',
+      criterio: 'Aplica tabela de preços e configurações contratuais para calcular valores.',
+      status: 'ativa',
+      implementadaEm: '2024-01-28',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'f001',
+      nome: 'Geração Automática de Faturas',
+      modulo: 'faturamento',
+      categoria: 'automacao',
+      criterio: 'Gera faturas automaticamente baseado nos exames realizados e valores contratuais.',
+      status: 'ativa',
+      implementadaEm: '2024-01-25',
+      ordem_execucao: 3,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'f002',
+      nome: 'Integração OMIE',
+      modulo: 'faturamento',
+      categoria: 'integracao',
+      criterio: 'Sincroniza dados de faturamento com sistema OMIE para controle fiscal.',
+      status: 'ativa',
+      implementadaEm: '2024-01-20',
+      ordem_execucao: 4,
+      tipo_regra: 'negocio'
+    },
+
+    // CLIENTES - Ordem de execução
+    {
+      id: 'c001',
+      nome: 'Validação de CNPJ',
+      modulo: 'clientes',
+      categoria: 'validacao',
+      criterio: 'Valida formato e autenticidade do CNPJ do cliente antes do cadastro.',
+      status: 'ativa',
+      implementadaEm: '2024-01-18',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'c002',
+      nome: 'Validação de Contratos',
+      modulo: 'clientes',
+      categoria: 'validacao',
+      criterio: 'Verifica vigência de contratos e configurações antes de permitir faturamento.',
+      status: 'ativa',
+      implementadaEm: '2024-01-22',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+
+    // PREÇOS - Ordem de execução
+    {
+      id: 'p001',
+      nome: 'Aplicação de Tabela Padrão',
+      modulo: 'precos',
+      categoria: 'calculo',
+      criterio: 'Aplica tabela de preços padrão quando não há configuração específica.',
+      status: 'ativa',
+      implementadaEm: '2024-01-20',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'p002',
+      nome: 'Aplicação de Descontos/Acréscimos',
+      modulo: 'precos',
+      categoria: 'calculo',
+      criterio: 'Aplica percentuais de desconto ou acréscimo conforme contrato.',
+      status: 'ativa',
+      implementadaEm: '2024-01-22',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+
+    // REPASSES - Ordem de execução
+    {
+      id: 'r001',
+      nome: 'Cálculo de Repasse Médico',
+      modulo: 'repasses',
+      categoria: 'calculo',
+      criterio: 'Calcula valores de repasse baseado na tabela de percentuais por médico.',
+      status: 'ativa',
+      implementadaEm: '2024-01-25',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+
+    // EXAMES - Ordem de execução
+    {
+      id: 'ex001',
+      nome: 'Validação de Modalidade',
+      modulo: 'exames',
+      categoria: 'validacao',
+      criterio: 'Valida se a modalidade do exame existe no cadastro.',
+      status: 'ativa',
+      implementadaEm: '2024-01-20',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'ex002',
+      nome: 'Validação de Especialidade',
+      modulo: 'exames',
+      categoria: 'validacao',
+      criterio: 'Valida se a especialidade do exame existe no cadastro.',
+      status: 'ativa',
+      implementadaEm: '2024-01-20',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+
+    // MÉDICOS - Ordem de execução
+    {
+      id: 'm001',
+      nome: 'Validação de CRM',
+      modulo: 'medicos',
+      categoria: 'validacao',
+      criterio: 'Valida formato do CRM e especialidade médica cadastrada.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+
+    // ESCALAS - Ordem de execução
+    {
+      id: 'e001',
+      nome: 'Proteção Temporal Escalas',
+      modulo: 'escalas',
+      categoria: 'temporal',
+      criterio: 'Aplicação das mesmas regras temporais de volumetria para escalas médicas.',
+      status: 'ativa',
+      implementadaEm: '2024-01-15',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+
+    // SEGURANÇA - Ordem de execução
+    {
+      id: 's001',
+      nome: 'Controle de Acesso por Perfil',
+      modulo: 'seguranca',
+      categoria: 'acesso',
+      criterio: 'Define permissões específicas baseadas no perfil do usuário.',
+      status: 'ativa',
+      implementadaEm: '2024-01-10',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 's002',
+      nome: 'Auditoria de Operações',
+      modulo: 'seguranca',
+      categoria: 'acesso',
+      criterio: 'Registra todas as operações críticas com identificação do usuário.',
+      status: 'ativa',
+      implementadaEm: '2024-01-08',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    }
+  ];
+
+  const buscarRegrasExclusao = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('regras_exclusao_faturamento')
+        .select('*')
+        .order('prioridade', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar regras de exclusão:', error);
+        return;
+      }
+
+      setRegrasExclusao(data || []);
+    } catch (error) {
+      console.error('Erro ao conectar com o banco:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    buscarRegrasExclusao();
+  }, []);
+
+  // Converter regras de exclusão do banco para o formato padrão
+  const regrasExclusaoFormatadas: Regra[] = regrasExclusao.map((regra, index) => ({
+    id: `exc_${regra.id}`,
+    nome: regra.nome_regra || 'Regra sem nome',
+    modulo: determinarModulo(regra.nome_regra || ''),
+    categoria: 'exclusao' as const,
+    criterio: regra.descricao || 'Sem descrição',
+    status: (regra.ativo !== false) ? 'ativa' as const : 'inativa' as const,
+    implementadaEm: regra.created_at || new Date().toISOString(),
+    observacoes: regra.prioridade || regra.acao || regra.motivo_exclusao 
+      ? `${regra.prioridade ? `Prioridade: ${regra.prioridade}` : ''} ${regra.acao ? `| Ação: ${regra.acao}` : ''} ${regra.motivo_exclusao ? `| ${regra.motivo_exclusao}` : ''}`.replace(/^\s*\|\s*/, '') 
+      : undefined,
+    ordem_execucao: regra.prioridade || index + 1,
+    tipo_regra: 'exclusao' as const
+  }));
+
+  // Todas as regras juntas
+  const todasRegras = [...regrasNegocio, ...regrasExclusaoFormatadas];
+
+  // Agrupar por módulo
+  const regrasAgrupadas = todasRegras.reduce((acc, regra) => {
+    if (!acc[regra.modulo]) {
+      acc[regra.modulo] = [];
+    }
+    acc[regra.modulo].push(regra);
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, Regra[]>);
+
+  // Ordenar regras dentro de cada grupo por ordem de execução
+  Object.keys(regrasAgrupadas).forEach(modulo => {
+    regrasAgrupadas[modulo].sort((a, b) => a.ordem_execucao - b.ordem_execucao);
+  });
+
+  const toggleGrupo = (modulo: string) => {
+    setGruposAbertos(prev => ({
+      ...prev,
+      [modulo]: !prev[modulo]
+    }));
+  };
+
+  function determinarModulo(nomeRegra: string): Regra['modulo'] {
+    const nome = nomeRegra.toLowerCase();
+    if (nome.includes('volumetria') || nome.includes('volume') || nome.includes('upload')) return 'volumetria';
+    if (nome.includes('faturamento') || nome.includes('fatura') || nome.includes('valor')) return 'faturamento';
+    if (nome.includes('cliente')) return 'clientes';
+    if (nome.includes('preço') || nome.includes('preco')) return 'precos';
+    if (nome.includes('repasse')) return 'repasses';
+    if (nome.includes('exame')) return 'exames';
+    if (nome.includes('medico') || nome.includes('médico')) return 'medicos';
+    if (nome.includes('escala')) return 'escalas';
+    if (nome.includes('segurança') || nome.includes('seguranca')) return 'seguranca';
+    return 'sistema';
+  }
+
+  const getModuleIcon = (modulo: Regra['modulo']) => {
+    switch (modulo) {
+      case 'volumetria': return <BarChart3 className="h-4 w-4" />;
+      case 'faturamento': return <DollarSign className="h-4 w-4" />;
+      case 'clientes': return <Users className="h-4 w-4" />;
+      case 'precos': return <Calculator className="h-4 w-4" />;
+      case 'repasses': return <FileText className="h-4 w-4" />;
+      case 'exames': return <Stethoscope className="h-4 w-4" />;
+      case 'medicos': return <Users className="h-4 w-4" />;
+      case 'escalas': return <Clock className="h-4 w-4" />;
+      case 'seguranca': return <CheckCircle className="h-4 w-4" />;
+      default: return <Settings className="h-4 w-4" />;
+    }
+  };
+
+  const getModuleColor = (modulo: Regra['modulo']) => {
+    switch (modulo) {
+      case 'volumetria': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'faturamento': return 'bg-green-100 text-green-800 border-green-200';
+      case 'clientes': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'precos': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'repasses': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'exames': return 'bg-teal-100 text-teal-800 border-teal-200';
+      case 'medicos': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
+      case 'escalas': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'seguranca': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getTipoColor = (tipo: 'exclusao' | 'negocio') => {
+    return tipo === 'exclusao' 
+      ? 'bg-red-100 text-red-800 border-red-200'
+      : 'bg-blue-100 text-blue-800 border-blue-200';
+  };
+
+  const getStatusColor = (status: Regra['status']) => {
+    switch (status) {
+      case 'ativa': return 'bg-green-100 text-green-800 border-green-200';
+      case 'inativa': return 'bg-red-100 text-red-800 border-red-200';
+      case 'pendente': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const contarRegras = (regras: Regra[]) => {
+    const ativas = regras.filter(r => r.status === 'ativa').length;
+    const exclusoes = regras.filter(r => r.tipo_regra === 'exclusao').length;
+    return { total: regras.length, ativas, exclusoes };
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">Carregando regras...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          Controle de Regras de Negócio - Sistema Completo
+          Controle de Regras - Sistema Completo
         </CardTitle>
         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-          <span>Total: {regrasImplementadas.length} regras</span>
+          <span>Total: {todasRegras.length} regras</span>
           <Separator orientation="vertical" className="h-4" />
-          <span>Volumetria: {modulosEstatisticas.volumetria || 0}</span>
-          <span>Faturamento: {modulosEstatisticas.faturamento || 0}</span>
-          <span>Clientes: {modulosEstatisticas.clientes || 0}</span>
-          <span>Médicos: {modulosEstatisticas.medicos || 0}</span>
-          <span>Escalas: {modulosEstatisticas.escalas || 0}</span>
-          <span>Segurança: {modulosEstatisticas.seguranca || 0}</span>
+          <span>Negócio: {regrasNegocio.length}</span>
+          <span>Exclusão: {regrasExclusaoFormatadas.length}</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {regrasImplementadas.map((regra) => (
-          <div key={regra.id} className="border rounded-lg p-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                {getModuleIcon(regra.modulo)}
-                <h4 className="font-medium">{regra.nome}</h4>
-                <Badge 
-                  variant="outline" 
-                  className={getModuleColor(regra.modulo)}
-                >
-                  {regra.modulo}
-                </Badge>
-                <Badge 
-                  variant="outline" 
-                  className={getCategoryColor(regra.categoria)}
-                >
-                  {regra.categoria}
-                </Badge>
-              </div>
-              <Badge 
-                variant="outline" 
-                className={getStatusColor(regra.status)}
-              >
-                {regra.status}
-              </Badge>
-            </div>
-            
-            <div className="text-sm text-muted-foreground">
-              <strong>ID:</strong> {regra.id}
-            </div>
-            
-            <div className="text-sm">
-              <strong>Critério:</strong> {regra.criterio}
-            </div>
-            
-            <div className="text-xs text-muted-foreground">
-              <strong>Implementada em:</strong> {new Date(regra.implementadaEm).toLocaleDateString('pt-BR')}
-            </div>
-            
-            {regra.observacoes && (
-              <div className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200">
-                <div className="flex items-center gap-1 text-yellow-800">
-                  <AlertTriangle className="h-3 w-3" />
-                  <strong>Observações:</strong>
-                </div>
-                <div className="text-yellow-700">{regra.observacoes}</div>
-              </div>
-            )}
-          </div>
-        ))}
-        
-        <Separator />
-        
-        <div className="text-sm text-muted-foreground">
-          <p className="flex items-center gap-1">
-            <Settings className="h-3 w-3" />
-            <strong>Próximas implementações:</strong> Regras de cobrança automática, Validação de dados duplicados, Alertas automáticos por e-mail, Integração com APIs externas
-          </p>
-        </div>
+        {Object.entries(regrasAgrupadas).map(([modulo, regras]) => {
+          const stats = contarRegras(regras);
+          const isAberto = gruposAbertos[modulo];
+          
+          return (
+            <Collapsible key={modulo} open={isAberto} onOpenChange={() => toggleGrupo(modulo)}>
+              <CollapsibleTrigger asChild>
+                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getModuleIcon(modulo as Regra['modulo'])}
+                        {isAberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        <h3 className="font-semibold capitalize">{modulo}</h3>
+                        <Badge variant="outline" className={getModuleColor(modulo as Regra['modulo'])}>
+                          {stats.total} regras
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          {stats.ativas} ativas
+                        </Badge>
+                        {stats.exclusoes > 0 && (
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            {stats.exclusoes} exclusões
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="mt-2 space-y-2">
+                {regras.map((regra) => (
+                  <Card key={regra.id} className="ml-4">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">#{regra.ordem_execucao}</span>
+                          <h4 className="font-medium">{regra.nome}</h4>
+                          <Badge variant="outline" className={getTipoColor(regra.tipo_regra)}>
+                            {regra.tipo_regra === 'exclusao' ? (
+                              <><Trash2 className="h-3 w-3 mr-1" />Exclusão</>
+                            ) : (
+                              'Negócio'
+                            )}
+                          </Badge>
+                        </div>
+                        <Badge variant="outline" className={getStatusColor(regra.status)}>
+                          {regra.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        <strong>ID:</strong> {regra.id}
+                      </div>
+                      
+                      <div className="text-sm">
+                        <strong>Critério:</strong> {regra.criterio}
+                      </div>
+                      
+                      <div className="text-xs text-muted-foreground">
+                        <strong>Implementada em:</strong> {new Date(regra.implementadaEm).toLocaleDateString('pt-BR')}
+                      </div>
+                      
+                      {regra.observacoes && (
+                        <div className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200">
+                          <div className="flex items-center gap-1 text-yellow-800">
+                            <AlertTriangle className="h-3 w-3" />
+                            <strong>Observações:</strong>
+                          </div>
+                          <div className="text-yellow-700">{regra.observacoes}</div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        })}
       </CardContent>
     </Card>
   );
