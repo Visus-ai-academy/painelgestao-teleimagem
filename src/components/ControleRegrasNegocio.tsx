@@ -314,72 +314,17 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'negocio'
     },
 
-    // SISTEMA - Regras de Proteção Temporal e Exclusão
+    // SISTEMA - Regras básicas do sistema
     {
       id: 'sys001',
-      nome: 'Proteção Temporal de Dados Históricos',
+      nome: 'Controle de Acesso e Permissões',
       modulo: 'sistema',
-      categoria: 'temporal',
-      criterio: 'Dados de meses anteriores são imutáveis. Não permite edição de dados com data anterior ao mês atual.',
+      categoria: 'acesso',
+      criterio: 'Sistema de roles e permissões para controlar acesso às funcionalidades.',
       status: 'ativa',
-      implementadaEm: '2024-01-15',
+      implementadaEm: '2024-01-10',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
-    },
-    {
-      id: 'sys002',
-      nome: 'Bloqueio de Dados Futuros',
-      modulo: 'sistema',
-      categoria: 'temporal',
-      criterio: 'Impede inserção ou edição de dados com data futura superior ao dia atual.',
-      status: 'ativa',
-      implementadaEm: '2024-01-15',
-      ordem_execucao: 2,
-      tipo_regra: 'negocio'
-    },
-    {
-      id: 'sys003',
-      nome: 'Janela de Edição Mês Anterior',
-      modulo: 'sistema',
-      categoria: 'temporal',
-      criterio: 'Permite edição de dados do mês anterior apenas até o dia 5 do mês seguinte.',
-      status: 'ativa',
-      implementadaEm: '2024-01-15',
-      ordem_execucao: 3,
-      tipo_regra: 'negocio'
-    },
-    {
-      id: 'sys004',
-      nome: 'Exclusão de Valores Zerados',
-      modulo: 'sistema',
-      categoria: 'exclusao',
-      criterio: 'Remove automaticamente registros com valor igual a zero ou nulo antes do processamento.',
-      status: 'ativa',
-      implementadaEm: '2024-02-01',
-      ordem_execucao: 4,
-      tipo_regra: 'exclusao'
-    },
-    {
-      id: 'sys005',
-      nome: 'Exclusão de Registros Cancelados',
-      modulo: 'sistema',
-      categoria: 'exclusao',
-      criterio: 'Remove registros com status "CANCELADO" ou equivalente dos dados de processamento.',
-      status: 'ativa',
-      implementadaEm: '2024-02-01',
-      ordem_execucao: 5,
-      tipo_regra: 'exclusao'
-    },
-    {
-      id: 'sys006',
-      nome: 'Alerta para Valores Altos',
-      modulo: 'sistema',
-      categoria: 'exclusao',
-      criterio: 'Identifica e alerta sobre valores superiores a R$ 1.000 para aprovação manual.',
-      status: 'ativa',
-      implementadaEm: '2024-02-01',
-      ordem_execucao: 6,
-      tipo_regra: 'exclusao'
     }
   ];
 
