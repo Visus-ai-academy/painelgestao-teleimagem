@@ -35,91 +35,30 @@ export const LaudosAtrasadosDetalhado = () => {
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // CARREGAR TODOS OS LAUDOS ATRASADOS - MÉTODO DIRETO SEM LIMITAÇÕES
+  // USAR EXATAMENTE A MESMA SOLUÇÃO QUE FUNCIONOU NA LISTA DE CLIENTES
   useEffect(() => {
     const carregarLaudosAtrasados = async () => {
       try {
-        console.log('🚀 [LaudosAtrasados] MÉTODO DIRETO - Carregando TODOS os dados sem limitações...');
+        console.log('🚀 [LaudosAtrasados] Usando MESMA solução que funcionou na lista de clientes...');
         
-        // BUSCA DIRETA NA TABELA COM PAGINAÇÃO COMPLETA
-        let todosOsDados: any[] = [];
-        let offset = 0;
-        const limite = 5000; // Buscar em lotes de 5000
-        let temMaisDados = true;
+        // USAR A FUNÇÃO RPC QUE FUNCIONA: get_laudos_atrasados_completos
+        const { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
         
-        while (temMaisDados) {
-          console.log(`📊 [LaudosAtrasados] Buscando lote ${Math.floor(offset/limite) + 1}, offset: ${offset}`);
-          
-          const { data: lote, error } = await supabase
-            .from('volumetria_mobilemed')
-            .select(`
-              EMPRESA,
-              NOME_PACIENTE,
-              ESTUDO_DESCRICAO,
-              MODALIDADE,
-              ESPECIALIDADE,
-              CATEGORIA,
-              PRIORIDADE,
-              MEDICO,
-              VALORES,
-              DATA_LAUDO,
-              HORA_LAUDO,
-              DATA_PRAZO,
-              HORA_PRAZO
-            `)
-            .not('DATA_LAUDO', 'is', null)
-            .not('HORA_LAUDO', 'is', null)
-            .not('DATA_PRAZO', 'is', null)
-            .not('HORA_PRAZO', 'is', null)
-            .range(offset, offset + limite - 1);
-          
-          if (error) {
-            console.error('❌ Erro na busca direta:', error);
-            throw error;
-          }
-          
-          if (lote && lote.length > 0) {
-            todosOsDados = [...todosOsDados, ...lote];
-            console.log(`✅ [LaudosAtrasados] Lote carregado: ${lote.length} registros. Total acumulado: ${todosOsDados.length}`);
-            
-            // Se retornou menos que o limite, acabaram os dados
-            if (lote.length < limite) {
-              temMaisDados = false;
-            } else {
-              offset += limite;
-            }
-          } else {
-            temMaisDados = false;
-          }
-          
-          // Proteção contra loop infinito
-          if (offset > 100000) {
-            console.warn('⚠️ Atingiu limite de segurança de 100k registros');
-            temMaisDados = false;
-          }
+        if (error) {
+          console.error('❌ Erro na função RPC:', error);
+          throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
         }
         
-        console.log(`🎯 [LaudosAtrasados] TOTAL DE DADOS CARREGADOS: ${todosOsDados.length} registros`);
+        console.log(`✅ [LaudosAtrasados] FUNÇÃO RPC RETORNOU: ${laudosAtrasadosData?.length || 0} registros`);
         
-        // FILTRAR APENAS OS ATRASADOS MANUALMENTE
-        const laudosAtrasados = todosOsDados.filter(item => {
-          if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
-          
-          try {
-            const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
-            const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
-            
-            return dataLaudo > dataPrazo;
-          } catch (error) {
-            console.warn('Erro ao processar data:', error);
-            return false;
-          }
-        });
+        if (!laudosAtrasadosData || laudosAtrasadosData.length === 0) {
+          console.warn('⚠️ [LaudosAtrasados] Nenhum dado retornado');
+          setLaudosAtrasados([]);
+          return;
+        }
         
-        console.log(`🔥 [LaudosAtrasados] LAUDOS ATRASADOS ENCONTRADOS: ${laudosAtrasados.length} registros`);
-        
-        // Processar TODOS os laudos atrasados
-        const laudosProcessados: LaudoAtrasado[] = laudosAtrasados.map((item: any) => {
+        // Processar os dados da MESMA FORMA que funciona na lista de clientes
+        const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           const tempoAtrasoMs = dataLaudo.getTime() - dataPrazo.getTime();
@@ -141,14 +80,14 @@ export const LaudosAtrasadosDetalhado = () => {
           };
         });
         
-        // Calcular totais FINAIS
+        // Calcular totais
         const totalLaudos = laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0);
         const totalRegistros = laudosProcessados.length;
         
-        console.log(`🎉🔥 [LaudosAtrasados] RESULTADO FINAL CORRETO:`);
+        console.log(`🎯 [LaudosAtrasados] RESULTADO USANDO SOLUÇÃO QUE FUNCIONA:`);
         console.log(`📊 Total de registros: ${totalRegistros.toLocaleString()}`);
-        console.log(`🎯 Total de laudos atrasados: ${totalLaudos.toLocaleString()}`);
-        console.log(`✅ TODOS OS DADOS PROCESSADOS SEM LIMITAÇÕES`);
+        console.log(`🔥 Total de laudos atrasados: ${totalLaudos.toLocaleString()}`);
+        console.log(`✅ MESMA ABORDAGEM DA LISTA DE CLIENTES - DEVE FUNCIONAR`);
         
         setLaudosAtrasados(laudosProcessados);
       } catch (error) {
