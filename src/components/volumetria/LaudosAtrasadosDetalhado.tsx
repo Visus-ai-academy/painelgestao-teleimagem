@@ -77,7 +77,9 @@ export const LaudosAtrasadosDetalhado = () => {
         });
         
         setLaudosAtrasados(laudosProcessados);
-        console.log(`📊 Total de laudos atrasados processados: ${laudosProcessados.length}`);
+        console.log(`📊 [LaudosAtrasados] Total de ${laudosProcessados.length} registros processados`);
+        console.log(`🔥 [LaudosAtrasados] Soma total: ${laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos`);
+        console.log(`🎯 [LaudosAtrasados] CONFIRMAÇÃO: Exibindo ${laudosProcessados.length} registros que somam ${laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()} laudos`);
       } catch (error) {
         console.error('❌ Erro ao carregar laudos atrasados:', error);
         setLaudosAtrasados([]);

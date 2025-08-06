@@ -455,7 +455,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 min-w-[400px] border-r font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[200px] border-r font-semibold h-12"
                     onClick={() => handleSort('nome')}
                   >
                     <div className="flex items-center gap-2">
@@ -464,7 +464,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[140px] border-r text-center font-semibold h-12"
                     onClick={() => handleSort('total_exames')}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -473,7 +473,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[140px] border-r text-center font-semibold h-12"
                     onClick={() => handleSort('atrasados')}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -482,7 +482,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 min-w-[120px] border-r text-center font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[120px] border-r text-center font-semibold h-12"
                     onClick={() => handleSort('percentual_atraso')}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -491,7 +491,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="cursor-pointer hover:bg-gray-200 min-w-[140px] border-r text-center font-semibold h-12"
+                    className="cursor-pointer hover:bg-gray-200 w-[140px] border-r text-center font-semibold h-12"
                     onClick={() => handleSort('tempoMedioAtraso')}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -499,7 +499,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                       {renderSortIcon('tempoMedioAtraso')}
                     </div>
                   </TableHead>
-                  <TableHead className="min-w-[100px] text-center font-semibold h-12">
+                  <TableHead className="w-[100px] text-center font-semibold h-12">
                     Status
                   </TableHead>
                 </TableRow>
@@ -524,32 +524,32 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                         className={`hover:bg-gray-50 ${category.bgColor.replace('100', '25')} cursor-pointer transition-colors`}
                         onClick={() => toggleClientExpansion(cliente.nome)}
                       >
-                        <TableCell className="min-w-[400px] border-r">
+                        <TableCell className="w-[200px] border-r">
                           <div className="flex items-center gap-2">
                             {isExpanded ? 
                               <ChevronDown className="h-4 w-4 text-gray-500" /> : 
                               <ChevronRight className="h-4 w-4 text-gray-500" />
                             }
-                            <div>
-                              <div className="font-medium text-sm">{cliente.nome}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm truncate" title={cliente.nome}>{cliente.nome}</div>
                               <div className="text-xs text-muted-foreground">
                                 Rank #{index + 1}
                               </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="min-w-[140px] border-r text-center">
+                        <TableCell className="w-[140px] border-r text-center">
                           <div className="font-medium">{cliente.total_exames.toLocaleString()}</div>
                         </TableCell>
-                        <TableCell className="min-w-[140px] border-r text-center">
+                        <TableCell className="w-[140px] border-r text-center">
                           <div className="font-bold text-red-600">{cliente.atrasados.toLocaleString()}</div>
                         </TableCell>
-                        <TableCell className="min-w-[120px] border-r text-center">
+                        <TableCell className="w-[120px] border-r text-center">
                           <div className="font-bold" style={{ color: category.color }}>
                             {cliente.percentual_atraso.toFixed(1)}%
                           </div>
                         </TableCell>
-                        <TableCell className="min-w-[140px] border-r text-center">
+                        <TableCell className="w-[140px] border-r text-center">
                           <div className="font-medium text-orange-600">
                             {cliente.tempoMedioAtraso > 0 
                               ? cliente.tempoMedioAtraso >= 60 
@@ -559,7 +559,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                             }
                           </div>
                         </TableCell>
-                        <TableCell className="min-w-[100px] text-center">
+                        <TableCell className="w-[100px] text-center">
                           <Badge 
                             className="text-xs font-medium px-2 py-1"
                             style={{ 
