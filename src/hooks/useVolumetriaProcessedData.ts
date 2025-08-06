@@ -48,6 +48,37 @@ export function useVolumetriaProcessedData() {
   
   // PROCESSAR TODOS OS DADOS UMA ÚNICA VEZ
   const processedData = useMemo(() => {
+    // SE TEMOS STATS COMPLETAS DOS CLIENTES, USAR ELAS EM VEZ DE PROCESSAR
+    if (data.clientesStats && data.clientesStats.length > 0) {
+      console.log('🔥 [useVolumetriaProcessedData] Usando stats completas dos clientes:', data.clientesStats.length);
+      
+      // Buscar CEDI_RJ especificamente
+      const cediStats = data.clientesStats.find((c: any) => c.empresa === 'CEDI_RJ');
+      console.log('🎯 [useVolumetriaProcessedData] CEDI_RJ stats completas:', cediStats);
+      
+      const clientesProcessados = data.clientesStats.map((cliente: any) => ({
+        nome: cliente.empresa,
+        total_exames: Number(cliente.total_laudos),
+        total_registros: Number(cliente.total_registros),
+        atrasados: Number(cliente.laudos_atrasados),
+        percentual_atraso: Number(cliente.percentual_atraso),
+        valor_medio: Number(cliente.total_laudos) / Number(cliente.total_registros) || 0
+      }));
+      
+      return {
+        clientes: clientesProcessados,
+        modalidades: [],
+        especialidades: [],
+        categorias: [],
+        prioridades: [],
+        medicos: [],
+        loading: data.loading,
+        totalExames: data.dashboardStats?.total_exames || 0,
+        totalAtrasados: data.dashboardStats?.total_atrasados || 0,
+        percentualAtraso: data.dashboardStats?.percentual_atraso || 0
+      };
+    }
+    
     if (!data.detailedData || data.detailedData.length === 0) {
       return {
         clientes: [],

@@ -37,6 +37,7 @@ interface VolumetriaData {
   lastUploads: Record<string, any>;
   // Dados detalhados para análises
   detailedData: any[];
+  clientesStats: any[]; // ADICIONAR STATS COMPLETAS DOS CLIENTES
   clientes: string[];
   modalidades: string[];
   especialidades: string[];
@@ -80,6 +81,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     },
     lastUploads: {},
     detailedData: [],
+    clientesStats: [], // ADICIONAR STATS VAZIAS DOS CLIENTES
     clientes: [],
     modalidades: [],
     especialidades: [],
@@ -128,7 +130,22 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const dashboardStats = dashboardData[0];
       console.log('✅ Dashboard stats carregadas:', dashboardStats);
       
-      console.log('🚀 FASE 2: Carregando TODOS os dados detalhados via RPC original...');
+      console.log('🚀 FASE 2: Carregando estatísticas COMPLETAS de clientes...');
+      
+      // CARREGAR ESTATÍSTICAS COMPLETAS DOS CLIENTES
+      const { data: clientesStats, error: clientesError } = await supabase.rpc('get_clientes_stats_completos');
+      
+      if (clientesError) {
+        throw new Error(`Erro nas estatísticas de clientes: ${clientesError.message}`);
+      }
+      
+      console.log(`✅ Estatísticas de ${clientesStats?.length || 0} clientes carregadas`);
+      
+      // Buscar CEDI_RJ especificamente para debug
+      const cediStats = clientesStats?.find((c: any) => c.empresa === 'CEDI_RJ');
+      console.log('🔍 [CONTEXTO DEBUG CEDI_RJ] Stats completas:', cediStats);
+      
+      console.log('🚀 FASE 3: Carregando TODOS os dados detalhados via RPC original...');
       
       // CARREGAR DADOS DETALHADOS USANDO FUNÇÃO EXISTENTE
       const { data: detailedData, error: detailedError } = await supabase.rpc('get_volumetria_complete_data');
@@ -195,6 +212,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         stats: fileStats,
         lastUploads: lastUploadsResult,
         detailedData: detailedData || [],
+        clientesStats: clientesStats || [], // ADICIONAR STATS COMPLETAS DOS CLIENTES
         clientes: dashboardStats.clientes_unicos || [],
         modalidades: dashboardStats.modalidades_unicas || [],
         especialidades: dashboardStats.especialidades_unicas || [],
@@ -286,6 +304,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         },
         lastUploads: {},
         detailedData: [],
+        clientesStats: [], // LIMPAR STATS DOS CLIENTES TAMBÉM
         clientes: [],
         modalidades: [],
         especialidades: [],
