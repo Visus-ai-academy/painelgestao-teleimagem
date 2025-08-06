@@ -117,18 +117,19 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // BUSCAR TODOS OS DADOS DIRETAMENTE - FORÇAR SEM LIMITE
+      // BUSCAR ABSOLUTAMENTE TODOS OS DADOS - SEM QUALQUER LIMITAÇÃO
       const { data: allData, error } = await supabase
-        .rpc('get_volumetria_complete_data')
-        .limit(50000); // FORÇAR LIMITE ALTO
+        .rpc('get_volumetria_complete_data');
       
       if (error) throw new Error(`Erro: ${error.message}`);
       
       console.log(`🔍 [DelayAnalysis] TOTAL GERAL de laudos retornados da API: ${allData?.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0) || 0}`);
+      console.log(`🔍 [DelayAnalysis] TOTAL GERAL de registros retornados da API: ${allData?.length || 0}`);
       
       // FILTRAR APENAS O CLIENTE ESPECÍFICO
       const clientData = allData?.filter((item: any) => item.EMPRESA === clienteName) || [];
-      console.log(`🔍 [DelayAnalysis] ${clientData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0)} laudos encontrados para ${clienteName} (${clientData.length} registros)`);
+      const totalLaudosCliente = clientData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0);
+      console.log(`🔍 [DelayAnalysis] ${totalLaudosCliente} LAUDOS encontrados para ${clienteName} (${clientData.length} registros)`);
       
       // PROCESSAR DADOS DO ZERO - CALCULAR SOMAS REAIS
       const especialidadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
