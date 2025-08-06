@@ -269,6 +269,13 @@ export async function processVolumetriaFile(
             continue;
           }
 
+          // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
+          if (empresa.toLowerCase().includes('_local')) {
+            console.log(`Cliente com _local excluído: ${empresa}`);
+            totalErrors++; // Contar como processado mas não inserido
+            continue;
+          }
+
           const safeString = (value: any): string | undefined => {
             if (value === null || value === undefined || value === '') return undefined;
             return String(value).trim() || undefined;
