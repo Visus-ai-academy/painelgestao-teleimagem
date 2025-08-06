@@ -1,7 +1,10 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users } from "lucide-react";
+import { Clock, Users, ChevronDown, ChevronRight, Calendar, TrendingUp } from "lucide-react";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useState } from "react";
 
 interface ClienteAtrasado {
   nome: string;
@@ -9,12 +12,28 @@ interface ClienteAtrasado {
   atrasados: number;
   percentualAtraso: number;
   tempoMedioAtraso: number; // em horas
+  detalhes?: {
+    modalidades: Array<{ nome: string; atrasados: number; total: number }>;
+    especialidades: Array<{ nome: string; atrasados: number; total: number }>;
+    medicos: Array<{ nome: string; atrasados: number; total: number }>;
+  };
 }
 
 export function VolumetriaClientesAtrasados() {
   const { data } = useVolumetria();
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
-  // Calcular clientes com atrasos usando dados detalhados CORRIGIDO
+  const toggleClient = (clienteNome: string) => {
+    const newExpanded = new Set(expandedClients);
+    if (newExpanded.has(clienteNome)) {
+      newExpanded.delete(clienteNome);
+    } else {
+      newExpanded.add(clienteNome);
+    }
+    setExpandedClients(newExpanded);
+  };
+
+  // Calcular clientes com atrasos usando dados detalhados CORRIGIDO + detalhes expandidos
   const { clientesAtrasados, totalAtrasadosGeral } = (() => {
     const clientesTemp: ClienteAtrasado[] = [];
     let totalGeralAtrasados = 0;
@@ -25,6 +44,9 @@ export function VolumetriaClientesAtrasados() {
         atrasados: number;
         tempoTotalAtraso: number;
         quantidadeRegistrosAtrasados: number;
+        modalidades: Map<string, { atrasados: number; total: number }>;
+        especialidades: Map<string, { atrasados: number; total: number }>;
+        medicos: Map<string, { atrasados: number; total: number }>;
       }>();
 
       data.detailedData.forEach(item => {
@@ -36,12 +58,36 @@ export function VolumetriaClientesAtrasados() {
             totalExames: 0,
             atrasados: 0,
             tempoTotalAtraso: 0,
-            quantidadeRegistrosAtrasados: 0
+            quantidadeRegistrosAtrasados: 0,
+            modalidades: new Map(),
+            especialidades: new Map(),
+            medicos: new Map()
           });
         }
 
         const clienteData = clienteMap.get(cliente)!;
         clienteData.totalExames += exames;
+
+        // Processar modalidades
+        const modalidade = item.MODALIDADE || 'Não informado';
+        if (!clienteData.modalidades.has(modalidade)) {
+          clienteData.modalidades.set(modalidade, { atrasados: 0, total: 0 });
+        }
+        clienteData.modalidades.get(modalidade)!.total += exames;
+
+        // Processar especialidades
+        const especialidade = item.ESPECIALIDADE || 'Não informado';
+        if (!clienteData.especialidades.has(especialidade)) {
+          clienteData.especialidades.set(especialidade, { atrasados: 0, total: 0 });
+        }
+        clienteData.especialidades.get(especialidade)!.total += exames;
+
+        // Processar médicos
+        const medico = item.MEDICO || 'Não informado';
+        if (!clienteData.medicos.has(medico)) {
+          clienteData.medicos.set(medico, { atrasados: 0, total: 0 });
+        }
+        clienteData.medicos.get(medico)!.total += exames;
 
         // Verificar se está atrasado - MESMA LÓGICA DO DASHBOARD
         if (item.DATA_LAUDO && item.HORA_LAUDO && item.DATA_PRAZO && item.HORA_PRAZO) {
@@ -57,6 +103,11 @@ export function VolumetriaClientesAtrasados() {
               clienteData.tempoTotalAtraso += tempoAtrasoHoras * exames;
               clienteData.quantidadeRegistrosAtrasados += 1;
               totalGeralAtrasados += exames;
+
+              // Contabilizar atrasos por categoria
+              clienteData.modalidades.get(modalidade)!.atrasados += exames;
+              clienteData.especialidades.get(especialidade)!.atrasados += exames;
+              clienteData.medicos.get(medico)!.atrasados += exames;
             }
           } catch (error) {
             console.log('Erro ao processar data:', error);
@@ -71,7 +122,24 @@ export function VolumetriaClientesAtrasados() {
           totalExames: dados.totalExames,
           atrasados: dados.atrasados,
           percentualAtraso: dados.totalExames > 0 ? (dados.atrasados / dados.totalExames) * 100 : 0,
-          tempoMedioAtraso: dados.atrasados > 0 ? dados.tempoTotalAtraso / dados.atrasados : 0
+          tempoMedioAtraso: dados.atrasados > 0 ? dados.tempoTotalAtraso / dados.atrasados : 0,
+          detalhes: {
+            modalidades: Array.from(dados.modalidades.entries())
+              .map(([nome, dados]) => ({ nome, ...dados }))
+              .filter(m => m.atrasados > 0)
+              .sort((a, b) => b.atrasados - a.atrasados)
+              .slice(0, 5),
+            especialidades: Array.from(dados.especialidades.entries())
+              .map(([nome, dados]) => ({ nome, ...dados }))
+              .filter(e => e.atrasados > 0)
+              .sort((a, b) => b.atrasados - a.atrasados)
+              .slice(0, 5),
+            medicos: Array.from(dados.medicos.entries())
+              .map(([nome, dados]) => ({ nome, ...dados }))
+              .filter(m => m.atrasados > 0)
+              .sort((a, b) => b.atrasados - a.atrasados)
+              .slice(0, 5)
+          }
         });
       });
     }
@@ -134,35 +202,116 @@ export function VolumetriaClientesAtrasados() {
                   </h4>
                 </div>
                 {clientesComAtrasos.map((cliente, index) => (
-                  <div key={`atrasado-${index}`} className="flex items-center justify-between p-4 border-l-4 border-red-500 bg-red-50/50 rounded-lg hover:bg-red-50">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{cliente.nome}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {cliente.totalExames.toLocaleString()} exames total
-                      </div>
+                  <Collapsible key={`atrasado-${index}`}>
+                    <div className="border-l-4 border-red-500 bg-red-50/50 rounded-lg hover:bg-red-50">
+                      <CollapsibleTrigger 
+                        className="w-full p-4 flex items-center justify-between hover:bg-red-100/50 transition-colors rounded-lg"
+                        onClick={() => toggleClient(cliente.nome)}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex-1 text-left">
+                            <div className="font-medium text-sm flex items-center gap-2">
+                              {expandedClients.has(cliente.nome) ? 
+                                <ChevronDown className="h-4 w-4 text-red-600" /> : 
+                                <ChevronRight className="h-4 w-4 text-red-600" />
+                              }
+                              {cliente.nome}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {cliente.totalExames.toLocaleString()} exames total • Clique para expandir detalhes
+                            </div>
+                          </div>
+                          
+                          <div className="text-center mx-4">
+                            <div className="text-lg font-bold text-red-600">
+                              {cliente.atrasados.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Laudos Atrasados</div>
+                          </div>
+                          
+                          <div className="text-center mx-4">
+                            <div className={`text-sm font-bold px-2 py-1 rounded ${getCorPercentual(cliente.percentualAtraso)}`}>
+                              {cliente.percentualAtraso.toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">% Atraso</div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="text-sm font-medium text-orange-600">
+                              {cliente.tempoMedioAtraso > 0 ? formatarTempoMedio(cliente.tempoMedioAtraso) : '-'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Tempo Médio</div>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+
+                      <CollapsibleContent className="px-4 pb-4">
+                        <div className="mt-3 space-y-4 bg-white/80 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Modalidades com mais atrasos */}
+                            {cliente.detalhes?.modalidades && cliente.detalhes.modalidades.length > 0 && (
+                              <div>
+                                <h5 className="font-medium text-sm text-red-800 mb-2 flex items-center gap-1">
+                                  <TrendingUp className="h-4 w-4" />
+                                  Modalidades (Top Atrasos)
+                                </h5>
+                                <div className="space-y-1">
+                                  {cliente.detalhes.modalidades.map((modalidade, idx) => (
+                                    <div key={idx} className="text-xs bg-red-50 p-2 rounded">
+                                      <div className="font-medium">{modalidade.nome}</div>
+                                      <div className="text-red-600">
+                                        {modalidade.atrasados}/{modalidade.total} ({((modalidade.atrasados/modalidade.total)*100).toFixed(1)}%)
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Especialidades com mais atrasos */}
+                            {cliente.detalhes?.especialidades && cliente.detalhes.especialidades.length > 0 && (
+                              <div>
+                                <h5 className="font-medium text-sm text-orange-800 mb-2 flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  Especialidades (Top Atrasos)
+                                </h5>
+                                <div className="space-y-1">
+                                  {cliente.detalhes.especialidades.map((especialidade, idx) => (
+                                    <div key={idx} className="text-xs bg-orange-50 p-2 rounded">
+                                      <div className="font-medium">{especialidade.nome}</div>
+                                      <div className="text-orange-600">
+                                        {especialidade.atrasados}/{especialidade.total} ({((especialidade.atrasados/especialidade.total)*100).toFixed(1)}%)
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Médicos com mais atrasos */}
+                            {cliente.detalhes?.medicos && cliente.detalhes.medicos.length > 0 && (
+                              <div>
+                                <h5 className="font-medium text-sm text-yellow-800 mb-2 flex items-center gap-1">
+                                  <Users className="h-4 w-4" />
+                                  Médicos (Top Atrasos)
+                                </h5>
+                                <div className="space-y-1">
+                                  {cliente.detalhes.medicos.map((medico, idx) => (
+                                    <div key={idx} className="text-xs bg-yellow-50 p-2 rounded">
+                                      <div className="font-medium">{medico.nome}</div>
+                                      <div className="text-yellow-600">
+                                        {medico.atrasados}/{medico.total} ({((medico.atrasados/medico.total)*100).toFixed(1)}%)
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                    
-                    <div className="text-center mx-4">
-                      <div className="text-lg font-bold text-red-600">
-                        {cliente.atrasados.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Laudos Atrasados</div>
-                    </div>
-                    
-                    <div className="text-center mx-4">
-                      <div className={`text-sm font-bold px-2 py-1 rounded ${getCorPercentual(cliente.percentualAtraso)}`}>
-                        {cliente.percentualAtraso.toFixed(1)}%
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">% Atraso</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-sm font-medium text-orange-600">
-                        {cliente.tempoMedioAtraso > 0 ? formatarTempoMedio(cliente.tempoMedioAtraso) : '-'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Tempo Médio</div>
-                    </div>
-                  </div>
+                  </Collapsible>
                 ))}
               </>
             )}
