@@ -56,7 +56,7 @@ export function EnhancedSecurityDashboard() {
         </TabsList>
 
         <TabsContent value="metrics" className="space-y-4">
-          <SecurityMetricsPanel metrics={null} />
+          <SecurityMetricsPanel />
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-4">

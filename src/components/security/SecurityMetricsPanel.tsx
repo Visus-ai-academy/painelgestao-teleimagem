@@ -33,7 +33,7 @@ export function SecurityMetricsPanel() {
         return;
       }
 
-      setMetrics(data);
+      setMetrics(data as unknown as SecurityMetrics);
       toast.success('Auditoria de segurança concluída');
     } catch (error) {
       console.error('Security audit failed:', error);
