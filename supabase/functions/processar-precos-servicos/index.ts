@@ -130,6 +130,11 @@ serve(async (req) => {
         const condVolume = row[10] ? parseInt(String(row[10])) || null : null
         const consideraPlantao = String(row[11] || '').toLowerCase() === 'sim'
 
+        // Log para debug das primeiras linhas
+        if (i <= 5) {
+          console.log(`🔍 Linha ${i + 1}: Cliente="${clienteNome}", Modal="${modalidade}", Espec="${especialidade}", Prior="${prioridade}", Preço="${precoStr}"`)
+        }
+
         // Validar campos obrigatórios (não podem estar vazios)
         if (!clienteNome || clienteNome.length < 2) {
           erros.push(`Linha ${i + 1}: Cliente obrigatório inválido - "${clienteNome}"`)
@@ -262,6 +267,12 @@ serve(async (req) => {
       .eq('id', logEntry.id)
 
     console.log(`🎉 Processamento concluído: ${registrosInseridos} sucessos, ${erros.length + registrosComErro} erros`)
+    
+    // Log dos primeiros erros para debug
+    if (erros.length > 0) {
+      console.log('🚨 Primeiros 10 erros encontrados:')
+      erros.slice(0, 10).forEach(erro => console.log(`   - ${erro}`))
+    }
 
     // 8. Retornar resposta
     return new Response(
@@ -271,7 +282,7 @@ serve(async (req) => {
         registros_erro: erros.length + registrosComErro,
         total_linhas: jsonData.length - 1,
         mensagem: `Processamento concluído. ${registrosInseridos} preços inseridos com sucesso. ${erros.length + registrosComErro} erros encontrados.`,
-        detalhes_erros: erros.slice(0, 5) // Primeiros 5 erros para debugging
+        detalhes_erros: erros.slice(0, 10) // Primeiros 10 erros para debugging
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
