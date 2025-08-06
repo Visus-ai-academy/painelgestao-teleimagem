@@ -254,30 +254,51 @@ export const LaudosAtrasadosDetalhado = () => {
         </div>
 
         {/* Estatísticas rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="text-center p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+            <div className="text-2xl font-bold text-blue-600">
+              {filteredAndSortedData.reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground font-semibold">Total Laudos Atrasados</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {filteredAndSortedData.length} registros
+            </div>
+          </div>
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <div className="text-2xl font-bold text-red-600">
-              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras > 3).length}
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras > 3).reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()}
             </div>
             <div className="text-sm text-muted-foreground">Emergencial (&gt;3h)</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras > 3).length} registros
+            </div>
           </div>
           <div className="text-center p-4 bg-orange-50 rounded-lg">
             <div className="text-2xl font-bold text-orange-600">
-              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 2 && l.tempoAtrasoHoras <= 3).length}
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 2 && l.tempoAtrasoHoras <= 3).reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()}
             </div>
             <div className="text-sm text-muted-foreground">Crítico (2-3h)</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 2 && l.tempoAtrasoHoras <= 3).length} registros
+            </div>
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
             <div className="text-2xl font-bold text-yellow-600">
-              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 1 && l.tempoAtrasoHoras < 2).length}
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 1 && l.tempoAtrasoHoras < 2).reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()}
             </div>
             <div className="text-sm text-muted-foreground">Moderado (1-2h)</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras >= 1 && l.tempoAtrasoHoras < 2).length} registros
+            </div>
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-600">
-              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras < 1).length}
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras < 1).reduce((sum, laudo) => sum + laudo.valores, 0).toLocaleString()}
             </div>
             <div className="text-sm text-muted-foreground">Baixo (&lt;1h)</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {filteredAndSortedData.filter(l => l.tempoAtrasoHoras < 1).length} registros
+            </div>
           </div>
         </div>
 
