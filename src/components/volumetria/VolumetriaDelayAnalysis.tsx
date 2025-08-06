@@ -110,7 +110,14 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
   // Função para buscar detalhes de um cliente específico USANDO CONTEXTO
   const fetchClientDetails = async (clienteName: string) => {
-    if (clientDetails.has(clienteName) || loadingDetails.has(clienteName)) return;
+    // FORÇAR LIMPEZA DO CACHE PARA RECALCULAR COM OS NOVOS DADOS
+    setClientDetails(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(clienteName);
+      return newMap;
+    });
+    
+    if (loadingDetails.has(clienteName)) return;
     
     setLoadingDetails(prev => new Set(prev).add(clienteName));
     
@@ -119,6 +126,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       const clientData = volumetriaData.detailedData.filter(item => item.EMPRESA === clienteName);
       
       console.log(`🎯 [DelayAnalysis] Processando ${clientData.length} registros para cliente ${clienteName}`);
+      console.log(`🔥 [DelayAnalysis] Primeiros 3 registros para debug:`, clientData.slice(0, 3));
 
       if (clientData && clientData.length > 0) {
         // Processar especialidades
@@ -193,6 +201,10 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
         }));
 
+        console.log(`🔥 [DelayAnalysis] Especialidades calculadas para ${clienteName}:`, especialidades);
+        console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA encontrada:`, especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
+
+        // Converter para formato DelayData
         const categorias: DelayData[] = Array.from(categoriasMap.entries()).map(([nome, data]) => ({
           nome,
           total_exames: data.total,
