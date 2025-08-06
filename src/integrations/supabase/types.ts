@@ -3165,6 +3165,14 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_dashboard: {
+        Row: {
+          description: string | null
+          metric: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       aceitar_cobertura_escala: {
@@ -3615,6 +3623,14 @@ export type Database = {
           p_ano_destino: number
         }
         Returns: Json
+      }
+      security_health_check: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          area: string
+          status: string
+          details: string
+        }[]
       }
       sincronizar_precos_servicos_contratos: {
         Args: Record<PropertyKey, never>
