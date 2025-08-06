@@ -166,6 +166,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           }
 
           const valores = Number(row.VALORES) || 1; // Usar quantidade de laudos
+          
+          // LOG DEBUG: Para MEDICINA INTERNA
+          if (row.ESPECIALIDADE === 'MEDICINA INTERNA') {
+            console.log(`🐛 [DelayAnalysis] Processando registro MEDICINA INTERNA: VALORES=${valores}, isAtrasado=${isAtrasado}`);
+          }
 
           // Processar especialidades - SOMAR VALORES EM VEZ DE CONTAR REGISTROS
           const esp = row.ESPECIALIDADE || 'Não Informado';
