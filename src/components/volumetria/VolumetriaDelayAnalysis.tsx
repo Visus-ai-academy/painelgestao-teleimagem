@@ -122,11 +122,11 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       
       if (error) throw new Error(`Erro: ${error.message}`);
       
-      console.log(`🔍 [DelayAnalysis] TOTAL GERAL de registros retornados da API: ${allData?.length || 0}`);
+      console.log(`🔍 [DelayAnalysis] TOTAL GERAL de laudos retornados da API: ${allData?.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0) || 0}`);
       
       // FILTRAR APENAS O CLIENTE ESPECÍFICO
       const clientData = allData?.filter((item: any) => item.EMPRESA === clienteName) || [];
-      console.log(`🔍 [DelayAnalysis] ${clientData.length} registros encontrados para ${clienteName}`);
+      console.log(`🔍 [DelayAnalysis] ${clientData.reduce((sum, item) => sum + (Number(item.VALORES) || 0), 0)} laudos encontrados para ${clienteName} (${clientData.length} registros)`);
       
       // PROCESSAR DADOS DO ZERO - CALCULAR SOMAS REAIS
       const especialidadesCalc = new Map<string, { totalLaudos: number; atrasadosLaudos: number; tempoTotal: number }>();
@@ -186,9 +186,9 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           prioData.tempoTotal += tempoAtraso;
         }
         
-        // DEBUG DETALHADO
+        // DEBUG DETALHADO para MEDICINA INTERNA
         if (especialidade === 'MEDICINA INTERNA') {
-          console.log(`📝 [DelayAnalysis] Registro: VALORES=${valores}, atrasado=${isAtrasado}, modalidade=${modalidade}, prioridade=${prioridade}`);
+          console.log(`📝 [DelayAnalysis] Laudo: VALORES=${valores}, atrasado=${isAtrasado}, modalidade=${modalidade}, prioridade=${prioridade}`);
         }
       });
       
@@ -196,8 +196,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       const especialidades: DelayData[] = Array.from(especialidadesCalc.entries()).map(([nome, data]) => {
         const resultado = {
           nome,
-          total_exames: data.totalLaudos, // TOTAL DE LAUDOS
-          atrasados: data.atrasadosLaudos, // LAUDOS ATRASADOS
+          total_exames: data.totalLaudos, // TOTAL DE LAUDOS (não registros)
+          atrasados: data.atrasadosLaudos, // LAUDOS ATRASADOS (não registros)
           percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
           tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
         };
@@ -226,8 +226,8 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       const prioridades: DelayData[] = Array.from(prioridadesCalc.entries()).map(([nome, data]) => {
         const resultado = {
           nome,
-          total_exames: data.totalLaudos,
-          atrasados: data.atrasadosLaudos,
+          total_exames: data.totalLaudos, // TOTAL DE LAUDOS (não registros)
+          atrasados: data.atrasadosLaudos, // LAUDOS ATRASADOS (não registros)
           percentual_atraso: data.totalLaudos > 0 ? (data.atrasadosLaudos / data.totalLaudos) * 100 : 0,
           tempo_medio_atraso: data.atrasadosLaudos > 0 ? data.tempoTotal / data.atrasadosLaudos : 0
         };
