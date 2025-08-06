@@ -7,8 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Clock, AlertTriangle, TrendingDown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useVolumetria } from "@/contexts/VolumetriaContext";
-import { useVolumetriaProcessedData } from "@/hooks/useVolumetriaProcessedData";
 import { LaudosAtrasadosDetalhado } from "./LaudosAtrasadosDetalhado";
 
 interface DelayData {
@@ -53,51 +51,189 @@ const categorizeDelay = (percentual: number) => {
 };
 
 export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) {
-  // USAR DADOS PROCESSADOS CORRETOS - FONTE ÚNICA
-  const { data: volumetriaData } = useVolumetria();
-  const processedData = useVolumetriaProcessedData();
-  
-  // USAR DADOS PROCESSADOS CORRETOS EM VEZ DE PROPS (com conversão de tipos)
-  const safeData = {
-    clientes: processedData.clientes.map(c => ({
-      nome: c.nome,
-      total_exames: c.total_exames,
-      atrasados: c.atrasados,
-      percentual_atraso: c.percentual_atraso,
-      tempo_medio_atraso: 0
-    })) as DelayData[],
-    modalidades: processedData.modalidades.map(m => ({
-      nome: m.nome,
-      total_exames: m.total_exames,
-      atrasados: m.atrasados || 0,
-      percentual_atraso: m.percentual_atraso || 0,
-      tempo_medio_atraso: 0
-    })) as DelayData[],
-    especialidades: processedData.especialidades.map(e => ({
-      nome: e.nome,
-      total_exames: e.total_exames,
-      atrasados: e.atrasados || 0,
-      percentual_atraso: e.percentual_atraso || 0,
-      tempo_medio_atraso: 0
-    })) as DelayData[],
-    categorias: processedData.categorias.map(c => ({
-      nome: c.nome,
-      total_exames: c.total_exames,
-      atrasados: 0,
-      percentual_atraso: 0,
-      tempo_medio_atraso: 0
-    })) as DelayData[],
-    prioridades: processedData.prioridades.map(p => ({
-      nome: p.nome,
-      total_exames: p.total_exames,
-      atrasados: 0,
-      percentual_atraso: 0,
-      tempo_medio_atraso: 0
-    })) as DelayData[],
-    totalAtrasados: volumetriaData.dashboardStats.total_atrasados || 0,
-    percentualAtrasoGeral: volumetriaData.dashboardStats.percentual_atraso || 0,
-    atrasosComTempo: data.atrasosComTempo || []
-  };
+  // BUSCAR DADOS DIRETAMENTE DO BANCO PARA ELIMINAR LIMITAÇÕES
+  const [safeData, setSafeData] = useState<DelayAnalysisData>({
+    clientes: [],
+    modalidades: [],
+    especialidades: [],
+    categorias: [],
+    prioridades: [],
+    totalAtrasados: 0,
+    percentualAtrasoGeral: 0,
+    atrasosComTempo: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  // BUSCAR DADOS CORRETOS SEM LIMITAÇÕES
+  useEffect(() => {
+    const fetchRealData = async () => {
+      try {
+        console.log('🔄 [DelayAnalysis] Buscando dados sem limitações...');
+        
+        // USAR A FUNÇÃO FORCE COMPLETE PARA GARANTIR TODOS OS DADOS
+        const { data: allData, error } = await supabase.rpc('get_volumetria_force_complete');
+        
+        if (error) {
+          console.error('❌ Erro ao buscar dados:', error);
+          return;
+        }
+
+        console.log(`✅ [DelayAnalysis] Dados obtidos: ${allData?.length || 0} registros`);
+        console.log(`✅ [DelayAnalysis] Total de laudos: ${allData?.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0) || 0}`);
+        
+        // PROCESSAR DADOS POR CATEGORIA
+        const especialidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        const modalidadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        const clientesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        const categoriasMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+        const prioridadesMap = new Map<string, { total: number; atrasados: number; tempoTotal: number }>();
+
+        let totalAtrasadosGeral = 0;
+        let totalLaudosGeral = 0;
+
+        allData?.forEach((registro: any) => {
+          const valores = Number(registro.VALORES) || 1;
+          totalLaudosGeral += valores;
+
+          // CALCULAR ATRASO
+          let isAtrasado = false;
+          let tempoAtraso = 0;
+          
+          if (registro.DATA_LAUDO && registro.DATA_PRAZO && registro.HORA_LAUDO && registro.HORA_PRAZO) {
+            const dataLaudo = new Date(`${registro.DATA_LAUDO}T${registro.HORA_LAUDO}`);
+            const dataPrazo = new Date(`${registro.DATA_PRAZO}T${registro.HORA_PRAZO}`);
+            isAtrasado = dataLaudo > dataPrazo;
+            tempoAtraso = isAtrasado ? (dataLaudo.getTime() - dataPrazo.getTime()) / (1000 * 60) : 0;
+          }
+
+          if (isAtrasado) {
+            totalAtrasadosGeral += valores;
+          }
+
+          // PROCESSAR ESPECIALIDADES
+          const especialidade = registro.ESPECIALIDADE || 'Não Informado';
+          if (!especialidadesMap.has(especialidade)) {
+            especialidadesMap.set(especialidade, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const espData = especialidadesMap.get(especialidade)!;
+          espData.total += valores;
+          if (isAtrasado) {
+            espData.atrasados += valores;
+            espData.tempoTotal += tempoAtraso;
+          }
+
+          // PROCESSAR MODALIDADES
+          const modalidade = registro.MODALIDADE || 'Não Informado';
+          if (!modalidadesMap.has(modalidade)) {
+            modalidadesMap.set(modalidade, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const modData = modalidadesMap.get(modalidade)!;
+          modData.total += valores;
+          if (isAtrasado) {
+            modData.atrasados += valores;
+            modData.tempoTotal += tempoAtraso;
+          }
+
+          // PROCESSAR CLIENTES
+          const cliente = registro.EMPRESA || 'Não Informado';
+          if (!clientesMap.has(cliente)) {
+            clientesMap.set(cliente, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const cliData = clientesMap.get(cliente)!;
+          cliData.total += valores;
+          if (isAtrasado) {
+            cliData.atrasados += valores;
+            cliData.tempoTotal += tempoAtraso;
+          }
+
+          // PROCESSAR CATEGORIAS  
+          const categoria = registro.CATEGORIA || 'Não Informado';
+          if (!categoriasMap.has(categoria)) {
+            categoriasMap.set(categoria, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const catData = categoriasMap.get(categoria)!;
+          catData.total += valores;
+          if (isAtrasado) {
+            catData.atrasados += valores;
+            catData.tempoTotal += tempoAtraso;
+          }
+
+          // PROCESSAR PRIORIDADES
+          const prioridade = registro.PRIORIDADE || 'Não Informado';
+          if (!prioridadesMap.has(prioridade)) {
+            prioridadesMap.set(prioridade, { total: 0, atrasados: 0, tempoTotal: 0 });
+          }
+          const prioData = prioridadesMap.get(prioridade)!;
+          prioData.total += valores;
+          if (isAtrasado) {
+            prioData.atrasados += valores;
+            prioData.tempoTotal += tempoAtraso;
+          }
+        });
+
+        // CONVERTER PARA FORMATO FINAL
+        const especialidades = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        })).sort((a, b) => b.atrasados - a.atrasados);
+
+        const modalidades = Array.from(modalidadesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        })).sort((a, b) => b.atrasados - a.atrasados);
+
+        const clientes = Array.from(clientesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        })).sort((a, b) => b.atrasados - a.atrasados);
+
+        const categorias = Array.from(categoriasMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        })).sort((a, b) => b.atrasados - a.atrasados);
+
+        const prioridades = Array.from(prioridadesMap.entries()).map(([nome, data]) => ({
+          nome,
+          total_exames: data.total,
+          atrasados: data.atrasados,
+          percentual_atraso: data.total > 0 ? (data.atrasados / data.total) * 100 : 0,
+          tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
+        })).sort((a, b) => b.atrasados - a.atrasados);
+
+        console.log('📊 [DelayAnalysis] MEDICINA INTERNA:', especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
+
+        setSafeData({
+          clientes,
+          modalidades,
+          especialidades,
+          categorias,
+          prioridades,
+          totalAtrasados: totalAtrasadosGeral,
+          percentualAtrasoGeral: totalLaudosGeral > 0 ? (totalAtrasadosGeral / totalLaudosGeral) * 100 : 0,
+          atrasosComTempo: data.atrasosComTempo || []
+        });
+
+      } catch (error) {
+        console.error('❌ Erro ao processar dados:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRealData();
+  }, []);
   
   // Estado para controle de ordenação
   const [sortField, setSortField] = useState<'nome' | 'total_exames' | 'atrasados' | 'percentual_atraso' | 'tempoMedioAtraso'>('atrasados');
@@ -404,6 +540,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
       : <ArrowDown className="h-4 w-4 text-blue-600" />;
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-muted-foreground">Carregando análise de atrasos sem limitações...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Visão Geral dos Atrasos */}
@@ -415,12 +560,12 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert className={`${volumetriaData.dashboardStats.percentual_atraso >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
+          <Alert className={`${safeData.percentualAtrasoGeral >= 10 ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'} mb-4`}>
             <Clock className="h-4 w-4" />
             <AlertDescription>
-              <strong>{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</strong> dos laudos estão atrasados 
-               ({volumetriaData.dashboardStats.total_atrasados.toLocaleString()} de {volumetriaData.dashboardStats.total_exames.toLocaleString()} laudos)
-               {volumetriaData.dashboardStats.percentual_atraso >= 2 && (
+              <strong>{safeData.percentualAtrasoGeral.toFixed(1)}%</strong> dos laudos estão atrasados 
+               ({safeData.totalAtrasados.toLocaleString()} laudos)
+               {safeData.percentualAtrasoGeral >= 2 && (
                  <span className="block mt-2 text-red-600 font-medium">
                    ⚠️ Atenção: Taxa de atraso acima do limite aceitável (2%)
                  </span>
@@ -430,15 +575,15 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
 
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div className="text-center">
-               <div className="text-3xl font-bold text-red-600">{volumetriaData.dashboardStats.total_atrasados.toLocaleString()}</div>
+               <div className="text-3xl font-bold text-red-600">{safeData.totalAtrasados.toLocaleString()}</div>
                <div className="text-sm text-muted-foreground">Laudos Atrasados</div>
              </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{processedData.clientes.filter(c => c.atrasados > 0).length}</div>
+                <div className="text-2xl font-bold text-orange-600">{safeData.clientes.filter(c => c.atrasados > 0).length}</div>
                 <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
               </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-yellow-600">{safeData.percentualAtrasoGeral.toFixed(1)}%</div>
               <div className="text-sm text-muted-foreground">Taxa Geral de Atraso</div>
             </div>
           </div>
@@ -461,7 +606,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <div className="text-2xl font-bold text-red-600">
-                {processedData.clientes.filter(c => c.percentual_atraso > 15).length}
+                {safeData.clientes.filter(c => c.percentual_atraso > 15).length}
               </div>
               <div className="text-sm text-muted-foreground">Críticos (&gt;15%)</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -470,7 +615,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
-                {processedData.clientes.filter(c => c.percentual_atraso >= 10 && c.percentual_atraso <= 15).length}
+                {safeData.clientes.filter(c => c.percentual_atraso >= 10 && c.percentual_atraso <= 15).length}
               </div>
               <div className="text-sm text-muted-foreground">Altos (10-15%)</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -479,7 +624,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </div>
             <div className="text-center p-4 bg-yellow-50 rounded-lg">
               <div className="text-2xl font-bold text-yellow-600">
-                {processedData.clientes.filter(c => c.percentual_atraso >= 5 && c.percentual_atraso < 10).length}
+                {safeData.clientes.filter(c => c.percentual_atraso >= 5 && c.percentual_atraso < 10).length}
               </div>
               <div className="text-sm text-muted-foreground">Médios (5-10%)</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -488,7 +633,7 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
-                {processedData.clientes.filter(c => c.percentual_atraso < 5).length}
+                {safeData.clientes.filter(c => c.percentual_atraso < 5).length}
               </div>
               <div className="text-sm text-muted-foreground">Baixos (&lt;5%)</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -509,19 +654,19 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <div className="text-2xl font-bold text-red-600">
-                {volumetriaData.dashboardStats.total_atrasados.toLocaleString()}
+                {safeData.totalAtrasados.toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground">Total de Laudos Atrasados</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
-                {volumetriaData.dashboardStats.percentual_atraso.toFixed(1)}%
+                {safeData.percentualAtrasoGeral.toFixed(1)}%
               </div>
               <div className="text-sm text-muted-foreground">Taxa de Atraso</div>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                {processedData.clientes.filter(c => c.atrasados > 0).length}
+                {safeData.clientes.filter(c => c.atrasados > 0).length}
               </div>
               <div className="text-sm text-muted-foreground">Clientes com Atrasos</div>
             </div>
