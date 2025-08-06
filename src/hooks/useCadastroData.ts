@@ -149,7 +149,7 @@ export const usePrecosServicos = () => {
       // Buscar TODOS os registros usando paginação otimizada
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 5000; // Reduzir tamanho do lote para melhor performance
+      const rangeSize = 1000; // Usar lotes menores para evitar timeouts
       let hasMore = true;
 
       console.log('🔍 Iniciando busca de preços de serviços...');
@@ -174,14 +174,22 @@ export const usePrecosServicos = () => {
           throw error;
         }
 
-        if (dataBatch && dataBatch.length > 0) {
+        if (dataBatch) {
           allData = [...allData, ...dataBatch];
-          rangeStart += rangeSize;
-          hasMore = dataBatch.length === rangeSize;
           console.log(`✅ Lote carregado: ${dataBatch.length} registros. Total acumulado: ${allData.length}`);
           
-          if (count !== null) {
+          if (count !== null && rangeStart === 0) {
             console.log(`📊 Total no banco: ${count} registros`);
+          }
+          
+          // Continuar se o lote está completo (indica que pode haver mais dados)
+          if (dataBatch.length === rangeSize) {
+            rangeStart += rangeSize;
+            hasMore = true;
+          } else {
+            // Se o lote não está completo, chegamos ao fim
+            hasMore = false;
+            console.log('🏁 Busca finalizada - último lote carregado');
           }
         } else {
           hasMore = false;
