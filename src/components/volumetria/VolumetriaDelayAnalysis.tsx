@@ -584,65 +584,92 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
                                   <span className="ml-2 text-sm text-muted-foreground">Carregando detalhes...</span>
                                 </div>
                               ) : clientDetalhe ? (
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-3 gap-4">
                                   {/* Especialidades */}
-                                  <div>
+                                  <div className="w-full max-w-xs">
                                     <h4 className="font-semibold text-sm mb-3 text-blue-700">Especialidades</h4>
-                                    <div className="space-y-2">
-                                      {clientDetalhe.especialidades.slice(0, 5).map(esp => (
-                                        <div key={esp.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
-                                          <span className="font-medium truncate flex-1">{esp.nome}</span>
-                                          <div className="text-right ml-2">
-                                            <div className="font-bold text-red-600">{esp.atrasados}</div>
-                                            <div className="text-muted-foreground">{esp.percentual_atraso.toFixed(1)}%</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {clientDetalhe.especialidades.slice(0, 8).map(esp => (
+                                        <div key={esp.nome} className="flex flex-col gap-1 text-xs bg-white p-2 rounded border">
+                                          <div className="flex justify-between items-start">
+                                            <span className="font-medium text-xs leading-tight">{esp.nome}</span>
+                                            <Badge variant={esp.percentual_atraso > 10 ? "destructive" : "secondary"} className="text-xs ml-1 px-1 py-0">
+                                              {esp.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between items-center text-gray-600">
+                                            <span className="text-xs">{esp.atrasados} de {esp.total_exames}</span>
+                                            {esp.tempo_medio_atraso > 0 && (
+                                              <span className="text-xs text-orange-600">
+                                                {Math.round(esp.tempo_medio_atraso / 60)}h
+                                              </span>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
-                                      {clientDetalhe.especialidades.length > 5 && (
+                                      {clientDetalhe.especialidades.length > 8 && (
                                         <div className="text-xs text-muted-foreground text-center py-1">
-                                          +{clientDetalhe.especialidades.length - 5} especialidades...
+                                          +{clientDetalhe.especialidades.length - 8} mais...
                                         </div>
                                       )}
                                     </div>
                                   </div>
 
                                   {/* Modalidades/Categorias */}
-                                  <div>
+                                  <div className="w-full max-w-xs">
                                     <h4 className="font-semibold text-sm mb-3 text-green-700">Modalidades</h4>
-                                    <div className="space-y-2">
-                                      {clientDetalhe.categorias.slice(0, 5).map(cat => (
-                                        <div key={cat.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
-                                          <span className="font-medium truncate flex-1">{cat.nome}</span>
-                                          <div className="text-right ml-2">
-                                            <div className="font-bold text-red-600">{cat.atrasados}</div>
-                                            <div className="text-muted-foreground">{cat.percentual_atraso.toFixed(1)}%</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {clientDetalhe.categorias.slice(0, 8).map(cat => (
+                                        <div key={cat.nome} className="flex flex-col gap-1 text-xs bg-white p-2 rounded border">
+                                          <div className="flex justify-between items-start">
+                                            <span className="font-medium text-xs leading-tight">{cat.nome}</span>
+                                            <Badge variant={cat.percentual_atraso > 10 ? "destructive" : "secondary"} className="text-xs ml-1 px-1 py-0">
+                                              {cat.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between items-center text-gray-600">
+                                            <span className="text-xs">{cat.atrasados} de {cat.total_exames}</span>
+                                            {cat.tempo_medio_atraso > 0 && (
+                                              <span className="text-xs text-orange-600">
+                                                {Math.round(cat.tempo_medio_atraso / 60)}h
+                                              </span>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
-                                      {clientDetalhe.categorias.length > 5 && (
+                                      {clientDetalhe.categorias.length > 8 && (
                                         <div className="text-xs text-muted-foreground text-center py-1">
-                                          +{clientDetalhe.categorias.length - 5} modalidades...
+                                          +{clientDetalhe.categorias.length - 8} mais...
                                         </div>
                                       )}
                                     </div>
                                   </div>
 
                                   {/* Prioridades */}
-                                  <div>
+                                  <div className="w-full max-w-xs">
                                     <h4 className="font-semibold text-sm mb-3 text-purple-700">Prioridades</h4>
-                                    <div className="space-y-2">
-                                      {clientDetalhe.prioridades.slice(0, 5).map(prio => (
-                                        <div key={prio.nome} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
-                                          <span className="font-medium truncate flex-1">{prio.nome}</span>
-                                          <div className="text-right ml-2">
-                                            <div className="font-bold text-red-600">{prio.atrasados}</div>
-                                            <div className="text-muted-foreground">{prio.percentual_atraso.toFixed(1)}%</div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {clientDetalhe.prioridades.slice(0, 8).map(prio => (
+                                        <div key={prio.nome} className="flex flex-col gap-1 text-xs bg-white p-2 rounded border">
+                                          <div className="flex justify-between items-start">
+                                            <span className="font-medium text-xs leading-tight">{prio.nome}</span>
+                                            <Badge variant={prio.percentual_atraso > 10 ? "destructive" : "secondary"} className="text-xs ml-1 px-1 py-0">
+                                              {prio.percentual_atraso.toFixed(1)}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between items-center text-gray-600">
+                                            <span className="text-xs">{prio.atrasados} de {prio.total_exames}</span>
+                                            {prio.tempo_medio_atraso > 0 && (
+                                              <span className="text-xs text-orange-600">
+                                                {Math.round(prio.tempo_medio_atraso / 60)}h
+                                              </span>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
-                                      {clientDetalhe.prioridades.length > 5 && (
+                                      {clientDetalhe.prioridades.length > 8 && (
                                         <div className="text-xs text-muted-foreground text-center py-1">
-                                          +{clientDetalhe.prioridades.length - 5} prioridades...
+                                          +{clientDetalhe.prioridades.length - 8} mais...
                                         </div>
                                       )}
                                     </div>
