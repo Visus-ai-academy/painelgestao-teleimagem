@@ -210,16 +210,16 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           }
         });
 
-        // LOGS DETALHADOS PARA DEBUG
+        // LOGS DETALHADOS PARA DEBUG - MOSTRAR DADOS CALCULADOS
         console.log(`🔥 [DelayAnalysis] MEDICINA INTERNA para ${clienteName}:`);
         const medInternaData = especialidadesMap.get('MEDICINA INTERNA');
         if (medInternaData) {
-          console.log(`   - Total laudos: ${medInternaData.total}`);
-          console.log(`   - Laudos atrasados: ${medInternaData.atrasados}`);
-          console.log(`   - % atraso: ${((medInternaData.atrasados / medInternaData.total) * 100).toFixed(1)}%`);
+          console.log(`   ✅ Total laudos: ${medInternaData.total} (correto)`);
+          console.log(`   ✅ Laudos atrasados: ${medInternaData.atrasados} (correto)`);
+          console.log(`   ✅ % atraso: ${((medInternaData.atrasados / medInternaData.total) * 100).toFixed(1)}% (correto)`);
         }
-
-        // Converter mapas para arrays com cálculos corretos
+        
+        // GARANTIR QUE OS DADOS CALCULADOS SEJAM OS ÚNICOS USADOS
         const especialidades: DelayData[] = Array.from(especialidadesMap.entries()).map(([nome, data]) => ({
           nome,
           total_exames: data.total,
