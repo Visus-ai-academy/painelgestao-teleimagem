@@ -68,30 +68,30 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        console.log('🔄 [DelayAnalysis] Buscando dados SEM LIMITAÇÕES - OBJETIVO: 10.433 laudos atrasados...');
+        console.log('🔄 [DelayAnalysis] ACESSANDO FUNÇÃO CORRETA - OBJETIVO: 10.433 laudos atrasados...');
         
-        // VALIDAÇÃO PRÉVIA: Verificar total correto do banco
-        const { data: totalCorreto } = await supabase.rpc('get_volumetria_total_atraso');
-        console.log(`🎯 [DelayAnalysis] VALIDAÇÃO BANCO:`, totalCorreto);
+        // ACESSO DIRETO À FUNÇÃO CORRETA SEM FALLBACKS
+        const { data: allData, error } = await supabase.rpc('get_volumetria_unlimited_force');
         
-        // BUSCAR TODOS OS DADOS SEM LIMITAÇÃO
-        let { data: allData, error } = await supabase.rpc('get_volumetria_unlimited_force');
-        
-        if (error || !allData || allData.length < 35000) {
-          console.warn(`⚠️ Função unlimited_force retornou apenas ${allData?.length || 0} registros, tentando force_complete...`);
-          
-          // FALLBACK: FUNÇÃO FORCE_COMPLETE 
-          const response2 = await supabase.rpc('get_volumetria_force_complete');
-          if (response2.data && !response2.error) {
-            allData = response2.data;
-            console.log(`🔄 [DelayAnalysis] Fallback: ${allData.length} registros obtidos`);
-          } else {
-            console.error('❌ TODAS as funções falharam!');
-            return;
-          }
+        if (error) {
+          console.error('❌ Erro na função unlimited_force:', error);
+          return;
         }
-
-        console.log(`✅ [DelayAnalysis] DADOS FINAIS: ${allData?.length || 0} registros obtidos`);
+        
+        if (!allData || allData.length === 0) {
+          console.error('❌ Função unlimited_force retornou dados vazios');
+          return;
+        }
+        
+        console.log(`✅ [DelayAnalysis] FUNÇÃO CORRETA ACESSADA: ${allData.length} registros obtidos`);
+        console.log(`✅ [DelayAnalysis] Total de laudos obtidos: ${allData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0).toLocaleString()}`);
+        
+        // VERIFICAÇÃO: Se retornou menos de 35k registros, há problema
+        if (allData.length < 35000) {
+          console.warn(`⚠️ ATENÇÃO: Obtidos apenas ${allData.length} registros de ~35.337 esperados - pode haver limitação ainda`);
+        } else {
+          console.log(`✅ SUCESSO: ${allData.length} registros obtidos - função correta funcionando!`);
+        }
         
         // VALIDAÇÃO: GARANTIR QUE TEMOS TODOS OS DADOS
         const totalLaudosObtidos = allData?.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0) || 0;
