@@ -146,14 +146,18 @@ export const usePrecosServicos = () => {
     try {
       setLoading(true);
       
-      // Buscar TODOS os registros usando paginação
+      // Buscar TODOS os registros usando paginação otimizada
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 10000;
+      const rangeSize = 5000; // Reduzir tamanho do lote para melhor performance
       let hasMore = true;
 
+      console.log('🔍 Iniciando busca de preços de serviços...');
+
       while (hasMore) {
-        const { data: dataBatch, error } = await supabase
+        console.log(`📥 Buscando lote: ${rangeStart} a ${rangeStart + rangeSize - 1}`);
+        
+        const { data: dataBatch, error, count } = await supabase
           .from('precos_servicos')
           .select(`
             *,
@@ -161,22 +165,37 @@ export const usePrecosServicos = () => {
               id,
               nome
             )
-          `)
+          `, { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(rangeStart, rangeStart + rangeSize - 1);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Erro ao buscar preços:', error);
+          throw error;
+        }
 
         if (dataBatch && dataBatch.length > 0) {
           allData = [...allData, ...dataBatch];
           rangeStart += rangeSize;
           hasMore = dataBatch.length === rangeSize;
+          console.log(`✅ Lote carregado: ${dataBatch.length} registros. Total acumulado: ${allData.length}`);
+          
+          if (count !== null) {
+            console.log(`📊 Total no banco: ${count} registros`);
+          }
         } else {
           hasMore = false;
+          console.log('🏁 Busca finalizada - nenhum registro restante');
         }
       }
       
-      setData(allData);
+      console.log(`🎉 Busca completa: ${allData.length} preços carregados`);
+      
+      // Filtrar apenas preços com valor > 0 se necessário
+      const precosValidos = allData.filter(preco => preco.valor_base > 0);
+      console.log(`💰 Preços válidos (valor > 0): ${precosValidos.length}`);
+      
+      setData(allData); // Manter todos os dados, deixar filtro para o usuário
     } catch (err: any) {
       setError(err.message);
     } finally {
