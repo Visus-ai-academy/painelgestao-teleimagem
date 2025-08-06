@@ -128,24 +128,27 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const dashboardStats = dashboardData[0];
       console.log('✅ Dashboard stats carregadas:', dashboardStats);
       
-      console.log('🚀 FASE 2: Carregando TODOS os 35.337 registros detalhados via RPC...');
+      console.log('🚀 FASE 2: Carregando TODOS os dados detalhados via RPC original...');
       
-      // CARREGAR TODOS OS DADOS DETALHADOS VIA RPC (SEM LIMITAÇÃO - CORRIGIDO)
+      // CARREGAR DADOS DETALHADOS USANDO FUNÇÃO EXISTENTE
       const { data: detailedData, error: detailedError } = await supabase.rpc('get_volumetria_complete_data');
       
       if (detailedError) {
         throw new Error(`Erro nos dados detalhados: ${detailedError.message}`);
       }
       
-      console.log(`🎉🔥 TODOS OS DADOS CARREGADOS VIA RPC: ${detailedData.length} registros (ERA 1000, AGORA ${detailedData.length}) 🔥🎉`);
-      console.log(`📊 Total exames somados: ${detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0)}`);
-      console.log(`🚨 ATRASOS AGORA BASEADOS EM VALORES (EXAMES), NÃO EM REGISTROS! 🚨`);
+      console.log(`🎉🔥 DADOS CARREGADOS: ${detailedData?.length || 0} registros detalhados 🔥🎉`);
+      if (detailedData) {
+        const totalExamesCalc = detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
+        console.log(`📊 Total exames somados: ${totalExamesCalc}`);
+        
+        // DEBUG ESPECÍFICO CEDI_RJ
+        const cediRegistros = detailedData.filter((item: any) => item.EMPRESA === 'CEDI_RJ');
+        const cediLaudos = cediRegistros.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
+        console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Detalhados: ${cediRegistros.length} reg, ${cediLaudos} laudos`);
+        console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Primeiros 3 registros:`, cediRegistros.slice(0, 3));
+      }
       
-      // DEBUG ESPECÍFICO CEDI_RJ
-      const cediRegistros = detailedData.filter((item: any) => item.EMPRESA === 'CEDI_RJ');
-      const cediLaudos = cediRegistros.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
-      console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Registros: ${cediRegistros.length}, Laudos: ${cediLaudos}`);
-      console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Primeiros 3 registros:`, cediRegistros.slice(0, 3));
       
       // Carregar dados de arquivos agregados
       const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
@@ -155,20 +158,20 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       }
       
       // Processar estatísticas por tipo de arquivo
-      const statsResult: any = {};
+      const fileStats: any = {};
       const tiposArquivo = ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'];
       
       tiposArquivo.forEach(tipo => {
         const tipoStats = aggregateStats?.find((stat: any) => stat.arquivo_fonte === tipo);
         if (tipoStats) {
-          statsResult[tipo] = {
+          fileStats[tipo] = {
             totalRecords: Number(tipoStats.total_records),
             recordsWithValue: Number(tipoStats.records_with_value),
             recordsZeroed: Number(tipoStats.records_zeroed),
             totalValue: Number(tipoStats.total_value)
           };
         } else {
-          statsResult[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
+          fileStats[tipo] = { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 };
         }
       });
       
@@ -189,9 +192,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
       console.log('🔄 Atualizando estado do contexto com dados RPC...');
       setData({
-        stats: statsResult,
+        stats: fileStats,
         lastUploads: lastUploadsResult,
-        detailedData: detailedData,
+        detailedData: detailedData || [],
         clientes: dashboardStats.clientes_unicos || [],
         modalidades: dashboardStats.modalidades_unicas || [],
         especialidades: dashboardStats.especialidades_unicas || [],

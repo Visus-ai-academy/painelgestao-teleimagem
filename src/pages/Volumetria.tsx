@@ -72,7 +72,7 @@ export default function Volumetria() {
   const { data: contextData, refreshData } = useVolumetria();
   const processedData = useVolumetriaProcessedData();
   
-  // Logs de debug para identificar inconsistências 
+  // LOGS DETALHADOS PARA DEBUG DO CEDI_RJ
   console.log('🔥 [Volumetria] Dados do contexto:', contextData.dashboardStats);
   console.log('📊 [Volumetria] Dados processados:', {
     clientes: processedData.clientes.length,
@@ -80,6 +80,15 @@ export default function Volumetria() {
     totalExames: processedData.totalExames,
     loading: processedData.loading
   });
+  
+  // DEBUG ESPECÍFICO DO CEDI_RJ
+  const cediProcessado = processedData.clientes.find(c => c.nome === 'CEDI_RJ');
+  if (cediProcessado) {
+    console.log('🎯 [Volumetria] CEDI_RJ PROCESSADO ENCONTRADO:', cediProcessado);
+  } else {
+    console.log('❌ [Volumetria] CEDI_RJ NÃO ENCONTRADO nos dados processados!');
+    console.log('📋 [Volumetria] Lista de clientes processados:', processedData.clientes.map(c => c.nome).slice(0, 10));
+  }
   
   // Verificar se há filtros ativos
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {

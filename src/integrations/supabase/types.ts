@@ -3241,6 +3241,16 @@ export type Database = {
           total_registros: number
         }[]
       }
+      get_clientes_stats_completos: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          empresa: string
+          total_registros: number
+          total_laudos: number
+          laudos_atrasados: number
+          percentual_atraso: number
+        }[]
+      }
       get_laudos_atrasados_completos: {
         Args: Record<PropertyKey, never>
         Returns: {
