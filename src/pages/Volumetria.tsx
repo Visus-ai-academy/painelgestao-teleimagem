@@ -9,9 +9,8 @@ import { VolumetriaClientesAtrasados } from "@/components/volumetria/VolumetriaC
 import { VolumetriaDelayAnalysis } from "@/components/volumetria/VolumetriaDelayAnalysis";
 import { VolumetriaExecutiveSummary } from "@/components/volumetria/VolumetriaExecutiveSummary";
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
-import { VolumetriaRetroativoRules } from "@/components/volumetria/VolumetriaRetroativoRules";
 import { useVolumetriaData } from "@/hooks/useVolumetriaData";
-import { Upload, BarChart3, FileText, Settings } from "lucide-react";
+import { Upload, BarChart3, FileText } from "lucide-react";
 
 export default function Volumetria() {
   const [periodo, setPeriodo] = useState("mes_atual");
@@ -32,7 +31,7 @@ export default function Volumetria() {
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -44,10 +43,6 @@ export default function Volumetria() {
             <TabsTrigger value="reports" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Relatórios
-            </TabsTrigger>
-            <TabsTrigger value="rules" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Regras
             </TabsTrigger>
           </TabsList>
 
@@ -145,58 +140,6 @@ export default function Volumetria() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="rules" className="space-y-6">
-            <VolumetriaRetroativoRules />
-            
-            <Card className="border-l-4 border-l-orange-500">
-              <CardHeader>
-                <CardTitle className="text-orange-700">⚠️ Problema Identificado - Regra de Datas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-orange-800 mb-2">Situação Atual:</h4>
-                    <p className="text-sm text-orange-700">
-                      Os arquivos 1, 2 e 5 (volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao) 
-                      não estão aplicando corretamente a regra de limite de data de laudo.
-                    </p>
-                  </div>
-                  
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-red-800 mb-2">Problema Identificado:</h4>
-                    <p className="text-sm text-red-700 mb-2">
-                      Exames com DATA_LAUDO posterior ao dia 7 do mês subsequente estão sendo incluídos na volumetria.
-                    </p>
-                    <div className="text-xs text-red-600 font-mono bg-red-100 p-2 rounded">
-                      Exemplo: Exame laudado em 15/07/2025 aparecendo no faturamento de junho/2025<br/>
-                      (Período: até 07/07/2025)
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-2">Regra Necessária:</h4>
-                    <p className="text-sm text-blue-700">
-                      Para período de faturamento junho/2025:
-                    </p>
-                    <ul className="text-xs text-blue-600 mt-2 ml-4 list-disc">
-                      <li>Período válido: 08/06/2025 a 07/07/2025</li>
-                      <li>Excluir exames com DATA_LAUDO {">"} 07/07/2025</li>
-                      <li>Aplicar apenas aos arquivos 1, 2 e 5 (não retroativos)</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-green-800 mb-2">Implementação Requerida:</h4>
-                    <p className="text-sm text-green-700">
-                      Necessário criar/atualizar as Edge Functions de processamento para aplicar 
-                      filtro de DATA_LAUDO nos arquivos não-retroativos, similar ao que já existe 
-                      para os arquivos retroativos.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>
