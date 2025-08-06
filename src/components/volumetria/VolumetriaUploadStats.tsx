@@ -165,14 +165,6 @@ export function VolumetriaUploadStats() {
               <div className="text-sm text-orange-700">Total de Exames</div>
             </div>
           </div>
-          {/* Debug info */}
-          <div className="mt-2 text-xs text-center text-muted-foreground">
-            Cache: {CACHE_BUSTER} | Debug: {JSON.stringify({
-              loading: data.loading,
-              totalValue: totalStats.totalValue,
-              hasStats: Object.keys(data.stats).length
-            })}
-          </div>
           {/* Indicador de última atualização */}
           <div className="mt-2 text-xs text-center text-muted-foreground">
             Última atualização: {new Date().toLocaleTimeString('pt-BR')}
