@@ -150,6 +150,12 @@ serve(async (req) => {
         if (headers.includes('NOME_PACIENTE') && rowData[headers.indexOf('NOME_PACIENTE')]) {
           record.NOME_PACIENTE = String(rowData[headers.indexOf('NOME_PACIENTE')]).trim();
         }
+
+        // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
+        if (record.EMPRESA && record.EMPRESA.toLowerCase().includes('_local')) {
+          console.log(`Linha ${rowIndex}: cliente com _local excluído: ${record.EMPRESA}`)
+          continue
+        }
         if (headers.includes('CODIGO_PACIENTE') && rowData[headers.indexOf('CODIGO_PACIENTE')]) {
           record.CODIGO_PACIENTE = String(rowData[headers.indexOf('CODIGO_PACIENTE')]).trim();
         }

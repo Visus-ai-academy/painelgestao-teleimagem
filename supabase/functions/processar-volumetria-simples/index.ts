@@ -111,6 +111,11 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
 
     if (!empresa.trim() || !nomePaciente.trim()) return null;
 
+    // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
+    if (empresa.toLowerCase().includes('_local')) {
+      return null;
+    }
+
     const safeString = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
       return String(value).trim() || undefined;
