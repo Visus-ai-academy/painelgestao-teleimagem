@@ -1,217 +1,170 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, TrendingUp, TrendingDown, Shield, Users, Eye, HardDrive } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface SecurityMetrics {
-  total_alerts: number;
-  critical_alerts: number;
-  recent_logins: number;
-  failed_logins: number;
-  data_access_events: number;
-  sensitive_access_events: number;
-  backup_status: string;
-  last_backup: string;
+  timestamp: string;
+  rls_enabled_tables: number;
+  total_policies: number;
+  recent_critical_alerts: number;
+  insecure_functions: number;
+  security_score: 'HIGH' | 'MEDIUM' | 'LOW';
+  recommendations: string[];
 }
 
-interface SecurityMetricsPanelProps {
-  metrics: SecurityMetrics | null;
-}
+export function SecurityMetricsPanel() {
+  const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
+  const [loading, setLoading] = useState(false);
 
-export function SecurityMetricsPanel({ metrics }: SecurityMetricsPanelProps) {
-  if (!metrics) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Métricas de Segurança</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">Carregando métricas...</div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const runSecurityAudit = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('enhanced_security_audit');
+      
+      if (error) {
+        console.error('Security audit error:', error);
+        toast.error('Erro ao executar auditoria de segurança');
+        return;
+      }
 
-  const securityScore = Math.max(0, 100 - (metrics.critical_alerts * 10) - 
-    (metrics.failed_logins > 10 ? 15 : 0) - 
-    (metrics.backup_status !== 'ok' ? 20 : 0));
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
+      setMetrics(data);
+      toast.success('Auditoria de segurança concluída');
+    } catch (error) {
+      console.error('Security audit failed:', error);
+      toast.error('Falha na auditoria de segurança');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getScoreDescription = (score: number) => {
-    if (score >= 90) return 'Excelente - Sistema altamente seguro';
-    if (score >= 80) return 'Bom - Segurança adequada com pequenos pontos de atenção';
-    if (score >= 60) return 'Regular - Algumas vulnerabilidades precisam ser tratadas';
-    return 'Crítico - Ação imediata necessária';
+  useEffect(() => {
+    runSecurityAudit();
+  }, []);
+
+  const getScoreColor = (score: string) => {
+    switch (score) {
+      case 'HIGH': return 'text-green-600';
+      case 'MEDIUM': return 'text-yellow-600';
+      case 'LOW': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getScoreIcon = (score: string) => {
+    switch (score) {
+      case 'HIGH': return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'MEDIUM': return <Clock className="h-5 w-5 text-yellow-600" />;
+      case 'LOW': return <AlertTriangle className="h-5 w-5 text-red-600" />;
+      default: return <Shield className="h-5 w-5" />;
+    }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Métricas de Segurança
-        </CardTitle>
-        <CardDescription>
-          Resumo das métricas de segurança dos últimos 30 dias
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {/* Score Geral de Segurança */}
-          <div className="text-center p-6 border rounded-lg">
-            <div className={`text-6xl font-bold ${getScoreColor(securityScore)}`}>
-              {securityScore}%
-            </div>
-            <p className="text-lg font-semibold mt-2">Score de Segurança</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {getScoreDescription(securityScore)}
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Métricas de Segurança</h2>
+        <Button onClick={runSecurityAudit} disabled={loading}>
+          {loading ? 'Auditando...' : 'Executar Auditoria'}
+        </Button>
+      </div>
 
-          {/* Métricas Detalhadas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Alertas Totais</p>
-                    <p className="text-2xl font-bold">{metrics.total_alerts}</p>
-                    {metrics.critical_alerts > 0 && (
-                      <p className="text-sm text-red-600">
-                        {metrics.critical_alerts} críticos
-                      </p>
-                    )}
-                  </div>
-                  <Shield className={`h-8 w-8 ${metrics.critical_alerts > 0 ? 'text-red-500' : 'text-green-500'}`} />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Tentativas de Login</p>
-                    <p className="text-2xl font-bold">{metrics.recent_logins}</p>
-                    {metrics.failed_logins > 0 && (
-                      <p className="text-sm text-orange-600">
-                        {metrics.failed_logins} falharam
-                      </p>
-                    )}
-                  </div>
-                  <Users className="h-8 w-8 text-blue-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Acessos a Dados</p>
-                    <p className="text-2xl font-bold">{metrics.data_access_events}</p>
-                    {metrics.sensitive_access_events > 0 && (
-                      <p className="text-sm text-orange-600">
-                        {metrics.sensitive_access_events} sensíveis
-                      </p>
-                    )}
-                  </div>
-                  <Eye className="h-8 w-8 text-purple-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status do Backup</p>
-                    <p className="text-sm font-bold">
-                      {metrics.backup_status === 'ok' ? 'Operacional' : 'Atenção Necessária'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {metrics.last_backup !== 'Nunca' 
-                        ? `Último: ${new Date(metrics.last_backup).toLocaleDateString('pt-BR')}`
-                        : 'Nunca executado'
-                      }
-                    </p>
-                  </div>
-                  <HardDrive className={`h-8 w-8 ${metrics.backup_status === 'ok' ? 'text-green-500' : 'text-red-500'}`} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Indicadores de Tendência */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-semibold mb-4">Tendências de Segurança</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded">
-                <div>
-                  <p className="text-sm font-medium">Logins Bem-sucedidos</p>
-                  <p className="text-lg font-bold text-green-600">{metrics.recent_logins}</p>
-                </div>
-                <TrendingUp className="h-5 w-5 text-green-600" />
+      {metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Score de Segurança</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                {getScoreIcon(metrics.security_score)}
+                <span className={`text-2xl font-bold ${getScoreColor(metrics.security_score)}`}>
+                  {metrics.security_score}
+                </span>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded">
-                <div>
-                  <p className="text-sm font-medium">Tentativas Falhadas</p>
-                  <p className="text-lg font-bold text-orange-600">{metrics.failed_logins}</p>
-                </div>
-                {metrics.failed_logins > 5 ? (
-                  <TrendingUp className="h-5 w-5 text-orange-600" />
-                ) : (
-                  <TrendingDown className="h-5 w-5 text-green-600" />
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Tabelas com RLS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.rls_enabled_tables}</div>
+              <Progress value={(metrics.rls_enabled_tables / 20) * 100} className="mt-2" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Políticas Ativas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metrics.total_policies}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Alertas Críticos (24h)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold">{metrics.recent_critical_alerts}</span>
+                {metrics.recent_critical_alerts > 0 && (
+                  <Badge variant="destructive">Atenção</Badge>
                 )}
               </div>
-
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded">
-                <div>
-                  <p className="text-sm font-medium">Acessos Monitorados</p>
-                  <p className="text-lg font-bold text-blue-600">{metrics.data_access_events}</p>
-                </div>
-                <Activity className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Recomendações */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-semibold mb-4">Recomendações de Segurança</h4>
-            <div className="space-y-2">
-              {metrics.critical_alerts > 0 && (
-                <div className="flex items-center gap-2 text-red-600">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm">Resolver alertas críticos imediatamente</span>
-                </div>
-              )}
-              {metrics.failed_logins > 10 && (
-                <div className="flex items-center gap-2 text-orange-600">
-                  <Users className="h-4 w-4" />
-                  <span className="text-sm">Investigar alto número de tentativas de login falhadas</span>
-                </div>
-              )}
-              {metrics.backup_status !== 'ok' && (
-                <div className="flex items-center gap-2 text-red-600">
-                  <HardDrive className="h-4 w-4" />
-                  <span className="text-sm">Verificar sistema de backup</span>
-                </div>
-              )}
-              {securityScore >= 90 && (
-                <div className="flex items-center gap-2 text-green-600">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm">Sistema operando com alta segurança</span>
-                </div>
-              )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {metrics && metrics.insecure_functions > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Detectadas {metrics.insecure_functions} funções com problemas de segurança. 
+            Recomenda-se revisar e corrigir imediatamente.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {metrics && metrics.recommendations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recomendações de Segurança</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {metrics.recommendations.map((recommendation, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 mt-1 text-blue-600" />
+                  <span className="text-sm">{recommendation}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {metrics && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Última Auditoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {new Date(metrics.timestamp).toLocaleString('pt-BR')}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
