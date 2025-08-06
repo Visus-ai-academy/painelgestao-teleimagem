@@ -1639,6 +1639,36 @@ export type Database = {
           },
         ]
       }
+      mapeamento_nomes_clientes: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          nome_arquivo: string
+          nome_sistema: string
+          observacoes: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          nome_arquivo: string
+          nome_sistema: string
+          observacoes?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          nome_arquivo?: string
+          nome_sistema?: string
+          observacoes?: string | null
+        }
+        Relationships: []
+      }
       medicos: {
         Row: {
           ativo: boolean
@@ -3292,6 +3322,10 @@ export type Database = {
           HORA_PRAZO: string
           data_referencia: string
         }[]
+      }
+      get_nome_cliente_mapeado: {
+        Args: { nome_arquivo: string }
+        Returns: string
       }
       get_periodo_faturamento: {
         Args: { data_referencia: string }
