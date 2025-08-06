@@ -156,6 +156,23 @@ export default async function handler(req: Request): Promise<Response> {
       console.log(`✅ Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO`);
     }
 
+    // REGRA ADICIONAL: Excluir laudos após 07/07/2025
+    console.log(`🗂️ Aplicando regra: Excluir laudos após 07/07/2025...`);
+    
+    const { error: errorLaudosRecentes, count: countLaudosRecentes } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .gt('DATA_LAUDO', '2025-07-07');
+
+    if (errorLaudosRecentes) {
+      console.error('❌ Erro ao excluir laudos após 07/07/2025:', errorLaudosRecentes);
+    } else {
+      const deletedCountLaudos = countLaudosRecentes || 0;
+      totalExcluidos += deletedCountLaudos;
+      detalhes.push(`Regra adicional: ${deletedCountLaudos} registros excluídos com DATA_LAUDO > 07/07/2025`);
+      console.log(`✅ Regra adicional: ${deletedCountLaudos} registros excluídos com laudos recentes`);
+    }
+
     console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
 
     return new Response(JSON.stringify({

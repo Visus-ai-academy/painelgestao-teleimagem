@@ -276,6 +276,18 @@ export async function processVolumetriaFile(
             continue;
           }
 
+          // REGRA: Excluir laudos após 07/07/2025
+          const dataLaudo = row['DATA_LAUDO'];
+          if (dataLaudo) {
+            const dataLaudoDate = typeof dataLaudo === 'string' ? new Date(dataLaudo) : dataLaudo;
+            const dataCorte = new Date('2025-07-07');
+            if (dataLaudoDate > dataCorte) {
+              console.log(`Laudo após 07/07/2025 excluído: ${empresa} - ${dataLaudo}`);
+              totalErrors++; // Contar como processado mas não inserido
+              continue;
+            }
+          }
+
           const safeString = (value: any): string | undefined => {
             if (value === null || value === undefined || value === '') return undefined;
             return String(value).trim() || undefined;
