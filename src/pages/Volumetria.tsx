@@ -10,7 +10,7 @@ import { VolumetriaDelayAnalysis } from "@/components/volumetria/VolumetriaDelay
 import { VolumetriaExecutiveSummary } from "@/components/volumetria/VolumetriaExecutiveSummary";
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
 import { useVolumetriaData } from "@/hooks/useVolumetriaData";
-import { Upload, BarChart3, FileText } from "lucide-react";
+import { Upload, BarChart3 } from "lucide-react";
 
 export default function Volumetria() {
   const [periodo, setPeriodo] = useState("mes_atual");
@@ -31,7 +31,7 @@ export default function Volumetria() {
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -39,10 +39,6 @@ export default function Volumetria() {
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Relatórios
             </TabsTrigger>
           </TabsList>
 
@@ -125,19 +121,6 @@ export default function Volumetria() {
             <VolumetriaUpload 
               arquivoFonte="volumetria_padrao"
             />
-          </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Relatórios Disponíveis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Esta seção está em desenvolvimento. Em breve você poderá gerar relatórios personalizados.
-                </p>
-              </CardContent>
-            </Card>
           </TabsContent>
 
         </Tabs>
