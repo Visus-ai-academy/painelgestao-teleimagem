@@ -68,24 +68,30 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        console.log('🔄 [DelayAnalysis] Buscando dados SEM LIMITAÇÕES...');
+        console.log('🔄 [DelayAnalysis] Buscando dados SEM LIMITAÇÕES - OBJETIVO: 10.433 laudos atrasados...');
         
-        // ESTRATÉGIA 1: FUNÇÃO ULTRA-DEFINITIVA UNLIMITED_FORCE (16GB RAM, sem timeout)
+        // VALIDAÇÃO PRÉVIA: Verificar total correto do banco
+        const { data: totalCorreto } = await supabase.rpc('get_volumetria_total_atraso');
+        console.log(`🎯 [DelayAnalysis] VALIDAÇÃO BANCO:`, totalCorreto);
+        
+        // BUSCAR TODOS OS DADOS SEM LIMITAÇÃO
         let { data: allData, error } = await supabase.rpc('get_volumetria_unlimited_force');
         
         if (error || !allData || allData.length < 35000) {
-          console.warn('⚠️ Função unlimited_force falhou, tentando force_complete...');
+          console.warn(`⚠️ Função unlimited_force retornou apenas ${allData?.length || 0} registros, tentando force_complete...`);
           
-          // ESTRATÉGIA 2: FUNÇÃO FORCE_COMPLETE (fallback)
+          // FALLBACK: FUNÇÃO FORCE_COMPLETE 
           const response2 = await supabase.rpc('get_volumetria_force_complete');
           if (response2.data && !response2.error) {
             allData = response2.data;
+            console.log(`🔄 [DelayAnalysis] Fallback: ${allData.length} registros obtidos`);
           } else {
-            throw new Error('Todas as funções falharam');
+            console.error('❌ TODAS as funções falharam!');
+            return;
           }
         }
 
-        console.log(`✅ [DelayAnalysis] DADOS OBTIDOS: ${allData?.length || 0} registros`);
+        console.log(`✅ [DelayAnalysis] DADOS FINAIS: ${allData?.length || 0} registros obtidos`);
         
         // VALIDAÇÃO: GARANTIR QUE TEMOS TODOS OS DADOS
         const totalLaudosObtidos = allData?.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0) || 0;
@@ -226,19 +232,20 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
           tempo_medio_atraso: data.atrasados > 0 ? data.tempoTotal / data.atrasados : 0
         })).sort((a, b) => b.atrasados - a.atrasados);
 
-        console.log('📊 [DelayAnalysis] RESULTADO FINAL:');
+        console.log('📊 [DelayAnalysis] RESULTADO FINAL (DEVE SER 10.433 laudos atrasados):');
         console.log(`  - Total de laudos: ${totalLaudosGeral.toLocaleString()}`);
         console.log(`  - Laudos atrasados: ${totalAtrasadosGeral.toLocaleString()}`);
         console.log(`  - Percentual de atraso: ${((totalAtrasadosGeral / totalLaudosGeral) * 100).toFixed(1)}%`);
-        console.log(`  - Especialidades: ${especialidades.length}`);
-        console.log(`  - MEDICINA INTERNA:`, especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
-
-        // VALIDAÇÃO FINAL: GARANTIR QUE TEMOS OS 8.888 LAUDOS ATRASADOS ESPERADOS
-        if (totalAtrasadosGeral < 8000) {
-          console.error(`❌ ERRO CRÍTICO: Esperava-se ~8.888 laudos atrasados, mas obtivemos apenas ${totalAtrasadosGeral}`);
+        
+        // VALIDAÇÃO CRÍTICA: DEVE MOSTRAR ~10.433 LAUDOS ATRASADOS
+        if (totalAtrasadosGeral < 10000) {
+          console.error(`❌ ERRO CRÍTICO: Esperava-se 10.433 laudos atrasados, mas obtivemos apenas ${totalAtrasadosGeral}`);
+          console.error(`❌ FALHA: Os dados não estão sendo processados corretamente!`);
         } else {
           console.log(`✅ SUCESSO: ${totalAtrasadosGeral.toLocaleString()} laudos atrasados carregados corretamente!`);
         }
+        
+        console.log(`📋 [DelayAnalysis] MEDICINA INTERNA:`, especialidades.find(e => e.nome === 'MEDICINA INTERNA'));
 
         setSafeData({
           clientes,
