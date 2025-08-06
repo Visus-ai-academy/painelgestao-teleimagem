@@ -117,7 +117,12 @@ export function VolumetriaDelayAnalysis({ data }: VolumetriaDelayAnalysisProps) 
     try {
       console.log(`🎯 [DelayAnalysis] INICIANDO busca para ${clienteName}...`);
       
-      // BUSCAR ABSOLUTAMENTE TODOS OS DADOS - SEM QUALQUER LIMITAÇÃO
+  // BUSCAR TODOS OS DADOS - NUNCA USAR LIMITAÇÕES
+      // PRIMEIRO VERIFICAR TOTAL DE REGISTROS
+      const { data: totalCount } = await supabase.rpc('get_volumetria_total_count');
+      console.log(`🔍 [DelayAnalysis] TOTAL DE REGISTROS NO BANCO: ${totalCount || 0}`);
+      
+      // BUSCAR TODOS OS DADOS SEM EXCEÇÃO
       const { data: allData, error } = await supabase
         .rpc('get_volumetria_complete_data');
       
