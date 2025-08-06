@@ -9,6 +9,11 @@ import { EnhancedFileUpload } from './EnhancedFileUpload';
 import { Shield, AlertTriangle, FileText, Eye, Upload } from 'lucide-react';
 
 export function SecurityDashboard() {
+  const handleMetricsUpdate = () => {
+    // Callback for when security metrics are updated
+    console.log('Security metrics updated');
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -47,7 +52,7 @@ export function SecurityDashboard() {
         </TabsContent>
 
         <TabsContent value="alerts" className="space-y-4">
-          <SecurityAlertsPanel />
+          <SecurityAlertsPanel onMetricsUpdate={handleMetricsUpdate} />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">

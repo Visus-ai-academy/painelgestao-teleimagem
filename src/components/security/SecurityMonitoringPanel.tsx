@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,10 +36,37 @@ export function SecurityMonitoringPanel() {
     try {
       setRefreshing(true);
       
-      const { data, error } = await supabase.rpc('run_security_health_check');
+      // Use direct SQL call since the function might not be in types yet
+      const { data, error } = await supabase.rpc('run_security_health_check' as any);
       
-      if (error) throw error;
-      setHealthCheck(data);
+      if (error) {
+        console.error('Security health check error:', error);
+        // Provide fallback data
+        setHealthCheck({
+          configuration: {
+            rls_enabled_tables: 0,
+            secure_functions: 0,
+            permissive_policies: 0,
+            security_definer_views: 0,
+            security_score: 0,
+            critical_issues: ['Unable to load security data'],
+            recommendations: ['Check database connection']
+          },
+          activity_monitoring: {
+            suspicious_logins: 0,
+            failed_uploads: 0,
+            unusual_access: 0,
+            risk_level: 'HIGH'
+          },
+          overall_status: 'NEEDS_ATTENTION',
+          last_check: new Date().toISOString()
+        });
+        return;
+      }
+      
+      // Type assertion for the response
+      const healthData = data as any;
+      setHealthCheck(healthData);
     } catch (error: any) {
       console.error('Erro ao carregar status de segurança:', error);
       toast({
