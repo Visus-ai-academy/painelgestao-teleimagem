@@ -101,6 +101,25 @@ serve(async (req) => {
 
     console.log(`📋 ${clientesData.length} clientes carregados`)
 
+    // 3.1. Buscar mapeamentos de nomes de clientes
+    const { data: mapeamentosData, error: mapeamentosError } = await supabaseClient
+      .from('mapeamento_nomes_clientes')
+      .select('nome_arquivo, nome_sistema')
+      .eq('ativo', true)
+
+    if (mapeamentosError) {
+      console.warn('⚠️ Erro ao buscar mapeamentos de nomes:', mapeamentosError.message)
+    }
+
+    // Criar mapa de mapeamentos
+    const mapeamentosMap = new Map()
+    if (mapeamentosData) {
+      mapeamentosData.forEach(mapeamento => {
+        mapeamentosMap.set(mapeamento.nome_arquivo.toUpperCase().trim(), mapeamento.nome_sistema.toUpperCase().trim())
+      })
+      console.log(`🔄 ${mapeamentosData.length} mapeamentos de nomes carregados`)
+    }
+
     // 4. Processar dados do Excel
     const registrosParaInserir = []
     const erros = []
@@ -155,8 +174,17 @@ serve(async (req) => {
 
         // Aceitar preços vazios (serão tratados como 0)
 
-        // Buscar cliente
-        const clienteId = clientesMap.get(clienteNome.toUpperCase())
+        // Buscar cliente (com mapeamento de nomes)
+        let clienteNomeBusca = clienteNome.toUpperCase()
+        
+        // Verificar se existe mapeamento para o nome
+        const nomeMapeado = mapeamentosMap.get(clienteNomeBusca)
+        if (nomeMapeado) {
+          clienteNomeBusca = nomeMapeado
+          console.log(`🔄 Mapeamento aplicado: "${clienteNome}" → "${nomeMapeado}"`)
+        }
+        
+        const clienteId = clientesMap.get(clienteNomeBusca)
         if (!clienteId) {
           erros.push(`Linha ${i + 1}: Cliente "${clienteNome}" não encontrado no cadastro`)
           continue
