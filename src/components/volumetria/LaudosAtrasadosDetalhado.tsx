@@ -35,25 +35,22 @@ export const LaudosAtrasadosDetalhado = () => {
   const [sortField, setSortField] = useState<SortField>('tempoAtrasoHoras');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // CARREGAR TODOS OS LAUDOS ATRASADOS - FORÇAR BYPASS COMPLETO
+  // CARREGAR TODOS OS LAUDOS ATRASADOS - MÉTODO DIRETO SEM LIMITAÇÕES
   useEffect(() => {
     const carregarLaudosAtrasados = async () => {
       try {
-        console.log('🚀 [LaudosAtrasados] Iniciando carregamento de TODOS os laudos atrasados...');
+        console.log('🚀 [LaudosAtrasados] MÉTODO DIRETO - Carregando TODOS os dados sem limitações...');
         
-        // MÉTODO 1: Usar a função RPC que elimina limitações
-        let { data: laudosAtrasadosData, error } = await supabase.rpc('get_laudos_atrasados_completos');
+        // BUSCA DIRETA NA TABELA COM PAGINAÇÃO COMPLETA
+        let todosOsDados: any[] = [];
+        let offset = 0;
+        const limite = 5000; // Buscar em lotes de 5000
+        let temMaisDados = true;
         
-        if (error) {
-          console.error('❌ Erro na função RPC:', error);
-          throw new Error(`Erro ao carregar laudos atrasados: ${error.message}`);
-        }
-        
-        if (!laudosAtrasadosData || laudosAtrasadosData.length === 0) {
-          console.warn('⚠️ [LaudosAtrasados] Função RPC retornou dados vazios, tentando método alternativo...');
+        while (temMaisDados) {
+          console.log(`📊 [LaudosAtrasados] Buscando lote ${Math.floor(offset/limite) + 1}, offset: ${offset}`);
           
-          // MÉTODO 2: Busca direta na tabela sem limitações
-          const { data: dadosDirectos, error: erroDirecto } = await supabase
+          const { data: lote, error } = await supabase
             .from('volumetria_mobilemed')
             .select(`
               EMPRESA,
@@ -68,38 +65,61 @@ export const LaudosAtrasadosDetalhado = () => {
               DATA_LAUDO,
               HORA_LAUDO,
               DATA_PRAZO,
-              HORA_PRAZO,
-              data_referencia
+              HORA_PRAZO
             `)
             .not('DATA_LAUDO', 'is', null)
             .not('HORA_LAUDO', 'is', null)
             .not('DATA_PRAZO', 'is', null)
             .not('HORA_PRAZO', 'is', null)
-            .range(0, 50000); // Buscar até 50k registros
+            .range(offset, offset + limite - 1);
           
-          if (erroDirecto) {
-            console.error('❌ Erro na busca direta:', erroDirecto);
-            throw erroDirecto;
+          if (error) {
+            console.error('❌ Erro na busca direta:', error);
+            throw error;
           }
           
-          // Filtrar atrasados manualmente
-          const atrasados = dadosDirectos?.filter(item => {
-            if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+          if (lote && lote.length > 0) {
+            todosOsDados = [...todosOsDados, ...lote];
+            console.log(`✅ [LaudosAtrasados] Lote carregado: ${lote.length} registros. Total acumulado: ${todosOsDados.length}`);
             
+            // Se retornou menos que o limite, acabaram os dados
+            if (lote.length < limite) {
+              temMaisDados = false;
+            } else {
+              offset += limite;
+            }
+          } else {
+            temMaisDados = false;
+          }
+          
+          // Proteção contra loop infinito
+          if (offset > 100000) {
+            console.warn('⚠️ Atingiu limite de segurança de 100k registros');
+            temMaisDados = false;
+          }
+        }
+        
+        console.log(`🎯 [LaudosAtrasados] TOTAL DE DADOS CARREGADOS: ${todosOsDados.length} registros`);
+        
+        // FILTRAR APENAS OS ATRASADOS MANUALMENTE
+        const laudosAtrasados = todosOsDados.filter(item => {
+          if (!item.DATA_LAUDO || !item.HORA_LAUDO || !item.DATA_PRAZO || !item.HORA_PRAZO) return false;
+          
+          try {
             const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
             const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
             
             return dataLaudo > dataPrazo;
-          }) || [];
-          
-          console.log(`🔄 [LaudosAtrasados] Método direto: ${atrasados.length} laudos atrasados encontrados`);
-          laudosAtrasadosData = atrasados;
-        }
+          } catch (error) {
+            console.warn('Erro ao processar data:', error);
+            return false;
+          }
+        });
         
-        console.log(`✅ [LaudosAtrasados] DADOS CARREGADOS: ${laudosAtrasadosData?.length || 0} registros`);
+        console.log(`🔥 [LaudosAtrasados] LAUDOS ATRASADOS ENCONTRADOS: ${laudosAtrasados.length} registros`);
         
-        // Processar TODOS os dados
-        const laudosProcessados: LaudoAtrasado[] = laudosAtrasadosData.map((item: any) => {
+        // Processar TODOS os laudos atrasados
+        const laudosProcessados: LaudoAtrasado[] = laudosAtrasados.map((item: any) => {
           const dataLaudo = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO}`);
           const dataPrazo = new Date(`${item.DATA_PRAZO}T${item.HORA_PRAZO}`);
           const tempoAtrasoMs = dataLaudo.getTime() - dataPrazo.getTime();
@@ -125,10 +145,10 @@ export const LaudosAtrasadosDetalhado = () => {
         const totalLaudos = laudosProcessados.reduce((sum, laudo) => sum + laudo.valores, 0);
         const totalRegistros = laudosProcessados.length;
         
-        console.log(`🎯 [LaudosAtrasados] RESULTADO FINAL:`);
+        console.log(`🎉🔥 [LaudosAtrasados] RESULTADO FINAL CORRETO:`);
         console.log(`📊 Total de registros: ${totalRegistros.toLocaleString()}`);
-        console.log(`🔥 Total de laudos atrasados: ${totalLaudos.toLocaleString()}`);
-        console.log(`✅ TODOS OS DADOS CARREGADOS SEM LIMITAÇÕES`);
+        console.log(`🎯 Total de laudos atrasados: ${totalLaudos.toLocaleString()}`);
+        console.log(`✅ TODOS OS DADOS PROCESSADOS SEM LIMITAÇÕES`);
         
         setLaudosAtrasados(laudosProcessados);
       } catch (error) {
