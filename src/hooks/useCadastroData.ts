@@ -155,7 +155,13 @@ export const usePrecosServicos = () => {
       while (hasMore) {
         const { data: dataBatch, error } = await supabase
           .from('precos_servicos')
-          .select('*')
+          .select(`
+            *,
+            clientes:cliente_id (
+              id,
+              nome
+            )
+          `)
           .order('created_at', { ascending: false })
           .range(rangeStart, rangeStart + rangeSize - 1);
 

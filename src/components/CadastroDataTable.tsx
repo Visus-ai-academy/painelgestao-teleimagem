@@ -42,13 +42,16 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         ];
       case 'precos':
         return [
-          { key: 'tipo_preco', label: 'Tipo', filterable: true },
+          { key: 'cliente_nome', label: 'Cliente', filterable: true },
           { key: 'modalidade', label: 'Modalidade', filterable: true },
           { key: 'especialidade', label: 'Especialidade', filterable: true },
-          { key: 'categoria', label: 'Categoria', filterable: true },
           { key: 'prioridade', label: 'Prioridade', filterable: true },
-          { key: 'valor_base', label: 'Valor Base', filterable: false },
-          { key: 'valor_urgencia', label: 'Valor Urgência', filterable: false },
+          { key: 'categoria', label: 'Categoria', filterable: true },
+          { key: 'valor_base', label: 'Preço', filterable: false },
+          { key: 'volume_inicial', label: 'Vol Inicial', filterable: false },
+          { key: 'volume_final', label: 'Vol Final', filterable: false },
+          { key: 'volume_total', label: 'Cond. Volume', filterable: false },
+          { key: 'considera_prioridade_plantao', label: 'Considera Plantão', filterable: true },
           { key: 'ativo', label: 'Status', filterable: true }
         ];
       case 'regras':
@@ -97,6 +100,8 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
   // Função para obter valor de uma coluna
   const getCellValue = (item: any, key: string) => {
     switch (key) {
+      case 'cliente_nome':
+        return item.clientes?.nome || item.cliente_nome || 'Cliente não identificado';
       case 'medico_nome':
         return item.medicos?.nome || 'Regra Geral';
       case 'medico_crm':
@@ -107,6 +112,14 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return `R$ ${Number(item.valor_urgencia || 0).toFixed(2)}`;
       case 'valor':
         return `R$ ${Number(item.valor || 0).toFixed(2)}`;
+      case 'volume_inicial':
+        return item.volume_inicial || '-';
+      case 'volume_final':
+        return item.volume_final || '-';
+      case 'volume_total':
+        return item.volume_total || '-';
+      case 'considera_prioridade_plantao':
+        return item.considera_prioridade_plantao ? "Sim" : "Não";
       case 'permite_quebra':
         return item.permite_quebra ? "Sim" : "Não";
       case 'quantidade_quebras':
