@@ -109,7 +109,44 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
       status: 'ativa',
       implementadaEm: '2024-01-28',
+      observacoes: 'Edge function: processar-valores-de-para + RPC aplicar_valores_de_para',
       ordem_execucao: 6,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v027',
+      nome: 'Aplicação de Regras de Quebra de Exames',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Aplica regras configuradas para quebrar exames compostos em exames individuais.',
+      status: 'ativa',
+      implementadaEm: '2024-01-30',
+      observacoes: 'Edge function: processar-quebra-exames, tabela regras_quebra_exames',
+      ordem_execucao: 7,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v028',
+      nome: 'Processamento de Categorias de Exames',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Processa e categoriza exames com base na tabela de categorias configuradas.',
+      status: 'ativa',
+      implementadaEm: '2024-02-01',
+      observacoes: 'Edge function: processar-categorias-exame, tabela categorias_exame',
+      ordem_execucao: 8,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v029',
+      nome: 'Tratamento de Exames Fora do Padrão',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Identifica e trata exames que não seguem o padrão estabelecido.',
+      status: 'ativa',
+      implementadaEm: '2024-02-02',
+      observacoes: 'Componente: ExamesForaPadraoUpload.tsx',
+      ordem_execucao: 9,
       tipo_regra: 'negocio'
     },
     {
@@ -120,7 +157,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
       status: 'ativa',
       implementadaEm: '2024-01-18',
-      ordem_execucao: 7,
+      ordem_execucao: 10,
       tipo_regra: 'negocio'
     },
     {
@@ -131,7 +168,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      ordem_execucao: 8,
+      ordem_execucao: 11,
       tipo_regra: 'negocio'
     },
     {
@@ -142,7 +179,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
       status: 'ativa',
       implementadaEm: '2024-01-12',
-      ordem_execucao: 9,
+      ordem_execucao: 12,
       tipo_regra: 'negocio'
     },
 
