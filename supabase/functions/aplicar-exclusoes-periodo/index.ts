@@ -89,10 +89,12 @@ export default async function handler(req: Request): Promise<Response> {
     // REGRA v031: Filtro de período atual para arquivos NÃO-RETROATIVOS
     console.log(`🗂️ Aplicando REGRA v031 nos arquivos não-retroativos...`);
     
-    // Calcular período para arquivos não-retroativos (mês atual)
-    const dataInicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-    const dataFimMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
-    const dataLimiteLaudoV031 = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 7).toISOString().split('T')[0];
+    // Para junho/2025 e outros períodos específicos - usar o período fornecido do cálculo acima
+    const { dataLimiteRealizacao: dataLimiteRealizacaoV031, inicioFaturamento: inicioFaturamentoV031, fimFaturamento: fimFaturamentoV031 } = calcularDatasPeriodoFaturamento(periodo_referencia);
+    
+    const dataInicioMes = inicioFaturamentoV031.slice(0, 8) + '01'; // Primeiro dia do mês
+    const dataFimMes = dataLimiteRealizacaoV031; // Último dia do mês anterior 
+    const dataLimiteLaudoV031 = fimFaturamentoV031; // dia 7 do mês seguinte
 
     console.log(`📅 REGRA v031 - Período atual: ${dataInicioMes} a ${dataFimMes}`);
     console.log(`📅 REGRA v031 - DATA_LAUDO até: ${dataLimiteLaudoV031}`);
@@ -102,7 +104,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao')
-      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
 
     if (!errorV031_1) {
       const deletedV031_1 = countV031_1 || 0;
@@ -116,7 +118,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
 
     if (!errorV031_2) {
       const deletedV031_2 = countV031_2 || 0;
@@ -130,7 +132,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_onco_padrao')
-      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
 
     if (!errorV031_3) {
       const deletedV031_3 = countV031_3 || 0;
@@ -147,7 +149,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-      .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+      .gte('data_realizacao', dataLimiteRealizacao);
 
     if (error3_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 3):', error3_realizacao);
@@ -163,7 +165,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-      .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
+      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gt.${fimFaturamento}`);
 
     if (error3_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 3):', error3_laudo);
@@ -182,7 +184,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-      .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+      .gte('data_realizacao', dataLimiteRealizacao);
 
     if (error4_realizacao) {
       console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 4):', error4_realizacao);
@@ -198,7 +200,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-      .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
+      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gt.${fimFaturamento}`);
 
     if (error4_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 4):', error4_laudo);
