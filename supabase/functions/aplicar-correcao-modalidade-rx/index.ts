@@ -39,37 +39,52 @@ serve(async (req) => {
     console.log(`Iniciando correção de modalidade RX para arquivo: ${arquivo_fonte}`);
 
     // 1. Buscar registros que precisam ser corrigidos
-    // Critério: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA'
-    const { data: registrosParaCorrigir, error: errorBusca } = await supabase
+    // Critério 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA' → RX
+    const { data: registrosParaRX, error: errorBuscaRX } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
       .eq('arquivo_fonte', arquivo_fonte)
       .in('MODALIDADE', ['CR', 'DX'])
       .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA');
 
-    if (errorBusca) {
-      throw new Error(`Erro ao buscar registros para correção: ${errorBusca.message}`);
+    // Critério 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = 'MAMOGRAFIA' → MG
+    const { data: registrosParaMG, error: errorBuscaMG } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .in('MODALIDADE', ['CR', 'DX'])
+      .eq('ESTUDO_DESCRICAO', 'MAMOGRAFIA');
+
+    if (errorBuscaRX) {
+      throw new Error(`Erro ao buscar registros RX para correção: ${errorBuscaRX.message}`);
     }
 
-    if (!registrosParaCorrigir || registrosParaCorrigir.length === 0) {
-      console.log(`Nenhum exame RX encontrado no arquivo: ${arquivo_fonte}`);
+    if (errorBuscaMG) {
+      throw new Error(`Erro ao buscar registros MG para correção: ${errorBuscaMG.message}`);
+    }
+
+    const totalRegistros = (registrosParaRX?.length || 0) + (registrosParaMG?.length || 0);
+
+    if (totalRegistros === 0) {
+      console.log(`Nenhum exame encontrado para correção no arquivo: ${arquivo_fonte}`);
       return new Response(JSON.stringify({
         sucesso: true,
         arquivo_fonte,
         registros_encontrados: 0,
-        registros_corrigidos: 0,
-        mensagem: 'Nenhum exame RX encontrado para correção'
+        registros_corrigidos_rx: 0,
+        registros_corrigidos_mg: 0,
+        mensagem: 'Nenhum exame encontrado para correção'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    console.log(`Encontrados ${registrosParaCorrigir.length} exames para correção`);
+    console.log(`Encontrados ${registrosParaRX?.length || 0} exames para RX e ${registrosParaMG?.length || 0} exames para MG`);
 
-    // 2. Aplicar correção - atualizar modalidade para "RX"
-    // Critério: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA'
-    const { data: resultadoUpdate, error: errorUpdate } = await supabase
+    // 2. Aplicar correções
+    // Correção 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA' → RX
+    const { data: resultadoUpdateRX, error: errorUpdateRX } = await supabase
       .from('volumetria_mobilemed')
       .update({ 
         "MODALIDADE": 'RX',
@@ -80,19 +95,42 @@ serve(async (req) => {
       .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
 
-    if (errorUpdate) {
-      throw new Error(`Erro ao aplicar correção: ${errorUpdate.message}`);
+    // Correção 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = 'MAMOGRAFIA' → MG
+    const { data: resultadoUpdateMG, error: errorUpdateMG } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ 
+        "MODALIDADE": 'MG',
+        updated_at: new Date().toISOString()
+      })
+      .eq('arquivo_fonte', arquivo_fonte)
+      .in('MODALIDADE', ['CR', 'DX'])
+      .eq('ESTUDO_DESCRICAO', 'MAMOGRAFIA')
+      .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
+
+    if (errorUpdateRX) {
+      throw new Error(`Erro ao aplicar correção RX: ${errorUpdateRX.message}`);
     }
 
-    const registrosCorrigidos = resultadoUpdate?.length || 0;
+    if (errorUpdateMG) {
+      throw new Error(`Erro ao aplicar correção MG: ${errorUpdateMG.message}`);
+    }
 
-    console.log(`Correção aplicada com sucesso: ${registrosCorrigidos} registros atualizados`);
+    const registrosCorrigidosRX = resultadoUpdateRX?.length || 0;
+    const registrosCorrigidosMG = resultadoUpdateMG?.length || 0;
+
+    console.log(`Correções aplicadas: ${registrosCorrigidosRX} para RX, ${registrosCorrigidosMG} para MG`);
 
     // 3. Criar relatório de correções
-    const exemplosCorrigan = registrosParaCorrigir.slice(0, 5).map(registro => ({
+    const exemplosRX = (registrosParaRX || []).slice(0, 3).map(registro => ({
       estudo_descricao: registro.ESTUDO_DESCRICAO,
       modalidade_anterior: registro.MODALIDADE,
       modalidade_nova: 'RX'
+    }));
+
+    const exemplosMG = (registrosParaMG || []).slice(0, 3).map(registro => ({
+      estudo_descricao: registro.ESTUDO_DESCRICAO,
+      modalidade_anterior: registro.MODALIDADE,
+      modalidade_nova: 'MG'
     }));
 
     // 4. Log da operação
@@ -100,13 +138,16 @@ serve(async (req) => {
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'CORRECAO_MODALIDADE_RX',
+        operation: 'CORRECAO_MODALIDADE_RX_MG',
         record_id: arquivo_fonte,
         new_data: {
           arquivo_fonte,
-          registros_encontrados: registrosParaCorrigir.length,
-          registros_corrigidos: registrosCorrigidos,
-          exemplos_corrigidos: exemplosCorrigan,
+          registros_encontrados_rx: registrosParaRX?.length || 0,
+          registros_encontrados_mg: registrosParaMG?.length || 0,
+          registros_corrigidos_rx: registrosCorrigidosRX,
+          registros_corrigidos_mg: registrosCorrigidosMG,
+          exemplos_rx: exemplosRX,
+          exemplos_mg: exemplosMG,
           regra: 'v030'
         },
         user_email: 'system',
@@ -120,12 +161,15 @@ serve(async (req) => {
     const resultado = {
       sucesso: true,
       arquivo_fonte,
-      registros_encontrados: registrosParaCorrigir.length,
-      registros_corrigidos: registrosCorrigidos,
-      exemplos_corrigidos: exemplosCorrigan,
-      regra_aplicada: 'v030 - Correção de Modalidade para Exames RX',
+      registros_encontrados_rx: registrosParaRX?.length || 0,
+      registros_encontrados_mg: registrosParaMG?.length || 0,
+      registros_corrigidos_rx: registrosCorrigidosRX,
+      registros_corrigidos_mg: registrosCorrigidosMG,
+      exemplos_rx: exemplosRX,
+      exemplos_mg: exemplosMG,
+      regra_aplicada: 'v030 - Correção de Modalidade para Exames RX e Mamografias',
       data_processamento: new Date().toISOString(),
-      observacao: 'Todos os exames com MODALIDADE "CR" ou "DX" que não sejam "MAMOGRAFIA" tiveram modalidade alterada para "RX"'
+      observacao: 'CR/DX não-mamografia → RX; CR/DX mamografia → MG'
     };
 
     console.log('Correção de modalidade RX concluída:', resultado);
