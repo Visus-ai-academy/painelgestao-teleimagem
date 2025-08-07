@@ -48,10 +48,10 @@ export function ControleRegrasNegocio() {
       nome: 'Proteção Temporal de Dados',
       modulo: 'volumetria',
       categoria: 'temporal',
-      criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros.',
+      criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros. Inclui botão de "fechar faturamento" que bloqueia novos dados após fechamento.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      observacoes: 'Implementado via RLS policies can_edit_data(), can_insert_data()',
+      observacoes: 'Implementado via RLS policies can_edit_data(), can_insert_data() + controle de fechamento por período',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
@@ -91,17 +91,6 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'negocio'
     },
     {
-      id: 'v015',
-      nome: 'Limpeza de Dados Duplicados',
-      modulo: 'volumetria',
-      categoria: 'dados',
-      criterio: 'Remove dados duplicados baseado em ACCESSION_NUMBER antes da inserção no banco.',
-      status: 'ativa',
-      implementadaEm: '2024-01-22',
-      ordem_execucao: 6,
-      tipo_regra: 'negocio'
-    },
-    {
       id: 'v022',
       nome: 'Validação e Limpeza de Caracteres Especiais',
       modulo: 'volumetria',
@@ -109,18 +98,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Remove caracteres especiais inválidos, espaços extras e normaliza encoding de texto (UTF-8).',
       status: 'ativa',
       implementadaEm: '2024-01-26',
-      ordem_execucao: 7,
-      tipo_regra: 'negocio'
-    },
-    {
-      id: 'v014',
-      nome: 'Mapeamento Dinâmico de Campos',
-      modulo: 'volumetria',
-      categoria: 'dados',
-      criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
-      status: 'ativa',
-      implementadaEm: '2024-01-18',
-      ordem_execucao: 8,
+      ordem_execucao: 5,
       tipo_regra: 'negocio'
     },
     {
@@ -131,7 +109,18 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
       status: 'ativa',
       implementadaEm: '2024-01-28',
-      ordem_execucao: 9,
+      ordem_execucao: 6,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v014',
+      nome: 'Mapeamento Dinâmico de Campos',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
+      status: 'ativa',
+      implementadaEm: '2024-01-18',
+      ordem_execucao: 7,
       tipo_regra: 'negocio'
     },
     {
@@ -142,7 +131,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      ordem_execucao: 10,
+      ordem_execucao: 8,
       tipo_regra: 'negocio'
     },
     {
@@ -153,22 +142,11 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
       status: 'ativa',
       implementadaEm: '2024-01-12',
-      ordem_execucao: 11,
+      ordem_execucao: 9,
       tipo_regra: 'negocio'
     },
 
     // FATURAMENTO - Ordem de execução
-    {
-      id: 'f003',
-      nome: 'Aplicação de Regras de Exclusão',
-      modulo: 'faturamento',
-      categoria: 'exclusao',
-      criterio: 'Aplica regras de exclusão de valores zerados, cancelamentos e outras validações.',
-      status: 'ativa',
-      implementadaEm: '2024-02-01',
-      ordem_execucao: 1,
-      tipo_regra: 'negocio'
-    },
     {
       id: 'f004',
       nome: 'Cálculo de Valores Contratuais',
@@ -177,7 +155,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Aplica tabela de preços e configurações contratuais para calcular valores.',
       status: 'ativa',
       implementadaEm: '2024-01-28',
-      ordem_execucao: 2,
+      ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
     {
@@ -188,7 +166,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Gera faturas automaticamente baseado nos exames realizados e valores contratuais.',
       status: 'ativa',
       implementadaEm: '2024-01-25',
-      ordem_execucao: 3,
+      ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
     {
@@ -199,7 +177,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Sincroniza dados de faturamento com sistema OMIE para controle fiscal.',
       status: 'ativa',
       implementadaEm: '2024-01-20',
-      ordem_execucao: 4,
+      ordem_execucao: 3,
       tipo_regra: 'negocio'
     },
 
