@@ -1291,6 +1291,11 @@ export default function GerarFaturamento() {
           <DemonstrativoFaturamento />
         </TabsContent>
 
+        {/* Tab: Fechamento de Período */}
+        <TabsContent value="fechamento" className="space-y-6">
+          <ControleFechamentoFaturamento />
+        </TabsContent>
+
         <TabsContent value="faturamento" className="space-y-6 mt-6">
           <div className="grid gap-6">
             <Card>
