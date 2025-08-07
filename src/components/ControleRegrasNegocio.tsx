@@ -243,14 +243,26 @@ export function ControleRegrasNegocio() {
     },
     {
       id: 'f005',
-      nome: 'Tipificação de Faturamento (CO-FT, NC-FT, NC-NF)',
+      nome: 'Tipificação de Faturamento - Clientes NC Originais',
       modulo: 'faturamento',
       categoria: 'dados',
-      criterio: 'Define tipos de faturamento: CO-FT (clientes consolidados), NC-FT (clientes NC faturados), NC-NF (clientes NC não faturados). Lista de clientes NC: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO.',
+      criterio: 'Define tipificação para 10 clientes NC originais: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO. NC-FT para especialidades CARDIO/MEDICINA INTERNA/NEUROBRAIN ou prioridade PLANTÃO.',
       status: 'ativa',
       implementadaEm: '2025-01-07',
-      observacoes: 'Implementado em utils/tipoFaturamento.ts - regras específicas a serem definidas',
+      observacoes: 'Implementado em utils/tipoFaturamento.ts - aplica automaticamente na volumetria e faturamento',
       ordem_execucao: 4,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'f006',
+      nome: 'Tipificação de Faturamento - Clientes NC Adicionais',
+      modulo: 'faturamento',
+      categoria: 'dados',
+      criterio: 'Define tipificação para 3 clientes NC adicionais: CEMVALENCA, RMPADUA, RADI-IMAGEM. NC-FT para: especialidades CARDIO/MEDICINA INTERNA/NEUROBRAIN, prioridade PLANTÃO, 29 médicos específicos, ou especialidade MAMA (apenas RADI-IMAGEM).',
+      status: 'ativa',
+      implementadaEm: '2025-01-07',
+      observacoes: 'Extensão da regra F005 com critérios adicionais por médico e especialidade MAMA para RADI-IMAGEM',
+      ordem_execucao: 5,
       tipo_regra: 'negocio'
     },
 
