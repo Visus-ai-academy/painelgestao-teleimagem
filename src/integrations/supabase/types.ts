@@ -1293,6 +1293,7 @@ export type Database = {
           quantidade: number | null
           sync_date: string
           tipo_dados: string
+          tipo_faturamento: string | null
           updated_at: string
           valor: number
           valor_bruto: number | null
@@ -1322,6 +1323,7 @@ export type Database = {
           quantidade?: number | null
           sync_date?: string
           tipo_dados?: string
+          tipo_faturamento?: string | null
           updated_at?: string
           valor: number
           valor_bruto?: number | null
@@ -1351,6 +1353,7 @@ export type Database = {
           quantidade?: number | null
           sync_date?: string
           tipo_dados?: string
+          tipo_faturamento?: string | null
           updated_at?: string
           valor?: number
           valor_bruto?: number | null
@@ -2967,6 +2970,7 @@ export type Database = {
           SEGUNDA_ASSINATURA: string | null
           STATUS: string | null
           tipo_dados: string
+          tipo_faturamento: string | null
           updated_at: string
           VALORES: number | null
         }
@@ -3011,6 +3015,7 @@ export type Database = {
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
           tipo_dados?: string
+          tipo_faturamento?: string | null
           updated_at?: string
           VALORES?: number | null
         }
@@ -3055,6 +3060,7 @@ export type Database = {
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
           tipo_dados?: string
+          tipo_faturamento?: string | null
           updated_at?: string
           VALORES?: number | null
         }

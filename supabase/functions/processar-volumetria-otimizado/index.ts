@@ -421,6 +421,27 @@ serve(async (req) => {
       }
     }
 
+    // 🏷️ APLICAR TIPIFICAÇÃO DE FATURAMENTO (Regras F005/F006)
+    if (totalInserted > 0) {
+      console.log('🏷️ Aplicando tipificação de faturamento...');
+      try {
+        const { data: tipificacaoResult, error: tipificacaoError } = await supabaseClient.functions.invoke('aplicar-tipificacao-faturamento', {
+          body: { 
+            arquivo_fonte: arquivo_fonte,
+            lote_upload: loteUpload 
+          }
+        });
+        
+        if (tipificacaoError) {
+          console.warn('⚠️ Erro ao aplicar tipificação:', tipificacaoError);
+        } else if (tipificacaoResult) {
+          console.log('✅ Tipificação aplicada:', tipificacaoResult);
+        }
+      } catch (tipificacaoException) {
+        console.warn('⚠️ Exceção ao aplicar tipificação:', tipificacaoException);
+      }
+    }
+
     // Finalizar log
     await supabaseClient
       .from('processamento_uploads')

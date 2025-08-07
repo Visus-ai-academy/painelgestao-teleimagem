@@ -128,29 +128,25 @@ serve(async (req) => {
 
     console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}`);
 
-    let whereClause = '';
-    const params: any = {};
-
-    if (arquivo_fonte && lote_upload) {
-      whereClause = 'arquivo_fonte = $1 AND lote_upload = $2';
-      params.p1 = arquivo_fonte;
-      params.p2 = lote_upload;
-    } else if (arquivo_fonte) {
-      whereClause = 'arquivo_fonte = $1';
-      params.p1 = arquivo_fonte;
-    } else if (lote_upload) {
-      whereClause = 'lote_upload = $1';
-      params.p1 = lote_upload;
-    } else {
-      // Aplicar a todos os registros sem tipo de faturamento
-      whereClause = 'tipo_faturamento IS NULL';
-    }
 
     // 1. Buscar registros que precisam de tipificação
-    const { data: registros, error: selectError } = await supabaseClient
+    let query = supabaseClient
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA", "ESPECIALIDADE", "PRIORIDADE", "MEDICO"')
-      .not('tipo_faturamento', 'is', null) === false;
+      .select('id, "EMPRESA", "ESPECIALIDADE", "PRIORIDADE", "MEDICO"');
+
+    // Aplicar filtros conforme parâmetros
+    if (arquivo_fonte && lote_upload) {
+      query = query.eq('arquivo_fonte', arquivo_fonte).eq('lote_upload', lote_upload);
+    } else if (arquivo_fonte) {
+      query = query.eq('arquivo_fonte', arquivo_fonte);
+    } else if (lote_upload) {
+      query = query.eq('lote_upload', lote_upload);
+    } else {
+      // Buscar apenas registros sem tipo de faturamento
+      query = query.is('tipo_faturamento', null);
+    }
+
+    const { data: registros, error: selectError } = await query;
 
     if (selectError) {
       console.error('❌ Erro ao buscar registros:', selectError);

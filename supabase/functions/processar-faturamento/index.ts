@@ -181,22 +181,55 @@ serve(async (req) => {
       
       console.log(`Processando linha ${i}: data original=${row[3]}, data formatada=${dataExameArquivo}`)
       
+      // Determinar tipo de faturamento (Regras F005/F006)
+      const determinarTipoFaturamento = (cliente, especialidade, prioridade, medico) => {
+        const CLIENTES_NC_ORIGINAL = ["CDICARDIO", "CDIGOIAS", "CISP", "CLIRAM", "CRWANDERLEY", "DIAGMAX-PR", "GOLD", "PRODIMAGEM", "TRANSDUSON", "ZANELLO"];
+        const CLIENTES_NC_ADICIONAIS = ["CEMVALENCA", "RMPADUA", "RADI-IMAGEM"];
+        const CLIENTES_NC = [...CLIENTES_NC_ORIGINAL, ...CLIENTES_NC_ADICIONAIS];
+        const ESPECIALIDADES_NC_FATURADAS = ["CARDIO", "MEDICINA INTERNA", "NEUROBRAIN"];
+        const MEDICOS_NC_FATURADOS = ["Dr. Antonio Gualberto Chianca Filho", "Dr. Daniel Chrispim", "Dr. Efraim Da Silva Ferreira", "Dr. Felipe Falcão de Sá", "Dr. Guilherme N. Schincariol", "Dr. Gustavo Andreis", "Dr. João Carlos Dantas do Amaral", "Dr. João Fernando Miranda Pompermayer", "Dr. Leonardo de Paula Ribeiro Figueiredo", "Dr. Raphael Sanfelice João", "Dr. Thiago P. Martins", "Dr. Virgílio Oliveira Barreto", "Dra. Adriana Giubilei Pimenta", "Dra. Aline Andrade Dorea", "Dra. Camila Amaral Campos", "Dra. Cynthia Mendes Vieira de Morais", "Dra. Fernanda Gama Barbosa", "Dra. Kenia Menezes Fernandes", "Dra. Lara M. Durante Bacelar", "Dr. Aguinaldo Cunha Zuppani", "Dr. Alex Gueiros de Barros", "Dr. Eduardo Caminha Nunes", "Dr. Márcio D'Andréa Rossi", "Dr. Rubens Pereira Moura Filho", "Dr. Wesley Walber da Silva", "Dra. Luna Azambuja Satte Alam", "Dra. Roberta Bertoldo Sabatini Treml", "Dra. Thais Nogueira D. Gastaldi", "Dra. Vanessa da Costa Maldonado"];
+
+        if (!CLIENTES_NC.includes(cliente)) return "CO-FT";
+        
+        if (CLIENTES_NC_ORIGINAL.includes(cliente)) {
+          const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
+          const ehPlantao = prioridade === "PLANTÃO";
+          return (temEspecialidadeFaturada || ehPlantao) ? "NC-FT" : "NC-NF";
+        }
+        
+        if (CLIENTES_NC_ADICIONAIS.includes(cliente)) {
+          const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
+          const ehPlantao = prioridade === "PLANTÃO";
+          const temMedicoFaturado = medico && MEDICOS_NC_FATURADOS.includes(medico);
+          const temMamaRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMA";
+          return (temEspecialidadeFaturada || ehPlantao || temMedicoFaturado || temMamaRadiImagem) ? "NC-FT" : "NC-NF";
+        }
+        
+        return "NC-NF";
+      };
+
+      const clienteNome = row[1]?.toString() || 'Paciente Não Informado';
+      const especialidade = row[5]?.toString() || 'Não Informado';
+      const prioridade = row[7]?.toString() || 'Normal';
+      const medico = row[2]?.toString() || 'Médico Não Informado';
+
       dadosMapeados.push({
         omie_id: `FAT_${Date.now()}_${i}`,
         numero_fatura: `NF_${Date.now()}_${i}`,
         cliente_id: clienteId,
-        cliente_nome: row[1]?.toString() || 'Paciente Não Informado',
+        cliente_nome: clienteNome,
         paciente: codigoCliente,
-        medico: row[2]?.toString() || 'Médico Não Informado',
+        medico: medico,
         data_exame: dataExameArquivo, // CORREÇÃO: usando data do arquivo
         modalidade: row[4]?.toString() || 'Não Informado',
-        especialidade: row[5]?.toString() || 'Não Informado',
+        especialidade: especialidade,
         categoria: row[6]?.toString() || 'Não Informado',
-        prioridade: row[7]?.toString() || 'Normal',
+        prioridade: prioridade,
         nome_exame: row[8]?.toString() || 'Exame Não Informado',
         quantidade: parseInt(row[9]?.toString() || '1'),
         valor_bruto: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
         valor: parseFloat(row[10]?.toString().replace(',', '.') || '0'),
+        tipo_faturamento: determinarTipoFaturamento(clienteNome, especialidade, prioridade, medico),
         data_emissao: hoje,
         data_vencimento: vencimento
       })
