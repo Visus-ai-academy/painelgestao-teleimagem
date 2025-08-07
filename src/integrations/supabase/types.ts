@@ -3646,6 +3646,10 @@ export type Database = {
           arquivos_processados: string[]
         }[]
       }
+      limpar_nome_cliente: {
+        Args: { nome_cliente: string }
+        Returns: string
+      }
       limpar_todos_precos: {
         Args: Record<PropertyKey, never>
         Returns: undefined
