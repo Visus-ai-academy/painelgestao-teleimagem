@@ -119,15 +119,18 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
   try {
     if (!row || typeof row !== 'object') return null;
 
-    const empresa = row['EMPRESA'] || '';
+    const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
 
-    if (!empresa.trim() || !nomePaciente.trim()) return null;
+    if (!empresaOriginal.trim() || !nomePaciente.trim()) return null;
 
     // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
-    if (empresa.toLowerCase().includes('_local')) {
+    if (empresaOriginal.toLowerCase().includes('_local')) {
       return null;
     }
+
+    // Não aplicar limpeza aqui pois processRow é síncrono - será aplicado via trigger SQL
+    const empresa = empresaOriginal.trim();
 
     const safeString = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
