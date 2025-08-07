@@ -15,21 +15,31 @@ const CLIENTES_NC = [
   "ZANELLO"
 ];
 
+// Especialidades que geram faturamento para clientes NC (NC-FT)
+const ESPECIALIDADES_NC_FATURADAS = ["CARDIO", "MEDICINA INTERNA", "NEUROBRAIN"];
+
 // Função para determinar o tipo de faturamento
 export function determinarTipoFaturamento(
   cliente: string,
   especialidade?: string,
   prioridade?: string
 ): TipoFaturamento {
-  // Clientes NC
-  if (CLIENTES_NC.includes(cliente)) {
-    // Por enquanto, todos os clientes NC são NC-FT
-    // As regras específicas serão aplicadas posteriormente
+  // Clientes CO (consolidados) - sempre CO-FT
+  if (!CLIENTES_NC.includes(cliente)) {
+    return "CO-FT";
+  }
+
+  // Para clientes NC, verificar especialidade e prioridade
+  const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
+  const ehPlantao = prioridade === "PLANTÃO";
+
+  // NC-FT: Clientes NC com especialidades específicas OU prioridade plantão
+  if (temEspecialidadeFaturada || ehPlantao) {
     return "NC-FT";
   }
 
-  // Clientes CO (consolidados)
-  return "CO-FT";
+  // NC-NF: Todos os demais exames de clientes NC
+  return "NC-NF";
 }
 
 // Função para verificar se é cliente NC
