@@ -86,6 +86,59 @@ export default async function handler(req: Request): Promise<Response> {
     let totalExcluidos = 0;
     const detalhes = [];
 
+    // REGRA v031: Filtro de período atual para arquivos NÃO-RETROATIVOS
+    console.log(`🗂️ Aplicando REGRA v031 nos arquivos não-retroativos...`);
+    
+    // Calcular período para arquivos não-retroativos (mês atual)
+    const dataInicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const dataFimMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+    const dataLimiteLaudoV031 = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 7).toISOString().split('T')[0];
+
+    console.log(`📅 REGRA v031 - Período atual: ${dataInicioMes} a ${dataFimMes}`);
+    console.log(`📅 REGRA v031 - DATA_LAUDO até: ${dataLimiteLaudoV031}`);
+
+    // Aplicar v031 em volumetria_padrao
+    const { error: errorV031_1, count: countV031_1 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_padrao')
+      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+
+    if (!errorV031_1) {
+      const deletedV031_1 = countV031_1 || 0;
+      totalExcluidos += deletedV031_1;
+      detalhes.push(`REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_fora_padrao
+    const { error: errorV031_2, count: countV031_2 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_fora_padrao')
+      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+
+    if (!errorV031_2) {
+      const deletedV031_2 = countV031_2 || 0;
+      totalExcluidos += deletedV031_2;
+      detalhes.push(`REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_onco_padrao
+    const { error: errorV031_3, count: countV031_3 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_onco_padrao')
+      .or(`DATA_REALIZACAO.lt.${dataInicioMes},DATA_REALIZACAO.gt.${dataFimMes},DATA_LAUDO.gt.${dataLimiteLaudoV031}`);
+
+    if (!errorV031_3) {
+      const deletedV031_3 = countV031_3 || 0;
+      totalExcluidos += deletedV031_3;
+      detalhes.push(`REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+    }
+
     // Arquivo 3: volumetria_padrao_retroativo
     console.log(`🗂️ Processando Arquivo 3 (volumetria_padrao_retroativo)...`);
     
@@ -156,8 +209,11 @@ export default async function handler(req: Request): Promise<Response> {
       console.log(`✅ Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO`);
     }
 
-    // REGRA v002: Aplicada SOMENTE nos arquivos retroativos conforme especificado
-    console.log(`✅ Regra v002 aplicada apenas em volumetria_padrao_retroativo e volumetria_fora_padrao_retroativo`)
+    // REGRAS APLICADAS:
+    // v031: Filtro período atual (arquivos não-retroativos)
+    // v002: Exclusão DATA_LAUDO (arquivos retroativos)  
+    // v003: Exclusão DATA_REALIZACAO (arquivos retroativos)
+    console.log(`✅ Regras v002, v003 e v031 aplicadas na ordem correta de execução`)
 
     console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
 

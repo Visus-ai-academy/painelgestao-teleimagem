@@ -87,8 +87,8 @@ export function ControleRegrasNegocio() {
       criterio: 'Remove registros com DATA_REALIZACAO fora do mês de referência (01 ao último dia) e DATA_LAUDO fora do período permitido (01 do mês até 07 do mês seguinte). Aplicada SOMENTE nos arquivos: volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao.',
       status: 'ativa',
       implementadaEm: '2025-01-07',
-      observacoes: 'Edge function: aplicar-filtro-periodo-atual (apenas arquivos não-retroativos)',
-      ordem_execucao: 1031,
+      observacoes: 'Edge function: aplicar-exclusoes-periodo (executa junto com v002 e v003)',
+      ordem_execucao: 1,
       tipo_regra: 'exclusao'
     },
     {
