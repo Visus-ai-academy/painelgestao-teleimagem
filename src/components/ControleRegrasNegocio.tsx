@@ -150,6 +150,18 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'negocio'
     },
     {
+      id: 'v030',
+      nome: 'Correção de Modalidade para Exames RX',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Todos os exames na coluna ESTUDO_DESCRICAO que começam com "RX " têm a modalidade alterada para "RX". Aplica-se aos arquivos de upload 1,2,3,4,5.',
+      status: 'ativa',
+      implementadaEm: '2025-01-07',
+      observacoes: 'Regra aplicada durante processamento dos dados de volumetria',
+      ordem_execucao: 10,
+      tipo_regra: 'negocio'
+    },
+    {
       id: 'v014',
       nome: 'Mapeamento Dinâmico de Campos',
       modulo: 'volumetria',
@@ -157,7 +169,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza tabela field_mappings para mapear colunas do arquivo para campos do banco de dados.',
       status: 'ativa',
       implementadaEm: '2024-01-18',
-      ordem_execucao: 10,
+      ordem_execucao: 11,
       tipo_regra: 'negocio'
     },
     {
@@ -168,7 +180,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Processa uploads em lotes de 1000 registros para otimizar performance.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      ordem_execucao: 11,
+      ordem_execucao: 12,
       tipo_regra: 'negocio'
     },
     {
@@ -179,7 +191,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza cache para otimizar consultas grandes, refresh automático a cada 5 minutos.',
       status: 'ativa',
       implementadaEm: '2024-01-12',
-      ordem_execucao: 12,
+      ordem_execucao: 13,
       tipo_regra: 'negocio'
     },
 
