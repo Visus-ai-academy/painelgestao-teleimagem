@@ -74,12 +74,51 @@ export default async function handler(req: Request): Promise<Response> {
     let totalExcluidos = 0;
     const detalhes = [];
 
-    // REGRA v002 NÃO SE APLICA MAIS AOS ARQUIVOS NÃO-RETROATIVOS
-    // A regra de DATA_LAUDO deve ser aplicada SOMENTE nos arquivos retroativos
-    console.log(`📝 Regra v002: Exclusão por DATA_LAUDO - aplicação removida dos arquivos não-retroativos`);
-    console.log(`📝 A regra será aplicada apenas em: volumetria_padrao_retroativo e volumetria_fora_padrao_retroativo`);
+    // REGRA v031: Filtro de DATA_LAUDO para arquivos NÃO-RETROATIVOS
+    // Excluir laudos após dia 7 do mês seguinte ao período
+    console.log(`📝 Regra v031: Exclusão por DATA_LAUDO para arquivos não-retroativos`);
     
-    // Sem exclusões nesta função - transferidas para aplicar-exclusoes-periodo
+    // Aplicar v031 em volumetria_padrao
+    const { error: errorV031_1, count: countV031_1 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (!errorV031_1) {
+      const deletedV031_1 = countV031_1 || 0;
+      totalExcluidos += deletedV031_1;
+      detalhes.push(`REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_fora_padrao
+    const { error: errorV031_2, count: countV031_2 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_fora_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (!errorV031_2) {
+      const deletedV031_2 = countV031_2 || 0;
+      totalExcluidos += deletedV031_2;
+      detalhes.push(`REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_onco_padrao
+    const { error: errorV031_3, count: countV031_3 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_onco_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (!errorV031_3) {
+      const deletedV031_3 = countV031_3 || 0;
+      totalExcluidos += deletedV031_3;
+      detalhes.push(`REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+    }
 
     console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
 
