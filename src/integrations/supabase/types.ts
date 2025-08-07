@@ -3592,6 +3592,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { _user_id?: string }
         Returns: boolean
       }
+      limpar_dados_ficticios: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       limpar_dados_volumetria: {
         Args: { arquivos_fonte: string[] }
         Returns: {
