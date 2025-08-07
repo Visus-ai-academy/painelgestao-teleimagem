@@ -39,11 +39,13 @@ serve(async (req) => {
     console.log(`Iniciando correção de modalidade RX para arquivo: ${arquivo_fonte}`);
 
     // 1. Buscar registros que precisam ser corrigidos
+    // Critério: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA'
     const { data: registrosParaCorrigir, error: errorBusca } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
       .eq('arquivo_fonte', arquivo_fonte)
-      .like('ESTUDO_DESCRICAO', 'RX %');
+      .in('MODALIDADE', ['CR', 'DX'])
+      .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA');
 
     if (errorBusca) {
       throw new Error(`Erro ao buscar registros para correção: ${errorBusca.message}`);
@@ -63,9 +65,10 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Encontrados ${registrosParaCorrigir.length} exames RX para correção`);
+    console.log(`Encontrados ${registrosParaCorrigir.length} exames para correção`);
 
     // 2. Aplicar correção - atualizar modalidade para "RX"
+    // Critério: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA'
     const { data: resultadoUpdate, error: errorUpdate } = await supabase
       .from('volumetria_mobilemed')
       .update({ 
@@ -73,7 +76,8 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('arquivo_fonte', arquivo_fonte)
-      .like('ESTUDO_DESCRICAO', 'RX %')
+      .in('MODALIDADE', ['CR', 'DX'])
+      .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
 
     if (errorUpdate) {
@@ -121,7 +125,7 @@ serve(async (req) => {
       exemplos_corrigidos: exemplosCorrigan,
       regra_aplicada: 'v030 - Correção de Modalidade para Exames RX',
       data_processamento: new Date().toISOString(),
-      observacao: 'Todos os exames com ESTUDO_DESCRICAO iniciando com "RX " tiveram modalidade alterada para "RX"'
+      observacao: 'Todos os exames com MODALIDADE "CR" ou "DX" que não sejam "MAMOGRAFIA" tiveram modalidade alterada para "RX"'
     };
 
     console.log('Correção de modalidade RX concluída:', resultado);
