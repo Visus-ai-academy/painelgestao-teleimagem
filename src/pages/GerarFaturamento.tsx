@@ -46,6 +46,7 @@ import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
 import LimparDadosCompleto from "@/components/LimparDadosCompleto";
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
+import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -963,7 +964,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Dados MobileMed
@@ -975,6 +976,10 @@ export default function GerarFaturamento() {
           <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
             <FileBarChart2 className="h-4 w-4" />
             Demonstrativo
+          </TabsTrigger>
+          <TabsTrigger value="fechamento" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Fechamento de Período
           </TabsTrigger>
           <TabsTrigger value="faturamento" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
