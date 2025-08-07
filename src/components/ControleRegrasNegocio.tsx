@@ -241,6 +241,18 @@ export function ControleRegrasNegocio() {
       ordem_execucao: 3,
       tipo_regra: 'negocio'
     },
+    {
+      id: 'f005',
+      nome: 'Tipificação de Faturamento (CO-FT, NC-FT, NC-NF)',
+      modulo: 'faturamento',
+      categoria: 'dados',
+      criterio: 'Define tipos de faturamento: CO-FT (clientes consolidados), NC-FT (clientes NC faturados), NC-NF (clientes NC não faturados). Lista de clientes NC: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO.',
+      status: 'ativa',
+      implementadaEm: '2025-01-07',
+      observacoes: 'Implementado em utils/tipoFaturamento.ts - regras específicas a serem definidas',
+      ordem_execucao: 4,
+      tipo_regra: 'negocio'
+    },
 
     // CLIENTES - Ordem de execução
     {
