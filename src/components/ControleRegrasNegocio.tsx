@@ -60,10 +60,10 @@ export function ControleRegrasNegocio() {
       nome: 'Exclusão por DATA_LAUDO fora do período',
       modulo: 'volumetria',
       categoria: 'exclusao',
-      criterio: 'Remove registros com DATA_LAUDO fora do período de faturamento (dia 8 do mês até dia 7 do mês seguinte).',
+      criterio: 'Remove registros com DATA_LAUDO fora do período de faturamento (dia 8 do mês até dia 7 do mês seguinte). Aplicada SOMENTE nos arquivos: volumetria_padrao_retroativo e volumetria_fora_padrao_retroativo.',
       status: 'ativa',
       implementadaEm: '2024-07-01',
-      observacoes: 'Edge function: aplicar-filtro-data-laudo',
+      observacoes: 'Edge function: aplicar-exclusoes-periodo (apenas arquivos retroativos)',
       ordem_execucao: 2,
       tipo_regra: 'exclusao'
     },

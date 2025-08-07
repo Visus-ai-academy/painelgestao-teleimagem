@@ -74,51 +74,12 @@ export default async function handler(req: Request): Promise<Response> {
     let totalExcluidos = 0;
     const detalhes = [];
 
-    // Arquivos não-retroativos que precisam do filtro de DATA_LAUDO
-    const arquivosNaoRetroativos = [
-      'volumetria_padrao',
-      'volumetria_fora_padrao', 
-      'volumetria_onco_padrao'
-    ];
-
-    for (const arquivo of arquivosNaoRetroativos) {
-      console.log(`🗂️ Processando ${arquivo}...`);
-      
-      // Excluir registros com DATA_LAUDO posterior ao período permitido
-      const { error, count } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', arquivo)
-        .gt('DATA_LAUDO', dataLimiteLaudo);
-
-      if (error) {
-        console.error(`❌ Erro ao filtrar ${arquivo}:`, error);
-        detalhes.push(`${arquivo}: ERRO - ${error.message}`);
-      } else {
-        const deletedCount = count || 0;
-        totalExcluidos += deletedCount;
-        detalhes.push(`${arquivo}: ${deletedCount} registros excluídos com DATA_LAUDO > ${dataLimiteLaudo}`);
-        console.log(`✅ ${arquivo}: ${deletedCount} registros excluídos`);
-      }
-    }
-
-    // REGRA ADICIONAL: Excluir TODOS os laudos após 07/07/2025 (independente do arquivo)
-    console.log(`🗂️ Aplicando regra fixa: Excluir laudos após 07/07/2025...`);
+    // REGRA v002 NÃO SE APLICA MAIS AOS ARQUIVOS NÃO-RETROATIVOS
+    // A regra de DATA_LAUDO deve ser aplicada SOMENTE nos arquivos retroativos
+    console.log(`📝 Regra v002: Exclusão por DATA_LAUDO - aplicação removida dos arquivos não-retroativos`);
+    console.log(`📝 A regra será aplicada apenas em: volumetria_padrao_retroativo e volumetria_fora_padrao_retroativo`);
     
-    const { error: errorLaudosRecentes, count: countLaudosRecentes } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .gt('DATA_LAUDO', '2025-07-07');
-
-    if (errorLaudosRecentes) {
-      console.error('❌ Erro ao excluir laudos após 07/07/2025:', errorLaudosRecentes);
-      detalhes.push(`Regra fixa: ERRO - ${errorLaudosRecentes.message}`);
-    } else {
-      const deletedCountLaudos = countLaudosRecentes || 0;
-      totalExcluidos += deletedCountLaudos;
-      detalhes.push(`Regra fixa: ${deletedCountLaudos} registros excluídos com DATA_LAUDO > 07/07/2025`);
-      console.log(`✅ Regra fixa: ${deletedCountLaudos} registros excluídos com laudos recentes`);
-    }
+    // Sem exclusões nesta função - transferidas para aplicar-exclusoes-periodo
 
     console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
 
@@ -128,7 +89,7 @@ export default async function handler(req: Request): Promise<Response> {
       total_excluidos: totalExcluidos,
       detalhes,
       data_limite_aplicada: dataLimiteLaudo,
-      arquivos_processados: arquivosNaoRetroativos
+      arquivos_processados: []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
