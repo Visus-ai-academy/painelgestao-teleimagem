@@ -1365,6 +1365,45 @@ export type Database = {
           },
         ]
       }
+      fechamento_faturamento: {
+        Row: {
+          created_at: string
+          data_fechamento: string | null
+          data_fim: string
+          data_inicio: string
+          fechado_por: string | null
+          id: string
+          observacoes: string | null
+          periodo_referencia: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_fechamento?: string | null
+          data_fim: string
+          data_inicio: string
+          fechado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_referencia: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_fechamento?: string | null
+          data_fim?: string
+          data_inicio?: string
+          fechado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_referencia?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       field_mappings: {
         Row: {
           active: boolean
@@ -3310,6 +3349,10 @@ export type Database = {
         Args: { p_ativacao_id: string; p_observacoes?: string }
         Returns: Json
       }
+      fechar_periodo_faturamento: {
+        Args: { p_periodo_referencia: string; p_observacoes?: string }
+        Returns: Json
+      }
       get_all_volumetria_data: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3677,6 +3720,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      periodo_esta_fechado: {
+        Args: { p_periodo_referencia: string }
+        Returns: boolean
+      }
       prepare_partition_structure: {
         Args: { table_name: string; partition_date: string }
         Returns: Json
@@ -3688,6 +3735,10 @@ export type Database = {
       promote_user_to_admin: {
         Args: { user_email: string }
         Returns: boolean
+      }
+      reabrir_periodo_faturamento: {
+        Args: { p_periodo_referencia: string }
+        Returns: Json
       }
       refresh_dashboard_summary: {
         Args: Record<PropertyKey, never>
