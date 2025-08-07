@@ -80,6 +80,18 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'exclusao'
     },
     {
+      id: 'v031',
+      nome: 'Filtro de período atual para arquivos não-retroativos',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Remove registros com DATA_REALIZACAO fora do mês de referência (01 ao último dia) e DATA_LAUDO fora do período permitido (01 do mês até 07 do mês seguinte). Aplicada SOMENTE nos arquivos: volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao.',
+      status: 'ativa',
+      implementadaEm: '2025-01-07',
+      observacoes: 'Edge function: aplicar-filtro-periodo-atual (apenas arquivos não-retroativos)',
+      ordem_execucao: 1031,
+      tipo_regra: 'exclusao'
+    },
+    {
       id: 'v013',
       nome: 'Validação de Formato Excel',
       modulo: 'volumetria',
