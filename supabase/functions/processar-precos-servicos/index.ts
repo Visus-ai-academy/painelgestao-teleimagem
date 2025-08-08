@@ -41,18 +41,8 @@ serve(async (req) => {
       .eq('status', 'processing')
       .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Mais de 5 minutos
 
-    // 1.1. Limpar tabela de preços antes do novo upload
-    console.log('🧹 Limpando tabela de preços existente...')
-    const { error: deleteError } = await supabaseClient
-      .from('precos_servicos')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all records
-    
-    if (deleteError) {
-      console.error('❌ Erro ao limpar tabela:', deleteError)
-    } else {
-      console.log('✅ Tabela precos_servicos limpa')
-    }
+    // 1.1. Replace strategy: a exclusão será feita por cliente após o parse do arquivo
+    // (remoção global da tabela foi desativada)
 
     // 2. Criar log de processamento
     const { data: logEntry, error: logError } = await supabaseClient
@@ -198,13 +188,8 @@ serve(async (req) => {
           preco = parseFloat(precoConvertido) || 0
         }
 
-        // Aceitar tanto preços zerados quanto não-zerados
-        // Apenas validar se não é um valor inválido/NaN
-        if (isNaN(preco)) {
-          erros.push(`Linha ${i + 1}: Preço com formato inválido - "${precoStr}" (assumido 0)`)
-          preco = 0
-          observacoesRow += `Preço inválido: ${precoStr}. Assumido 0. `
-        }
+        // Arredondar para 2 casas decimais (garantir 2 casas)
+        preco = Math.round(preco * 100) / 100
 
         // Preparar registro para inserção
         registrosParaInserir.push({
@@ -236,6 +221,23 @@ serve(async (req) => {
 
     console.log(`📊 Registros preparados: ${registrosParaInserir.length}`)
     console.log(`❌ Erros de validação: ${erros.length}`)
+
+    // 4.1. Replace por cliente: apagar preços existentes apenas dos clientes presentes no arquivo
+    const clienteIdsAlvo = Array.from(new Set(registrosParaInserir.map((r: any) => r.cliente_id).filter((id: string | null): id is string => !!id)))
+    console.log(`🧹 Clientes alvo para replace: ${clienteIdsAlvo.length}`)
+    const DELETE_BATCH = 100
+    for (let i = 0; i < clienteIdsAlvo.length; i += DELETE_BATCH) {
+      const ids = clienteIdsAlvo.slice(i, i + DELETE_BATCH)
+      const { error: delErr } = await supabaseClient
+        .from('precos_servicos')
+        .delete()
+        .in('cliente_id', ids)
+      if (delErr) {
+        console.error(`❌ Erro ao remover preços existentes (lote ${Math.floor(i/DELETE_BATCH)+1}):`, delErr)
+      } else {
+        console.log(`✅ Removidos preços antigos de ${ids.length} cliente(s) (lote ${Math.floor(i/DELETE_BATCH)+1})`)
+      }
+    }
 
     // 5. Inserir registros no banco em lotes
     let registrosInseridos = 0
