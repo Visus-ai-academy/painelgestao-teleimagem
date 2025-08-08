@@ -94,6 +94,21 @@ export default function MapaDistribuicaoClientes() {
   const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
+  // Volumetria por cliente via RPC (dataset tratado e completo)
+  const [volumetriaClientesRpc, setVolumetriaClientesRpc] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.rpc('get_clientes_com_volumetria');
+      if (error) {
+        console.error('❌ Erro ao carregar volumetria por cliente (RPC):', error);
+      } else {
+        setVolumetriaClientesRpc(data || []);
+        const totalIdentificado = (data || []).reduce((s: number, r: any) => s + Number(r.volume_exames || 0), 0);
+        console.log('✅ RPC get_clientes_com_volumetria carregado. Total identificado:', totalIdentificado);
+      }
+    })();
+  }, []);
+
   // NOVO: Carregar volumetria completa via paginação para remover limites
   // Removido estado local de paginação - usando dados do contexto
   useEffect(() => {
@@ -160,54 +175,70 @@ export default function MapaDistribuicaoClientes() {
 
     let volumetriaPorEmpresa: Record<string, any> = {};
     
-    // Criar mapa de volumetria por empresa usando dados completos (sem limite)
-    const baseVol = contextData.detailedData || [];
-    if (baseVol.length > 0) {
-      let volumetriaFiltrada = baseVol;
-      
-      // Se há filtros de volumetria, aplicar
-      if (temFiltrosVolumetria) {
-        console.log('🔧 COM FILTROS - Processando dados filtrados (base completa)');
-        volumetriaFiltrada = baseVol.filter(item => {
-          if (filtroModalidade !== 'todas' && item.MODALIDADE !== filtroModalidade) return false;
-          if (filtroEspecialidade !== 'todas' && item.ESPECIALIDADE !== filtroEspecialidade) return false;
-          if (filtroPrioridade !== 'todas' && item.PRIORIDADE !== filtroPrioridade) return false;
-          return true;
-        });
+    // Preferir dataset tratado via RPC quando NÃO há filtros de volumetria
+    if (!temFiltrosVolumetria && volumetriaClientesRpc.length > 0) {
+      console.log('🧮 Usando RPC get_clientes_com_volumetria para mapa (dataset tratado)');
+      volumetriaClientesRpc.forEach((row: any) => {
+        const nome = row?.nome;
+        if (!nome) return;
+        volumetriaPorEmpresa[nome] = {
+          volume_exames: Number(row.volume_exames) || 0,
+          total_registros: Number(row.total_registros) || 0,
+          modalidades: new Set<string>(),
+          especialidades: new Set<string>(),
+          prioridades: new Set<string>()
+        };
+      });
+    } else {
+      // Criar mapa de volumetria por empresa usando base completa do contexto (aplica filtros se houver)
+      const baseVol = contextData.detailedData || [];
+      if (baseVol.length > 0) {
+        let volumetriaFiltrada = baseVol;
         
-        // Filtrar apenas clientes que têm volumetria com os filtros aplicados
-        const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item.EMPRESA));
-        clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
-        
-        console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
-      } else {
-        console.log('🚀 SEM FILTROS - Usando base completa');
-      }
-
-      // Criar mapa de volumetria por empresa usando base completa
-      volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
-        const empresa = item.EMPRESA;
-        if (!empresa) return acc;
-        
-        if (!acc[empresa]) {
-          acc[empresa] = {
-            volume_exames: 0,
-            total_registros: 0,
-            modalidades: new Set<string>(),
-            especialidades: new Set<string>(),
-            prioridades: new Set<string>()
-          };
+        // Se há filtros de volumetria, aplicar
+        if (temFiltrosVolumetria) {
+          console.log('🔧 COM FILTROS - Processando dados filtrados (base completa)');
+          volumetriaFiltrada = baseVol.filter(item => {
+            if (filtroModalidade !== 'todas' && item.MODALIDADE !== filtroModalidade) return false;
+            if (filtroEspecialidade !== 'todas' && item.ESPECIALIDADE !== filtroEspecialidade) return false;
+            if (filtroPrioridade !== 'todas' && item.PRIORIDADE !== filtroPrioridade) return false;
+            return true;
+          });
+          
+          // Filtrar apenas clientes que têm volumetria com os filtros aplicados
+          const empresasComVolumetria = new Set(volumetriaFiltrada.map(item => item.EMPRESA));
+          clientesFiltrados = clientesFiltrados.filter(cliente => empresasComVolumetria.has(cliente.nome));
+          
+          console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
+        } else {
+          console.log('🚀 SEM FILTROS - Usando base completa do contexto');
         }
-        
-        acc[empresa].volume_exames += Number(item.VALORES) || 0; // Valores reais dos dados
-        acc[empresa].total_registros += 1;
-        
-        if (item.MODALIDADE) acc[empresa].modalidades.add(item.MODALIDADE);
-        if (item.ESPECIALIDADE) acc[empresa].especialidades.add(item.ESPECIALIDADE);
-        if (item.PRIORIDADE) acc[empresa].prioridades.add(item.PRIORIDADE);
-        
-        return acc;
-      }, {} as Record<string, any>);
+  
+        // Criar mapa de volumetria por empresa usando base (filtrada ou não)
+        volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
+          const empresa = item.EMPRESA;
+          if (!empresa) return acc;
+          
+          if (!acc[empresa]) {
+            acc[empresa] = {
+              volume_exames: 0,
+              total_registros: 0,
+              modalidades: new Set<string>(),
+              especialidades: new Set<string>(),
+              prioridades: new Set<string>()
+            };
+          }
+          
+          acc[empresa].volume_exames += Number(item.VALORES) || 0; // Valores reais dos dados
+          acc[empresa].total_registros += 1;
+          
+          if (item.MODALIDADE) acc[empresa].modalidades.add(item.MODALIDADE);
+          if (item.ESPECIALIDADE) acc[empresa].especialidades.add(item.ESPECIALIDADE);
+          if (item.PRIORIDADE) acc[empresa].prioridades.add(item.PRIORIDADE);
+          
+          return acc;
+        }, {} as Record<string, any>);
+      }
     }
 
     // Processar todos os clientes filtrados
@@ -238,12 +269,35 @@ export default function MapaDistribuicaoClientes() {
       } as ClienteVolumetria;
     });
     
+    const totalIdentificado = clientesProcessados.reduce((sum, c) => sum + c.volume_exames, 0);
+    const totalExames = Number(contextData.dashboardStats.total_exames) || 0;
+    const naoIdentificado = Math.max(totalExames - totalIdentificado, 0);
+
+    if (!temFiltrosVolumetria && naoIdentificado > 0) {
+      clientesProcessados.push({
+        id: 'nao-identificado',
+        nome: 'Não identificado',
+        endereco: undefined,
+        cidade: 'Não informado',
+        estado: 'NI',
+        status: 'Ativo',
+        ativo: true,
+        email: undefined,
+        tipo_cliente: undefined,
+        volume_exames: naoIdentificado,
+        total_registros: 0,
+        modalidades: [],
+        especialidades: [],
+        prioridades: []
+      });
+    }
+    
     console.log('✅ Clientes processados:', clientesProcessados.length);
-    console.log('📊 Volume total dos clientes processados:', clientesProcessados.reduce((sum, c) => sum + c.volume_exames, 0));
+    console.log('📊 Volume identificado:', totalIdentificado.toLocaleString(), '| Não identificado:', naoIdentificado.toLocaleString(), '| Total esperado:', totalExames.toLocaleString());
     console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
-  }, [clientesData, contextData.detailedData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, volumetriaClientesRpc, contextData.detailedData, contextData.dashboardStats.total_exames, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {
