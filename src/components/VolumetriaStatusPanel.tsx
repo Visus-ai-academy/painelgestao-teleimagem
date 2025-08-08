@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface UploadStats {
   tipo_arquivo: string;
@@ -18,13 +21,19 @@ interface UploadStats {
 export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
   const [uploadStats, setUploadStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     fetchUploadStats();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, selectedDate]);
 
   const fetchUploadStats = async () => {
     try {
+      // Limitar pela janela do mês selecionado
+      const baseDate = selectedDate || new Date();
+      const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+      const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
       // Buscar uploads de volumetria/mobilemed
       const { data, error } = await supabase
         .from('processamento_uploads')
@@ -36,6 +45,8 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
           'volumetria_fora_padrao_retroativo',
           'volumetria_onco_padrao'
         ])
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false })
         .limit(100000); // Removida limitação - volumes altos
 
@@ -123,8 +134,27 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <CardTitle>Status dos Uploads Recentes - Dados MobileMed</CardTitle>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-start min-w-[220px]">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {selectedDate
+                ? selectedDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+                : 'Período de referência'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              initialFocus
+              className="p-3 pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
       </CardHeader>
       <CardContent>
         {uploadStats.length === 0 ? (
