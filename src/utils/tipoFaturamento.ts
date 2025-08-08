@@ -26,7 +26,7 @@ const CLIENTES_NC_ADICIONAIS = [
 const CLIENTES_NC = [...CLIENTES_NC_ORIGINAL, ...CLIENTES_NC_ADICIONAIS];
 
 // Especialidades que geram faturamento para clientes NC (NC-FT)
-const ESPECIALIDADES_NC_FATURADAS = ["CARDIO", "MEDICINA INTERNA", "NEUROBRAIN"];
+const ESPECIALIDADES_NC_FATURADAS = ["CARDIO"];
 
 // Médicos específicos que geram NC-FT para clientes NC adicionais - Regra F006
 const MEDICOS_NC_FATURADOS = [
@@ -66,7 +66,8 @@ export function determinarTipoFaturamento(
   cliente: string,
   especialidade?: string,
   prioridade?: string,
-  medico?: string
+  medico?: string,
+  estudoDescricao?: string
 ): TipoFaturamento {
   // Clientes CO (consolidados) - sempre CO-FT
   if (!CLIENTES_NC.includes(cliente)) {
@@ -78,7 +79,7 @@ export function determinarTipoFaturamento(
     const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
     const ehPlantao = prioridade === "PLANTÃO";
 
-    if (temEspecialidadeFaturada || ehPlantao) {
+    if (temEspecialidadeFaturada || ehPlantao || (estudoDescricao && ["ANGIOTC VENOSA TORAX CARDIOLOGIA", "RM CRANIO NEUROBRAIN"].includes(estudoDescricao))) {
       return "NC-FT";
     }
     return "NC-NF";

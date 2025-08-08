@@ -246,7 +246,7 @@ export function ControleRegrasNegocio() {
       nome: 'Tipificação de Faturamento - Clientes NC Originais',
       modulo: 'faturamento',
       categoria: 'dados',
-      criterio: 'Define tipificação para 10 clientes NC originais: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO. NC-FT para especialidades CARDIO/MEDICINA INTERNA/NEUROBRAIN ou prioridade PLANTÃO.',
+      criterio: 'Define tipificação para 10 clientes NC originais: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO. NC-FT para especialidade CARDIO, ou prioridade PLANTÃO, ou quando ESTUDO_DESCRICAO for "ANGIOTC VENOSA TORAX CARDIOLOGIA" ou "RM CRANIO NEUROBRAIN".',
       status: 'ativa',
       implementadaEm: '2025-01-07',
       observacoes: 'Implementado em utils/tipoFaturamento.ts - aplica automaticamente na volumetria e faturamento',

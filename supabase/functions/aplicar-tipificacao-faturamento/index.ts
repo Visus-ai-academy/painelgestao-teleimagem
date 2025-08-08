@@ -34,7 +34,7 @@ const CLIENTES_NC_ADICIONAIS = [
 const CLIENTES_NC = [...CLIENTES_NC_ORIGINAL, ...CLIENTES_NC_ADICIONAIS];
 
 // Especialidades que geram faturamento para clientes NC (NC-FT)
-const ESPECIALIDADES_NC_FATURADAS = ["CARDIO", "MEDICINA INTERNA", "NEUROBRAIN"];
+const ESPECIALIDADES_NC_FATURADAS = ["CARDIO"];
 
 // Médicos específicos que geram NC-FT para clientes NC adicionais - Regra F006
 const MEDICOS_NC_FATURADOS = [
@@ -74,7 +74,8 @@ function determinarTipoFaturamento(
   cliente: string,
   especialidade?: string,
   prioridade?: string,
-  medico?: string
+  medico?: string,
+  estudoDescricao?: string
 ): TipoFaturamento {
   // Clientes CO (consolidados) - sempre CO-FT
   if (!CLIENTES_NC.includes(cliente)) {
@@ -86,7 +87,7 @@ function determinarTipoFaturamento(
     const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
     const ehPlantao = prioridade === "PLANTÃO";
 
-    if (temEspecialidadeFaturada || ehPlantao) {
+    if (temEspecialidadeFaturada || ehPlantao || (estudoDescricao && ["ANGIOTC VENOSA TORAX CARDIOLOGIA", "RM CRANIO NEUROBRAIN"].includes(estudoDescricao))) {
       return "NC-FT";
     }
     return "NC-NF";
@@ -132,7 +133,7 @@ serve(async (req) => {
     // 1. Buscar registros que precisam de tipificação
     let query = supabaseClient
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA", "ESPECIALIDADE", "PRIORIDADE", "MEDICO"');
+      .select('id, "EMPRESA", "ESPECIALIDADE", "PRIORIDADE", "MEDICO", "ESTUDO_DESCRICAO"');
 
     // Aplicar filtros conforme parâmetros
     if (arquivo_fonte && lote_upload) {
@@ -183,7 +184,8 @@ serve(async (req) => {
           registro.EMPRESA,
           registro.ESPECIALIDADE,
           registro.PRIORIDADE,
-          registro.MEDICO
+          registro.MEDICO,
+          registro.ESTUDO_DESCRICAO
         );
 
         registrosProcessados++;
