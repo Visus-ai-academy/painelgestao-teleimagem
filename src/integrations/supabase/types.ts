@@ -2521,6 +2521,36 @@ export type Database = {
         }
         Relationships: []
       }
+      regras_negocio_meta: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          created_at: string
+          id: string
+          modulo: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          id: string
+          modulo: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          modulo?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       regras_quebra_exames: {
         Row: {
           ativo: boolean
