@@ -84,7 +84,7 @@ export function ControleRegrasNegocio() {
       nome: 'Filtro de período atual para arquivos não-retroativos',
       modulo: 'volumetria',
       categoria: 'exclusao',
-      criterio: 'Remove registros com DATA_LAUDO fora do período permitido (08 do mês anterior até 07 do mês atual). Aplicada SOMENTE nos arquivos: volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao.',
+      criterio: 'Remove registros com DATA_REALIZACAO fora do mês de referência (01 ao último dia) e DATA_LAUDO fora do período permitido (01 do mês de referencia até 07 do mês subsequente ao mes de referencia). Aplicada SOMENTE nos arquivos: volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao.',
       status: 'ativa',
       implementadaEm: '2024-07-01',
       observacoes: 'Edge function: aplicar-exclusoes-periodo (válida apenas para arquivos não-retroativos)',
