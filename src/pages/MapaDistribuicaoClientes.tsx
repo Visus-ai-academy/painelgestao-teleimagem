@@ -102,7 +102,7 @@ export default function MapaDistribuicaoClientes() {
       try {
         let all: any[] = [];
         let offset = 0;
-        const limit = 100000; // grandes volumes por lote
+        const limit = 1000; // paginação segura (PostgREST costuma limitar ~1k)
         while (true) {
           const { data, error } = await supabase
             .from('volumetria_mobilemed')

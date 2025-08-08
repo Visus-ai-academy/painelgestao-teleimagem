@@ -48,8 +48,16 @@ export default function DemonstrativoFaturamento() {
     setCarregando(true);
     try {
       console.log('Carregando demonstrativo de faturamento...');
+      // Converter período selecionado (YYYY-MM) para formato mon/YY (ex.: jun/25)
+      const formatPeriodo = (yyyyMM: string) => {
+        const [y, m] = yyyyMM.split('-');
+        const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
+        return `${mon}/${y.slice(2)}`;
+      };
+      const periodoRef = formatPeriodo(periodo);
       
-      // Buscar dados de faturamento agrupados por cliente
+      // Buscar dados de faturamento do período (sem limite implícito)
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
@@ -63,7 +71,7 @@ export default function DemonstrativoFaturamento() {
           data_vencimento,
           periodo_referencia
         `)
-        .like('periodo_referencia', `%${periodo}%`)
+        .eq('periodo_referencia', periodoRef)
         .order('cliente_nome');
 
       if (error) {

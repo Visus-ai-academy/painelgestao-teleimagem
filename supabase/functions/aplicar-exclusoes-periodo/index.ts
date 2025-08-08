@@ -9,10 +9,8 @@ const corsHeaders = {
 // Função para calcular datas do período de faturamento
 function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
   console.log(`🗓️ Calculando datas para período: ${periodoReferencia}`);
-  
   const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
-  
-  const meses = {
+  const meses: Record<string, number> = {
     'janeiro': 1, 'jan': 1,
     'fevereiro': 2, 'fev': 2,
     'março': 3, 'mar': 3,
@@ -26,35 +24,30 @@ function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
     'novembro': 11, 'nov': 11,
     'dezembro': 12, 'dez': 12
   };
-  
   const mes = meses[mesStr];
   const ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr);
-  
-  if (!mes || !ano) {
-    throw new Error(`Período inválido: ${periodoReferencia}`);
-  }
-  
-  console.log(`📅 Mês: ${mes}, Ano: ${ano}`);
-  
-  // Data limite para DATA_REALIZACAO: 01 do mês especificado (INCLUSIVE)
-  // Para Jun/25 = 01/06/2025 (excluir >= 01/06/2025)
-  const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
-  
-  // Período de faturamento: dia 8 do mês especificado até dia 7 do mês SEGUINTE
-  // Para Jun/25: 08/06/2025 a 07/07/2025
-  const inicioFaturamento = new Date(ano, mes - 1, 8);
-  const fimFaturamento = new Date(ano, mes, 7);
-  
+  if (!mes || !ano) throw new Error(`Período inválido: ${periodoReferencia}`);
+
+  // Datas base
+  const primeiroDiaMes = new Date(ano, mes - 1, 1);
+  const ultimoDiaMes = new Date(ano, mes, 0); // dia 0 do próximo mês = último dia do mês atual
+  const inicioFaturamento = new Date(ano, mes - 1, 8); // 08 do mês de referência
+  const fimFaturamento = new Date(ano, mes, 7); // 07 do mês seguinte
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
   const result = {
-    dataLimiteRealizacao: dataLimiteRealizacao.toISOString().split('T')[0],
-    inicioFaturamento: inicioFaturamento.toISOString().split('T')[0],
-    fimFaturamento: fimFaturamento.toISOString().split('T')[0]
+    // Para retroativos (v002/v003)
+    dataLimiteRealizacao: fmt(primeiroDiaMes),
+    inicioFaturamento: fmt(inicioFaturamento),
+    fimFaturamento: fmt(fimFaturamento),
+    // Para não-retroativos (v031)
+    realizacaoInicioMes: fmt(primeiroDiaMes),
+    realizacaoFimMes: fmt(ultimoDiaMes),
+    laudoInicioJanela: fmt(primeiroDiaMes),
+    laudoFimJanela: fmt(fimFaturamento),
   };
-  
-  console.log(`📊 Datas calculadas:`);
-  console.log(`   - Excluir DATA_REALIZACAO >= ${result.dataLimiteRealizacao}`);
-  console.log(`   - Manter DATA_LAUDO entre ${result.inicioFaturamento} e ${result.fimFaturamento}`);
-  
+
+  console.log('📊 Datas calculadas:', result);
   return result;
 }
 
@@ -77,34 +70,34 @@ export default async function handler(req: Request): Promise<Response> {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { dataLimiteRealizacao, inicioFaturamento, fimFaturamento } = calcularDatasPeriodoFaturamento(periodo_referencia);
+    const { 
+      dataLimiteRealizacao,
+      inicioFaturamento,
+      fimFaturamento,
+      realizacaoInicioMes,
+      realizacaoFimMes,
+      laudoInicioJanela,
+      laudoFimJanela,
+    } = calcularDatasPeriodoFaturamento(periodo_referencia);
     
     console.log(`📅 Datas calculadas:`);
-    console.log(`   - Data limite DATA_REALIZACAO: ${dataLimiteRealizacao}`);
-    console.log(`   - Período DATA_LAUDO: ${inicioFaturamento} a ${fimFaturamento}`);
+    console.log(`   - Data limite DATA_REALIZACAO (retroativos): ${dataLimiteRealizacao}`);
+    console.log(`   - Período DATA_LAUDO (retroativos): ${inicioFaturamento} a ${fimFaturamento}`);
 
     let totalExcluidos = 0;
-    const detalhes = [];
+    const detalhes = [] as string[];
 
     // REGRA v031: Filtro de período atual para arquivos NÃO-RETROATIVOS
     console.log(`🗂️ Aplicando REGRA v031 nos arquivos não-retroativos...`);
-    
-    // Para junho/2025 e outros períodos específicos - usar o período fornecido do cálculo acima
-    const { dataLimiteRealizacao: dataLimiteRealizacaoV031, inicioFaturamento: inicioFaturamentoV031, fimFaturamento: fimFaturamentoV031 } = calcularDatasPeriodoFaturamento(periodo_referencia);
-    
-    const dataInicioMes = inicioFaturamentoV031.slice(0, 8) + '01'; // Primeiro dia do mês
-    const dataFimMes = dataLimiteRealizacaoV031; // Último dia do mês anterior 
-    const dataLimiteLaudoV031 = fimFaturamentoV031; // dia 7 do mês seguinte
-
-    console.log(`📅 REGRA v031 - Período atual: ${dataInicioMes} a ${dataFimMes}`);
-    console.log(`📅 REGRA v031 - DATA_LAUDO até: ${dataLimiteLaudoV031}`);
+    console.log(`📅 REGRA v031 - REALIZAÇÃO entre: ${realizacaoInicioMes} e ${realizacaoFimMes}`);
+    console.log(`📅 REGRA v031 - LAUDO entre: ${laudoInicioJanela} e ${laudoFimJanela}`);
 
     // Aplicar v031 em volumetria_padrao
     const { error: errorV031_1, count: countV031_1 } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao')
-      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
 
     if (!errorV031_1) {
       const deletedV031_1 = countV031_1 || 0;
@@ -118,7 +111,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
 
     if (!errorV031_2) {
       const deletedV031_2 = countV031_2 || 0;
@@ -132,7 +125,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_onco_padrao')
-      .or(`data_realizacao.lt.${dataInicioMes},data_realizacao.gt.${dataFimMes},data_laudo.gt.${dataLimiteLaudoV031}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
 
     if (!errorV031_3) {
       const deletedV031_3 = countV031_3 || 0;
