@@ -996,16 +996,6 @@ export default function GerarFaturamento() {
                     <Zap className="h-5 w-5" />
                     <CardTitle>Dados de Volumetria MobileMed</CardTitle>
                   </div>
-                  <Button 
-                    onClick={handleLimparDadosVolumetria} 
-                    disabled={isClearing}
-                    variant="destructive"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {isClearing ? "Limpando..." : "Limpar Dados"}
-                  </Button>
                 </div>
                 <CardDescription>
                   Processamento dos arquivos de volumetria com conversões automáticas
