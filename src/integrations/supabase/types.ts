@@ -634,8 +634,10 @@ export type Database = {
         Row: {
           acrescimo_percentual: number | null
           cliente_id: string
+          cond_volume: string | null
           configuracoes_franquia: Json | null
           configuracoes_integracao: Json | null
+          considera_plantao: boolean
           created_at: string
           created_by: string | null
           data_fim: string | null
@@ -643,6 +645,7 @@ export type Database = {
           desconto_percentual: number | null
           dia_vencimento: number | null
           especialidades: string[] | null
+          faixas_volume: Json
           forma_pagamento: string | null
           id: string
           modalidades: string[] | null
@@ -660,8 +663,10 @@ export type Database = {
         Insert: {
           acrescimo_percentual?: number | null
           cliente_id: string
+          cond_volume?: string | null
           configuracoes_franquia?: Json | null
           configuracoes_integracao?: Json | null
+          considera_plantao?: boolean
           created_at?: string
           created_by?: string | null
           data_fim?: string | null
@@ -669,6 +674,7 @@ export type Database = {
           desconto_percentual?: number | null
           dia_vencimento?: number | null
           especialidades?: string[] | null
+          faixas_volume?: Json
           forma_pagamento?: string | null
           id?: string
           modalidades?: string[] | null
@@ -686,8 +692,10 @@ export type Database = {
         Update: {
           acrescimo_percentual?: number | null
           cliente_id?: string
+          cond_volume?: string | null
           configuracoes_franquia?: Json | null
           configuracoes_integracao?: Json | null
+          considera_plantao?: boolean
           created_at?: string
           created_by?: string | null
           data_fim?: string | null
@@ -695,6 +703,7 @@ export type Database = {
           desconto_percentual?: number | null
           dia_vencimento?: number | null
           especialidades?: string[] | null
+          faixas_volume?: Json
           forma_pagamento?: string | null
           id?: string
           modalidades?: string[] | null
@@ -3275,6 +3284,18 @@ export type Database = {
       calcular_capacidade_produtiva: {
         Args: { p_medico_id: string; p_dias?: number }
         Returns: Json
+      }
+      calcular_preco_exame: {
+        Args: {
+          p_cliente_id: string
+          p_modalidade: string
+          p_especialidade: string
+          p_prioridade: string
+          p_categoria: string
+          p_volume_total: number
+          p_is_plantao?: boolean
+        }
+        Returns: number
       }
       calculate_custom_metric: {
         Args: { metric_name: string }
