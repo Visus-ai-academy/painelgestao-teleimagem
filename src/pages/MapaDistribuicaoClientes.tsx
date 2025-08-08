@@ -11,6 +11,7 @@ import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "luc
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MapaPorEstado } from "@/components/mapa/MapaPorEstado";
 import { MapaPorCidade } from "@/components/mapa/MapaPorCidade";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ClienteVolumetria {
   id: string;
@@ -93,6 +94,38 @@ export default function MapaDistribuicaoClientes() {
   const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
+  // NOVO: Carregar volumetria completa via paginação para remover limites
+  const [volumetriaAll, setVolumetriaAll] = useState<any[]>([]);
+  useEffect(() => {
+    let isCancelled = false;
+    (async () => {
+      try {
+        let all: any[] = [];
+        let offset = 0;
+        const limit = 100000; // grandes volumes por lote
+        while (true) {
+          const { data, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('EMPRESA, MODALIDADE, ESPECIALIDADE, PRIORIDADE, VALORES')
+            .range(offset, offset + limit - 1);
+          if (error) {
+            console.error('❌ Erro ao carregar volumetria completa:', error);
+            break;
+          }
+          if (!data || data.length === 0) break;
+          all = all.concat(data);
+          if (data.length < limit) break;
+          offset += limit;
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        if (!isCancelled) setVolumetriaAll(all);
+        console.log('✅ Volumetria completa carregada:', all.length);
+      } catch (e) {
+        console.error('❌ Falha ao paginar volumetria:', e);
+      }
+    })();
+    return () => { isCancelled = true; };
+  }, []);
   // Processar dados para o mapa - com verificação de filtros
   const dadosProcessados = useMemo(() => {
     if (!clientesData) return [];
@@ -127,14 +160,15 @@ export default function MapaDistribuicaoClientes() {
 
     let volumetriaPorEmpresa: Record<string, any> = {};
     
-    // Criar mapa de volumetria por empresa usando dados do contexto centralizado
-    if (contextData.detailedData && contextData.detailedData.length > 0) {
-      let volumetriaFiltrada = contextData.detailedData;
+    // Criar mapa de volumetria por empresa usando dados completos (sem limite)
+    const baseVol = (volumetriaAll && volumetriaAll.length > 0) ? volumetriaAll : (contextData.detailedData || []);
+    if (baseVol.length > 0) {
+      let volumetriaFiltrada = baseVol;
       
       // Se há filtros de volumetria, aplicar
       if (temFiltrosVolumetria) {
-        console.log('🔧 COM FILTROS - Processando dados filtrados');
-        volumetriaFiltrada = contextData.detailedData.filter(item => {
+        console.log('🔧 COM FILTROS - Processando dados filtrados (base completa)');
+        volumetriaFiltrada = baseVol.filter(item => {
           if (filtroModalidade !== 'todas' && item.MODALIDADE !== filtroModalidade) return false;
           if (filtroEspecialidade !== 'todas' && item.ESPECIALIDADE !== filtroEspecialidade) return false;
           if (filtroPrioridade !== 'todas' && item.PRIORIDADE !== filtroPrioridade) return false;
@@ -147,10 +181,10 @@ export default function MapaDistribuicaoClientes() {
         
         console.log('📋 Clientes após filtros de volumetria:', clientesFiltrados.length);
       } else {
-        console.log('🚀 SEM FILTROS - Usando dados reais');
+        console.log('🚀 SEM FILTROS - Usando base completa');
       }
 
-      // Criar mapa de volumetria por empresa usando dados reais do contexto
+      // Criar mapa de volumetria por empresa usando base completa
       volumetriaPorEmpresa = volumetriaFiltrada.reduce((acc, item) => {
         const empresa = item.EMPRESA;
         if (!empresa) return acc;
@@ -209,7 +243,7 @@ export default function MapaDistribuicaoClientes() {
     console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
-  }, [clientesData, contextData.detailedData, contextData.stats, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, volumetriaAll, contextData.detailedData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {
