@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,8 @@ interface Colaborador {
   categoria?: string;
   modalidades?: string[];
   especialidades?: string[];
-  valoresCombinacoes?: Record<string, Record<string, Record<string, number>>>;
   documentos?: DocumentoColaborador[];
+  prioridades?: string[];
 }
 
 interface DocumentoColaborador {
@@ -66,154 +66,6 @@ interface DocumentoColaborador {
   data_assinatura?: string;
 }
 
-const colaboradores: Colaborador[] = [
-  {
-    id: "1",
-    nome: "Dr. João Silva",
-    email: "joao.silva@clinica.com",
-    funcao: "Médico Radiologista",
-    departamento: "Medicina",
-    nivel: "Pleno",
-    status: "Ativo",
-    dataAdmissao: "2022-03-15",
-    telefone: "(11) 99999-1111",
-    cpf: "123.456.789-00",
-    permissoes: ["dashboard", "volumetria", "operacional"],
-    gestor: "Dra. Ana Costa",
-    salario: 12000,
-    crm: "12345-SP",
-    categoria: "Radiologista Pleno",
-    modalidades: ["Radiologia", "Tomografia"],
-    especialidades: ["Radiologia e Diagnóstico por Imagem"],
-    documentos: [
-      {
-        id: "doc1",
-        tipo_documento: 'contrato_medico',
-        nome_arquivo: 'contrato_joao_silva.pdf',
-        status_documento: 'assinado',
-        data_assinatura: '2022-03-15T10:00:00Z'
-      }
-    ]
-  },
-  {
-    id: "2", 
-    nome: "Dra. Maria Santos",
-    email: "maria.santos@clinica.com",
-    funcao: "Médica Cardiologista",
-    departamento: "Medicina",
-    nivel: "Sênior",
-    status: "Ativo",
-    dataAdmissao: "2020-01-10",
-    telefone: "(11) 99999-2222",
-    cpf: "234.567.890-11",
-    permissoes: ["dashboard", "volumetria", "operacional", "qualidade"],
-    gestor: "Dr. Fernando Costa",
-    salario: 15000,
-    crm: "23456-SP",
-    categoria: "Cardiologista",
-    modalidades: ["Ecocardiograma"],
-    especialidades: ["Cardiologia"],
-    documentos: [
-      {
-        id: "doc2",
-        tipo_documento: 'contrato_medico',
-        nome_arquivo: 'contrato_maria_santos.pdf',
-        status_documento: 'assinatura_pendente',
-        data_envio: '2024-01-10T09:00:00Z'
-      }
-    ]
-  },
-  {
-    id: "3",
-    nome: "Carlos Oliveira",
-    email: "carlos.oliveira@clinica.com", 
-    funcao: "Técnico em Radiologia",
-    departamento: "Técnico",
-    nivel: "Pleno",
-    status: "Ativo",
-    dataAdmissao: "2021-07-20",
-    telefone: "(11) 99999-3333",
-    cpf: "345.678.901-22",
-    permissoes: ["dashboard", "operacional"],
-    gestor: "Dr. João Silva",
-    salario: 4500
-  },
-  {
-    id: "4",
-    nome: "Ana Ferreira",
-    email: "ana.ferreira@clinica.com",
-    funcao: "Enfermeira",
-    departamento: "Enfermagem", 
-    nivel: "Sênior",
-    status: "Ativo",
-    dataAdmissao: "2019-05-30",
-    telefone: "(11) 99999-4444",
-    cpf: "456.789.012-33",
-    permissoes: ["dashboard", "operacional", "people"],
-    gestor: "Coordenadora Lucia",
-    salario: 5500
-  },
-  {
-    id: "5",
-    nome: "Pedro Mendes",
-    email: "pedro.mendes@clinica.com",
-    funcao: "Administrador TI",
-    departamento: "TI",
-    nivel: "Especialista",
-    status: "Ativo",
-    dataAdmissao: "2020-11-15",
-    telefone: "(11) 99999-5555", 
-    cpf: "567.890.123-44",
-    permissoes: ["dashboard", "volumetria", "operacional", "financeiro", "people", "contratos"],
-    gestor: "Diretor Geral",
-    salario: 8000
-  },
-  {
-    id: "6",
-    nome: "Lucia Rocha",
-    email: "lucia.rocha@clinica.com",
-    funcao: "Coordenadora Enfermagem",
-    departamento: "Enfermagem",
-    nivel: "Coordenador",
-    status: "Ativo",
-    dataAdmissao: "2018-02-10",
-    telefone: "(11) 99999-6666",
-    cpf: "678.901.234-55", 
-    permissoes: ["dashboard", "operacional", "people", "escala"],
-    gestor: "Diretor Geral",
-    salario: 7500
-  },
-  {
-    id: "7",
-    nome: "Roberto Santos",
-    email: "roberto.santos@clinica.com",
-    funcao: "Analista Financeiro", 
-    departamento: "Financeiro",
-    nivel: "Pleno",
-    status: "Ativo",
-    dataAdmissao: "2021-09-05",
-    telefone: "(11) 99999-7777",
-    cpf: "789.012.345-66",
-    permissoes: ["dashboard", "financeiro"],
-    gestor: "Gerente Financeiro",
-    salario: 6000
-  },
-  {
-    id: "8",
-    nome: "Camila Costa",
-    email: "camila.costa@clinica.com",
-    funcao: "Recepcionista",
-    departamento: "Atendimento",
-    nivel: "Júnior", 
-    status: "Férias",
-    dataAdmissao: "2023-01-12",
-    telefone: "(11) 99999-8888",
-    cpf: "890.123.456-77",
-    permissoes: ["dashboard"],
-    gestor: "Supervisora Atendimento",
-    salario: 2800
-  }
-];
 
 const funcoes = [
   { nome: "Médico Radiologista", count: 15, departamento: "Medicina" },
@@ -262,6 +114,67 @@ export default function Colaboradores() {
     crm: "",
     rqe: ""
   });
+
+  // Lista de colaboradores (médicos) derivada da volumetria final
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [loadingColaboradores, setLoadingColaboradores] = useState(true);
+
+  useEffect(() => {
+    const carregar = async () => {
+      try {
+        setLoadingColaboradores(true);
+        const arquivos = ['volumetria_padrao','volumetria_fora_padrao','volumetria_padrao_retroativo','volumetria_fora_padrao_retroativo','volumetria_onco_padrao'];
+        const { data, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('"MEDICO","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","arquivo_fonte"')
+          .in('arquivo_fonte', arquivos);
+        if (error) throw error;
+
+        const map = new Map<string, { modalidades: Set<string>; especialidades: Set<string>; categorias: Set<string>; prioridades: Set<string>; }>();
+
+        (data || []).forEach((row: any) => {
+          const nome = (row?.MEDICO || '').trim();
+          if (!nome) return;
+          if (!map.has(nome)) {
+            map.set(nome, { modalidades: new Set(), especialidades: new Set(), categorias: new Set(), prioridades: new Set() });
+          }
+          const entry = map.get(nome)!;
+          if (row?.MODALIDADE) entry.modalidades.add(String(row.MODALIDADE));
+          if (row?.ESPECIALIDADE) entry.especialidades.add(String(row.ESPECIALIDADE));
+          if (row?.CATEGORIA) entry.categorias.add(String(row.CATEGORIA));
+          if (row?.PRIORIDADE) entry.prioridades.add(String(row.PRIORIDADE));
+        });
+
+        const lista: Colaborador[] = Array.from(map.entries()).map(([nome, info], idx) => ({
+          id: `${idx + 1}`,
+          nome,
+          email: '',
+          funcao: 'Medico',
+          departamento: 'Medicina',
+          nivel: '',
+          status: 'Ativo',
+          dataAdmissao: '',
+          telefone: '',
+          cpf: '',
+          permissoes: [],
+          gestor: '',
+          salario: 0,
+          categoria: Array.from(info.categorias).sort().join(', '),
+          modalidades: Array.from(info.modalidades).sort(),
+          especialidades: Array.from(info.especialidades).sort(),
+          prioridades: Array.from(info.prioridades).sort(),
+          documentos: []
+        }));
+
+        setColaboradores(lista);
+      } catch (err) {
+        console.error('Erro ao carregar médicos da volumetria:', err);
+      } finally {
+        setLoadingColaboradores(false);
+      }
+    };
+    carregar();
+  }, []);
 
   const handleFileUpload = async (file: File) => {
     // Simular processamento do arquivo CSV
