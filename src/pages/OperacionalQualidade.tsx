@@ -16,71 +16,13 @@ import {
   Activity
 } from "lucide-react";
 
-const qualityMetrics = [
-  { 
-    examType: "MR - Ressonância Magnética", 
-    total: 450, 
-    approved: 442, 
-    rejected: 8, 
-    quality: 98.2,
-    category: "Angio"
-  },
-  { 
-    examType: "CT - Tomografia", 
-    total: 380, 
-    approved: 374, 
-    rejected: 6, 
-    quality: 98.4,
-    category: "Contrastado"
-  },
-  { 
-    examType: "DO - Densitometria", 
-    total: 220, 
-    approved: 215, 
-    rejected: 5, 
-    quality: 97.7,
-    category: "Score"
-  },
-  { 
-    examType: "MG - Mamografia", 
-    total: 180, 
-    approved: 176, 
-    rejected: 4, 
-    quality: 97.8,
-    category: "Mastoide"
-  },
-  { 
-    examType: "RX - Raio-X", 
-    total: 320, 
-    approved: 312, 
-    rejected: 8, 
-    quality: 97.5,
-    category: "OIT"
-  }
-];
+const qualityMetrics: any[] = [];
 
-const specialtyQuality = [
-  { specialty: "NE - Neurologia", quality: 98.5, trend: "+0.3%" },
-  { specialty: "CA - Cardiologia", quality: 97.8, trend: "+0.1%" },
-  { specialty: "ME - Medicina", quality: 98.1, trend: "-0.2%" },
-  { specialty: "MI - Medicina Interna", quality: 97.6, trend: "+0.4%" },
-  { specialty: "MA - Mastologia", quality: 98.9, trend: "+0.6%" }
-];
+const specialtyQuality: any[] = [];
 
-const doctorQuality = [
-  { name: "Dr. João Silva", specialty: "NE", exams: 145, approved: 143, quality: 98.6, trend: "+0.2%" },
-  { name: "Dra. Maria Santos", specialty: "CA", exams: 128, approved: 125, quality: 97.7, trend: "+0.1%" },
-  { name: "Dr. Carlos Lima", specialty: "ME", exams: 118, approved: 116, quality: 98.3, trend: "-0.1%" },
-  { name: "Dra. Ana Costa", specialty: "MI", exams: 102, approved: 99, quality: 97.1, trend: "+0.3%" },
-  { name: "Dr. Pedro Oliveira", specialty: "MA", exams: 89, approved: 88, quality: 98.9, trend: "+0.4%" }
-];
+const doctorQuality: any[] = [];
 
-const teamData = [
-  { name: "Equipe A", members: ["Dr. João Silva", "Dra. Ana Costa", "Dr. Carlos Lima"] },
-  { name: "Equipe B", members: ["Dra. Maria Santos", "Dr. Pedro Oliveira", "Dra. Sofia Mendes"] },
-  { name: "Equipe C", members: ["Dr. Bruno Alves", "Dra. Lucia Rocha", "Dr. Ricardo Santos"] },
-  { name: "Equipe Plantão", members: ["Dr. Fernando Costa", "Dra. Carla Oliveira", "Dr. Marcelo Silva"] }
-];
+const teamData: any[] = [];
 
 export default function OperacionalQualidade() {
   const navigate = useNavigate();
@@ -91,7 +33,8 @@ export default function OperacionalQualidade() {
   const totalExams = qualityMetrics.reduce((sum, metric) => sum + metric.total, 0);
   const totalApproved = qualityMetrics.reduce((sum, metric) => sum + metric.approved, 0);
   const totalRejected = qualityMetrics.reduce((sum, metric) => sum + metric.rejected, 0);
-  const overallQuality = (totalApproved / totalExams) * 100;
+  const overallQuality = totalExams ? (totalApproved / totalExams) * 100 : 0;
+  const rejectionRate = totalExams ? (totalRejected / totalExams) * 100 : 0;
 
   const getQualityBadge = (quality: number) => {
     if (quality >= 98) return <Badge className="bg-green-100 text-green-800">Excelente</Badge>;

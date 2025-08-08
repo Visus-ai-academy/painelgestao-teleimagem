@@ -15,21 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { useNavigate } from "react-router-dom";
 
-const volumeData = [
-  { name: "Jan", exames: 1200, consultas: 800 },
-  { name: "Fev", exames: 1400, consultas: 900 },
-  { name: "Mar", exames: 1100, consultas: 750 },
-  { name: "Abr", exames: 1600, consultas: 1100 },
-  { name: "Mai", exames: 1350, consultas: 950 },
-  { name: "Jun", exames: 1500, consultas: 1000 },
-];
+const volumeData: any[] = [];
 
-const performanceData = [
-  { name: "Produção", meta: 100, realizado: 95 },
-  { name: "Qualidade", meta: 100, realizado: 98 },
-  { name: "Eficiência", meta: 100, realizado: 92 },
-  { name: "SLA", meta: 100, realizado: 96 },
-];
+const performanceData: any[] = [];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -57,9 +45,9 @@ export default function Dashboard() {
         <div onClick={() => navigate("/financeiro")} className="cursor-pointer">
           <MetricCard
             title="Faturamento"
-            value="R$ 2.4M"
-            change="+8% vs mês anterior"
-            changeType="positive"
+            value="—"
+            change="Aguardando dados"
+            changeType="neutral"
             icon={DollarSign}
             iconColor="text-green-600"
           />
@@ -77,9 +65,9 @@ export default function Dashboard() {
         <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
           <MetricCard
             title="Taxa de Qualidade"
-            value="97.8%"
-            change="+0.5% vs mês anterior"
-            changeType="positive"
+            value="—"
+            change="Aguardando dados"
+            changeType="neutral"
             icon={Award}
             iconColor="text-orange-600"
           />
@@ -95,7 +83,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div onClick={() => navigate("/operacional/producao")} className="cursor-pointer">
               <Speedometer
-                value={95}
+                value={0}
                 max={100}
                 label="Meta de Produção"
                 unit="%"
@@ -103,7 +91,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional/qualidade")} className="cursor-pointer">
               <Speedometer
-                value={98}
+                value={0}
                 max={100}
                 label="Qualidade"
                 unit="%"
@@ -111,7 +99,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional")} className="cursor-pointer">
               <Speedometer
-                value={92}
+                value={0}
                 max={100}
                 label="Eficiência"
                 unit="%"
@@ -119,7 +107,7 @@ export default function Dashboard() {
             </div>
             <div onClick={() => navigate("/operacional")} className="cursor-pointer">
               <Speedometer
-                value={96}
+                value={0}
                 max={100}
                 label="SLA"
                 unit="%"
