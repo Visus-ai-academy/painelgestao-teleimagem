@@ -95,7 +95,7 @@ export default function MapaDistribuicaoClientes() {
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
   // NOVO: Carregar volumetria completa via paginação para remover limites
-  const [volumetriaAll, setVolumetriaAll] = useState<any[]>([]);
+  // Removido estado local de paginação - usando dados do contexto
   useEffect(() => {
     let isCancelled = false;
     (async () => {
@@ -118,7 +118,7 @@ export default function MapaDistribuicaoClientes() {
           offset += limit;
           await new Promise(resolve => setTimeout(resolve, 5));
         }
-        if (!isCancelled) setVolumetriaAll(all);
+        // (resultado da paginação ignorado: usaremos dados tratados do contexto)
         console.log('✅ Volumetria completa carregada:', all.length);
       } catch (e) {
         console.error('❌ Falha ao paginar volumetria:', e);
@@ -161,7 +161,7 @@ export default function MapaDistribuicaoClientes() {
     let volumetriaPorEmpresa: Record<string, any> = {};
     
     // Criar mapa de volumetria por empresa usando dados completos (sem limite)
-    const baseVol = (volumetriaAll && volumetriaAll.length > 0) ? volumetriaAll : (contextData.detailedData || []);
+    const baseVol = contextData.detailedData || [];
     if (baseVol.length > 0) {
       let volumetriaFiltrada = baseVol;
       
@@ -243,7 +243,7 @@ export default function MapaDistribuicaoClientes() {
     console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
-  }, [clientesData, volumetriaAll, contextData.detailedData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, contextData.detailedData, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
 
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {

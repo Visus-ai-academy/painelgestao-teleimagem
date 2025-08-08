@@ -37,7 +37,7 @@ export function VolumetriaClientesComparison({
 
   useEffect(() => {
     loadClientesComparison();
-  }, []);
+  }, [uploaded]);
 
   const loadClientesComparison = async () => {
     setLoading(true);
