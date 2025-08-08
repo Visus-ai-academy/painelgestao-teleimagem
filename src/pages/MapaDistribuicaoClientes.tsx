@@ -8,6 +8,8 @@ import { useClienteData } from '@/hooks/useClienteData';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { toast } from "sonner";
 import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "lucide-react";
+import { MapaPorEstado } from "@/components/mapa/MapaPorEstado";
+import { MapaPorCidade } from "@/components/mapa/MapaPorCidade";
 
 interface ClienteVolumetria {
   id: string;
@@ -513,52 +515,8 @@ export default function MapaDistribuicaoClientes() {
         </Card>
       )}
 
-      {/* Mapa de Calor por Estados */}
       {visualizacao === 'estados' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              Mapa de Calor - Distribuição por Estado-UF
-               <Badge variant="outline" className="text-sm">
-                 Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
-               </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 text-sm text-muted-foreground">
-              Estados ordenados por volume de exames (maior para menor)
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-              {estadosEstatisticas
-                .sort((a, b) => b.volume_total - a.volume_total)
-                .map((estado, index) => {
-                  const maxVolume = Math.max(...estadosEstatisticas.map(e => e.volume_total));
-                  const corClasse = getCorIntensidade(estado.volume_total, maxVolume);
-                  
-                  return (
-                    <div key={estado.estado} className={`p-3 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
-                      <div className="text-center">
-                        <div className="absolute top-1 right-1">
-                          <Badge variant="secondary" className="text-xs px-1 py-0">
-                            #{index + 1}
-                          </Badge>
-                        </div>
-                        <h3 className="font-bold text-base">{estado.estado}</h3>
-                        <p className="text-xs opacity-80 mb-2">{estado.regiao}</p>
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium">{estado.total_clientes} clientes</p>
-                          <p className="text-xs font-medium">{estado.volume_total.toLocaleString()} exames</p>
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {Object.keys(estado.cidades).length} cidades
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </CardContent>
-        </Card>
+        <MapaPorEstado estados={estadosEstatisticas} />
       )}
 
       {/* Mapa de Calor por Cidades */}
