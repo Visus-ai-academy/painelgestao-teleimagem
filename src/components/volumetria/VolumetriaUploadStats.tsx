@@ -95,7 +95,9 @@ export function VolumetriaUploadStats() {
     }
   ];
 
-  const totalStats = stats.reduce((acc, stat) => {
+  const mainStats = stats.filter(s => s.fileName !== "Volumetria Onco Padrão");
+
+  const totalStats = mainStats.reduce((acc, stat) => {
     console.log(`🔍 SOMA INDIVIDUAL - ${stat.fileName}:`);
     console.log(`  - totalRecords: ${stat.totalRecords}`);
     console.log(`  - recordsWithValue: ${stat.recordsWithValue}`);
@@ -157,7 +159,7 @@ export function VolumetriaUploadStats() {
               <div className="text-sm text-green-700">Com Valores</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-red-900">{stats.reduce((acc, stat) => acc + stat.recordsZeroed, 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-red-900">{mainStats.reduce((acc, stat) => acc + stat.recordsZeroed, 0).toLocaleString()}</div>
               <div className="text-sm text-red-700">Total de Zerados</div>
             </div>
             <div>
@@ -194,7 +196,7 @@ export function VolumetriaUploadStats() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {stats.map((stat, index) => (
+            {mainStats.map((stat, index) => (
               <TableRow key={index}>
                  <TableCell className="font-medium">
                    <span>{stat.fileName}</span>

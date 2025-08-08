@@ -1078,20 +1078,6 @@ export default function GerarFaturamento() {
                     />
                   </div>
 
-                  <div>
-                    <VolumetriaUpload
-                      arquivoFonte="volumetria_onco_padrao"
-                      disabled={!periodoFaturamentoVolumetria}
-                      periodoFaturamento={periodoFaturamentoVolumetria || undefined}
-                      onSuccess={() => {
-                        toast({
-                          title: "Upload Concluído",
-                          description: "Dados de volumetria oncológica processados com sucesso!",
-                        });
-                        setRefreshUploadStatus(prev => prev + 1);
-                      }}
-                    />
-                  </div>
 
                   {/* Upload De-Para removido - usar apenas em Gerenciar Cadastros */}
 
