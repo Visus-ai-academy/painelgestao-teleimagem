@@ -73,6 +73,15 @@ const getCorIntensidade = (volume: number, maxVolume: number): string => {
   return 'bg-red-800 text-white';
 };
 
+// Normaliza códigos de estado para agrupar N/A, NA, NI, etc. em "NI"
+const normalizeEstado = (uf?: string): string => {
+  const valor = (uf || '').toString().trim().toUpperCase();
+  if (!valor) return 'NI';
+  if (['N/A', 'NA', 'NI', 'N.I.', 'N I'].includes(valor)) return 'NI';
+  if (valor === 'NÃO IDENTIFICADO' || valor === 'NAO IDENTIFICADO' || valor === 'NAO IDENT.') return 'NI';
+  return valor;
+};
+
 export default function MapaDistribuicaoClientes() {
   const [regioesEstatisticas, setRegioesEstatisticas] = useState<RegiaoEstatistica[]>([]);
   const [estadosEstatisticas, setEstadosEstatisticas] = useState<EstadoEstatistica[]>([]);
@@ -256,7 +265,7 @@ export default function MapaDistribuicaoClientes() {
         nome: cliente.nome,
         endereco: cliente.endereco,
         cidade: cliente.cidade || 'N/A',
-        estado: cliente.estado || 'N/A',
+        estado: normalizeEstado(cliente.estado),
         status: cliente.status,
         ativo: cliente.ativo,
         email: cliente.email,
