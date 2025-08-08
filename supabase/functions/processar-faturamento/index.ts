@@ -192,6 +192,13 @@ serve(async (req) => {
         // REGRA F007 - Clientes especiais com lógica própria
         const CLIENTES_F007 = ["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"];
         const MEDICO_EXCECAO_F007 = "Dr. Rodrigo Vaz de Lima";
+        // Clientes NC fixos (sempre NC-FT)
+        const CLIENTES_NC_FIXOS = ["CICOMANGRA", "VOTUPORANGA"];
+
+        // Clientes NC fixos têm prioridade absoluta
+        if (CLIENTES_NC_FIXOS.includes(cliente)) {
+          return "NC-FT";
+        }
 
         // Aplicação prioritária da REGRA F007
         if (CLIENTES_F007.includes(cliente)) {
@@ -199,6 +206,7 @@ serve(async (req) => {
           if (especialidade === "MEDICINA INTERNA" && medico !== MEDICO_EXCECAO_F007) return "CO-FT";
           return "NC-NF";
         }
+
 
         if (!CLIENTES_NC.includes(cliente)) return "CO-FT";
         
