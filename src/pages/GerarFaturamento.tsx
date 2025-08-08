@@ -47,7 +47,7 @@ import LimparDadosCompleto from "@/components/LimparDadosCompleto";
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
-
+import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Período atual (julho/2025) - onde estão os dados carregados
@@ -1262,9 +1262,10 @@ export default function GerarFaturamento() {
           </Card>
         </TabsContent>
 
-        {/* Tab: Demonstrativo de Faturamento */}
         <TabsContent value="demonstrativo" className="space-y-6">
           <DemonstrativoFaturamento />
+          <Separator />
+          <ListaExamesPeriodo />
         </TabsContent>
 
         {/* Tab: Fechamento de Período */}
