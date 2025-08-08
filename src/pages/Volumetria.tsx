@@ -12,6 +12,7 @@ import { VolumetriaMedicosAnalysis } from "@/components/volumetria/VolumetriaMed
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
+import { useVolumetriaDataFiltered } from "@/hooks/useVolumetriaDataFiltered";
 
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>({
@@ -32,12 +33,14 @@ export default function Volumetria() {
   });
   
   // Usar o contexto otimizado que já tem dados em cache
-  const { data } = useVolumetria();
+  const { data, getFilteredData } = useVolumetria();
+  const filtered = useVolumetriaDataFiltered(filters);
   
-  // Extrair dados necessários do contexto
-  const stats = data.dashboardStats;
-  const loading = data.loading;
-  const hasData = stats.total_exames > 0;
+  // Extrair dados necessários
+  const contextStats = data.dashboardStats;
+  const loading = data.loading || filtered.loading;
+  const hasData = (filtered.stats?.total_exames || 0) > 0;
+  const filteredDetailed = useMemo(() => getFilteredData(filters), [getFilteredData, filters]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,50 +94,61 @@ export default function Volumetria() {
             </TabsList>
 
             <TabsContent value="resumo" className="space-y-6">
-              <VolumetriaExecutiveSummary />
+              <VolumetriaExecutiveSummary
+                override={{
+                  clientes: filtered.clientes,
+                  modalidades: filtered.modalidades,
+                  especialidades: filtered.especialidades,
+                  categorias: filtered.prioridades, // sem categorias dedicadas no hook
+                  prioridades: filtered.prioridades,
+                  medicos: filtered.medicos,
+                  totalExames: filtered.stats.total_exames,
+                  totalAtrasados: filtered.stats.total_atrasados,
+                  percentualAtraso: filtered.stats.percentual_atraso,
+                  loading
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="volume" className="space-y-6">
-              <VolumetriaStats stats={{
-                ...stats,
-                total_clientes_volumetria: stats.total_clientes_volumetria
-              }} />
+              <VolumetriaStats stats={filtered.stats} />
               <VolumetriaCharts 
-                clientes={[]}
-                modalidades={[]}
-                especialidades={[]}
+                clientes={filtered.clientes}
+                modalidades={filtered.modalidades}
+                especialidades={filtered.especialidades}
                 categorias={[]}
-                prioridades={[]}
+                prioridades={filtered.prioridades}
               />
             </TabsContent>
 
             <TabsContent value="medicos" className="space-y-6">
               <VolumetriaMedicosAnalysis 
-                medicos={[]}
-                modalidades={[]}
-                especialidades={[]}
-                categorias={[]}
-                prioridades={[]}
-                totalExames={stats.total_exames}
+                medicos={filtered.medicos}
+                modalidades={filtered.modalidades as any}
+                especialidades={filtered.especialidades as any}
+                categorias={[] as any}
+                prioridades={filtered.prioridades as any}
+                totalExames={filtered.stats.total_exames}
               />
             </TabsContent>
 
             <TabsContent value="atrasos" className="space-y-6">
               <VolumetriaDelayAnalysis 
                 data={{
-                  clientes: [],
-                  modalidades: [],
-                  especialidades: [],
+                  clientes: filtered.atrasoClientes,
+                  modalidades: filtered.atrasoModalidades,
+                  especialidades: filtered.atrasoEspecialidades,
                   categorias: [],
-                  prioridades: [],
-                  totalAtrasados: stats.total_atrasados,
-                  percentualAtrasoGeral: stats.percentual_atraso
+                  prioridades: filtered.atrasoPrioridades,
+                  totalAtrasados: filtered.stats.total_atrasados,
+                  percentualAtrasoGeral: filtered.stats.percentual_atraso,
+                  atrasosComTempo: filtered.atrasosComTempo
                 }}
               />
             </TabsContent>
 
             <TabsContent value="clientes" className="space-y-6">
-              <VolumetriaClientesAtrasados />
+              <VolumetriaClientesAtrasados filteredData={filteredDetailed} />
             </TabsContent>
 
           </Tabs>

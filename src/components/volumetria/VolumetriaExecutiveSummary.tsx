@@ -5,7 +5,20 @@ import { TrendingUp, TrendingDown, DollarSign, Users, Activity, Target, AlertTri
 import { useVolumetriaProcessedData } from "@/hooks/useVolumetriaProcessedData";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
-export function VolumetriaExecutiveSummary() {
+interface ExecutiveSummaryOverride {
+  clientes: any[];
+  modalidades: any[];
+  especialidades: any[];
+  categorias: any[];
+  prioridades: any[];
+  medicos: any[];
+  totalExames: number;
+  totalAtrasados: number;
+  percentualAtraso: number;
+  loading: boolean;
+}
+
+export function VolumetriaExecutiveSummary({ override }: { override?: ExecutiveSummaryOverride }) {
   const processedData = useVolumetriaProcessedData();
 
   if (processedData.loading) {
