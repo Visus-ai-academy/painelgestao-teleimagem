@@ -25,6 +25,10 @@ const CLIENTES_NC_ADICIONAIS = [
 // Todos os clientes NC
 const CLIENTES_NC = [...CLIENTES_NC_ORIGINAL, ...CLIENTES_NC_ADICIONAIS];
 
+// REGRA F007 - Clientes especiais com lógica própria
+const CLIENTES_F007 = ["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"];
+const MEDICO_EXCECAO_F007 = "Dr. Rodrigo Vaz de Lima";
+
 // Especialidades que geram faturamento para clientes NC (NC-FT)
 const ESPECIALIDADES_NC_FATURADAS = ["CARDIO"];
 
@@ -69,11 +73,22 @@ export function determinarTipoFaturamento(
   medico?: string,
   estudoDescricao?: string
 ): TipoFaturamento {
+  // REGRA F007 - Clientes especiais (aplicação prioritária)
+  if (CLIENTES_F007.includes(cliente)) {
+    // Plantão de qualquer especialidade => CO-FT
+    if (prioridade === "PLANTÃO") return "CO-FT";
+    // Medicina Interna (exceto Dr. Rodrigo Vaz de Lima) => CO-FT
+    if (especialidade === "MEDICINA INTERNA" && medico !== MEDICO_EXCECAO_F007) {
+      return "CO-FT";
+    }
+    // Demais casos para estes clientes => NC-NF
+    return "NC-NF";
+  }
+
   // Clientes CO (consolidados) - sempre CO-FT
   if (!CLIENTES_NC.includes(cliente)) {
     return "CO-FT";
   }
-
   // REGRA F005 - Clientes NC originais
   if (CLIENTES_NC_ORIGINAL.includes(cliente)) {
     const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);

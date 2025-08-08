@@ -21,11 +21,23 @@ function determinarTipoFaturamento(
   const ESPECIALIDADES_NC_FATURADAS = ["CARDIO"];
   const MEDICOS_NC_FATURADOS = ["Dr. Antonio Gualberto Chianca Filho", "Dr. Daniel Chrispim", "Dr. Efraim Da Silva Ferreira", "Dr. Felipe Falcão de Sá", "Dr. Guilherme N. Schincariol", "Dr. Gustavo Andreis", "Dr. João Carlos Dantas do Amaral", "Dr. João Fernando Miranda Pompermayer", "Dr. Leonardo de Paula Ribeiro Figueiredo", "Dr. Raphael Sanfelice João", "Dr. Thiago P. Martins", "Dr. Virgílio Oliveira Barreto", "Dra. Adriana Giubilei Pimenta", "Dra. Aline Andrade Dorea", "Dra. Camila Amaral Campos", "Dra. Cynthia Mendes Vieira de Morais", "Dra. Fernanda Gama Barbosa", "Dra. Kenia Menezes Fernandes", "Dra. Lara M. Durante Bacelar", "Dr. Aguinaldo Cunha Zuppani", "Dr. Alex Gueiros de Barros", "Dr. Eduardo Caminha Nunes", "Dr. Márcio D'Andréa Rossi", "Dr. Rubens Pereira Moura Filho", "Dr. Wesley Walber da Silva", "Dra. Luna Azambuja Satte Alam", "Dra. Roberta Bertoldo Sabatini Treml", "Dra. Thais Nogueira D. Gastaldi", "Dra. Vanessa da Costa Maldonado"];
 
+  // REGRA F007 - Clientes especiais com lógica própria
+  const CLIENTES_F007 = ["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"];
+  const MEDICO_EXCECAO_F007 = "Dr. Rodrigo Vaz de Lima";
+
+  // REGRA F007 - Clientes especiais (aplicação prioritária)
+  if (["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"].includes(cliente)) {
+    if (prioridade === "PLANTÃO") return "CO-FT";
+    if (especialidade === "MEDICINA INTERNA" && medico !== "Dr. Rodrigo Vaz de Lima") {
+      return "CO-FT";
+    }
+    return "NC-NF";
+  }
+
   // Clientes CO (consolidados) - sempre CO-FT
   if (!CLIENTES_NC.includes(cliente)) {
     return "CO-FT";
   }
-
   // REGRA F005 - Clientes NC originais
   if (CLIENTES_NC_ORIGINAL.includes(cliente)) {
     const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
@@ -199,7 +211,7 @@ serve(async (req) => {
       total_atualizados: volumetriaAtualizados + faturamentoAtualizados,
       estatisticas_volumetria: estatisticasVolumetria,
       estatisticas_faturamento: estatisticasFaturamento,
-      regras_aplicadas: ['F005 - Clientes NC Originais', 'F006 - Clientes NC Adicionais'],
+      regras_aplicadas: ['F005 - Clientes NC Originais', 'F006 - Clientes NC Adicionais', 'F007 - Clientes especiais (CBU, CEDI_RJ, CEDI_RO, CEDI_UNIMED, RADMED)'],
       data_processamento: new Date().toISOString()
     };
 

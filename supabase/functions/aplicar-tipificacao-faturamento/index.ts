@@ -69,6 +69,10 @@ const MEDICOS_NC_FATURADOS = [
   "Dra. Vanessa da Costa Maldonado"
 ];
 
+// REGRA F007 - Clientes especiais com lógica própria
+const CLIENTES_F007 = ["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"];
+const MEDICO_EXCECAO_F007 = "Dr. Rodrigo Vaz de Lima";
+
 // Função para determinar o tipo de faturamento
 function determinarTipoFaturamento(
   cliente: string,
@@ -77,11 +81,19 @@ function determinarTipoFaturamento(
   medico?: string,
   estudoDescricao?: string
 ): TipoFaturamento {
+  // REGRA F007 - Clientes especiais (aplicação prioritária)
+  if (CLIENTES_F007.includes(cliente)) {
+    if (prioridade === "PLANTÃO") return "CO-FT";
+    if (especialidade === "MEDICINA INTERNA" && medico !== MEDICO_EXCECAO_F007) {
+      return "CO-FT";
+    }
+    return "NC-NF";
+  }
+
   // Clientes CO (consolidados) - sempre CO-FT
   if (!CLIENTES_NC.includes(cliente)) {
     return "CO-FT";
   }
-
   // REGRA F005 - Clientes NC originais
   if (CLIENTES_NC_ORIGINAL.includes(cliente)) {
     const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
@@ -240,7 +252,7 @@ serve(async (req) => {
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
       estatisticas_tipos: estatisticas,
-      regras_aplicadas: ['F005 - Clientes NC Originais', 'F006 - Clientes NC Adicionais'],
+      regras_aplicadas: ['F005 - Clientes NC Originais', 'F006 - Clientes NC Adicionais', 'F007 - Clientes especiais (CBU, CEDI_RJ, CEDI_RO, CEDI_UNIMED, RADMED)'],
       data_processamento: new Date().toISOString()
     };
 
