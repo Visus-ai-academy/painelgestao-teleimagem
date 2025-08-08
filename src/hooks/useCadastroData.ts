@@ -149,7 +149,7 @@ export const usePrecosServicos = () => {
       // Buscar TODOS os registros usando paginação otimizada
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 1000; // Usar lotes menores para evitar timeouts
+      const rangeSize = 2000; // Lotes maiores para reduzir requisições e acelerar
       let hasMore = true;
 
       console.log('🔍 Iniciando busca de preços de serviços...');

@@ -268,17 +268,16 @@ const [options, setOptions] = useState<FilterOptions>({
                 </Badge>
               )}
             </div>
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="h-7 px-2 text-xs"
-              >
-                <X className="h-3 w-3 mr-1" />
-                Limpar
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="h-7 px-2 text-xs"
+              disabled={!hasActiveFilters}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Limpar filtros
+            </Button>
           </div>
 
           {/* Filtros Ativos Resumidos */}
@@ -628,11 +627,11 @@ const [options, setOptions] = useState<FilterOptions>({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
                     <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
-                      <SelectTrigger className="h-8 text-xs">
+                      <SelectTrigger className="h-8 text-xs min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
@@ -644,10 +643,10 @@ const [options, setOptions] = useState<FilterOptions>({
                     </Select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-xs font-medium text-muted-foreground">Especialidade</label>
                     <Select value={filters.especialidade} onValueChange={(value) => updateFilter('especialidade', value)}>
-                      <SelectTrigger className="h-8 text-xs">
+                      <SelectTrigger className="h-8 text-xs min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
@@ -659,10 +658,10 @@ const [options, setOptions] = useState<FilterOptions>({
                     </Select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-xs font-medium text-muted-foreground">Categoria</label>
                     <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
-                      <SelectTrigger className="h-8 text-xs">
+                      <SelectTrigger className="h-8 text-xs min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
@@ -674,10 +673,10 @@ const [options, setOptions] = useState<FilterOptions>({
                     </Select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
                     <Select value={filters.prioridade} onValueChange={(value) => updateFilter('prioridade', value)}>
-                      <SelectTrigger className="h-8 text-xs">
+                      <SelectTrigger className="h-8 text-xs min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
