@@ -149,7 +149,7 @@ export const usePrecosServicos = () => {
       // Buscar TODOS os registros usando paginação otimizada
       let allData: any[] = [];
       let rangeStart = 0;
-      const rangeSize = 2000; // Lotes maiores para reduzir requisições e acelerar
+      const rangeSize = 1000; // Tamanho máximo suportado por requisição no PostgREST
       let hasMore = true;
 
       console.log('🔍 Iniciando busca de preços de serviços...');
