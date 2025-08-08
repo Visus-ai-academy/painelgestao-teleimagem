@@ -22,8 +22,11 @@ export interface VolumetriaFilters {
   dia: string;
   dataEspecifica?: Date | null;
   cliente: string;
+  tipoCliente: string; // CO, NC
+  tipoFaturamento: string; // CO-FT, NC-FT, NC-NF
   modalidade: string;
   especialidade: string;
+  categoria: string;
   prioridade: string;
   medico: string;
 }
@@ -38,6 +41,7 @@ interface FilterOptions {
   clientes: string[];
   modalidades: string[];
   especialidades: string[];
+  categorias: string[];
   prioridades: string[];
   medicos: string[];
 }
@@ -53,25 +57,27 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
   const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Estados para controlar quais blocos estão expandidos
-  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    periodo: false,
-    cliente: false,
-    laudo: false,
-    medico: false
-  });
+const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+  periodo: false,
+  cliente: false,
+  faturamento: false,
+  laudo: false,
+  medico: false
+});
 
   // Estados para controlar a abertura dos comboboxes de busca
   const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [openMedicoCombobox, setOpenMedicoCombobox] = useState(false);
 
-  const [options, setOptions] = useState<FilterOptions>({
-    anos: [],
-    clientes: [],
-    modalidades: [],
-    especialidades: [],
-    prioridades: [],
-    medicos: []
-  });
+const [options, setOptions] = useState<FilterOptions>({
+  anos: [],
+  clientes: [],
+  modalidades: [],
+  especialidades: [],
+  categorias: [],
+  prioridades: [],
+  medicos: []
+});
 
   // Carregar opções dos filtros baseado nos dados reais DO CONTEXTO CENTRALIZADO
   const { data: volumetriaData } = useVolumetria();
@@ -112,6 +118,12 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
           .filter(Boolean)
       )].sort();
       
+      const categoriasUnicas = [...new Set(
+        volumetriaData.detailedData
+          .map(item => item.CATEGORIA)
+          .filter(Boolean)
+      )].sort();
+      
       const prioridadesUnicas = [...new Set(
         volumetriaData.detailedData
           .map(item => item.PRIORIDADE)
@@ -129,6 +141,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
         clientes: clientesUnicos,
         modalidades: modalidadesUnicas,
         especialidades: especialidadesUnicas,
+        categorias: categoriasUnicas,
         prioridades: prioridadesUnicas,
         medicos: medicosUnicos
       });
@@ -170,8 +183,11 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
       dia: 'todos',
       dataEspecifica: null,
       cliente: 'todos',
+      tipoCliente: 'todos',
+      tipoFaturamento: 'todos',
       modalidade: 'todos',
       especialidade: 'todos',
+      categoria: 'todos',
       prioridade: 'todos',
       medico: 'todos'
     });
@@ -189,25 +205,30 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
     }));
   };
 
-  // Função para obter filtros ativos por seção
   const getActiveFiltersForSection = (section: string) => {
     switch (section) {
       case 'periodo':
         return [
           filters.ano !== 'todos' ? `Ano: ${filters.ano}` : null,
-          filters.trimestre !== 'todos' ? `Trimestre: ${filters.trimestre}º` : null,
+          filters.trimestre !== 'todos' ? `Tri: ${filters.trimestre}º` : null,
           filters.mes !== 'todos' ? `Mês: ${months[parseInt(filters.mes) - 1]}` : null,
           filters.semana !== 'todos' ? `Semana: ${filters.semana}` : null,
           filters.dia !== 'todos' ? `Dia: ${filters.dia === 'especifico' && filters.dataEspecifica ? format(filters.dataEspecifica, "dd/MM/yyyy") : filters.dia}` : null
         ].filter(Boolean);
       case 'cliente':
         return [
-          filters.cliente !== 'todos' ? `Cliente: ${filters.cliente}` : null
+          filters.cliente !== 'todos' ? `Cliente: ${filters.cliente}` : null,
+          filters.tipoCliente !== 'todos' ? `Tipo Cliente: ${filters.tipoCliente}` : null
+        ].filter(Boolean);
+      case 'faturamento':
+        return [
+          filters.tipoFaturamento !== 'todos' ? `Tipo Fat.: ${filters.tipoFaturamento}` : null
         ].filter(Boolean);
       case 'laudo':
         return [
           filters.modalidade !== 'todos' ? `Modalidade: ${filters.modalidade}` : null,
           filters.especialidade !== 'todos' ? `Especialidade: ${filters.especialidade}` : null,
+          filters.categoria !== 'todos' ? `Categoria: ${filters.categoria}` : null,
           filters.prioridade !== 'todos' ? `Prioridade: ${filters.prioridade}` : null
         ].filter(Boolean);
       case 'medico':
@@ -268,6 +289,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 {[
                   ...getActiveFiltersForSection('periodo'),
                   ...getActiveFiltersForSection('cliente'),
+                  ...getActiveFiltersForSection('faturamento'),
                   ...getActiveFiltersForSection('laudo'),
                   ...getActiveFiltersForSection('medico')
                 ].map((filter, index) => (
@@ -325,7 +347,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Trimestre</label>
+                    <label className="text-xs font-medium text-muted-foreground">Tri</label>
                     <Select value={filters.trimestre} onValueChange={(value) => updateFilter('trimestre', value)}>
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
@@ -476,7 +498,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                         <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
+                    <PopoverContent className="w-full p-0 z-50 bg-background border" align="start">
                       <Command>
                         <CommandInput placeholder="Digite para localizar cliente..." className="h-8 text-xs" />
                         <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
@@ -521,6 +543,61 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                     </PopoverContent>
                   </Popover>
                 </div>
+                <div className="space-y-1 mt-3">
+                  <label className="text-xs font-medium text-muted-foreground">Tipo de Cliente</label>
+                  <Select value={filters.tipoCliente} onValueChange={(value) => updateFilter('tipoCliente', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO">CO</SelectItem>
+                      <SelectItem value="NC">NC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Botão TIPO DE FATURAMENTO */}
+            <Collapsible 
+              open={expandedSections.faturamento} 
+              onOpenChange={() => toggleSection('faturamento')}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={getActiveFiltersForSection('faturamento').length > 0 ? "default" : "outline"}
+                  className="w-full h-20 flex flex-col items-center justify-center gap-1 p-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span className="font-medium">Tipo de Faturamento</span>
+                    {getActiveFiltersForSection('faturamento').length > 0 && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1">
+                        {getActiveFiltersForSection('faturamento').length}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {filters.tipoFaturamento !== 'todos' ? filters.tipoFaturamento : 'Todos os tipos'}
+                  </span>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Tipo de Faturamento</label>
+                  <Select value={filters.tipoFaturamento} onValueChange={(value) => updateFilter('tipoFaturamento', value)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background border">
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="CO-FT">CO-FT</SelectItem>
+                      <SelectItem value="NC-FT">NC-FT</SelectItem>
+                      <SelectItem value="NC-NF">NC-NF</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -551,7 +628,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
                     <Select value={filters.modalidade} onValueChange={(value) => updateFilter('modalidade', value)}>
@@ -577,6 +654,21 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                         <SelectItem value="todos">Todas</SelectItem>
                         {options.especialidades.map(especialidade => (
                           <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                    <Select value={filters.categoria} onValueChange={(value) => updateFilter('categoria', value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-background border max-h-60 overflow-y-auto">
+                        <SelectItem value="todos">Todas</SelectItem>
+                        {options.categorias.map(categoria => (
+                          <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -644,7 +736,7 @@ export function VolumetriaAdvancedFilters({ filters, onFiltersChange }: Volumetr
                         <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
+                    <PopoverContent className="w-full p-0 z-50 bg-background border" align="start">
                       <Command>
                         <CommandInput placeholder="Digite para localizar médico..." className="h-8 text-xs" />
                         <CommandEmpty>Nenhum médico encontrado.</CommandEmpty>

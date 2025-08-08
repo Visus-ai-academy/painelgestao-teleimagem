@@ -22,8 +22,11 @@ export default function Volumetria() {
     dia: "todos",
     dataEspecifica: null,
     cliente: "todos",
+    tipoCliente: "todos",
+    tipoFaturamento: "todos",
     modalidade: "todos",
     especialidade: "todos",
+    categoria: "todos",
     prioridade: "todos",
     medico: "todos"
   });
@@ -147,8 +150,11 @@ export default function Volumetria() {
                 dia: "todos",
                 dataEspecifica: null,
                 cliente: "todos",
+                tipoCliente: "todos",
+                tipoFaturamento: "todos",
                 modalidade: "todos",
                 especialidade: "todos",
+                categoria: "todos",
                 prioridade: "todos",
                 medico: "todos"
               });
