@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, ArrowLeftRight, Filter } from "lucide-react";
+import { Users, ArrowLeftRight, Filter, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +16,20 @@ interface ClienteComparison {
   total_exames: number;
 }
 
-export function VolumetriaClientesComparison() {
+export type Divergencia = {
+  tipo: 'missing_in_system' | 'missing_in_file' | 'total_mismatch';
+  cliente: string;
+  totalSistema?: number;
+  totalArquivo?: number;
+};
+
+export function VolumetriaClientesComparison({
+  uploaded,
+  onDivergencesComputed,
+}: {
+  uploaded?: { cliente: string; totalExames?: number }[];
+  onDivergencesComputed?: (divs: Divergencia[]) => void;
+}) {
   const [clientes, setClientes] = useState<ClienteComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<'todos' | 'divergencias' | 'comuns'>('todos');
@@ -123,6 +136,61 @@ export function VolumetriaClientesComparison() {
     ).length
   };
 
+  const normalize = (s: string) => (s || '').toString().trim().toLowerCase();
+
+  const uploadedMap = useMemo(() => {
+    if (!uploaded || uploaded.length === 0) return null;
+    const map = new Map<string, { totalExames?: number; raw: string }>();
+    uploaded.forEach(u => {
+      if (!u?.cliente) return;
+      map.set(normalize(u.cliente), { totalExames: u.totalExames, raw: u.cliente });
+    });
+    return map;
+  }, [uploaded]);
+
+  const sistemaMap = useMemo(() => {
+    const map = new Map<string, ClienteComparison>();
+    clientes.forEach(c => map.set(normalize(c.cliente), c));
+    return map;
+  }, [clientes]);
+
+  const divergencias = useMemo(() => {
+    const list: Divergencia[] = [];
+    if (!uploadedMap) return list;
+
+    // faltando no arquivo e total mismatch
+    clientes.forEach(c => {
+      const key = normalize(c.cliente);
+      const u = uploadedMap.get(key);
+      if (!u) {
+        list.push({ tipo: 'missing_in_file', cliente: c.cliente });
+      } else if (typeof u.totalExames === 'number' && u.totalExames !== c.total_exames) {
+        list.push({ tipo: 'total_mismatch', cliente: c.cliente, totalSistema: c.total_exames, totalArquivo: u.totalExames });
+      }
+    });
+
+    // faltando no sistema
+    uploadedMap.forEach((u, key) => {
+      if (!sistemaMap.has(key)) {
+        list.push({ tipo: 'missing_in_system', cliente: u.raw, totalArquivo: u.totalExames });
+      }
+    });
+
+    return list;
+  }, [uploadedMap, sistemaMap, clientes]);
+
+  useEffect(() => {
+    onDivergencesComputed?.(divergencias);
+  }, [divergencias, onDivergencesComputed]);
+
+  const divCounts = useMemo(() => {
+    return {
+      missingInFile: divergencias.filter(d => d.tipo === 'missing_in_file').length,
+      missingInSystem: divergencias.filter(d => d.tipo === 'missing_in_system').length,
+      totalMismatch: divergencias.filter(d => d.tipo === 'total_mismatch').length,
+    };
+  }, [divergencias]);
+
   if (loading) {
     return (
       <Card>
@@ -167,6 +235,14 @@ export function VolumetriaClientesComparison() {
             <div className="text-sm text-muted-foreground">Em Ambos</div>
           </div>
         </div>
+        {uploaded && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              Divergências: no arquivo {divCounts.missingInFile}, no sistema {divCounts.missingInSystem}, total diferente {divCounts.totalMismatch}
+            </span>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="flex gap-2 mb-4">
@@ -217,6 +293,16 @@ export function VolumetriaClientesComparison() {
                 <Badge variant={cliente.arquivo_fora_padrão_retroativo ? "secondary" : "outline"} className="text-xs">
                   Retro Fora
                 </Badge>
+                {uploadedMap && (
+                  (!uploadedMap.has(normalize(cliente.cliente))) ||
+                  ((uploadedMap.get(normalize(cliente.cliente))?.totalExames !== undefined) &&
+                   (uploadedMap.get(normalize(cliente.cliente))?.totalExames !== cliente.total_exames))
+                ) && (
+                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Divergência
+                  </Badge>
+                )}
               </div>
             </div>
           ))}
