@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,27 @@ interface CadastroDataTableProps {
 export function CadastroDataTable({ data, loading, error, type, title }: CadastroDataTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
+  // Infinite scroll controls
+  const INITIAL_BATCH = 200;
+  const BATCH_SIZE = 300;
+  const [visibleCount, setVisibleCount] = useState(INITIAL_BATCH);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Reset when data or filters change
+    setVisibleCount(INITIAL_BATCH);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [data, searchTerm, columnFilters, type]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
+    if (nearBottom && visibleCount < filteredAndSortedData.length) {
+      setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, filteredAndSortedData.length));
+    }
+  };
 
   // Definir colunas por tipo
   const getColumns = () => {
@@ -218,7 +239,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">{title}</h3>
         <Badge variant="outline">
-          {data.length} itens
+          {filteredAndSortedData.length} itens
         </Badge>
       </div>
       
@@ -233,7 +254,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         />
       </div>
       
-      <div className="border rounded-md max-h-[500px] overflow-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="border rounded-md max-h-[500px] overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -259,7 +280,7 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedData.map((item) => (
+            {filteredAndSortedData.slice(0, visibleCount).map((item) => (
               <TableRow key={item.id}>
                 {columns.map((col) => (
                   <TableCell key={col.key}>
@@ -287,6 +308,11 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       {filteredAndSortedData.length === 0 && (searchTerm || Object.values(columnFilters).some(f => f)) && (
         <div className="text-center py-8 text-muted-foreground">
           Nenhum item encontrado com os filtros aplicados.
+        </div>
+      )}
+      {visibleCount < filteredAndSortedData.length && (
+        <div className="text-center py-3 text-muted-foreground text-sm">
+          Role para carregar mais... ({Math.min(visibleCount, filteredAndSortedData.length)} de {filteredAndSortedData.length})
         </div>
       )}
     </div>
