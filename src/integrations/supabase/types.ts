@@ -3721,6 +3721,10 @@ export type Database = {
         Args: { resource_type: string; access_pattern: string; metadata?: Json }
         Returns: undefined
       }
+      normalizar_clientes_cedi: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
