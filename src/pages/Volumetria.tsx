@@ -42,6 +42,35 @@ export default function Volumetria() {
   const hasData = (filtered.stats?.total_exames || 0) > 0;
   const filteredDetailed = useMemo(() => getFilteredData(filters), [getFilteredData, filters]);
 
+  // Map filtered arrays to the DelayData shape expected by VolumetriaDelayAnalysis
+  const atrasoClientesDelay = useMemo(() => (filtered.atrasoClientes || []).map(c => ({
+    nome: c.nome,
+    total_exames: c.total_exames,
+    atrasados: c.atrasados,
+    percentual_atraso: c.percentual_atraso,
+  })), [filtered.atrasoClientes]);
+
+  const atrasoModalidadesDelay = useMemo(() => (filtered.atrasoModalidades || []).map(m => ({
+    nome: m.nome,
+    total_exames: m.total_exames,
+    atrasados: m.atrasados ?? 0,
+    percentual_atraso: m.percentual_atraso ?? (m.total_exames > 0 ? ((m.atrasados ?? 0) / m.total_exames) * 100 : 0),
+  })), [filtered.atrasoModalidades]);
+
+  const atrasoEspecialidadesDelay = useMemo(() => (filtered.atrasoEspecialidades || []).map(e => ({
+    nome: e.nome,
+    total_exames: e.total_exames,
+    atrasados: e.atrasados ?? 0,
+    percentual_atraso: e.percentual_atraso ?? (e.total_exames > 0 ? ((e.atrasados ?? 0) / e.total_exames) * 100 : 0),
+  })), [filtered.atrasoEspecialidades]);
+
+  const atrasoPrioridadesDelay = useMemo(() => (filtered.atrasoPrioridades || []).map(p => ({
+    nome: p.nome,
+    total_exames: p.total_exames,
+    atrasados: p.atrasados ?? 0,
+    percentual_atraso: p.percentual_atraso ?? (p.total_exames > 0 ? ((p.atrasados ?? 0) / p.total_exames) * 100 : 0),
+  })), [filtered.atrasoPrioridades]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-8">
@@ -135,11 +164,11 @@ export default function Volumetria() {
             <TabsContent value="atrasos" className="space-y-6">
               <VolumetriaDelayAnalysis 
                 data={{
-                  clientes: filtered.atrasoClientes,
-                  modalidades: filtered.atrasoModalidades,
-                  especialidades: filtered.atrasoEspecialidades,
+                  clientes: atrasoClientesDelay,
+                  modalidades: atrasoModalidadesDelay,
+                  especialidades: atrasoEspecialidadesDelay,
                   categorias: [],
-                  prioridades: filtered.atrasoPrioridades,
+                  prioridades: atrasoPrioridadesDelay,
                   totalAtrasados: filtered.stats.total_atrasados,
                   percentualAtrasoGeral: filtered.stats.percentual_atraso,
                   atrasosComTempo: filtered.atrasosComTempo
@@ -148,7 +177,7 @@ export default function Volumetria() {
             </TabsContent>
 
             <TabsContent value="clientes" className="space-y-6">
-              <VolumetriaClientesAtrasados filteredData={filteredDetailed} />
+              <VolumetriaClientesAtrasados />
             </TabsContent>
 
           </Tabs>
