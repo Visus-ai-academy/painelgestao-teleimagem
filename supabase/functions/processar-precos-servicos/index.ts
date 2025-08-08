@@ -129,9 +129,8 @@ serve(async (req) => {
       try {
         const row = jsonData[i] as any[]
         
-        if (!row || row.length < 6) {
-          erros.push(`Linha ${i + 1}: dados insuficientes - ${row ? row.length : 0} colunas`)
-          continue
+        if (!row) {
+          erros.push(`Linha ${i + 1}: linha vazia`)
         }
 
         // Mapear campos do Excel baseado no template correto
@@ -146,6 +145,7 @@ serve(async (req) => {
         const volFinal = row[7] ? parseInt(String(row[7])) || null : null
         const condVolume = row[8] ? parseInt(String(row[8])) || null : null
         const consideraPlantao = String(row[9] || '').toLowerCase() === 'sim'
+        let observacoesRow = ''
         
         // Tratar categoria vazia ou "Normal" como "N/A"
         if (!categoria || categoria === 'Normal' || categoria === '') {
@@ -186,8 +186,7 @@ serve(async (req) => {
         
         const clienteId = clientesMap.get(clienteNomeBusca)
         if (!clienteId) {
-          erros.push(`Linha ${i + 1}: Cliente "${clienteNome}" não encontrado no cadastro`)
-          continue
+          observacoesRow += `Cliente não localizado: ${clienteNome}. `
         }
 
         // Limpar e converter preço
@@ -202,13 +201,14 @@ serve(async (req) => {
         // Aceitar tanto preços zerados quanto não-zerados
         // Apenas validar se não é um valor inválido/NaN
         if (isNaN(preco)) {
-          erros.push(`Linha ${i + 1}: Preço com formato inválido - "${precoStr}"`)
-          continue
+          erros.push(`Linha ${i + 1}: Preço com formato inválido - "${precoStr}" (assumido 0)`)
+          preco = 0
+          observacoesRow += `Preço inválido: ${precoStr}. Assumido 0. `
         }
 
         // Preparar registro para inserção
         registrosParaInserir.push({
-          cliente_id: clienteId,
+          cliente_id: clienteId || null,
           modalidade: modalidadeFinal,
           especialidade: especialidadeFinal,
           categoria: categoria,
@@ -222,7 +222,9 @@ serve(async (req) => {
           tipo_preco: 'especial',
           aplicar_legado: true,
           aplicar_incremental: true,
-          ativo: true
+          ativo: true,
+          observacoes: observacoesRow || null,
+          descricao: clienteId ? null : `Cliente original: ${clienteNome}`
         })
 
         registrosProcessados++

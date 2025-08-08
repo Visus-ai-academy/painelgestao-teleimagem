@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -196,6 +196,18 @@ const [options, setOptions] = useState<FilterOptions>({
   const hasActiveFilters = Object.values(filters).some(value => 
     value !== 'todos' && value !== null && value !== undefined
   );
+
+  const faturamentoOptions = useMemo(() => {
+    if (filters.tipoCliente === 'CO') return ['CO-FT'];
+    if (filters.tipoCliente === 'NC') return ['NC-FT', 'NC-NF'];
+    return ['CO-FT', 'NC-FT', 'NC-NF'];
+  }, [filters.tipoCliente]);
+
+  useEffect(() => {
+    if (filters.tipoFaturamento !== 'todos' && !faturamentoOptions.includes(filters.tipoFaturamento)) {
+      updateFilter('tipoFaturamento', 'todos');
+    }
+  }, [filters.tipoCliente]);
 
   // Função para alternar seções
   const toggleSection = (section: string) => {
@@ -591,9 +603,9 @@ const [options, setOptions] = useState<FilterOptions>({
                     </SelectTrigger>
                     <SelectContent className="z-50 bg-background border">
                       <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="CO-FT">CO-FT</SelectItem>
-                      <SelectItem value="NC-FT">NC-FT</SelectItem>
-                      <SelectItem value="NC-NF">NC-NF</SelectItem>
+                      {faturamentoOptions.map((opt) => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
