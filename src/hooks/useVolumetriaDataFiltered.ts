@@ -178,14 +178,29 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         console.log(`👩‍⚕️ Filtro médico aplicado: ${filters.medico}, restaram ${allData.length} registros`);
       }
       
-      // Aplicar filtros de data se necessário
+      // Aplicar filtros de data: para recorte mensal, usar janela de DATA_LAUDO (1º dia do mês até dia 7 do mês seguinte)
       const { startDate, endDate } = buildDateFilter();
-      if (startDate && endDate && filters.ano !== 'todos') {
+      if (filters.ano !== 'todos' && filters.mes !== 'todos') {
+        const year = parseInt(filters.ano);
+        const month = parseInt(filters.mes); // 1-12
+        const laudoStart = new Date(year, month - 1, 1); // 1º dia do mês
+        const laudoEnd = new Date(year, month, 7); // dia 7 do mês seguinte
+        allData = allData.filter(item => {
+          if (!item.DATA_LAUDO) return false;
+          try {
+            const laudoDate = new Date(`${item.DATA_LAUDO}T${item.HORA_LAUDO || '00:00:00'}`);
+            return laudoStart <= laudoDate && laudoDate <= laudoEnd;
+          } catch {
+            return false;
+          }
+        });
+        console.log(`📅 Filtro por janela de DATA_LAUDO aplicado: ${laudoStart.toISOString().slice(0,10)} - ${laudoEnd.toISOString().slice(0,10)}, restaram ${allData.length} registros`);
+      } else if (startDate && endDate && filters.ano !== 'todos') {
         allData = allData.filter(item => {
           if (!item.data_referencia) return false;
           return item.data_referencia >= startDate && item.data_referencia <= endDate;
         });
-        console.log(`📅 Filtro de data aplicado: ${startDate} - ${endDate}, restaram ${allData.length} registros`);
+        console.log(`📅 Filtro de data_referencia aplicado: ${startDate} - ${endDate}, restaram ${allData.length} registros`);
       }
 
       if (!allData || allData.length === 0) {

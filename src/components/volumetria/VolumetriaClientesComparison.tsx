@@ -42,21 +42,34 @@ export function VolumetriaClientesComparison({
   const loadClientesComparison = async () => {
     setLoading(true);
     try {
-      // Buscar todos os clientes distintos
-      const { data, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('EMPRESA, arquivo_fonte, VALORES')
-        .order('EMPRESA');
+      // Paginar para evitar limites padrão da API
+      let offset = 0;
+      const limit = 50000;
+      let all: Array<{ EMPRESA: string; arquivo_fonte: string; VALORES: number }>= [];
 
-      if (error) throw error;
+      while (true) {
+        const { data, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA, arquivo_fonte, VALORES')
+          .order('EMPRESA')
+          .range(offset, offset + limit - 1);
 
-      // Agrupar por cliente e arquivo
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all = all.concat(data as any[]);
+        if (data.length < limit) break;
+        offset += limit;
+        await new Promise((r) => setTimeout(r, 5));
+      }
+
+      // Agrupar por cliente e arquivo (sem limitação)
       const clienteMap = new Map<string, ClienteComparison>();
 
-      data?.forEach(item => {
+      all.forEach((item: any) => {
         const cliente = item.EMPRESA || 'Não Informado';
         const exames = Number(item.VALORES) || 0;
-        
+        const fonte = String(item.arquivo_fonte || '');
+
         if (!clienteMap.has(cliente)) {
           clienteMap.set(cliente, {
             cliente,
@@ -65,38 +78,33 @@ export function VolumetriaClientesComparison({
             arquivo_padrão_retroativo: false,
             arquivo_fora_padrão_retroativo: false,
             total_registros: 0,
-            total_exames: 0
+            total_exames: 0,
           });
         }
 
-        const clienteData = clienteMap.get(cliente)!;
-        clienteData.total_registros += 1;
-        clienteData.total_exames += exames;
+        const c = clienteMap.get(cliente)!;
+        c.total_registros += 1;
+        c.total_exames += exames;
 
-        // Marcar presença nos arquivos baseado no arquivo_fonte
-        switch (item.arquivo_fonte) {
-          case 'data_laudo':
-            clienteData.arquivo_padrão = true;
-            break;
-          case 'data_exame':
-            clienteData.arquivo_fora_padrão = true;
-            break;
-          case 'data_laudo_retroativo':
-            clienteData.arquivo_padrão_retroativo = true;
-            break;
-          case 'data_exame_retroativo':
-            clienteData.arquivo_fora_padrão_retroativo = true;
-            break;
-        }
+        // Mapear diferentes nomes de fonte para categorias equivalentes
+        const isPadrao = fonte === 'volumetria_padrao' || fonte === 'data_laudo';
+        const isFora = fonte === 'volumetria_fora_padrao' || fonte === 'data_exame';
+        const isPadraoRetro = fonte === 'volumetria_padrao_retroativo' || fonte === 'data_laudo_retroativo';
+        const isForaRetro = fonte === 'volumetria_fora_padrao_retroativo' || fonte === 'data_exame_retroativo';
+
+        if (isPadrao) c.arquivo_padrão = true;
+        if (isFora) c.arquivo_fora_padrão = true;
+        if (isPadraoRetro) c.arquivo_padrão_retroativo = true;
+        if (isForaRetro) c.arquivo_fora_padrão_retroativo = true;
       });
 
       setClientes(Array.from(clienteMap.values()).sort((a, b) => a.cliente.localeCompare(b.cliente)));
     } catch (error) {
       console.error('Erro ao carregar comparação de clientes:', error);
       toast({
-        title: "Erro",
-        description: "Falha ao carregar comparação de clientes",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Falha ao carregar comparação de clientes',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
