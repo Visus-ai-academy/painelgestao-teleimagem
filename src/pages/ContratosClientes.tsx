@@ -41,7 +41,7 @@ import {
   Download,
   Trash2,
   Upload,
-  Send,
+  Pencil,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -151,7 +151,11 @@ export default function ContratosClientes() {
   const [showEditarContrato, setShowEditarContrato] = useState(false);
   const [contratoEditando, setContratoEditando] = useState<ContratoCliente | null>(null);
   const [isCreatingContracts, setIsCreatingContracts] = useState(false);
-  
+  const [showVisualizarContrato, setShowVisualizarContrato] = useState(false);
+  const [contratoVisualizando, setContratoVisualizando] = useState<ContratoCliente | null>(null);
+  const [editDataInicio, setEditDataInicio] = useState("");
+  const [editDataFim, setEditDataFim] = useState("");
+
   // Estados para busca, filtro e ordenação
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -273,6 +277,12 @@ export default function ContratosClientes() {
     carregarContratos();
   }, []);
 
+  useEffect(() => {
+    if (contratoEditando) {
+      setEditDataInicio(contratoEditando.dataInicio ? contratoEditando.dataInicio.slice(0, 10) : "");
+      setEditDataFim(contratoEditando.dataFim ? contratoEditando.dataFim.slice(0, 10) : "");
+    }
+  }, [contratoEditando]);
   // Função para sincronizar preços com contratos
   const sincronizarPrecos = async () => {
     if (!confirm('Deseja sincronizar os preços de serviços com os contratos? Esta ação atualizará os serviços contratados de todos os contratos.')) {
@@ -312,6 +322,28 @@ export default function ContratosClientes() {
     }
   };
 
+  const salvarContrato = async () => {
+    if (!contratoEditando) return;
+    try {
+      const { error } = await supabase
+        .from('contratos_clientes')
+        .update({
+          data_inicio: editDataInicio || null,
+          data_fim: editDataFim || null,
+        })
+        .eq('id', contratoEditando.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Contrato atualizado com sucesso' });
+      setShowEditarContrato(false);
+      setContratoEditando(null);
+      await carregarContratos();
+    } catch (err: any) {
+      console.error('Erro ao salvar contrato:', err);
+      toast({ title: 'Erro ao salvar contrato', description: err.message, variant: 'destructive' });
+    }
+  };
   const criarContratosAutomatico = async () => {
     try {
       setIsCreatingContracts(true);
@@ -746,11 +778,11 @@ export default function ContratosClientes() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" aria-label="Visualizar contrato" onClick={() => { setContratoVisualizando(contrato); setShowVisualizarContrato(true); }}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline">
-                          <Send className="h-4 w-4" />
+                        <Button size="sm" variant="outline" aria-label="Editar contrato" onClick={() => { setContratoEditando(contrato); setShowEditarContrato(true); }}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -761,6 +793,67 @@ export default function ContratosClientes() {
           )}
         </CardContent>
       </Card>
+
+      {/* Visualizar Contrato */}
+      <Dialog open={showVisualizarContrato} onOpenChange={setShowVisualizarContrato}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Serviços Contratados — {contratoVisualizando?.cliente}</DialogTitle>
+            <DialogDescription>Visualize os serviços e preços configurados neste contrato.</DialogDescription>
+          </DialogHeader>
+          <div className="border rounded-md max-h-[60vh] overflow-auto">
+            {contratoVisualizando?.servicos?.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Modalidade</TableHead>
+                    <TableHead>Especialidade</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Prioridade</TableHead>
+                    <TableHead className="text-right">Preço</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contratoVisualizando.servicos.map((s, i) => (
+                    <TableRow key={s.id || i}>
+                      <TableCell>{s.modalidade}</TableCell>
+                      <TableCell>{s.especialidade}</TableCell>
+                      <TableCell>{s.categoria}</TableCell>
+                      <TableCell>{s.prioridade}</TableCell>
+                      <TableCell className="text-right">R$ {Number(s.valor || 0).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">Nenhum serviço configurado para este contrato.</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar Contrato */}
+      <Dialog open={showEditarContrato} onOpenChange={setShowEditarContrato}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Contrato — {contratoEditando?.cliente}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Data Início</Label>
+              <Input type="date" value={editDataInicio} onChange={(e) => setEditDataInicio(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Data Fim</Label>
+              <Input type="date" value={editDataFim} onChange={(e) => setEditDataFim(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowEditarContrato(false)}>Cancelar</Button>
+            <Button onClick={salvarContrato}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
