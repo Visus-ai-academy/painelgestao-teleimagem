@@ -8,6 +8,7 @@ import { useClienteData } from '@/hooks/useClienteData';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { toast } from "sonner";
 import { MapPin, Users, Building2, RefreshCw, Filter, BarChart3, Zap } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MapaPorEstado } from "@/components/mapa/MapaPorEstado";
 import { MapaPorCidade } from "@/components/mapa/MapaPorCidade";
 
@@ -468,141 +469,147 @@ export default function MapaDistribuicaoClientes() {
         </Card>
       </div>
 
-      {/* Mapa de Calor por Regiões */}
-      {visualizacao === 'regioes' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              Mapa de Calor - Distribuição por Região
-               <Badge variant="outline" className="text-sm">
-                 Total: {regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0).toLocaleString()} exames
-               </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 text-sm text-muted-foreground">
-              Regiões ordenadas por volume de exames (maior para menor)
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {regioesEstatisticas
-                .sort((a, b) => b.volume_total - a.volume_total)
-                .map((regiao, index) => {
-                  const maxVolume = Math.max(...regioesEstatisticas.map(r => r.volume_total));
-                  const corClasse = getCorIntensidade(regiao.volume_total, maxVolume);
-                  
-                  return (
-                    <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
-                      <div className="text-center">
-                        <div className="absolute top-2 right-2">
-                          <Badge variant="secondary" className="text-xs px-2 py-1">
-                            #{index + 1}
-                          </Badge>
-                        </div>
-                        <h3 className="font-bold text-lg">{regiao.regiao}</h3>
-                        <div className="mt-3 space-y-1">
-                          <p className="text-sm font-medium">{regiao.total_clientes} clientes</p>
-                          <p className="text-sm font-bold">{regiao.volume_total.toLocaleString()} exames</p>
-                          <Badge variant="outline" className="mt-2 text-xs">
-                            {regiao.estados.length} estados
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs value={visualizacao} onValueChange={(v) => setVisualizacao(v as any)} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="regioes">Por Região</TabsTrigger>
+          <TabsTrigger value="estados">Por Estado</TabsTrigger>
+          <TabsTrigger value="cidades">Por Cidade</TabsTrigger>
+        </TabsList>
 
-      {visualizacao === 'estados' && (
-        <MapaPorEstado estados={estadosEstatisticas} />
-      )}
-
-      {/* Mapa de Calor por Cidades */}
-      {visualizacao === 'cidades' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              Mapa de Calor - Distribuição por Cidade
-               <Badge variant="outline" className="text-sm">
-                 Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
-               </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 text-sm text-muted-foreground">
-              Cidades agrupadas por estado, ordenadas por volume de exames
-            </div>
-            <div className="space-y-6">
-              {estadosEstatisticas
-                .filter(estado => estado.total_clientes > 0)
-                .sort((a, b) => b.volume_total - a.volume_total)
-                .map(estado => (
-                  <div key={estado.estado} className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-lg text-blue-600">
-                        {estado.estado} - {estado.regiao}
-                      </h3>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-gray-600">
-                          {estado.total_clientes} clientes | {estado.volume_total.toLocaleString()} exames
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {Object.keys(estado.cidades).length} cidades
-                        </Badge>
-                      </div>
-                    </div>
+        <TabsContent value="regioes">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                Mapa de Calor - Distribuição por Região
+                 <Badge variant="outline" className="text-sm">
+                   Total: {regioesEstatisticas.reduce((sum, r) => sum + r.volume_total, 0).toLocaleString()} exames
+                 </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 text-sm text-muted-foreground">
+                Regiões ordenadas por volume de exames (maior para menor)
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {regioesEstatisticas
+                  .sort((a, b) => b.volume_total - a.volume_total)
+                  .map((regiao, index) => {
+                    const maxVolume = Math.max(...regioesEstatisticas.map(r => r.volume_total));
+                    const corClasse = getCorIntensidade(regiao.volume_total, maxVolume);
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                      {Object.entries(estado.cidades)
-                        .sort(([,a], [,b]) => {
-                          const volumeA = a.reduce((sum, c) => sum + c.volume_exames, 0);
-                          const volumeB = b.reduce((sum, c) => sum + c.volume_exames, 0);
-                          return volumeB - volumeA;
-                        })
-                        .map(([cidade, clientesCidade], index) => {
-                          const volumeCidade = clientesCidade.reduce((sum, c) => sum + c.volume_exames, 0);
-                          const maxVolumeCidades = Math.max(...Object.values(estado.cidades).map(cidades => 
-                            cidades.reduce((sum, c) => sum + c.volume_exames, 0)
-                          ));
-                          const corClasse = getCorIntensidade(volumeCidade, maxVolumeCidades);
-                          
-                          return (
-                            <div key={`${estado.estado}-${cidade}`} className={`p-3 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
-                              <div className="text-center">
-                                <div className="absolute top-1 right-1">
-                                  <Badge variant="secondary" className="text-xs px-1 py-0">
-                                    #{index + 1}
-                                  </Badge>
-                                </div>
-                                <h4 className="font-medium text-sm mb-1">{cidade}</h4>
-                                <div className="space-y-1">
-                                  <p className="text-xs">{clientesCidade.length} clientes</p>
-                                  <p className="text-xs font-medium">{volumeCidade.toLocaleString()} exames</p>
-                                </div>
-                                {/* Lista dos clientes */}
-                                <div className="mt-2 text-xs opacity-75">
-                                  {clientesCidade.slice(0, 2).map(cliente => (
-                                    <div key={cliente.id} className="truncate">
-                                      {cliente.nome.split(' ')[0]}...
-                                    </div>
-                                  ))}
-                                  {clientesCidade.length > 2 && (
-                                    <div>+{clientesCidade.length - 2} mais</div>
-                                  )}
+                    return (
+                      <div key={regiao.regiao} className={`p-6 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
+                        <div className="text-center">
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="secondary" className="text-xs px-2 py-1">
+                              #{index + 1}
+                            </Badge>
+                          </div>
+                          <h3 className="font-bold text-lg">{regiao.regiao}</h3>
+                          <div className="mt-3 space-y-1">
+                            <p className="text-sm font-medium">{regiao.total_clientes} clientes</p>
+                            <p className="text-sm font-bold">{regiao.volume_total.toLocaleString()} exames</p>
+                            <Badge variant="outline" className="mt-2 text-xs">
+                              {regiao.estados.length} estados
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="estados">
+          <MapaPorEstado estados={estadosEstatisticas} />
+        </TabsContent>
+
+        <TabsContent value="cidades">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                Mapa de Calor - Distribuição por Cidade
+                 <Badge variant="outline" className="text-sm">
+                   Total: {estadosEstatisticas.reduce((sum, e) => sum + e.volume_total, 0).toLocaleString()} exames
+                 </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 text-sm text-muted-foreground">
+                Cidades agrupadas por estado, ordenadas por volume de exames
+              </div>
+              <div className="space-y-6">
+                {estadosEstatisticas
+                  .filter(estado => estado.total_clientes > 0)
+                  .sort((a, b) => b.volume_total - a.volume_total)
+                  .map(estado => (
+                    <div key={estado.estado} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-lg text-blue-600">
+                          {estado.estado} - {estado.regiao}
+                        </h3>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-600">
+                            {estado.total_clientes} clientes | {estado.volume_total.toLocaleString()} exames
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {Object.keys(estado.cidades).length} cidades
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                        {Object.entries(estado.cidades)
+                          .sort(([,a], [,b]) => {
+                            const volumeA = a.reduce((sum, c) => sum + c.volume_exames, 0);
+                            const volumeB = b.reduce((sum, c) => sum + c.volume_exames, 0);
+                            return volumeB - volumeA;
+                          })
+                          .map(([cidade, clientesCidade], index) => {
+                            const volumeCidade = clientesCidade.reduce((sum, c) => sum + c.volume_exames, 0);
+                            const maxVolumeCidades = Math.max(...Object.values(estado.cidades).map(cidades => 
+                              cidades.reduce((sum, c) => sum + c.volume_exames, 0)
+                            ));
+                            const corClasse = getCorIntensidade(volumeCidade, maxVolumeCidades);
+                            
+                            return (
+                              <div key={`${estado.estado}-${cidade}`} className={`p-3 rounded-lg ${corClasse} transition-all hover:scale-105 cursor-pointer relative`}>
+                                <div className="text-center">
+                                  <div className="absolute top-1 right-1">
+                                    <Badge variant="secondary" className="text-xs px-1 py-0">
+                                      #{index + 1}
+                                    </Badge>
+                                  </div>
+                                  <h4 className="font-medium text-sm mb-1">{cidade}</h4>
+                                  <div className="space-y-1">
+                                    <p className="text-xs">{clientesCidade.length} clientes</p>
+                                    <p className="text-xs font-medium">{volumeCidade.toLocaleString()} exames</p>
+                                  </div>
+                                  {/* Lista dos clientes */}
+                                  <div className="mt-2 text-xs opacity-75">
+                                    {clientesCidade.slice(0, 2).map(cliente => (
+                                      <div key={cliente.id} className="truncate">
+                                        {cliente.nome.split(' ')[0]}...
+                                      </div>
+                                    ))}
+                                    {clientesCidade.length > 2 && (
+                                      <div>+{clientesCidade.length - 2} mais</div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
