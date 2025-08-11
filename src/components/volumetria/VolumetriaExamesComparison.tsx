@@ -82,12 +82,20 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   // Filtros
   const [clienteFilter, setClienteFilter] = useState<string>('todos');
   const [modalidadeFilter, setModalidadeFilter] = useState<string>('todos');
-  const normStr = (s?: string) => (s || '').toString().trim().toLowerCase();
+  const stripAccents = (s: string) => s?.toString().normalize('NFD').replace(/\p{Diacritic}/gu, '') || '';
+  const canonical = (s?: string) => {
+    const raw = (s || '').toString().trim();
+    if (!raw) return '';
+    const noAcc = stripAccents(raw);
+    const cleaned = noAcc.replace(/[^a-zA-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+    return cleaned;
+  };
+  const normStr = (s?: string) => canonical(s);
   const normModal = (m?: string) => {
-    const u = (m || '').toString().trim().toUpperCase();
+    const u = canonical(m);
     if (u === 'CT') return 'TC';
     if (u === 'MR') return 'RM';
-    return (m || '').toString().trim();
+    return u;
   };
   const clienteOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => r.cliente), ...arquivoRows.map(r => r.cliente)])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
   const modalidadeOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => normModal(r.modalidade)), ...arquivoRows.map(r => normModal(r.modalidade))])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
@@ -108,12 +116,12 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   const pageRows = useMemo(() => filteredRows.slice((page - 1) * pageSize, page * pageSize), [filteredRows, page]);
 
   // Divergências agregadas por combinação de dimensões (ignora datas e médico para comparação mais justa)
-  const normalize = (s?: string) => (s || '').toString().trim().toLowerCase();
+  const normalize = (s?: string) => canonical(s);
   const normalizeModalidade = (m?: string) => {
-    const u = (m || '').toString().trim().toUpperCase();
+    const u = canonical(m);
     if (u === 'CT') return 'TC';
     if (u === 'MR') return 'RM';
-    return (m || '').toString().trim();
+    return u;
   };
   type AggKey = string;
   type AggDims = {
@@ -137,12 +145,12 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     return {
       key,
       dims: {
-        cliente: r.cliente,
-        modalidade: modalFix,
-        especialidade: r.especialidade,
-        categoria: r.categoria,
-        prioridade: r.prioridade,
-        exame: r.exame,
+          cliente: canonical(r.cliente),
+          modalidade: normalizeModalidade(r.modalidade),
+          especialidade: canonical(r.especialidade),
+          categoria: canonical(r.categoria),
+          prioridade: canonical(r.prioridade),
+          exame: canonical(r.exame),
       }
     };
   };

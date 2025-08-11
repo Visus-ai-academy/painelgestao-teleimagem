@@ -36,6 +36,28 @@ type ClienteAggregated = {
   exames: Breakdown;
 };
 
+const stripAccents = (s: string) => s?.toString().normalize('NFD').replace(/\p{Diacritic}/gu, '') || '';
+const canonical = (s?: string) => {
+  const raw = (s || '').toString().trim();
+  if (!raw) return '';
+  const noAcc = stripAccents(raw);
+  const cleaned = noAcc.replace(/[^a-zA-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+  return cleaned;
+};
+const canonicalModalidade = (m?: string) => {
+  const up = canonical(m);
+  if (up === 'CT') return 'TC';
+  if (up === 'MR') return 'RM';
+  return up;
+};
+const canonicalPrioridade = (p?: string) => {
+  const up = canonical(p);
+  if (up === 'URGENCIA' || up === 'URGENTE') return 'URGENTE';
+  if (up.startsWith('PLANTAO')) return 'PLANTAO';
+  if (up === 'ROTINA') return 'ROTINA';
+  return up;
+};
+
 function formatBreakdown(map: Breakdown, maxItems = 4) {
   const entries = Object.entries(map)
     .filter(([k]) => !!k)
@@ -102,15 +124,11 @@ export function VolumetriaClientesComparison({
           const anyItem: any = item;
           // Usar valor numérico real do registro detalhado quando disponível
           const inc = (Number(anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1) || 1);
-          // Normalização de campos (maiúsculo/minúsculo) e sinônimos de modalidade
-          let mod = String(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade ?? '').trim();
-          const modU = mod.toUpperCase();
-          if (modU === 'CT') mod = 'TC';
-          else if (modU === 'MR') mod = 'RM';
-          const esp = String(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade ?? '').trim();
-          const pri = String(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade ?? '').trim();
-          const cat = String(anyItem.CATEGORIA ?? anyItem.categoria ?? anyItem.Categoria ?? '').trim();
-          const exame = String(anyItem.ESTUDO_DESCRICAO ?? anyItem.NOME_EXAME ?? anyItem.EXAME ?? anyItem.ESTUDO ?? anyItem.nome_exame ?? anyItem.Nome_Est ?? anyItem.nome_est ?? '').trim();
+          const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
+          const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
+          const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
+          const cat = canonical(anyItem.CATEGORIA ?? anyItem.categoria ?? anyItem.Categoria);
+          const exame = canonical(anyItem.ESTUDO_DESCRICAO ?? anyItem.NOME_EXAME ?? anyItem.EXAME ?? anyItem.ESTUDO ?? anyItem.nome_exame ?? anyItem.Nome_Est ?? anyItem.nome_est);
           if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
           if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
           if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
@@ -148,13 +166,11 @@ export function VolumetriaClientesComparison({
       }
       const ref = agg.get(cliente)!;
       ref.total_exames += val;
-      let mod = String(row.modalidade || '').trim();
-      if (mod.toUpperCase() === 'CT') mod = 'TC';
-      if (mod.toUpperCase() === 'MR') mod = 'RM';
-      const esp = String(row.especialidade || '').trim();
-      const pri = String(row.prioridade || '').trim();
-      const cat = String(row.categoria || '').trim();
-      const exame = String(row.exame || '').trim();
+      let mod = canonicalModalidade(row.modalidade);
+      const esp = canonical(row.especialidade);
+      const pri = canonicalPrioridade(row.prioridade);
+      const cat = canonical(row.categoria);
+      const exame = canonical(row.exame);
       if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
       if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
       if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
