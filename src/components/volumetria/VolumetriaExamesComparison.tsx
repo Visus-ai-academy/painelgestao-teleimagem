@@ -19,6 +19,8 @@ export type UploadedExamRow = {
   paciente?: string;
   quant?: number;
   exame?: string;
+  accessionNumber?: string;
+  codigoPaciente?: string | number;
 };
 
 export default function VolumetriaExamesComparison({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
@@ -66,7 +68,9 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
       const paciente = String(item.PACIENTE || item.NOME_PACIENTE || item.NOME_PAC || item.PACIENTE_NOME || '').trim();
       const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || item.nome_exame || item.Nome_Est || item.nome_est || '').trim();
       const quant = Number(item.VALORES ?? item.VALOR ?? item.QUANTIDADE ?? item.QTD ?? item.QTDE ?? 1) || 1;
-      return { fonte: 'Sistema', cliente, modalidade, especialidade, categoria, prioridade, data_exame, data_laudo, medico, paciente, quant, exame } as SystemExamRow;
+      const accessionNumber = String(item.ACCESSION_NUMBER || item.Accession || item.ACCESSION || '').trim() || undefined;
+      const codigoPaciente = (item.CODIGO_PACIENTE ?? item.CODIGO_INTERNO ?? undefined);
+      return { fonte: 'Sistema', cliente, modalidade, especialidade, categoria, prioridade, data_exame, data_laudo, medico, paciente, quant, exame, accessionNumber, codigoPaciente } as SystemExamRow;
     }).filter(r => r.cliente);
   }, [context]);
 
@@ -293,6 +297,8 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
                 <TableHead>Data Laudo</TableHead>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Médico</TableHead>
+                <TableHead>Accession</TableHead>
+                <TableHead>Código Paciente</TableHead>
                 <TableHead className="text-right">Quant.</TableHead>
               </TableRow>
             </TableHeader>
@@ -312,12 +318,14 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
                   <TableCell>{toDisplayDate(r.data_laudo)}</TableCell>
                   <TableCell>{r.paciente || '—'}</TableCell>
                   <TableCell>{r.medico || '—'}</TableCell>
+                  <TableCell>{r.accessionNumber || '—'}</TableCell>
+                  <TableCell>{r.codigoPaciente ?? '—'}</TableCell>
                   <TableCell className="text-right">{(r.quant ?? 0).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center text-muted-foreground">
+                  <TableCell colSpan={14} className="text-center text-muted-foreground">
                     Nenhum registro para exibir.
                   </TableCell>
                 </TableRow>

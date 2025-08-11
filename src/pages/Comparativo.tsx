@@ -40,6 +40,8 @@ export default function Comparativo() {
       const dataLaudoKeys = ['data_laudo','dt_laudo','data_laudo_exame'];
       const medicoKeys = ['medico','nome_medico','medico_nome'];
       const pacienteKeys = ['paciente','nome_paciente','nm_paciente','paciente_nome','nome_do_paciente'];
+      const accessionKeys = ['accession_number','acession_number','accession'];
+      const codigoPacienteKeys = ['codigo_paciente','cod_paciente','paciente_codigo','codigo_interno'];
 
       const parseCount = (v: any): number | undefined => {
         if (v === null || v === undefined) return undefined;
@@ -114,6 +116,8 @@ export default function Comparativo() {
         const dataLaudoKey = findKey(dataLaudoKeys);
         const medicoKey = findKey(medicoKeys);
         const pacienteKey = findKey(pacienteKeys);
+        const accessionKey = findKey(accessionKeys);
+        const codigoPacKey = findKey(codigoPacienteKeys);
         const cliente = String(nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]])).trim();
         const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
         const num = parseCount(totalRaw);
@@ -126,9 +130,11 @@ export default function Comparativo() {
         const data_laudo = dataLaudoKey ? r[normMap[dataLaudoKey]] : undefined;
         const medico = medicoKey ? String(r[normMap[medicoKey]] ?? '').trim() : undefined;
         const paciente = pacienteKey ? String(r[normMap[pacienteKey]] ?? '').trim() : undefined;
+        const accessionNumber = accessionKey ? String(r[normMap[accessionKey]] ?? '').trim() : undefined;
+        const codigoPaciente = codigoPacKey ? r[normMap[codigoPacKey]] : undefined;
         const hasDim = !!(modalidade || especialidade || prioridade || categoria || exame);
         const quant = num !== undefined ? num : (hasDim ? 1 : undefined);
-        return { cliente, modalidade, especialidade, categoria, prioridade, exame, data_exame, data_laudo, medico, paciente, quant } as UploadedExamRow;
+        return { cliente, modalidade, especialidade, categoria, prioridade, exame, data_exame, data_laudo, medico, paciente, quant, accessionNumber, codigoPaciente } as UploadedExamRow;
       }).filter(item => item.cliente);
 
       setUploaded(parsedRows);
