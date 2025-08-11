@@ -27,7 +27,7 @@ export default function Comparativo() {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
       const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome'];
-      const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd','qtdade','qte'];
+      const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd','qtdade','qte','laudos','total_laudos','qtd_laudos','qtde_laudos','laudos_exames','laudos_exame','qtd_laudos_exames','qtd_laudos_exame','total_laudos_exames','quantidade_laudos','quantidade_exames','qtd_exame','qtd_exames_total','num_laudos','num_exames'];
       const modalidadeKeys = ['modalidade'];
       const especialidadeKeys = ['especialidade'];
       const prioridadeKeys = ['prioridade'];

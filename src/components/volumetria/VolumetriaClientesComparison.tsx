@@ -61,42 +61,66 @@ export function VolumetriaClientesComparison({
   // Agregar dados do sistema (definitivos) a partir do contexto
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
     try {
-      const agg = new Map<string, ClienteAggregated>();
-      (context.detailedData || []).forEach((item: any) => {
-        const cliente = String(item.EMPRESA || '').trim();
+      // Priorizar estatísticas definitivas por cliente (100% do banco)
+      const stats = (context as any)?.clientesStats || [];
+      const map = new Map<string, ClienteAggregated>();
+
+      // 1) Criar base com totais por cliente vindos do RPC completo
+      (stats as any[]).forEach((s) => {
+        const cliente = String(s.empresa || s.cliente || '').trim();
         if (!cliente) return;
-        const val = Number(item.VALORES) || 0;
-        if (!agg.has(cliente)) {
-          agg.set(cliente, {
-            cliente,
-            total_exames: 0,
-            modalidades: {},
-            especialidades: {},
-            prioridades: {},
-            categorias: {},
-            exames: {},
-          });
-        }
-        const ref = agg.get(cliente)!;
-        ref.total_exames += val;
-        const mod = String(item.MODALIDADE || '').trim();
-        const esp = String(item.ESPECIALIDADE || '').trim();
-        const pri = String(item.PRIORIDADE || '').trim();
-        const cat = String(item.CATEGORIA || '').trim();
-        const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || '').trim();
-        if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
-        if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
-        if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
-        if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
-        if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + val;
+        map.set(cliente.toLowerCase(), {
+          cliente,
+          total_exames: Number(s.total_laudos) || 0,
+          modalidades: {},
+          especialidades: {},
+          prioridades: {},
+          categorias: {},
+          exames: {},
+        });
       });
-      return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+
+      // 2) Se houver dados detalhados, preencher apenas os detalhamentos
+      if (context.detailedData && context.detailedData.length > 0) {
+        (context.detailedData as any[]).forEach((item) => {
+          const cliente = String(item.EMPRESA || '').trim();
+          if (!cliente) return;
+          const key = cliente.toLowerCase();
+          if (!map.has(key)) {
+            // Cliente não veio nas stats por algum motivo; cria com total 0
+            map.set(key, {
+              cliente,
+              total_exames: 0,
+              modalidades: {},
+              especialidades: {},
+              prioridades: {},
+              categorias: {},
+              exames: {},
+            });
+          }
+          const ref = map.get(key)!;
+          // Para evitar zerar por falta de VALORES, contamos 1 por registro no detalhamento
+          const inc = 1;
+          const mod = String(item.MODALIDADE || '').trim();
+          const esp = String(item.ESPECIALIDADE || '').trim();
+          const pri = String(item.PRIORIDADE || '').trim();
+          const cat = String(item.CATEGORIA || '').trim();
+          const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || '').trim();
+          if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
+          if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
+          if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
+          if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + inc;
+          if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + inc;
+        });
+      }
+
+      return Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
     } catch (e) {
       console.error('Erro ao agregar dados do sistema para comparativo:', e);
       toast({ title: 'Erro', description: 'Falha ao preparar dados do sistema.', variant: 'destructive' });
       return [];
     }
-  }, [context.detailedData, toast]);
+  }, [context.clientesStats, context.detailedData, toast]);
 
   // Agregar dados do arquivo (se houver)
   const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
