@@ -295,6 +295,13 @@ serve(async (req) => {
 
     console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}`);
 
+    // Debug específico para paciente reportado
+    const DEBUG_PACIENTE = 'NATALIA NUNES DA SILVA MENEZES';
+    let dbgFoundInFile = 0;
+    let dbgPrepared = 0;
+    let dbgInserted = 0;
+    let dbgSkippedSemEmpresaOuNome = 0;
+
     // Processar em chunks
     for (let i = 0; i < jsonData.length; i += batchSize) {
       const batch = jsonData.slice(i, i + batchSize);
@@ -304,15 +311,33 @@ serve(async (req) => {
       console.log(`📋 Processando lote ${batchNumber}/${totalBatches} (${i + 1}-${Math.min(i + batchSize, jsonData.length)})`);
 
       const records: VolumetriaRecord[] = [];
-
       // Processar registros
       for (const row of batch) {
         try {
+          const nomeRaw = String(row['NOME_PACIENTE'] ?? '').toUpperCase().trim();
+          if (nomeRaw === DEBUG_PACIENTE) {
+            dbgFoundInFile++;
+          }
+
           const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
           if (record && record.EMPRESA && record.NOME_PACIENTE) {
             records.push(record);
+            if ((record.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE) {
+              dbgPrepared++;
+              console.log('🔎 DEBUG PACIENTE - preparado', {
+                EMPRESA: record.EMPRESA,
+                ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
+                DATA_LAUDO: record.DATA_LAUDO,
+                MODALIDADE: record.MODALIDADE,
+                PRIORIDADE: record.PRIORIDADE
+              });
+            }
           } else {
             totalErrors++;
+            if (nomeRaw === DEBUG_PACIENTE) {
+              dbgSkippedSemEmpresaOuNome++;
+              console.log('⚠️ DEBUG PACIENTE - descartado por falta de EMPRESA/NOME');
+            }
           }
         } catch (rowError) {
           console.error('❌ Erro ao processar linha:', rowError);
@@ -338,6 +363,11 @@ serve(async (req) => {
           totalErrors += records.length;
         } else {
           totalInserted += records.length;
+          const insertedThisBatch = records.filter(r => (r.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE).length;
+          if (insertedThisBatch > 0) {
+            dbgInserted += insertedThisBatch;
+            console.log(`🟢 DEBUG PACIENTE - inseridos neste lote: ${insertedThisBatch}`);
+          }
           console.log(`✅ Lote ${batchNumber}: ${records.length} registros inseridos`);
         }
       } catch (insertException) {
@@ -466,7 +496,16 @@ serve(async (req) => {
         registros_processados: jsonData.length,
         registros_inseridos: totalInserted,
         registros_erro: totalErrors,
-        detalhes_erro: totalInserted === 0 ? JSON.stringify({ erro: 'Nenhum registro foi inserido' }) : null
+        detalhes_erro: JSON.stringify({
+          status: totalInserted > 0 ? 'Concluído' : 'Erro',
+          debug_paciente: {
+            nome: DEBUG_PACIENTE,
+            encontrados_no_arquivo: dbgFoundInFile,
+            preparados_para_insercao: dbgPrepared,
+            inseridos: dbgInserted,
+            descartados_sem_empresa_ou_nome: dbgSkippedSemEmpresaOuNome
+          }
+        })
       })
       .eq('id', uploadLog.id);
 
