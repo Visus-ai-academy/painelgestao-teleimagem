@@ -252,6 +252,13 @@ export async function processVolumetriaFile(
 
     // DEBUG específico para paciente reportado
     const DEBUG_PACIENTE = 'NATALIA NUNES DA SILVA MENEZES';
+    const norm = (s: any) => (s == null ? '' : String(s))
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    const DEBUG_PACIENTE_NORM = norm(DEBUG_PACIENTE);
     let dbgFoundInFile = 0;
     let dbgPrepared = 0;
     let dbgInserted = 0;
@@ -270,14 +277,14 @@ export async function processVolumetriaFile(
 
           const empresa = row['EMPRESA'] || '';
           const nomePaciente = row['NOME_PACIENTE'] || '';
-          const nomeUpper = String(nomePaciente).toUpperCase().trim();
-          if (nomeUpper === DEBUG_PACIENTE) {
+          const nomeNorm = norm(nomePaciente);
+          if (nomeNorm === DEBUG_PACIENTE_NORM) {
             dbgFoundInFile++;
           }
 
           if (!empresa.trim() || !nomePaciente.trim()) {
             totalErrors++;
-            if (nomeUpper === DEBUG_PACIENTE) {
+            if (nomeNorm === DEBUG_PACIENTE_NORM) {
               dbgSkippedMissingFields++;
               console.log('⚠️ DEBUG PACIENTE - descartado por falta de EMPRESA/NOME');
             }
@@ -422,7 +429,7 @@ export async function processVolumetriaFile(
           // Para arquivos padrão, usar DATA_LAUDO ou DATA_REALIZACAO como fallback
           (record as any).data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
 
-          if (nomeUpper === DEBUG_PACIENTE) {
+          if (norm(record.NOME_PACIENTE) === DEBUG_PACIENTE_NORM) {
             dbgPrepared++;
             console.log('🔎 DEBUG PACIENTE - preparado', {
               EMPRESA: record.EMPRESA,
@@ -467,7 +474,7 @@ export async function processVolumetriaFile(
               }
             } else {
               totalInserted += subBatch.length;
-              const insertedThisBatch = subBatch.filter(r => (r.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE).length;
+              const insertedThisBatch = subBatch.filter(r => norm(r.NOME_PACIENTE) === DEBUG_PACIENTE_NORM).length;
               if (insertedThisBatch > 0) {
                 dbgInserted += insertedThisBatch;
                 console.log(`🟢 DEBUG PACIENTE - inseridos neste sub-lote: ${insertedThisBatch}`);
@@ -558,7 +565,14 @@ export async function processVolumetriaFile(
           total_processado: jsonData.length,
           total_inserido: totalInserted,
           total_erros: totalErrors,
-          regras_aplicadas: registrosAtualizados
+          regras_aplicadas: registrosAtualizados,
+          debug_paciente: {
+            nome: DEBUG_PACIENTE,
+            encontrados_no_arquivo: dbgFoundInFile,
+            preparados_para_insercao: dbgPrepared,
+            inseridos: dbgInserted,
+            descartados_por_campos_obrigatorios: dbgSkippedMissingFields
+          }
         })
       })
       .eq('id', uploadLog.id);
