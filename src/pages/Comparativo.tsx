@@ -55,56 +55,7 @@ export default function Comparativo() {
         return Number.isFinite(n) ? n : undefined;
       };
 
-      const parsed: UploadedRow[] = rows.map((r) => {
-        const keys = Object.keys(r);
-        const normalizeHeader = (s: string) =>
-          s?.toString().trim().toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
-        const normMap: Record<string,string> = Object.fromEntries(keys.map(k => [normalizeHeader(k), k]));
-        const findKey = (candidates: string[]) => candidates.find(n => normMap[n]);
-        const nameKey = findKey(nameKeys);
-        const totalKey = findKey(totalKeys);
-        const modalidadeKey = findKey(modalidadeKeys);
-        const especialidadeKey = findKey(especialidadeKeys);
-        const prioridadeKey = findKey(prioridadeKeys);
-        const categoriaKey = findKey(categoriaKeys);
-        const exameKey = findKey(exameKeys);
-        const dataExKey = findKey(dataExameKeys);
-        const dataLaudoKey = findKey(dataLaudoKeys);
-        const medicoKey = findKey(medicoKeys);
-        const clienteRaw = nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
-        const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
-        const num = parseCount(totalRaw);
-        const modVal = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : '';
-        const espVal = especialidadeKey ? String(r[normMap[especialidadeKey]] ?? '').trim() : '';
-        const priVal = prioridadeKey ? String(r[normMap[prioridadeKey]] ?? '').trim() : '';
-        const catVal = categoriaKey ? String(r[normMap[categoriaKey]] ?? '').trim() : '';
-        const exameVal = exameKey ? String(r[normMap[exameKey]] ?? '').trim() : '';
-        const dataExVal = dataExKey ? String(r[normMap[dataExKey]] ?? '').trim() : '';
-        const dataLaudoVal = dataLaudoKey ? String(r[normMap[dataLaudoKey]] ?? '').trim() : '';
-        const medicoVal = medicoKey ? String(r[normMap[medicoKey]] ?? '').trim() : '';
-        const hasDim = !!(modVal || espVal || priVal || catVal || exameVal);
-        const totalExames = num !== undefined ? num : (hasDim ? 1 : undefined);
-        return {
-          cliente: String(clienteRaw || '').trim(),
-          totalExames: typeof totalExames === 'number' && !Number.isNaN(totalExames) ? totalExames : undefined,
-          modalidade: modVal || undefined,
-          especialidade: espVal || undefined,
-          prioridade: priVal || undefined,
-          categoria: catVal || undefined,
-          exame: exameVal || undefined,
-          data_exame: dataExVal || undefined,
-          data_laudo: dataLaudoVal || undefined,
-          medico: medicoVal || undefined,
-          quant: num !== undefined ? num : (hasDim ? 1 : undefined),
-        } as any;
-      }).filter(item => item.cliente);
-
-      // Converter para tipos específicos de cada visão
-      const parsed: UploadedRow[] = (rows.map(() => ({})) as any); // placeholder para tipagem
-      // Recriar parsed usando o mapeamento acima, mantendo UploadedRow
+// removido: parsing intermediário substituído por parsedRows e parsedDetailed
       const parsedRows: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
         const normalizeHeader = (s: string) =>

@@ -99,13 +99,17 @@ export function VolumetriaClientesComparison({
             });
           }
           const ref = map.get(key)!;
+          const anyItem: any = item;
           // Usar valor numérico real do registro detalhado quando disponível
-          const inc = (Number((item as any).VALORES ?? (item as any).VALOR ?? (item as any).QUANTIDADE ?? (item as any).QTD ?? (item as any).QTDE ?? 1) || 1);
-          const mod = String(item.MODALIDADE || '').trim();
-          const esp = String(item.ESPECIALIDADE || '').trim();
-          const pri = String(item.PRIORIDADE || '').trim();
-          const cat = String(item.CATEGORIA || '').trim();
-          const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || '').trim();
+          const inc = (Number(anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1) || 1);
+          // Normalização de campos (maiúsculo/minúsculo) e sinônimos de modalidade
+          let mod = String(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade ?? '').trim();
+          if (mod.toUpperCase() === 'CT') mod = 'TC';
+          if (mod.toUpperCase() === 'MR') mod = 'RM';
+          const esp = String(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade ?? '').trim();
+          const pri = String(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade ?? '').trim();
+          const cat = String(anyItem.CATEGORIA ?? anyItem.categoria ?? anyItem.Categoria ?? '').trim();
+          const exame = String(anyItem.ESTUDO_DESCRICAO ?? anyItem.NOME_EXAME ?? anyItem.EXAME ?? anyItem.ESTUDO ?? anyItem.nome_exame ?? anyItem.Nome_Est ?? anyItem.nome_est ?? '').trim();
           if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
           if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
           if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
