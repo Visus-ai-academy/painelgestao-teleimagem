@@ -27,12 +27,12 @@ export default function Comparativo() {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
       const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome'];
-      const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd','qtdade','qte','laudos','total_laudos','qtd_laudos','qtde_laudos','laudos_exames','laudos_exame','qtd_laudos_exames','qtd_laudos_exame','total_laudos_exames','quantidade_laudos','quantidade_exames','qtd_exame','qtd_exames_total','num_laudos','num_exames'];
+      const totalKeys = ['total_exames','exames','qtd_exames','total','quant','quantidade','qtd','qtdade','qte','laudos','total_laudos','qtd_laudos','qtde_laudos','laudos_exames','laudos_exame','qtd_laudos_exames','qtd_laudos_exame','total_laudos_exames','quantidade_laudos','quantidade_exames','qtd_exame','qtd_exames_total','num_laudos','num_exames'];
       const modalidadeKeys = ['modalidade'];
       const especialidadeKeys = ['especialidade'];
       const prioridadeKeys = ['prioridade'];
       const categoriaKeys = ['categoria','cat','categoria_exame'];
-      const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame','procedimento','codigo_exame','cod_exame','descricao','nm_exame'];
+      const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame','procedimento','codigo_exame','cod_exame','descricao','nm_exame','nome_est'];
 
       const parseCount = (v: any): number | undefined => {
         if (v === null || v === undefined) return undefined;
@@ -51,22 +51,28 @@ export default function Comparativo() {
 
       const parsed: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
-        const lowerMap: Record<string,string> = Object.fromEntries(keys.map(k => [k.toString().trim().toLowerCase(), k]));
-        const nameKey = nameKeys.find(n => lowerMap[n]);
-        const totalKey = totalKeys.find(n => lowerMap[n]);
-        const modalidadeKey = modalidadeKeys.find(n => lowerMap[n]);
-        const especialidadeKey = especialidadeKeys.find(n => lowerMap[n]);
-        const prioridadeKey = prioridadeKeys.find(n => lowerMap[n]);
-        const categoriaKey = categoriaKeys.find(n => lowerMap[n]);
-        const exameKey = exameKeys.find(n => lowerMap[n]);
-        const clienteRaw = nameKey ? r[lowerMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
-        const totalRaw = totalKey ? r[lowerMap[totalKey]] : undefined;
+        const normalizeHeader = (s: string) =>
+          s?.toString().trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        const normMap: Record<string,string> = Object.fromEntries(keys.map(k => [normalizeHeader(k), k]));
+        const findKey = (candidates: string[]) => candidates.find(n => normMap[n]);
+        const nameKey = findKey(nameKeys);
+        const totalKey = findKey(totalKeys);
+        const modalidadeKey = findKey(modalidadeKeys);
+        const especialidadeKey = findKey(especialidadeKeys);
+        const prioridadeKey = findKey(prioridadeKeys);
+        const categoriaKey = findKey(categoriaKeys);
+        const exameKey = findKey(exameKeys);
+        const clienteRaw = nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
+        const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
         const num = parseCount(totalRaw);
-        const modVal = modalidadeKey ? String(r[lowerMap[modalidadeKey]] ?? '').trim() : '';
-        const espVal = especialidadeKey ? String(r[lowerMap[especialidadeKey]] ?? '').trim() : '';
-        const priVal = prioridadeKey ? String(r[lowerMap[prioridadeKey]] ?? '').trim() : '';
-        const catVal = categoriaKey ? String(r[lowerMap[categoriaKey]] ?? '').trim() : '';
-        const exameVal = exameKey ? String(r[lowerMap[exameKey]] ?? '').trim() : '';
+        const modVal = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : '';
+        const espVal = especialidadeKey ? String(r[normMap[especialidadeKey]] ?? '').trim() : '';
+        const priVal = prioridadeKey ? String(r[normMap[prioridadeKey]] ?? '').trim() : '';
+        const catVal = categoriaKey ? String(r[normMap[categoriaKey]] ?? '').trim() : '';
+        const exameVal = exameKey ? String(r[normMap[exameKey]] ?? '').trim() : '';
         const hasDim = !!(modVal || espVal || priVal || catVal || exameVal);
         const totalExames = num !== undefined ? num : (hasDim ? 1 : undefined);
         return {
