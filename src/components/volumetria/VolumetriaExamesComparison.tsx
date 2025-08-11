@@ -5,6 +5,7 @@ import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import * as XLSX from "xlsx";
 
 export type UploadedExamRow = {
@@ -86,6 +87,7 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   // Filtros
   const [clienteFilter, setClienteFilter] = useState<string>('todos');
   const [modalidadeFilter, setModalidadeFilter] = useState<string>('todos');
+  const [searchText, setSearchText] = useState<string>('');
   const stripAccents = (s: string) => s?.toString().normalize('NFD').replace(/\p{Diacritic}/gu, '') || '';
   const canonical = (s?: string) => {
     const raw = (s || '').toString().trim();
@@ -131,12 +133,19 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   const matchesFilters = useMemo(() => {
     const c = normalizeClientName(clienteFilter);
     const m = normModal(modalidadeFilter);
+    const q = stripAccents(searchText).toUpperCase().trim();
     return (r: UploadedExamRow) => {
       const okCliente = clienteFilter === 'todos' || normalizeClientName(r.cliente) === c;
       const okModalidade = modalidadeFilter === 'todos' || normModal(r.modalidade) === m;
-      return okCliente && okModalidade;
+      const okSearch = !q || [
+        (r as any).accessionNumber?.toString().toUpperCase(),
+        (r as any).codigoPaciente?.toString().toUpperCase(),
+        (r.paciente || '').toString().toUpperCase(),
+        (r.exame || '').toString().toUpperCase(),
+      ].some(v => v && v.includes(q));
+      return okCliente && okModalidade && okSearch;
     };
-  }, [clienteFilter, modalidadeFilter]);
+  }, [clienteFilter, modalidadeFilter, searchText]);
   const filteredRows = useMemo(() => allRows.filter(r => matchesFilters(r)), [allRows, matchesFilters]);
   // Paginação simples para performance
   const pageSize = 100;
@@ -269,7 +278,14 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setClienteFilter('todos'); setModalidadeFilter('todos'); setPage(1); }}>
+          <div className="w-72">
+            <Input
+              value={searchText}
+              onChange={(e) => { setSearchText(e.target.value); setPage(1); }}
+              placeholder="Accession / Cód. Paciente / Paciente / Exame"
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { setClienteFilter('todos'); setModalidadeFilter('todos'); setSearchText(''); setPage(1); }}>
             Limpar filtros
           </Button>
         </div>
