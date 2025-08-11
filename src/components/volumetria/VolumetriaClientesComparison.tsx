@@ -147,7 +147,8 @@ export function VolumetriaClientesComparison({
           const rawVal = (anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1);
           const incNum = Number(rawVal);
           const inc = Number.isFinite(incNum) ? incNum : 1;
-          ref.total_exames += inc;
+          // ATENÇÃO: não somar ao total_exames quando o total já vem das stats (evita duplicar);
+          // usar os detalhados apenas para compor os breakdowns abaixo.
           const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
           const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
           const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
