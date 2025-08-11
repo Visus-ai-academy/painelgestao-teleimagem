@@ -365,7 +365,7 @@ serve(async (req) => {
       console.log(`📅 Período para validação: ${periodoReferenciaExclusao}`);
       
       if (arquivo_fonte.includes('retroativo')) {
-        // Para arquivos retroativos: manter comportamento existente (exclusões por período)
+        // Para arquivos retroativos: aplicar exclusões completas por período
         console.log('🗑️ Aplicando exclusões por período (arquivos retroativos)...');
         try {
           const { data: exclusoesResult, error: exclusoesError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
@@ -383,9 +383,23 @@ serve(async (req) => {
           console.warn('⚠️ Exceção nas exclusões:', exclusoesException);
         }
       } else {
-        // Para arquivos não-retroativos (Arquivo 1 e 2): NÃO excluir nenhum registro por DATA_LAUDO
-        // Mantemos todos os registros para conferência/comparativo.
-        console.log('✅ Filtro de DATA_LAUDO desabilitado para arquivos não-retroativos (nenhum registro será excluído).');
+        // Para arquivos não-retroativos: aplicar apenas filtro de DATA_LAUDO
+        console.log('🗑️ Aplicando filtro de DATA_LAUDO (arquivos não-retroativos)...');
+        try {
+          const { data: filtroResult, error: filtroError } = await supabaseClient.functions.invoke('aplicar-filtro-data-laudo', {
+            body: { periodo_referencia: periodoReferenciaExclusao }
+          });
+          
+          if (filtroError) {
+            console.warn('⚠️ Erro no filtro de DATA_LAUDO:', filtroError);
+          } else if (filtroResult) {
+            console.log('✅ Filtro de DATA_LAUDO aplicado:', filtroResult);
+            const registrosExcluidos = filtroResult.total_excluidos || 0;
+            totalInserted = Math.max(0, totalInserted - registrosExcluidos);
+          }
+        } catch (filtroException) {
+          console.warn('⚠️ Exceção no filtro de DATA_LAUDO:', filtroException);
+        }
       }
     }
 
