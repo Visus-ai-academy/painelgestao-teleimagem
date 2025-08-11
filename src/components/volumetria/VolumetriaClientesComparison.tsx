@@ -99,8 +99,8 @@ export function VolumetriaClientesComparison({
             });
           }
           const ref = map.get(key)!;
-          // Para evitar zerar por falta de VALORES, contamos 1 por registro no detalhamento
-          const inc = 1;
+          // Usar valor numérico real do registro detalhado quando disponível
+          const inc = (Number((item as any).VALORES ?? (item as any).VALOR ?? (item as any).QUANTIDADE ?? (item as any).QTD ?? (item as any).QTDE ?? 1) || 1);
           const mod = String(item.MODALIDADE || '').trim();
           const esp = String(item.ESPECIALIDADE || '').trim();
           const pri = String(item.PRIORIDADE || '').trim();
@@ -467,14 +467,26 @@ export function VolumetriaClientesComparison({
                     ).sort();
                     return exameKeys.length > 0 ? (
                       <ul className="mt-1 space-y-1">
-                        {exameKeys.map((k) => (
-                          <li key={k} className="flex items-center justify-between text-sm">
-                            <span className="text-foreground">{k}</span>
-                            <span className="text-muted-foreground">
-                              Sist: {(c.exames[k] || 0).toLocaleString()} • Arq: {(up?.exames?.[k] || 0).toLocaleString()}
-                            </span>
-                          </li>
-                        ))}
+                        {exameKeys.map((k) => {
+                          const s = c.exames[k] || 0;
+                          const a = (up?.exames?.[k] || 0);
+                          const delta = a - s;
+                          return (
+                            <li key={k} className="flex items-center justify-between text-sm">
+                              <span className="text-foreground">{k}</span>
+                              <span className="text-muted-foreground flex items-center gap-2">
+                                <span>
+                                  Sist: {s.toLocaleString()} • Arq: {a.toLocaleString()}
+                                </span>
+                                {delta !== 0 && (
+                                  <Badge variant={delta > 0 ? 'destructive' : 'outline'}>
+                                    Δ {delta > 0 ? '+' : ''}{delta}
+                                  </Badge>
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <div className="text-sm text-muted-foreground">—</div>
