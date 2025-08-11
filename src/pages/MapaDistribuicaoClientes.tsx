@@ -101,6 +101,7 @@ export default function MapaDistribuicaoClientes() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>('todas');
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>('todas');
   const [filtroTipoCliente, setFiltroTipoCliente] = useState<string>('todos');
+  const [filtroTipoFaturamento, setFiltroTipoFaturamento] = useState<string>('todos');
   const [visualizacao, setVisualizacao] = useState<'regioes' | 'estados' | 'cidades'>('regioes');
 
   // Volumetria por cliente via RPC (dataset tratado e completo)
@@ -163,7 +164,7 @@ export default function MapaDistribuicaoClientes() {
     });
 
     // Verificar se há filtros de volumetria ativos
-    const temFiltrosVolumetria = filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas';
+    const temFiltrosVolumetria = filtroModalidade !== 'todas' || filtroEspecialidade !== 'todas' || filtroPrioridade !== 'todas' || filtroTipoFaturamento !== 'todos';
     const temFiltroTipoCliente = filtroTipoCliente !== 'todos';
     const temQualquerFiltro = temFiltrosVolumetria || temFiltroTipoCliente;
 
@@ -211,6 +212,8 @@ export default function MapaDistribuicaoClientes() {
             if (filtroModalidade !== 'todas' && item.MODALIDADE !== filtroModalidade) return false;
             if (filtroEspecialidade !== 'todas' && item.ESPECIALIDADE !== filtroEspecialidade) return false;
             if (filtroPrioridade !== 'todas' && item.PRIORIDADE !== filtroPrioridade) return false;
+            const tipoFat = (item as any).tipo_faturamento ?? (item as any).TIPO_FATURAMENTO;
+            if (filtroTipoFaturamento !== 'todos' && tipoFat !== filtroTipoFaturamento) return false;
             return true;
           });
           
@@ -306,7 +309,7 @@ export default function MapaDistribuicaoClientes() {
     console.log('🎯 Tem qualquer filtro ativo:', temQualquerFiltro);
     
     return clientesProcessados;
-  }, [clientesData, volumetriaClientesRpc, contextData.detailedData, contextData.dashboardStats.total_exames, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade]);
+  }, [clientesData, volumetriaClientesRpc, contextData.detailedData, contextData.dashboardStats.total_exames, filtroTipoCliente, filtroModalidade, filtroEspecialidade, filtroPrioridade, filtroTipoFaturamento]);
 
   // Usar dados corretos do contexto para totais gerais
   const totalGeralCorreto = {
@@ -319,9 +322,11 @@ export default function MapaDistribuicaoClientes() {
     filtroTipoCliente,
     filtroModalidade, 
     filtroEspecialidade,
-    filtroPrioridade
+    filtroPrioridade,
+    filtroTipoFaturamento
   }).some(([key, value]) => {
     if (key === 'filtroTipoCliente') return value !== 'todos';
+    if (key === 'filtroTipoFaturamento') return value !== 'todos';
     return value !== 'todas';
   });
 
@@ -397,6 +402,9 @@ export default function MapaDistribuicaoClientes() {
   const especialidadesUnicas = [...new Set(contextData.detailedData?.map(v => v.ESPECIALIDADE).filter(Boolean) || [])];
   const prioridadesUnicas = [...new Set(contextData.detailedData?.map(v => v.PRIORIDADE).filter(Boolean) || [])];
   const tiposClienteUnicos = [...new Set(clientesData?.map(c => c.tipo_cliente).filter(Boolean) || [])];
+  const tiposFaturamentoUnicos = [...new Set((contextData.detailedData || [])
+    .map((v: any) => v?.tipo_faturamento ?? v?.TIPO_FATURAMENTO)
+    .filter(Boolean))];
 
 
   // Usar dados filtrados apenas para exibição condicional, não para totais
@@ -447,7 +455,7 @@ export default function MapaDistribuicaoClientes() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Tipo Cliente</label>
               <Select value={filtroTipoCliente} onValueChange={setFiltroTipoCliente}>
@@ -459,6 +467,20 @@ export default function MapaDistribuicaoClientes() {
                   <SelectItem value="CO">CO - Consolidado</SelectItem>
                   <SelectItem value="NC">NC - Não Consolidado</SelectItem>
                   {tiposClienteUnicos.filter(tipo => tipo && !['CO', 'NC'].includes(tipo as string)).map(tipo => (
+                    <SelectItem key={String(tipo)} value={String(tipo)}>{String(tipo)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo Faturamento</label>
+              <Select value={filtroTipoFaturamento} onValueChange={setFiltroTipoFaturamento}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {tiposFaturamentoUnicos.map(tipo => (
                     <SelectItem key={String(tipo)} value={String(tipo)}>{String(tipo)}</SelectItem>
                   ))}
                 </SelectContent>
