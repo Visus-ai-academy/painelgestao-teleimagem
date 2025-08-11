@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Users, ArrowLeftRight, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
+import * as XLSX from "xlsx";
 
 export type Divergencia = {
   tipo: 'missing_in_system' | 'missing_in_file' | 'total_mismatch';
@@ -194,6 +195,48 @@ export function VolumetriaClientesComparison({
     return sistemaClientes;
   }, [filtro, divergencias, sistemaClientes]);
 
+  const handleExportList = () => {
+    try {
+      const rows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        rows.push({
+          section: 'Cliente',
+          cliente: c.cliente,
+          total_sistema: c.total_exames,
+          total_arquivo: up?.total_exames ?? 0,
+        });
+        const buildRows = (label: string, sys: Record<string, number>, upMap?: Record<string, number>) => {
+          const keys = Array.from(new Set([
+            ...Object.keys(sys || {}),
+            ...(upMap ? Object.keys(upMap) : []),
+          ])).sort();
+          keys.forEach((k) => {
+            rows.push({
+              section: label,
+              cliente: c.cliente,
+              item: k,
+              sist: (sys?.[k] || 0),
+              arq: (upMap?.[k] || 0),
+            });
+          });
+        };
+        buildRows('Modalidade', c.modalidades, up?.modalidades);
+        buildRows('Especialidade', c.especialidades, up?.especialidades);
+        buildRows('Categoria', c.categorias, up?.categorias);
+        buildRows('Prioridade', c.prioridades, up?.prioridades);
+        buildRows('Exame', c.exames, up?.exames);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'comparativo');
+      XLSX.writeFile(wb, `comparativo_clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
+    } catch (e) {
+      console.error('Erro ao exportar lista:', e);
+      toast({ title: 'Erro', description: 'Falha ao exportar a lista.', variant: 'destructive' });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -209,6 +252,11 @@ export function VolumetriaClientesComparison({
             </span>
           </div>
         )}
+        <div className="mt-3">
+          <Button variant="outline" size="sm" onClick={handleExportList}>
+            Exportar lista (Excel)
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex gap-2 mb-4">
@@ -268,6 +316,87 @@ export function VolumetriaClientesComparison({
                             <span className="text-foreground">{k}</span>
                             <span className="text-muted-foreground">
                               Sist: {(c.modalidades[k] || 0).toLocaleString()} • Arq: {(up?.modalidades?.[k] || 0).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    );
+                  })()}
+                </div>
+
+                {/* Especialidades */}
+                <div className="mt-3">
+                  <div className="font-medium text-foreground">Especialidades</div>
+                  {(() => {
+                    const keys = Array.from(
+                      new Set([
+                        ...Object.keys(c.especialidades || {}),
+                        ...(up?.especialidades ? Object.keys(up.especialidades) : []),
+                      ])
+                    ).sort();
+                    return keys.length > 0 ? (
+                      <ul className="mt-1 space-y-1">
+                        {keys.map((k) => (
+                          <li key={k} className="flex items-center justify-between text-sm">
+                            <span className="text-foreground">{k}</span>
+                            <span className="text-muted-foreground">
+                              Sist: {(c.especialidades[k] || 0).toLocaleString()} • Arq: {(up?.especialidades?.[k] || 0).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    );
+                  })()}
+                </div>
+
+                {/* Categorias */}
+                <div className="mt-3">
+                  <div className="font-medium text-foreground">Categorias</div>
+                  {(() => {
+                    const keys = Array.from(
+                      new Set([
+                        ...Object.keys(c.categorias || {}),
+                        ...(up?.categorias ? Object.keys(up.categorias) : []),
+                      ])
+                    ).sort();
+                    return keys.length > 0 ? (
+                      <ul className="mt-1 space-y-1">
+                        {keys.map((k) => (
+                          <li key={k} className="flex items-center justify-between text-sm">
+                            <span className="text-foreground">{k}</span>
+                            <span className="text-muted-foreground">
+                              Sist: {(c.categorias[k] || 0).toLocaleString()} • Arq: {(up?.categorias?.[k] || 0).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    );
+                  })()}
+                </div>
+
+                {/* Prioridades */}
+                <div className="mt-3">
+                  <div className="font-medium text-foreground">Prioridades</div>
+                  {(() => {
+                    const keys = Array.from(
+                      new Set([
+                        ...Object.keys(c.prioridades || {}),
+                        ...(up?.prioridades ? Object.keys(up.prioridades) : []),
+                      ])
+                    ).sort();
+                    return keys.length > 0 ? (
+                      <ul className="mt-1 space-y-1">
+                        {keys.map((k) => (
+                          <li key={k} className="flex items-center justify-between text-sm">
+                            <span className="text-foreground">{k}</span>
+                            <span className="text-muted-foreground">
+                              Sist: {(c.prioridades[k] || 0).toLocaleString()} • Arq: {(up?.prioridades?.[k] || 0).toLocaleString()}
                             </span>
                           </li>
                         ))}

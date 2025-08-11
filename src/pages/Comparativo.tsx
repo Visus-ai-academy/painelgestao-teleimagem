@@ -50,6 +50,7 @@ export default function Comparativo() {
           especialidade: especialidadeKey ? String(r[lowerMap[especialidadeKey]] ?? '').trim() : undefined,
           prioridade: prioridadeKey ? String(r[lowerMap[prioridadeKey]] ?? '').trim() : undefined,
           categoria: categoriaKey ? String(r[lowerMap[categoriaKey]] ?? '').trim() : undefined,
+          exame: exameKey ? String(r[lowerMap[exameKey]] ?? '').trim() : undefined,
         } as UploadedRow;
       }).filter(item => item.cliente);
 
