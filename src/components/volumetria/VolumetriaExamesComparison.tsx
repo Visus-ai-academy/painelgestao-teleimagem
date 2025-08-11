@@ -51,7 +51,13 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
     return s;
   };
-
+  const normPrior = (p?: string) => {
+    const u = canonical(p);
+    if (u === 'URGENCIA' || u === 'URGENTE') return 'URGENTE';
+    if (u.startsWith('PLANTAO')) return 'PLANTAO';
+    if (u === 'ROTINA') return 'ROTINA';
+    return u;
+  };
   type SystemExamRow = UploadedExamRow & { fonte: 'Sistema' };
   type FileExamRow = UploadedExamRow & { fonte: 'Arquivo' };
 
@@ -179,8 +185,7 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
       normalize(clienteFix),
       normalize(modalFix),
       normalize(r.especialidade || ''),
-      normalize(r.categoria || ''),
-      normalize(r.prioridade || ''),
+      normalize(normPrior(r.prioridade || '')),
       normalize(r.exame || '')
     ].join('|');
     return {
