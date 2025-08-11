@@ -16,6 +16,10 @@ export default function Comparativo() {
 
   const parseXlsx = useCallback(async (file: File) => {
     setIsUploading(true);
+    // Resetar estado para evitar qualquer percepção de sobreposição
+    setUploaded(null);
+    setDivergencias([]);
+    setLastFileName(null);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });

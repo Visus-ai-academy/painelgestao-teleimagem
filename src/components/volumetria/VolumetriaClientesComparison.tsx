@@ -289,7 +289,7 @@ export function VolumetriaClientesComparison({
             size="sm"
             onClick={() => setFiltro('todos')}
           >
-            Todos ({sistemaClientes.length})
+            Todos ({clientesExibidos.length})
           </Button>
           <Button
             variant={filtro === 'divergencias' ? 'default' : 'outline'}
