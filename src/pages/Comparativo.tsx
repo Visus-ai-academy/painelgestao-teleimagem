@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { VolumetriaClientesComparison, Divergencia } from "@/components/volumetria/VolumetriaClientesComparison";
+import { VolumetriaClientesComparison, Divergencia, UploadedRow } from "@/components/volumetria/VolumetriaClientesComparison";
 import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Comparativo() {
-  const [uploaded, setUploaded] = useState<{ cliente: string; totalExames?: number }[] | null>(null);
+  const [uploaded, setUploaded] = useState<UploadedRow[] | null>(null);
   const [divergencias, setDivergencias] = useState<Divergencia[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
@@ -24,19 +24,31 @@ export default function Comparativo() {
 
       const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome'];
       const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd'];
+      const modalidadeKeys = ['modalidade'];
+      const especialidadeKeys = ['especialidade'];
+      const prioridadeKeys = ['prioridade'];
+      const categoriaKeys = ['categoria','cat','categoria_exame'];
 
-      const parsed = rows.map((r) => {
+      const parsed: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
         const lowerMap: Record<string,string> = Object.fromEntries(keys.map(k => [k.toString().trim().toLowerCase(), k]));
         const nameKey = nameKeys.find(n => lowerMap[n]);
         const totalKey = totalKeys.find(n => lowerMap[n]);
+        const modalidadeKey = modalidadeKeys.find(n => lowerMap[n]);
+        const especialidadeKey = especialidadeKeys.find(n => lowerMap[n]);
+        const prioridadeKey = prioridadeKeys.find(n => lowerMap[n]);
+        const categoriaKey = categoriaKeys.find(n => lowerMap[n]);
         const clienteRaw = nameKey ? r[lowerMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
         const totalRaw = totalKey ? r[lowerMap[totalKey]] : undefined;
         const totalExames = totalRaw !== undefined && totalRaw !== null ? Number(totalRaw) : undefined;
         return {
           cliente: String(clienteRaw || '').trim(),
           totalExames: typeof totalExames === 'number' && !Number.isNaN(totalExames) ? totalExames : undefined,
-        };
+          modalidade: modalidadeKey ? String(r[lowerMap[modalidadeKey]] ?? '').trim() : undefined,
+          especialidade: especialidadeKey ? String(r[lowerMap[especialidadeKey]] ?? '').trim() : undefined,
+          prioridade: prioridadeKey ? String(r[lowerMap[prioridadeKey]] ?? '').trim() : undefined,
+          categoria: categoriaKey ? String(r[lowerMap[categoriaKey]] ?? '').trim() : undefined,
+        } as UploadedRow;
       }).filter(item => item.cliente);
 
       setUploaded(parsed);

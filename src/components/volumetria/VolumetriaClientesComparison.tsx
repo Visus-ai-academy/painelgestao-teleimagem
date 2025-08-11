@@ -2,19 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, ArrowLeftRight, Filter, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Users, ArrowLeftRight, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface ClienteComparison {
-  cliente: string;
-  arquivo_padrão: boolean;
-  arquivo_fora_padrão: boolean;
-  arquivo_padrão_retroativo: boolean;
-  arquivo_fora_padrão_retroativo: boolean;
-  total_registros: number;
-  total_exames: number;
-}
+import { useVolumetria } from "@/contexts/VolumetriaContext";
 
 export type Divergencia = {
   tipo: 'missing_in_system' | 'missing_in_file' | 'total_mismatch';
@@ -23,169 +13,158 @@ export type Divergencia = {
   totalArquivo?: number;
 };
 
+export type UploadedRow = {
+  cliente: string;
+  totalExames?: number;
+  modalidade?: string;
+  especialidade?: string;
+  prioridade?: string;
+  categoria?: string;
+};
+
+type Breakdown = Record<string, number>;
+
+type ClienteAggregated = {
+  cliente: string;
+  total_exames: number;
+  modalidades: Breakdown;
+  especialidades: Breakdown;
+  prioridades: Breakdown;
+  categorias: Breakdown;
+};
+
+function formatBreakdown(map: Breakdown, maxItems = 4) {
+  const entries = Object.entries(map)
+    .filter(([k]) => !!k)
+    .sort((a, b) => b[1] - a[1]);
+  const top = entries.slice(0, maxItems);
+  const rest = entries.slice(maxItems).reduce((s, [, v]) => s + v, 0);
+  const parts = top.map(([k, v]) => `${k}: ${v.toLocaleString()}`);
+  if (rest > 0) parts.push(`+${rest.toLocaleString()} outros`);
+  return parts.join(" • ");
+}
+
 export function VolumetriaClientesComparison({
   uploaded,
   onDivergencesComputed,
 }: {
-  uploaded?: { cliente: string; totalExames?: number }[];
+  uploaded?: UploadedRow[];
   onDivergencesComputed?: (divs: Divergencia[]) => void;
 }) {
-  const [clientes, setClientes] = useState<ClienteComparison[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filtro, setFiltro] = useState<'todos' | 'divergencias' | 'comuns'>('todos');
+  const { data: context } = useVolumetria();
   const { toast } = useToast();
+  const [filtro, setFiltro] = useState<'todos' | 'divergencias'>('todos');
 
-  useEffect(() => {
-    loadClientesComparison();
-  }, [uploaded]);
-
-  const loadClientesComparison = async () => {
-    setLoading(true);
+  // Agregar dados do sistema (definitivos) a partir do contexto
+  const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
     try {
-      // Paginar para evitar limites padrão da API
-      let offset = 0;
-      const limit = 50000;
-      let all: Array<{ EMPRESA: string; arquivo_fonte: string; VALORES: number }>= [];
-
-      while (true) {
-        const { data, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('EMPRESA, arquivo_fonte, VALORES')
-          .order('EMPRESA')
-          .range(offset, offset + limit - 1);
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        all = all.concat(data as any[]);
-        if (data.length < limit) break;
-        offset += limit;
-        await new Promise((r) => setTimeout(r, 5));
-      }
-
-      // Agrupar por cliente e arquivo (sem limitação)
-      const clienteMap = new Map<string, ClienteComparison>();
-
-      all.forEach((item: any) => {
-        const cliente = item.EMPRESA || 'Não Informado';
-        const exames = Number(item.VALORES) || 0;
-        const fonte = String(item.arquivo_fonte || '');
-
-        if (!clienteMap.has(cliente)) {
-          clienteMap.set(cliente, {
+      const agg = new Map<string, ClienteAggregated>();
+      (context.detailedData || []).forEach((item: any) => {
+        const cliente = String(item.EMPRESA || '').trim();
+        if (!cliente) return;
+        const val = Number(item.VALORES) || 0;
+        if (!agg.has(cliente)) {
+          agg.set(cliente, {
             cliente,
-            arquivo_padrão: false,
-            arquivo_fora_padrão: false,
-            arquivo_padrão_retroativo: false,
-            arquivo_fora_padrão_retroativo: false,
-            total_registros: 0,
             total_exames: 0,
+            modalidades: {},
+            especialidades: {},
+            prioridades: {},
+            categorias: {},
           });
         }
-
-        const c = clienteMap.get(cliente)!;
-        c.total_registros += 1;
-        c.total_exames += exames;
-
-        // Mapear diferentes nomes de fonte para categorias equivalentes
-        const isPadrao = fonte === 'volumetria_padrao' || fonte === 'data_laudo';
-        const isFora = fonte === 'volumetria_fora_padrao' || fonte === 'data_exame';
-        const isPadraoRetro = fonte === 'volumetria_padrao_retroativo' || fonte === 'data_laudo_retroativo';
-        const isForaRetro = fonte === 'volumetria_fora_padrao_retroativo' || fonte === 'data_exame_retroativo';
-
-        if (isPadrao) c.arquivo_padrão = true;
-        if (isFora) c.arquivo_fora_padrão = true;
-        if (isPadraoRetro) c.arquivo_padrão_retroativo = true;
-        if (isForaRetro) c.arquivo_fora_padrão_retroativo = true;
+        const ref = agg.get(cliente)!;
+        ref.total_exames += val;
+        const mod = String(item.MODALIDADE || '').trim();
+        const esp = String(item.ESPECIALIDADE || '').trim();
+        const pri = String(item.PRIORIDADE || '').trim();
+        const cat = String(item.CATEGORIA || '').trim();
+        if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
+        if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
+        if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
+        if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
       });
-
-      setClientes(Array.from(clienteMap.values()).sort((a, b) => a.cliente.localeCompare(b.cliente)));
-    } catch (error) {
-      console.error('Erro ao carregar comparação de clientes:', error);
-      toast({
-        title: 'Erro',
-        description: 'Falha ao carregar comparação de clientes',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+      return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+    } catch (e) {
+      console.error('Erro ao agregar dados do sistema para comparativo:', e);
+      toast({ title: 'Erro', description: 'Falha ao preparar dados do sistema.', variant: 'destructive' });
+      return [];
     }
-  };
+  }, [context.detailedData, toast]);
 
-  const clientesFiltrados = clientes.filter(cliente => {
-    if (filtro === 'todos') return true;
-    
-    const temPadrao = cliente.arquivo_padrão || cliente.arquivo_padrão_retroativo;
-    const temForaPadrao = cliente.arquivo_fora_padrão || cliente.arquivo_fora_padrão_retroativo;
-    
-    if (filtro === 'divergencias') {
-      return (temPadrao && !temForaPadrao) || (!temPadrao && temForaPadrao);
-    }
-    
-    if (filtro === 'comuns') {
-      return temPadrao && temForaPadrao;
-    }
-    
-    return true;
-  });
-
-  const stats = {
-    total: clientes.length,
-    apenas_padrão: clientes.filter(c => 
-      (c.arquivo_padrão || c.arquivo_padrão_retroativo) && 
-      !c.arquivo_fora_padrão && !c.arquivo_fora_padrão_retroativo
-    ).length,
-    apenas_fora_padrão: clientes.filter(c => 
-      (c.arquivo_fora_padrão || c.arquivo_fora_padrão_retroativo) && 
-      !c.arquivo_padrão && !c.arquivo_padrão_retroativo
-    ).length,
-    em_ambos: clientes.filter(c => 
-      (c.arquivo_padrão || c.arquivo_padrão_retroativo) && 
-      (c.arquivo_fora_padrão || c.arquivo_fora_padrão_retroativo)
-    ).length
-  };
+  // Agregar dados do arquivo (se houver)
+  const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
+    if (!uploaded || uploaded.length === 0) return null;
+    const agg = new Map<string, ClienteAggregated>();
+    uploaded.forEach((row) => {
+      const cliente = String(row.cliente || '').trim();
+      if (!cliente) return;
+      const val = Number(row.totalExames) || 0;
+      if (!agg.has(cliente)) {
+        agg.set(cliente, {
+          cliente,
+          total_exames: 0,
+          modalidades: {},
+          especialidades: {},
+          prioridades: {},
+          categorias: {},
+        });
+      }
+      const ref = agg.get(cliente)!;
+      ref.total_exames += val;
+      const mod = String(row.modalidade || '').trim();
+      const esp = String(row.especialidade || '').trim();
+      const pri = String(row.prioridade || '').trim();
+      const cat = String(row.categoria || '').trim();
+      if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
+      if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
+      if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
+      if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
+    });
+    return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+  }, [uploaded]);
 
   const normalize = (s: string) => (s || '').toString().trim().toLowerCase();
 
   const uploadedMap = useMemo(() => {
-    if (!uploaded || uploaded.length === 0) return null;
-    const map = new Map<string, { totalExames?: number; raw: string }>();
-    uploaded.forEach(u => {
-      if (!u?.cliente) return;
-      map.set(normalize(u.cliente), { totalExames: u.totalExames, raw: u.cliente });
-    });
+    if (!arquivoClientes) return null;
+    const map = new Map<string, ClienteAggregated>();
+    arquivoClientes.forEach(u => map.set(normalize(u.cliente), u));
     return map;
-  }, [uploaded]);
+  }, [arquivoClientes]);
 
   const sistemaMap = useMemo(() => {
-    const map = new Map<string, ClienteComparison>();
-    clientes.forEach(c => map.set(normalize(c.cliente), c));
+    const map = new Map<string, ClienteAggregated>();
+    sistemaClientes.forEach(c => map.set(normalize(c.cliente), c));
     return map;
-  }, [clientes]);
+  }, [sistemaClientes]);
 
   const divergencias = useMemo(() => {
     const list: Divergencia[] = [];
     if (!uploadedMap) return list;
 
     // faltando no arquivo e total mismatch
-    clientes.forEach(c => {
+    sistemaClientes.forEach(c => {
       const key = normalize(c.cliente);
       const u = uploadedMap.get(key);
       if (!u) {
         list.push({ tipo: 'missing_in_file', cliente: c.cliente });
-      } else if (typeof u.totalExames === 'number' && u.totalExames !== c.total_exames) {
-        list.push({ tipo: 'total_mismatch', cliente: c.cliente, totalSistema: c.total_exames, totalArquivo: u.totalExames });
+      } else if (typeof u.total_exames === 'number' && u.total_exames !== c.total_exames) {
+        list.push({ tipo: 'total_mismatch', cliente: c.cliente, totalSistema: c.total_exames, totalArquivo: u.total_exames });
       }
     });
 
     // faltando no sistema
-    uploadedMap.forEach((u, key) => {
-      if (!sistemaMap.has(key)) {
-        list.push({ tipo: 'missing_in_system', cliente: u.raw, totalArquivo: u.totalExames });
-      }
-    });
+    if (uploadedMap) {
+      uploadedMap.forEach((u, key) => {
+        if (!sistemaMap.has(key)) {
+          list.push({ tipo: 'missing_in_system', cliente: u.cliente, totalArquivo: u.total_exames });
+        }
+      });
+    }
 
     return list;
-  }, [uploadedMap, sistemaMap, clientes]);
+  }, [uploadedMap, sistemaMap, sistemaClientes]);
 
   useEffect(() => {
     onDivergencesComputed?.(divergencias);
@@ -199,51 +178,22 @@ export function VolumetriaClientesComparison({
     };
   }, [divergencias]);
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Comparação de Clientes por Arquivo
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Carregando comparação...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const clientesExibidos = useMemo(() => {
+    if (filtro === 'divergencias' && divergencias.length > 0) {
+      const setDiv = new Set(divergencias.map(d => normalize(d.cliente)));
+      return sistemaClientes.filter(c => setDiv.has(normalize(c.cliente)));
+    }
+    return sistemaClientes;
+  }, [filtro, divergencias, sistemaClientes]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Comparação de Clientes por Arquivo
+          Comparação Integral (Sistema x Arquivo)
         </CardTitle>
-        <div className="grid grid-cols-4 gap-4 mt-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Total Clientes</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.apenas_padrão}</div>
-            <div className="text-sm text-muted-foreground">Apenas Padrão</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{stats.apenas_fora_padrão}</div>
-            <div className="text-sm text-muted-foreground">Apenas Fora Padrão</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.em_ambos}</div>
-            <div className="text-sm text-muted-foreground">Em Ambos</div>
-          </div>
-        </div>
-        {uploaded && (
+        {uploadedMap && (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4" />
             <span>
@@ -259,7 +209,7 @@ export function VolumetriaClientesComparison({
             size="sm"
             onClick={() => setFiltro('todos')}
           >
-            Todos ({clientes.length})
+            Todos ({sistemaClientes.length})
           </Button>
           <Button
             variant={filtro === 'divergencias' ? 'default' : 'outline'}
@@ -267,58 +217,57 @@ export function VolumetriaClientesComparison({
             onClick={() => setFiltro('divergencias')}
           >
             <ArrowLeftRight className="h-4 w-4 mr-1" />
-            Divergências ({stats.apenas_padrão + stats.apenas_fora_padrão})
-          </Button>
-          <Button
-            variant={filtro === 'comuns' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFiltro('comuns')}
-          >
-            <Filter className="h-4 w-4 mr-1" />
-            Comuns ({stats.em_ambos})
+            Divergências ({divergencias.length})
           </Button>
         </div>
 
-        <div className="space-y-2 max-h-96 overflow-auto">
-          {clientesFiltrados.map((cliente, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex-1">
-                <div className="font-medium">{cliente.cliente}</div>
-                <div className="text-sm text-muted-foreground">
-                  {cliente.total_registros.toLocaleString()} registros | {cliente.total_exames.toLocaleString()} exames
+        <div className="space-y-2 max-h-[70vh] overflow-auto">
+          {clientesExibidos.map((c) => {
+            const up = uploadedMap?.get(normalize(c.cliente));
+            const mismatch = up && up.total_exames !== undefined && up.total_exames !== c.total_exames;
+            return (
+              <div key={c.cliente} className="p-3 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">
+                    {c.cliente}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge variant={mismatch ? 'destructive' : 'outline'}>
+                      Sistema: {c.total_exames.toLocaleString()}
+                    </Badge>
+                    {uploadedMap && (
+                      <Badge variant={mismatch ? 'destructive' : 'secondary'}>
+                        Arquivo: {up ? up.total_exames.toLocaleString() : '—'}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-2 text-sm text-muted-foreground">
+                  <div>
+                    <div className="font-medium text-foreground">Modalidades</div>
+                    <div>{formatBreakdown(c.modalidades) || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-foreground">Especialidades</div>
+                    <div>{formatBreakdown(c.especialidades) || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-foreground">Prioridades</div>
+                    <div>{formatBreakdown(c.prioridades) || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-foreground">Categorias</div>
+                    <div>{formatBreakdown(c.categorias) || '—'}</div>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Badge variant={cliente.arquivo_padrão ? "default" : "outline"} className="text-xs">
-                  Padrão
-                </Badge>
-                <Badge variant={cliente.arquivo_fora_padrão ? "default" : "outline"} className="text-xs">
-                  Fora Padrão
-                </Badge>
-                <Badge variant={cliente.arquivo_padrão_retroativo ? "secondary" : "outline"} className="text-xs">
-                  Retro Padrão
-                </Badge>
-                <Badge variant={cliente.arquivo_fora_padrão_retroativo ? "secondary" : "outline"} className="text-xs">
-                  Retro Fora
-                </Badge>
-                {uploadedMap && (
-                  (!uploadedMap.has(normalize(cliente.cliente))) ||
-                  ((uploadedMap.get(normalize(cliente.cliente))?.totalExames !== undefined) &&
-                   (uploadedMap.get(normalize(cliente.cliente))?.totalExames !== cliente.total_exames))
-                ) && (
-                  <Badge variant="outline" className="text-xs flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    Divergência
-                  </Badge>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {clientesFiltrados.length === 0 && (
+        {clientesExibidos.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            Nenhum cliente encontrado com os filtros aplicados.
+            Nenhum cliente encontrado.
           </div>
         )}
       </CardContent>
