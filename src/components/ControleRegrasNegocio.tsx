@@ -220,6 +220,18 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'negocio'
     },
     {
+      id: 'f007',
+      nome: 'Seleção de Faixa de Volumetria (Preço por Volume)',
+      modulo: 'faturamento',
+      categoria: 'calculo',
+      criterio: 'Seleciona a faixa de preço conforme volume total e arranjo Modalidade + Especialidade + Categoria (+ Prioridade opcional): filtra precos_servicos por esses campos; escolhe a faixa onde volume_inicial <= volume_total <= volume_final (limites nulos permitem faixa aberta); prioriza match exato de prioridade e, em empate, a maior volume_inicial; aplica valor_urgencia quando Prioridade = Urgência/Plantão ou quando considera_prioridade_plantao estiver ativa; caso contrário usa valor_base.',
+      status: 'ativa',
+      implementadaEm: '2025-08-11',
+      observacoes: 'Implementada na função SQL public.calcular_preco_exame (Postgres).',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
       id: 'f001',
       nome: 'Geração Automática de Faturas',
       modulo: 'faturamento',
