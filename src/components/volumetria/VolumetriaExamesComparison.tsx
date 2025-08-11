@@ -68,7 +68,9 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
       const medico = String(item.MEDICO || '').trim();
       const paciente = String(item.PACIENTE || item.NOME_PACIENTE || item.NOME_PAC || item.PACIENTE_NOME || '').trim();
       const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || item.nome_exame || item.Nome_Est || item.nome_est || '').trim();
-      const quant = Number(item.VALORES ?? item.VALOR ?? item.QUANTIDADE ?? item.QTD ?? item.QTDE ?? 1) || 1;
+      const qRaw = (item.VALORES ?? item.VALOR ?? item.QUANTIDADE ?? item.QTD ?? item.QTDE ?? 1);
+      const qNum = Number(qRaw);
+      const quant = Number.isFinite(qNum) ? qNum : 1;
       const accessionNumber = String(item.ACCESSION_NUMBER || item.Accession || item.ACCESSION || '').trim() || undefined;
       const codigoPaciente = (item.CODIGO_PACIENTE ?? item.CODIGO_INTERNO ?? undefined);
       return { fonte: 'Sistema', cliente, modalidade, especialidade, categoria, prioridade, data_exame, data_laudo, medico, paciente, quant, exame, accessionNumber, codigoPaciente } as SystemExamRow;

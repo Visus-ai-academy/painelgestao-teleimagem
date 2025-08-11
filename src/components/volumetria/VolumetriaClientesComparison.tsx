@@ -124,7 +124,9 @@ export function VolumetriaClientesComparison({
           const ref = map.get(key)!;
           const anyItem: any = item;
           // Usar valor numérico real do registro detalhado quando disponível
-          const inc = (Number(anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1) || 1);
+          const rawVal = (anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1);
+          const incNum = Number(rawVal);
+          const inc = Number.isFinite(incNum) ? incNum : 1;
           const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
           const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
           const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
