@@ -1,14 +1,16 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { VolumetriaClientesComparison, Divergencia, UploadedRow } from "@/components/volumetria/VolumetriaClientesComparison";
+import VolumetriaExamesComparison, { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
 import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function Comparativo() {
   const [uploaded, setUploaded] = useState<UploadedRow[] | null>(null);
+  const [uploadedExams, setUploadedExams] = useState<UploadedExamRow[] | null>(null);
   const [divergencias, setDivergencias] = useState<Divergencia[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
@@ -18,6 +20,7 @@ export default function Comparativo() {
     setIsUploading(true);
     // Resetar estado para evitar qualquer percepção de sobreposição
     setUploaded(null);
+    setUploadedExams(null);
     setDivergencias([]);
     setLastFileName(null);
     try {
@@ -33,6 +36,9 @@ export default function Comparativo() {
       const prioridadeKeys = ['prioridade'];
       const categoriaKeys = ['categoria','cat','categoria_exame'];
       const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame','procedimento','codigo_exame','cod_exame','descricao','nm_exame','nome_est'];
+      const dataExameKeys = ['data_exame','dt_exame'];
+      const dataLaudoKeys = ['data_laudo','dt_laudo','data_laudo_exame'];
+      const medicoKeys = ['medico','nome_medico','medico_nome'];
 
       const parseCount = (v: any): number | undefined => {
         if (v === null || v === undefined) return undefined;
@@ -50,6 +56,56 @@ export default function Comparativo() {
       };
 
       const parsed: UploadedRow[] = rows.map((r) => {
+        const keys = Object.keys(r);
+        const normalizeHeader = (s: string) =>
+          s?.toString().trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        const normMap: Record<string,string> = Object.fromEntries(keys.map(k => [normalizeHeader(k), k]));
+        const findKey = (candidates: string[]) => candidates.find(n => normMap[n]);
+        const nameKey = findKey(nameKeys);
+        const totalKey = findKey(totalKeys);
+        const modalidadeKey = findKey(modalidadeKeys);
+        const especialidadeKey = findKey(especialidadeKeys);
+        const prioridadeKey = findKey(prioridadeKeys);
+        const categoriaKey = findKey(categoriaKeys);
+        const exameKey = findKey(exameKeys);
+        const dataExKey = findKey(dataExameKeys);
+        const dataLaudoKey = findKey(dataLaudoKeys);
+        const medicoKey = findKey(medicoKeys);
+        const clienteRaw = nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
+        const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
+        const num = parseCount(totalRaw);
+        const modVal = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : '';
+        const espVal = especialidadeKey ? String(r[normMap[especialidadeKey]] ?? '').trim() : '';
+        const priVal = prioridadeKey ? String(r[normMap[prioridadeKey]] ?? '').trim() : '';
+        const catVal = categoriaKey ? String(r[normMap[categoriaKey]] ?? '').trim() : '';
+        const exameVal = exameKey ? String(r[normMap[exameKey]] ?? '').trim() : '';
+        const dataExVal = dataExKey ? String(r[normMap[dataExKey]] ?? '').trim() : '';
+        const dataLaudoVal = dataLaudoKey ? String(r[normMap[dataLaudoKey]] ?? '').trim() : '';
+        const medicoVal = medicoKey ? String(r[normMap[medicoKey]] ?? '').trim() : '';
+        const hasDim = !!(modVal || espVal || priVal || catVal || exameVal);
+        const totalExames = num !== undefined ? num : (hasDim ? 1 : undefined);
+        return {
+          cliente: String(clienteRaw || '').trim(),
+          totalExames: typeof totalExames === 'number' && !Number.isNaN(totalExames) ? totalExames : undefined,
+          modalidade: modVal || undefined,
+          especialidade: espVal || undefined,
+          prioridade: priVal || undefined,
+          categoria: catVal || undefined,
+          exame: exameVal || undefined,
+          data_exame: dataExVal || undefined,
+          data_laudo: dataLaudoVal || undefined,
+          medico: medicoVal || undefined,
+          quant: num !== undefined ? num : (hasDim ? 1 : undefined),
+        } as any;
+      }).filter(item => item.cliente);
+
+      // Converter para tipos específicos de cada visão
+      const parsed: UploadedRow[] = (rows.map(() => ({})) as any); // placeholder para tipagem
+      // Recriar parsed usando o mapeamento acima, mantendo UploadedRow
+      const parsedRows: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
         const normalizeHeader = (s: string) =>
           s?.toString().trim().toLowerCase()
@@ -86,9 +142,45 @@ export default function Comparativo() {
         } as UploadedRow;
       }).filter(item => item.cliente);
 
-      setUploaded(parsed);
+      const parsedDetailed: UploadedExamRow[] = rows.map((r) => {
+        const keys = Object.keys(r);
+        const normalizeHeader = (s: string) =>
+          s?.toString().trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        const normMap: Record<string,string> = Object.fromEntries(keys.map(k => [normalizeHeader(k), k]));
+        const findKey = (candidates: string[]) => candidates.find(n => normMap[n]);
+        const nameKey = findKey(nameKeys);
+        const totalKey = findKey(totalKeys);
+        const modalidadeKey = findKey(modalidadeKeys);
+        const especialidadeKey = findKey(especialidadeKeys);
+        const prioridadeKey = findKey(prioridadeKeys);
+        const categoriaKey = findKey(categoriaKeys);
+        const exameKey = findKey(exameKeys);
+        const dataExKey = findKey(dataExameKeys);
+        const dataLaudoKey = findKey(dataLaudoKeys);
+        const medicoKey = findKey(medicoKeys);
+        const cliente = String(nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]])).trim();
+        const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
+        const num = parseCount(totalRaw);
+        const modalidade = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : undefined;
+        const especialidade = especialidadeKey ? String(r[normMap[especialidadeKey]] ?? '').trim() : undefined;
+        const prioridade = prioridadeKey ? String(r[normMap[prioridadeKey]] ?? '').trim() : undefined;
+        const categoria = categoriaKey ? String(r[normMap[categoriaKey]] ?? '').trim() : undefined;
+        const exame = exameKey ? String(r[normMap[exameKey]] ?? '').trim() : undefined;
+        const data_exame = dataExKey ? String(r[normMap[dataExKey]] ?? '').trim() : undefined;
+        const data_laudo = dataLaudoKey ? String(r[normMap[dataLaudoKey]] ?? '').trim() : undefined;
+        const medico = medicoKey ? String(r[normMap[medicoKey]] ?? '').trim() : undefined;
+        const hasDim = !!(modalidade || especialidade || prioridade || categoria || exame);
+        const quant = num !== undefined ? num : (hasDim ? 1 : undefined);
+        return { cliente, modalidade, especialidade, categoria, prioridade, exame, data_exame, data_laudo, medico, quant } as UploadedExamRow;
+      }).filter(item => item.cliente);
+
+      setUploaded(parsedRows);
+      setUploadedExams(parsedDetailed);
       setLastFileName(file.name);
-      toast({ title: 'Arquivo carregado', description: `${parsed.length} linhas processadas para comparação.` });
+      toast({ title: 'Arquivo carregado', description: `${rows.length} linhas processadas para comparação.` });
     } catch (e) {
       console.error('Erro ao ler XLSX:', e);
       toast({ title: 'Falha ao ler arquivo', description: 'Verifique o formato do XLSX.', variant: 'destructive' });
@@ -99,6 +191,7 @@ export default function Comparativo() {
 
   const handleClear = useCallback(() => {
     setUploaded(null);
+    setUploadedExams(null);
     setDivergencias([]);
     setLastFileName(null);
   }, []);
@@ -156,18 +249,29 @@ export default function Comparativo() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Comparativo</CardTitle>
-          <CardDescription>Compare clientes por período, modalidade e outros filtros.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <VolumetriaClientesComparison
-            uploaded={uploaded || undefined}
-            onDivergencesComputed={setDivergencias}
-          />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="resumo" className="mt-2">
+        <TabsList>
+          <TabsTrigger value="resumo">Resumo</TabsTrigger>
+          <TabsTrigger value="exames">Por Exame</TabsTrigger>
+        </TabsList>
+        <TabsContent value="resumo">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comparativo</CardTitle>
+              <CardDescription>Compare clientes por período, modalidade e outros filtros.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VolumetriaClientesComparison
+                uploaded={uploaded || undefined}
+                onDivergencesComputed={setDivergencias}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="exames">
+          <VolumetriaExamesComparison uploadedExams={uploadedExams || undefined} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
