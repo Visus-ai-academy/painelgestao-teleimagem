@@ -263,6 +263,7 @@ export async function processVolumetriaFile(
     let dbgPrepared = 0;
     let dbgInserted = 0;
     let dbgSkippedMissingFields = 0;
+    let dbgExcludedByLaudoCutoff = 0;
 
     console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}...`);
 
@@ -298,12 +299,30 @@ export async function processVolumetriaFile(
             continue;
           }
 
-          // REGRA: Excluir laudos após 07/07/2025
+          // REGRA: Excluir laudos após 07/07/2025 (parser robusto para datas BR)
           const dataLaudo = row['DATA_LAUDO'];
           if (dataLaudo) {
-            const dataLaudoDate = typeof dataLaudo === 'string' ? new Date(dataLaudo) : dataLaudo;
+            const parseBR = (val: any): Date | null => {
+              if (val instanceof Date) return val;
+              if (val == null || val === '') return null;
+              const str = String(val).trim();
+              const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+              if (m) {
+                let [, d, mo, y] = m;
+                if (y.length === 2) y = String(2000 + parseInt(y));
+                const dt = new Date(parseInt(y), parseInt(mo) - 1, parseInt(d));
+                return isNaN(dt.getTime()) ? null : dt;
+              }
+              const dt = new Date(str);
+              return isNaN(dt.getTime()) ? null : dt;
+            };
+            const dataLaudoDate = parseBR(dataLaudo);
             const dataCorte = new Date('2025-07-07');
-            if (dataLaudoDate > dataCorte) {
+            if (dataLaudoDate && dataLaudoDate > dataCorte) {
+              if (nomeNorm === DEBUG_PACIENTE_NORM) {
+                dbgExcludedByLaudoCutoff++;
+                console.log(`⚠️ DEBUG PACIENTE - descartado por DATA_LAUDO > 07/07/2025: ${empresa} - ${String(dataLaudo)}`);
+              }
               console.log(`Laudo após 07/07/2025 excluído: ${empresa} - ${dataLaudo}`);
               totalErrors++; // Contar como processado mas não inserido
               continue;
@@ -571,7 +590,8 @@ export async function processVolumetriaFile(
             encontrados_no_arquivo: dbgFoundInFile,
             preparados_para_insercao: dbgPrepared,
             inseridos: dbgInserted,
-            descartados_por_campos_obrigatorios: dbgSkippedMissingFields
+            descartados_por_campos_obrigatorios: dbgSkippedMissingFields,
+            descartados_por_corte_data_laudo: dbgExcludedByLaudoCutoff
           }
         })
       })
