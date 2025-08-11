@@ -150,7 +150,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       // CARREGAR DADOS DETALHADOS EM LOTES PARA TRAZER 100% DOS REGISTROS
       const allDetails: any[] = [];
       let offset = 0;
-      const limit = 5000;
+      const limit = 1000; // Ajuste para respeitar o limite de retorno do PostgREST/Supabase
       while (true) {
         const { data: batch, error: batchError } = await supabase
           .from('volumetria_mobilemed')
