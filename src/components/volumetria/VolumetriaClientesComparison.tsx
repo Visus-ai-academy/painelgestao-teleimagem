@@ -58,6 +58,26 @@ const canonicalPrioridade = (p?: string) => {
   return up;
 };
 
+// Normaliza o nome do cliente para combinar com a limpeza do banco
+const normalizeClientName = (name?: string) => {
+  const raw = (name || '').toString().trim();
+  if (!raw) return '';
+  let s = stripAccents(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+  if (['INTERCOR2', 'INTERCOR_2', 'INTERCOR-2'].includes(s)) s = 'INTERCOR';
+  if (s === 'P-HADVENTISTA') s = 'HADVENTISTA';
+  if (s === 'P-UNIMED_CARUARU') s = 'UNIMED_CARUARU';
+  if (s === 'PRN - MEDIMAGEM CAMBORIU') s = 'MEDIMAGEM_CAMBORIU';
+  if (s === 'UNIMAGEM_CENTRO') s = 'UNIMAGEM_ATIBAIA';
+  if (s === 'VIVERCLIN 2') s = 'VIVERCLIN';
+  if (['CEDI-RJ','CEDI_RJ','CEDI-RO','CEDI_RO','CEDI-UNIMED','CEDI_UNIMED'].includes(s)) s = 'CEDIDIAG';
+  s = s.replace(/\s*-\s*TELE$/, '');
+  s = s.replace(/\s*-\s*CT$/, '');
+  s = s.replace(/\s*-\s*MR$/, '');
+  s = s.replace(/_PLANT(ÃO|AO)$/,'');
+  s = s.replace(/_RMX$/, '');
+  return s.trim();
+};
+
 function formatBreakdown(map: Breakdown, maxItems = 4) {
   const entries = Object.entries(map)
     .filter(([k]) => !!k)
@@ -91,7 +111,7 @@ export function VolumetriaClientesComparison({
       (stats as any[]).forEach((s) => {
         const cliente = String(s.empresa || s.cliente || '').trim();
         if (!cliente) return;
-        map.set(cliente.toLowerCase(), {
+        map.set(normalizeClientName(cliente).toLowerCase(), {
           cliente,
           total_exames: Number(s.total_laudos) || 0,
           modalidades: {},
@@ -108,7 +128,7 @@ export function VolumetriaClientesComparison({
           const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? (item as any).Empresa ?? (item as any).CLIENTE ?? (item as any).cliente ?? (item as any).Cliente ?? '';
           const cliente = String(clienteRaw).trim();
           if (!cliente) return;
-          const key = cliente.toLowerCase();
+          const key = normalizeClientName(cliente).toLowerCase();
           if (!map.has(key)) {
             // Cliente não veio nas stats por algum motivo; cria com total 0
             map.set(key, {
@@ -127,6 +147,7 @@ export function VolumetriaClientesComparison({
           const rawVal = (anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1);
           const incNum = Number(rawVal);
           const inc = Number.isFinite(incNum) ? incNum : 1;
+          ref.total_exames += inc;
           const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
           const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
           const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
@@ -183,7 +204,7 @@ export function VolumetriaClientesComparison({
     return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
   }, [uploaded]);
 
-  const normalize = (s: string) => (s || '').toString().trim().toLowerCase();
+  const normalize = (s: string) => normalizeClientName(s).toLowerCase();
 
   const uploadedMap = useMemo(() => {
     if (!arquivoClientes) return null;
