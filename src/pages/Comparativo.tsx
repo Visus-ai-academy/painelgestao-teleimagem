@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { VolumetriaClientesComparison, Divergencia, UploadedRow } from "@/components/volumetria/VolumetriaClientesComparison";
 import VolumetriaExamesComparison, { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
@@ -15,6 +15,43 @@ export default function Comparativo() {
   const [isUploading, setIsUploading] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Persistência simples para manter o comparativo ao sair/voltar da tela
+  const STORAGE_KEYS = {
+    uploaded: 'comparativo_uploaded',
+    uploadedExams: 'comparativo_uploadedExams',
+    lastFileName: 'comparativo_lastFileName',
+  } as const;
+
+  // Restaurar ao montar
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem(STORAGE_KEYS.uploaded);
+      const ue = localStorage.getItem(STORAGE_KEYS.uploadedExams);
+      const lf = localStorage.getItem(STORAGE_KEYS.lastFileName);
+      if (u) setUploaded(JSON.parse(u));
+      if (ue) setUploadedExams(JSON.parse(ue));
+      if (lf) setLastFileName(JSON.parse(lf));
+    } catch (e) {
+      console.warn('Falha ao restaurar comparativo do storage', e);
+    }
+  }, []);
+
+  // Salvar alterações
+  useEffect(() => {
+    try {
+      if (uploaded) localStorage.setItem(STORAGE_KEYS.uploaded, JSON.stringify(uploaded));
+      else localStorage.removeItem(STORAGE_KEYS.uploaded);
+
+      if (uploadedExams) localStorage.setItem(STORAGE_KEYS.uploadedExams, JSON.stringify(uploadedExams));
+      else localStorage.removeItem(STORAGE_KEYS.uploadedExams);
+
+      if (lastFileName) localStorage.setItem(STORAGE_KEYS.lastFileName, JSON.stringify(lastFileName));
+      else localStorage.removeItem(STORAGE_KEYS.lastFileName);
+    } catch (e) {
+      console.warn('Falha ao salvar comparativo no storage', e);
+    }
+  }, [uploaded, uploadedExams, lastFileName]);
 
   const parseXlsx = useCallback(async (file: File) => {
     setIsUploading(true);
@@ -154,6 +191,11 @@ export default function Comparativo() {
     setUploadedExams(null);
     setDivergencias([]);
     setLastFileName(null);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.uploaded);
+      localStorage.removeItem(STORAGE_KEYS.uploadedExams);
+      localStorage.removeItem(STORAGE_KEYS.lastFileName);
+    } catch {}
   }, []);
 
   const handleExport = useCallback(() => {
