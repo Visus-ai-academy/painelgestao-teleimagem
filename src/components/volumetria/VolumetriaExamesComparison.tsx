@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
 export type UploadedExamRow = {
@@ -51,11 +52,33 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     return [...sistemaRows, ...arquivoRows];
   }, [sistemaRows, arquivoRows]);
 
+  // Filtros
+  const [clienteFilter, setClienteFilter] = useState<string>('todos');
+  const [modalidadeFilter, setModalidadeFilter] = useState<string>('todos');
+  const normStr = (s?: string) => (s || '').toString().trim().toLowerCase();
+  const normModal = (m?: string) => {
+    const u = (m || '').toString().trim().toUpperCase();
+    if (u === 'CT') return 'TC';
+    if (u === 'MR') return 'RM';
+    return (m || '').toString().trim();
+  };
+  const clienteOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => r.cliente), ...arquivoRows.map(r => r.cliente)])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
+  const modalidadeOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => normModal(r.modalidade)), ...arquivoRows.map(r => normModal(r.modalidade))])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
+  const matchesFilters = useMemo(() => {
+    const c = normStr(clienteFilter);
+    const m = normModal(modalidadeFilter);
+    return (r: UploadedExamRow) => {
+      const okCliente = clienteFilter === 'todos' || normStr(r.cliente) === c;
+      const okModalidade = modalidadeFilter === 'todos' || normModal(r.modalidade) === m;
+      return okCliente && okModalidade;
+    };
+  }, [clienteFilter, modalidadeFilter]);
+  const filteredRows = useMemo(() => allRows.filter(r => matchesFilters(r)), [allRows, matchesFilters]);
   // Paginação simples para performance
   const pageSize = 100;
   const [page, setPage] = React.useState(1);
-  const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
-  const pageRows = useMemo(() => allRows.slice((page - 1) * pageSize, page * pageSize), [allRows, page]);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const pageRows = useMemo(() => filteredRows.slice((page - 1) * pageSize, page * pageSize), [filteredRows, page]);
 
   // Divergências agregadas por combinação de dimensões (ignora datas e médico para comparação mais justa)
   const normalize = (s?: string) => (s || '').toString().trim().toLowerCase();
@@ -109,8 +132,10 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     });
     return map;
   };
-  const sysAgg = useMemo(() => groupSum(sistemaRows), [sistemaRows]);
-  const fileAgg = useMemo(() => groupSum(arquivoRows), [arquivoRows]);
+  const sistemaFilteredAgg = useMemo(() => sistemaRows.filter(r => matchesFilters(r)), [sistemaRows, matchesFilters]);
+  const arquivoFilteredAgg = useMemo(() => arquivoRows.filter(r => matchesFilters(r)), [arquivoRows, matchesFilters]);
+  const sysAgg = useMemo(() => groupSum(sistemaFilteredAgg), [sistemaFilteredAgg]);
+  const fileAgg = useMemo(() => groupSum(arquivoFilteredAgg), [arquivoFilteredAgg]);
   const [onlyDiffs, setOnlyDiffs] = useState(false);
   const diffs = useMemo(() => {
     const keys = new Set<AggKey>([...Array.from(sysAgg.keys()), ...Array.from(fileAgg.keys())]);
@@ -152,9 +177,40 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="w-64">
+            <Select value={clienteFilter} onValueChange={(v) => { setClienteFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os clientes</SelectItem>
+                {clienteOptions.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-48">
+            <Select value={modalidadeFilter} onValueChange={(v) => { setModalidadeFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Modalidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as modalidades</SelectItem>
+                {modalidadeOptions.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { setClienteFilter('todos'); setModalidadeFilter('todos'); setPage(1); }}>
+            Limpar filtros
+          </Button>
+        </div>
         <div className="flex items-center justify-between mb-3 text-sm">
           <div className="text-muted-foreground">
-            Registros: {allRows.length.toLocaleString()} — Página {page} de {totalPages}
+            Registros: {filteredRows.length.toLocaleString()} — Página {page} de {totalPages}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Button>
