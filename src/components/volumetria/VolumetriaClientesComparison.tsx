@@ -105,7 +105,8 @@ export function VolumetriaClientesComparison({
       // 2) Se houver dados detalhados, preencher apenas os detalhamentos
       if (context.detailedData && context.detailedData.length > 0) {
         (context.detailedData as any[]).forEach((item) => {
-          const cliente = String(item.EMPRESA || '').trim();
+          const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? (item as any).Empresa ?? (item as any).CLIENTE ?? (item as any).cliente ?? (item as any).Cliente ?? '';
+          const cliente = String(clienteRaw).trim();
           if (!cliente) return;
           const key = cliente.toLowerCase();
           if (!map.has(key)) {
