@@ -122,15 +122,16 @@ export function VolumetriaClientesComparison({
         });
       });
 
-      // 2) Se houver dados detalhados, preencher apenas os detalhamentos
+      // 2) Se houver dados detalhados, preencher detalhamentos e criar fallback de totais
       if (context.detailedData && context.detailedData.length > 0) {
+        const detailsTotals = new Map<string, number>();
         (context.detailedData as any[]).forEach((item) => {
           const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? (item as any).Empresa ?? (item as any).CLIENTE ?? (item as any).cliente ?? (item as any).Cliente ?? '';
           const cliente = String(clienteRaw).trim();
           if (!cliente) return;
           const key = normalizeClientName(cliente).toLowerCase();
           if (!map.has(key)) {
-            // Cliente não veio nas stats por algum motivo; cria com total 0
+            // Cliente não veio nas stats por algum motivo; cria com total 0 (será atualizado pelo fallback)
             map.set(key, {
               cliente,
               total_exames: 0,
@@ -147,8 +148,8 @@ export function VolumetriaClientesComparison({
           const rawVal = (anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1);
           const incNum = Number(rawVal);
           const inc = Number.isFinite(incNum) ? incNum : 1;
-          // ATENÇÃO: não somar ao total_exames quando o total já vem das stats (evita duplicar);
-          // usar os detalhados apenas para compor os breakdowns abaixo.
+          // Acumular totais de fallback a partir do detalhado
+          detailsTotals.set(key, (detailsTotals.get(key) || 0) + inc);
           const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
           const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
           const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
@@ -160,8 +161,14 @@ export function VolumetriaClientesComparison({
           if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + inc;
           if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + inc;
         });
+        // Fallback: quando stats não trouxe o total do cliente, usar a soma dos detalhados
+        for (const [key, ref] of map.entries()) {
+          if (!ref.total_exames || ref.total_exames === 0) {
+            ref.total_exames = detailsTotals.get(key) || 0;
+          }
+        }
       }
-
+ 
       return Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
     } catch (e) {
       console.error('Erro ao agregar dados do sistema para comparativo:', e);
