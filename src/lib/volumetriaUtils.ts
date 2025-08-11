@@ -250,6 +250,13 @@ export async function processVolumetriaFile(
     let totalInserted = 0;
     let totalErrors = 0;
 
+    // DEBUG específico para paciente reportado
+    const DEBUG_PACIENTE = 'NATALIA NUNES DA SILVA MENEZES';
+    let dbgFoundInFile = 0;
+    let dbgPrepared = 0;
+    let dbgInserted = 0;
+    let dbgSkippedMissingFields = 0;
+
     console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}...`);
 
     for (let i = 0; i < jsonData.length; i += batchSize) {
@@ -263,9 +270,17 @@ export async function processVolumetriaFile(
 
           const empresa = row['EMPRESA'] || '';
           const nomePaciente = row['NOME_PACIENTE'] || '';
+          const nomeUpper = String(nomePaciente).toUpperCase().trim();
+          if (nomeUpper === DEBUG_PACIENTE) {
+            dbgFoundInFile++;
+          }
 
           if (!empresa.trim() || !nomePaciente.trim()) {
             totalErrors++;
+            if (nomeUpper === DEBUG_PACIENTE) {
+              dbgSkippedMissingFields++;
+              console.log('⚠️ DEBUG PACIENTE - descartado por falta de EMPRESA/NOME');
+            }
             continue;
           }
 
@@ -407,6 +422,17 @@ export async function processVolumetriaFile(
           // Para arquivos padrão, usar DATA_LAUDO ou DATA_REALIZACAO como fallback
           (record as any).data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
 
+          if (nomeUpper === DEBUG_PACIENTE) {
+            dbgPrepared++;
+            console.log('🔎 DEBUG PACIENTE - preparado', {
+              EMPRESA: record.EMPRESA,
+              ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
+              DATA_LAUDO: record.DATA_LAUDO,
+              MODALIDADE: record.MODALIDADE,
+              PRIORIDADE: record.PRIORIDADE
+            });
+          }
+
           records.push(record);
         } catch (error) {
           console.error('Erro ao processar linha:', error);
@@ -441,6 +467,11 @@ export async function processVolumetriaFile(
               }
             } else {
               totalInserted += subBatch.length;
+              const insertedThisBatch = subBatch.filter(r => (r.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE).length;
+              if (insertedThisBatch > 0) {
+                dbgInserted += insertedThisBatch;
+                console.log(`🟢 DEBUG PACIENTE - inseridos neste sub-lote: ${insertedThisBatch}`);
+              }
               console.log(`✅ Lote ${i}-${j}: ${subBatch.length} registros inseridos`);
               break;
             }
