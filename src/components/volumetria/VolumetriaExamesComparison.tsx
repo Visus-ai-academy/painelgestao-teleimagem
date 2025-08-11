@@ -97,13 +97,38 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     if (u === 'MR') return 'RM';
     return u;
   };
-  const clienteOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => r.cliente), ...arquivoRows.map(r => r.cliente)])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
+  const normalizeClientName = (name?: string) => {
+    const raw = (name || '').toString().trim();
+    if (!raw) return '';
+    let s = stripAccents(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+    // Mapeamentos específicos (espelham limpar_nome_cliente do banco)
+    if (['INTERCOR2', 'INTERCOR_2', 'INTERCOR-2'].includes(s)) s = 'INTERCOR';
+    if (s === 'P-HADVENTISTA') s = 'HADVENTISTA';
+    if (s === 'P-UNIMED_CARUARU') s = 'UNIMED_CARUARU';
+    if (s === 'PRN - MEDIMAGEM CAMBORIU') s = 'MEDIMAGEM_CAMBORIU';
+    if (s === 'UNIMAGEM_CENTRO') s = 'UNIMAGEM_ATIBAIA';
+    if (s === 'VIVERCLIN 2') s = 'VIVERCLIN';
+    if (['CEDI-RJ','CEDI_RJ','CEDI-RO','CEDI_RO','CEDI-UNIMED','CEDI_UNIMED'].includes(s)) s = 'CEDIDIAG';
+    // Remoção de sufixos comuns
+    s = s.replace(/\s*-\s*TELE$/, '');
+    s = s.replace(/\s*-\s*CT$/, '');
+    s = s.replace(/\s*-\s*MR$/, '');
+    s = s.replace(/_PLANT(ÃO|AO)$/,'');
+    s = s.replace(/_RMX$/, '');
+    return s.trim();
+  };
+  const clienteOptions = useMemo(() =>
+    Array.from(new Set([
+      ...sistemaRows.map(r => normalizeClientName(r.cliente)),
+      ...arquivoRows.map(r => normalizeClientName(r.cliente))
+    ])).filter(Boolean).sort()
+  , [sistemaRows, arquivoRows]);
   const modalidadeOptions = useMemo(() => Array.from(new Set([...sistemaRows.map(r => normModal(r.modalidade)), ...arquivoRows.map(r => normModal(r.modalidade))])).filter(Boolean).sort(), [sistemaRows, arquivoRows]);
   const matchesFilters = useMemo(() => {
-    const c = normStr(clienteFilter);
+    const c = normalizeClientName(clienteFilter);
     const m = normModal(modalidadeFilter);
     return (r: UploadedExamRow) => {
-      const okCliente = clienteFilter === 'todos' || normStr(r.cliente) === c;
+      const okCliente = clienteFilter === 'todos' || normalizeClientName(r.cliente) === c;
       const okModalidade = modalidadeFilter === 'todos' || normModal(r.modalidade) === m;
       return okCliente && okModalidade;
     };
@@ -134,8 +159,9 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   };
   const makeKey = (r: UploadedExamRow): { key: AggKey; dims: AggDims } => {
     const modalFix = normalizeModalidade(r.modalidade);
+    const clienteFix = normalizeClientName(r.cliente);
     const key = [
-      normalize(r.cliente),
+      normalize(clienteFix),
       normalize(modalFix),
       normalize(r.especialidade || ''),
       normalize(r.categoria || ''),
@@ -145,7 +171,7 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     return {
       key,
       dims: {
-          cliente: canonical(r.cliente),
+          cliente: canonical(clienteFix),
           modalidade: normalizeModalidade(r.modalidade),
           especialidade: canonical(r.especialidade),
           categoria: canonical(r.categoria),
