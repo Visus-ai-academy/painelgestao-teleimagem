@@ -23,12 +23,27 @@ export default function Comparativo() {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
       const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome'];
-      const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd'];
+      const totalKeys = ['total_exames','exames','qtd_exames','total','quantidade','qtd','qtdade','qte'];
       const modalidadeKeys = ['modalidade'];
       const especialidadeKeys = ['especialidade'];
       const prioridadeKeys = ['prioridade'];
       const categoriaKeys = ['categoria','cat','categoria_exame'];
-      const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame'];
+      const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame','procedimento','codigo_exame','cod_exame','descricao','nm_exame'];
+
+      const parseCount = (v: any): number | undefined => {
+        if (v === null || v === undefined) return undefined;
+        if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+        const s = String(v).trim();
+        if (!s) return undefined;
+        // remove qualquer texto, mantendo dígitos, vírgula e ponto
+        const cleaned = s.replace(/[^0-9.,-]/g, '');
+        // se tem vírgula como decimal, troque por ponto; remova separadores de milhar
+        const normalized = cleaned.includes(',') && cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')
+          ? cleaned.replace(/\./g, '').replace(',', '.')
+          : cleaned.replace(/,/g, '');
+        const n = Number(normalized);
+        return Number.isFinite(n) ? n : undefined;
+      };
 
       const parsed: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
@@ -42,15 +57,22 @@ export default function Comparativo() {
         const exameKey = exameKeys.find(n => lowerMap[n]);
         const clienteRaw = nameKey ? r[lowerMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
         const totalRaw = totalKey ? r[lowerMap[totalKey]] : undefined;
-        const totalExames = totalRaw !== undefined && totalRaw !== null ? Number(totalRaw) : undefined;
+        const num = parseCount(totalRaw);
+        const modVal = modalidadeKey ? String(r[lowerMap[modalidadeKey]] ?? '').trim() : '';
+        const espVal = especialidadeKey ? String(r[lowerMap[especialidadeKey]] ?? '').trim() : '';
+        const priVal = prioridadeKey ? String(r[lowerMap[prioridadeKey]] ?? '').trim() : '';
+        const catVal = categoriaKey ? String(r[lowerMap[categoriaKey]] ?? '').trim() : '';
+        const exameVal = exameKey ? String(r[lowerMap[exameKey]] ?? '').trim() : '';
+        const hasDim = !!(modVal || espVal || priVal || catVal || exameVal);
+        const totalExames = num !== undefined ? num : (hasDim ? 1 : undefined);
         return {
           cliente: String(clienteRaw || '').trim(),
           totalExames: typeof totalExames === 'number' && !Number.isNaN(totalExames) ? totalExames : undefined,
-          modalidade: modalidadeKey ? String(r[lowerMap[modalidadeKey]] ?? '').trim() : undefined,
-          especialidade: especialidadeKey ? String(r[lowerMap[especialidadeKey]] ?? '').trim() : undefined,
-          prioridade: prioridadeKey ? String(r[lowerMap[prioridadeKey]] ?? '').trim() : undefined,
-          categoria: categoriaKey ? String(r[lowerMap[categoriaKey]] ?? '').trim() : undefined,
-          exame: exameKey ? String(r[lowerMap[exameKey]] ?? '').trim() : undefined,
+          modalidade: modVal || undefined,
+          especialidade: espVal || undefined,
+          prioridade: priVal || undefined,
+          categoria: catVal || undefined,
+          exame: exameVal || undefined,
         } as UploadedRow;
       }).filter(item => item.cliente);
 

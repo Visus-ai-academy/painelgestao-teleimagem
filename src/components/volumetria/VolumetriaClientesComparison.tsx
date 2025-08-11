@@ -188,12 +188,36 @@ export function VolumetriaClientesComparison({
   }, [divergencias]);
 
   const clientesExibidos = useMemo(() => {
-    if (filtro === 'divergencias' && divergencias.length > 0) {
-      const setDiv = new Set(divergencias.map(d => normalize(d.cliente)));
-      return sistemaClientes.filter(c => setDiv.has(normalize(c.cliente)));
+    // Unir clientes do sistema e do arquivo (para exibir também os que existem só no upload)
+    const map = new Map<string, ClienteAggregated>();
+    sistemaClientes.forEach((c) => map.set(normalize(c.cliente), c));
+
+    if (arquivoClientes) {
+      arquivoClientes.forEach((u) => {
+        const key = normalize(u.cliente);
+        if (!map.has(key)) {
+          map.set(key, {
+            cliente: u.cliente,
+            total_exames: 0,
+            modalidades: {},
+            especialidades: {},
+            prioridades: {},
+            categorias: {},
+            exames: {},
+          });
+        }
+      });
     }
-    return sistemaClientes;
-  }, [filtro, divergencias, sistemaClientes]);
+
+    const union = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+
+    if (filtro === 'divergencias' && divergencias.length > 0) {
+      const setDiv = new Set(divergencias.map((d) => normalize(d.cliente)));
+      return union.filter((c) => setDiv.has(normalize(c.cliente)));
+    }
+
+    return union;
+  }, [filtro, divergencias, sistemaClientes, arquivoClientes]);
 
   const handleExportList = () => {
     try {
