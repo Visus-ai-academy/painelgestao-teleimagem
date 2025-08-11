@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import * as XLSX from "xlsx";
 
 export type UploadedExamRow = {
   cliente: string;
@@ -56,6 +57,92 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
   const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
   const pageRows = useMemo(() => allRows.slice((page - 1) * pageSize, page * pageSize), [allRows, page]);
 
+  // Divergências agregadas por combinação de dimensões (ignora datas e médico para comparação mais justa)
+  const normalize = (s?: string) => (s || '').toString().trim().toLowerCase();
+  const normalizeModalidade = (m?: string) => {
+    const u = (m || '').toString().trim().toUpperCase();
+    if (u === 'CT') return 'TC';
+    if (u === 'MR') return 'RM';
+    return (m || '').toString().trim();
+  };
+  type AggKey = string;
+  type AggDims = {
+    cliente: string;
+    modalidade?: string;
+    especialidade?: string;
+    categoria?: string;
+    prioridade?: string;
+    exame?: string;
+  };
+  const makeKey = (r: UploadedExamRow): { key: AggKey; dims: AggDims } => {
+    const modalFix = normalizeModalidade(r.modalidade);
+    const key = [
+      normalize(r.cliente),
+      normalize(modalFix),
+      normalize(r.especialidade || ''),
+      normalize(r.categoria || ''),
+      normalize(r.prioridade || ''),
+      normalize(r.exame || '')
+    ].join('|');
+    return {
+      key,
+      dims: {
+        cliente: r.cliente,
+        modalidade: modalFix,
+        especialidade: r.especialidade,
+        categoria: r.categoria,
+        prioridade: r.prioridade,
+        exame: r.exame,
+      }
+    };
+  };
+  const groupSum = (rows: UploadedExamRow[]) => {
+    const map = new Map<AggKey, { dims: AggDims; total: number }>();
+    rows.forEach((r) => {
+      const { key, dims } = makeKey(r);
+      const q = Number(r.quant || 0);
+      const cur = map.get(key) || { dims, total: 0 };
+      cur.total += q;
+      // Preserve first non-empty dims for display
+      if (!map.has(key)) map.set(key, cur);
+      else map.set(key, cur);
+    });
+    return map;
+  };
+  const sysAgg = useMemo(() => groupSum(sistemaRows), [sistemaRows]);
+  const fileAgg = useMemo(() => groupSum(arquivoRows), [arquivoRows]);
+  const [onlyDiffs, setOnlyDiffs] = useState(false);
+  const diffs = useMemo(() => {
+    const keys = new Set<AggKey>([...Array.from(sysAgg.keys()), ...Array.from(fileAgg.keys())]);
+    const arr = Array.from(keys).map((k) => {
+      const s = sysAgg.get(k);
+      const a = fileAgg.get(k);
+      const dims = s?.dims || a?.dims || { cliente: '' };
+      const sist = s?.total || 0;
+      const arq = a?.total || 0;
+      return { ...dims, sistema: sist, arquivo: arq, delta: arq - sist };
+    });
+    return arr.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+  }, [sysAgg, fileAgg]);
+  const diffsFiltered = useMemo(() => (onlyDiffs ? diffs.filter(d => d.delta !== 0) : diffs), [diffs, onlyDiffs]);
+
+  const handleExportDiffs = () => {
+    const rows = diffsFiltered.map((d) => ({
+      cliente: d.cliente,
+      modalidade: d.modalidade || '',
+      especialidade: d.especialidade || '',
+      categoria: d.categoria || '',
+      prioridade: d.prioridade || '',
+      exame: d.exame || '',
+      total_sistema: d.sistema,
+      total_arquivo: d.arquivo,
+      delta: d.delta,
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'divergencias_exame');
+    XLSX.writeFile(wb, `divergencias_por_exame_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
   return (
     <Card>
       <CardHeader>
@@ -118,6 +205,72 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Divergências agregadas por exame */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-foreground">
+              Divergências por exame: {diffsFiltered.length.toLocaleString()} itens
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={onlyDiffs ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOnlyDiffs((v) => !v)}
+              >
+                {onlyDiffs ? 'Mostrar todos' : 'Somente divergências'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportDiffs}>
+                Exportar divergências (Excel)
+              </Button>
+            </div>
+          </div>
+          <div className="max-h-[50vh] overflow-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Modalidade</TableHead>
+                  <TableHead>Especialidade</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Exame</TableHead>
+                  <TableHead className="text-right">Sist.</TableHead>
+                  <TableHead className="text-right">Arq.</TableHead>
+                  <TableHead className="text-right">Δ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {diffsFiltered.map((d, idx) => (
+                  <TableRow key={`diff-${idx}`}>
+                    <TableCell>{d.cliente}</TableCell>
+                    <TableCell>{d.modalidade || '—'}</TableCell>
+                    <TableCell>{d.especialidade || '—'}</TableCell>
+                    <TableCell>{d.categoria || '—'}</TableCell>
+                    <TableCell>{d.prioridade || '—'}</TableCell>
+                    <TableCell>{d.exame || '—'}</TableCell>
+                    <TableCell className="text-right">{d.sistema.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{d.arquivo.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      {d.delta !== 0 ? (
+                        <Badge variant={d.delta > 0 ? 'destructive' : 'outline'}>
+                          {d.delta > 0 ? '+' : ''}{d.delta}
+                        </Badge>
+                      ) : '0'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {diffsFiltered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      Nenhuma divergência encontrada.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
     </Card>
