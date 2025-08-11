@@ -154,37 +154,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       while (true) {
         const { data: batch, error: batchError } = await supabase
           .from('volumetria_mobilemed')
-          .select(`
-            EMPRESA,
-            MODALIDADE,
-            ESPECIALIDADE,
-            PRIORIDADE,
-            CATEGORIA,
-            ESTUDO_DESCRICAO,
-            NOME_EXAME,
-            EXAME,
-            ESTUDO,
-            nome_exame,
-            Nome_Est,
-            nome_est,
-            MEDICO,
-            PACIENTE,
-            NOME_PACIENTE,
-            NOME_PAC,
-            PACIENTE_NOME,
-            VALORES,
-            VALOR,
-            QUANTIDADE,
-            QTD,
-            QTDE,
-            DATA_REALIZACAO,
-            DATA_EXAME,
-            DATA_LAUDO,
-            HORA_LAUDO,
-            DATA_PRAZO,
-            HORA_PRAZO,
-            data_referencia
-          `)
+          .select('*')
           .range(offset, offset + limit - 1);
 
         if (batchError) {
