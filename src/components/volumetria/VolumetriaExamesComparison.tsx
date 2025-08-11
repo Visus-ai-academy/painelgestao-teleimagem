@@ -13,15 +13,41 @@ export type UploadedExamRow = {
   especialidade?: string;
   categoria?: string;
   prioridade?: string;
-  data_exame?: string;
-  data_laudo?: string;
+  data_exame?: any;
+  data_laudo?: any;
   medico?: string;
+  paciente?: string;
   quant?: number;
   exame?: string;
 };
 
 export default function VolumetriaExamesComparison({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: context } = useVolumetria();
+
+  const toDisplayDate = (val: any): string => {
+    if (val === null || val === undefined) return '—';
+    const tryNumber = Number(val);
+    if (!Number.isNaN(tryNumber) && String(val).trim() !== '') {
+      const epoch = Date.UTC(1899, 11, 30);
+      const d = new Date(epoch + Math.round(tryNumber) * 86400000);
+      return d.toISOString().slice(0, 10);
+    }
+    const s = String(val).trim();
+    if (!s) return '—';
+    // dd/mm/yyyy
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      const dd = m[1].padStart(2, '0');
+      const mm = m[2].padStart(2, '0');
+      const yyyy = m[3].length === 2 ? `20${m[3]}` : m[3];
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    // yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    return s;
+  };
 
   type SystemExamRow = UploadedExamRow & { fonte: 'Sistema' };
   type FileExamRow = UploadedExamRow & { fonte: 'Arquivo' };
@@ -34,12 +60,13 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
       const especialidade = String(item.ESPECIALIDADE || '').trim();
       const categoria = String(item.CATEGORIA || '').trim();
       const prioridade = String(item.PRIORIDADE || '').trim();
-      const data_exame = String(item.DATA_EXAME || item.DATA || '').trim();
-      const data_laudo = String(item.DATA_LAUDO || item.DATA_LAUDO_EXAME || '').trim();
+      const data_exame = item.DATA_REALIZACAO || item.DATA_EXAME || item.DATA || '';
+      const data_laudo = item.DATA_LAUDO || item.DATA_LAUDO_EXAME || '';
       const medico = String(item.MEDICO || '').trim();
-      const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || '').trim();
+      const paciente = String(item.PACIENTE || item.NOME_PACIENTE || item.NOME_PAC || item.PACIENTE_NOME || '').trim();
+      const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || item.nome_exame || item.Nome_Est || item.nome_est || '').trim();
       const quant = Number(item.VALORES ?? item.VALOR ?? item.QUANTIDADE ?? item.QTD ?? item.QTDE ?? 1) || 1;
-      return { fonte: 'Sistema', cliente, modalidade, especialidade, categoria, prioridade, data_exame, data_laudo, medico, quant, exame } as SystemExamRow;
+      return { fonte: 'Sistema', cliente, modalidade, especialidade, categoria, prioridade, data_exame, data_laudo, medico, paciente, quant, exame } as SystemExamRow;
     }).filter(r => r.cliente);
   }, [context]);
 
@@ -230,6 +257,7 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
                 <TableHead>Exame</TableHead>
                 <TableHead>Data Exame</TableHead>
                 <TableHead>Data Laudo</TableHead>
+                <TableHead>Paciente</TableHead>
                 <TableHead>Médico</TableHead>
                 <TableHead className="text-right">Quant.</TableHead>
               </TableRow>
@@ -246,15 +274,16 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
                   <TableCell>{r.categoria || '—'}</TableCell>
                   <TableCell>{r.prioridade || '—'}</TableCell>
                   <TableCell>{r.exame || '—'}</TableCell>
-                  <TableCell>{r.data_exame || '—'}</TableCell>
-                  <TableCell>{r.data_laudo || '—'}</TableCell>
+                  <TableCell>{toDisplayDate(r.data_exame)}</TableCell>
+                  <TableCell>{toDisplayDate(r.data_laudo)}</TableCell>
+                  <TableCell>{r.paciente || '—'}</TableCell>
                   <TableCell>{r.medico || '—'}</TableCell>
                   <TableCell className="text-right">{(r.quant ?? 0).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground">
                     Nenhum registro para exibir.
                   </TableCell>
                 </TableRow>
