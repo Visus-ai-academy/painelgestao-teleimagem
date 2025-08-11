@@ -20,6 +20,7 @@ export type UploadedRow = {
   especialidade?: string;
   prioridade?: string;
   categoria?: string;
+  exame?: string;
 };
 
 type Breakdown = Record<string, number>;
@@ -31,6 +32,7 @@ type ClienteAggregated = {
   especialidades: Breakdown;
   prioridades: Breakdown;
   categorias: Breakdown;
+  exames: Breakdown;
 };
 
 function formatBreakdown(map: Breakdown, maxItems = 4) {
@@ -71,6 +73,7 @@ export function VolumetriaClientesComparison({
             especialidades: {},
             prioridades: {},
             categorias: {},
+            exames: {},
           });
         }
         const ref = agg.get(cliente)!;
@@ -79,10 +82,12 @@ export function VolumetriaClientesComparison({
         const esp = String(item.ESPECIALIDADE || '').trim();
         const pri = String(item.PRIORIDADE || '').trim();
         const cat = String(item.CATEGORIA || '').trim();
+        const exame = String(item.ESTUDO_DESCRICAO || item.NOME_EXAME || item.EXAME || item.ESTUDO || '').trim();
         if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
         if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
         if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
         if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
+        if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + val;
       });
       return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
     } catch (e) {
@@ -108,6 +113,7 @@ export function VolumetriaClientesComparison({
           especialidades: {},
           prioridades: {},
           categorias: {},
+          exames: {},
         });
       }
       const ref = agg.get(cliente)!;
@@ -116,10 +122,12 @@ export function VolumetriaClientesComparison({
       const esp = String(row.especialidade || '').trim();
       const pri = String(row.prioridade || '').trim();
       const cat = String(row.categoria || '').trim();
+      const exame = String(row.exame || '').trim();
       if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
       if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
       if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
       if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
+      if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + val;
     });
     return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
   }, [uploaded]);
@@ -227,38 +235,74 @@ export function VolumetriaClientesComparison({
             const mismatch = up && up.total_exames !== undefined && up.total_exames !== c.total_exames;
             return (
               <div key={c.cliente} className="p-3 border rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">
-                    {c.cliente}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                  <div className="font-medium">{c.cliente}</div>
+                  <div className="text-sm">
+                    <Badge variant={mismatch ? 'destructive' : 'outline'}>Sistema: {c.total_exames.toLocaleString()}</Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Badge variant={mismatch ? 'destructive' : 'outline'}>
-                      Sistema: {c.total_exames.toLocaleString()}
-                    </Badge>
-                    {uploadedMap && (
+                  <div className="text-sm">
+                    {uploadedMap ? (
                       <Badge variant={mismatch ? 'destructive' : 'secondary'}>
-                        Arquivo: {up ? up.total_exames.toLocaleString() : '—'}
+                        Arquivo: {up ? up.total_exames?.toLocaleString() : '—'}
                       </Badge>
+                    ) : (
+                      <Badge variant="secondary">Arquivo: —</Badge>
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-2 text-sm text-muted-foreground">
-                  <div>
-                    <div className="font-medium text-foreground">Modalidades</div>
-                    <div>{formatBreakdown(c.modalidades) || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium text-foreground">Especialidades</div>
-                    <div>{formatBreakdown(c.especialidades) || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium text-foreground">Prioridades</div>
-                    <div>{formatBreakdown(c.prioridades) || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium text-foreground">Categorias</div>
-                    <div>{formatBreakdown(c.categorias) || '—'}</div>
-                  </div>
+
+                {/* Modalidades */}
+                <div className="mt-3">
+                  <div className="font-medium text-foreground">Modalidades</div>
+                  {(() => {
+                    const modKeys = Array.from(
+                      new Set([
+                        ...Object.keys(c.modalidades || {}),
+                        ...(up?.modalidades ? Object.keys(up.modalidades) : []),
+                      ])
+                    ).sort();
+                    return modKeys.length > 0 ? (
+                      <ul className="mt-1 space-y-1">
+                        {modKeys.map((k) => (
+                          <li key={k} className="flex items-center justify-between text-sm">
+                            <span className="text-foreground">{k}</span>
+                            <span className="text-muted-foreground">
+                              Sist: {(c.modalidades[k] || 0).toLocaleString()} • Arq: {(up?.modalidades?.[k] || 0).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    );
+                  })()}
+                </div>
+
+                {/* Exames */}
+                <div className="mt-3">
+                  <div className="font-medium text-foreground">Exames</div>
+                  {(() => {
+                    const exameKeys = Array.from(
+                      new Set([
+                        ...Object.keys(c.exames || {}),
+                        ...(up?.exames ? Object.keys(up.exames) : []),
+                      ])
+                    ).sort();
+                    return exameKeys.length > 0 ? (
+                      <ul className="mt-1 space-y-1">
+                        {exameKeys.map((k) => (
+                          <li key={k} className="flex items-center justify-between text-sm">
+                            <span className="text-foreground">{k}</span>
+                            <span className="text-muted-foreground">
+                              Sist: {(c.exames[k] || 0).toLocaleString()} • Arq: {(up?.exames?.[k] || 0).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    );
+                  })()}
                 </div>
               </div>
             );

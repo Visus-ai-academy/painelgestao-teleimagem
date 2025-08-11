@@ -28,6 +28,7 @@ export default function Comparativo() {
       const especialidadeKeys = ['especialidade'];
       const prioridadeKeys = ['prioridade'];
       const categoriaKeys = ['categoria','cat','categoria_exame'];
+      const exameKeys = ['exame','nome_exame','estudo','estudo_descricao','descricao_exame'];
 
       const parsed: UploadedRow[] = rows.map((r) => {
         const keys = Object.keys(r);
@@ -38,6 +39,7 @@ export default function Comparativo() {
         const especialidadeKey = especialidadeKeys.find(n => lowerMap[n]);
         const prioridadeKey = prioridadeKeys.find(n => lowerMap[n]);
         const categoriaKey = categoriaKeys.find(n => lowerMap[n]);
+        const exameKey = exameKeys.find(n => lowerMap[n]);
         const clienteRaw = nameKey ? r[lowerMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
         const totalRaw = totalKey ? r[lowerMap[totalKey]] : undefined;
         const totalExames = totalRaw !== undefined && totalRaw !== null ? Number(totalRaw) : undefined;
