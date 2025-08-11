@@ -104,8 +104,9 @@ export function VolumetriaClientesComparison({
           const inc = (Number(anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1) || 1);
           // Normalização de campos (maiúsculo/minúsculo) e sinônimos de modalidade
           let mod = String(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade ?? '').trim();
-          if (mod.toUpperCase() === 'CT') mod = 'TC';
-          if (mod.toUpperCase() === 'MR') mod = 'RM';
+          const modU = mod.toUpperCase();
+          if (modU === 'CT') mod = 'TC';
+          else if (modU === 'MR') mod = 'RM';
           const esp = String(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade ?? '').trim();
           const pri = String(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade ?? '').trim();
           const cat = String(anyItem.CATEGORIA ?? anyItem.categoria ?? anyItem.Categoria ?? '').trim();
@@ -147,7 +148,9 @@ export function VolumetriaClientesComparison({
       }
       const ref = agg.get(cliente)!;
       ref.total_exames += val;
-      const mod = String(row.modalidade || '').trim();
+      let mod = String(row.modalidade || '').trim();
+      if (mod.toUpperCase() === 'CT') mod = 'TC';
+      if (mod.toUpperCase() === 'MR') mod = 'RM';
       const esp = String(row.especialidade || '').trim();
       const pri = String(row.prioridade || '').trim();
       const cat = String(row.categoria || '').trim();

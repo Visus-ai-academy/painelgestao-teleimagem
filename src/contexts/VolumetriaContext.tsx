@@ -145,22 +145,61 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const cediStats = clientesStats?.find((c: any) => c.empresa === 'CEDI_RJ');
       console.log('🔍 [CONTEXTO DEBUG CEDI_RJ] Stats completas:', cediStats);
       
-      console.log('🚀 FASE 3: Carregando TODOS os dados detalhados via RPC original...');
+      console.log('🚀 FASE 3: Carregando TODOS os dados detalhados via leitura paginada da tabela...');
       
-      // CARREGAR DADOS DETALHADOS USANDO FUNÇÃO EXISTENTE
-      const { data: detailedData, error: detailedError } = await supabase.rpc('get_volumetria_complete_data');
-      
-      if (detailedError) {
-        throw new Error(`Erro nos dados detalhados: ${detailedError.message}`);
+      // CARREGAR DADOS DETALHADOS EM LOTES PARA TRAZER 100% DOS REGISTROS
+      const allDetails: any[] = [];
+      let offset = 0;
+      const limit = 5000;
+      while (true) {
+        const { data: batch, error: batchError } = await supabase
+          .from('volumetria_mobilemed')
+          .select(`
+            EMPRESA,
+            MODALIDADE,
+            ESPECIALIDADE,
+            PRIORIDADE,
+            CATEGORIA,
+            ESTUDO_DESCRICAO,
+            NOME_EXAME,
+            EXAME,
+            ESTUDO,
+            nome_exame,
+            Nome_Est,
+            nome_est,
+            MEDICO,
+            VALORES,
+            VALOR,
+            QUANTIDADE,
+            QTD,
+            QTDE,
+            DATA_LAUDO,
+            HORA_LAUDO,
+            DATA_PRAZO,
+            HORA_PRAZO,
+            data_referencia
+          `)
+          .range(offset, offset + limit - 1);
+
+        if (batchError) {
+          throw new Error(`Erro nos dados detalhados: ${batchError.message}`);
+        }
+        if (!batch || batch.length === 0) break;
+        allDetails.push(...batch);
+        console.log(`📦 Lote detalhado carregado: ${batch.length} (total: ${allDetails.length})`);
+        if (batch.length < limit) break;
+        offset += limit;
+        // Pequena pausa para não sobrecarregar
+        await new Promise((r) => setTimeout(r, 5));
       }
-      
-      console.log(`🎉🔥 DADOS CARREGADOS: ${detailedData?.length || 0} registros detalhados 🔥🎉`);
-      if (detailedData) {
-        const totalExamesCalc = detailedData.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
+
+      console.log(`🎉🔥 DADOS CARREGADOS: ${allDetails.length} registros detalhados 🔥🎉`);
+      if (allDetails.length > 0) {
+        const totalExamesCalc = allDetails.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
         console.log(`📊 Total exames somados: ${totalExamesCalc}`);
         
         // DEBUG ESPECÍFICO CEDI_RJ
-        const cediRegistros = detailedData.filter((item: any) => item.EMPRESA === 'CEDI_RJ');
+        const cediRegistros = allDetails.filter((item: any) => item.EMPRESA === 'CEDI_RJ');
         const cediLaudos = cediRegistros.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
         console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Detalhados: ${cediRegistros.length} reg, ${cediLaudos} laudos`);
         console.log(`🔍 [CONTEXTO DEBUG CEDI_RJ] Primeiros 3 registros:`, cediRegistros.slice(0, 3));
@@ -211,7 +250,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       setData({
         stats: fileStats,
         lastUploads: lastUploadsResult,
-        detailedData: detailedData || [],
+        detailedData: allDetails,
         clientesStats: clientesStats || [], // ADICIONAR STATS COMPLETAS DOS CLIENTES
         clientes: dashboardStats.clientes_unicos || [],
         modalidades: dashboardStats.modalidades_unicas || [],
