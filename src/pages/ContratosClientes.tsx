@@ -58,6 +58,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface ContratoCliente {
   id: string;
+  clienteId: string;
   cliente: string;
   dataInicio: string;
   dataFim: string;
@@ -181,6 +182,9 @@ const [editIntegraValor, setEditIntegraValor] = useState<number | "">(0);
 const [editFaixasVolumeText, setEditFaixasVolumeText] = useState<string>("[]");
 // Serviços contratados (JSON opcional)
 const [editServicosText, setEditServicosText] = useState<string>("");
+// Condições de preço (preços por faixa)
+const [precosCliente, setPrecosCliente] = useState<any[]>([]);
+const [loadingPrecos, setLoadingPrecos] = useState(false);
 
   // Estados para busca, filtro e ordenação
   const [searchTerm, setSearchTerm] = useState("");
@@ -256,6 +260,7 @@ const [editServicosText, setEditServicosText] = useState<string>("");
 
 return {
   id: contrato.id,
+  clienteId: cliente?.id || '',
   cliente: cliente?.nome || 'Cliente não encontrado',
   cnpj: cliente?.cnpj || '',
   dataInicio: contrato.data_inicio || '',
@@ -333,6 +338,32 @@ useEffect(() => {
     setEditServicosText(JSON.stringify(contratoEditando.servicos || [], null, 2));
   }
 }, [contratoEditando]);
+
+// Carregar condições de preço (preços por faixa) ao abrir visualização
+useEffect(() => {
+  const fetchPrecos = async () => {
+    if (!showVisualizarContrato || !contratoVisualizando?.clienteId) {
+      setPrecosCliente([]);
+      return;
+    }
+    try {
+      setLoadingPrecos(true);
+      const { data, error } = await supabase
+        .from('precos_servicos')
+        .select('modalidade, especialidade, categoria, prioridade, volume_inicial, volume_final, valor_base, valor_urgencia, considera_prioridade_plantao')
+        .eq('cliente_id', contratoVisualizando.clienteId)
+        .order('modalidade', { ascending: true });
+      if (error) throw error;
+      setPrecosCliente(data || []);
+    } catch (e) {
+      console.error('Erro ao carregar condições de preço:', e);
+      setPrecosCliente([]);
+    } finally {
+      setLoadingPrecos(false);
+    }
+  };
+  fetchPrecos();
+}, [showVisualizarContrato, contratoVisualizando?.clienteId]);
   // Função para sincronizar preços com contratos
   const sincronizarPrecos = async () => {
     if (!confirm('Deseja sincronizar os preços de serviços com os contratos? Esta ação atualizará os serviços contratados de todos os contratos.')) {
@@ -940,34 +971,81 @@ const salvarContrato = async () => {
             </div>
           </div>
 
-          <div className="border rounded-md max-h-[60vh] overflow-auto">
-            {contratoVisualizando?.servicos?.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Modalidade</TableHead>
-                    <TableHead>Especialidade</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Prioridade</TableHead>
-                    <TableHead className="text-right">Preço</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contratoVisualizando.servicos.map((s, i) => (
-                    <TableRow key={s.id || i}>
-                      <TableCell>{s.modalidade}</TableCell>
-                      <TableCell>{s.especialidade}</TableCell>
-                      <TableCell>{s.categoria}</TableCell>
-                      <TableCell>{s.prioridade}</TableCell>
-                      <TableCell className="text-right">R$ {Number(s.valor || 0).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="p-4 text-sm text-muted-foreground">Nenhum serviço configurado para este contrato.</div>
-            )}
-          </div>
+{/* Condições de Preço (preços por faixa carregados de precos_servicos) */}
+<div className="border rounded-md max-h-[50vh] overflow-auto mb-4">
+  <div className="p-3 border-b">
+    <p className="font-medium">Condições de Preço (Faixas por Serviço)</p>
+    <p className="text-xs text-muted-foreground">VOL INICIAL, VOL FINAL, COND. VOLUME, CONSIDERA PLANTÃO</p>
+  </div>
+  {loadingPrecos ? (
+    <div className="p-4 text-sm text-muted-foreground">Carregando condições...</div>
+  ) : precosCliente.length > 0 ? (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Modalidade</TableHead>
+          <TableHead>Especialidade</TableHead>
+          <TableHead>Categoria</TableHead>
+          <TableHead>Prioridade</TableHead>
+          <TableHead>Vol. Inicial</TableHead>
+          <TableHead>Vol. Final</TableHead>
+          <TableHead>Cond. Volume</TableHead>
+          <TableHead>Plantão</TableHead>
+          <TableHead className="text-right">Valor Base</TableHead>
+          <TableHead className="text-right">Valor Urgência</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {precosCliente.map((p, i) => (
+          <TableRow key={i}>
+            <TableCell>{p.modalidade}</TableCell>
+            <TableCell>{p.especialidade}</TableCell>
+            <TableCell>{p.categoria}</TableCell>
+            <TableCell>{p.prioridade || '-'}</TableCell>
+            <TableCell>{p.volume_inicial ?? '-'}</TableCell>
+            <TableCell>{p.volume_final ?? '-'}</TableCell>
+            <TableCell>{contratoVisualizando?.condVolume || '-'}</TableCell>
+            <TableCell>{p.considera_prioridade_plantao ? 'Sim' : 'Não'}</TableCell>
+            <TableCell className="text-right">R$ {Number(p.valor_base || 0).toFixed(2)}</TableCell>
+            <TableCell className="text-right">R$ {Number(p.valor_urgencia || 0).toFixed(2)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  ) : (
+    <div className="p-4 text-sm text-muted-foreground">Nenhuma condição de preço cadastrada para este cliente.</div>
+  )}
+</div>
+
+{/* Serviços contratados (resumo) */}
+<div className="border rounded-md max-h-[60vh] overflow-auto">
+  {contratoVisualizando?.servicos?.length ? (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Modalidade</TableHead>
+          <TableHead>Especialidade</TableHead>
+          <TableHead>Categoria</TableHead>
+          <TableHead>Prioridade</TableHead>
+          <TableHead className="text-right">Preço</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {contratoVisualizando.servicos.map((s, i) => (
+          <TableRow key={s.id || i}>
+            <TableCell>{s.modalidade}</TableCell>
+            <TableCell>{s.especialidade}</TableCell>
+            <TableCell>{s.categoria}</TableCell>
+            <TableCell>{s.prioridade}</TableCell>
+            <TableCell className="text-right">R$ {Number(s.valor || 0).toFixed(2)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  ) : (
+    <div className="p-4 text-sm text-muted-foreground">Nenhum serviço configurado para este contrato.</div>
+  )}
+</div>
         </DialogContent>
       </Dialog>
 
