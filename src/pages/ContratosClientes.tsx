@@ -993,6 +993,7 @@ const salvarContrato = async () => {
           <TableHead>Plantão</TableHead>
           <TableHead className="text-right">Valor Base</TableHead>
           <TableHead className="text-right">Valor Urgência</TableHead>
+          <TableHead className="text-right">Preço (Contrato)</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -1008,6 +1009,15 @@ const salvarContrato = async () => {
             <TableCell>{p.considera_prioridade_plantao ? 'Sim' : 'Não'}</TableCell>
             <TableCell className="text-right">R$ {Number(p.valor_base || 0).toFixed(2)}</TableCell>
             <TableCell className="text-right">R$ {Number(p.valor_urgencia || 0).toFixed(2)}</TableCell>
+            <TableCell className="text-right">{(() => {
+              const s = contratoVisualizando?.servicos?.find((s) =>
+                s.modalidade === p.modalidade &&
+                s.especialidade === p.especialidade &&
+                s.categoria === p.categoria &&
+                (!p.prioridade || s.prioridade === p.prioridade)
+              );
+              return s ? `R$ ${Number(s.valor || 0).toFixed(2)}` : '—';
+            })()}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -1017,35 +1027,6 @@ const salvarContrato = async () => {
   )}
 </div>
 
-{/* Serviços contratados (resumo) */}
-<div className="border rounded-md max-h-[60vh] overflow-auto">
-  {contratoVisualizando?.servicos?.length ? (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Modalidade</TableHead>
-          <TableHead>Especialidade</TableHead>
-          <TableHead>Categoria</TableHead>
-          <TableHead>Prioridade</TableHead>
-          <TableHead className="text-right">Preço</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {contratoVisualizando.servicos.map((s, i) => (
-          <TableRow key={s.id || i}>
-            <TableCell>{s.modalidade}</TableCell>
-            <TableCell>{s.especialidade}</TableCell>
-            <TableCell>{s.categoria}</TableCell>
-            <TableCell>{s.prioridade}</TableCell>
-            <TableCell className="text-right">R$ {Number(s.valor || 0).toFixed(2)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  ) : (
-    <div className="p-4 text-sm text-muted-foreground">Nenhum serviço configurado para este contrato.</div>
-  )}
-</div>
         </DialogContent>
       </Dialog>
 
