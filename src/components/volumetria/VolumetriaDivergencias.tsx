@@ -132,6 +132,35 @@ function formatDateBR(val?: string) {
   return s;
 }
 
+function toYMD(val?: any) {
+  if (val === null || val === undefined) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  // ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  // dd/mm/yyyy or dd-mm-yyyy
+  const br = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (br) return `${br[3].length===2?`20${br[3]}`:br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
+  // Excel serial number (approx range)
+  const num = Number(s);
+  if (!isNaN(num) && num > 25000 && num < 60000) {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    const d = new Date(base.getTime() + Math.round(num) * 86400000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2,'0');
+    const day = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  return '';
+}
+
 export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: ctx } = useVolumetria();
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
@@ -195,7 +224,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
           canonical(cleanExamName(r.ESTUDO_DESCRICAO)),
-          canonical(r.NOME_PACIENTE)
+          canonical(r.NOME_PACIENTE),
+          toYMD(r.DATA_REALIZACAO || r.DATA_LAUDO)
         ].join('|');
         const cur = mapSistema.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
@@ -226,7 +256,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
           canonical(cleanExamName(r.exame)),
-          canonical((r as any).paciente)
+          canonical((r as any).paciente),
+          toYMD((r as any).data_exame || (r as any).data_laudo)
         ].join('|');
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.quant || 0);
