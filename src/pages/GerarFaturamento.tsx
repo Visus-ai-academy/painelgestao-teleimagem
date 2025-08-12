@@ -505,17 +505,15 @@ export default function GerarFaturamento() {
         progresso: 60
       });
 
-      // Buscar dados processados da tabela faturamento
-      const inicioMes = `${periodoSelecionado}-01`;
-      const proximoMes = new Date(`${periodoSelecionado}-01`);
-      proximoMes.setMonth(proximoMes.getMonth() + 1);
-      const fimMes = proximoMes.toISOString().split('T')[0];
+      // Buscar dados processados da tabela faturamento pelo período de referência
+      const mesesAbrev = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      const [anoSel, mesSel] = periodoSelecionado.split('-');
+      const periodoRef = `${mesesAbrev[Math.max(0, Math.min(11, Number(mesSel)-1))]}/${anoSel.slice(2)}`;
       
       const { data: faturamentoData, error: faturamentoError } = await supabase
         .from('faturamento')
         .select('*')
-        .gte('data_emissao', inicioMes)
-        .lt('data_emissao', fimMes);
+        .eq('periodo_referencia', periodoRef);
 
       console.log('🔍 DEBUG: Dados brutos da tabela faturamento:', faturamentoData?.slice(0, 3));
       console.log('🔍 DEBUG: Total de registros:', faturamentoData?.length);
