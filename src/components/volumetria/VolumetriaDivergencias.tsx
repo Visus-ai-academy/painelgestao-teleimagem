@@ -48,7 +48,7 @@ interface SistemaRow {
   medico_id?: string;
 }
 
-type DivergenciaTipo = 'arquivo_nao_no_sistema' | 'sistema_nao_no_arquivo' | 'quantidade_diferente';
+type DivergenciaTipo = 'arquivo_nao_no_sistema' | 'sistema_nao_no_arquivo' | 'quantidade_diferente' | 'categoria_diferente';
 
 interface LinhaDivergencia {
   tipo: DivergenciaTipo;
@@ -79,6 +79,8 @@ interface LinhaDivergencia {
   // extras
   total_arquivo?: number;
   total_sistema?: number;
+  categoria_arquivo?: string;
+  categoria_sistema?: string;
 }
 
 function canonical(val?: string) {
@@ -158,7 +160,7 @@ export default function VolumetriaDivergencias() {
       if (volErr) throw volErr;
 
       // 2) Ler exames do sistema do mesmo período
-      let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, quantidade, data_exame, medico_id');
+      let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, nome_exame, quantidade, data_exame, medico_id');
       exQuery = exQuery.gte('data_exame', start).lte('data_exame', end);
       if (cliente !== 'todos') {
         // Filtrar por cliente nome => mapear ids candidatos
@@ -177,7 +179,7 @@ export default function VolumetriaDivergencias() {
           normalizeCliente(r.EMPRESA),
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
-          canonical((r as any).CATEGORIA)
+          canonical(r.ESTUDO_DESCRICAO)
         ].join('|');
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
@@ -193,7 +195,7 @@ export default function VolumetriaDivergencias() {
           normalizeCliente(clienteNome),
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
-          canonical(r.categoria)
+          canonical(r.nome_exame)
         ].join('|');
         const cur = mapSistema.get(key) || { total: 0, amostra: { ...r, cliente: clienteNome } };
         cur.total += Number(r.quantidade || 0);
@@ -271,14 +273,26 @@ export default function VolumetriaDivergencias() {
       allKeys.forEach((k) => {
         const a = mapArquivo.get(k);
         const s = mapSistema.get(k);
-        if (a && !s) divergencias.push(toLinhaFromArquivo(k, a));
-        else if (!a && s) divergencias.push(toLinhaFromSistema(k, s));
-        else if (a && s && a.total !== s.total) {
-          // Quantidade diferente — priorizar dados do arquivo e anexar totais
-          const base = toLinhaFromArquivo(k, a);
-          base.tipo = 'quantidade_diferente';
-          base.total_sistema = s.total;
-          divergencias.push(base);
+        if (a && !s) {
+          divergencias.push(toLinhaFromArquivo(k, a));
+        } else if (!a && s) {
+          divergencias.push(toLinhaFromSistema(k, s));
+        } else if (a && s) {
+          const catA = canonical(((a.amostra as any) || {}).CATEGORIA || '');
+          const catS = canonical(((s.amostra as any) || {}).categoria || '');
+          if (catA && catS && catA !== catS) {
+            const base = toLinhaFromArquivo(k, a);
+            base.tipo = 'categoria_diferente';
+            base.total_sistema = s.total;
+            base.categoria_arquivo = (a.amostra as any).CATEGORIA || '';
+            base.categoria_sistema = (s.amostra as any).categoria || '';
+            divergencias.push(base);
+          } else if (a.total !== s.total) {
+            const base = toLinhaFromArquivo(k, a);
+            base.tipo = 'quantidade_diferente';
+            base.total_sistema = s.total;
+            divergencias.push(base);
+          }
         }
       });
 
@@ -300,15 +314,17 @@ export default function VolumetriaDivergencias() {
     arquivo: linhas.filter(l => l.tipo === 'arquivo_nao_no_sistema').length,
     sistema: linhas.filter(l => l.tipo === 'sistema_nao_no_arquivo').length,
     qtd: linhas.filter(l => l.tipo === 'quantidade_diferente').length,
+    cat: linhas.filter(l => l.tipo === 'categoria_diferente').length,
   }), [linhas]);
 
-  const [only, setOnly] = useState<'todos'|'arquivo'|'sistema'|'qtd'>('todos');
+  const [only, setOnly] = useState<'todos'|'arquivo'|'sistema'|'qtd'|'cat'>('todos');
   const linhasFiltradas = useMemo(() => {
     return linhas.filter((l) => {
       if (only === 'todos') return true;
       if (only === 'arquivo') return l.tipo === 'arquivo_nao_no_sistema';
       if (only === 'sistema') return l.tipo === 'sistema_nao_no_arquivo';
       if (only === 'qtd') return l.tipo === 'quantidade_diferente';
+      if (only === 'cat') return l.tipo === 'categoria_diferente';
       return true;
     });
   }, [linhas, only]);
@@ -318,7 +334,7 @@ export default function VolumetriaDivergencias() {
       <CardHeader>
         <CardTitle>Divergências de Exames (Sistema x Arquivo)</CardTitle>
         <CardDescription>
-          Liste exames com: faltando no sistema, faltando no arquivo, e quantidade diferente. Período atual por padrão.
+          Liste exames com: faltando no sistema, faltando no arquivo, quantidade diferente e categoria diferente. Período atual por padrão.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -342,6 +358,7 @@ export default function VolumetriaDivergencias() {
           <Button onClick={carregar} disabled={loading}>{loading ? 'Carregando...' : 'Atualizar'}</Button>
           <div className="flex gap-2 text-sm">
             <Badge variant="secondary">Arquivo≠Sistema: {counts.qtd}</Badge>
+            <Badge variant="outline">Categoria≠: {counts.cat}</Badge>
             <Badge variant="outline">Só no Arquivo: {counts.arquivo}</Badge>
             <Badge variant="outline">Só no Sistema: {counts.sistema}</Badge>
           </div>
@@ -351,6 +368,7 @@ export default function VolumetriaDivergencias() {
             <Button variant={only==='arquivo'? 'default':'outline'} size="sm" onClick={() => setOnly('arquivo')}>Só no Arquivo</Button>
             <Button variant={only==='sistema'? 'default':'outline'} size="sm" onClick={() => setOnly('sistema')}>Só no Sistema</Button>
             <Button variant={only==='qtd'? 'default':'outline'} size="sm" onClick={() => setOnly('qtd')}>Qtd diferente</Button>
+            <Button variant={only==='cat'? 'default':'outline'} size="sm" onClick={() => setOnly('cat')}>Categoria diferente</Button>
           </div>
         </div>
 
@@ -389,10 +407,11 @@ export default function VolumetriaDivergencias() {
               {linhasFiltradas.map((l, idx) => (
                 <TableRow key={`${l.chave}-${idx}`}>
                   <TableCell>
-                    <Badge variant={l.tipo==='quantidade_diferente' ? 'default' : 'outline'}>
+                    <Badge variant={l.tipo==='quantidade_diferente' || l.tipo==='categoria_diferente' ? 'default' : 'outline'}>
                       {l.tipo === 'arquivo_nao_no_sistema' && 'Só no Arquivo'}
                       {l.tipo === 'sistema_nao_no_arquivo' && 'Só no Sistema'}
                       {l.tipo === 'quantidade_diferente' && 'Qtd diferente'}
+                      {l.tipo === 'categoria_diferente' && 'Categoria diferente'}
                     </Badge>
                   </TableCell>
                   <TableCell>{l.EMPRESA}</TableCell>
