@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { supabase } from "@/integrations/supabase/client";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 // Tipos para linhas
 interface VolumetriaRow {
@@ -110,10 +111,8 @@ export default function VolumetriaDivergencias() {
 
   // Filtros básicos para evitar sobrecarga
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
-  const lastDay = new Date(today.getFullYear(), today.getMonth()+1, 0).toISOString().slice(0,10);
-  const [inicio, setInicio] = useState<string>(firstDay);
-  const [fim, setFim] = useState<string>(lastDay);
+  const defaultRef = format(today, 'yyyy-MM');
+  const [referencia, setReferencia] = useState<string>(defaultRef);
   const [cliente, setCliente] = useState<string>('todos');
 
   useEffect(() => {
@@ -131,18 +130,20 @@ export default function VolumetriaDivergencias() {
   const carregar = async () => {
     try {
       setLoading(true);
+      // Calcular início e fim do mês de referência selecionado
+      const refDate = new Date(referencia + "-01");
+      const start = format(startOfMonth(refDate), 'yyyy-MM-dd');
+      const end = format(endOfMonth(refDate), 'yyyy-MM-dd');
       // 1) Ler volumetria (arquivo) do período/cliente
       let volQuery = supabase.from('volumetria_mobilemed').select('*');
-      if (inicio) volQuery = volQuery.gte('DATA_REALIZACAO', inicio);
-      if (fim) volQuery = volQuery.lte('DATA_REALIZACAO', fim);
+      volQuery = volQuery.gte('DATA_REALIZACAO', start).lte('DATA_REALIZACAO', end);
       if (cliente !== 'todos') volQuery = volQuery.eq('EMPRESA', cliente);
       const { data: volRows, error: volErr } = await volQuery.limit(5000);
       if (volErr) throw volErr;
 
       // 2) Ler exames do sistema do mesmo período
       let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, prioridade, nome_exame, paciente_nome, quantidade, data_exame, medico_id');
-      if (inicio) exQuery = exQuery.gte('data_exame', inicio);
-      if (fim) exQuery = exQuery.lte('data_exame', fim);
+      exQuery = exQuery.gte('data_exame', start).lte('data_exame', end);
       if (cliente !== 'todos') {
         // Filtrar por cliente nome => mapear ids candidatos
         const ids = Object.entries(clientesMap).filter(([, nome]) => normalizeCliente(nome) === normalizeCliente(cliente)).map(([id]) => id);
@@ -267,7 +268,7 @@ export default function VolumetriaDivergencias() {
   useEffect(() => {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cliente, inicio, fim, Object.keys(clientesMap).length]);
+  }, [cliente, referencia, Object.keys(clientesMap).length]);
 
   const counts = useMemo(() => ({
     arquivo: linhas.filter(l => l.tipo === 'arquivo_nao_no_sistema').length,
@@ -308,12 +309,8 @@ export default function VolumetriaDivergencias() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Início</label>
-            <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Fim</label>
-            <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
+            <label className="text-xs text-muted-foreground">Mês de referência</label>
+            <Input type="month" value={referencia} onChange={(e) => setReferencia(e.target.value)} />
           </div>
 
           <Button onClick={carregar} disabled={loading}>{loading ? 'Carregando...' : 'Atualizar'}</Button>
