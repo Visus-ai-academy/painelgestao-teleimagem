@@ -1,0 +1,189 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+type GrupoChave = {
+  modalidade: string;
+  especialidade: string;
+  categoria: string;
+  prioridade: string;
+  estudo: string;
+};
+
+function periodoToDatas(periodo: string) {
+  // período no formato YYYY-MM
+  const [y, m] = periodo.split('-').map(Number);
+  // JS Date: mês 0-11. Início = dia 8 do mês anterior; Fim = dia 7 do mês atual
+  const inicio = new Date(y, (m - 1) - 1, 8); // m-2
+  const fim = new Date(y, (m - 1), 7);       // m-1
+  const toISO = (d: Date) => d.toISOString().split('T')[0];
+  return { inicio: toISO(inicio), fim: toISO(fim) };
+}
+
+function periodoReferencia(periodo: string) {
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const [y, m] = periodo.split('-');
+  const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
+  return `${mon}/${y.slice(2)}`;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { periodo } = await req.json();
+
+    if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
+      return new Response(JSON.stringify({ success: false, error: 'Parâmetro periodo (YYYY-MM) é obrigatório' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { inicio, fim } = periodoToDatas(periodo);
+    const periodoRef = periodoReferencia(periodo);
+
+    console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} Ref=${periodoRef}`);
+
+    // Buscar clientes ativos
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('id, nome, email, ativo, status')
+      .eq('ativo', true)
+      .eq('status', 'Ativo');
+
+    if (clientesError) throw clientesError;
+
+    const clientesAtivos = clientes || [];
+    console.log(`[gerar-faturamento-periodo] Clientes ativos: ${clientesAtivos.length}`);
+
+    // Limpar faturamento do período antes de inserir
+    const { error: delErr } = await supabase
+      .from('faturamento')
+      .delete()
+      .eq('periodo_referencia', periodoRef);
+    if (delErr) {
+      console.log('[gerar-faturamento-periodo] Aviso ao limpar faturamento:', delErr.message);
+    }
+
+    let totalItens = 0;
+    let clientesComDados = 0;
+
+    for (const cliente of clientesAtivos) {
+      // Buscar volumetria do cliente no período
+      const { data: vm, error: vmErr } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES"')
+        .eq('"EMPRESA"', cliente.nome)
+        .gte('data_referencia', inicio)
+        .lte('data_referencia', fim);
+
+      if (vmErr) {
+        console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
+        continue;
+      }
+
+      const rows = vm || [];
+      if (rows.length === 0) continue;
+
+      // Volume total (usado na faixa de preço)
+      const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
+
+      // Agrupar por chave
+      const grupos = new Map<string, { chave: GrupoChave; qtd: number }>();
+      for (const r of rows) {
+        const chave: GrupoChave = {
+          modalidade: r.MODALIDADE || '',
+          especialidade: r.ESPECIALIDADE || '',
+          categoria: r.CATEGORIA || 'SC',
+          prioridade: r.PRIORIDADE || '',
+          estudo: r.ESTUDO_DESCRICAO || 'Exame',
+        };
+        const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}`;
+        const qtd = Number(r.VALORES) || 1;
+        const atual = grupos.get(key);
+        if (atual) atual.qtd += qtd; else grupos.set(key, { chave, qtd });
+      }
+
+      const itensInserir: any[] = [];
+
+      for (const { chave, qtd } of grupos.values()) {
+        // Calcular preço unitário via RPC
+        const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
+          p_cliente_id: cliente.id,
+          p_modalidade: chave.modalidade,
+          p_especialidade: chave.especialidade,
+          p_prioridade: chave.prioridade,
+          p_categoria: chave.categoria,
+          p_volume_total: volumeTotal,
+          p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
+        });
+
+        if (precoErr) {
+          console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
+        }
+
+        const unit = Number(preco) || 0;
+        const valor = Number((unit * qtd).toFixed(2));
+
+        const hoje = new Date();
+        const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+        const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        itensInserir.push({
+          omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+          numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+          cliente_id: cliente.id,
+          cliente_nome: cliente.nome,
+          cliente_email: cliente.email || null,
+          modalidade: chave.modalidade,
+          especialidade: chave.especialidade,
+          categoria: chave.categoria,
+          prioridade: chave.prioridade,
+          nome_exame: chave.estudo,
+          quantidade: qtd,
+          valor_bruto: valor,
+          valor: valor,
+          data_emissao: emissao,
+          data_vencimento: vencimento,
+          periodo_referencia: periodoRef,
+          tipo_dados: 'incremental',
+        });
+      }
+
+      if (itensInserir.length > 0) {
+        const batchSize = 100;
+        for (let i = 0; i < itensInserir.length; i += batchSize) {
+          const lote = itensInserir.slice(i, i + batchSize);
+          const { error: insErr } = await supabase.from('faturamento').insert(lote);
+          if (insErr) {
+            console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
+          }
+        }
+        totalItens += itensInserir.length;
+        clientesComDados++;
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      periodo,
+      periodo_referencia: periodoRef,
+      clientes_processados: clientesAtivos.length,
+      clientes_com_dados: clientesComDados,
+      itens_inseridos: totalItens
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  } catch (error: any) {
+    console.error('[gerar-faturamento-periodo] Erro:', error);
+    return new Response(JSON.stringify({ success: false, error: error?.message || 'Erro desconhecido' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+});

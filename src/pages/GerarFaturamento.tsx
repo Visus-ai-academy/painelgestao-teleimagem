@@ -448,45 +448,55 @@ export default function GerarFaturamento() {
 
   // Função para processar arquivo de faturamento e gerar PDFs
   const handleProcessarFaturamento = async () => {
+    // Novo fluxo: se não houver arquivo, geramos faturamento a partir da volumetria + preços
     if (!arquivoFaturamento) {
-      toast({
-        title: "Arquivo Necessário",
-        description: "Faça upload do arquivo de faturamento primeiro",
-        variant: "destructive",
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Gerando faturamento (volumetria + preços)...',
+        progresso: 30
       });
-      return;
     }
 
     setStatusProcessamento({
       processando: true,
-      mensagem: 'Fazendo upload do arquivo...',
+      mensagem: 'Preparando processamento...',
       progresso: 20
     });
 
     try {
-      // Upload do arquivo para storage
-      const nomeArquivo = `faturamento_${Date.now()}_${arquivoFaturamento.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(nomeArquivo, arquivoFaturamento);
+      if (arquivoFaturamento) {
+        // Fluxo antigo com upload (mantido para compatibilidade, mas não obrigatório)
+        const nomeArquivo = `faturamento_${Date.now()}_${arquivoFaturamento.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(nomeArquivo, arquivoFaturamento);
 
-      if (uploadError) {
-        throw new Error(`Erro no upload: ${uploadError.message}`);
-      }
+        if (uploadError) {
+          throw new Error(`Erro no upload: ${uploadError.message}`);
+        }
 
-      setStatusProcessamento({
-        processando: true,
-        mensagem: 'Processando dados...',
-        progresso: 40
-      });
+        setStatusProcessamento({
+          processando: true,
+          mensagem: 'Processando dados do arquivo...',
+          progresso: 40
+        });
 
-      // Primeiro processar os dados do arquivo
-      const { data: processData, error: processError } = await supabase.functions.invoke('processar-faturamento', {
-        body: { fileName: nomeArquivo }
-      });
+        // Processar o arquivo (compatibilidade)
+        const { data: processData, error: processError } = await supabase.functions.invoke('processar-faturamento', {
+          body: { fileName: nomeArquivo }
+        });
 
-      if (processError) {
-        throw new Error(`Erro ao processar dados: ${processError.message}`);
+        if (processError) {
+          throw new Error(`Erro ao processar dados: ${processError.message}`);
+        }
+      } else {
+        // Novo: gerar faturamento direto da volumetria aplicando preços
+        const { data: gerarData, error: gerarError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
+          body: { periodo: periodoSelecionado }
+        });
+        if (gerarError || (gerarData && gerarData.success === false)) {
+          throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
+        }
       }
 
       setStatusProcessamento({
