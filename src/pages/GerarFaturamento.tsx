@@ -448,55 +448,19 @@ export default function GerarFaturamento() {
 
   // Função para processar arquivo de faturamento e gerar PDFs
   const handleProcessarFaturamento = async () => {
-    // Novo fluxo: se não houver arquivo, geramos faturamento a partir da volumetria + preços
-    if (!arquivoFaturamento) {
-      setStatusProcessamento({
-        processando: true,
-        mensagem: 'Gerando faturamento (volumetria + preços)...',
-        progresso: 30
-      });
-    }
-
+    // Fluxo único: gerar faturamento a partir da volumetria + preços do período selecionado
     setStatusProcessamento({
       processando: true,
-      mensagem: 'Preparando processamento...',
-      progresso: 20
+      mensagem: 'Gerando faturamento (volumetria + preços)...',
+      progresso: 30
     });
 
     try {
-      if (arquivoFaturamento) {
-        // Fluxo antigo com upload (mantido para compatibilidade, mas não obrigatório)
-        const nomeArquivo = `faturamento_${Date.now()}_${arquivoFaturamento.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('uploads')
-          .upload(nomeArquivo, arquivoFaturamento);
-
-        if (uploadError) {
-          throw new Error(`Erro no upload: ${uploadError.message}`);
-        }
-
-        setStatusProcessamento({
-          processando: true,
-          mensagem: 'Processando dados do arquivo...',
-          progresso: 40
-        });
-
-        // Processar o arquivo (compatibilidade)
-        const { data: processData, error: processError } = await supabase.functions.invoke('processar-faturamento', {
-          body: { fileName: nomeArquivo }
-        });
-
-        if (processError) {
-          throw new Error(`Erro ao processar dados: ${processError.message}`);
-        }
-      } else {
-        // Novo: gerar faturamento direto da volumetria aplicando preços
-        const { data: gerarData, error: gerarError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
-          body: { periodo: periodoSelecionado }
-        });
-        if (gerarError || (gerarData && gerarData.success === false)) {
-          throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
-        }
+      const { data: gerarData, error: gerarError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
+        body: { periodo: periodoSelecionado }
+      });
+      if (gerarError || (gerarData && gerarData.success === false)) {
+        throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
       }
 
       setStatusProcessamento({
@@ -1290,7 +1254,7 @@ export default function GerarFaturamento() {
                   Gerar Faturamento - {PERIODO_ATUAL}
                 </CardTitle>
                 <CardDescription>
-                  Faça upload do arquivo de faturamento para gerar e enviar relatórios automáticos
+                  Gere o faturamento a partir da volumetria processada do período selecionado
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2003,102 +1967,26 @@ export default function GerarFaturamento() {
             <CardContent className="space-y-6">
               {clientesCarregados.length > 0 ? (
                 <>
-                  {/* Upload de Arquivo de Faturamento */}
+                  {/* Fluxo de faturamento (sem upload) */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <FileSpreadsheet className="h-5 w-5" />
-                      Upload de Arquivo de Faturamento
+                      Faturamento baseado na Volumetria
                     </h3>
-                    
-                    {/* Estrutura esperada do arquivo */}
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-blue-900">Estrutura do Arquivo Excel</h4>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = '/templates/template_faturamento_dados.csv';
-                            link.download = 'template_faturamento_dados.csv';
-                            link.click();
-                          }}
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          Baixar Template
-                        </Button>
-                      </div>
-                      <p className="text-sm text-blue-800 mb-3">O arquivo deve conter as seguintes colunas:</p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-blue-700">
-                        <div>• Data do Exame</div>
-                        <div>• Nome do Paciente</div>
-                        <div>• Nome do Cliente</div>
-                        <div>• CNPJ Cliente</div>
-                        <div>• Nome do Médico Laudador</div>
-                        <div>• Modalidade</div>
-                        <div>• Especialidade</div>
-                        <div>• Categoria</div>
-                        <div>• Prioridade</div>
-                        <div>• Quantidade de Laudos</div>
-                        <div>• Valor</div>
-                        <div>• Franquia (opcional)</div>
-                        <div>• Ajuste (opcional)</div>
-                      </div>
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <h4 className="font-semibold text-amber-900 mb-2">Fluxo sem upload de arquivo</h4>
+                      <p className="text-sm text-amber-700">
+                        O faturamento será gerado a partir da volumetria processada do período selecionado,
+                        aplicando preços, regras e parâmetros do contrato de cada cliente. Não é necessário enviar arquivos.
+                      </p>
                     </div>
-
-                    {/* Upload de arquivo */}
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
-                      <label className="cursor-pointer">
-                        <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <span className="text-lg font-medium text-gray-700">
-                          {arquivoFaturamento ? arquivoFaturamento.name : 'Selecione o arquivo de faturamento'}
-                        </span>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Formatos aceitos: .xlsx, .xls
-                        </p>
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setArquivoFaturamento(file);
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-
-                    {arquivoFaturamento && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                            <div>
-                              <p className="font-medium text-green-900">{arquivoFaturamento.name}</p>
-                              <p className="text-sm text-green-700">
-                                {(arquivoFaturamento.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setArquivoFaturamento(null)}
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Botão principal para processar e gerar PDFs */}
                   <div className="flex justify-center">
                     <Button
                       onClick={handleProcessarFaturamento}
-                      disabled={!arquivoFaturamento || statusProcessamento.processando}
+                      disabled={statusProcessamento.processando}
                       size="lg"
                       className="min-w-[300px] bg-green-600 hover:bg-green-700"
                     >
