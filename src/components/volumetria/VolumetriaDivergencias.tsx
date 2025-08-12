@@ -106,6 +106,11 @@ function normalizeCliente(name?: string) {
   return s;
 }
 
+function cleanExamName(name?: string) {
+  const raw = (name || '').toString();
+  return raw.replace(/\s+X[1-9]\b/gi, '').replace(/\s+XE\b/gi, '').replace(/\s+/g, ' ').trim();
+}
+
 export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: ctx } = useVolumetria();
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
@@ -168,7 +173,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeCliente(r.EMPRESA),
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
-          canonical(r.ESTUDO_DESCRICAO)
+          canonical(cleanExamName(r.ESTUDO_DESCRICAO))
         ].join('|');
         const cur = mapSistema.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
@@ -198,7 +203,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeCliente(r.cliente),
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
-          canonical(r.exame)
+          canonical(cleanExamName(r.exame))
         ].join('|');
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.quant || 0);
@@ -312,7 +317,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   useEffect(() => {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cliente, referencia, Object.keys(clientesMap).length]);
+  }, [cliente, referencia, Object.keys(clientesMap).length, uploadedExams]);
 
   const counts = useMemo(() => ({
     arquivo: linhas.filter(l => l.tipo === 'arquivo_nao_no_sistema').length,
