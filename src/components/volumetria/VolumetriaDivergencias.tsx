@@ -142,7 +142,7 @@ export default function VolumetriaDivergencias() {
       if (volErr) throw volErr;
 
       // 2) Ler exames do sistema do mesmo período
-      let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, prioridade, nome_exame, paciente_nome, quantidade, data_exame, medico_id');
+      let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, quantidade, data_exame, medico_id');
       exQuery = exQuery.gte('data_exame', start).lte('data_exame', end);
       if (cliente !== 'todos') {
         // Filtrar por cliente nome => mapear ids candidatos
@@ -157,7 +157,12 @@ export default function VolumetriaDivergencias() {
       type Agg = { total: number; amostra?: VolumetriaRow; };
       const mapArquivo = new Map<string, Agg>();
       (volRows || []).forEach((r: any) => {
-        const key = [normalizeCliente(r.EMPRESA), normalizeModalidade(r.MODALIDADE), canonical(r.ESPECIALIDADE), canonical(r.PRIORIDADE), canonical(r.ESTUDO_DESCRICAO)].join('|');
+        const key = [
+          normalizeCliente(r.EMPRESA),
+          normalizeModalidade(r.MODALIDADE),
+          canonical(r.ESPECIALIDADE),
+          canonical((r as any).CATEGORIA)
+        ].join('|');
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
         if (!cur.amostra) cur.amostra = r;
@@ -168,7 +173,12 @@ export default function VolumetriaDivergencias() {
       const mapSistema = new Map<string, AggSys>();
       (exRows || []).forEach((r: any) => {
         const clienteNome = clientesMap[r.cliente_id] || '';
-        const key = [normalizeCliente(clienteNome), normalizeModalidade(r.modalidade), canonical(r.especialidade), canonical(r.prioridade), canonical(r.nome_exame)].join('|');
+        const key = [
+          normalizeCliente(clienteNome),
+          normalizeModalidade(r.modalidade),
+          canonical(r.especialidade),
+          canonical(r.categoria)
+        ].join('|');
         const cur = mapSistema.get(key) || { total: 0, amostra: { ...r, cliente: clienteNome } };
         cur.total += Number(r.quantidade || 0);
         if (!cur.amostra) cur.amostra = { ...r, cliente: clienteNome };
