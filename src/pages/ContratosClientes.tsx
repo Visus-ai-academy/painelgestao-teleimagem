@@ -917,7 +917,7 @@ const salvarContrato = async () => {
 
       {/* Visualizar Contrato */}
       <Dialog open={showVisualizarContrato} onOpenChange={setShowVisualizarContrato}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[95vw] max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>Serviços Contratados — {contratoVisualizando?.cliente}</DialogTitle>
             <DialogDescription>Visualize os serviços, volumes e condições de preço configurados neste contrato.</DialogDescription>
