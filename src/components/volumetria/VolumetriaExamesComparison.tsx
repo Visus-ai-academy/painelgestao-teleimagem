@@ -22,7 +22,7 @@ export type UploadedExamRow = {
   exame?: string;
   accessionNumber?: string;
   codigoPaciente?: string | number;
-};
+  };
 
 export default function VolumetriaExamesComparison({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: context } = useVolumetria();
@@ -249,6 +249,30 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
     XLSX.utils.book_append_sheet(wb, ws, 'divergencias_exame');
     XLSX.writeFile(wb, `divergencias_por_exame_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
+
+  // Exporta a lista da primeira tabela (Exames - Sistema x Arquivo)
+  const handleExportExams = () => {
+    const rows = filteredRows.map((r) => ({
+      fonte: (r as any).fonte,
+      cliente: r.cliente,
+      modalidade: r.modalidade || '',
+      especialidade: r.especialidade || '',
+      categoria: r.categoria || '',
+      prioridade: r.prioridade || '',
+      exame: r.exame || '',
+      data_exame: toDisplayDate((r as any).data_exame),
+      data_laudo: toDisplayDate((r as any).data_laudo),
+      paciente: (r as any).paciente || '',
+      medico: (r as any).medico || '',
+      accession: (r as any).accessionNumber || '',
+      codigo_paciente: (r as any).codigoPaciente ?? '',
+      quant: r.quant ?? 0,
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'exames_lista');
+    XLSX.writeFile(wb, `exames_sistema_x_arquivo_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
   return (
     <Card>
       <CardHeader>
@@ -301,6 +325,7 @@ export default function VolumetriaExamesComparison({ uploadedExams }: { uploaded
             Registros: {filteredRows.length.toLocaleString()} — Página {page} de {totalPages}
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportExams}>Exportar exames (Excel)</Button>
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Button>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Próxima</Button>
           </div>
