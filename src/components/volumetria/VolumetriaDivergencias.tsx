@@ -183,7 +183,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       let sysQuery = supabase.from('volumetria_mobilemed').select('*');
       sysQuery = sysQuery.eq('periodo_referencia', referencia);
       if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
-      const { data: systemRows, error: sysErr } = await sysQuery.limit(5000);
+      const { data: systemRows, error: sysErr } = await sysQuery.range(0, 99999);
       if (sysErr) throw sysErr;
 
       // Mapear por chave agregada
