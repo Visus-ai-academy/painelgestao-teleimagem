@@ -282,7 +282,7 @@ export default function Comparativo() {
           <VolumetriaExamesComparison uploadedExams={uploadedExams || undefined} />
         </TabsContent>
         <TabsContent value="divergencias">
-          <VolumetriaDivergencias />
+          <VolumetriaDivergencias uploadedExams={uploadedExams || undefined} />
         </TabsContent>
       </Tabs>
     </div>

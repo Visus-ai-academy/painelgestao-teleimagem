@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import type { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
 
 // Tipos para linhas
 interface VolumetriaRow {
@@ -105,7 +106,7 @@ function normalizeCliente(name?: string) {
   return s;
 }
 
-export default function VolumetriaDivergencias() {
+export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: ctx } = useVolumetria();
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -152,74 +153,108 @@ export default function VolumetriaDivergencias() {
       const refDate = new Date(referencia + "-01");
       const start = format(startOfMonth(refDate), 'yyyy-MM-dd');
       const end = format(endOfMonth(refDate), 'yyyy-MM-dd');
-      // 1) Ler volumetria (arquivo) do período/cliente
-      let volQuery = supabase.from('volumetria_mobilemed').select('*');
-      volQuery = volQuery.eq('periodo_referencia', referencia);
-      if (cliente !== 'todos') volQuery = volQuery.eq('EMPRESA', cliente);
-      const { data: volRows, error: volErr } = await volQuery.limit(5000);
-      if (volErr) throw volErr;
-
-      // 2) Ler exames do sistema do mesmo período
-      let exQuery = supabase.from('exames').select('id, cliente_id, modalidade, especialidade, categoria, nome_exame, quantidade, data_exame, medico_id');
-      exQuery = exQuery.gte('data_exame', start).lte('data_exame', end);
-      if (cliente !== 'todos') {
-        // Filtrar por cliente nome => mapear ids candidatos
-        const ids = Object.entries(clientesMap).filter(([, nome]) => normalizeCliente(nome) === normalizeCliente(cliente)).map(([id]) => id);
-        if (ids.length) exQuery = exQuery.in('cliente_id', ids);
-        else exQuery = exQuery.eq('cliente_id', '00000000-0000-0000-0000-000000000000');
-      }
-      const { data: exRows, error: exErr } = await exQuery.limit(5000);
-      if (exErr) throw exErr;
+      // 1) Ler dados do SISTEMA (volumetria processada no banco) por período/cliente
+      let sysQuery = supabase.from('volumetria_mobilemed').select('*');
+      sysQuery = sysQuery.eq('periodo_referencia', referencia);
+      if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
+      const { data: systemRows, error: sysErr } = await sysQuery.limit(5000);
+      if (sysErr) throw sysErr;
 
       // Mapear por chave agregada
-      type Agg = { total: number; amostra?: VolumetriaRow; };
-      const mapArquivo = new Map<string, Agg>();
-      (volRows || []).forEach((r: any) => {
+      type AggSys = { total: number; amostra?: VolumetriaRow };
+      const mapSistema = new Map<string, AggSys>();
+      (systemRows || []).forEach((r: any) => {
         const key = [
           normalizeCliente(r.EMPRESA),
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
           canonical(r.ESTUDO_DESCRICAO)
         ].join('|');
-        const cur = mapArquivo.get(key) || { total: 0, amostra: r };
+        const cur = mapSistema.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
         if (!cur.amostra) cur.amostra = r;
-        mapArquivo.set(key, cur);
+        mapSistema.set(key, cur);
       });
 
-      type AggSys = { total: number; amostra?: SistemaRow };
-      const mapSistema = new Map<string, AggSys>();
-      (exRows || []).forEach((r: any) => {
-        const clienteNome = clientesMap[r.cliente_id] || '';
+      // 2) Ler dados do ARQUIVO (enviado na tela)
+      type AggFile = { total: number; amostra?: UploadedExamRow };
+      const mapArquivo = new Map<string, AggFile>();
+      const inMonth = (val: any) => {
+        if (!val) return true; // caso não tenha data no arquivo, não filtra
+        const s = String(val);
+        // formatos: yyyy-mm-dd ou dd/mm/yyyy
+        let ym = '';
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) ym = s.slice(0,7);
+        else {
+          const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+          if (m) ym = `${m[3].length===2?`20${m[3]}`:m[3]}-${m[2].padStart(2,'0')}`;
+        }
+        return ym ? ym === referencia : true;
+      };
+      (uploadedExams || []).forEach((r) => {
+        if (cliente !== 'todos' && normalizeCliente(r.cliente) !== normalizeCliente(cliente)) return;
+        if (!inMonth((r as any).data_exame || (r as any).data_laudo)) return;
         const key = [
-          normalizeCliente(clienteNome),
+          normalizeCliente(r.cliente),
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
-          canonical(r.nome_exame)
+          canonical(r.exame)
         ].join('|');
-        const cur = mapSistema.get(key) || { total: 0, amostra: { ...r, cliente: clienteNome } };
-        cur.total += Number(r.quantidade || 0);
-        if (!cur.amostra) cur.amostra = { ...r, cliente: clienteNome };
-        mapSistema.set(key, cur);
+        const cur = mapArquivo.get(key) || { total: 0, amostra: r };
+        cur.total += Number(r.quant || 0);
+        if (!cur.amostra) cur.amostra = r;
+        mapArquivo.set(key, cur);
       });
 
       // Construir divergências
       const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
       const divergencias: LinhaDivergencia[] = [];
 
-      const toLinhaFromArquivo = (key: string, a: Agg): LinhaDivergencia => {
-        const r = a.amostra as VolumetriaRow;
+      const toLinhaFromArquivo = (key: string, a: AggFile): LinhaDivergencia => {
+        const r = a.amostra as any as UploadedExamRow;
         return {
           tipo: 'arquivo_nao_no_sistema',
+          chave: key,
+          EMPRESA: r.cliente || '-',
+          NOME_PACIENTE: (r as any).paciente || '-',
+          CODIGO_PACIENTE: String((r as any).codigoPaciente ?? '-') ,
+          ESTUDO_DESCRICAO: (r as any).exame || '-',
+          ACCESSION_NUMBER: (r as any).accessionNumber || '-',
+          MODALIDADE: r.modalidade || '-',
+          PRIORIDADE: (r as any).prioridade || '-',
+          VALORES: Number(a.total || 0),
+          ESPECIALIDADE: r.especialidade || '-',
+          MEDICO: (r as any).medico || '-',
+          DUPLICADO: '-',
+          DATA_REALIZACAO: ((r as any).data_exame || '-') as string,
+          HORA_REALIZACAO: '-',
+          DATA_TRANSFERENCIA: '-',
+          HORA_TRANSFERENCIA: '-',
+          DATA_LAUDO: ((r as any).data_laudo || '-') as string,
+          HORA_LAUDO: '-',
+          DATA_PRAZO: '-',
+          HORA_PRAZO: '-',
+          STATUS: '-',
+          UNIDADE_ORIGEM: '-',
+          CLIENTE: r.cliente || '-',
+          total_arquivo: a.total,
+          total_sistema: 0,
+          categoria_arquivo: (r as any).categoria || undefined,
+        };
+      };
+      const toLinhaFromSistema = (key: string, s: AggSys): LinhaDivergencia => {
+        const r = s.amostra as any as VolumetriaRow;
+        return {
+          tipo: 'sistema_nao_no_arquivo',
           chave: key,
           EMPRESA: r.EMPRESA || '-',
           NOME_PACIENTE: r.NOME_PACIENTE || '-',
           CODIGO_PACIENTE: String(r.CODIGO_PACIENTE ?? '-') ,
           ESTUDO_DESCRICAO: r.ESTUDO_DESCRICAO || '-',
           ACCESSION_NUMBER: r.ACCESSION_NUMBER || '-',
-          MODALIDADE: r.MODALIDADE || '-',
-          PRIORIDADE: r.PRIORIDADE || '-',
-          VALORES: Number(a.total || 0),
+          MODALIDADE: r.MODALIDADE || '-'
+          ,PRIORIDADE: r.PRIORIDADE || '-',
+          VALORES: Number(s.total || 0),
           ESPECIALIDADE: r.ESPECIALIDADE || '-',
           MEDICO: r.MEDICO || '-',
           DUPLICADO: String(r.DUPLICADO ?? '-') ,
@@ -234,39 +269,9 @@ export default function VolumetriaDivergencias() {
           STATUS: r.STATUS || '-',
           UNIDADE_ORIGEM: (r as any).UNIDADE_ORIGEM || r.EMPRESA || '-',
           CLIENTE: r.EMPRESA || '-',
-          total_arquivo: a.total,
-          total_sistema: 0,
-        };
-      };
-      const toLinhaFromSistema = (key: string, s: AggSys): LinhaDivergencia => {
-        const r = s.amostra as any as SistemaRow;
-        return {
-          tipo: 'sistema_nao_no_arquivo',
-          chave: key,
-          EMPRESA: r.cliente || '-',
-          NOME_PACIENTE: r.paciente_nome || '-',
-          CODIGO_PACIENTE: '-',
-          ESTUDO_DESCRICAO: r.nome_exame || '-',
-          ACCESSION_NUMBER: '-',
-          MODALIDADE: r.modalidade || '-',
-          PRIORIDADE: r.prioridade || '-',
-          VALORES: Number(s.total || 0),
-          ESPECIALIDADE: r.especialidade || '-',
-          MEDICO: '-',
-          DUPLICADO: '-',
-          DATA_REALIZACAO: r.data_exame || '-',
-          HORA_REALIZACAO: '-',
-          DATA_TRANSFERENCIA: '-',
-          HORA_TRANSFERENCIA: '-',
-          DATA_LAUDO: '-',
-          HORA_LAUDO: '-',
-          DATA_PRAZO: '-',
-          HORA_PRAZO: '-',
-          STATUS: '-',
-          UNIDADE_ORIGEM: '-',
-          CLIENTE: r.cliente || '-',
           total_arquivo: 0,
           total_sistema: s.total,
+          categoria_sistema: (r as any).CATEGORIA || undefined,
         };
       };
 
@@ -278,14 +283,14 @@ export default function VolumetriaDivergencias() {
         } else if (!a && s) {
           divergencias.push(toLinhaFromSistema(k, s));
         } else if (a && s) {
-          const catA = canonical(((a.amostra as any) || {}).CATEGORIA || '');
-          const catS = canonical(((s.amostra as any) || {}).categoria || '');
+          const catA = canonical(((a.amostra as any) || {}).categoria || '');
+          const catS = canonical(((s.amostra as any) || {}).CATEGORIA || '');
           if (catA && catS && catA !== catS) {
             const base = toLinhaFromArquivo(k, a);
             base.tipo = 'categoria_diferente';
             base.total_sistema = s.total;
-            base.categoria_arquivo = (a.amostra as any).CATEGORIA || '';
-            base.categoria_sistema = (s.amostra as any).categoria || '';
+            base.categoria_arquivo = (a.amostra as any).categoria || '';
+            base.categoria_sistema = (s.amostra as any).CATEGORIA || '';
             divergencias.push(base);
           } else if (a.total !== s.total) {
             const base = toLinhaFromArquivo(k, a);
@@ -304,7 +309,6 @@ export default function VolumetriaDivergencias() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
