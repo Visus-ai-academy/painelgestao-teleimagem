@@ -111,6 +111,27 @@ function cleanExamName(name?: string) {
   return raw.replace(/\s+X[1-9]\b/gi, '').replace(/\s+XE\b/gi, '').replace(/\s+/g, ' ').trim();
 }
 
+function formatDateBR(val?: string) {
+  if (!val) return '-';
+  const s = String(val).trim();
+  if (!s) return '-';
+  // ISO or yyyy-mm-dd
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  // dd/mm/yyyy keep
+  const br = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})$/);
+  if (br) return `${br[1].padStart(2,'0')}/${br[2].padStart(2,'0')}/${br[3].length===2?`20${br[3]}`:br[3]}`;
+  // try Date parse fallback
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yy = String(d.getFullYear());
+    return `${dd}/${mm}/${yy}`;
+  }
+  return s;
+}
+
 export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
   const { data: ctx } = useVolumetria();
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
@@ -173,7 +194,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeCliente(r.EMPRESA),
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
-          canonical(cleanExamName(r.ESTUDO_DESCRICAO))
+          canonical(cleanExamName(r.ESTUDO_DESCRICAO)),
+          canonical(r.NOME_PACIENTE)
         ].join('|');
         const cur = mapSistema.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
@@ -203,7 +225,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           normalizeCliente(r.cliente),
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
-          canonical(cleanExamName(r.exame))
+          canonical(cleanExamName(r.exame)),
+          canonical((r as any).paciente)
         ].join('|');
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.quant || 0);
@@ -436,13 +459,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
                   <TableCell>{l.ESPECIALIDADE}</TableCell>
                   <TableCell>{l.MEDICO}</TableCell>
                   <TableCell>{l.DUPLICADO}</TableCell>
-                  <TableCell>{l.DATA_REALIZACAO}</TableCell>
+                  <TableCell>{formatDateBR(l.DATA_REALIZACAO)}</TableCell>
                   <TableCell>{l.HORA_REALIZACAO}</TableCell>
-                  <TableCell>{l.DATA_TRANSFERENCIA}</TableCell>
+                  <TableCell>{formatDateBR(l.DATA_TRANSFERENCIA)}</TableCell>
                   <TableCell>{l.HORA_TRANSFERENCIA}</TableCell>
-                  <TableCell>{l.DATA_LAUDO}</TableCell>
+                  <TableCell>{formatDateBR(l.DATA_LAUDO)}</TableCell>
                   <TableCell>{l.HORA_LAUDO}</TableCell>
-                  <TableCell>{l.DATA_PRAZO}</TableCell>
+                  <TableCell>{formatDateBR(l.DATA_PRAZO)}</TableCell>
                   <TableCell>{l.HORA_PRAZO}</TableCell>
                   <TableCell>{l.STATUS}</TableCell>
                   <TableCell className="text-right">{(l.total_arquivo ?? 0).toLocaleString()}</TableCell>
