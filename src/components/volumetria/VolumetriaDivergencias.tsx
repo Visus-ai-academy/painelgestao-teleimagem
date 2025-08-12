@@ -125,6 +125,22 @@ export default function VolumetriaDivergencias() {
     })();
   }, []);
 
+  // Ajuste inicial: usar o último período disponível da fonte (se existir)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('volumetria_mobilemed')
+          .select('periodo_referencia')
+          .not('periodo_referencia', 'is', null)
+          .order('periodo_referencia', { ascending: false })
+          .limit(1);
+        const ref = data?.[0]?.periodo_referencia as string | undefined;
+        if (ref && ref !== referencia) setReferencia(ref);
+      } catch {}
+    })();
+  }, []);
+
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const carregar = async () => {
@@ -136,7 +152,7 @@ export default function VolumetriaDivergencias() {
       const end = format(endOfMonth(refDate), 'yyyy-MM-dd');
       // 1) Ler volumetria (arquivo) do período/cliente
       let volQuery = supabase.from('volumetria_mobilemed').select('*');
-      volQuery = volQuery.gte('DATA_REALIZACAO', start).lte('DATA_REALIZACAO', end);
+      volQuery = volQuery.eq('periodo_referencia', referencia);
       if (cliente !== 'todos') volQuery = volQuery.eq('EMPRESA', cliente);
       const { data: volRows, error: volErr } = await volQuery.limit(5000);
       if (volErr) throw volErr;
