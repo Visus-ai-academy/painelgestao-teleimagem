@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { 
   FileText, 
   Send,
@@ -137,7 +135,7 @@ export default function GerarFaturamento() {
 
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
-  const [enviarEmails, setEnviarEmails] = useState(true);
+  const [enviarEmails, setEnviarEmails] = useState(false);
   const [statusProcessamento, setStatusProcessamento] = useState<{
     processando: boolean;
     mensagem: string;
@@ -1225,7 +1223,7 @@ export default function GerarFaturamento() {
                 <div className="text-center py-8 text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>Nenhum relatório gerado ainda</p>
-                  <p className="text-sm">Faça upload dos dados de faturamento para gerar relatórios</p>
+                  <p className="text-sm">Use a aba Gerar (Etapa 1) para gerar os relatórios a partir da volumetria do período</p>
                 </div>
               )}
             </CardContent>
@@ -1492,24 +1490,6 @@ export default function GerarFaturamento() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Controle de envio de emails */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="enviar-emails"
-                    checked={enviarEmails}
-                    onCheckedChange={setEnviarEmails}
-                  />
-                  <Label htmlFor="enviar-emails" className="text-sm font-medium">
-                    Enviar emails após gerar relatórios (apenas quando usar "Fazer Tudo")
-                  </Label>
-                </div>
-                <p className="text-xs text-blue-700 mt-2">
-                  {enviarEmails 
-                    ? '✅ Emails serão enviados automaticamente quando usar "Fazer Tudo"' 
-                    : '🚫 Emails NÃO serão enviados automaticamente. Use "Enviar Emails" separadamente.'}
-                </p>
-              </div>
 
               {/* Status atual */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1576,30 +1556,24 @@ export default function GerarFaturamento() {
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    Etapa 2: Enviar Emails
+                    Etapa 2: Enviar Emails (em breve)
                   </h4>
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     <Button 
                       onClick={handleEnviarEmails}
-                      disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro && r.emailDestino).length === 0}
+                      disabled={true}
                       size="lg"
                       className="min-w-[250px]"
                       variant="outline"
+                      title="Função será habilitada na próxima etapa"
                     >
-                      {processandoTodos ? (
-                        <>
-                          <Clock className="h-5 w-5 mr-2 animate-spin" />
-                          Enviando Emails...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="h-5 w-5 mr-2" />
-                          Enviar Emails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado && !r.erro && r.emailDestino).length} prontos)
-                        </>
-                      )}
+                      <>
+                        <Mail className="h-5 w-5 mr-2" />
+                        Enviar Emails (em breve)
+                      </>
                     </Button>
                     <p className="text-sm text-blue-700">
-                      Envia relatórios por email apenas para clientes com PDFs gerados e com e-mail cadastrado
+                      Esta etapa será habilitada na sequência, após validação dos relatórios.
                     </p>
                   </div>
                 </div>
@@ -1612,32 +1586,18 @@ export default function GerarFaturamento() {
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     <Button 
                       onClick={handleProcessarTodosClientes}
-                      disabled={processandoTodos || !sistemaProntoParagerar}
+                      disabled={true}
                       size="lg"
                       className="min-w-[250px] bg-purple-600 hover:bg-purple-700"
-                      title={!sistemaProntoParagerar ? "Aguarde o processamento dos dados de faturamento" : ""}
+                      title="Função combinada será habilitada em breve"
                     >
-                      {processandoTodos ? (
-                        <>
-                          <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                          Processando...
-                        </>
-                      ) : !sistemaProntoParagerar ? (
-                        <>
-                          <Clock className="h-5 w-5 mr-2" />
-                          Aguardando Dados...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-5 w-5 mr-2" />
-                          Fazer Tudo ({enviarEmails ? 'Gerar + Enviar' : 'Apenas Gerar'})
-                        </>
-                      )}
+                      <>
+                        <Zap className="h-5 w-5 mr-2" />
+                        Fazer Tudo (em breve)
+                      </>
                     </Button>
                     <p className="text-sm text-purple-700">
-                      {enviarEmails 
-                        ? 'Gera relatórios e envia emails automaticamente' 
-                        : 'Gera apenas relatórios (emails desabilitados)'}
+                      Função combinada (Gerar + Enviar) será disponibilizada na próxima etapa.
                     </p>
                   </div>
                 </div>
