@@ -269,6 +269,27 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
       const divergencias: LinhaDivergencia[] = [];
 
+      const splitKey = (k: string) => k.split('|');
+      const findSistemaCandidato = (k: string) => {
+        const [cli, mod, esp, exame, pac, data] = splitKey(k);
+        // 1) Igual sem data
+        for (const ks of mapSistema.keys()) {
+          const [cliS, modS, espS, exameS, pacS] = splitKey(ks);
+          if (cli===cliS && mod===modS && esp===espS && exame===exameS && pac===pacS) return {ks, motivo:'data_diferente'};
+        }
+        // 2) Igual sem especialidade
+        for (const ks of mapSistema.keys()) {
+          const [cliS, modS, _espS, exameS, pacS, dataS] = splitKey(ks);
+          if (cli===cliS && mod===modS && exame===exameS && pac===pacS && data===dataS) return {ks, motivo:'especialidade_diferente'};
+        }
+        // 3) Igual sem exame (títulos variantes)
+        for (const ks of mapSistema.keys()) {
+          const [cliS, modS, espS, _exameS, pacS, dataS] = splitKey(ks);
+          if (cli===cliS && mod===modS && esp===espS && pac===pacS && data===dataS) return {ks, motivo:'descricao_exame_variavel'};
+        }
+        return null;
+      };
+
       const toLinhaFromArquivo = (key: string, a: AggFile): LinhaDivergencia => {
         const r = a.amostra as any as UploadedExamRow;
         return {
@@ -338,6 +359,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         const a = mapArquivo.get(k);
         const s = mapSistema.get(k);
         if (a && !s) {
+          const cand = findSistemaCandidato(k);
+          if (cand) {
+            console.warn('[Divergência: Só no Arquivo] possível causa:', cand.motivo, { arquivo: a.amostra, sistema_exemplo: mapSistema.get(cand.ks)?.amostra });
+          } else {
+            console.warn('[Divergência: Só no Arquivo] sem correspondência próxima', { arquivo: a.amostra });
+          }
           divergencias.push(toLinhaFromArquivo(k, a));
         } else if (!a && s) {
           divergencias.push(toLinhaFromSistema(k, s));
