@@ -22,6 +22,7 @@ export default function Comparativo() {
     uploaded: 'comparativo_uploaded',
     uploadedExams: 'comparativo_uploadedExams',
     lastFileName: 'comparativo_lastFileName',
+    divergencias: 'comparativo_divergencias',
   } as const;
 
   // Restaurar ao montar
@@ -30,9 +31,11 @@ export default function Comparativo() {
       const u = localStorage.getItem(STORAGE_KEYS.uploaded);
       const ue = localStorage.getItem(STORAGE_KEYS.uploadedExams);
       const lf = localStorage.getItem(STORAGE_KEYS.lastFileName);
+      const dv = localStorage.getItem(STORAGE_KEYS.divergencias);
       if (u) setUploaded(JSON.parse(u));
       if (ue) setUploadedExams(JSON.parse(ue));
       if (lf) setLastFileName(JSON.parse(lf));
+      if (dv) setDivergencias(JSON.parse(dv));
     } catch (e) {
       console.warn('Falha ao restaurar comparativo do storage', e);
     }
@@ -49,10 +52,12 @@ export default function Comparativo() {
 
       if (lastFileName) localStorage.setItem(STORAGE_KEYS.lastFileName, JSON.stringify(lastFileName));
       else localStorage.removeItem(STORAGE_KEYS.lastFileName);
+
+      localStorage.setItem(STORAGE_KEYS.divergencias, JSON.stringify(divergencias || []));
     } catch (e) {
       console.warn('Falha ao salvar comparativo no storage', e);
     }
-  }, [uploaded, uploadedExams, lastFileName]);
+  }, [uploaded, uploadedExams, lastFileName, divergencias]);
 
   const parseXlsx = useCallback(async (file: File) => {
     setIsUploading(true);
@@ -196,6 +201,7 @@ export default function Comparativo() {
       localStorage.removeItem(STORAGE_KEYS.uploaded);
       localStorage.removeItem(STORAGE_KEYS.uploadedExams);
       localStorage.removeItem(STORAGE_KEYS.lastFileName);
+      localStorage.removeItem(STORAGE_KEYS.divergencias);
     } catch {}
   }, []);
 
