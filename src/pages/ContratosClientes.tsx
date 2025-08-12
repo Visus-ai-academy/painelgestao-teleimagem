@@ -66,7 +66,6 @@ interface ContratoCliente {
   valorTotal: number;
   diasParaVencer: number;
   indiceReajuste: "IPCA" | "IGP-M" | "INPC" | "CDI";
-  percentualUltimos12Meses?: number;
   // Dados do cliente
   cnpj?: string;
   endereco?: string;
@@ -82,6 +81,15 @@ interface ContratoCliente {
   valorIntegracao?: number;
   cobrancaSuporte: boolean;
   valorSuporte?: number;
+  // Regras e condições de preço
+  consideraPlantao?: boolean;
+  condVolume?: string;
+  diaVencimento?: number;
+  descontoPercentual?: number;
+  acrescimoPercentual?: number;
+  faixasVolume?: any[];
+  configuracoesFranquia?: any;
+  configuracoesIntegracao?: any;
   // Histórico de alterações
   termosAditivos?: TermoAditivo[];
   documentos?: DocumentoCliente[];
@@ -154,7 +162,25 @@ export default function ContratosClientes() {
   const [showVisualizarContrato, setShowVisualizarContrato] = useState(false);
   const [contratoVisualizando, setContratoVisualizando] = useState<ContratoCliente | null>(null);
   const [editDataInicio, setEditDataInicio] = useState("");
-  const [editDataFim, setEditDataFim] = useState("");
+const [editDataFim, setEditDataFim] = useState("");
+// Campos adicionais para edição
+const [editDiaVencimento, setEditDiaVencimento] = useState<number | "">(10);
+const [editConsideraPlantao, setEditConsideraPlantao] = useState(false);
+const [editCondVolume, setEditCondVolume] = useState<string>("MOD/ESP/CAT");
+const [editDesconto, setEditDesconto] = useState<number | "">(0);
+const [editAcrescimo, setEditAcrescimo] = useState<number | "">(0);
+// Franquia
+const [editFranqAtiva, setEditFranqAtiva] = useState(false);
+const [editFranqVolume, setEditFranqVolume] = useState<number | "">(0);
+const [editFranqValor, setEditFranqValor] = useState<number | "">(0);
+const [editFranqAcimaValor, setEditFranqAcimaValor] = useState<number | "">(0);
+// Integração
+const [editIntegraCobra, setEditIntegraCobra] = useState(false);
+const [editIntegraValor, setEditIntegraValor] = useState<number | "">(0);
+// Faixas de volume (JSON)
+const [editFaixasVolumeText, setEditFaixasVolumeText] = useState<string>("[]");
+// Serviços contratados (JSON opcional)
+const [editServicosText, setEditServicosText] = useState<string>("");
 
   // Estados para busca, filtro e ordenação
   const [searchTerm, setSearchTerm] = useState("");
@@ -228,35 +254,44 @@ export default function ContratosClientes() {
           valorEstimado += Number(configuracoesIntegracao.valor_integracao || 0);
         }
 
-        return {
-          id: contrato.id,
-          cliente: cliente?.nome || 'Cliente não encontrado',
-          cnpj: cliente?.cnpj || '',
-          dataInicio: contrato.data_inicio || '',
-          dataFim: contrato.data_fim || contrato.data_inicio || '',
-          status,
-          servicos: servicosContratados.map((s: any) => ({
-            id: s.id,
-            modalidade: s.modalidade,
-            especialidade: s.especialidade,
-            categoria: s.categoria,
-            prioridade: s.prioridade,
-            valor: Number(s.valor || 0)
-          })) as ServicoContratado[],
-          valorTotal: valorEstimado, // Valor estimado baseado em franquia/integração
-          diasParaVencer,
-          indiceReajuste: "IPCA" as const,
-          endereco: cliente?.endereco || '',
-          telefone: cliente?.telefone || '',
-          emailFinanceiro: cliente?.email || '',
-          emailOperacional: cliente?.email || '',
-          responsavel: cliente?.contato || '',
-          cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
-          valorIntegracao: Number(configuracoesIntegracao.valor_integracao || 0),
-          cobrancaSuporte: false,
-          termosAditivos: [],
-          documentos: []
-        };
+return {
+  id: contrato.id,
+  cliente: cliente?.nome || 'Cliente não encontrado',
+  cnpj: cliente?.cnpj || '',
+  dataInicio: contrato.data_inicio || '',
+  dataFim: contrato.data_fim || contrato.data_inicio || '',
+  status,
+  servicos: servicosContratados.map((s: any) => ({
+    id: s.id,
+    modalidade: s.modalidade,
+    especialidade: s.especialidade,
+    categoria: s.categoria,
+    prioridade: s.prioridade,
+    valor: Number(s.valor || 0)
+  })) as ServicoContratado[],
+  valorTotal: valorEstimado,
+  diasParaVencer,
+  indiceReajuste: "IPCA" as const,
+  endereco: cliente?.endereco || '',
+  telefone: cliente?.telefone || '',
+  emailFinanceiro: cliente?.email || '',
+  emailOperacional: cliente?.email || '',
+  responsavel: cliente?.contato || '',
+  cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
+  valorIntegracao: Number(configuracoesIntegracao.valor_integracao || 0),
+  cobrancaSuporte: false,
+  // Novos campos
+  consideraPlantao: Boolean(contrato.considera_plantao),
+  condVolume: contrato.cond_volume || 'MOD/ESP/CAT',
+  diaVencimento: Number(contrato.dia_vencimento || 10),
+  descontoPercentual: Number(contrato.desconto_percentual || 0),
+  acrescimoPercentual: Number(contrato.acrescimo_percentual || 0),
+  faixasVolume: Array.isArray(contrato.faixas_volume) ? contrato.faixas_volume : [],
+  configuracoesFranquia: configuracoesFranquia,
+  configuracoesIntegracao: configuracoesIntegracao,
+  termosAditivos: [],
+  documentos: []
+};
       });
 
       setContratos(contratosFormatados);
@@ -277,12 +312,27 @@ export default function ContratosClientes() {
     carregarContratos();
   }, []);
 
-  useEffect(() => {
-    if (contratoEditando) {
-      setEditDataInicio(contratoEditando.dataInicio ? contratoEditando.dataInicio.slice(0, 10) : "");
-      setEditDataFim(contratoEditando.dataFim ? contratoEditando.dataFim.slice(0, 10) : "");
-    }
-  }, [contratoEditando]);
+useEffect(() => {
+  if (contratoEditando) {
+    setEditDataInicio(contratoEditando.dataInicio ? contratoEditando.dataInicio.slice(0, 10) : "");
+    setEditDataFim(contratoEditando.dataFim ? contratoEditando.dataFim.slice(0, 10) : "");
+    setEditDiaVencimento(contratoEditando.diaVencimento ?? 10);
+    setEditConsideraPlantao(Boolean(contratoEditando.consideraPlantao));
+    setEditCondVolume(contratoEditando.condVolume || "MOD/ESP/CAT");
+    setEditDesconto(contratoEditando.descontoPercentual ?? 0);
+    setEditAcrescimo(contratoEditando.acrescimoPercentual ?? 0);
+    const franq = contratoEditando.configuracoesFranquia || {};
+    setEditFranqAtiva(Boolean(franq.tem_franquia));
+    setEditFranqVolume(franq.volume_franquia ?? 0);
+    setEditFranqValor(franq.valor_franquia ?? 0);
+    setEditFranqAcimaValor(franq.valor_acima_franquia ?? 0);
+    const integ = contratoEditando.configuracoesIntegracao || {};
+    setEditIntegraCobra(Boolean(integ.cobra_integracao));
+    setEditIntegraValor(integ.valor_integracao ?? 0);
+    setEditFaixasVolumeText(JSON.stringify(contratoEditando.faixasVolume || [], null, 2));
+    setEditServicosText(JSON.stringify(contratoEditando.servicos || [], null, 2));
+  }
+}, [contratoEditando]);
   // Função para sincronizar preços com contratos
   const sincronizarPrecos = async () => {
     if (!confirm('Deseja sincronizar os preços de serviços com os contratos? Esta ação atualizará os serviços contratados de todos os contratos.')) {
@@ -322,28 +372,68 @@ export default function ContratosClientes() {
     }
   };
 
-  const salvarContrato = async () => {
-    if (!contratoEditando) return;
+const salvarContrato = async () => {
+  if (!contratoEditando) return;
+  try {
+    // Validar e preparar JSONs
+    let faixas: any[] = [];
     try {
-      const { error } = await supabase
-        .from('contratos_clientes')
-        .update({
-          data_inicio: editDataInicio || null,
-          data_fim: editDataFim || null,
-        })
-        .eq('id', contratoEditando.id);
-
-      if (error) throw error;
-
-      toast({ title: 'Contrato atualizado com sucesso' });
-      setShowEditarContrato(false);
-      setContratoEditando(null);
-      await carregarContratos();
-    } catch (err: any) {
-      console.error('Erro ao salvar contrato:', err);
-      toast({ title: 'Erro ao salvar contrato', description: err.message, variant: 'destructive' });
+      faixas = JSON.parse(editFaixasVolumeText || '[]');
+      if (!Array.isArray(faixas)) throw new Error('Faixas de volume deve ser um array');
+    } catch (e: any) {
+      toast({ title: 'JSON inválido em Faixas de Volume', description: e.message, variant: 'destructive' });
+      return;
     }
-  };
+    let servicosAtualizados: any | undefined = undefined;
+    if (editServicosText && editServicosText.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(editServicosText);
+        if (!Array.isArray(parsed)) throw new Error('Serviços deve ser um array');
+        servicosAtualizados = parsed;
+      } catch (e: any) {
+        toast({ title: 'JSON inválido em Serviços', description: e.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    const updateData: any = {
+      data_inicio: editDataInicio || null,
+      data_fim: editDataFim || null,
+      dia_vencimento: editDiaVencimento || null,
+      considera_plantao: editConsideraPlantao,
+      cond_volume: editCondVolume,
+      desconto_percentual: Number(editDesconto || 0),
+      acrescimo_percentual: Number(editAcrescimo || 0),
+      configuracoes_franquia: {
+        tem_franquia: editFranqAtiva,
+        volume_franquia: Number(editFranqVolume || 0),
+        valor_franquia: Number(editFranqValor || 0),
+        valor_acima_franquia: Number(editFranqAcimaValor || 0)
+      },
+      configuracoes_integracao: {
+        cobra_integracao: editIntegraCobra,
+        valor_integracao: Number(editIntegraValor || 0)
+      },
+      faixas_volume: faixas
+    };
+    if (servicosAtualizados) updateData.servicos_contratados = servicosAtualizados;
+
+    const { error } = await supabase
+      .from('contratos_clientes')
+      .update(updateData)
+      .eq('id', contratoEditando.id);
+
+    if (error) throw error;
+
+    toast({ title: 'Contrato atualizado com sucesso' });
+    setShowEditarContrato(false);
+    setContratoEditando(null);
+    await carregarContratos();
+  } catch (err: any) {
+    console.error('Erro ao salvar contrato:', err);
+    toast({ title: 'Erro ao salvar contrato', description: err.message, variant: 'destructive' });
+  }
+};
   const criarContratosAutomatico = async () => {
     try {
       setIsCreatingContracts(true);
@@ -799,8 +889,57 @@ export default function ContratosClientes() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Serviços Contratados — {contratoVisualizando?.cliente}</DialogTitle>
-            <DialogDescription>Visualize os serviços e preços configurados neste contrato.</DialogDescription>
+            <DialogDescription>Visualize os serviços, volumes e condições de preço configurados neste contrato.</DialogDescription>
           </DialogHeader>
+
+          {/* Condições e Regras de Preço do Contrato */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Condição de Volume</p>
+              <p className="text-sm font-medium">{contratoVisualizando?.condVolume || '—'}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Considera Plantão</p>
+              <p className="text-sm font-medium">{contratoVisualizando?.consideraPlantao ? 'Sim' : 'Não'}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Dia de Vencimento</p>
+              <p className="text-sm font-medium">{contratoVisualizando?.diaVencimento ?? '—'}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Desconto (%)</p>
+              <p className="text-sm font-medium">{Number(contratoVisualizando?.descontoPercentual || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Acréscimo (%)</p>
+              <p className="text-sm font-medium">{Number(contratoVisualizando?.acrescimoPercentual || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Faixas de Volume</p>
+              <p className="text-sm font-medium">{Array.isArray(contratoVisualizando?.faixasVolume) ? contratoVisualizando?.faixasVolume.length : 0} faixa(s)</p>
+            </div>
+          </div>
+
+          {/* Franquia e Integração */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground mb-1">Franquia</p>
+              <div className="text-xs space-y-1">
+                <p>Ativa: <span className="font-medium">{contratoVisualizando?.configuracoesFranquia?.tem_franquia ? 'Sim' : 'Não'}</span></p>
+                <p>Volume: <span className="font-medium">{contratoVisualizando?.configuracoesFranquia?.volume_franquia ?? 0}</span></p>
+                <p>Valor: <span className="font-medium">R$ {Number(contratoVisualizando?.configuracoesFranquia?.valor_franquia || 0).toFixed(2)}</span></p>
+                <p>Acima: <span className="font-medium">R$ {Number(contratoVisualizando?.configuracoesFranquia?.valor_acima_franquia || 0).toFixed(2)}</span></p>
+              </div>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground mb-1">Integração</p>
+              <div className="text-xs space-y-1">
+                <p>Cobra integração: <span className="font-medium">{contratoVisualizando?.configuracoesIntegracao?.cobra_integracao ? 'Sim' : 'Não'}</span></p>
+                <p>Valor integração: <span className="font-medium">R$ {Number(contratoVisualizando?.configuracoesIntegracao?.valor_integracao || 0).toFixed(2)}</span></p>
+              </div>
+            </div>
+          </div>
+
           <div className="border rounded-md max-h-[60vh] overflow-auto">
             {contratoVisualizando?.servicos?.length ? (
               <Table>
