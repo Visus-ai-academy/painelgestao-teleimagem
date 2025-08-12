@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { VolumetriaClientesComparison, Divergencia, UploadedRow } from "@/components/volumetria/VolumetriaClientesComparison";
 import VolumetriaExamesComparison, { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
+import VolumetriaDivergencias from "@/components/volumetria/VolumetriaDivergencias";
 import { SimpleFileUpload } from "@/components/SimpleFileUpload";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
@@ -255,6 +256,7 @@ export default function Comparativo() {
         <TabsList>
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
           <TabsTrigger value="exames">Por Exame</TabsTrigger>
+          <TabsTrigger value="divergencias">Divergências</TabsTrigger>
         </TabsList>
         <TabsContent value="resumo">
           <Card>
@@ -272,6 +274,9 @@ export default function Comparativo() {
         </TabsContent>
         <TabsContent value="exames">
           <VolumetriaExamesComparison uploadedExams={uploadedExams || undefined} />
+        </TabsContent>
+        <TabsContent value="divergencias">
+          <VolumetriaDivergencias />
         </TabsContent>
       </Tabs>
     </div>

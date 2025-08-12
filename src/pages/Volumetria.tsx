@@ -13,7 +13,7 @@ import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
 import { useVolumetriaDataFiltered } from "@/hooks/useVolumetriaDataFiltered";
-import VolumetriaDivergencias from "@/components/volumetria/VolumetriaDivergencias";
+
 
 export default function Volumetria() {
   const [filters, setFilters] = useState<VolumetriaFilters>({
@@ -121,10 +121,6 @@ export default function Volumetria() {
                 <TrendingUp className="h-4 w-4" />
                 Clientes Atrasados
               </TabsTrigger>
-              <TabsTrigger value="divergencias" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Divergências
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="resumo" className="space-y-6">
@@ -185,9 +181,6 @@ export default function Volumetria() {
               <VolumetriaClientesAtrasados />
             </TabsContent>
 
-            <TabsContent value="divergencias" className="space-y-6">
-              <VolumetriaDivergencias />
-            </TabsContent>
           </Tabs>
         ) : (
           <VolumetriaNoData 
