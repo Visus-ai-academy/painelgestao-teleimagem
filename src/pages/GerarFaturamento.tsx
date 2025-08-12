@@ -41,8 +41,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
-import { UploadStatusPanel } from "@/components/UploadStatusPanel";
-import { FaturamentoUploadStatus } from "@/components/FaturamentoUploadStatus";
 import LimparDadosCompleto from "@/components/LimparDadosCompleto";
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
@@ -112,7 +110,7 @@ export default function GerarFaturamento() {
   const [processandoTodos, setProcessandoTodos] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
-  const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(false);
+  const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
   
   // Controle de período para volumetria retroativa
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
@@ -1303,14 +1301,6 @@ export default function GerarFaturamento() {
                   </div>
                 </div>
 
-                {/* Status dos Uploads de Faturamento */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    Status dos Uploads de Faturamento
-                  </h4>
-                  <FaturamentoUploadStatus refreshTrigger={refreshUploadStatus} />
-                </div>
               </CardContent>
             </Card>
           </div>
