@@ -181,10 +181,13 @@ const [editFranqAcimaValor, setEditFranqAcimaValor] = useState<number | "">(0);
 // Integração
 const [editIntegraCobra, setEditIntegraCobra] = useState(false);
 const [editIntegraValor, setEditIntegraValor] = useState<number | "">(0);
+// Portal de Laudos
+const [editPortalAtivo, setEditPortalAtivo] = useState(false);
+const [editPortalValor, setEditPortalValor] = useState<number | "">(0);
 // Faixas de volume (JSON)
 const [editFaixasVolumeText, setEditFaixasVolumeText] = useState<string>("[]");
 // Serviços contratados (editáveis)
-const [editServicos, setEditServicos] = useState<ServicoContratado[]>([]);
+const [editServicos, setEditServicos] = useState<any[]>([]);
 // Data de vigência da edição
 const [editDataVigencia, setEditDataVigencia] = useState("");
 const [editDescricaoAlteracao, setEditDescricaoAlteracao] = useState("");
@@ -345,6 +348,8 @@ useEffect(() => {
     const integ = contratoEditando.configuracoesIntegracao || {};
     setEditIntegraCobra(Boolean(integ.cobra_integracao));
     setEditIntegraValor(integ.valor_integracao ?? 0);
+    setEditPortalAtivo(Boolean(integ.portal_laudos_ativo));
+    setEditPortalValor(integ.valor_portal_laudos ?? 0);
     setEditFaixasVolumeText(JSON.stringify(contratoEditando.faixasVolume || [], null, 2));
     setEditServicos([...contratoEditando.servicos || []]);
     
@@ -492,7 +497,9 @@ const salvarContrato = async () => {
       },
       configuracoes_integracao: {
         cobra_integracao: editIntegraCobra,
-        valor_integracao: Number(editIntegraValor || 0)
+        valor_integracao: Number(editIntegraValor || 0),
+        portal_laudos_ativo: editPortalAtivo,
+        valor_portal_laudos: Number(editPortalValor || 0)
       },
       faixas_volume: faixas
     };
@@ -1286,178 +1293,198 @@ const salvarContrato = async () => {
               )}
             </div>
 
-            {/* Faixas de Volume (JSON) */}
-            <div className="grid gap-2">
-              <Label>Faixas de Volume (JSON)</Label>
-              <Textarea 
-                rows={4}
-                value={editFaixasVolumeText} 
-                onChange={(e) => setEditFaixasVolumeText(e.target.value)}
-                placeholder='[{"inicial": 0, "final": 100, "desconto": 0}, {"inicial": 101, "final": 500, "desconto": 5}]'
-              />
-            </div>
-
-            {/* Serviços Contratados */}
+            {/* Condições de Preço (Faixas por Serviço) */}
             <div className="border rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">Serviços Contratados</Label>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  onClick={() => setEditServicos([...editServicos, {
-                    modalidade: "MR" as const,
-                    especialidade: "NE" as const,
-                    categoria: "Normal" as const,
-                    prioridade: "Rotina" as const,
-                    valor: 0
-                  }])}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar Serviço
-                </Button>
+                <Label className="text-base font-medium">Condições de Preço (Faixas por Serviço)</Label>
+                <p className="text-sm text-muted-foreground">Edite os valores e ative/inative serviços</p>
               </div>
               
-              {editServicos.length > 0 ? (
-                <div className="border rounded-lg overflow-hidden">
+              {loadingPrecos ? (
+                <div className="p-4 text-sm text-muted-foreground">Carregando condições...</div>
+              ) : precosCliente.length > 0 ? (
+                <div className="border rounded-lg overflow-auto max-h-[400px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-16">Ativo</TableHead>
                         <TableHead>Modalidade</TableHead>
                         <TableHead>Especialidade</TableHead>
                         <TableHead>Categoria</TableHead>
                         <TableHead>Prioridade</TableHead>
-                        <TableHead>Valor (R$)</TableHead>
-                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Vol. Inicial</TableHead>
+                        <TableHead>Vol. Final</TableHead>
+                        <TableHead>Plantão</TableHead>
+                        <TableHead>Valor Base (R$)</TableHead>
+                        <TableHead>Valor Urgência (R$)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {editServicos.map((servico, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Select 
-                              value={servico.modalidade} 
-                              onValueChange={(value) => {
-                                const newServicos = [...editServicos];
-                                newServicos[index] = { ...newServicos[index], modalidade: value as any };
-                                setEditServicos(newServicos);
-                              }}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="MR">MR</SelectItem>
-                                <SelectItem value="CT">CT</SelectItem>
-                                <SelectItem value="DO">DO</SelectItem>
-                                <SelectItem value="MG">MG</SelectItem>
-                                <SelectItem value="RX">RX</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select 
-                              value={servico.especialidade} 
-                              onValueChange={(value) => {
-                                const newServicos = [...editServicos];
-                                newServicos[index] = { ...newServicos[index], especialidade: value as any };
-                                setEditServicos(newServicos);
-                              }}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="CA">CA</SelectItem>
-                                <SelectItem value="NE">NE</SelectItem>
-                                <SelectItem value="ME">ME</SelectItem>
-                                <SelectItem value="MI">MI</SelectItem>
-                                <SelectItem value="MA">MA</SelectItem>
-                                <SelectItem value="OB">OB</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select 
-                              value={servico.categoria} 
-                              onValueChange={(value) => {
-                                const newServicos = [...editServicos];
-                                newServicos[index] = { ...newServicos[index], categoria: value as any };
-                                setEditServicos(newServicos);
-                              }}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Normal">Normal</SelectItem>
-                                <SelectItem value="Especial">Especial</SelectItem>
-                                <SelectItem value="Angio">Angio</SelectItem>
-                                <SelectItem value="Contrastado">Contrastado</SelectItem>
-                                <SelectItem value="Mastoide">Mastoide</SelectItem>
-                                <SelectItem value="OIT">OIT</SelectItem>
-                                <SelectItem value="Pescoço">Pescoço</SelectItem>
-                                <SelectItem value="Prostata">Prostata</SelectItem>
-                                <SelectItem value="Score">Score</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select 
-                              value={servico.prioridade} 
-                              onValueChange={(value) => {
-                                const newServicos = [...editServicos];
-                                newServicos[index] = { ...newServicos[index], prioridade: value as any };
-                                setEditServicos(newServicos);
-                              }}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Rotina">Rotina</SelectItem>
-                                <SelectItem value="Urgente">Urgente</SelectItem>
-                                <SelectItem value="Plantão">Plantão</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              value={servico.valor} 
-                              onChange={(e) => {
-                                const newServicos = [...editServicos];
-                                newServicos[index] = { ...newServicos[index], valor: Number(e.target.value) || 0 };
-                                setEditServicos(newServicos);
-                              }}
-                              className="w-full"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => {
-                                const newServicos = editServicos.filter((_, i) => i !== index);
-                                setEditServicos(newServicos);
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {precosCliente.map((preco, index) => {
+                        const servicoKey = `${preco.modalidade}-${preco.especialidade}-${preco.categoria}-${preco.prioridade || ''}`;
+                        const servicoAtivo = editServicos.find(s => 
+                          `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                        );
+                        
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Checkbox 
+                                checked={!!servicoAtivo}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    // Adicionar serviço
+                                    setEditServicos([...editServicos, {
+                                      modalidade: preco.modalidade as any,
+                                      especialidade: preco.especialidade as any,
+                                      categoria: preco.categoria as any,
+                                      prioridade: preco.prioridade as any,
+                                      valor: Number(preco.valor_base || 0),
+                                      volumeInicial: preco.volume_inicial,
+                                      volumeFinal: preco.volume_final,
+                                      consideraPlantao: preco.considera_prioridade_plantao
+                                    }]);
+                                  } else {
+                                    // Remover serviço
+                                    setEditServicos(editServicos.filter(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` !== servicoKey
+                                    ));
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>{preco.modalidade}</TableCell>
+                            <TableCell>{preco.especialidade}</TableCell>
+                            <TableCell>{preco.categoria}</TableCell>
+                            <TableCell>{preco.prioridade || '-'}</TableCell>
+                            <TableCell>
+                              {servicoAtivo ? (
+                                <Input 
+                                  type="number"
+                                  value={servicoAtivo.volumeInicial || preco.volume_inicial || ''}
+                                  onChange={(e) => {
+                                    const newServicos = editServicos.map(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                                        ? { ...s, volumeInicial: Number(e.target.value) || null }
+                                        : s
+                                    );
+                                    setEditServicos(newServicos);
+                                  }}
+                                  className="w-20"
+                                />
+                              ) : (
+                                preco.volume_inicial || '-'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {servicoAtivo ? (
+                                <Input 
+                                  type="number"
+                                  value={servicoAtivo.volumeFinal || preco.volume_final || ''}
+                                  onChange={(e) => {
+                                    const newServicos = editServicos.map(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                                        ? { ...s, volumeFinal: Number(e.target.value) || null }
+                                        : s
+                                    );
+                                    setEditServicos(newServicos);
+                                  }}
+                                  className="w-20"
+                                />
+                              ) : (
+                                preco.volume_final || '-'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {servicoAtivo ? (
+                                <Checkbox 
+                                  checked={servicoAtivo.consideraPlantao || false}
+                                  onCheckedChange={(checked) => {
+                                    const newServicos = editServicos.map(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                                        ? { ...s, consideraPlantao: checked === true }
+                                        : s
+                                    );
+                                    setEditServicos(newServicos);
+                                  }}
+                                />
+                              ) : (
+                                preco.considera_prioridade_plantao ? 'Sim' : 'Não'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {servicoAtivo ? (
+                                <Input 
+                                  type="number"
+                                  step="0.01"
+                                  value={servicoAtivo.valor || preco.valor_base || ''}
+                                  onChange={(e) => {
+                                    const newServicos = editServicos.map(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                                        ? { ...s, valor: Number(e.target.value) || 0 }
+                                        : s
+                                    );
+                                    setEditServicos(newServicos);
+                                  }}
+                                  className="w-24"
+                                />
+                              ) : (
+                                `R$ ${Number(preco.valor_base || 0).toFixed(2)}`
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {servicoAtivo ? (
+                                <Input 
+                                  type="number"
+                                  step="0.01"
+                                  value={servicoAtivo.valorUrgencia || preco.valor_urgencia || ''}
+                                  onChange={(e) => {
+                                    const newServicos = editServicos.map(s => 
+                                      `${s.modalidade}-${s.especialidade}-${s.categoria}-${s.prioridade || ''}` === servicoKey
+                                        ? { ...s, valorUrgencia: Number(e.target.value) || 0 }
+                                        : s
+                                    );
+                                    setEditServicos(newServicos);
+                                  }}
+                                  className="w-24"
+                                />
+                              ) : (
+                                `R$ ${Number(preco.valor_urgencia || 0).toFixed(2)}`
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Nenhum serviço contratado.</p>
-                  <p className="text-sm">Clique em "Adicionar Serviço" para começar.</p>
+                <div className="p-4 text-sm text-muted-foreground">Nenhuma condição de preço cadastrada para este cliente.</div>
+              )}
+            </div>
+            
+            {/* Portal de Laudos */}
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  checked={editPortalAtivo} 
+                  onCheckedChange={(checked) => setEditPortalAtivo(checked === true)} 
+                />
+                <Label>Portal de Laudos Ativo</Label>
+              </div>
+              {editPortalAtivo && (
+                <div className="grid gap-2">
+                  <Label>Valor Portal de Laudos (R$)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={editPortalValor} 
+                    onChange={(e) => setEditPortalValor(Number(e.target.value) || "")} 
+                  />
                 </div>
               )}
             </div>
+            
               </div>
             </TabsContent>
             
