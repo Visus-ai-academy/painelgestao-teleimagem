@@ -15,11 +15,13 @@ type GrupoChave = {
 };
 
 function periodoToDatas(periodo: string) {
-  // período no formato YYYY-MM
+  // período no formato YYYY-MM (ex: 2025-06 para jun/25)
   const [y, m] = periodo.split('-').map(Number);
-  // JS Date: mês 0-11. Início = dia 8 do mês anterior; Fim = dia 7 do mês atual
-  const inicio = new Date(y, (m - 1) - 1, 8); // m-2
-  const fim = new Date(y, (m - 1), 7);       // m-1
+  
+  // Para jun/25 (2025-06), buscar todo o mês de junho: 01/06 a 30/06
+  const inicio = new Date(y, m - 1, 1); // Primeiro dia do mês
+  const fim = new Date(y, m, 0);        // Último dia do mês (dia 0 do próximo mês)
+  
   const toISO = (d: Date) => d.toISOString().split('T')[0];
   return { inicio: toISO(inicio), fim: toISO(fim) };
 }
