@@ -22,11 +22,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Limpar dados de faturamento do período específico
+    // Limpar TODOS os dados de faturamento (incluindo os com periodo_referencia NULL)
     const { error: deleteError, count } = await supabase
       .from('faturamento')
       .delete()
-      .eq('periodo_referencia', periodo_referencia);
+      .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos os registros
 
     if (deleteError) {
       console.error('[limpar-faturamento-periodo] Erro ao limpar:', deleteError);
@@ -34,6 +34,13 @@ serve(async (req) => {
     }
 
     console.log(`[limpar-faturamento-periodo] ${count || 0} registros removidos`);
+
+    // Log adicional para confirmar limpeza
+    const { data: verificacao, error: errVerif } = await supabase
+      .from('faturamento')
+      .select('*', { count: 'exact', head: true });
+    
+    console.log(`[limpar-faturamento-periodo] Verificação pós-limpeza: ${verificacao?.length || 0} registros restantes`);
 
     return new Response(JSON.stringify({
       success: true,

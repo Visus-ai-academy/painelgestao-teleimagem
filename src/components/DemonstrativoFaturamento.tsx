@@ -87,6 +87,7 @@ export default function DemonstrativoFaturamento() {
           periodo_referencia
         `)
         .eq('periodo_referencia', periodoRef)
+        .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .order('cliente_nome');
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
