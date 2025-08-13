@@ -22,11 +22,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Limpar TODOS os dados de faturamento (incluindo os com periodo_referencia NULL)
-    const { error: deleteError, count } = await supabase
-      .from('faturamento')
-      .delete()
-      .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos os registros
+    // Verificar se deve limpar TODOS os dados ou apenas um período específico
+    let deleteQuery;
+    
+    if (periodo_referencia === 'all') {
+      console.log('[limpar-faturamento-periodo] Limpando TODOS os dados de faturamento...');
+      // Limpar TODOS os dados de faturamento
+      deleteQuery = supabase.from('faturamento').delete().gte('id', '00000000-0000-0000-0000-000000000000');
+    } else {
+      console.log('[limpar-faturamento-periodo] Limpando dados do período:', periodo_referencia);
+      // Limpar apenas dados do período específico E registros sem período (NULL)
+      deleteQuery = supabase.from('faturamento').delete().or(`periodo_referencia.eq.${periodo_referencia},periodo_referencia.is.null`);
+    }
+
+    const { error: deleteError, count } = await deleteQuery;
 
     if (deleteError) {
       console.error('[limpar-faturamento-periodo] Erro ao limpar:', deleteError);
@@ -36,11 +45,11 @@ serve(async (req) => {
     console.log(`[limpar-faturamento-periodo] ${count || 0} registros removidos`);
 
     // Log adicional para confirmar limpeza
-    const { data: verificacao, error: errVerif } = await supabase
+    const { count: verificacaoCount, error: errVerif } = await supabase
       .from('faturamento')
       .select('*', { count: 'exact', head: true });
     
-    console.log(`[limpar-faturamento-periodo] Verificação pós-limpeza: ${verificacao?.length || 0} registros restantes`);
+    console.log(`[limpar-faturamento-periodo] Verificação pós-limpeza: ${verificacaoCount || 0} registros restantes`);
 
     return new Response(JSON.stringify({
       success: true,
