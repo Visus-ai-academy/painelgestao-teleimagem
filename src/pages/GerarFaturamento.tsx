@@ -135,15 +135,6 @@ export default function GerarFaturamento() {
     return saved ? JSON.parse(saved) : [];
   });
   
-  // Estado para relatórios prontos
-  const [relatoriosProntos, setRelatoriosProntos] = useState<Array<{
-    clienteId: string;
-    clienteNome: string;
-    arquivo: File;
-    nomeArquivo: string;
-    uploadUrl?: string;
-    dataUpload: string;
-  }>>([]);
 
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
@@ -381,121 +372,6 @@ export default function GerarFaturamento() {
     localStorage.setItem('emailsEnviados', emailsEnviados.toString());
   }, [emailsEnviados]);
 
-  // Função para fazer upload de relatório pronto
-  const handleUploadRelatorio = async (clienteId: string, file: File) => {
-    try {
-      const cliente = clientesCarregados.find(c => c.id === clienteId);
-      if (!cliente) {
-        throw new Error("Cliente não encontrado");
-      }
-
-      // Simular upload - em produção seria para storage do Supabase
-      const uploadUrl = URL.createObjectURL(file);
-      
-      const novoRelatorio = {
-        clienteId,
-        clienteNome: cliente.nome,
-        arquivo: file,
-        nomeArquivo: file.name,
-        uploadUrl,
-        dataUpload: new Date().toLocaleString('pt-BR')
-      };
-
-      setRelatoriosProntos(prev => {
-        // Remove relatório anterior do mesmo cliente se existir
-        const filtered = prev.filter(r => r.clienteId !== clienteId);
-        return [...filtered, novoRelatorio];
-      });
-
-      // Atualizar resultados para mostrar que o relatório está disponível
-      setResultados(prev => {
-        const existing = prev.find(r => r.clienteId === clienteId);
-        if (existing) {
-          return prev.map(r => 
-            r.clienteId === clienteId 
-              ? { ...r, relatorioGerado: true, linkRelatorio: uploadUrl, dataProcessamento: novoRelatorio.dataUpload }
-              : r
-          );
-        } else {
-          return [...prev, {
-            clienteId,
-            clienteNome: cliente.nome,
-            relatorioGerado: true,
-            emailEnviado: false,
-            emailDestino: cliente.email,
-            linkRelatorio: uploadUrl,
-            dataProcessamento: novoRelatorio.dataUpload
-          }];
-        }
-      });
-
-      toast({
-        title: "Relatório Carregado",
-        description: `Relatório para ${cliente.nome} foi carregado com sucesso`,
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Erro no Upload",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Função para carregar relatórios prontos em lote
-  const handleCarregarRelatoriosProntos = () => {
-    // Verificar se há relatórios carregados
-    const clientesComRelatorio = relatoriosProntos.filter(rel => 
-      clientesCarregados.some(cliente => cliente.id === rel.clienteId)
-    );
-
-    if (clientesComRelatorio.length === 0) {
-      toast({
-        title: "Nenhum Relatório Encontrado",
-        description: "Faça upload dos relatórios primeiro.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Marcar como prontos para envio
-    setResultados(prev => {
-      const novosResultados = [...prev];
-      
-      clientesComRelatorio.forEach(rel => {
-        const existingIndex = novosResultados.findIndex(r => r.clienteId === rel.clienteId);
-        if (existingIndex >= 0) {
-          novosResultados[existingIndex] = {
-            ...novosResultados[existingIndex],
-            relatorioGerado: true,
-            linkRelatorio: rel.uploadUrl,
-            dataProcessamento: rel.dataUpload
-          };
-        } else {
-          const cliente = clientesCarregados.find(c => c.id === rel.clienteId)!;
-          novosResultados.push({
-            clienteId: rel.clienteId,
-            clienteNome: rel.clienteNome,
-            relatorioGerado: true,
-            emailEnviado: false,
-            emailDestino: cliente.email,
-            linkRelatorio: rel.uploadUrl,
-            dataProcessamento: rel.dataUpload
-          });
-        }
-      });
-      
-      return novosResultados;
-    });
-
-    setRelatoriosGerados(clientesComRelatorio.length);
-    
-    toast({
-      title: "Relatórios Prontos",
-      description: `${clientesComRelatorio.length} relatórios prontos para envio`,
-    });
-  };
 
   // Função para processar arquivo de faturamento e gerar PDFs
   const handleProcessarFaturamento = async () => {
@@ -960,17 +836,14 @@ export default function GerarFaturamento() {
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo de delay
           }
 
-          // Encontrar o relatório pronto para este cliente
-          const relatorioPronto = relatoriosProntos.find(r => r.clienteId === cliente.clienteId);
-          
           const responseEmail = await supabase.functions.invoke('enviar-relatorio-email', {
             body: {
               cliente_id: cliente.clienteId,
               relatorio: {
-                arquivo_nome: relatorioPronto?.nomeArquivo || 'relatorio.pdf',
+                arquivo_nome: 'relatorio_faturamento.pdf',
                 arquivo_url: cliente.linkRelatorio,
                 periodo: PERIODO_ATUAL,
-                tipo: 'relatorio_pronto'
+                tipo: 'relatorio_gerado'
               }
             }
           });
@@ -1155,14 +1028,10 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Dados MobileMed
-          </TabsTrigger>
-          <TabsTrigger value="relatorios-prontos" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Relatórios Prontos
           </TabsTrigger>
           <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
             <FileBarChart2 className="h-4 w-4" />
@@ -1297,151 +1166,6 @@ export default function GerarFaturamento() {
           </div>
         </TabsContent>
 
-        <TabsContent value="relatorios-prontos" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Relatórios Prontos - {PERIODO_ATUAL}
-              </CardTitle>
-              <CardDescription>
-                Faça upload dos relatórios de faturamento já prontos para cada cliente
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Resumo */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Users className="h-8 w-8 text-blue-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-blue-900">{clientesCarregados.length}</div>
-                      <div className="text-sm text-blue-700">Clientes Ativos</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-green-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-green-900">{resultados.filter(r => r.relatorioGerado).length}</div>
-                      <div className="text-sm text-green-700">Relatórios Gerados</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-8 w-8 text-purple-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-orange-900">
-                        {resultados.filter(r => r.emailEnviado).length}
-                      </div>
-                      <div className="text-sm text-orange-700">Emails Enviados</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista de Relatórios Gerados pelo Sistema */}
-              {resultados.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Relatórios Gerados pelo Sistema</h3>
-                  </div>
-                  
-                  <div className="grid gap-4">
-                    {resultados.map((resultado) => (
-                      <div key={resultado.clienteId} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium">{resultado.clienteNome}</h4>
-                            <p className="text-sm text-muted-foreground">{resultado.emailDestino}</p>
-                            {resultado.detalhesRelatorio && (
-                              <p className="text-xs text-blue-600 mt-1">
-                                {resultado.detalhesRelatorio.total_laudos} laudos - 
-                                R$ {resultado.detalhesRelatorio.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {resultado.relatorioGerado ? (
-                              <Badge variant="default" className="bg-green-100 text-green-800">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                PDF Gerado
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Pendente
-                              </Badge>
-                            )}
-                            {resultado.emailEnviado && (
-                              <Badge variant="default" className="bg-blue-100 text-blue-800">
-                                <Mail className="h-3 w-3 mr-1" />
-                                Email Enviado
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {resultado.relatorioGerado && (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-green-600" />
-                              <span className="text-sm text-green-800">Relatório disponível</span>
-                              {resultado.dataProcessamento && (
-                                <span className="text-xs text-green-600">
-                                  • {resultado.dataProcessamento}
-                                </span>
-                              )}
-                            </div>
-                            {resultado.linkRelatorio && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => window.open(resultado.linkRelatorio, '_blank')}
-                                className="text-green-700 border-green-300 hover:bg-green-50"
-                              >
-                                <ExternalLink className="h-3 w-3 mr-1" />
-                                Abrir
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                        
-                        {resultado.erro && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded">
-                            <div className="flex items-center gap-2 text-red-800">
-                              <AlertTriangle className="h-4 w-4" />
-                              <span className="text-sm font-medium">Erro no processamento:</span>
-                            </div>
-                            <p className="text-sm text-red-700 mt-1">{resultado.erro}</p>
-                          </div>
-                        )}
-                        
-                        {resultado.erroEmail && (
-                          <div className="p-3 bg-orange-50 border border-orange-200 rounded">
-                            <div className="flex items-center gap-2 text-orange-800">
-                              <AlertTriangle className="h-4 w-4" />
-                              <span className="text-sm font-medium">Erro no envio do email:</span>
-                            </div>
-                            <p className="text-sm text-orange-700 mt-1">{resultado.erroEmail}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhum relatório gerado ainda</p>
-                  <p className="text-sm">Use a aba Gerar (Etapa 1) para gerar os relatórios a partir da volumetria do período</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="demonstrativo" className="space-y-6">
           <DemonstrativoFaturamento />
