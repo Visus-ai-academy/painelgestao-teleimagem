@@ -245,57 +245,86 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Carregar clientes da base de dados (inicialização)
+  // Carregar clientes da base de dados (inicialização) - APENAS os que TÊM faturamento
   const carregarClientes = async () => {
     try {
       console.log('🔍 Iniciando carregamento de clientes...');
       
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nome, email, ativo, status')
-        .eq('ativo', true)
-        .eq('status', 'Ativo')
-        .not('email', 'is', null)
-        .neq('email', ''); // Excluir emails vazios
+      // Converter período selecionado (YYYY-MM) para formato mon/YY (ex.: jun/25)
+      const formatPeriodo = (yyyyMM: string) => {
+        const [y, m] = yyyyMM.split('-');
+        const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
+        return `${mon}/${y.slice(2)}`;
+      };
+      const periodoRef = formatPeriodo(periodoSelecionado);
+      
+      console.log('🔍 Buscando clientes com faturamento para período:', periodoRef);
 
-      console.log('🔍 Resultado da consulta clientes:', { data, error, count: data?.length });
+      // Buscar apenas clientes que têm dados na tabela faturamento para o período
+      const { data: clientesComFaturamento, error: errorFaturamento } = await supabase
+        .from('faturamento')
+        .select('cliente_nome, cliente_email')
+        .eq('periodo_referencia', periodoRef)
+        .not('cliente_nome', 'is', null);
 
-      if (error) {
-        console.error('❌ Erro na consulta clientes:', error);
-        throw error;
+      if (errorFaturamento) {
+        console.error('❌ Erro na consulta faturamento:', errorFaturamento);
+        throw errorFaturamento;
       }
 
-      console.log('📊 Total de clientes ativos encontrados:', data?.length || 0);
+      // Obter clientes únicos do faturamento
+      const clientesUnicos = Array.from(
+        new Map(
+          clientesComFaturamento?.map(item => [
+            item.cliente_nome, 
+            {
+              nome: item.cliente_nome,
+              email: item.cliente_email || 'email@cliente.com'
+            }
+          ])
+        ).values()
+      );
 
-      // Carregar todos os clientes ativos (removido filtro de email)
-      const clientesAtivos = data || [];
+      console.log('📊 Clientes com faturamento encontrados:', clientesUnicos.length);
+      console.log('📋 Lista de clientes:', clientesUnicos.map(c => c.nome));
+
+      // Converter para formato esperado pelo sistema
+      const clientesFormatados = clientesUnicos.map((cliente, index) => ({
+        id: `cliente-${cliente.nome}`, // ID baseado no nome para consistência
+        nome: cliente.nome,
+        email: cliente.email,
+        ativo: true,
+        status: 'Ativo'
+      }));
       
-      console.log('Clientes carregados (todos):', clientesAtivos);
+      console.log('🔄 Clientes formatados:', clientesFormatados.length);
       
-      setClientesCarregados(clientesAtivos);
+      setClientesCarregados(clientesFormatados);
       
       // Sempre inicializar resultados quando há clientes
-      if (clientesAtivos.length > 0) {
-        setResultados(clientesAtivos.map(cliente => ({
+      if (clientesFormatados.length > 0) {
+        setResultados(clientesFormatados.map(cliente => ({
           clienteId: cliente.id,
           clienteNome: cliente.nome,
           relatorioGerado: false,
           emailEnviado: false,
-          emailDestino: cliente.email || '',
+          emailDestino: cliente.email,
         })));
-        console.log('Lista populada com clientes reais:', clientesAtivos.length);
+        console.log('✅ Lista populada com clientes com faturamento:', clientesFormatados.length);
       } else {
         setResultados([]);
+        console.log('⚠️ Nenhum cliente com faturamento encontrado para o período');
       }
       
-      return clientesAtivos;
+      return clientesFormatados;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       setClientesCarregados([]);
       
       toast({
         title: "Erro ao carregar clientes",
-        description: "Não foi possível carregar os clientes da base de dados. Faça upload dos clientes primeiro.",
+        description: "Não foi possível carregar os clientes com faturamento. Execute primeiro a geração de faturamento.",
         variant: "destructive",
       });
       
@@ -596,7 +625,7 @@ export default function GerarFaturamento() {
 
       // Agrupar dados por cliente - cada linha do faturamento é um exame individual
       const clientesAgrupados = faturamentoData.reduce((acc: any, item: any) => {
-        console.log('🔍 DEBUG: Item individual:', item);
+        console.log('🔍 DEBUG: Item individual do faturamento:', item);
         
         if (!acc[item.cliente_nome]) {
           acc[item.cliente_nome] = {
@@ -608,8 +637,16 @@ export default function GerarFaturamento() {
           };
         }
         
-        // Obter unidade origem do mapa ou usar cliente como fallback
-        const unidadeOrigem = mapUnidadeOrigem[item.accession_number] || item.cliente_nome || 'Não informado';
+        // Obter unidade origem do mapa ou usar EMPRESA padrão ou fallback
+        let unidadeOrigem = 'Não informado';
+        if (item.accession_number && mapUnidadeOrigem[item.accession_number]) {
+          unidadeOrigem = mapUnidadeOrigem[item.accession_number];
+        } else if (item.unidade_origem) {
+          unidadeOrigem = item.unidade_origem;
+        } else {
+          // Fallback para buscar na volumetria_mobilemed se não encontrou no mapeamento
+          console.log('⚠️ Unidade origem não encontrada para:', item.accession_number);
+        }
         
         // Cada linha do faturamento representa um exame individual
         const exameFormatado = {
@@ -622,19 +659,21 @@ export default function GerarFaturamento() {
           modalidade: item.modalidade || 'Não informado',
           especialidade: item.especialidade || 'Não informado',
           categoria: item.categoria || 'Não informado',
-          quantidade_laudos: 1, // Cada linha é um laudo individual
+          quantidade_laudos: item.quantidade || 1, // Usar quantidade real do faturamento
           valor_total: Number(item.valor || item.valor_bruto || 0),
           data_exame: item.data_exame || new Date().toISOString().split('T')[0]
         };
         
-        console.log('🔍 DEBUG: Exame formatado:', exameFormatado);
-        
         acc[item.cliente_nome].exames.push(exameFormatado);
-        acc[item.cliente_nome].total_exames++;
+        acc[item.cliente_nome].total_exames += (item.quantidade || 1); // Somar quantidade real
         acc[item.cliente_nome].valor_total += Number(item.valor || item.valor_bruto || 0);
         acc[item.cliente_nome].valor_bruto += Number(item.valor_bruto || item.valor || 0);
+        
         return acc;
       }, {});
+
+      console.log('🔍 DEBUG: Clientes agrupados:', Object.keys(clientesAgrupados));
+      console.log('🔍 DEBUG: Exemplo CBU:', clientesAgrupados['CBU']);
 
       // Gerar PDFs usando a biblioteca local
       const novosResultados = [];

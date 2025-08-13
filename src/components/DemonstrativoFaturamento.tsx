@@ -107,15 +107,16 @@ export default function DemonstrativoFaturamento() {
 
       console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodoRef}`);
 
-      // Agrupar por cliente - CORRIGIDO para somar corretamente
+      // Agrupar por cliente - CORRIGIDO para usar mesma lógica da aba Gerar
       const clientesMap = new Map<string, ClienteFaturamento>();
       
       dadosFaturamento?.forEach(item => {
-        const clienteId = item.cliente_id || item.cliente_nome;
+        const clienteNome = item.cliente_nome;
         
-        if (clientesMap.has(clienteId)) {
-          const cliente = clientesMap.get(clienteId)!;
-          cliente.total_exames += item.quantidade || 0; // Somar quantidade real
+        if (clientesMap.has(clienteNome)) {
+          const cliente = clientesMap.get(clienteNome)!;
+          // Somar QUANTIDADE real dos exames (não o número de registros)
+          cliente.total_exames += item.quantidade || 1; 
           cliente.valor_bruto += Number(item.valor_bruto || 0);
           cliente.valor_liquido += Number(item.valor || 0);
         } else {
@@ -128,11 +129,11 @@ export default function DemonstrativoFaturamento() {
             status = 'vencido';
           }
           
-          clientesMap.set(clienteId, {
-            id: clienteId,
+          clientesMap.set(clienteNome, {
+            id: clienteNome,
             nome: item.cliente_nome || 'Cliente não identificado',
             email: item.cliente_email || '',
-            total_exames: item.quantidade || 0, // Usar quantidade real
+            total_exames: item.quantidade || 1, // Usar quantidade real do faturamento
             valor_bruto: Number(item.valor_bruto || 0),
             valor_liquido: Number(item.valor || 0),
             periodo: item.periodo_referencia || periodo,
