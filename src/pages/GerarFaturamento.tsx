@@ -1124,16 +1124,6 @@ export default function GerarFaturamento() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Relatórios Gerados pelo Sistema</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={recarregarClientes}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Atualizar
-                      </Button>
-                    </div>
                   </div>
                   
                   <div className="grid gap-4">
@@ -1354,16 +1344,6 @@ export default function GerarFaturamento() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Relatórios Gerados pelo Sistema</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={recarregarClientes}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Atualizar
-                      </Button>
-                    </div>
                   </div>
                   
                   <div className="grid gap-4">
@@ -1604,18 +1584,8 @@ export default function GerarFaturamento() {
               </div>
                   
               
-              {/* Botões utilitários */}
+              {/* Botões utilitários removidos - sistema agora é 100% automatizado */}
               <div className="flex flex-wrap gap-2 justify-center pt-4 border-t">
-                <Button 
-                  variant="outline"
-                  onClick={recarregarClientes}
-                  disabled={processandoTodos}
-                  size="sm"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Recarregar Clientes
-                </Button>
-                
                 <Button 
                   variant="outline"
                   onClick={limparResultados}
