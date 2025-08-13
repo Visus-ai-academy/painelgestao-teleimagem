@@ -627,14 +627,17 @@ export default function GerarFaturamento() {
           const pdfBlob = await generatePDF(clienteData);
           const pdfFileName = `relatorio_${clienteNome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodoSelecionado}.pdf`;
           
-          // Upload do PDF para o storage
-          const { error: pdfUploadError } = await supabase.storage
-            .from('uploads')
-            .upload(`pdfs/${pdfFileName}`, pdfBlob);
+      // Upload do PDF para o storage (substituir se já existir)
+      const { error: pdfUploadError } = await supabase.storage
+        .from('uploads')
+        .upload(`pdfs/${pdfFileName}`, pdfBlob, {
+          upsert: true // Substituir arquivo se já existir
+        });
 
-          if (pdfUploadError) {
-            console.error(`Erro no upload do PDF para ${clienteNome}:`, pdfUploadError);
-          }
+      if (pdfUploadError) {
+        console.error(`Erro no upload do PDF para ${clienteNome}:`, pdfUploadError);
+        throw new Error(`Falha no upload: ${pdfUploadError.message}`);
+      }
 
           const { data: { publicUrl } } = supabase.storage
             .from('uploads')
