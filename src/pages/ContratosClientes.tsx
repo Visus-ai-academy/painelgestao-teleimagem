@@ -1189,48 +1189,26 @@ const salvarContrato = async () => {
                   </div>
                 </div>
 
-            {/* Configurações de Volume e Plantão */}
+            {/* Ajustes de Faturamento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Condição de Volume</Label>
-                <Select value={editCondVolume} onValueChange={setEditCondVolume}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MOD/ESP/CAT">MOD/ESP/CAT</SelectItem>
-                    <SelectItem value="GLOBAL">GLOBAL</SelectItem>
-                    <SelectItem value="CUSTOMIZADO">CUSTOMIZADO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2 pt-6">
-                <Checkbox 
-                  checked={editConsideraPlantao} 
-                  onCheckedChange={(checked) => setEditConsideraPlantao(checked === true)} 
-                />
-                <Label>Considera Plantão</Label>
-              </div>
-            </div>
-
-            {/* Desconto e Acréscimo */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Desconto (%)</Label>
+                <Label>Desconto (%) - Ajuste de Faturamento</Label>
                 <Input 
                   type="number" 
                   step="0.01" 
                   value={editDesconto} 
                   onChange={(e) => setEditDesconto(Number(e.target.value) || "")} 
+                  placeholder="Ex: 5.5 (para ajustes no período)"
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Acréscimo (%)</Label>
+                <Label>Acréscimo (%) - Ajuste de Faturamento</Label>
                 <Input 
                   type="number" 
                   step="0.01" 
                   value={editAcrescimo} 
                   onChange={(e) => setEditAcrescimo(Number(e.target.value) || "")} 
+                  placeholder="Ex: 2.5 (para ajustes no período)"
                 />
               </div>
             </div>
