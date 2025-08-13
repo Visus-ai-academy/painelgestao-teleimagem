@@ -587,26 +587,33 @@ export default function GerarFaturamento() {
             cliente_nome: item.cliente_nome,
             exames: [],
             total_exames: 0,
-            valor_total: 0
+            valor_total: 0,
+            valor_bruto: 0
           };
         }
         
-        // Mapear item para a estrutura esperada pelo PDF
+        // Mapear item para a estrutura completa esperada pelo PDF
         const exameFormatado = {
-          paciente: item.cliente_nome || 'Nome não informado',
-          data_exame: item.data_exame,
+          unidade_origem: 'Teleimagem', // Padrão
+          paciente: item.paciente || 'Paciente não informado',
+          accession_number: item.accession_number || 'N/A',
+          nome_exame: item.nome_exame || 'Exame não informado',
+          laudado_por: item.laudado_por || 'Médico não informado',
+          prioridade: item.prioridade || 'ROTINA',
           modalidade: item.modalidade || 'Não informado',
           especialidade: item.especialidade || 'Não informado',
-          nome_exame: item.nome_exame || 'Exame não informado',
-          quantidade: item.quantidade || 1,
-          valor_bruto: item.valor_bruto || 0
+          categoria: item.categoria || 'Não informado',
+          quantidade_laudos: item.quantidade || 1,
+          valor_total: Number(item.valor || item.valor_bruto || 0),
+          data_exame: item.data_exame || new Date().toISOString().split('T')[0]
         };
         
         console.log('🔍 DEBUG: Exame formatado:', exameFormatado);
         
         acc[item.cliente_nome].exames.push(exameFormatado);
         acc[item.cliente_nome].total_exames++;
-        acc[item.cliente_nome].valor_total += item.valor_bruto || 0;
+        acc[item.cliente_nome].valor_total += Number(item.valor || item.valor_bruto || 0);
+        acc[item.cliente_nome].valor_bruto += Number(item.valor_bruto || item.valor || 0);
         return acc;
       }, {});
 
@@ -616,13 +623,26 @@ export default function GerarFaturamento() {
       
       for (const clienteNome in clientesAgrupados) {
         try {
+          const clienteInfo = clientesAgrupados[clienteNome];
+          
+          // Estrutura completa conforme esperado pelo generatePDF
           const clienteData: FaturamentoData = {
-            ...clientesAgrupados[clienteNome],
-            periodo: periodoSelecionado
+            cliente_nome: clienteInfo.cliente_nome,
+            total_exames: clienteInfo.total_exames,
+            valor_total: clienteInfo.valor_total,
+            periodo: periodoSelecionado,
+            valor_bruto: clienteInfo.valor_bruto,
+            franquia: 0, // Valores padrão - podem ser configurados depois
+            integracao: 0,
+            portal_laudos: 0,
+            impostos: 0,
+            valor_liquido: clienteInfo.valor_total,
+            exames: clienteInfo.exames
           };
 
-          console.log('🔍 DEBUG: Dados enviados para PDF:', clienteData);
-          console.log('🔍 DEBUG: Exames no clienteData:', clienteData.exames?.slice(0, 2));
+          console.log('🔍 DEBUG: Dados completos enviados para PDF:', clienteData);
+          console.log('🔍 DEBUG: Total de exames:', clienteData.exames?.length);
+          console.log('🔍 DEBUG: Primeiro exame:', clienteData.exames?.[0]);
 
           const pdfBlob = await generatePDF(clienteData);
           const pdfFileName = `relatorio_${clienteNome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodoSelecionado}.pdf`;
