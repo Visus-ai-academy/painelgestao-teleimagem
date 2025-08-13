@@ -578,7 +578,23 @@ export default function GerarFaturamento() {
         progresso: 80
       });
 
-      // Agrupar dados por cliente
+      // Buscar dados de unidade_origem da tabela volumetria_mobilemed
+      const { data: volumetriaData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA, ACCESSION_NUMBER')
+        .eq('periodo_referencia', periodoRef);
+
+      console.log('🔍 DEBUG: Dados volumetria para unidade origem:', volumetriaData?.slice(0, 3));
+
+      // Criar mapa de unidade origem por accession number
+      const mapUnidadeOrigem: Record<string, string> = {};
+      volumetriaData?.forEach(vol => {
+        if (vol.ACCESSION_NUMBER && vol.EMPRESA) {
+          mapUnidadeOrigem[vol.ACCESSION_NUMBER] = vol.EMPRESA;
+        }
+      });
+
+      // Agrupar dados por cliente - cada linha do faturamento é um exame individual
       const clientesAgrupados = faturamentoData.reduce((acc: any, item: any) => {
         console.log('🔍 DEBUG: Item individual:', item);
         
@@ -592,18 +608,21 @@ export default function GerarFaturamento() {
           };
         }
         
-        // Mapear item para a estrutura completa esperada pelo PDF
+        // Obter unidade origem do mapa ou usar cliente como fallback
+        const unidadeOrigem = mapUnidadeOrigem[item.accession_number] || item.cliente_nome || 'Não informado';
+        
+        // Cada linha do faturamento representa um exame individual
         const exameFormatado = {
-          unidade_origem: 'Teleimagem', // Padrão
+          unidade_origem: unidadeOrigem,
           paciente: item.paciente || 'Paciente não informado',
           accession_number: item.accession_number || 'N/A',
           nome_exame: item.nome_exame || 'Exame não informado',
-          laudado_por: item.laudado_por || 'Médico não informado',
+          laudado_por: item.medico || 'Médico não informado',
           prioridade: item.prioridade || 'ROTINA',
           modalidade: item.modalidade || 'Não informado',
           especialidade: item.especialidade || 'Não informado',
           categoria: item.categoria || 'Não informado',
-          quantidade_laudos: item.quantidade || 1,
+          quantidade_laudos: 1, // Cada linha é um laudo individual
           valor_total: Number(item.valor || item.valor_bruto || 0),
           data_exame: item.data_exame || new Date().toISOString().split('T')[0]
         };
@@ -625,18 +644,26 @@ export default function GerarFaturamento() {
         try {
           const clienteInfo = clientesAgrupados[clienteNome];
           
+          // Calcular impostos e outros valores (exemplo: 6% de impostos)
+          const valorBruto = clienteInfo.valor_bruto;
+          const impostos = valorBruto * 0.06; // 6% de impostos
+          const franquia = 0; // Buscar de parametros futuramente
+          const integracao = 0; // Buscar de parametros futuramente
+          const portalLaudos = 0; // Buscar de parametros futuramente
+          const valorLiquido = valorBruto - impostos - franquia - integracao - portalLaudos;
+
           // Estrutura completa conforme esperado pelo generatePDF
           const clienteData: FaturamentoData = {
             cliente_nome: clienteInfo.cliente_nome,
             total_exames: clienteInfo.total_exames,
             valor_total: clienteInfo.valor_total,
             periodo: periodoSelecionado,
-            valor_bruto: clienteInfo.valor_bruto,
-            franquia: 0, // Valores padrão - podem ser configurados depois
-            integracao: 0,
-            portal_laudos: 0,
-            impostos: 0,
-            valor_liquido: clienteInfo.valor_total,
+            valor_bruto: valorBruto,
+            franquia: franquia,
+            integracao: integracao,
+            portal_laudos: portalLaudos,
+            impostos: impostos,
+            valor_liquido: valorLiquido,
             exames: clienteInfo.exames
           };
 
