@@ -209,10 +209,21 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       const start = format(startOfMonth(refDate), 'yyyy-MM-dd');
       const end = format(endOfMonth(refDate), 'yyyy-MM-dd');
       // 1) Ler dados do SISTEMA (volumetria processada no banco) por período/cliente
-      let sysQuery = supabase.from('volumetria_mobilemed').select('*');
+      let sysQuery = supabase.from('volumetria_mobilemed').select(`
+        "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "ESTUDO_DESCRICAO", 
+        "NOME_PACIENTE", "DATA_REALIZACAO", "DATA_LAUDO", "VALORES",
+        "PRIORIDADE", "MEDICO", "DUPLICADO", "CODIGO_PACIENTE",
+        "ACCESSION_NUMBER", "HORA_REALIZACAO", "DATA_TRANSFERENCIA",
+        "HORA_TRANSFERENCIA", "HORA_LAUDO", "DATA_PRAZO", "HORA_PRAZO",
+        "STATUS", "CATEGORIA"
+      `);
       sysQuery = sysQuery.eq('periodo_referencia', referencia);
       if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
-      const { data: systemRows, error: sysErr } = await sysQuery.range(0, 99999);
+      
+      // Limitar a 10.000 registros para evitar timeout
+      const { data: systemRows, error: sysErr } = await sysQuery
+        .order('created_at', { ascending: false })
+        .limit(10000);
       if (sysErr) throw sysErr;
 
       // Mapear por chave agregada
