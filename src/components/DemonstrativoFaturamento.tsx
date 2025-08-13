@@ -107,7 +107,7 @@ export default function DemonstrativoFaturamento() {
 
       console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodoRef}`);
 
-      // Agrupar por cliente
+      // Agrupar por cliente - CORRIGIDO para somar corretamente
       const clientesMap = new Map<string, ClienteFaturamento>();
       
       dadosFaturamento?.forEach(item => {
@@ -115,9 +115,9 @@ export default function DemonstrativoFaturamento() {
         
         if (clientesMap.has(clienteId)) {
           const cliente = clientesMap.get(clienteId)!;
-          cliente.total_exames += item.quantidade || 1;
-          cliente.valor_bruto += item.valor_bruto || item.valor || 0;
-          cliente.valor_liquido += item.valor || 0;
+          cliente.total_exames += item.quantidade || 0; // Somar quantidade real
+          cliente.valor_bruto += Number(item.valor_bruto || 0);
+          cliente.valor_liquido += Number(item.valor || 0);
         } else {
           // Determinar status de pagamento baseado na data de vencimento
           const dataVencimento = new Date(item.data_vencimento);
@@ -132,9 +132,9 @@ export default function DemonstrativoFaturamento() {
             id: clienteId,
             nome: item.cliente_nome || 'Cliente não identificado',
             email: item.cliente_email || '',
-            total_exames: item.quantidade || 1,
-            valor_bruto: item.valor_bruto || item.valor || 0,
-            valor_liquido: item.valor || 0,
+            total_exames: item.quantidade || 0, // Usar quantidade real
+            valor_bruto: Number(item.valor_bruto || 0),
+            valor_liquido: Number(item.valor || 0),
             periodo: item.periodo_referencia || periodo,
             status_pagamento: status,
             data_vencimento: item.data_vencimento,

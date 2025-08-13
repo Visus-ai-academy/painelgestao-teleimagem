@@ -241,17 +241,21 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   document.body.appendChild(reportElement);
   
   try {
-    // Converter HTML para canvas
+    // Converter HTML para canvas com escala reduzida para diminuir tamanho do arquivo
     const canvas = await html2canvas(reportElement, {
-      scale: 2,
+      scale: 1.2, // Reduzido de 2 para 1.2 para diminuir tamanho
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      removeContainer: true,
+      logging: false // Desabilitar logs para performance
     });
     
-    // Criar PDF em PAISAGEM
+    // Criar PDF em PAISAGEM com compressão
     const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (paisagem)
-    const imgData = canvas.toDataURL('image/png');
+    
+    // Usar JPEG com qualidade reduzida para diminuir tamanho do arquivo
+    const imgData = canvas.toDataURL('image/jpeg', 0.7); // 70% de qualidade
     
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -261,10 +265,18 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     const imgX = (pdfWidth - imgWidth * ratio) / 2;
     const imgY = 0;
     
-    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
     
-    // Converter para Blob
-    return pdf.output('blob');
+    // Converter para Blob com compressão
+    const pdfBlob = pdf.output('blob');
+    console.log(`📄 PDF gerado - Tamanho: ${(pdfBlob.size / 1024 / 1024).toFixed(2)} MB`);
+    
+    // Verificar se o arquivo é muito grande (limite Supabase: ~50MB)
+    if (pdfBlob.size > 45 * 1024 * 1024) { // 45MB para margem de segurança
+      throw new Error(`PDF muito grande (${(pdfBlob.size / 1024 / 1024).toFixed(2)} MB). Limite: 45MB`);
+    }
+    
+    return pdfBlob;
   } finally {
     // Remover elemento temporário
     document.body.removeChild(reportElement);
