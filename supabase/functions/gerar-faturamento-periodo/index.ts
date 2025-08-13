@@ -59,137 +59,166 @@ serve(async (req) => {
 
     console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} Ref=${periodoRef}`);
 
-    // Buscar clientes ativos
+    // Buscar clientes ativos (limitado a 50 para evitar timeout)
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
       .select('id, nome, email, ativo, status')
       .eq('ativo', true)
-      .eq('status', 'Ativo');
+      .eq('status', 'Ativo')
+      .limit(50); // Processar apenas 50 clientes por vez
 
     if (clientesError) throw clientesError;
 
     const clientesAtivos = clientes || [];
     console.log(`[gerar-faturamento-periodo] Clientes ativos: ${clientesAtivos.length}`);
 
-    // Limpar faturamento do período antes de inserir
-    const { error: delErr } = await supabase
-      .from('faturamento')
-      .delete()
-      .eq('periodo_referencia', periodoRef);
-    if (delErr) {
-      console.log('[gerar-faturamento-periodo] Aviso ao limpar faturamento:', delErr.message);
-    }
-
-    let totalItens = 0;
-    let clientesComDados = 0;
-
-    console.log('[gerar-faturamento-periodo] Iniciando processamento de clientes...');
-    for (const cliente of clientesAtivos) {
-      console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome}`);
-      // Buscar volumetria do cliente no período de referência (dados já processados e apropriados)
-      const { data: vm, error: vmErr } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES"')
-        .eq('"EMPRESA"', cliente.nome)
-        .eq('periodo_referencia', periodo); // Usar periodo_referencia em vez de filtros de data
-
-      if (vmErr) {
-        console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
-        continue;
-      }
-
-      const rows = vm || [];
-      if (rows.length === 0) continue;
-
-      // Volume total (usado na faixa de preço)
-      const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
-
-      // Agrupar por chave
-      const grupos = new Map<string, { chave: GrupoChave; qtd: number }>();
-      for (const r of rows) {
-        const chave: GrupoChave = {
-          modalidade: r.MODALIDADE || '',
-          especialidade: r.ESPECIALIDADE || '',
-          categoria: r.CATEGORIA || 'SC',
-          prioridade: r.PRIORIDADE || '',
-          estudo: r.ESTUDO_DESCRICAO || 'Exame',
-        };
-        const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}`;
-        const qtd = Number(r.VALORES) || 1;
-        const atual = grupos.get(key);
-        if (atual) atual.qtd += qtd; else grupos.set(key, { chave, qtd });
-      }
-
-      const itensInserir: any[] = [];
-
-      for (const { chave, qtd } of grupos.values()) {
-        // Calcular preço unitário via RPC
-        const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
-          p_cliente_id: cliente.id,
-          p_modalidade: chave.modalidade,
-          p_especialidade: chave.especialidade,
-          p_prioridade: chave.prioridade,
-          p_categoria: chave.categoria,
-          p_volume_total: volumeTotal,
-          p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
-        });
-
-        if (precoErr) {
-          console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
+    // Retornar resposta imediata e processar em background
+    const backgroundTask = async () => {
+      try {
+        console.log('[gerar-faturamento-periodo] Iniciando processamento em background...');
+        
+        // Limpar faturamento do período antes de inserir
+        const { error: delErr } = await supabase
+          .from('faturamento')
+          .delete()
+          .eq('periodo_referencia', periodoRef);
+        if (delErr) {
+          console.log('[gerar-faturamento-periodo] Aviso ao limpar faturamento:', delErr.message);
         }
 
-        const unit = Number(preco) || 0;
-        const valor = Number((unit * qtd).toFixed(2));
+        let totalItens = 0;
+        let clientesComDados = 0;
 
-        const hoje = new Date();
-        const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-        const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // Processar clientes em lotes de 10 para evitar sobrecarga
+        const loteSize = 10;
+        for (let i = 0; i < clientesAtivos.length; i += loteSize) {
+          const loteClientes = clientesAtivos.slice(i, i + loteSize);
+          
+          for (const cliente of loteClientes) {
+            console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome}`);
+            
+            // Buscar volumetria do cliente no período de referência
+            const { data: vm, error: vmErr } = await supabase
+              .from('volumetria_mobilemed')
+              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES"')
+              .eq('"EMPRESA"', cliente.nome)
+              .eq('periodo_referencia', periodo)
+              .limit(1000); // Limitar registros por cliente
 
-        itensInserir.push({
-          omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-          numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-          cliente_id: cliente.id,
-          cliente_nome: cliente.nome,
-          cliente_email: cliente.email || null,
-          modalidade: chave.modalidade,
-          especialidade: chave.especialidade,
-          categoria: chave.categoria,
-          prioridade: chave.prioridade,
-          nome_exame: chave.estudo,
-          quantidade: qtd,
-          valor_bruto: valor,
-          valor: valor,
-          data_emissao: emissao,
-          data_vencimento: vencimento,
-          periodo_referencia: periodoRef,
-          tipo_dados: 'incremental',
-        });
-      }
+            if (vmErr) {
+              console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
+              continue;
+            }
 
-      if (itensInserir.length > 0) {
-        const batchSize = 100;
-        for (let i = 0; i < itensInserir.length; i += batchSize) {
-          const lote = itensInserir.slice(i, i + batchSize);
-          const { error: insErr } = await supabase.from('faturamento').insert(lote);
-          if (insErr) {
-            console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
+            const rows = vm || [];
+            if (rows.length === 0) continue;
+
+            // Volume total (usado na faixa de preço)
+            const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
+
+            // Agrupar por chave
+            const grupos = new Map<string, { chave: GrupoChave; qtd: number }>();
+            for (const r of rows) {
+              const chave: GrupoChave = {
+                modalidade: r.MODALIDADE || '',
+                especialidade: r.ESPECIALIDADE || '',
+                categoria: r.CATEGORIA || 'SC',
+                prioridade: r.PRIORIDADE || '',
+                estudo: r.ESTUDO_DESCRICAO || 'Exame',
+              };
+              const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}`;
+              const qtd = Number(r.VALORES) || 1;
+              const atual = grupos.get(key);
+              if (atual) atual.qtd += qtd; else grupos.set(key, { chave, qtd });
+            }
+
+            const itensInserir: any[] = [];
+
+            for (const { chave, qtd } of grupos.values()) {
+              // Calcular preço unitário via RPC
+              const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
+                p_cliente_id: cliente.id,
+                p_modalidade: chave.modalidade,
+                p_especialidade: chave.especialidade,
+                p_prioridade: chave.prioridade,
+                p_categoria: chave.categoria,
+                p_volume_total: volumeTotal,
+                p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
+              });
+
+              if (precoErr) {
+                console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
+              }
+
+              const unit = Number(preco) || 0;
+              const valor = Number((unit * qtd).toFixed(2));
+
+              const hoje = new Date();
+              const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+              const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+              itensInserir.push({
+                omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                cliente_id: cliente.id,
+                cliente_nome: cliente.nome,
+                cliente_email: cliente.email || null,
+                modalidade: chave.modalidade,
+                especialidade: chave.especialidade,
+                categoria: chave.categoria,
+                prioridade: chave.prioridade,
+                nome_exame: chave.estudo,
+                quantidade: qtd,
+                valor_bruto: valor,
+                valor: valor,
+                data_emissao: emissao,
+                data_vencimento: vencimento,
+                periodo_referencia: periodoRef,
+                tipo_dados: 'incremental',
+              });
+            }
+
+            if (itensInserir.length > 0) {
+              const batchSize = 50; // Reduzir tamanho do lote
+              for (let j = 0; j < itensInserir.length; j += batchSize) {
+                const lote = itensInserir.slice(j, j + batchSize);
+                const { error: insErr } = await supabase.from('faturamento').insert(lote);
+                if (insErr) {
+                  console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
+                }
+              }
+              totalItens += itensInserir.length;
+              clientesComDados++;
+              console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
+            }
           }
+          
+          // Pausa pequena entre lotes para não sobrecarregar
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-        totalItens += itensInserir.length;
-        clientesComDados++;
-        console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
+
+        console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {
+          totalItens,
+          clientesComDados,
+          clientesProcessados: clientesAtivos.length
+        });
+
+      } catch (error: any) {
+        console.error('[gerar-faturamento-periodo] Erro no background:', error);
       }
-    }
+    };
 
-    console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO');
+    // Iniciar tarefa em background
+    EdgeRuntime.waitUntil(backgroundTask());
 
+    // Retornar resposta imediata
     return new Response(JSON.stringify({
       success: true,
       periodo,
       periodo_referencia: periodoRef,
       clientes_processados: clientesAtivos.length,
-      clientes_com_dados: clientesComDados,
-      itens_inseridos: totalItens
+      message: 'Processamento iniciado em background',
+      status: 'processing'
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {

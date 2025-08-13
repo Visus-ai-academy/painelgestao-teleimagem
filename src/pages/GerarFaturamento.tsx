@@ -472,6 +472,18 @@ export default function GerarFaturamento() {
         throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
       }
 
+      // Se retornou status 'processing', aguardar alguns segundos e verificar dados
+      if (gerarData?.status === 'processing') {
+        setStatusProcessamento({
+          processando: true,
+          mensagem: 'Aguardando processamento em background...',
+          progresso: 50
+        });
+        
+        // Aguardar 10 segundos para o processamento em background
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
+
       setStatusProcessamento({
         processando: true,
         mensagem: 'Buscando dados processados...',
