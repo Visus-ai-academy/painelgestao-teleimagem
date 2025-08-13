@@ -47,7 +47,8 @@ export default function DemonstrativoFaturamento() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      console.log('Carregando demonstrativo de faturamento...');
+      console.log('Carregando demonstrativo de faturamento para período:', periodo);
+      
       // Converter período selecionado (YYYY-MM) para formato mon/YY (ex.: jun/25)
       const formatPeriodo = (yyyyMM: string) => {
         const [y, m] = yyyyMM.split('-');
@@ -56,6 +57,8 @@ export default function DemonstrativoFaturamento() {
         return `${mon}/${y.slice(2)}`;
       };
       const periodoRef = formatPeriodo(periodo);
+      
+      console.log('Buscando dados para período de referência:', periodoRef);
       
       // Buscar dados de faturamento do período (sem limite implícito)
       const { data: dadosFaturamento, error } = await supabase
@@ -78,6 +81,15 @@ export default function DemonstrativoFaturamento() {
         console.error('Erro ao carregar faturamento:', error);
         throw error;
       }
+
+      if (!dadosFaturamento || dadosFaturamento.length === 0) {
+        console.warn(`Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
+        setClientes([]);
+        setClientesFiltrados([]);
+        return;
+      }
+
+      console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodoRef}`);
 
       // Agrupar por cliente
       const clientesMap = new Map<string, ClienteFaturamento>();
@@ -118,7 +130,13 @@ export default function DemonstrativoFaturamento() {
       setClientes(clientesArray);
       setClientesFiltrados(clientesArray);
 
-      console.log('Dados carregados:', clientesArray.length, 'clientes');
+      // Calcular totais para o log
+      const totaisCalculados = clientesArray.reduce((acc, cliente) => ({
+        exames: acc.exames + cliente.total_exames,
+        valorBruto: acc.valorBruto + cliente.valor_bruto,
+      }), { exames: 0, valorBruto: 0 });
+
+      console.log(`Demonstrativo atualizado: ${clientesArray.length} clientes, ${totaisCalculados.exames} exames, R$ ${totaisCalculados.valorBruto.toFixed(2)} valor bruto`);
 
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
@@ -154,6 +172,33 @@ export default function DemonstrativoFaturamento() {
   // Carregar dados ao montar o componente
   useEffect(() => {
     carregarDados();
+  }, [periodo]);
+
+  // Escutar mudanças na tabela de faturamento para atualizar automaticamente
+  useEffect(() => {
+    const canal = supabase
+      .channel('faturamento_updates')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'faturamento' 
+        }, 
+        (payload) => {
+          console.log('Mudança detectada na tabela faturamento:', payload);
+          // Recarregar dados automaticamente quando houver mudanças
+          carregarDados();
+          toast({
+            title: "Dados atualizados",
+            description: "O demonstrativo foi atualizado automaticamente",
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, [periodo]);
 
   // Calcular totais
@@ -214,6 +259,9 @@ export default function DemonstrativoFaturamento() {
             <Filter className="h-5 w-5" />
             Filtros e Controles
           </CardTitle>
+          <CardDescription>
+            Dados do faturamento gerado automaticamente. Atualiza automaticamente quando novo faturamento é processado.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
