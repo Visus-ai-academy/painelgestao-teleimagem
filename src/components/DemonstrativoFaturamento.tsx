@@ -99,7 +99,15 @@ export default function DemonstrativoFaturamento() {
 
       if (!dadosFaturamento || dadosFaturamento.length === 0) {
         console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
-        console.log('💡 Dica: Vá para a aba "Gerar" e execute a geração de faturamento para este período');
+        console.log('💡 Será necessário executar a geração de faturamento para este período');
+        
+        // Se não há dados de faturamento, mostrar mensagem explicativa
+        toast({
+          title: "Dados não encontrados",
+          description: `Nenhum dado de faturamento encontrado para ${periodoRef}. Execute a geração de faturamento primeiro na aba "Gerar".`,
+          variant: "destructive",
+        });
+        
         setClientes([]);
         setClientesFiltrados([]);
         return;

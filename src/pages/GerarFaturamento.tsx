@@ -239,9 +239,9 @@ export default function GerarFaturamento() {
   // Carregar clientes da base de dados (inicialização) - APENAS os que TÊM faturamento
   const carregarClientes = async () => {
     try {
-      console.log('🔍 Iniciando carregamento de clientes...');
+      console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Converter período selecionado (YYYY-MM) para formato mon/YY (ex.: jun/25)
+      // Converter período (YYYY-MM) para formato mon/YY (ex.: jun/25)
       const formatPeriodo = (yyyyMM: string) => {
         const [y, m] = yyyyMM.split('-');
         const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -252,7 +252,7 @@ export default function GerarFaturamento() {
       
       console.log('🔍 Buscando clientes com faturamento para período:', periodoRef);
 
-      // Buscar apenas clientes que têm dados na tabela faturamento para o período
+      // 1. PRIMEIRO: Buscar clientes que têm dados na tabela faturamento
       const { data: clientesComFaturamento, error: errorFaturamento } = await supabase
         .from('faturamento')
         .select('cliente_nome, cliente_email')
@@ -264,24 +264,71 @@ export default function GerarFaturamento() {
         throw errorFaturamento;
       }
 
-      // Obter clientes únicos do faturamento
-      const clientesUnicos = Array.from(
-        new Map(
-          clientesComFaturamento?.map(item => [
-            item.cliente_nome, 
-            {
-              nome: item.cliente_nome,
-              email: item.cliente_email || 'email@cliente.com'
-            }
-          ])
-        ).values()
-      );
+      // 2. SEGUNDO: Se não há dados na tabela faturamento, buscar da volumetria
+      let clientesFinais: any[] = [];
+      
+      if (!clientesComFaturamento || clientesComFaturamento.length === 0) {
+        console.log('⚠️ Nenhum dado no faturamento, buscando da volumetria...');
+        
+        // Buscar da volumetria_mobilemed
+        const { data: clientesVolumetria, error: errorVolumetria } = await supabase
+          .from('volumetria_mobilemed')
+          .select('EMPRESA')
+          .eq('periodo_referencia', periodoRef)
+          .not('EMPRESA', 'is', null);
 
-      console.log('📊 Clientes com faturamento encontrados:', clientesUnicos.length);
-      console.log('📋 Lista de clientes:', clientesUnicos.map(c => c.nome));
+        if (errorVolumetria) {
+          console.error('❌ Erro na consulta volumetria:', errorVolumetria);
+          throw errorVolumetria;
+        }
+
+        if (!clientesVolumetria || clientesVolumetria.length === 0) {
+          console.log('⚠️ Nenhum dado encontrado na volumetria também');
+          setClientesCarregados([]);
+          setResultados([]);
+          
+          toast({
+            title: "Nenhum cliente encontrado",
+            description: `Não há dados de faturamento nem volumetria para o período ${periodoSelecionado}. Carregue os dados primeiro.`,
+            variant: "destructive",
+          });
+          
+          return [];
+        }
+
+        // Converter dados da volumetria para o formato esperado
+        const clientesUnicosVolumetria = Array.from(
+          new Set(clientesVolumetria.map(item => item.EMPRESA))
+        ).map(empresa => ({
+          nome: empresa,
+          email: 'email@cliente.com'
+        }));
+
+        clientesFinais = clientesUnicosVolumetria;
+        console.log('📊 Clientes da volumetria encontrados:', clientesFinais.length);
+        
+      } else {
+        // Usar dados do faturamento
+        const clientesUnicosFaturamento = Array.from(
+          new Map(
+            clientesComFaturamento?.map(item => [
+              item.cliente_nome, 
+              {
+                nome: item.cliente_nome,
+                email: item.cliente_email || 'email@cliente.com'
+              }
+            ])
+          ).values()
+        );
+
+        clientesFinais = clientesUnicosFaturamento;
+        console.log('📊 Clientes com faturamento encontrados:', clientesFinais.length);
+      }
+
+      console.log('📋 Lista final de clientes:', clientesFinais.map(c => c.nome));
 
       // Converter para formato esperado pelo sistema
-      const clientesFormatados = clientesUnicos.map((cliente, index) => ({
+      const clientesFormatados = clientesFinais.map((cliente, index) => ({
         id: `cliente-${cliente.nome}`, // ID baseado no nome para consistência
         nome: cliente.nome,
         email: cliente.email,
@@ -302,20 +349,20 @@ export default function GerarFaturamento() {
           emailEnviado: false,
           emailDestino: cliente.email,
         })));
-        console.log('✅ Lista populada com clientes com faturamento:', clientesFormatados.length);
+        console.log('✅ Lista populada com clientes:', clientesFormatados.length);
       } else {
         setResultados([]);
-        console.log('⚠️ Nenhum cliente com faturamento encontrado para o período');
+        console.log('⚠️ Nenhum cliente encontrado para o período');
       }
       
       return clientesFormatados;
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error('❌ Erro ao carregar clientes:', error);
       setClientesCarregados([]);
       
       toast({
         title: "Erro ao carregar clientes",
-        description: "Não foi possível carregar os clientes com faturamento. Execute primeiro a geração de faturamento.",
+        description: "Não foi possível carregar os clientes. Verifique se há dados para o período selecionado.",
         variant: "destructive",
       });
       
