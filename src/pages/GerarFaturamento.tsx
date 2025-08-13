@@ -1908,74 +1908,75 @@ export default function GerarFaturamento() {
                 Gerar Relatórios
               </CardTitle>
               <CardDescription>
-                {clientesCarregados.length > 0 
-                  ? `${clientesCarregados.length} clientes encontrados. Configure o período e gere os relatórios.`
-                  : "Nenhum Cliente Encontrado - Faça upload da lista de clientes primeiro na página 'Cadastro de Clientes'."
-                }
+                Sistema irá processar automaticamente a volumetria do período jun/25, buscar contratos e preços de cada cliente, e gerar demonstrativos individuais.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {clientesCarregados.length > 0 ? (
-                <>
-                  {/* Fluxo de faturamento (sem upload) */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <FileSpreadsheet className="h-5 w-5" />
-                      Faturamento baseado na Volumetria
-                    </h3>
+                {/* Fluxo de faturamento automatizado baseado na volumetria */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5" />
+                    Processamento Automatizado - jun/25
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-semibold text-blue-900 mb-2">🔍 1. Análise da Volumetria</h4>
+                      <p className="text-sm text-blue-700">
+                        Sistema lê automaticamente os dados de volumetria do período jun/25 e identifica todos os clientes.
+                      </p>
+                    </div>
+                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <h4 className="font-semibold text-purple-900 mb-2">📋 2. Busca de Contratos</h4>
+                      <p className="text-sm text-purple-700">
+                        Para cada cliente encontrado, busca automaticamente o contrato ativo e tabela de preços.
+                      </p>
+                    </div>
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <h4 className="font-semibold text-green-900 mb-2">💰 3. Cálculo de Preços</h4>
+                      <p className="text-sm text-green-700">
+                        Aplica preços por modalidade, especialidade, categoria e volume de cada cliente.
+                      </p>
+                    </div>
                     <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                      <h4 className="font-semibold text-amber-900 mb-2">Fluxo sem upload de arquivo</h4>
+                      <h4 className="font-semibold text-amber-900 mb-2">📄 4. Geração de PDFs</h4>
                       <p className="text-sm text-amber-700">
-                        O faturamento será gerado a partir da volumetria processada do período selecionado,
-                        aplicando preços, regras e parâmetros do contrato de cada cliente. Não é necessário enviar arquivos.
+                        Gera demonstrativos individuais e consolidados automaticamente para todos os clientes.
                       </p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Botão principal para processar e gerar PDFs */}
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={handleProcessarFaturamento}
-                      disabled={statusProcessamento.processando}
-                      size="lg"
-                      className="min-w-[300px] bg-green-600 hover:bg-green-700"
-                    >
-                      {statusProcessamento.processando ? (
-                        <>
-                          <RefreshCw className="h-5 w-5 mr-3 animate-spin" />
-                          Processando...
-                        </>
-                      ) : (
-                        <>
-                          <FileBarChart2 className="h-5 w-5 mr-3" />
-                          Processar e Gerar PDFs
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                    <strong>ℹ️ Como funciona:</strong> O arquivo será processado, os dados serão agrupados por cliente, 
-                    e relatórios PDF individuais serão gerados automaticamente. Configure o período e opções de envio 
-                    na aba "Configuração".
-                  </div>
-                </>
-              ) : (
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
-                    <AlertTriangle className="h-8 w-8 text-yellow-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Nenhum Cliente Encontrado</h3>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Faça upload da lista de clientes primeiro na página "Cadastro de Clientes".
-                    </p>
-                  </div>
-                  <Button onClick={() => window.location.href = '/clientes/cadastro'}>
-                    Ir para Cadastro de Clientes
+                {/* Botão principal para processar e gerar PDFs */}
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleProcessarFaturamento}
+                    disabled={statusProcessamento.processando}
+                    size="lg"
+                    className="min-w-[400px] bg-green-600 hover:bg-green-700 h-14 text-lg"
+                  >
+                    {statusProcessamento.processando ? (
+                      <>
+                        <RefreshCw className="h-6 w-6 mr-3 animate-spin" />
+                        Processando Automaticamente...
+                      </>
+                    ) : (
+                      <>
+                        <FileBarChart2 className="h-6 w-6 mr-3" />
+                        🚀 Gerar Faturamento jun/25
+                      </>
+                    )}
                   </Button>
                 </div>
-              )}
+
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h4 className="font-semibold text-green-900 mb-2">✨ Processo 100% Automatizado</h4>
+                  <ul className="text-sm text-green-700 space-y-1">
+                    <li>• <strong>Sem upload manual:</strong> Lê diretamente da volumetria carregada</li>
+                    <li>• <strong>Busca automática:</strong> Encontra contratos e preços de cada cliente</li>
+                    <li>• <strong>Cálculo inteligente:</strong> Aplica regras de volume e prioridade</li>
+                    <li>• <strong>PDFs individuais:</strong> Gera demonstrativo para cada cliente automaticamente</li>
+                  </ul>
+                </div>
             </CardContent>
           </Card>
         </TabsContent>
