@@ -80,13 +80,12 @@ serve(async (req) => {
     let clientesComDados = 0;
 
     for (const cliente of clientesAtivos) {
-      // Buscar volumetria do cliente no período
+      // Buscar volumetria do cliente no período de referência (dados já processados e apropriados)
       const { data: vm, error: vmErr } = await supabase
         .from('volumetria_mobilemed')
         .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES"')
         .eq('"EMPRESA"', cliente.nome)
-        .gte('data_referencia', inicio)
-        .lte('data_referencia', fim);
+        .eq('periodo_referencia', periodo); // Usar periodo_referencia em vez de filtros de data
 
       if (vmErr) {
         console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
