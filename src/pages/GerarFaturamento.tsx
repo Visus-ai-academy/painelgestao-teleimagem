@@ -1010,6 +1010,51 @@ export default function GerarFaturamento() {
     });
   };
 
+  // Função para limpar dados de faturamento
+  const limparDadosFaturamento = async () => {
+    setStatusProcessamento({
+      processando: true,
+      mensagem: 'Limpando dados de faturamento...',
+      progresso: 50
+    });
+    
+    try {
+      console.log('🧹 Limpando TODOS os dados de faturamento...');
+      
+      // Usar DELETE direto no Supabase
+      const { error: deleteError, count } = await supabase
+        .from('faturamento')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos os registros
+
+      if (deleteError) {
+        console.error('Erro ao limpar faturamento:', deleteError);
+        throw deleteError;
+      }
+
+      console.log(`✅ ${count || 0} registros de faturamento removidos`);
+      
+      toast({
+        title: "Faturamento limpo!",
+        description: `${count || 0} registros de faturamento foram removidos. O demonstrativo será atualizado automaticamente.`,
+      });
+      
+    } catch (error) {
+      console.error('Erro na limpeza de faturamento:', error);
+      toast({
+        title: "Erro na limpeza",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setStatusProcessamento({
+        processando: false,
+        mensagem: '',
+        progresso: 0
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -1784,7 +1829,7 @@ export default function GerarFaturamento() {
               </div>
                   
               
-              {/* Botões utilitários removidos - sistema agora é 100% automatizado */}
+              {/* Botões utilitários */}
               <div className="flex flex-wrap gap-2 justify-center pt-4 border-t">
                 <Button 
                   variant="outline"
@@ -1794,6 +1839,16 @@ export default function GerarFaturamento() {
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Limpar Resultados
+                </Button>
+                
+                <Button 
+                  variant="destructive"
+                  onClick={limparDadosFaturamento}
+                  disabled={statusProcessamento.processando}
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {statusProcessamento.processando ? 'Limpando...' : 'Limpar Dados Faturamento'}
                 </Button>
               </div>
             </CardContent>
