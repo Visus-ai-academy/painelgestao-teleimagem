@@ -452,10 +452,23 @@ export default function GerarFaturamento() {
     });
 
     try {
-      const { data: gerarData, error: gerarError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
+      console.log('🚀 Iniciando chamada da função gerar-faturamento-periodo...');
+      
+      // Implementar timeout de 5 minutos
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout: Processamento demorou mais de 5 minutos')), 5 * 60 * 1000);
+      });
+      
+      const functionPromise = supabase.functions.invoke('gerar-faturamento-periodo', {
         body: { periodo: periodoSelecionado }
       });
+      
+      const { data: gerarData, error: gerarError } = await Promise.race([functionPromise, timeoutPromise]) as any;
+      
+      console.log('✅ Resposta da função:', { gerarData, gerarError });
+      
       if (gerarError || (gerarData && gerarData.success === false)) {
+        console.error('❌ Erro na função:', gerarError?.message || gerarData?.error);
         throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
       }
 

@@ -38,10 +38,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('[gerar-faturamento-periodo] INÍCIO DA FUNÇÃO');
+  
   try {
     const { periodo } = await req.json();
+    console.log('[gerar-faturamento-periodo] Período recebido:', periodo);
 
     if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
+      console.log('[gerar-faturamento-periodo] ERRO: Período inválido');
       return new Response(JSON.stringify({ success: false, error: 'Parâmetro periodo (YYYY-MM) é obrigatório' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -79,7 +83,9 @@ serve(async (req) => {
     let totalItens = 0;
     let clientesComDados = 0;
 
+    console.log('[gerar-faturamento-periodo] Iniciando processamento de clientes...');
     for (const cliente of clientesAtivos) {
+      console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome}`);
       // Buscar volumetria do cliente no período de referência (dados já processados e apropriados)
       const { data: vm, error: vmErr } = await supabase
         .from('volumetria_mobilemed')
@@ -171,8 +177,11 @@ serve(async (req) => {
         }
         totalItens += itensInserir.length;
         clientesComDados++;
+        console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
       }
     }
+
+    console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO');
 
     return new Response(JSON.stringify({
       success: true,
