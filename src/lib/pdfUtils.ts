@@ -37,11 +37,13 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   const reportElement = document.createElement('div');
   reportElement.style.position = 'absolute';
   reportElement.style.left = '-9999px';
-  reportElement.style.width = '297mm'; // A4 paisagem
-  reportElement.style.padding = '15px';
+  reportElement.style.width = '1400px'; // Largura fixa para paisagem
+  reportElement.style.minHeight = '900px'; // Altura mínima
+  reportElement.style.padding = '40px';
   reportElement.style.fontFamily = 'Arial, sans-serif';
   reportElement.style.backgroundColor = 'white';
-  reportElement.style.fontSize = '10px';
+  reportElement.style.fontSize = '12px';
+  reportElement.style.boxSizing = 'border-box';
   
   // Função para sanitizar strings e prevenir XSS
   const sanitizeHtml = (str: string): string => {
@@ -89,50 +91,75 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
 
   const createResumoFinanceiro = () => {
     const resumoDiv = document.createElement('div');
-    resumoDiv.style.marginBottom = '20px';
-    resumoDiv.style.padding = '15px';
-    resumoDiv.style.border = '1px solid #ddd';
+    resumoDiv.style.marginBottom = '30px';
+    resumoDiv.style.padding = '20px';
+    resumoDiv.style.border = '2px solid #ddd';
     resumoDiv.style.borderRadius = '8px';
+    resumoDiv.style.backgroundColor = '#f8f9fa';
     
     const clienteTitle = document.createElement('h2');
     clienteTitle.style.color = '#374151';
-    clienteTitle.style.marginBottom = '15px';
-    clienteTitle.style.fontSize = '16px';
+    clienteTitle.style.marginBottom = '20px';
+    clienteTitle.style.fontSize = '18px';
+    clienteTitle.style.textAlign = 'center';
     clienteTitle.textContent = `Cliente: ${sanitizeHtml(data.cliente_nome)}`;
     
-    // Tabela resumo financeiro
+    // Container flexível para resumo em duas colunas
+    const resumoContainer = document.createElement('div');
+    resumoContainer.style.display = 'flex';
+    resumoContainer.style.gap = '40px';
+    resumoContainer.style.justifyContent = 'space-between';
+    
+    // Coluna esquerda - Informações básicas
+    const colunaEsquerda = document.createElement('div');
+    colunaEsquerda.style.flex = '1';
+    
+    const infoBasica = document.createElement('div');
+    infoBasica.style.fontSize = '14px';
+    infoBasica.innerHTML = `
+      <p style="margin: 10px 0;"><strong>Período:</strong> ${sanitizeHtml(data.periodo)}</p>
+      <p style="margin: 10px 0;"><strong>Total de Exames:</strong> ${data.total_exames}</p>
+      <p style="margin: 10px 0;"><strong>Data do Relatório:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+    `;
+    
+    colunaEsquerda.appendChild(infoBasica);
+    
+    // Coluna direita - Resumo financeiro
+    const colunaDireita = document.createElement('div');
+    colunaDireita.style.flex = '1';
+    
     const resumoTable = document.createElement('table');
     resumoTable.style.width = '100%';
     resumoTable.style.borderCollapse = 'collapse';
-    resumoTable.style.marginTop = '10px';
-    resumoTable.style.fontSize = '12px';
+    resumoTable.style.fontSize = '14px';
     
     const resumoData = [
       ['Valor Bruto', formatarValor(data.valor_bruto)],
-      ['Franquia', formatarValor(data.franquia)],
-      ['Integração', formatarValor(data.integracao)],
-      ['Portal Laudos', formatarValor(data.portal_laudos)],
-      ['Impostos', formatarValor(data.impostos)],
-      ['Valor Líquido', formatarValor(data.valor_liquido)]
+      ['(-) Franquia', formatarValor(data.franquia)],
+      ['(-) Integração', formatarValor(data.integracao)],
+      ['(-) Portal Laudos', formatarValor(data.portal_laudos)],
+      ['(-) Impostos (6%)', formatarValor(data.impostos)],
+      ['VALOR LÍQUIDO', formatarValor(data.valor_liquido)]
     ];
     
     resumoData.forEach((row, index) => {
       const tr = document.createElement('tr');
       if (index === resumoData.length - 1) {
         tr.style.fontWeight = 'bold';
-        tr.style.backgroundColor = '#f3f4f6';
+        tr.style.backgroundColor = '#e3f2fd';
+        tr.style.fontSize = '16px';
       }
       
       const td1 = document.createElement('td');
       td1.style.border = '1px solid #ddd';
-      td1.style.padding = '8px';
+      td1.style.padding = '10px';
       td1.textContent = row[0];
       
       const td2 = document.createElement('td');
       td2.style.border = '1px solid #ddd';
-      td2.style.padding = '8px';
+      td2.style.padding = '10px';
       td2.style.textAlign = 'right';
-      td2.style.width = '150px';
+      td2.style.width = '120px';
       td2.textContent = row[1];
       
       tr.appendChild(td1);
@@ -140,37 +167,49 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
       resumoTable.appendChild(tr);
     });
     
+    colunaDireita.appendChild(resumoTable);
+    
+    resumoContainer.appendChild(colunaEsquerda);
+    resumoContainer.appendChild(colunaDireita);
+    
     resumoDiv.appendChild(clienteTitle);
-    resumoDiv.appendChild(resumoTable);
+    resumoDiv.appendChild(resumoContainer);
     
     return resumoDiv;
   };
 
   const createExamesTable = () => {
     const containerDiv = document.createElement('div');
+    containerDiv.style.marginTop = '20px';
     
     const title = document.createElement('h3');
     title.style.color = '#374151';
     title.style.marginBottom = '15px';
+    title.style.fontSize = '16px';
     title.textContent = 'Detalhamento dos Exames';
     
     const table = document.createElement('table');
     table.style.width = '100%';
     table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.style.fontSize = '11px';
     
     // Criar cabeçalho
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    headerRow.style.backgroundColor = '#f3f4f6';
+    headerRow.style.backgroundColor = '#2563eb';
+    headerRow.style.color = 'white';
     
-    const headers = ['Unidade Origem', 'Paciente', 'Accession Number', 'Nome Exame', 'Laudado Por', 'Prioridade', 'Modalidade', 'Especialidade', 'Categoria', 'Qtd Laudos', 'Valor Total'];
-    headers.forEach(headerText => {
+    const headers = ['Unidade Origem', 'Paciente', 'Accession', 'Exame', 'Médico', 'Prioridade', 'Modalidade', 'Especialidade', 'Categoria', 'Qtd', 'Valor'];
+    const headerWidths = ['10%', '15%', '8%', '15%', '12%', '8%', '8%', '10%', '8%', '4%', '8%'];
+    
+    headers.forEach((headerText, index) => {
       const th = document.createElement('th');
-      th.style.border = '1px solid #ddd';
-      th.style.padding = '6px';
-      th.style.fontSize = '9px';
-      th.style.textAlign = headerText === 'Qtd Laudos' ? 'center' : headerText === 'Valor Total' ? 'right' : 'left';
+      th.style.border = '1px solid #1e40af';
+      th.style.padding = '8px 4px';
+      th.style.fontSize = '10px';
+      th.style.fontWeight = 'bold';
+      th.style.width = headerWidths[index];
+      th.style.textAlign = headerText === 'Qtd' ? 'center' : headerText === 'Valor' ? 'right' : 'left';
       th.textContent = headerText;
       headerRow.appendChild(th);
     });
@@ -180,30 +219,32 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     
     // Criar corpo da tabela
     const tbody = document.createElement('tbody');
-    data.exames.forEach(exame => {
+    data.exames.forEach((exame, index) => {
       const row = document.createElement('tr');
+      row.style.backgroundColor = index % 2 === 0 ? '#f8f9fa' : 'white';
       
       const cells = [
         sanitizeHtml(exame.unidade_origem),
-        sanitizeHtml(exame.paciente),
+        sanitizeHtml(exame.paciente.substring(0, 20) + (exame.paciente.length > 20 ? '...' : '')), // Limitar tamanho
         sanitizeHtml(exame.accession_number),
-        sanitizeHtml(exame.nome_exame),
-        sanitizeHtml(exame.laudado_por),
+        sanitizeHtml(exame.nome_exame.substring(0, 25) + (exame.nome_exame.length > 25 ? '...' : '')), // Limitar tamanho
+        sanitizeHtml(exame.laudado_por.substring(0, 15) + (exame.laudado_por.length > 15 ? '...' : '')), // Limitar tamanho
         sanitizeHtml(exame.prioridade),
         sanitizeHtml(exame.modalidade),
-        sanitizeHtml(exame.especialidade),
+        sanitizeHtml(exame.especialidade.substring(0, 12) + (exame.especialidade.length > 12 ? '...' : '')), // Limitar tamanho
         sanitizeHtml(exame.categoria),
         (exame.quantidade_laudos || 0).toString(),
         formatarValor(exame.valor_total)
       ];
       
-      cells.forEach((cellText, index) => {
+      cells.forEach((cellText, cellIndex) => {
         const td = document.createElement('td');
         td.style.border = '1px solid #ddd';
-        td.style.padding = '4px';
-        td.style.fontSize = '8px';
-        if (index === 9) td.style.textAlign = 'center'; // Qtd Laudos
-        if (index === 10) td.style.textAlign = 'right';  // Valor Total
+        td.style.padding = '6px 4px';
+        td.style.fontSize = '9px';
+        td.style.width = headerWidths[cellIndex];
+        if (cellIndex === 9) td.style.textAlign = 'center'; // Qtd
+        if (cellIndex === 10) td.style.textAlign = 'right';  // Valor
         td.textContent = cellText;
         row.appendChild(td);
       });
@@ -241,31 +282,48 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   document.body.appendChild(reportElement);
   
   try {
-    // Converter HTML para canvas com escala reduzida para diminuir tamanho do arquivo
+    // Converter HTML para canvas com configurações otimizadas para paisagem
     const canvas = await html2canvas(reportElement, {
-      scale: 1.2, // Reduzido de 2 para 1.2 para diminuir tamanho
+      scale: 1.5, // Escala adequada para qualidade
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       removeContainer: true,
-      logging: false // Desabilitar logs para performance
+      logging: false,
+      width: 1400, // Largura fixa do container
+      height: Math.max(900, reportElement.offsetHeight) // Altura mínima ou do conteúdo
     });
     
-    // Criar PDF em PAISAGEM com compressão
+    // Criar PDF em PAISAGEM com dimensões adequadas
     const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (paisagem)
     
-    // Usar JPEG com qualidade reduzida para diminuir tamanho do arquivo
-    const imgData = canvas.toDataURL('image/jpeg', 0.7); // 70% de qualidade
+    // Usar JPEG com boa qualidade
+    const imgData = canvas.toDataURL('image/jpeg', 0.8); // 80% de qualidade
     
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 0;
+    const pdfWidth = pdf.internal.pageSize.getWidth(); // ~297mm
+    const pdfHeight = pdf.internal.pageSize.getHeight(); // ~210mm
     
-    pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    // Calcular proporções para preencher a página
+    const imgAspectRatio = canvas.width / canvas.height;
+    const pdfAspectRatio = pdfWidth / pdfHeight;
+    
+    let finalWidth, finalHeight, offsetX, offsetY;
+    
+    if (imgAspectRatio > pdfAspectRatio) {
+      // Imagem é mais larga proporcionalmente
+      finalWidth = pdfWidth - 20; // Margem de 10mm de cada lado
+      finalHeight = finalWidth / imgAspectRatio;
+      offsetX = 10;
+      offsetY = (pdfHeight - finalHeight) / 2;
+    } else {
+      // Imagem é mais alta proporcionalmente
+      finalHeight = pdfHeight - 20; // Margem de 10mm em cima e embaixo
+      finalWidth = finalHeight * imgAspectRatio;
+      offsetX = (pdfWidth - finalWidth) / 2;
+      offsetY = 10;
+    }
+    
+    pdf.addImage(imgData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight);
     
     // Converter para Blob com compressão
     const pdfBlob = pdf.output('blob');
