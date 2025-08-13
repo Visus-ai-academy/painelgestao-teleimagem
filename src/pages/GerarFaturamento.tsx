@@ -46,8 +46,8 @@ import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFa
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
-// Período atual (julho/2025) - onde estão os dados carregados
-const PERIODO_ATUAL = "2025-07";
+// Período atual - onde estão os dados carregados (junho/2025)
+const PERIODO_ATUAL = "2025-06";
 
 // Função para verificar se um período pode ser editado
 const isPeriodoEditavel = (periodo: string): boolean => {
@@ -123,7 +123,7 @@ export default function GerarFaturamento() {
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
   
   // Controle de período para upload
-  const [periodoSelecionado, setPeriodoSelecionado] = useState(PERIODO_ATUAL);
+  const [periodoSelecionado, setPeriodoSelecionado] = useState("2025-06"); // Período com dados
   const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
   
   const [clientesCarregados, setClientesCarregados] = useState<Array<{
@@ -479,14 +479,40 @@ export default function GerarFaturamento() {
 
   // Função para processar arquivo de faturamento e gerar PDFs
   const handleProcessarFaturamento = async () => {
-    // Fluxo único: gerar faturamento a partir da volumetria + preços do período selecionado
+    // Primeiro limpar dados antigos do período
     setStatusProcessamento({
       processando: true,
-      mensagem: 'Gerando faturamento (volumetria + preços)...',
-      progresso: 30
+      mensagem: 'Limpando dados antigos do período...',
+      progresso: 10
     });
 
     try {
+      // Limpar faturamento anterior do período
+      const periodoRefLimpeza = (() => {
+        const [ano, mes] = periodoSelecionado.split('-');
+        const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        return `${meses[Number(mes)-1]}/${ano.slice(2)}`;
+      })();
+
+      console.log('🧹 Limpando dados antigos do período:', periodoRefLimpeza);
+      
+      const { data: limparData, error: limparError } = await supabase.functions.invoke('limpar-faturamento-periodo', {
+        body: { periodo_referencia: periodoRefLimpeza }
+      });
+
+      if (limparError || !limparData?.success) {
+        console.warn('⚠️ Não foi possível limpar dados antigos:', limparError?.message || limparData?.error);
+      } else {
+        console.log('✅ Dados antigos limpos:', limparData.registros_removidos, 'registros');
+      }
+
+      // Agora gerar novo faturamento
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Gerando faturamento (volumetria + preços)...',
+        progresso: 30
+      });
+
       console.log('🚀 Iniciando chamada da função gerar-faturamento-periodo...');
       
       // Implementar timeout de 5 minutos

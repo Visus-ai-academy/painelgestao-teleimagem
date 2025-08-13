@@ -198,7 +198,7 @@ serve(async (req) => {
                   data_emissao: emissao,
                   data_vencimento: vencimento,
                   periodo_referencia: periodoRef,
-                  tipo_dados: 'sem_preco_padrao',
+                  tipo_dados: 'incremental', // Usar valor válido conforme constraint
                 });
                 continue;
               }

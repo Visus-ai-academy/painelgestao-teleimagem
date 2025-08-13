@@ -41,7 +41,7 @@ export default function DemonstrativoFaturamento() {
   const [carregando, setCarregando] = useState(false);
   const [filtroNome, setFiltroNome] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [periodo, setPeriodo] = useState("2025-07");
+  const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
 
   // Carregar dados de faturamento
   const carregarDados = async () => {
