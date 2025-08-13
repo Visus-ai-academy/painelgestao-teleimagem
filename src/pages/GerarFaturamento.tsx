@@ -1012,12 +1012,6 @@ export default function GerarFaturamento() {
 
   // Função para limpar dados de faturamento
   const limparDadosFaturamento = async () => {
-    setStatusProcessamento({
-      processando: true,
-      mensagem: 'Limpando dados de faturamento...',
-      progresso: 50
-    });
-    
     try {
       console.log('🧹 Limpando TODOS os dados de faturamento...');
       
@@ -1045,12 +1039,6 @@ export default function GerarFaturamento() {
         title: "Erro na limpeza",
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive",
-      });
-    } finally {
-      setStatusProcessamento({
-        processando: false,
-        mensagem: '',
-        progresso: 0
       });
     }
   };
