@@ -153,6 +153,12 @@ serve(async (req) => {
               const unit = Number(preco) || 0;
               const valor = Number((unit * qtd).toFixed(2));
 
+              // Pular itens com valor zero ou negativo para evitar violação do constraint
+              if (valor <= 0) {
+                console.log(`[gerar-faturamento-periodo] Pulando item com valor ${valor} para ${cliente.nome} -> ${chave.estudo}`);
+                continue;
+              }
+
               const hoje = new Date();
               const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
               const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
