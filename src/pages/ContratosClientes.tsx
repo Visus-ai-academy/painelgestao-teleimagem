@@ -804,14 +804,14 @@ export default function ContratosClientes() {
                   {/* Ajustes de Faturamento */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label>Desconto (%) - Ajuste de Faturamento</Label>
+                      <Label>Desconto (R$) - Ajuste de Faturamento</Label>
                       {showEditarContrato ? (
                         <Input 
                           type="number" 
                           step="0.01" 
                           value={editDesconto} 
                           onChange={(e) => setEditDesconto(Number(e.target.value) || "")} 
-                          placeholder="Ex: 5.5 (para ajustes no período)"
+                          placeholder="Ex: 150.00 (valor em reais para ajustes no período)"
                         />
                       ) : (
                         <Input 
@@ -823,14 +823,14 @@ export default function ContratosClientes() {
                       )}
                     </div>
                     <div className="grid gap-2">
-                      <Label>Acréscimo (%) - Ajuste de Faturamento</Label>
+                      <Label>Acréscimo (R$) - Ajuste de Faturamento</Label>
                       {showEditarContrato ? (
                         <Input 
                           type="number" 
                           step="0.01" 
                           value={editAcrescimo} 
                           onChange={(e) => setEditAcrescimo(Number(e.target.value) || "")} 
-                          placeholder="Ex: 2.5 (para ajustes no período)"
+                          placeholder="Ex: 200.00 (valor em reais para ajustes no período)"
                         />
                       ) : (
                         <Input 
