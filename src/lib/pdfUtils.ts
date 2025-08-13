@@ -37,14 +37,14 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   const reportElement = document.createElement('div');
   reportElement.style.position = 'absolute';
   reportElement.style.left = '-9999px';
-  reportElement.style.width = '1600px'; // Largura maior para melhor distribuição
-  reportElement.style.minHeight = '1000px'; // Altura proporcional
-  reportElement.style.padding = '30px';
+  reportElement.style.width = '1200px'; // Largura otimizada para A4 paisagem
+  reportElement.style.minHeight = '800px'; // Altura proporcional para A4
+  reportElement.style.padding = '20px';
   reportElement.style.fontFamily = 'Arial, sans-serif';
   reportElement.style.backgroundColor = 'white';
-  reportElement.style.fontSize = '13px';
+  reportElement.style.fontSize = '12px';
   reportElement.style.boxSizing = 'border-box';
-  reportElement.style.lineHeight = '1.4';
+  reportElement.style.lineHeight = '1.2';
   
   // Função para sanitizar strings e prevenir XSS
   const sanitizeHtml = (str: string): string => {
@@ -308,21 +308,21 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   try {
     // Converter HTML para canvas com configurações otimizadas para paisagem
     const canvas = await html2canvas(reportElement, {
-      scale: 1.5, // Escala adequada para qualidade
+      scale: 2, // Maior resolução para texto mais nítido
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       removeContainer: true,
       logging: false,
-      width: 1600, // Largura fixa do container
-      height: Math.max(1000, reportElement.offsetHeight) // Altura mínima ou do conteúdo
+      width: 1200, // Largura otimizada
+      height: Math.max(800, reportElement.offsetHeight) // Altura proporcional
     });
     
-    // Criar PDF em PAISAGEM com dimensões adequadas
+    // Criar PDF em PAISAGEM com alta qualidade
     const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (paisagem)
     
-    // Usar JPEG com boa qualidade
-    const imgData = canvas.toDataURL('image/jpeg', 0.8); // 80% de qualidade
+    // Usar PNG com alta qualidade para melhor texto
+    const imgData = canvas.toDataURL('image/png'); // PNG para melhor qualidade de texto
     
     const pdfWidth = pdf.internal.pageSize.getWidth(); // ~297mm
     const pdfHeight = pdf.internal.pageSize.getHeight(); // ~210mm
@@ -333,13 +333,13 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     
     let finalWidth, finalHeight, offsetX, offsetY;
     
-    // Maximizar preenchimento da página mantendo proporção
-    finalWidth = pdfWidth - 10; // Margem mínima de 5mm de cada lado
-    finalHeight = pdfHeight - 10; // Margem mínima de 5mm em cima e embaixo
-    offsetX = 5;
-    offsetY = 5;
+    // Usar toda a página com margens mínimas para melhor legibilidade  
+    finalWidth = pdfWidth - 20; // Margem de 10mm de cada lado
+    finalHeight = pdfHeight - 20; // Margem de 10mm em cima e embaixo
+    offsetX = 10;
+    offsetY = 10;
     
-    pdf.addImage(imgData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight);
+    pdf.addImage(imgData, 'PNG', offsetX, offsetY, finalWidth, finalHeight);
     
     // Converter para Blob com compressão
     const pdfBlob = pdf.output('blob');

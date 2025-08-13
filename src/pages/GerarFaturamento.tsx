@@ -335,24 +335,17 @@ export default function GerarFaturamento() {
   // Recarregar clientes sem resetar resultados
   const recarregarClientes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nome, email, status')
-        .eq('ativo', true)
-        .eq('status', 'Ativo')
-        .not('email', 'is', null);
-
-      if (error) throw error;
-
-      const clientesAtivos = data || [];
-      setClientesCarregados(clientesAtivos);
+      console.log('🔄 Recarregando clientes com faturamento...');
+      
+      // Usar a mesma lógica do carregarClientes
+      const clientesAtualizados = await carregarClientes();
       
       toast({
         title: "Clientes atualizados",
-        description: `${clientesAtivos.length} clientes carregados da base`,
+        description: `${clientesAtualizados.length} clientes com faturamento carregados`,
       });
       
-      return clientesAtivos;
+      return clientesAtualizados;
     } catch (error) {
       console.error('Erro ao recarregar clientes:', error);
       toast({
@@ -367,11 +360,9 @@ export default function GerarFaturamento() {
 
   // Carregar clientes apenas na inicialização - persistir dados na mudança de tab
   useEffect(() => {
-    // Só carrega se não houver clientes já carregados
-    if (clientesCarregados.length === 0) {
-      carregarClientes();
-    }
-  }, [clientesCarregados.length]);
+    // SEMPRE carregar clientes quando trocar de período ou quando o componente montar
+    carregarClientes();
+  }, [periodoSelecionado]); // Depende do período selecionado
 
   // Persistir dados no localStorage quando mudarem
   useEffect(() => {
