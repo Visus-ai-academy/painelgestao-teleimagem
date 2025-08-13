@@ -88,24 +88,44 @@ serve(async (req) => {
         let totalItens = 0;
         let clientesComDados = 0;
 
-        // Processar TODOS os clientes em lotes de 50 para evitar sobrecarga
-        const loteSize = 50;
+        // Processar TODOS os clientes que têm dados de volumetria
+        const loteSize = 10; // Reduzir para evitar timeout
         console.log(`[gerar-faturamento-periodo] Processando ${clientesAtivos.length} clientes em lotes de ${loteSize}`);
-        for (let i = 0; i < clientesAtivos.length; i += loteSize) {
-          const loteClientes = clientesAtivos.slice(i, i + loteSize);
+        
+        // Buscar clientes que realmente têm dados de volumetria no período
+        const { data: clientesComVolumetria } = await supabase
+          .from('volumetria_mobilemed')
+          .select('"EMPRESA"')
+          .eq('periodo_referencia', periodo)
+          .not('"VALORES"', 'is', null)
+          .neq('"VALORES"', 0);
+        
+        const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.EMPRESA) || [])];
+        console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
+        console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
+        
+        // Filtrar apenas clientes que têm dados de volumetria
+        const clientesParaProcessar = clientesAtivos.filter(cliente => 
+          nomesClientesComVolumetria.includes(cliente.nome)
+        );
+        
+        console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
+        
+        for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
+          const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
           
           for (const cliente of loteClientes) {
             console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome}`);
             
-            // Buscar volumetria do cliente no período de referência
+            // Buscar TODOS os dados de volumetria do cliente no período (incluindo modalidade RX)
             const { data: vm, error: vmErr } = await supabase
               .from('volumetria_mobilemed')
-              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES"')
+              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_EXAME"')
               .eq('"EMPRESA"', cliente.nome)
               .eq('periodo_referencia', periodo)
               .not('"VALORES"', 'is', null)
               .neq('"VALORES"', 0)
-              .limit(5000); // Aumentar limite por cliente
+              .limit(10000); // Aumentar limite para capturar todos os dados
 
             if (vmErr) {
               console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);

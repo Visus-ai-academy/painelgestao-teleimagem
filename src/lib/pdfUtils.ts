@@ -6,14 +6,25 @@ export interface FaturamentoData {
   total_exames: number;
   valor_total: number;
   periodo: string;
+  valor_bruto: number;
+  franquia: number;
+  integracao: number;
+  portal_laudos: number;
+  impostos: number;
+  valor_liquido: number;
   exames: Array<{
+    unidade_origem: string;
     paciente: string;
-    data_exame: string;
+    accession_number: string;
+    nome_exame: string;
+    laudado_por: string;
+    prioridade: string;
     modalidade: string;
     especialidade: string;
-    nome_exame: string;
-    quantidade: number;
-    valor_bruto: number;
+    categoria: string;
+    quantidade_laudos: number;
+    valor_total: number;
+    data_exame: string;
   }>;
 }
 
@@ -22,14 +33,15 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   console.log('🔍 Exames array:', data.exames);
   console.log('🔍 Primeiro exame:', data.exames[0]);
   
-  // Criar elemento HTML temporário para o relatório
+  // Criar elemento HTML temporário para o relatório (PAISAGEM)
   const reportElement = document.createElement('div');
   reportElement.style.position = 'absolute';
   reportElement.style.left = '-9999px';
-  reportElement.style.width = '210mm';
-  reportElement.style.padding = '20px';
+  reportElement.style.width = '297mm'; // A4 paisagem
+  reportElement.style.padding = '15px';
   reportElement.style.fontFamily = 'Arial, sans-serif';
   reportElement.style.backgroundColor = 'white';
+  reportElement.style.fontSize = '10px';
   
   // Função para sanitizar strings e prevenir XSS
   const sanitizeHtml = (str: string): string => {
@@ -67,39 +79,63 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     return headerDiv;
   };
 
-  const createClienteInfo = () => {
-    const clienteDiv = document.createElement('div');
-    clienteDiv.style.marginBottom = '30px';
-    clienteDiv.style.padding = '20px';
-    clienteDiv.style.border = '1px solid #ddd';
-    clienteDiv.style.borderRadius = '8px';
+  const createResumoFinanceiro = () => {
+    const resumoDiv = document.createElement('div');
+    resumoDiv.style.marginBottom = '20px';
+    resumoDiv.style.padding = '15px';
+    resumoDiv.style.border = '1px solid #ddd';
+    resumoDiv.style.borderRadius = '8px';
     
     const clienteTitle = document.createElement('h2');
     clienteTitle.style.color = '#374151';
     clienteTitle.style.marginBottom = '15px';
+    clienteTitle.style.fontSize = '16px';
     clienteTitle.textContent = `Cliente: ${sanitizeHtml(data.cliente_nome)}`;
     
-    const gridDiv = document.createElement('div');
-    gridDiv.style.display = 'grid';
-    gridDiv.style.gridTemplateColumns = '1fr 1fr';
-    gridDiv.style.gap = '20px';
+    // Tabela resumo financeiro
+    const resumoTable = document.createElement('table');
+    resumoTable.style.width = '100%';
+    resumoTable.style.borderCollapse = 'collapse';
+    resumoTable.style.marginTop = '10px';
+    resumoTable.style.fontSize = '12px';
     
-    const totalExamesDiv = document.createElement('div');
-    const totalExamesP = document.createElement('p');
-    totalExamesP.innerHTML = `<strong>Total de Exames:</strong> ${data.total_exames}`;
-    totalExamesDiv.appendChild(totalExamesP);
+    const resumoData = [
+      ['Valor Bruto', `R$ ${data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Franquia', `R$ ${data.franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Integração', `R$ ${data.integracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Portal Laudos', `R$ ${data.portal_laudos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Impostos', `R$ ${data.impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Valor Líquido', `R$ ${data.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
+    ];
     
-    const valorTotalDiv = document.createElement('div');
-    const valorTotalP = document.createElement('p');
-    valorTotalP.innerHTML = `<strong>Valor Total:</strong> R$ ${data.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-    valorTotalDiv.appendChild(valorTotalP);
+    resumoData.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      if (index === resumoData.length - 1) {
+        tr.style.fontWeight = 'bold';
+        tr.style.backgroundColor = '#f3f4f6';
+      }
+      
+      const td1 = document.createElement('td');
+      td1.style.border = '1px solid #ddd';
+      td1.style.padding = '8px';
+      td1.textContent = row[0];
+      
+      const td2 = document.createElement('td');
+      td2.style.border = '1px solid #ddd';
+      td2.style.padding = '8px';
+      td2.style.textAlign = 'right';
+      td2.style.width = '150px';
+      td2.textContent = row[1];
+      
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      resumoTable.appendChild(tr);
+    });
     
-    gridDiv.appendChild(totalExamesDiv);
-    gridDiv.appendChild(valorTotalDiv);
-    clienteDiv.appendChild(clienteTitle);
-    clienteDiv.appendChild(gridDiv);
+    resumoDiv.appendChild(clienteTitle);
+    resumoDiv.appendChild(resumoTable);
     
-    return clienteDiv;
+    return resumoDiv;
   };
 
   const createExamesTable = () => {
@@ -120,12 +156,13 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     const headerRow = document.createElement('tr');
     headerRow.style.backgroundColor = '#f3f4f6';
     
-    const headers = ['Paciente', 'Data', 'Modalidade', 'Especialidade', 'Exame', 'Qtd', 'Valor'];
+    const headers = ['Unidade Origem', 'Paciente', 'Accession Number', 'Nome Exame', 'Laudado Por', 'Prioridade', 'Modalidade', 'Especialidade', 'Categoria', 'Qtd Laudos', 'Valor Total'];
     headers.forEach(headerText => {
       const th = document.createElement('th');
       th.style.border = '1px solid #ddd';
-      th.style.padding = '8px';
-      th.style.textAlign = headerText === 'Qtd' ? 'center' : headerText === 'Valor' ? 'right' : 'left';
+      th.style.padding = '6px';
+      th.style.fontSize = '9px';
+      th.style.textAlign = headerText === 'Qtd Laudos' ? 'center' : headerText === 'Valor Total' ? 'right' : 'left';
       th.textContent = headerText;
       headerRow.appendChild(th);
     });
@@ -139,21 +176,26 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
       const row = document.createElement('tr');
       
       const cells = [
+        sanitizeHtml(exame.unidade_origem),
         sanitizeHtml(exame.paciente),
-        new Date(exame.data_exame).toLocaleDateString('pt-BR'),
+        sanitizeHtml(exame.accession_number),
+        sanitizeHtml(exame.nome_exame),
+        sanitizeHtml(exame.laudado_por),
+        sanitizeHtml(exame.prioridade),
         sanitizeHtml(exame.modalidade),
         sanitizeHtml(exame.especialidade),
-        sanitizeHtml(exame.nome_exame),
-        exame.quantidade.toString(),
-        `R$ ${exame.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        sanitizeHtml(exame.categoria),
+        exame.quantidade_laudos.toString(),
+        `R$ ${exame.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       ];
       
       cells.forEach((cellText, index) => {
         const td = document.createElement('td');
         td.style.border = '1px solid #ddd';
-        td.style.padding = '6px';
-        if (index === 5) td.style.textAlign = 'center'; // Qtd
-        if (index === 6) td.style.textAlign = 'right';  // Valor
+        td.style.padding = '4px';
+        td.style.fontSize = '8px';
+        if (index === 9) td.style.textAlign = 'center'; // Qtd Laudos
+        if (index === 10) td.style.textAlign = 'right';  // Valor Total
         td.textContent = cellText;
         row.appendChild(td);
       });
@@ -184,7 +226,7 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
 
   // Montar elemento do relatório de forma segura
   reportElement.appendChild(createHeader());
-  reportElement.appendChild(createClienteInfo());
+  reportElement.appendChild(createResumoFinanceiro());
   reportElement.appendChild(createExamesTable());
   reportElement.appendChild(createFooter());
   
@@ -199,8 +241,8 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
       backgroundColor: '#ffffff'
     });
     
-    // Criar PDF
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    // Criar PDF em PAISAGEM
+    const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (paisagem)
     const imgData = canvas.toDataURL('image/png');
     
     const pdfWidth = pdf.internal.pageSize.getWidth();
