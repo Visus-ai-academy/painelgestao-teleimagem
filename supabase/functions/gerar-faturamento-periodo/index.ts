@@ -59,18 +59,17 @@ serve(async (req) => {
 
     console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} Ref=${periodoRef}`);
 
-    // Buscar clientes ativos (limitado a 50 para evitar timeout)
+    // Buscar TODOS os clientes ativos
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
       .select('id, nome, email, ativo, status')
       .eq('ativo', true)
-      .eq('status', 'Ativo')
-      .limit(50); // Processar apenas 50 clientes por vez
+      .eq('status', 'Ativo');
 
     if (clientesError) throw clientesError;
 
     const clientesAtivos = clientes || [];
-    console.log(`[gerar-faturamento-periodo] Clientes ativos: ${clientesAtivos.length}`);
+    console.log(`[gerar-faturamento-periodo] Total de clientes ativos: ${clientesAtivos.length}`);
 
     // Retornar resposta imediata e processar em background
     const backgroundTask = async () => {
@@ -89,8 +88,9 @@ serve(async (req) => {
         let totalItens = 0;
         let clientesComDados = 0;
 
-        // Processar clientes em lotes de 10 para evitar sobrecarga
-        const loteSize = 10;
+        // Processar TODOS os clientes em lotes de 50 para evitar sobrecarga
+        const loteSize = 50;
+        console.log(`[gerar-faturamento-periodo] Processando ${clientesAtivos.length} clientes em lotes de ${loteSize}`);
         for (let i = 0; i < clientesAtivos.length; i += loteSize) {
           const loteClientes = clientesAtivos.slice(i, i + loteSize);
           
