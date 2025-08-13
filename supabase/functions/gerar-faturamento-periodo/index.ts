@@ -120,7 +120,7 @@ serve(async (req) => {
             // Buscar TODOS os dados de volumetria do cliente no período (incluindo modalidade RX)
             const { data: vm, error: vmErr } = await supabase
               .from('volumetria_mobilemed')
-              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO"')
+              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
               .eq('"EMPRESA"', cliente.nome)
               .eq('periodo_referencia', periodo)
               .not('"VALORES"', 'is', null)
@@ -141,8 +141,8 @@ serve(async (req) => {
             // Volume total (usado na faixa de preço)
             const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
 
-            // Agrupar por chave
-            const grupos = new Map<string, { chave: GrupoChave; qtd: number }>();
+            // Agrupar por chave INCLUINDO paciente
+            const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
             for (const r of rows) {
               const chave: GrupoChave = {
                 modalidade: r.MODALIDADE || '',
@@ -151,15 +151,27 @@ serve(async (req) => {
                 prioridade: r.PRIORIDADE || '',
                 estudo: r.ESTUDO_DESCRICAO || 'Exame',
               };
-              const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}`;
+              // INCLUIR PACIENTE na chave para evitar agregação incorreta
+              const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}|${r.NOME_PACIENTE}|${r.ACCESSION_NUMBER}`;
               const qtd = Number(r.VALORES) || 1;
               const atual = grupos.get(key);
-              if (atual) atual.qtd += qtd; else grupos.set(key, { chave, qtd });
+              if (atual) {
+                atual.qtd += qtd;
+              } else {
+                grupos.set(key, { 
+                  chave, 
+                  qtd, 
+                  paciente: r.NOME_PACIENTE || 'N/A',
+                  medico: r.MEDICO || 'N/A',
+                  dataExame: r.DATA_REALIZACAO || '',
+                  accession: r.ACCESSION_NUMBER || ''
+                });
+              }
             }
 
             const itensInserir: any[] = [];
 
-            for (const { chave, qtd } of grupos.values()) {
+            for (const { chave, qtd, paciente, medico, dataExame } of grupos.values()) {
               // Calcular preço unitário via RPC
               const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente.id,
@@ -182,6 +194,7 @@ serve(async (req) => {
               if (valor <= 0) {
                 console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO:`);
                 console.log(`  Cliente: ${cliente.nome}`);
+                console.log(`  Paciente: ${paciente}`);
                 console.log(`  Exame: ${chave.estudo}`);
                 console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
                 console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
@@ -201,29 +214,20 @@ serve(async (req) => {
                 const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
                 const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-                // Buscar dados do primeiro registro para este grupo
-                const primeiroRegistro = rows.find(r => 
-                  r.MODALIDADE === chave.modalidade && 
-                  r.ESPECIALIDADE === chave.especialidade &&
-                  r.CATEGORIA === chave.categoria &&
-                  r.PRIORIDADE === chave.prioridade &&
-                  r.ESTUDO_DESCRICAO === chave.estudo
-                );
-
                 itensInserir.push({
                   omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                   numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
                   cliente_id: cliente.id,
                   cliente_nome: cliente.nome,
                   cliente_email: cliente.email || null,
-                  paciente: primeiroRegistro?.NOME_PACIENTE || 'N/A',
+                  paciente: paciente,
                   modalidade: chave.modalidade,
                   especialidade: chave.especialidade,
                   categoria: chave.categoria,
                   prioridade: chave.prioridade,
                   nome_exame: chave.estudo,
-                  medico: primeiroRegistro?.MEDICO || 'N/A',
-                  data_exame: primeiroRegistro?.DATA_REALIZACAO || emissao,
+                  medico: medico,
+                  data_exame: dataExame || emissao,
                   quantidade: qtd,
                   valor_bruto: valorComPadrao,
                   valor: valorComPadrao,
@@ -239,29 +243,20 @@ serve(async (req) => {
               const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
               const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-              // Buscar dados do primeiro registro para este grupo
-              const primeiroRegistro = rows.find(r => 
-                r.MODALIDADE === chave.modalidade && 
-                r.ESPECIALIDADE === chave.especialidade &&
-                r.CATEGORIA === chave.categoria &&
-                r.PRIORIDADE === chave.prioridade &&
-                r.ESTUDO_DESCRICAO === chave.estudo
-              );
-
               itensInserir.push({
                 omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                 numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
                 cliente_id: cliente.id,
                 cliente_nome: cliente.nome,
                 cliente_email: cliente.email || null,
-                paciente: primeiroRegistro?.NOME_PACIENTE || 'N/A',
+                paciente: paciente,
                 modalidade: chave.modalidade,
                 especialidade: chave.especialidade,
                 categoria: chave.categoria,
                 prioridade: chave.prioridade,
                 nome_exame: chave.estudo,
-                medico: primeiroRegistro?.MEDICO || 'N/A',
-                data_exame: primeiroRegistro?.DATA_REALIZACAO || emissao,
+                medico: medico,
+                data_exame: dataExame || emissao,
                 quantidade: qtd,
                 valor_bruto: valor,
                 valor: valor,
