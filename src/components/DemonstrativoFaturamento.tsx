@@ -47,7 +47,19 @@ export default function DemonstrativoFaturamento() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      console.log('Carregando demonstrativo de faturamento para período:', periodo);
+      console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
+      
+      // Primeiro, verificar se há dados na tabela de faturamento
+      const { data: todosFaturamento, error: erroTotal } = await supabase
+        .from('faturamento')
+        .select('periodo_referencia', { count: 'exact' });
+
+      console.log('📊 Total de registros na tabela faturamento:', todosFaturamento?.length || 0);
+      
+      if (todosFaturamento && todosFaturamento.length > 0) {
+        const periodosDisponiveis = [...new Set(todosFaturamento.map(f => f.periodo_referencia))];
+        console.log('📅 Períodos disponíveis:', periodosDisponiveis);
+      }
       
       // Converter período selecionado (YYYY-MM) para formato mon/YY (ex.: jun/25)
       const formatPeriodo = (yyyyMM: string) => {
@@ -58,9 +70,9 @@ export default function DemonstrativoFaturamento() {
       };
       const periodoRef = formatPeriodo(periodo);
       
-      console.log('Buscando dados para período de referência:', periodoRef);
+      console.log('🔍 Buscando dados para período de referência:', periodoRef);
       
-      // Buscar dados de faturamento do período (sem limite implícito)
+      // Buscar dados de faturamento do período
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
@@ -77,13 +89,16 @@ export default function DemonstrativoFaturamento() {
         .eq('periodo_referencia', periodoRef)
         .order('cliente_nome');
 
+      console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
+
       if (error) {
-        console.error('Erro ao carregar faturamento:', error);
+        console.error('❌ Erro ao carregar faturamento:', error);
         throw error;
       }
 
       if (!dadosFaturamento || dadosFaturamento.length === 0) {
-        console.warn(`Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
+        console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
+        console.log('💡 Dica: Vá para a aba "Gerar" e execute a geração de faturamento para este período');
         setClientes([]);
         setClientesFiltrados([]);
         return;

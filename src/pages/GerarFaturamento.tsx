@@ -102,9 +102,18 @@ const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico'
 };
 
 export default function GerarFaturamento() {
-  const [activeTab, setActiveTab] = useState("teste-volumetria");
-  const [relatoriosGerados, setRelatoriosGerados] = useState(0);
-  const [emailsEnviados, setEmailsEnviados] = useState(0);
+  const [activeTab, setActiveTab] = useState("faturamento");
+  
+  // Estados persistentes que não devem zerar ao trocar de aba
+  const [relatoriosGerados, setRelatoriosGerados] = useState(() => {
+    const saved = localStorage.getItem('relatoriosGerados');
+    return saved ? parseInt(saved) : 0;
+  });
+  const [emailsEnviados, setEmailsEnviados] = useState(() => {
+    const saved = localStorage.getItem('emailsEnviados');
+    return saved ? parseInt(saved) : 0;
+  });
+  
   const [processandoTodos, setProcessandoTodos] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
@@ -121,7 +130,10 @@ export default function GerarFaturamento() {
     id: string;
     nome: string;
     email: string;
-  }>>([]);
+  }>>(() => {
+    const saved = localStorage.getItem('clientesCarregados');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   // Estado para relatórios prontos
   const [relatoriosProntos, setRelatoriosProntos] = useState<Array<{
@@ -162,7 +174,10 @@ export default function GerarFaturamento() {
       total_laudos: number;
       valor_total: number;
     };
-  }>>([]);
+  }>>(() => {
+    const saved = localStorage.getItem('resultadosFaturamento');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   const { toast } = useToast();
 
@@ -321,10 +336,30 @@ export default function GerarFaturamento() {
   };
 
 
-  // Carregar clientes apenas na inicialização
+  // Carregar clientes apenas na inicialização - persistir dados na mudança de tab
   useEffect(() => {
-    carregarClientes();
-  }, []);
+    // Só carrega se não houver clientes já carregados
+    if (clientesCarregados.length === 0) {
+      carregarClientes();
+    }
+  }, [clientesCarregados.length]);
+
+  // Persistir dados no localStorage quando mudarem
+  useEffect(() => {
+    localStorage.setItem('clientesCarregados', JSON.stringify(clientesCarregados));
+  }, [clientesCarregados]);
+
+  useEffect(() => {
+    localStorage.setItem('resultadosFaturamento', JSON.stringify(resultados));
+  }, [resultados]);
+
+  useEffect(() => {
+    localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+  }, [relatoriosGerados]);
+
+  useEffect(() => {
+    localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+  }, [emailsEnviados]);
 
   // Função para fazer upload de relatório pronto
   const handleUploadRelatorio = async (clienteId: string, file: File) => {
@@ -1131,9 +1166,9 @@ export default function GerarFaturamento() {
                     </div>
                   </div>
                 </div>
-                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <Mail className="h-8 w-8 text-orange-600" />
+                    <Mail className="h-8 w-8 text-purple-600" />
                     <div>
                       <div className="text-2xl font-bold text-orange-900">
                         {resultados.filter(r => r.emailEnviado).length}
@@ -1375,12 +1410,12 @@ export default function GerarFaturamento() {
               </CardContent>
             </Card>
 
-            {/* Card de Status do Sistema - SEGUNDO */}
+            {/* Card de Relatórios de Faturamento - SEGUNDO */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileBarChart2 className="h-5 w-5" />
-                  Status do Sistema - {(() => {
+                  Gerar Relatórios de Faturamento - {(() => {
                     const [ano, mes] = periodoSelecionado.split('-');
                     const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
                     return `${meses[Number(mes)-1]}/${ano.slice(2)}`;
@@ -1392,11 +1427,11 @@ export default function GerarFaturamento() {
               </CardHeader>
               <CardContent className="space-y-6">
 
-                {/* Resumo do Sistema */}
+                {/* Resumo dos Relatórios */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                   <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
                     <FileBarChart2 className="h-4 w-4" />
-                    Status do Sistema
+                    Relatórios de Faturamento
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded">
