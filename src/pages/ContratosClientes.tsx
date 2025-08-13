@@ -383,10 +383,15 @@ const carregarHistoricoContrato = async (contratoId: string) => {
   }
 };
 
-// Carregar condições de preço (preços por faixa) ao abrir visualização
+// Carregar condições de preço (preços por faixa) ao abrir visualização OU edição
 useEffect(() => {
   const fetchPrecos = async () => {
-    if (!showVisualizarContrato || !contratoVisualizando?.clienteId) {
+    // Carregar tanto na visualização quanto na edição
+    const clienteId = contratoVisualizando?.clienteId || contratoEditando?.clienteId;
+    const shouldLoad = (showVisualizarContrato && contratoVisualizando?.clienteId) || 
+                      (showEditarContrato && contratoEditando?.clienteId);
+    
+    if (!shouldLoad || !clienteId) {
       setPrecosCliente([]);
       return;
     }
@@ -395,7 +400,7 @@ useEffect(() => {
       const { data, error } = await supabase
         .from('precos_servicos')
         .select('modalidade, especialidade, categoria, prioridade, volume_inicial, volume_final, valor_base, valor_urgencia, considera_prioridade_plantao')
-        .eq('cliente_id', contratoVisualizando.clienteId)
+        .eq('cliente_id', clienteId)
         .order('modalidade', { ascending: true });
       if (error) throw error;
       setPrecosCliente(data || []);
@@ -407,7 +412,7 @@ useEffect(() => {
     }
   };
   fetchPrecos();
-}, [showVisualizarContrato, contratoVisualizando?.clienteId]);
+}, [showVisualizarContrato, contratoVisualizando?.clienteId, showEditarContrato, contratoEditando?.clienteId]);
   // Função para sincronizar preços com contratos
   const sincronizarPrecos = async () => {
     if (!confirm('Deseja sincronizar os preços de serviços com os contratos? Esta ação atualizará os serviços contratados de todos os contratos.')) {
