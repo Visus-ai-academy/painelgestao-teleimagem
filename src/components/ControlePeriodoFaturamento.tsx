@@ -30,24 +30,16 @@ export const isPeriodoDisponivelFaturamento = (periodo: string): boolean => {
   }
 };
 
-// Status específico para faturamento com novas regras
+// Status específico para faturamento - todos pendentes por enquanto
 export const getStatusPeriodoFaturamento = (periodo: string): 'concluido' | 'pronto' | 'pendente' | 'futuro' => {
   try {
-    const periodoObj = stringParaPeriodo(periodo);
-    const dadosPassado = isDadosPassado(periodoObj);
-    const podeSerFaturado = podeFaturar(periodoObj);
-
-    if (dadosPassado) {
-      return 'concluido';
-    }
-
-    if (podeSerFaturado) {
-      return 'pronto';
-    }
-
-    // Verificar se é muito futuro
+    // Por enquanto, todos os períodos são "pendentes" pois nenhum faturamento foi processado ainda
+    // No futuro, esta lógica será baseada na verificação de dados na tabela de faturamento
+    
+    // Verificar se é muito futuro (mais de 6 meses)
     const hoje = new Date();
-    const dataLimite = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 1); // 3 meses no futuro
+    const dataLimite = new Date(hoje.getFullYear(), hoje.getMonth() + 6, 1);
+    const periodoObj = stringParaPeriodo(periodo);
     
     if (periodoObj.inicioPeriodo > dataLimite) {
       return 'futuro';
