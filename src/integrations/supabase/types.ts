@@ -1473,6 +1473,56 @@ export type Database = {
         }
         Relationships: []
       }
+      historico_contratos: {
+        Row: {
+          aplicado_em: string | null
+          contrato_id: string
+          created_at: string | null
+          created_by: string | null
+          dados_anteriores: Json
+          dados_novos: Json
+          data_vigencia_fim: string | null
+          data_vigencia_inicio: string
+          descricao_alteracao: string | null
+          id: string
+          tipo_alteracao: string
+        }
+        Insert: {
+          aplicado_em?: string | null
+          contrato_id: string
+          created_at?: string | null
+          created_by?: string | null
+          dados_anteriores: Json
+          dados_novos: Json
+          data_vigencia_fim?: string | null
+          data_vigencia_inicio: string
+          descricao_alteracao?: string | null
+          id?: string
+          tipo_alteracao?: string
+        }
+        Update: {
+          aplicado_em?: string | null
+          contrato_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          dados_anteriores?: Json
+          dados_novos?: Json
+          data_vigencia_fim?: string | null
+          data_vigencia_inicio?: string
+          descricao_alteracao?: string | null
+          id?: string
+          tipo_alteracao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_contratos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_history: {
         Row: {
           created_at: string

@@ -52,7 +52,9 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  History,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBar } from "@/components/FilterBar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,9 +185,16 @@ const [editIntegraValor, setEditIntegraValor] = useState<number | "">(0);
 const [editFaixasVolumeText, setEditFaixasVolumeText] = useState<string>("[]");
 // Serviços contratados (editáveis)
 const [editServicos, setEditServicos] = useState<ServicoContratado[]>([]);
+// Data de vigência da edição
+const [editDataVigencia, setEditDataVigencia] = useState("");
+const [editDescricaoAlteracao, setEditDescricaoAlteracao] = useState("");
 // Condições de preço (preços por faixa)
 const [precosCliente, setPrecosCliente] = useState<any[]>([]);
 const [loadingPrecos, setLoadingPrecos] = useState(false);
+// Histórico do contrato
+const [historicoContrato, setHistoricoContrato] = useState<any[]>([]);
+const [loadingHistorico, setLoadingHistorico] = useState(false);
+const [activeTab, setActiveTab] = useState<"atual" | "historico">("atual");
 
   // Estados para busca, filtro e ordenação
   const [searchTerm, setSearchTerm] = useState("");
@@ -320,6 +329,7 @@ return {
 
 useEffect(() => {
   if (contratoEditando) {
+    // Carregar dados atuais do contrato
     setEditDataInicio(contratoEditando.dataInicio ? contratoEditando.dataInicio.slice(0, 10) : "");
     setEditDataFim(contratoEditando.dataFim ? contratoEditando.dataFim.slice(0, 10) : "");
     setEditDiaVencimento(contratoEditando.diaVencimento ?? 10);
@@ -336,9 +346,37 @@ useEffect(() => {
     setEditIntegraCobra(Boolean(integ.cobra_integracao));
     setEditIntegraValor(integ.valor_integracao ?? 0);
     setEditFaixasVolumeText(JSON.stringify(contratoEditando.faixasVolume || [], null, 2));
-    setEditServicos(contratoEditando.servicos || []);
+    setEditServicos([...contratoEditando.servicos || []]);
+    
+    // Definir data de vigência padrão como hoje
+    const hoje = new Date().toISOString().slice(0, 10);
+    setEditDataVigencia(hoje);
+    setEditDescricaoAlteracao("");
+    
+    // Carregar histórico do contrato
+    carregarHistoricoContrato(contratoEditando.id);
   }
 }, [contratoEditando]);
+
+// Função para carregar histórico do contrato
+const carregarHistoricoContrato = async (contratoId: string) => {
+  try {
+    setLoadingHistorico(true);
+    const { data, error } = await supabase
+      .from('historico_contratos')
+      .select('*')
+      .eq('contrato_id', contratoId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    setHistoricoContrato(data || []);
+  } catch (error) {
+    console.error('Erro ao carregar histórico:', error);
+    setHistoricoContrato([]);
+  } finally {
+    setLoadingHistorico(false);
+  }
+};
 
 // Carregar condições de preço (preços por faixa) ao abrir visualização
 useEffect(() => {
@@ -406,6 +444,17 @@ useEffect(() => {
 
 const salvarContrato = async () => {
   if (!contratoEditando) return;
+  
+  // Validar data de vigência
+  if (!editDataVigencia) {
+    toast({ 
+      title: 'Data de vigência obrigatória', 
+      description: 'Informe a partir de quando a alteração será aplicada', 
+      variant: 'destructive' 
+    });
+    return;
+  }
+  
   try {
     // Validar e preparar JSONs
     let faixas: any[] = [];
@@ -416,9 +465,17 @@ const salvarContrato = async () => {
       toast({ title: 'JSON inválido em Faixas de Volume', description: e.message, variant: 'destructive' });
       return;
     }
-    // Preparar serviços contratados
-    const servicosAtualizados = editServicos.length > 0 ? editServicos : undefined;
-
+    
+    // Buscar dados atuais do contrato para salvar no histórico
+    const { data: contratoAtual, error: errorBusca } = await supabase
+      .from('contratos_clientes')
+      .select('*')
+      .eq('id', contratoEditando.id)
+      .single();
+    
+    if (errorBusca) throw errorBusca;
+    
+    // Preparar dados para o banco
     const updateData: any = {
       data_inicio: editDataInicio || null,
       data_fim: editDataFim || null,
@@ -439,8 +496,39 @@ const salvarContrato = async () => {
       },
       faixas_volume: faixas
     };
-    if (servicosAtualizados) updateData.servicos_contratados = servicosAtualizados;
+    
+    // Adicionar serviços se existirem
+    if (editServicos.length > 0) {
+      updateData.servicos_contratados = editServicos;
+    }
+    
+    // Dados para histórico (inclui serviços sempre)
+    const dadosParaHistorico = {
+      ...updateData,
+      servicos_contratados: editServicos || []
+    };
 
+    // Salvar no histórico antes de atualizar
+    const { error: errorHistorico } = await supabase
+      .from('historico_contratos')
+      .insert({
+        contrato_id: contratoEditando.id,
+        data_vigencia_inicio: editDataVigencia,
+        data_vigencia_fim: null, // Pode ser preenchida futuramente
+        tipo_alteracao: 'edicao',
+        descricao_alteracao: editDescricaoAlteracao || 'Edição manual do contrato',
+        dados_anteriores: contratoAtual as any,
+        dados_novos: dadosParaHistorico as any,
+        created_by: null, // Pode ser preenchido com auth.uid() se necessário
+        aplicado_em: new Date().toISOString()
+      });
+
+    if (errorHistorico) {
+      console.warn('Erro ao salvar histórico:', errorHistorico);
+      // Continua mesmo com erro no histórico
+    }
+
+    // Atualizar o contrato
     const { error } = await supabase
       .from('contratos_clientes')
       .update(updateData)
@@ -448,7 +536,7 @@ const salvarContrato = async () => {
 
     if (error) throw error;
 
-    toast({ title: 'Contrato atualizado com sucesso' });
+    toast({ title: 'Contrato atualizado com sucesso', description: 'As alterações foram aplicadas e o histórico foi preservado' });
     setShowEditarContrato(false);
     setContratoEditando(null);
     await carregarContratos();
@@ -1030,28 +1118,64 @@ const salvarContrato = async () => {
             <DialogDescription>Edite as condições e configurações do contrato</DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-6">
-            {/* Datas e Vencimento */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label>Data Início</Label>
-                <Input type="date" value={editDataInicio} onChange={(e) => setEditDataInicio(e.target.value)} />
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "atual" | "historico")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="atual">Dados Atuais</TabsTrigger>
+              <TabsTrigger value="historico" className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Histórico
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="atual" className="space-y-6">
+              {/* Data de Vigência da Alteração */}
+              <div className="border rounded-lg p-4 bg-blue-50 space-y-4">
+                <h4 className="font-medium text-blue-900">Controle de Vigência</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-blue-800">Data de Vigência das Alterações *</Label>
+                    <Input 
+                      type="date" 
+                      value={editDataVigencia} 
+                      onChange={(e) => setEditDataVigencia(e.target.value)}
+                      className="border-blue-300"
+                    />
+                    <p className="text-sm text-blue-600">A partir de quando as alterações serão aplicadas</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-blue-800">Descrição da Alteração</Label>
+                    <Input 
+                      placeholder="Ex: Reajuste anual, alteração de preços..."
+                      value={editDescricaoAlteracao} 
+                      onChange={(e) => setEditDescricaoAlteracao(e.target.value)}
+                      className="border-blue-300"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Data Fim</Label>
-                <Input type="date" value={editDataFim} onChange={(e) => setEditDataFim(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Dia Vencimento</Label>
-                <Input 
-                  type="number" 
-                  min="1" 
-                  max="31" 
-                  value={editDiaVencimento} 
-                  onChange={(e) => setEditDiaVencimento(Number(e.target.value) || "")} 
-                />
-              </div>
-            </div>
+              
+              <div className="grid gap-6">
+                {/* Datas e Vencimento */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Data Início</Label>
+                    <Input type="date" value={editDataInicio} onChange={(e) => setEditDataInicio(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Data Fim</Label>
+                    <Input type="date" value={editDataFim} onChange={(e) => setEditDataFim(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Dia Vencimento</Label>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      max="31" 
+                      value={editDiaVencimento} 
+                      onChange={(e) => setEditDiaVencimento(Number(e.target.value) || "")} 
+                    />
+                  </div>
+                </div>
 
             {/* Configurações de Volume e Plantão */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1334,11 +1458,86 @@ const salvarContrato = async () => {
                 </div>
               )}
             </div>
-          </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="historico" className="space-y-4">
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-4 flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Histórico de Alterações
+                </h4>
+                
+                {loadingHistorico ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                  </div>
+                ) : historicoContrato.length > 0 ? (
+                  <div className="space-y-3">
+                    {historicoContrato.map((item, index) => (
+                      <div key={item.id} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h5 className="font-medium text-sm">{item.descricao_alteracao || 'Alteração no contrato'}</h5>
+                            <p className="text-xs text-gray-600">
+                              Vigência: {new Date(item.data_vigencia_inicio).toLocaleDateString('pt-BR')}
+                              {item.data_vigencia_fim && ` até ${new Date(item.data_vigencia_fim).toLocaleDateString('pt-BR')}`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {new Date(item.created_at).toLocaleDateString('pt-BR')} às {new Date(item.created_at).toLocaleTimeString('pt-BR')}
+                            </p>
+                            <Badge variant="outline" className="text-xs">
+                              {item.tipo_alteracao}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Mostrar resumo das alterações principais */}
+                        <div className="text-xs text-gray-600 space-y-1">
+                          {item.dados_novos && (
+                            <div className="grid grid-cols-2 gap-2">
+                              {item.dados_novos.desconto_percentual !== undefined && (
+                                <span>Desconto: {item.dados_novos.desconto_percentual}%</span>
+                              )}
+                              {item.dados_novos.acrescimo_percentual !== undefined && (
+                                <span>Acréscimo: {item.dados_novos.acrescimo_percentual}%</span>
+                              )}
+                              {item.dados_novos.dia_vencimento && (
+                                <span>Vencimento: dia {item.dados_novos.dia_vencimento}</span>
+                              )}
+                              {item.dados_novos.servicos_contratados && (
+                                <span>Serviços: {item.dados_novos.servicos_contratados.length} itens</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhuma alteração encontrada no histórico</p>
+                    <p className="text-sm">As alterações serão registradas aqui quando salvas</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowEditarContrato(false)}>Cancelar</Button>
-            <Button onClick={salvarContrato}>Salvar Alterações</Button>
+            <Button variant="secondary" onClick={() => {
+              setShowEditarContrato(false);
+              setActiveTab("atual");
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarContrato} disabled={activeTab === "historico"}>
+              Salvar Alterações
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
