@@ -153,9 +153,18 @@ serve(async (req) => {
               const unit = Number(preco) || 0;
               const valor = Number((unit * qtd).toFixed(2));
 
-              // Pular itens com valor zero ou negativo para evitar violação do constraint
+              // Debug detalhado para identificar a origem do valor zero
               if (valor <= 0) {
-                console.log(`[gerar-faturamento-periodo] Pulando item com valor ${valor} para ${cliente.nome} -> ${chave.estudo}`);
+                console.log(`[gerar-faturamento-periodo] VALOR ZERO DETECTADO:`);
+                console.log(`  Cliente: ${cliente.nome}`);
+                console.log(`  Exame: ${chave.estudo}`);
+                console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
+                console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
+                console.log(`  Quantidade (qtd): ${qtd}`);
+                console.log(`  Preço unitário (unit): ${unit}`);
+                console.log(`  Preço retornado pela RPC: ${preco}`);
+                console.log(`  Volume total: ${volumeTotal}`);
+                console.log(`  Valor final calculado: ${valor}`);
                 continue;
               }
 
