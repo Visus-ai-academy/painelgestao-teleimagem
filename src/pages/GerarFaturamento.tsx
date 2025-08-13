@@ -1233,25 +1233,139 @@ export default function GerarFaturamento() {
 
         <TabsContent value="faturamento" className="space-y-6 mt-6">
           <div className="grid gap-6">
+            {/* BOTÃO PRINCIPAL NO INÍCIO - Card para Gerar Faturamento */}
+            <Card className={`border-green-200 ${statusProcessamento.processando ? 'relative' : 'bg-green-50'}`}>
+              {statusProcessamento.processando && (
+                <div className="absolute inset-0 bg-black/80 rounded-lg overflow-hidden z-10">
+                  <div className="w-full h-full bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-green-400 text-4xl font-mono mb-4">⚡</div>
+                      <p className="text-green-400 font-mono text-lg">PROCESSANDO</p>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-black/70 p-6 rounded-lg border border-green-400/50 backdrop-blur-sm">
+                      <div className="flex items-center gap-4">
+                        <RefreshCw className="h-8 w-8 text-green-400 animate-spin" />
+                        <div>
+                          <h3 className="text-lg font-semibold text-green-400">Processando Relatórios</h3>
+                          <p className="text-green-300">{statusProcessamento.mensagem}</p>
+                          <div className="mt-2 w-64 bg-green-900 rounded-full h-2">
+                            <div 
+                              className="bg-green-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${statusProcessamento.progresso}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileBarChart2 className="h-5 w-5 text-green-600" />
+                  Gerar Relatórios
+                </CardTitle>
+                <CardDescription>
+                  Sistema irá processar automaticamente a volumetria do período selecionado, buscar contratos e preços de cada cliente, e gerar demonstrativos individuais.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Seletor de Período de Faturamento - PRIMEIRO */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-3">📅 Selecionar Período para Faturamento</h4>
+                  <ControlePeriodoFaturamento 
+                    periodoSelecionado={periodoSelecionado}
+                    setPeriodoSelecionado={setPeriodoSelecionado}
+                    mostrarApenasDisponiveis={mostrarApenasEditaveis}
+                    setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
+                    onPeriodoChange={setPeriodoSelecionado}
+                  />
+                </div>
+
+                {/* Botão principal para processar e gerar PDFs - SEGUNDO */}
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleProcessarFaturamento}
+                    disabled={statusProcessamento.processando}
+                    size="lg"
+                    className="min-w-[400px] bg-green-600 hover:bg-green-700 h-14 text-lg"
+                  >
+                    {statusProcessamento.processando ? (
+                      <>
+                        <RefreshCw className="h-6 w-6 mr-3 animate-spin" />
+                        Processando Automaticamente...
+                      </>
+                    ) : (
+                      <>
+                        <FileBarChart2 className="h-6 w-6 mr-3" />
+                        🚀 Gerar Faturamento {(() => {
+                          const [ano, mes] = periodoSelecionado.split('-');
+                          const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+                          return `${meses[Number(mes)-1]}/${ano.slice(2)}`;
+                        })()}
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Fluxo explicativo - TERCEIRO */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-900 mb-2">🔍 1. Análise da Volumetria</h4>
+                    <p className="text-sm text-blue-700">
+                      Sistema lê automaticamente os dados de volumetria do período selecionado e identifica todos os clientes.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h4 className="font-semibold text-purple-900 mb-2">📋 2. Busca de Contratos</h4>
+                    <p className="text-sm text-purple-700">
+                      Para cada cliente encontrado, busca automaticamente o contrato ativo e tabela de preços.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h4 className="font-semibold text-green-900 mb-2">💰 3. Cálculo de Preços</h4>
+                    <p className="text-sm text-green-700">
+                      Aplica preços por modalidade, especialidade, categoria e volume de cada cliente.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <h4 className="font-semibold text-amber-900 mb-2">📄 4. Geração de PDFs</h4>
+                    <p className="text-sm text-amber-700">
+                      Gera demonstrativos individuais e consolidados automaticamente para todos os clientes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h4 className="font-semibold text-green-900 mb-2">✨ Processo 100% Automatizado</h4>
+                  <ul className="text-sm text-green-700 space-y-1">
+                    <li>• <strong>Sem upload manual:</strong> Lê diretamente da volumetria carregada</li>
+                    <li>• <strong>Busca automática:</strong> Encontra contratos e preços de cada cliente</li>
+                    <li>• <strong>Cálculo inteligente:</strong> Aplica regras de volume e prioridade</li>
+                    <li>• <strong>PDFs individuais:</strong> Gera demonstrativo para cada cliente automaticamente</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card de Status do Sistema - SEGUNDO */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileBarChart2 className="h-5 w-5" />
-                  Gerar Faturamento - {PERIODO_ATUAL}
+                  Status do Sistema - {(() => {
+                    const [ano, mes] = periodoSelecionado.split('-');
+                    const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+                    return `${meses[Number(mes)-1]}/${ano.slice(2)}`;
+                  })()}
                 </CardTitle>
                 <CardDescription>
-                  Gere o faturamento a partir da volumetria processada do período selecionado
+                  Acompanhe o progresso da geração de faturamento do período selecionado
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Período de Faturamento */}
-                <ControlePeriodoFaturamento 
-                  periodoSelecionado={periodoSelecionado}
-                  setPeriodoSelecionado={setPeriodoSelecionado}
-                  mostrarApenasDisponiveis={mostrarApenasEditaveis}
-                  setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
-                  onPeriodoChange={setPeriodoSelecionado}
-                />
 
                 {/* Resumo do Sistema */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
@@ -1843,112 +1957,6 @@ export default function GerarFaturamento() {
             </CardContent>
           </Card>
 
-          {/* Botão principal para gerar relatórios */}
-          <Card className={`border-green-200 ${statusProcessamento.processando ? 'relative' : 'bg-green-50'}`}>
-            {statusProcessamento.processando && (
-              <div className="absolute inset-0 bg-black/80 rounded-lg overflow-hidden z-10">
-                <div className="w-full h-full bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-green-400 text-4xl font-mono mb-4">⚡</div>
-                    <p className="text-green-400 font-mono text-lg">PROCESSANDO</p>
-                  </div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/70 p-6 rounded-lg border border-green-400/50 backdrop-blur-sm">
-                    <div className="flex items-center gap-4">
-                      <RefreshCw className="h-8 w-8 text-green-400 animate-spin" />
-                      <div>
-                        <h3 className="text-lg font-semibold text-green-400">Processando Relatórios</h3>
-                        <p className="text-green-300">{statusProcessamento.mensagem}</p>
-                        <div className="mt-2 w-64 bg-green-900 rounded-full h-2">
-                          <div 
-                            className="bg-green-400 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${statusProcessamento.progresso}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileBarChart2 className="h-5 w-5 text-green-600" />
-                Gerar Relatórios
-              </CardTitle>
-              <CardDescription>
-                Sistema irá processar automaticamente a volumetria do período jun/25, buscar contratos e preços de cada cliente, e gerar demonstrativos individuais.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {/* Fluxo de faturamento automatizado baseado na volumetria */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <FileSpreadsheet className="h-5 w-5" />
-                    Processamento Automatizado - jun/25
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-semibold text-blue-900 mb-2">🔍 1. Análise da Volumetria</h4>
-                      <p className="text-sm text-blue-700">
-                        Sistema lê automaticamente os dados de volumetria do período jun/25 e identifica todos os clientes.
-                      </p>
-                    </div>
-                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                      <h4 className="font-semibold text-purple-900 mb-2">📋 2. Busca de Contratos</h4>
-                      <p className="text-sm text-purple-700">
-                        Para cada cliente encontrado, busca automaticamente o contrato ativo e tabela de preços.
-                      </p>
-                    </div>
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <h4 className="font-semibold text-green-900 mb-2">💰 3. Cálculo de Preços</h4>
-                      <p className="text-sm text-green-700">
-                        Aplica preços por modalidade, especialidade, categoria e volume de cada cliente.
-                      </p>
-                    </div>
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                      <h4 className="font-semibold text-amber-900 mb-2">📄 4. Geração de PDFs</h4>
-                      <p className="text-sm text-amber-700">
-                        Gera demonstrativos individuais e consolidados automaticamente para todos os clientes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botão principal para processar e gerar PDFs */}
-                <div className="flex justify-center">
-                  <Button
-                    onClick={handleProcessarFaturamento}
-                    disabled={statusProcessamento.processando}
-                    size="lg"
-                    className="min-w-[400px] bg-green-600 hover:bg-green-700 h-14 text-lg"
-                  >
-                    {statusProcessamento.processando ? (
-                      <>
-                        <RefreshCw className="h-6 w-6 mr-3 animate-spin" />
-                        Processando Automaticamente...
-                      </>
-                    ) : (
-                      <>
-                        <FileBarChart2 className="h-6 w-6 mr-3" />
-                        🚀 Gerar Faturamento jun/25
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <h4 className="font-semibold text-green-900 mb-2">✨ Processo 100% Automatizado</h4>
-                  <ul className="text-sm text-green-700 space-y-1">
-                    <li>• <strong>Sem upload manual:</strong> Lê diretamente da volumetria carregada</li>
-                    <li>• <strong>Busca automática:</strong> Encontra contratos e preços de cada cliente</li>
-                    <li>• <strong>Cálculo inteligente:</strong> Aplica regras de volume e prioridade</li>
-                    <li>• <strong>PDFs individuais:</strong> Gera demonstrativo para cada cliente automaticamente</li>
-                  </ul>
-                </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
 
