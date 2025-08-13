@@ -1010,27 +1010,43 @@ export default function GerarFaturamento() {
     });
   };
 
-  // Função para limpar dados de faturamento
+  // Função para limpar dados de faturamento com force
   const limparDadosFaturamento = async () => {
     try {
-      console.log('🧹 Limpando TODOS os dados de faturamento...');
+      console.log('🧹 Limpando TODOS os dados de faturamento (versão forçada)...');
       
-      // Usar DELETE direto no Supabase
-      const { error: deleteError, count } = await supabase
-        .from('faturamento')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos os registros
+      // Tentar usar a edge function com force
+      const { data: limparData, error: limparError } = await supabase.functions.invoke('limpar-faturamento-periodo', {
+        body: { periodo_referencia: 'force_all' }
+      });
 
-      if (deleteError) {
-        console.error('Erro ao limpar faturamento:', deleteError);
-        throw deleteError;
+      if (limparError) {
+        console.error('Erro na edge function:', limparError);
+        
+        // Fallback: tentar usar RPC direta
+        console.log('Tentando fallback com RPC...');
+        const { data: rpcData, error: rpcError } = await supabase.rpc('limpar_todos_dados_faturamento');
+        
+        if (rpcError) {
+          console.error('Erro no RPC também:', rpcError);
+          throw new Error('Falha em ambos os métodos de limpeza');
+        }
+        
+        console.log('✅ Limpeza via RPC bem-sucedida');
+      } else {
+        console.log('✅ Limpeza via edge function bem-sucedida:', limparData);
       }
-
-      console.log(`✅ ${count || 0} registros de faturamento removidos`);
+      
+      // Verificar resultado
+      const { count, error: countError } = await supabase
+        .from('faturamento')
+        .select('*', { count: 'exact', head: true });
+      
+      console.log(`📊 Verificação final: ${count || 0} registros restantes na tabela`);
       
       toast({
         title: "Faturamento limpo!",
-        description: `${count || 0} registros de faturamento foram removidos. O demonstrativo será atualizado automaticamente.`,
+        description: `Limpeza executada. Restam ${count || 0} registros na tabela. O demonstrativo será atualizado automaticamente.`,
       });
       
     } catch (error) {

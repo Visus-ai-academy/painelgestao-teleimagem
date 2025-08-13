@@ -193,7 +193,7 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
         sanitizeHtml(exame.modalidade),
         sanitizeHtml(exame.especialidade),
         sanitizeHtml(exame.categoria),
-        exame.quantidade_laudos.toString(),
+        (exame.quantidade_laudos || 0).toString(),
         formatarValor(exame.valor_total)
       ];
       
