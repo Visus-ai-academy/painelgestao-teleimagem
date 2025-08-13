@@ -59,21 +59,33 @@ export default function LimparDadosCompleto() {
   const limparDadosFaturamento = async () => {
     setIsLoadingFaturamento(true);
     try {
-      console.log('🧹 Limpando TODOS os dados de faturamento...');
+      console.log('🧹 Limpando TODOS os dados de faturamento diretamente...');
       
-      const { data: limparData, error: limparError } = await supabase.functions.invoke('limpar-faturamento-periodo', {
-        body: { periodo_referencia: 'all' } // Sinal para limpar tudo
-      });
+      // Usar DELETE direto no Supabase ao invés da edge function
+      const { error: deleteError, count } = await supabase
+        .from('faturamento')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos os registros
 
-      if (limparError || !limparData?.success) {
-        throw new Error(limparError?.message || limparData?.error || 'Erro ao limpar faturamento');
+      if (deleteError) {
+        console.error('Erro ao limpar faturamento:', deleteError);
+        throw deleteError;
       }
 
+      console.log(`✅ ${count || 0} registros de faturamento removidos`);
+      
+      // Verificar se realmente limpou
+      const { count: verificacao, error: errVerif } = await supabase
+        .from('faturamento')
+        .select('*', { count: 'exact', head: true });
+      
+      console.log(`📊 Verificação: ${verificacao || 0} registros restantes na tabela`);
+      
       setTotalFaturamento(0);
       
       toast({
         title: "Faturamento limpo!",
-        description: `${limparData.registros_removidos || 0} registros de faturamento foram removidos`,
+        description: `${count || 0} registros de faturamento foram removidos`,
       });
       
     } catch (error) {
