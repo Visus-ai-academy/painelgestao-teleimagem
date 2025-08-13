@@ -1032,23 +1032,170 @@ const salvarContrato = async () => {
 
       {/* Editar Contrato */}
       <Dialog open={showEditarContrato} onOpenChange={setShowEditarContrato}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Contrato — {contratoEditando?.cliente}</DialogTitle>
+            <DialogDescription>Edite as condições e configurações do contrato</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Data Início</Label>
-              <Input type="date" value={editDataInicio} onChange={(e) => setEditDataInicio(e.target.value)} />
+          
+          <div className="grid gap-6">
+            {/* Datas e Vencimento */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label>Data Início</Label>
+                <Input type="date" value={editDataInicio} onChange={(e) => setEditDataInicio(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Data Fim</Label>
+                <Input type="date" value={editDataFim} onChange={(e) => setEditDataFim(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Dia Vencimento</Label>
+                <Input 
+                  type="number" 
+                  min="1" 
+                  max="31" 
+                  value={editDiaVencimento} 
+                  onChange={(e) => setEditDiaVencimento(Number(e.target.value) || "")} 
+                />
+              </div>
             </div>
+
+            {/* Configurações de Volume e Plantão */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Condição de Volume</Label>
+                <Select value={editCondVolume} onValueChange={setEditCondVolume}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MOD/ESP/CAT">MOD/ESP/CAT</SelectItem>
+                    <SelectItem value="GLOBAL">GLOBAL</SelectItem>
+                    <SelectItem value="CUSTOMIZADO">CUSTOMIZADO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2 pt-6">
+                <Checkbox 
+                  checked={editConsideraPlantao} 
+                  onCheckedChange={(checked) => setEditConsideraPlantao(checked === true)} 
+                />
+                <Label>Considera Plantão</Label>
+              </div>
+            </div>
+
+            {/* Desconto e Acréscimo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Desconto (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  value={editDesconto} 
+                  onChange={(e) => setEditDesconto(Number(e.target.value) || "")} 
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Acréscimo (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  value={editAcrescimo} 
+                  onChange={(e) => setEditAcrescimo(Number(e.target.value) || "")} 
+                />
+              </div>
+            </div>
+
+            {/* Configurações de Franquia */}
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  checked={editFranqAtiva} 
+                  onCheckedChange={(checked) => setEditFranqAtiva(checked === true)} 
+                />
+                <Label>Franquia Ativa</Label>
+              </div>
+              {editFranqAtiva && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Volume Franquia</Label>
+                    <Input 
+                      type="number" 
+                      value={editFranqVolume} 
+                      onChange={(e) => setEditFranqVolume(Number(e.target.value) || "")} 
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Valor Franquia (R$)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      value={editFranqValor} 
+                      onChange={(e) => setEditFranqValor(Number(e.target.value) || "")} 
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Valor Acima Franquia (R$)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      value={editFranqAcimaValor} 
+                      onChange={(e) => setEditFranqAcimaValor(Number(e.target.value) || "")} 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Configurações de Integração */}
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  checked={editIntegraCobra} 
+                  onCheckedChange={(checked) => setEditIntegraCobra(checked === true)} 
+                />
+                <Label>Cobra Integração</Label>
+              </div>
+              {editIntegraCobra && (
+                <div className="grid gap-2">
+                  <Label>Valor Integração (R$)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={editIntegraValor} 
+                    onChange={(e) => setEditIntegraValor(Number(e.target.value) || "")} 
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Faixas de Volume (JSON) */}
             <div className="grid gap-2">
-              <Label>Data Fim</Label>
-              <Input type="date" value={editDataFim} onChange={(e) => setEditDataFim(e.target.value)} />
+              <Label>Faixas de Volume (JSON)</Label>
+              <Textarea 
+                rows={4}
+                value={editFaixasVolumeText} 
+                onChange={(e) => setEditFaixasVolumeText(e.target.value)}
+                placeholder='[{"inicial": 0, "final": 100, "desconto": 0}, {"inicial": 101, "final": 500, "desconto": 5}]'
+              />
+            </div>
+
+            {/* Serviços Contratados (JSON) */}
+            <div className="grid gap-2">
+              <Label>Serviços Contratados (JSON) - Opcional</Label>
+              <Textarea 
+                rows={4}
+                value={editServicosText} 
+                onChange={(e) => setEditServicosText(e.target.value)}
+                placeholder='[{"modalidade": "MR", "especialidade": "NE", "categoria": "Normal", "prioridade": "Rotina", "valor": 150.00}]'
+              />
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="secondary" onClick={() => setShowEditarContrato(false)}>Cancelar</Button>
-            <Button onClick={salvarContrato}>Salvar</Button>
+            <Button onClick={salvarContrato}>Salvar Alterações</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
