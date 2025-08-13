@@ -58,6 +58,14 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     });
   };
 
+  // Função para formatar valor com verificação de undefined/null
+  const formatarValor = (valor: number | undefined | null): string => {
+    if (valor === undefined || valor === null || isNaN(valor)) {
+      return 'R$ 0,00';
+    }
+    return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  };
+
   // Criar elementos DOM de forma segura
   const createHeader = () => {
     const headerDiv = document.createElement('div');
@@ -100,12 +108,12 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     resumoTable.style.fontSize = '12px';
     
     const resumoData = [
-      ['Valor Bruto', `R$ ${data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Franquia', `R$ ${data.franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Integração', `R$ ${data.integracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Portal Laudos', `R$ ${data.portal_laudos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Impostos', `R$ ${data.impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Valor Líquido', `R$ ${data.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
+      ['Valor Bruto', formatarValor(data.valor_bruto)],
+      ['Franquia', formatarValor(data.franquia)],
+      ['Integração', formatarValor(data.integracao)],
+      ['Portal Laudos', formatarValor(data.portal_laudos)],
+      ['Impostos', formatarValor(data.impostos)],
+      ['Valor Líquido', formatarValor(data.valor_liquido)]
     ];
     
     resumoData.forEach((row, index) => {
@@ -186,7 +194,7 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
         sanitizeHtml(exame.especialidade),
         sanitizeHtml(exame.categoria),
         exame.quantidade_laudos.toString(),
-        `R$ ${exame.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        formatarValor(exame.valor_total)
       ];
       
       cells.forEach((cellText, index) => {
