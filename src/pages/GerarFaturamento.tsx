@@ -644,13 +644,18 @@ export default function GerarFaturamento() {
         try {
           const clienteInfo = clientesAgrupados[clienteNome];
           
-          // Calcular impostos e outros valores (exemplo: 6% de impostos)
+          // Calcular impostos detalhados e outros valores
           const valorBruto = clienteInfo.valor_bruto;
-          const impostos = valorBruto * 0.06; // 6% de impostos
+          const irpj = valorBruto * 0.015; // 1.5%
+          const pis = valorBruto * 0.0065; // 0.65% 
+          const cofins = valorBruto * 0.03; // 3%
+          const csll = valorBruto * 0.01; // 1%
+          const totalImpostos = irpj + pis + cofins + csll;
+          
           const franquia = 0; // Buscar de parametros futuramente
           const integracao = 0; // Buscar de parametros futuramente
           const portalLaudos = 0; // Buscar de parametros futuramente
-          const valorLiquido = valorBruto - impostos - franquia - integracao - portalLaudos;
+          const valorLiquido = valorBruto - totalImpostos - franquia - integracao - portalLaudos;
 
           // Estrutura completa conforme esperado pelo generatePDF
           const clienteData: FaturamentoData = {
@@ -662,7 +667,7 @@ export default function GerarFaturamento() {
             franquia: franquia,
             integracao: integracao,
             portal_laudos: portalLaudos,
-            impostos: impostos,
+            impostos: totalImpostos,
             valor_liquido: valorLiquido,
             exames: clienteInfo.exames
           };

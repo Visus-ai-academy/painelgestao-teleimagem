@@ -37,13 +37,14 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
   const reportElement = document.createElement('div');
   reportElement.style.position = 'absolute';
   reportElement.style.left = '-9999px';
-  reportElement.style.width = '1400px'; // Largura fixa para paisagem
-  reportElement.style.minHeight = '900px'; // Altura mínima
-  reportElement.style.padding = '40px';
+  reportElement.style.width = '1600px'; // Largura maior para melhor distribuição
+  reportElement.style.minHeight = '1000px'; // Altura proporcional
+  reportElement.style.padding = '30px';
   reportElement.style.fontFamily = 'Arial, sans-serif';
   reportElement.style.backgroundColor = 'white';
-  reportElement.style.fontSize = '12px';
+  reportElement.style.fontSize = '13px';
   reportElement.style.boxSizing = 'border-box';
+  reportElement.style.lineHeight = '1.4';
   
   // Função para sanitizar strings e prevenir XSS
   const sanitizeHtml = (str: string): string => {
@@ -66,6 +67,23 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
       return 'R$ 0,00';
     }
     return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  };
+
+  // Calcular impostos detalhados
+  const calcularImpostosDetalhados = (valorBruto: number) => {
+    const irpj = valorBruto * 0.015; // 1.5%
+    const pis = valorBruto * 0.0065; // 0.65%
+    const cofins = valorBruto * 0.03; // 3%
+    const csll = valorBruto * 0.01; // 1%
+    const total = irpj + pis + cofins + csll;
+    
+    return {
+      irpj,
+      pis,
+      cofins,
+      csll,
+      total
+    };
   };
 
   // Criar elementos DOM de forma segura
@@ -133,12 +151,18 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     resumoTable.style.borderCollapse = 'collapse';
     resumoTable.style.fontSize = '14px';
     
+    // Calcular impostos detalhados
+    const impostosDetalhados = calcularImpostosDetalhados(data.valor_bruto);
+    
     const resumoData = [
       ['Valor Bruto', formatarValor(data.valor_bruto)],
       ['(-) Franquia', formatarValor(data.franquia)],
       ['(-) Integração', formatarValor(data.integracao)],
       ['(-) Portal Laudos', formatarValor(data.portal_laudos)],
-      ['(-) Impostos (6%)', formatarValor(data.impostos)],
+      ['(-) IRPJ (1,5%)', formatarValor(impostosDetalhados.irpj)],
+      ['(-) PIS (0,65%)', formatarValor(impostosDetalhados.pis)],
+      ['(-) COFINS (3%)', formatarValor(impostosDetalhados.cofins)],
+      ['(-) CSLL (1%)', formatarValor(impostosDetalhados.csll)],
       ['VALOR LÍQUIDO', formatarValor(data.valor_liquido)]
     ];
     
@@ -290,8 +314,8 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
       backgroundColor: '#ffffff',
       removeContainer: true,
       logging: false,
-      width: 1400, // Largura fixa do container
-      height: Math.max(900, reportElement.offsetHeight) // Altura mínima ou do conteúdo
+      width: 1600, // Largura fixa do container
+      height: Math.max(1000, reportElement.offsetHeight) // Altura mínima ou do conteúdo
     });
     
     // Criar PDF em PAISAGEM com dimensões adequadas
@@ -309,19 +333,11 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
     
     let finalWidth, finalHeight, offsetX, offsetY;
     
-    if (imgAspectRatio > pdfAspectRatio) {
-      // Imagem é mais larga proporcionalmente
-      finalWidth = pdfWidth - 20; // Margem de 10mm de cada lado
-      finalHeight = finalWidth / imgAspectRatio;
-      offsetX = 10;
-      offsetY = (pdfHeight - finalHeight) / 2;
-    } else {
-      // Imagem é mais alta proporcionalmente
-      finalHeight = pdfHeight - 20; // Margem de 10mm em cima e embaixo
-      finalWidth = finalHeight * imgAspectRatio;
-      offsetX = (pdfWidth - finalWidth) / 2;
-      offsetY = 10;
-    }
+    // Maximizar preenchimento da página mantendo proporção
+    finalWidth = pdfWidth - 10; // Margem mínima de 5mm de cada lado
+    finalHeight = pdfHeight - 10; // Margem mínima de 5mm em cima e embaixo
+    offsetX = 5;
+    offsetY = 5;
     
     pdf.addImage(imgData, 'JPEG', offsetX, offsetY, finalWidth, finalHeight);
     
