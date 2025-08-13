@@ -120,7 +120,7 @@ serve(async (req) => {
             // Buscar TODOS os dados de volumetria do cliente no período (incluindo modalidade RX)
             const { data: vm, error: vmErr } = await supabase
               .from('volumetria_mobilemed')
-              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_EXAME"')
+              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO"')
               .eq('"EMPRESA"', cliente.nome)
               .eq('periodo_referencia', periodo)
               .not('"VALORES"', 'is', null)
@@ -201,24 +201,36 @@ serve(async (req) => {
                 const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
                 const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+                // Buscar dados do primeiro registro para este grupo
+                const primeiroRegistro = rows.find(r => 
+                  r.MODALIDADE === chave.modalidade && 
+                  r.ESPECIALIDADE === chave.especialidade &&
+                  r.CATEGORIA === chave.categoria &&
+                  r.PRIORIDADE === chave.prioridade &&
+                  r.ESTUDO_DESCRICAO === chave.estudo
+                );
+
                 itensInserir.push({
                   omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                   numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
                   cliente_id: cliente.id,
                   cliente_nome: cliente.nome,
                   cliente_email: cliente.email || null,
+                  paciente: primeiroRegistro?.NOME_PACIENTE || 'N/A',
                   modalidade: chave.modalidade,
                   especialidade: chave.especialidade,
                   categoria: chave.categoria,
                   prioridade: chave.prioridade,
                   nome_exame: chave.estudo,
+                  medico: primeiroRegistro?.MEDICO || 'N/A',
+                  data_exame: primeiroRegistro?.DATA_REALIZACAO || emissao,
                   quantidade: qtd,
                   valor_bruto: valorComPadrao,
                   valor: valorComPadrao,
                   data_emissao: emissao,
                   data_vencimento: vencimento,
                   periodo_referencia: periodoRef,
-                  tipo_dados: 'incremental', // Usar valor válido conforme constraint
+                  tipo_dados: 'incremental',
                 });
                 continue;
               }
@@ -227,17 +239,29 @@ serve(async (req) => {
               const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
               const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+              // Buscar dados do primeiro registro para este grupo
+              const primeiroRegistro = rows.find(r => 
+                r.MODALIDADE === chave.modalidade && 
+                r.ESPECIALIDADE === chave.especialidade &&
+                r.CATEGORIA === chave.categoria &&
+                r.PRIORIDADE === chave.prioridade &&
+                r.ESTUDO_DESCRICAO === chave.estudo
+              );
+
               itensInserir.push({
                 omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                 numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
                 cliente_id: cliente.id,
                 cliente_nome: cliente.nome,
                 cliente_email: cliente.email || null,
+                paciente: primeiroRegistro?.NOME_PACIENTE || 'N/A',
                 modalidade: chave.modalidade,
                 especialidade: chave.especialidade,
                 categoria: chave.categoria,
                 prioridade: chave.prioridade,
                 nome_exame: chave.estudo,
+                medico: primeiroRegistro?.MEDICO || 'N/A',
+                data_exame: primeiroRegistro?.DATA_REALIZACAO || emissao,
                 quantidade: qtd,
                 valor_bruto: valor,
                 valor: valor,
