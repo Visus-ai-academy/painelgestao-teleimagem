@@ -248,11 +248,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
       if (cliente !== 'todos') {
         console.log('🔍 Filtro de cliente aplicado:', cliente);
-        // CORREÇÃO: Usar normalização para filtro consistente
-        const clienteNormalizado = normalizeCliente(cliente);
-        console.log('🔍 Cliente normalizado para filtro:', clienteNormalizado);
-        // Buscar por cliente normalizado - vai trazer mais registros que serão filtrados depois
-        sysQuery = sysQuery.ilike('"EMPRESA"', `%${cliente}%`);
+        // CORREÇÃO: Remover filtro SQL e filtrar em memória para garantir consistência
+        console.log('🔍 Não aplicando filtro SQL - filtrando em memória para consistência');
       }
       
       // Teste específico: verificar se existem registros com os pacientes mencionados
