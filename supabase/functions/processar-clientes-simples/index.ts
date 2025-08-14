@@ -199,7 +199,26 @@ serve(async (req) => {
 
         // Clean and format CNPJ/CPF if present
         if (cliente.cnpj) {
-          let cnpjLimpo = cliente.cnpj.toString().replace(/[^\d]/g, '')
+          // Converter para string e garantir que números com zeros à esquerda sejam preservados
+          let cnpjLimpo;
+          
+          if (typeof cliente.cnpj === 'number') {
+            // Se for um número, converter para string e garantir 11 ou 14 dígitos
+            cnpjLimpo = cliente.cnpj.toString();
+            
+            // Se tem menos de 11 dígitos, é provável que seja um CPF com zeros removidos
+            if (cnpjLimpo.length < 11) {
+              cnpjLimpo = cnpjLimpo.padStart(11, '0');
+            }
+            // Se tem entre 11 e 13 dígitos, é provável que seja um CNPJ com zeros removidos  
+            else if (cnpjLimpo.length > 11 && cnpjLimpo.length < 14) {
+              cnpjLimpo = cnpjLimpo.padStart(14, '0');
+            }
+          } else {
+            // Se já é string, apenas remover caracteres não numéricos
+            cnpjLimpo = cliente.cnpj.toString().replace(/[^\d]/g, '');
+          }
+          
           if (cnpjLimpo.length === 14) {
             // CNPJ format: 00.000.000/0000-00
             cliente.cnpj = `${cnpjLimpo.substring(0,2)}.${cnpjLimpo.substring(2,5)}.${cnpjLimpo.substring(5,8)}/${cnpjLimpo.substring(8,12)}-${cnpjLimpo.substring(12,14)}`
