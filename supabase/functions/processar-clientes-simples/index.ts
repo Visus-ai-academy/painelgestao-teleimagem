@@ -114,12 +114,23 @@ serve(async (req) => {
           valor_franquia_acima_volume: row[24] ? parseFloat(row[24]) : 0 // R$ Valor Franquia Acima Volume
         }
 
-        // Skip if no name (required field) - usar nome_mobilemed como campo obrigatório
-        if (!cliente.nome_mobilemed || cliente.nome_mobilemed.trim() === '') {
-          console.log(`Pulando linha ${i + 2}: sem nome_mobilemed - dados:`, {
+        // Debug: Log first few rows to understand the data structure
+        if (i < 3) {
+          console.log(`Linha ${i + 2} dados:`, {
+            row_length: row.length,
+            first_5_columns: row.slice(0, 5),
             nome_mobilemed: cliente.nome_mobilemed,
             nome_fantasia: cliente.nome_fantasia,
-            linha_completa: row
+            nome: cliente.nome
+          })
+        }
+
+        // Skip if no name (required field) - usar nome como campo obrigatório (nome_fantasia)
+        if (!cliente.nome || cliente.nome.trim() === '') {
+          console.log(`Pulando linha ${i + 2}: sem nome - dados:`, {
+            nome: cliente.nome,
+            nome_mobilemed: cliente.nome_mobilemed,
+            nome_fantasia: cliente.nome_fantasia
           })
           errorCount++
           continue
