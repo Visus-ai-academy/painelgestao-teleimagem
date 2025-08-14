@@ -234,74 +234,25 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         dados: testeVilma.data
       });
       
-      // 1) Ler dados do SISTEMA (volumetria processada no banco) por período/cliente
-      let sysQuery = supabase.from('volumetria_mobilemed').select(`
-        "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "ESTUDO_DESCRICAO", 
-        "NOME_PACIENTE", "DATA_REALIZACAO", "DATA_LAUDO", "VALORES",
-        "PRIORIDADE", "MEDICO", "DUPLICADO", "CODIGO_PACIENTE",
-        "ACCESSION_NUMBER", "HORA_REALIZACAO", "DATA_TRANSFERENCIA",
-        "HORA_TRANSFERENCIA", "HORA_LAUDO", "DATA_PRAZO", "HORA_PRAZO",
-        "STATUS", "CATEGORIA"
-      `);
+      // USAR A MESMA FONTE DE DADOS DO RESUMO - ctx.detailedData
+      console.log('🔍 Usando contexto para dados do sistema (mesma fonte do resumo)');
+      const systemData = ctx?.detailedData || [];
+      console.log('🏥 Total de registros detalhados do contexto:', systemData.length);
       
-      console.log('🔍 Consultando banco com período:', periodoReferenciaBanco);
-      sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
-      if (cliente !== 'todos') {
-        console.log('🔍 Filtro de cliente aplicado:', cliente);
-        // CORREÇÃO: Remover filtro SQL e filtrar em memória para garantir consistência
-        console.log('🔍 Não aplicando filtro SQL - filtrando em memória para consistência');
+      if (!systemData || systemData.length === 0) {
+        console.log('❌ Nenhum dado detalhado encontrado no contexto');
+        throw new Error('Nenhum dado encontrado no contexto. Atualize a tela.');
       }
-      
-      // Teste específico: verificar se existem registros com os pacientes mencionados
-      console.log('🔍 Fazendo consulta específica para pacientes VILMA e ADELINO...');
-      const testQuery = await supabase
-        .from('volumetria_mobilemed')
-        .select('NOME_PACIENTE, EMPRESA, ESTUDO_DESCRICAO, DATA_REALIZACAO, periodo_referencia')
-        .eq('periodo_referencia', periodoReferenciaBanco)
-        .or('NOME_PACIENTE.ilike.%VILMA%,NOME_PACIENTE.ilike.%ADELINO%')
-        .limit(20);
-      
-      console.log('🔍 Resultado da consulta específica:', {
-        erro: testQuery.error,
-        quantidade: testQuery.data?.length || 0,
-        primeiros5: testQuery.data?.slice(0, 5)
-      });
-      
-      // Verificar também todos os períodos disponíveis
-      const periodosQuery = await supabase
-        .from('volumetria_mobilemed')
-        .select('periodo_referencia')
-        .not('periodo_referencia', 'is', null)
-        .or('NOME_PACIENTE.ilike.%VILMA%,NOME_PACIENTE.ilike.%ADELINO%');
-      
-      console.log('🔍 Períodos onde encontramos VILMA/ADELINO:', 
-        [...new Set(periodosQuery.data?.map(p => p.periodo_referencia) || [])]
-      );
-      
-      // OTIMIZAÇÃO: Limitar consulta para evitar timeout
-      const { data: systemRows, error: sysErr } = await sysQuery
-        .order('created_at', { ascending: false })
-        .limit(15000); // Limite para evitar timeout do banco
-      
-      if (sysErr) {
-        console.error('❌ Erro na consulta do sistema:', sysErr);
-        throw sysErr;
-      }
-
-      console.log('🏥 Query executada no sistema:', {
-        periodoReferenciaBanco,
-        cliente: cliente !== 'todos' ? cliente : 'todos',
-        totalRegistros: systemRows?.length || 0
-      });
 
       // Mapear por chave agregada
-      type AggSys = { total: number; amostra?: VolumetriaRow };
+      type AggSys = { total: number; amostra?: any };
       const mapSistema = new Map<string, AggSys>();
-      console.log('🔍 Total de registros do sistema encontrados:', systemRows?.length || 0);
       
-      (systemRows || []).forEach((r: any, index) => {
-        // CORREÇÃO: Aplicar filtro de cliente após busca para garantir consistência
-        const empresaNormalizada = normalizeCliente(r.EMPRESA);
+      systemData.forEach((r: any, index) => {
+        const empresaRaw = r.EMPRESA || r.empresa || r.Empresa || '';
+        const empresaNormalizada = normalizeCliente(empresaRaw);
+        
+        // Filtrar por cliente se especificado
         if (cliente !== 'todos') {
           const clienteNormalizado = normalizeCliente(cliente);
           if (empresaNormalizada !== clienteNormalizado) {
@@ -309,51 +260,90 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           }
         }
         
-        const key = [
+        // Filtrar por período usando mesma lógica do resumo
+        const inMonth = (val: any) => {
+          if (!val) return true;
+          const s = String(val);
+          let ym = '';
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) ym = s.slice(0,7);
+          else {
+            const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+            if (m) ym = `${m[3].length===2?`20${m[3]}`:m[3]}-${m[2].padStart(2,'0')}`;
+          }
+          return ym ? ym === referencia : true;
+        };
+        
+        const dataRef = r.data_referencia || r.DATA_REFERENCIA;
+        if (dataRef && !inMonth(dataRef)) {
+          return;
+        }
+        
+        const pacienteNome = r.NOME_PACIENTE || r.paciente || r.PACIENTE || '';
+        const exameDescricao = r.ESTUDO_DESCRICAO || r.NOME_EXAME || r.exame || r.EXAME || '';
+        const modalidade = r.MODALIDADE || r.modalidade || '';
+        const especialidade = r.ESPECIALIDADE || r.especialidade || '';
+        const dataLaudo = r.DATA_LAUDO || r.data_laudo;
+        const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
+        
+        const chave = [
           empresaNormalizada,
-          normalizeModalidade(r.MODALIDADE),
-          canonical(r.ESPECIALIDADE),
-          canonical(cleanExamName(r.ESTUDO_DESCRICAO)),
-          canonical(r.NOME_PACIENTE),
-          toYMD(r.DATA_REALIZACAO || r.DATA_LAUDO)
+          normalizeModalidade(modalidade),
+          canonical(especialidade),
+          canonical(cleanExamName(exameDescricao)),
+          canonical(pacienteNome),
+          toYMD(dataExame || dataLaudo)
         ].join('|');
         
         // Log especial para AKC PALMAS
-        if (r.EMPRESA?.includes('AKC') || empresaNormalizada.includes('AKC')) {
-          console.log('🏥 AKC PALMAS - Processando registro do sistema:', {
+        if (empresaRaw?.includes('AKC') || empresaNormalizada.includes('AKC')) {
+          console.log('🏥 AKC PALMAS - Processando registro do sistema (contexto):', {
             index,
-            empresaOriginal: r.EMPRESA,
+            empresaOriginal: empresaRaw,
             empresaNormalizada,
-            paciente: r.NOME_PACIENTE,
-            exame: r.ESTUDO_DESCRICAO,
-            valores: r.VALORES,
-            chaveGerada: key
+            paciente: pacienteNome,
+            exame: exameDescricao,
+            valores: r.VALORES || r.valores || 1,
+            chaveGerada: chave
           });
         }
         
-        if (index < 5 || r.NOME_PACIENTE?.includes('VILMA') || r.NOME_PACIENTE?.includes('ADELINO')) {
-          console.log('🏥 Processando registro do sistema:', {
+        if (index < 5 || pacienteNome?.includes('VILMA') || pacienteNome?.includes('ADELINO')) {
+          console.log('🏥 Processando registro do sistema (contexto):', {
             index,
-            empresa: r.EMPRESA,
+            empresa: empresaRaw,
             empresaNormalizada,
-            paciente: r.NOME_PACIENTE,
-            exame: r.ESTUDO_DESCRICAO,
-            modalidade: r.MODALIDADE,
-            especialidade: r.ESPECIALIDADE,
-            dataRealizacao: r.DATA_REALIZACAO,
-            dataLaudo: r.DATA_LAUDO,
-            chaveGerada: key
+            paciente: pacienteNome,
+            exame: exameDescricao,
+            modalidade,
+            especialidade,
+            dataExame,
+            dataLaudo,
+            registroCompleto: r
           });
         }
         
-        const cur = mapSistema.get(key) || { total: 0, amostra: r };
-        cur.total += Number(r.VALORES || 0);
-        if (!cur.amostra) cur.amostra = r;
-        mapSistema.set(key, cur);
+        const valores = Number(r.VALORES || r.valores || 1);
+        
+        if (mapSistema.has(chave)) {
+          mapSistema.get(chave)!.total += valores;
+        } else {
+          mapSistema.set(chave, {
+            total: valores,
+            amostra: {
+              empresa: empresaNormalizada,
+              paciente: pacienteNome,
+              exame: exameDescricao,
+              modalidade: normalizeModalidade(modalidade),
+              especialidade: canonical(especialidade),
+              dataExame: toYMD(dataExame || dataLaudo),
+              origem: 'sistema'
+            }
+          });
+        }
       });
       
-      console.log('📊 Total de chaves únicas no sistema:', mapSistema.size);
-
+      console.log('🏥 Total de chaves únicas no sistema (contexto):', mapSistema.size);
+      
       // 2) Ler dados do ARQUIVO (enviado na tela)
       type AggFile = { total: number; amostra?: UploadedExamRow };
       const mapArquivo = new Map<string, AggFile>();
