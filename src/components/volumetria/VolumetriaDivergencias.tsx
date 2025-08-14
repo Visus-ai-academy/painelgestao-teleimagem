@@ -242,7 +242,9 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       // Mapear por chave agregada
       type AggSys = { total: number; amostra?: VolumetriaRow };
       const mapSistema = new Map<string, AggSys>();
-      (systemRows || []).forEach((r: any) => {
+      console.log('🔍 Total de registros do sistema encontrados:', systemRows?.length || 0);
+      
+      (systemRows || []).forEach((r: any, index) => {
         const key = [
           normalizeCliente(r.EMPRESA),
           normalizeModalidade(r.MODALIDADE),
@@ -251,11 +253,28 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           canonical(r.NOME_PACIENTE),
           toYMD(r.DATA_REALIZACAO || r.DATA_LAUDO)
         ].join('|');
+        
+        if (index < 5 || r.NOME_PACIENTE?.includes('VILMA') || r.NOME_PACIENTE?.includes('ADELINO')) {
+          console.log('🏥 Processando registro do sistema:', {
+            index,
+            empresa: r.EMPRESA,
+            paciente: r.NOME_PACIENTE,
+            exame: r.ESTUDO_DESCRICAO,
+            modalidade: r.MODALIDADE,
+            especialidade: r.ESPECIALIDADE,
+            dataRealizacao: r.DATA_REALIZACAO,
+            dataLaudo: r.DATA_LAUDO,
+            chaveGerada: key
+          });
+        }
+        
         const cur = mapSistema.get(key) || { total: 0, amostra: r };
         cur.total += Number(r.VALORES || 0);
         if (!cur.amostra) cur.amostra = r;
         mapSistema.set(key, cur);
       });
+      
+      console.log('📊 Total de chaves únicas no sistema:', mapSistema.size);
 
       // 2) Ler dados do ARQUIVO (enviado na tela)
       type AggFile = { total: number; amostra?: UploadedExamRow };
@@ -271,22 +290,53 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         }
         return ym ? ym === referencia : true;
       };
-      (uploadedExams || []).forEach((r) => {
+      console.log('🔍 Total de registros do arquivo disponíveis:', uploadedExams?.length || 0);
+      
+      (uploadedExams || []).forEach((r, index) => {
         if (cliente !== 'todos' && normalizeCliente(r.cliente) !== normalizeCliente(cliente)) return;
         if (!inMonth((r as any).data_exame || (r as any).data_laudo)) return;
+        
+        // Usar mesmos campos que o sistema para garantir correspondência
+        const pacienteNome = (r as any).paciente || (r as any).nome_paciente || (r as any).NOME_PACIENTE;
+        const exameDescricao = r.exame || (r as any).estudo_descricao || (r as any).ESTUDO_DESCRICAO;
+        const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
+        const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
+        
+        // Log detalhado para casos específicos
+        if (index < 5 || pacienteNome?.includes('VILMA') || pacienteNome?.includes('ADELINO')) {
+          console.log('📁 Processando registro do arquivo:', {
+            index,
+            cliente: r.cliente,
+            paciente: pacienteNome,
+            exame: exameDescricao,
+            modalidade: r.modalidade,
+            especialidade: r.especialidade,
+            dataExame,
+            dataLaudo,
+            registroCompleto: r
+          });
+        }
+        
         const key = [
           normalizeCliente(r.cliente),
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
-          canonical(cleanExamName(r.exame)),
-          canonical((r as any).paciente),
-          toYMD((r as any).data_exame || (r as any).data_laudo)
+          canonical(cleanExamName(exameDescricao)),
+          canonical(pacienteNome),
+          toYMD(dataExame || dataLaudo)
         ].join('|');
+        
         const cur = mapArquivo.get(key) || { total: 0, amostra: r };
-        cur.total += Number(r.quant || 0);
+        cur.total += Number(r.quant || (r as any).quantidade || (r as any).valores || 1);
         if (!cur.amostra) cur.amostra = r;
         mapArquivo.set(key, cur);
+        
+        if (index < 5 || pacienteNome?.includes('VILMA') || pacienteNome?.includes('ADELINO')) {
+          console.log('📝 Chave gerada para arquivo:', key);
+        }
       });
+      
+      console.log('📊 Total de chaves únicas no arquivo:', mapArquivo.size);
 
       // Construir divergências
       const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
@@ -375,16 +425,76 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         };
       };
 
+      // Log de análise especial para os casos mencionados
+      console.log('🔍 Análise de divergências - Total de chaves únicas:', allKeys.size);
+      
+      // Buscar pacientes específicos mencionados
+      const pacientesEspecificos = ['VILMA', 'ADELINO'];
+      pacientesEspecificos.forEach(nome => {
+        console.log(`🔍 Buscando registros de ${nome}:`);
+        
+        // No arquivo
+        const chavesArquivo = Array.from(mapArquivo.keys()).filter(k => k.includes(nome));
+        console.log(`📁 ${nome} - Chaves no arquivo (${chavesArquivo.length}):`, chavesArquivo);
+        
+        // No sistema
+        const chavesSistema = Array.from(mapSistema.keys()).filter(k => k.includes(nome));
+        console.log(`🏥 ${nome} - Chaves no sistema (${chavesSistema.length}):`, chavesSistema);
+        
+        // Comparação direta
+        chavesArquivo.forEach(chaveArq => {
+          const temNoSistema = mapSistema.has(chaveArq);
+          if (!temNoSistema) {
+            console.log(`❌ ${nome} - Chave só no arquivo:`, chaveArq);
+            console.log(`📋 ${nome} - Dados do arquivo:`, mapArquivo.get(chaveArq)?.amostra);
+            
+            // Buscar chaves similares no sistema
+            const [cli, mod, esp, exame, pac, data] = chaveArq.split('|');
+            const chavesSimilares = Array.from(mapSistema.keys()).filter(ks => {
+              const [cliS, modS, espS, exameS, pacS] = ks.split('|');
+              return pac === pacS && cli === cliS; // Mesmo paciente e cliente
+            });
+            console.log(`🔍 ${nome} - Chaves similares no sistema:`, chavesSimilares);
+            chavesSimilares.forEach(cs => {
+              console.log(`📋 ${nome} - Dados similares no sistema:`, mapSistema.get(cs)?.amostra);
+            });
+          } else {
+            console.log(`✅ ${nome} - Chave encontrada no sistema:`, chaveArq);
+          }
+        });
+      });
+
       allKeys.forEach((k) => {
         const a = mapArquivo.get(k);
         const s = mapSistema.get(k);
+        
+        // Log especial para pacientes mencionados
+        const temPacienteEspecifico = pacientesEspecificos.some(nome => k.includes(nome));
+        
         if (a && !s) {
+          if (temPacienteEspecifico) {
+            console.log('🚨 DIVERGÊNCIA ESPECÍFICA - Só no arquivo:', {
+              chave: k,
+              dadosArquivo: a.amostra,
+              paciente: (a.amostra as any)?.paciente,
+              cliente: a.amostra?.cliente
+            });
+          }
+          
           const cand = findSistemaCandidato(k);
           if (cand) {
             console.warn('[Divergência: Só no Arquivo] possível causa:', cand.motivo, { arquivo: a.amostra, sistema_exemplo: mapSistema.get(cand.ks)?.amostra });
           }
           divergencias.push(toLinhaFromArquivo(k, a));
         } else if (!a && s) {
+          if (temPacienteEspecifico) {
+            console.log('🚨 DIVERGÊNCIA ESPECÍFICA - Só no sistema:', {
+              chave: k,
+              dadosSistema: s.amostra,
+              paciente: (s.amostra as any)?.NOME_PACIENTE,
+              cliente: (s.amostra as any)?.EMPRESA
+            });
+          }
           divergencias.push(toLinhaFromSistema(k, s));
         } else if (a && s) {
           const catA = canonical(((a.amostra as any) || {}).categoria || '');
