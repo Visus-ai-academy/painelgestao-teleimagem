@@ -65,11 +65,11 @@ serve(async (req) => {
       }
 
       try {
-        // Mapeamento baseado no arquivo real com 24 colunas conforme logs:
+        // Mapeamento baseado na sequência correta de colunas fornecida pelo usuário:
         // 0: NOME_MOBILEMED, 1: Nome Fantasia, 2: Contrato, 3: CNPJ, 4: Razão Social, 5: Endereço, 6: Bairro, 7: CEP, 8: Cidade, 9: UF, 10: E-MAIL ENVIO NF, 11: TIPO_CLIENTE, 12: DIA_FATURAMENTO, 13: DATA_INICIO, 14: DATA_TERMINO, 15: STATUS
         const cliente = {
-          // Campos principais seguindo a estrutura real do arquivo
-          nome: row[1] || null, // Nome Fantasia - coluna 1 (campo obrigatório)
+          // nome preenchido apenas com Nome Fantasia (coluna 1)
+          nome: row[1] || null, // Nome Fantasia - coluna 1
           nome_fantasia: row[1] || null, // Nome Fantasia - coluna 1
           nome_mobilemed: row[0] || null, // NOME_MOBILEMED - coluna 0
           email: row[10] || null, // E-MAIL ENVIO NF - coluna 10
