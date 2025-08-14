@@ -277,8 +277,11 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         [...new Set(periodosQuery.data?.map(p => p.periodo_referencia) || [])]
       );
       
-      // Sem limite para processar todos os dados para o Excel
-      const { data: systemRows, error: sysErr } = await sysQuery.order('created_at', { ascending: false });
+      // OTIMIZAÇÃO: Limitar consulta para evitar timeout
+      const { data: systemRows, error: sysErr } = await sysQuery
+        .order('created_at', { ascending: false })
+        .limit(15000); // Limite para evitar timeout do banco
+      
       if (sysErr) {
         console.error('❌ Erro na consulta do sistema:', sysErr);
         throw sysErr;
