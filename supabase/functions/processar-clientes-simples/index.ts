@@ -65,43 +65,63 @@ serve(async (req) => {
       }
 
       try {
-        // Mapeamento completo do novo cadastro de clientes
+        // Mapeamento baseado no cabeçalho real: NOME_MOBILEMED,Nome Fantasia,Contrato,CNPJ,Razão Social,Endereço,Bairro,CEP,Cidade,UF,E-MAIL ENVIO NF,TIPO_CLIENTE,DIA_FATURAMENTO,DATA_INICIO,DATA_TERMINO,STATUS,Integração,Portal de Laudos,Possui Franquia,Valor Franquia,Frequencia Contínua,Frequência por volume,Volume Franquia,R$ Valor Franquia Acima Volume
         const cliente = {
-          // Campos existentes - baseado no template CSV: Nome,email,cnpj,contato,endereço,Status,data inicio,data termino,cod cliente
-          nome: row[0] || null, // Contagem de Cliente (Nome Fantasia)
-          email: row[1] || null, // email  
-          cnpj: row[2] || null, // cnpj
-          contato: row[3] || null, // contato
-          endereco: row[4] || null, // endereço
-          status: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo') ? 'Ativo' : 'Inativo',
-          ativo: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo'),
-          data_inicio_contrato: row[6] && row[6] !== '' ? (() => {
-            try {
-              const date = new Date(row[6]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // data inicio contrato
-          data_termino_contrato: row[7] && row[7] !== '' ? (() => {
-            try {
-              const date = new Date(row[7]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // data termino de vigência
-          cod_cliente: row[8] || null, // cod cliente
+          // Campos principais mapeados corretamente
+          nome: row[1] || null, // Nome Fantasia (coluna 1)
+          email: row[10] || null, // E-MAIL ENVIO NF (coluna 10)
+          cnpj: row[3] || null, // CNPJ (coluna 3)
+          contato: row[0] || null, // NOME_MOBILEMED (coluna 0) - usado como contato
+          endereco: row[5] || null, // Endereço (coluna 5)
+          cidade: row[8] || null, // Cidade (coluna 8)
+          estado: row[9] || null, // UF (coluna 9)
+          bairro: row[6] || null, // Bairro (coluna 6)
+          cep: row[7] || null, // CEP (coluna 7)
+          telefone: null, // Não disponível no arquivo
           
-          // Campos adicionais
-          nome_mobilemed: row[0] || null,
-          nome_fantasia: row[0] || null,
-          tipo_cliente: 'CO',
-          cidade: null,
-          estado: null,
-          telefone: null,
-          bairro: null,
-          cep: null
+          // Status e controle
+          status: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo' || row[15] === 'A') ? 'Ativo' : 'Inativo',
+          ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo' || row[15] === 'A'),
+          
+          // Campos específicos
+          nome_mobilemed: row[0] || null, // NOME_MOBILEMED (coluna 0)
+          nome_fantasia: row[1] || null, // Nome Fantasia (coluna 1)
+          numero_contrato: row[2] || null, // Contrato (coluna 2)
+          razao_social: row[4] || null, // Razão Social (coluna 4)
+          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE (coluna 11)
+          cod_cliente: row[2] || null, // Usando contrato como cod_cliente
+          
+          // Datas
+          data_inicio_contrato: row[13] && row[13] !== '' ? (() => {
+            try {
+              const date = new Date(row[13]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // DATA_INICIO (coluna 13)
+          data_termino_contrato: row[14] && row[14] !== '' ? (() => {
+            try {
+              const date = new Date(row[14]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // DATA_TERMINO (coluna 14)
+          
+          // Campos adicionais do arquivo
+          dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO (coluna 12)
+          integracao: row[16] || null, // Integração (coluna 16)
+          portal_laudos: row[17] === 'SIM' || row[17] === 'sim' || row[17] === 'S', // Portal de Laudos (coluna 17)
+          possui_franquia: row[18] === 'SIM' || row[18] === 'sim' || row[18] === 'S', // Possui Franquia (coluna 18)
+          valor_franquia: row[19] ? parseFloat(row[19]) : 0, // Valor Franquia (coluna 19)
+          frequencia_continua: row[20] === 'SIM' || row[20] === 'sim' || row[20] === 'S', // Frequencia Contínua (coluna 20)
+          frequencia_por_volume: row[21] === 'SIM' || row[21] === 'sim' || row[21] === 'S', // Frequência por volume (coluna 21)
+          volume_franquia: row[22] ? parseInt(row[22]) : 0, // Volume Franquia (coluna 22)
+          valor_franquia_acima_volume: row[23] ? parseFloat(row[23]) : 0, // R$ Valor Franquia Acima Volume (coluna 23)
+          
+          // Campo de controle
+          email_envio_nf: row[10] || null // E-MAIL ENVIO NF (coluna 10)
         }
 
         // Debug: Log first few rows to understand the data structure
@@ -109,11 +129,15 @@ serve(async (req) => {
           console.log(`Linha ${i + 2} dados:`, {
             row_length: row.length,
             first_10_columns: row.slice(0, 10),
-            status_valor: row[5],
+            status_raw: row[15],
             status_processado: cliente.status,
             nome_mobilemed: cliente.nome_mobilemed,
             nome_fantasia: cliente.nome_fantasia,
-            nome: cliente.nome
+            nome: cliente.nome,
+            email: cliente.email,
+            cnpj: cliente.cnpj,
+            cidade: cliente.cidade,
+            estado: cliente.estado
           })
         }
 

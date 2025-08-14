@@ -96,14 +96,20 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         ];
       case 'clientes':
         return [
-          { key: 'nome', label: 'Nome Mobilemed', filterable: true },
+          { key: 'nome', label: 'Nome Fantasia', filterable: true },
+          { key: 'nome_mobilemed', label: 'Nome Mobilemed', filterable: true },
           { key: 'cnpj', label: 'CNPJ', filterable: true },
-          { key: 'email', label: 'E-mail Envio NF', filterable: true },
-          { key: 'contato', label: 'Nome Fantasia', filterable: true },
+          { key: 'email', label: 'E-mail', filterable: true },
+          { key: 'contato', label: 'Contato', filterable: true },
+          { key: 'endereco', label: 'Endereço', filterable: true },
           { key: 'cidade', label: 'Cidade', filterable: true },
           { key: 'estado', label: 'Estado', filterable: true },
+          { key: 'bairro', label: 'Bairro', filterable: true },
+          { key: 'cep', label: 'CEP', filterable: true },
           { key: 'tipo_cliente', label: 'Tipo Cliente', filterable: true },
-          { key: 'ativo', label: 'Status', filterable: true }
+          { key: 'status', label: 'Status', filterable: true },
+          { key: 'data_inicio_contrato', label: 'Data Início', filterable: false },
+          { key: 'data_termino_contrato', label: 'Data Término', filterable: false }
         ];
       default:
         return [
@@ -147,6 +153,11 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return item.quantidade_quebras || 0;
       case 'ativo':
         return item.ativo ? "Ativo" : "Inativo";
+      case 'status':
+        return item.status || (item.ativo ? "Ativo" : "Inativo");
+      case 'data_inicio_contrato':
+      case 'data_termino_contrato':
+        return item[key] ? format(new Date(item[key]), 'dd/MM/yyyy') : '-';
       case 'created_at':
         return format(new Date(item.created_at), 'dd/MM/yyyy');
       default:
