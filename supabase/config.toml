@@ -72,3 +72,6 @@ verify_jwt = true  # SECURITY FIX: No longer public
 
 [functions.aplicar-exclusoes-periodo]
 verify_jwt = true  # SECURITY FIX: No longer public
+
+[functions.limpar-clientes]
+verify_jwt = true
