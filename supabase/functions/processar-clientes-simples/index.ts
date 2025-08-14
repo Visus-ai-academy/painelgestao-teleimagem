@@ -48,16 +48,8 @@ serve(async (req) => {
     const dataRows = jsonData.slice(1)
     console.log('Linhas de dados:', dataRows.length)
 
-    // Clear existing clients
-    console.log('Limpando clientes existentes...')
-    const { error: clearError } = await supabase
-      .from('clientes')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
-
-    if (clearError) {
-      console.error('Erro ao limpar clientes:', clearError)
-    }
+    // Não limpar clientes - usar UPSERT para evitar duplicação
+    console.log('Processando clientes com UPSERT...')
 
     // Process data - direct mapping to known structure
     const processedClients = []
@@ -163,7 +155,10 @@ serve(async (req) => {
       
       const { data, error } = await supabase
         .from('clientes')
-        .insert(batch)
+        .upsert(batch, { 
+          onConflict: 'cnpj',
+          ignoreDuplicates: false 
+        })
         .select('id')
 
       if (error) {
@@ -173,7 +168,7 @@ serve(async (req) => {
         for (const cliente of batch) {
           const { error: singleError } = await supabase
             .from('clientes')
-            .insert([cliente])
+            .upsert([cliente], { onConflict: 'cnpj' })
 
           if (singleError) {
             console.error('Erro individual:', singleError, cliente.nome)
