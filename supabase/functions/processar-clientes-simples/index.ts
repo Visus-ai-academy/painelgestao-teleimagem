@@ -69,13 +69,13 @@ serve(async (req) => {
         // 0: NOME_MOBILEMED, 1: Nome Fantasia, 2: Contrato, 3: CNPJ, 4: Razão Social, 5: Endereço, 6: Bairro, 7: CEP, 8: Cidade, 9: UF, 10: E-MAIL ENVIO NF, 11: TIPO_CLIENTE, 12: DIA_FATURAMENTO, 13: DATA_INICIO, 14: DATA_TERMINO, 15: STATUS
         const cliente = {
           // Campos principais seguindo a estrutura real do arquivo
-          nome: row[1] || row[0] || null, // Nome Fantasia (coluna 1) ou NOME_MOBILEMED (coluna 0) como fallback
+          nome: row[1] || null, // Nome Fantasia - coluna 1 (campo obrigatório)
           nome_fantasia: row[1] || null, // Nome Fantasia - coluna 1
           nome_mobilemed: row[0] || null, // NOME_MOBILEMED - coluna 0
           email: row[10] || null, // E-MAIL ENVIO NF - coluna 10
           email_envio_nf: row[10] || null, // E-MAIL ENVIO NF - coluna 10
           cnpj: row[3] || null, // CNPJ - coluna 3
-          contato: row[3] || null, // Usando CNPJ como contato temporariamente (corrigir se necessário)
+          contato: null, // Não existe no arquivo - deixar em branco
           endereco: row[5] || null, // Endereço - coluna 5
           cidade: row[8] || null, // Cidade - coluna 8
           estado: row[9] || null, // UF - coluna 9
@@ -85,7 +85,23 @@ serve(async (req) => {
           razao_social: row[4] || null, // Razão Social - coluna 4
           tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE - coluna 11
           dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO - coluna 12
-          cod_cliente: row[8] || null, // Cidade como cod_cliente
+          
+          // Gerar cod_cliente sequencial baseado na data de início
+          cod_cliente: (() => {
+            if (row[13] && row[13] !== '') {
+              try {
+                const date = new Date(row[13]);
+                if (!isNaN(date.getTime())) {
+                  const year = date.getFullYear().toString().slice(-2);
+                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                  return `CLI${year}${month}${(i + 1).toString().padStart(3, '0')}`;
+                }
+              } catch (error) {
+                // Se erro na data, usar apenas sequencial
+              }
+            }
+            return `CLI${(i + 1).toString().padStart(6, '0')}`;
+          })(),
           
           // Status processamento
           status: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo', // STATUS - coluna 15
