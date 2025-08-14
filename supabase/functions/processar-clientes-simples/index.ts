@@ -114,11 +114,11 @@ serve(async (req) => {
           valor_franquia_acima_volume: row[24] ? parseFloat(row[24]) : 0 // R$ Valor Franquia Acima Volume
         }
 
-        // Skip if no name (required field) - CORRIGIDO: usar nome_fantasia como campo principal
-        if (!cliente.nome_fantasia || cliente.nome_fantasia.trim() === '') {
-          console.log(`Pulando linha ${i + 2}: sem nome fantasia - dados:`, {
-            nome_fantasia: cliente.nome_fantasia,
+        // Skip if no name (required field) - usar nome_mobilemed como campo obrigatório
+        if (!cliente.nome_mobilemed || cliente.nome_mobilemed.trim() === '') {
+          console.log(`Pulando linha ${i + 2}: sem nome_mobilemed - dados:`, {
             nome_mobilemed: cliente.nome_mobilemed,
+            nome_fantasia: cliente.nome_fantasia,
             linha_completa: row
           })
           errorCount++
