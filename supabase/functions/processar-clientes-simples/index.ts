@@ -76,8 +76,8 @@ serve(async (req) => {
           email: row[10] || null, // E-MAIL ENVIO NF
           cnpj: row[3] || null, // CNPJ
           tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE (corrigido)
-          status: (row[15] === 'ATIVO' || row[15] === 'Ativo') ? 'Ativo' : 'Inativo',
-          ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo'),
+          status: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo',
+          ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo'),
           
           // Novos campos específicos
           nome_mobilemed: row[0] || null, // NOME_MOBILEMED
@@ -119,6 +119,8 @@ serve(async (req) => {
           console.log(`Linha ${i + 2} dados:`, {
             row_length: row.length,
             first_10_columns: row.slice(0, 10),
+            status_valor: row[15],
+            status_processado: cliente.status,
             nome_mobilemed: cliente.nome_mobilemed,
             nome_fantasia: cliente.nome_fantasia,
             nome: cliente.nome
