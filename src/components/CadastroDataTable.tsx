@@ -167,6 +167,13 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         } catch {
           return '';
         }
+      case 'cep':
+        if (!item[key]) return '';
+        const cepNumbers = item[key].toString().replace(/\D/g, '');
+        if (cepNumbers.length === 8) {
+          return cepNumbers.replace(/(\d{2})(\d{3})(\d{3})/, '$1.$2-$3');
+        }
+        return item[key];
       case 'created_at':
         return format(new Date(item.created_at), 'dd/MM/yyyy');
       default:
