@@ -428,6 +428,8 @@ export type Database = {
       clientes: {
         Row: {
           ativo: boolean | null
+          bairro: string | null
+          cep: string | null
           cidade: string | null
           cnpj: string | null
           cod_cliente: string | null
@@ -435,19 +437,36 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_inicio_contrato: string | null
+          data_termino_contrato: string | null
           data_termino_vigencia: string | null
+          dia_faturamento: number | null
           email: string | null
+          email_envio_nf: string | null
           endereco: string | null
           estado: string | null
+          frequencia_continua: boolean | null
+          frequencia_por_volume: boolean | null
           id: string
+          integracao: string | null
           nome: string
+          nome_fantasia: string | null
+          nome_mobilemed: string | null
+          numero_contrato: string | null
+          portal_laudos: boolean | null
+          possui_franquia: boolean | null
+          razao_social: string | null
           status: string
           telefone: string | null
           tipo_cliente: string | null
           updated_at: string
+          valor_franquia: number | null
+          valor_franquia_acima_volume: number | null
+          volume_franquia: number | null
         }
         Insert: {
           ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
           cnpj?: string | null
           cod_cliente?: string | null
@@ -455,19 +474,36 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_inicio_contrato?: string | null
+          data_termino_contrato?: string | null
           data_termino_vigencia?: string | null
+          dia_faturamento?: number | null
           email?: string | null
+          email_envio_nf?: string | null
           endereco?: string | null
           estado?: string | null
+          frequencia_continua?: boolean | null
+          frequencia_por_volume?: boolean | null
           id?: string
+          integracao?: string | null
           nome: string
+          nome_fantasia?: string | null
+          nome_mobilemed?: string | null
+          numero_contrato?: string | null
+          portal_laudos?: boolean | null
+          possui_franquia?: boolean | null
+          razao_social?: string | null
           status?: string
           telefone?: string | null
           tipo_cliente?: string | null
           updated_at?: string
+          valor_franquia?: number | null
+          valor_franquia_acima_volume?: number | null
+          volume_franquia?: number | null
         }
         Update: {
           ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
           cnpj?: string | null
           cod_cliente?: string | null
@@ -475,16 +511,31 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_inicio_contrato?: string | null
+          data_termino_contrato?: string | null
           data_termino_vigencia?: string | null
+          dia_faturamento?: number | null
           email?: string | null
+          email_envio_nf?: string | null
           endereco?: string | null
           estado?: string | null
+          frequencia_continua?: boolean | null
+          frequencia_por_volume?: boolean | null
           id?: string
+          integracao?: string | null
           nome?: string
+          nome_fantasia?: string | null
+          nome_mobilemed?: string | null
+          numero_contrato?: string | null
+          portal_laudos?: boolean | null
+          possui_franquia?: boolean | null
+          razao_social?: string | null
           status?: string
           telefone?: string | null
           tipo_cliente?: string | null
           updated_at?: string
+          valor_franquia?: number | null
+          valor_franquia_acima_volume?: number | null
+          volume_franquia?: number | null
         }
         Relationships: []
       }

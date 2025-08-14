@@ -73,18 +73,39 @@ serve(async (req) => {
       }
 
       try {
-        // Direct mapping based on known Excel structure
+        // Mapeamento completo do novo cadastro de clientes
         const cliente = {
-          nome: row[0] || null, // NOME_MOBILEMED
-          contato: row[1] || null, // Nome_Fantasia
+          // Campos existentes (mantidos para compatibilidade)
+          nome: row[1] || null, // Nome_Fantasia -> nome (campo principal)
+          contato: row[0] || null, // NOME_MOBILEMED -> contato (temporário)
           endereco: row[5] || null, // Endereço
           cidade: row[8] || null, // Cidade
           estado: row[9] || null, // UF
           email: row[10] || null, // E-MAIL ENVIO NF
           cnpj: row[3] || null, // CNPJ
-          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE
-          status: 'Ativo',
-          ativo: true
+          tipo_cliente: row[12] || 'CO', // TIPO_CLIENTE
+          status: (row[16] === 'ATIVO' || row[16] === 'ATIVO' || !row[16]) ? 'Ativo' : 'Inativo',
+          ativo: (row[16] === 'ATIVO' || row[16] === 'ATIVO' || !row[16]),
+          
+          // Novos campos específicos
+          nome_mobilemed: row[0] || null, // NOME_MOBILEMED
+          nome_fantasia: row[1] || null, // Nome_Fantasia
+          numero_contrato: row[2] || null, // Contrato
+          razao_social: row[4] || null, // Razão Social
+          bairro: row[6] || null, // Bairro
+          cep: row[7] || null, // CEP
+          email_envio_nf: row[11] || null, // E-MAIL ENVIO NF
+          dia_faturamento: row[13] ? parseInt(row[13]) : null, // DIA_FATURAMENTO
+          data_inicio_contrato: row[14] ? new Date(row[14]).toISOString().split('T')[0] : null, // DATA_INICIO
+          data_termino_contrato: row[15] ? new Date(row[15]).toISOString().split('T')[0] : null, // DATA_TERMINO
+          integracao: row[17] || null, // Integração
+          portal_laudos: row[18] === 'SIM' || row[18] === 'sim' || row[18] === 'S', // Portal de Laudos
+          possui_franquia: row[19] === 'SIM' || row[19] === 'sim' || row[19] === 'S', // Possui Franquia
+          valor_franquia: row[20] ? parseFloat(row[20]) : 0, // Valor Franquia
+          frequencia_continua: row[21] === 'SIM' || row[21] === 'sim' || row[21] === 'S', // Frequencia Contínua
+          frequencia_por_volume: row[22] === 'SIM' || row[22] === 'sim' || row[22] === 'S', // Frequência por volume
+          volume_franquia: row[23] ? parseInt(row[23]) : 0, // Volume Franquia
+          valor_franquia_acima_volume: row[24] ? parseFloat(row[24]) : 0 // R$ Valor Franquia Acima Volume
         }
 
         // Skip if no name (required field)
