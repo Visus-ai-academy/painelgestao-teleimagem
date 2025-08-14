@@ -222,6 +222,20 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         cliente: cliente !== 'todos' ? cliente : 'todos'
       });
       
+      // TESTE DIRETO: Buscar um paciente específico no banco
+      console.log('🔍 TESTE DIRETO: Buscando Vilma Borges no banco...');
+      const testeVilma = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .ilike('NOME_PACIENTE', '%VILMA BORGES%')
+        .limit(5);
+      
+      console.log('🔍 RESULTADO TESTE VILMA:', {
+        erro: testeVilma.error,
+        encontrados: testeVilma.data?.length || 0,
+        dados: testeVilma.data
+      });
+      
       // 1) Ler dados do SISTEMA (volumetria processada no banco) por período/cliente
       let sysQuery = supabase.from('volumetria_mobilemed').select(`
         "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "ESTUDO_DESCRICAO", 
