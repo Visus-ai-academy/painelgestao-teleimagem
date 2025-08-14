@@ -206,6 +206,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const gerarExcelDivergencias = async () => {
+    console.log('🚀 INÍCIO DO PROCESSO DE DIVERGÊNCIAS');
     try {
       setExporting(true);
       
