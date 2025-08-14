@@ -476,7 +476,7 @@ export default function GerarFaturamento() {
         throw new Error(gerarError?.message || gerarData?.error || 'Falha ao gerar faturamento do período');
       }
 
-      // Se retornou status 'processing', aguardar alguns segundos e verificar dados
+      // Se retornou status 'processing', aguardar e verificar dados periodicamente
       if (gerarData?.status === 'processing') {
         setStatusProcessamento({
           processando: true,
@@ -484,8 +484,41 @@ export default function GerarFaturamento() {
           progresso: 50
         });
         
-        // Aguardar 10 segundos para o processamento em background
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Aguardar até 2 minutos, verificando a cada 15 segundos
+        const maxTentativas = 8; // 8 * 15s = 2 minutos
+        let tentativas = 0;
+        let dadosEncontrados = false;
+        
+        const mesesAbrev = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        const [anoSel, mesSel] = periodoSelecionado.split('-');
+        const periodoRef = `${mesesAbrev[Math.max(0, Math.min(11, Number(mesSel)-1))]}/${anoSel.slice(2)}`;
+        
+        while (tentativas < maxTentativas && !dadosEncontrados) {
+          await new Promise(resolve => setTimeout(resolve, 15000)); // 15 segundos
+          tentativas++;
+          
+          // Verificar se os dados foram processados
+          const { data: checkData } = await supabase
+            .from('faturamento')
+            .select('id')
+            .eq('periodo_referencia', periodoRef)
+            .limit(1);
+            
+          if (checkData && checkData.length > 0) {
+            dadosEncontrados = true;
+            console.log(`✅ Dados encontrados após ${tentativas * 15} segundos`);
+          } else {
+            setStatusProcessamento({
+              processando: true,
+              mensagem: `Aguardando processamento... (${tentativas * 15}s)`,
+              progresso: 50 + (tentativas * 5)
+            });
+          }
+        }
+        
+        if (!dadosEncontrados) {
+          throw new Error('Timeout: Processamento não foi concluído em 2 minutos. Tente novamente.');
+        }
       }
 
       setStatusProcessamento({
