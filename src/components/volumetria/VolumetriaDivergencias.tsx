@@ -220,19 +220,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         cliente: cliente !== 'todos' ? cliente : 'todos'
       });
       
-      // TESTE DIRETO: Buscar um paciente específico no banco
-      console.log('🔍 TESTE DIRETO: Buscando Vilma Borges no banco...');
-      const testeVilma = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .ilike('NOME_PACIENTE', '%VILMA BORGES%')
-        .limit(5);
-      
-      console.log('🔍 RESULTADO TESTE VILMA:', {
-        erro: testeVilma.error,
-        encontrados: testeVilma.data?.length || 0,
-        dados: testeVilma.data
-      });
+      // Removido teste desnecessário que pode causar travamento
       
       // USAR A MESMA FONTE DE DADOS DO RESUMO - ctx.detailedData
       console.log('🔍 Usando contexto para dados do sistema (mesma fonte do resumo)');
@@ -294,31 +282,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           toYMD(dataExame || dataLaudo)
         ].join('|');
         
-        // Log especial para AKC PALMAS
-        if (empresaRaw?.includes('AKC') || empresaNormalizada.includes('AKC')) {
-          console.log('🏥 AKC PALMAS - Processando registro do sistema (contexto):', {
+        // Logs reduzidos para evitar travamento
+        if (index < 3) {
+          console.log('🏥 Processando registro do sistema:', {
             index,
-            empresaOriginal: empresaRaw,
-            empresaNormalizada,
-            paciente: pacienteNome,
-            exame: exameDescricao,
-            valores: r.VALORES || r.valores || 1,
-            chaveGerada: chave
-          });
-        }
-        
-        if (index < 5 || pacienteNome?.includes('VILMA') || pacienteNome?.includes('ADELINO')) {
-          console.log('🏥 Processando registro do sistema (contexto):', {
-            index,
-            empresa: empresaRaw,
-            empresaNormalizada,
-            paciente: pacienteNome,
-            exame: exameDescricao,
-            modalidade,
-            especialidade,
-            dataExame,
-            dataLaudo,
-            registroCompleto: r
+            empresa: empresaNormalizada,
+            paciente: pacienteNome?.substring(0, 20)
           });
         }
         
