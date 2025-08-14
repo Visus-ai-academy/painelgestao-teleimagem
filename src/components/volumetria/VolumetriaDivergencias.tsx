@@ -248,7 +248,11 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
       if (cliente !== 'todos') {
         console.log('🔍 Filtro de cliente aplicado:', cliente);
-        sysQuery = sysQuery.eq('EMPRESA', cliente);
+        // CORREÇÃO: Usar normalização para filtro consistente
+        const clienteNormalizado = normalizeCliente(cliente);
+        console.log('🔍 Cliente normalizado para filtro:', clienteNormalizado);
+        // Buscar por cliente normalizado - vai trazer mais registros que serão filtrados depois
+        sysQuery = sysQuery.ilike('"EMPRESA"', `%${cliente}%`);
       }
       
       // Teste específico: verificar se existem registros com os pacientes mencionados
@@ -299,8 +303,17 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       console.log('🔍 Total de registros do sistema encontrados:', systemRows?.length || 0);
       
       (systemRows || []).forEach((r: any, index) => {
+        // CORREÇÃO: Aplicar filtro de cliente após busca para garantir consistência
+        const empresaNormalizada = normalizeCliente(r.EMPRESA);
+        if (cliente !== 'todos') {
+          const clienteNormalizado = normalizeCliente(cliente);
+          if (empresaNormalizada !== clienteNormalizado) {
+            return; // Pular registro que não é do cliente selecionado
+          }
+        }
+        
         const key = [
-          normalizeCliente(r.EMPRESA),
+          empresaNormalizada,
           normalizeModalidade(r.MODALIDADE),
           canonical(r.ESPECIALIDADE),
           canonical(cleanExamName(r.ESTUDO_DESCRICAO)),
@@ -308,10 +321,24 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           toYMD(r.DATA_REALIZACAO || r.DATA_LAUDO)
         ].join('|');
         
+        // Log especial para AKC PALMAS
+        if (r.EMPRESA?.includes('AKC') || empresaNormalizada.includes('AKC')) {
+          console.log('🏥 AKC PALMAS - Processando registro do sistema:', {
+            index,
+            empresaOriginal: r.EMPRESA,
+            empresaNormalizada,
+            paciente: r.NOME_PACIENTE,
+            exame: r.ESTUDO_DESCRICAO,
+            valores: r.VALORES,
+            chaveGerada: key
+          });
+        }
+        
         if (index < 5 || r.NOME_PACIENTE?.includes('VILMA') || r.NOME_PACIENTE?.includes('ADELINO')) {
           console.log('🏥 Processando registro do sistema:', {
             index,
             empresa: r.EMPRESA,
+            empresaNormalizada,
             paciente: r.NOME_PACIENTE,
             exame: r.ESTUDO_DESCRICAO,
             modalidade: r.MODALIDADE,
@@ -347,7 +374,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       console.log('🔍 Total de registros do arquivo disponíveis:', uploadedExams?.length || 0);
       
       (uploadedExams || []).forEach((r, index) => {
-        if (cliente !== 'todos' && normalizeCliente(r.cliente) !== normalizeCliente(cliente)) return;
+        const clienteNormalizado = normalizeCliente(r.cliente);
+        if (cliente !== 'todos' && clienteNormalizado !== normalizeCliente(cliente)) return;
         if (!inMonth((r as any).data_exame || (r as any).data_laudo)) return;
         
         // Usar mesmos campos que o sistema para garantir correspondência
@@ -356,11 +384,24 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
         const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
         
+        // Log especial para AKC PALMAS
+        if (r.cliente?.includes('AKC') || clienteNormalizado.includes('AKC')) {
+          console.log('📁 AKC PALMAS - Processando registro do arquivo:', {
+            index,
+            clienteOriginal: r.cliente,
+            clienteNormalizado,
+            paciente: pacienteNome,
+            exame: exameDescricao,
+            valores: r.quant || (r as any).quantidade || (r as any).valores || 1
+          });
+        }
+        
         // Log detalhado para casos específicos
         if (index < 5 || pacienteNome?.includes('VILMA') || pacienteNome?.includes('ADELINO')) {
           console.log('📁 Processando registro do arquivo:', {
             index,
             cliente: r.cliente,
+            clienteNormalizado,
             paciente: pacienteNome,
             exame: exameDescricao,
             modalidade: r.modalidade,
@@ -372,7 +413,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         }
         
         const key = [
-          normalizeCliente(r.cliente),
+          clienteNormalizado,
           normalizeModalidade(r.modalidade),
           canonical(r.especialidade),
           canonical(cleanExamName(exameDescricao)),
