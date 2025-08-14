@@ -232,12 +232,51 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         "STATUS", "CATEGORIA"
       `);
       
+      console.log('🔍 Consultando banco com período:', periodoReferenciaBanco);
       sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
-      if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
+      if (cliente !== 'todos') {
+        console.log('🔍 Filtro de cliente aplicado:', cliente);
+        sysQuery = sysQuery.eq('EMPRESA', cliente);
+      }
+      
+      // Teste específico: verificar se existem registros com os pacientes mencionados
+      console.log('🔍 Fazendo consulta específica para pacientes VILMA e ADELINO...');
+      const testQuery = await supabase
+        .from('volumetria_mobilemed')
+        .select('NOME_PACIENTE, EMPRESA, ESTUDO_DESCRICAO, DATA_REALIZACAO, periodo_referencia')
+        .eq('periodo_referencia', periodoReferenciaBanco)
+        .or('NOME_PACIENTE.ilike.%VILMA%,NOME_PACIENTE.ilike.%ADELINO%')
+        .limit(20);
+      
+      console.log('🔍 Resultado da consulta específica:', {
+        erro: testQuery.error,
+        quantidade: testQuery.data?.length || 0,
+        primeiros5: testQuery.data?.slice(0, 5)
+      });
+      
+      // Verificar também todos os períodos disponíveis
+      const periodosQuery = await supabase
+        .from('volumetria_mobilemed')
+        .select('periodo_referencia')
+        .not('periodo_referencia', 'is', null)
+        .or('NOME_PACIENTE.ilike.%VILMA%,NOME_PACIENTE.ilike.%ADELINO%');
+      
+      console.log('🔍 Períodos onde encontramos VILMA/ADELINO:', 
+        [...new Set(periodosQuery.data?.map(p => p.periodo_referencia) || [])]
+      );
       
       // Sem limite para processar todos os dados para o Excel
       const { data: systemRows, error: sysErr } = await sysQuery.order('created_at', { ascending: false });
-      if (sysErr) throw sysErr;
+      if (sysErr) {
+        console.error('❌ Erro na consulta do sistema:', sysErr);
+        throw sysErr;
+      }
+
+      console.log('🏥 Query executada no sistema:', {
+        periodoReferenciaBanco,
+        cliente: cliente !== 'todos' ? cliente : 'todos',
+        totalRegistros: systemRows?.length || 0
+      });
 
       // Mapear por chave agregada
       type AggSys = { total: number; amostra?: VolumetriaRow };
