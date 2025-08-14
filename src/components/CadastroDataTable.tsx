@@ -99,18 +99,17 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return [
           { key: 'nome_mobilemed', label: 'Nome MobileMed', filterable: true, width: '200px' },
           { key: 'nome', label: 'Nome Fantasia', filterable: true, width: '200px' },
+          { key: 'razao_social', label: 'Razão Social', filterable: true, width: '250px' },
           { key: 'cnpj', label: 'CNPJ', filterable: true, width: '150px' },
-          { key: 'email', label: 'E-mail', filterable: true, width: '200px' },
           { key: 'contato', label: 'Contato', filterable: true, width: '150px' },
+          { key: 'telefone', label: 'Telefone', filterable: true, width: '120px' },
           { key: 'cidade', label: 'Cidade', filterable: true, width: '120px' },
           { key: 'estado', label: 'UF', filterable: true, width: '60px' },
-          { key: 'endereco', label: 'Endereço', filterable: true, width: '250px' },
+          { key: 'endereco', label: 'Endereço', filterable: true, width: '200px' },
           { key: 'bairro', label: 'Bairro', filterable: true, width: '120px' },
           { key: 'cep', label: 'CEP', filterable: true, width: '100px' },
           { key: 'tipo_cliente', label: 'Tipo', filterable: true, width: '80px' },
           { key: 'status', label: 'Status', filterable: true, width: '80px' },
-          { key: 'data_inicio_contrato', label: 'Data Início', filterable: false, width: '110px' },
-          { key: 'data_termino_contrato', label: 'Data Término', filterable: false, width: '110px' },
           { key: 'actions', label: 'Ações', filterable: false, width: '100px' }
         ];
       default:

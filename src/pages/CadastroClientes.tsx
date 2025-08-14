@@ -20,15 +20,30 @@ import { CadastroDataTable } from "@/components/CadastroDataTable";
 interface Cliente {
   id: string;
   nome: string;
+  nome_fantasia?: string;
+  nome_mobilemed?: string;
+  razao_social?: string;
   email: string;
+  email_envio_nf?: string;
   cnpj?: string;
+  telefone?: string;
   endereco?: string;
+  bairro?: string;
+  cep?: string;
   cidade?: string;
   estado?: string;
   contato?: string;
   cod_cliente?: string;
-  data_inicio_contrato?: string;
-  data_termino_vigencia?: string;
+  numero_contrato?: string;
+  dia_faturamento?: number;
+  integracao?: string;
+  portal_laudos?: boolean;
+  possui_franquia?: boolean;
+  valor_franquia?: number;
+  frequencia_continua?: boolean;
+  frequencia_por_volume?: boolean;
+  volume_franquia?: number;
+  valor_franquia_acima_volume?: number;
   ativo: boolean;
   status: string;
   tipo_cliente?: string;
@@ -47,15 +62,30 @@ export default function CadastroClientes() {
   
   const [clienteData, setClienteData] = useState({
     nome: "",
+    nome_fantasia: "",
+    nome_mobilemed: "",
+    razao_social: "",
     email: "",
+    email_envio_nf: "",
     cnpj: "",
+    telefone: "",
     endereco: "",
+    bairro: "",
+    cep: "",
     cidade: "",
     estado: "",
     contato: "",
     cod_cliente: "",
-    data_inicio_contrato: "",
-    data_termino_vigencia: "",
+    numero_contrato: "",
+    dia_faturamento: "",
+    integracao: "",
+    portal_laudos: false,
+    possui_franquia: false,
+    valor_franquia: "",
+    frequencia_continua: false,
+    frequencia_por_volume: false,
+    volume_franquia: "",
+    valor_franquia_acima_volume: "",
     tipo_cliente: "",
     ativo: true,
     status: "Ativo"
@@ -121,8 +151,10 @@ export default function CadastroClientes() {
       const dadosParaSalvar = {
         ...clienteData,
         status: clienteData.ativo ? 'Ativo' : 'Inativo',
-        data_inicio_contrato: clienteData.data_inicio_contrato || null,
-        data_termino_vigencia: clienteData.data_termino_vigencia || null
+        dia_faturamento: clienteData.dia_faturamento ? Number(clienteData.dia_faturamento) : null,
+        valor_franquia: clienteData.valor_franquia ? Number(clienteData.valor_franquia) : null,
+        volume_franquia: clienteData.volume_franquia ? Number(clienteData.volume_franquia) : null,
+        valor_franquia_acima_volume: clienteData.valor_franquia_acima_volume ? Number(clienteData.valor_franquia_acima_volume) : null
       };
       
       const { error } = await supabase
@@ -139,15 +171,30 @@ export default function CadastroClientes() {
       setShowNovoCliente(false);
       setClienteData({
         nome: "",
+        nome_fantasia: "",
+        nome_mobilemed: "",
+        razao_social: "",
         email: "",
+        email_envio_nf: "",
         cnpj: "",
+        telefone: "",
         endereco: "",
+        bairro: "",
+        cep: "",
         cidade: "",
         estado: "",
         contato: "",
         cod_cliente: "",
-        data_inicio_contrato: "",
-        data_termino_vigencia: "",
+        numero_contrato: "",
+        dia_faturamento: "",
+        integracao: "",
+        portal_laudos: false,
+        possui_franquia: false,
+        valor_franquia: "",
+        frequencia_continua: false,
+        frequencia_por_volume: false,
+        volume_franquia: "",
+        valor_franquia_acima_volume: "",
         tipo_cliente: "",
         ativo: true,
         status: "Ativo"
@@ -168,15 +215,30 @@ export default function CadastroClientes() {
     setClienteEditando(cliente);
     setClienteData({
       nome: cliente.nome,
+      nome_fantasia: cliente.nome_fantasia || "",
+      nome_mobilemed: cliente.nome_mobilemed || "",
+      razao_social: cliente.razao_social || "",
       email: cliente.email,
+      email_envio_nf: cliente.email_envio_nf || "",
       cnpj: cliente.cnpj || "",
+      telefone: cliente.telefone || "",
       endereco: cliente.endereco || "",
+      bairro: cliente.bairro || "",
+      cep: cliente.cep || "",
       cidade: cliente.cidade || "",
       estado: cliente.estado || "",
       contato: cliente.contato || "",
       cod_cliente: cliente.cod_cliente || "",
-      data_inicio_contrato: cliente.data_inicio_contrato || "",
-      data_termino_vigencia: cliente.data_termino_vigencia || "",
+      numero_contrato: cliente.numero_contrato || "",
+      dia_faturamento: cliente.dia_faturamento?.toString() || "",
+      integracao: cliente.integracao || "",
+      portal_laudos: cliente.portal_laudos || false,
+      possui_franquia: cliente.possui_franquia || false,
+      valor_franquia: cliente.valor_franquia?.toString() || "",
+      frequencia_continua: cliente.frequencia_continua || false,
+      frequencia_por_volume: cliente.frequencia_por_volume || false,
+      volume_franquia: cliente.volume_franquia?.toString() || "",
+      valor_franquia_acima_volume: cliente.valor_franquia_acima_volume?.toString() || "",
       tipo_cliente: cliente.tipo_cliente || "",
       ativo: cliente.ativo,
       status: cliente.status || (cliente.ativo ? "Ativo" : "Inativo")
@@ -191,8 +253,10 @@ export default function CadastroClientes() {
       const dadosParaAtualizar = {
         ...clienteData,
         status: clienteData.ativo ? 'Ativo' : 'Inativo',
-        data_inicio_contrato: clienteData.data_inicio_contrato || null,
-        data_termino_vigencia: clienteData.data_termino_vigencia || null
+        dia_faturamento: clienteData.dia_faturamento ? Number(clienteData.dia_faturamento) : null,
+        valor_franquia: clienteData.valor_franquia ? Number(clienteData.valor_franquia) : null,
+        volume_franquia: clienteData.volume_franquia ? Number(clienteData.volume_franquia) : null,
+        valor_franquia_acima_volume: clienteData.valor_franquia_acima_volume ? Number(clienteData.valor_franquia_acima_volume) : null
       };
       
       const { error } = await supabase
@@ -461,25 +525,6 @@ export default function CadastroClientes() {
                  </Select>
                </div>
                
-               <div className="space-y-2">
-                 <Label htmlFor="data_inicio" className="text-sm font-semibold text-foreground">Data Início Contrato</Label>
-                 <Input
-                   id="data_inicio"
-                   type="date"
-                   value={clienteData.data_inicio_contrato}
-                   onChange={(e) => handleInputChange("data_inicio_contrato", e.target.value)}
-                 />
-               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="data_fim" className="text-sm font-semibold text-foreground">Data Término Vigência</Label>
-                <Input
-                  id="data_fim"
-                  type="date"
-                  value={clienteData.data_termino_vigencia}
-                  onChange={(e) => handleInputChange("data_termino_vigencia", e.target.value)}
-                />
-              </div>
               
               <div className="flex items-center space-x-2">
                 <Switch
@@ -603,15 +648,15 @@ export default function CadastroClientes() {
 
         {/* Dialog para editar cliente */}
         <Dialog open={showEditarCliente} onOpenChange={setShowEditarCliente}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
               <DialogDescription>
-                Edite os dados do cliente
+                Edite os dados completos do cliente
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-nome" className="text-sm font-semibold text-foreground">Nome*</Label>
                   <Input
@@ -619,6 +664,36 @@ export default function CadastroClientes() {
                     value={clienteData.nome}
                     onChange={(e) => handleInputChange("nome", e.target.value)}
                     placeholder="Nome do cliente"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome_fantasia" className="text-sm font-semibold text-foreground">Nome Fantasia</Label>
+                  <Input
+                    id="edit-nome_fantasia"
+                    value={clienteData.nome_fantasia}
+                    onChange={(e) => handleInputChange("nome_fantasia", e.target.value)}
+                    placeholder="Nome fantasia"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome_mobilemed" className="text-sm font-semibold text-foreground">Nome MobileMed</Label>
+                  <Input
+                    id="edit-nome_mobilemed"
+                    value={clienteData.nome_mobilemed}
+                    onChange={(e) => handleInputChange("nome_mobilemed", e.target.value)}
+                    placeholder="Nome no sistema MobileMed"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-razao_social" className="text-sm font-semibold text-foreground">Razão Social</Label>
+                  <Input
+                    id="edit-razao_social"
+                    value={clienteData.razao_social}
+                    onChange={(e) => handleInputChange("razao_social", e.target.value)}
+                    placeholder="Razão social da empresa"
                   />
                 </div>
                 
@@ -634,6 +709,17 @@ export default function CadastroClientes() {
                 </div>
                 
                 <div className="space-y-2">
+                  <Label htmlFor="edit-email_envio_nf" className="text-sm font-semibold text-foreground">Email Envio NF</Label>
+                  <Input
+                    id="edit-email_envio_nf"
+                    type="email"
+                    value={clienteData.email_envio_nf}
+                    onChange={(e) => handleInputChange("email_envio_nf", e.target.value)}
+                    placeholder="nf@cliente.com"
+                  />
+                </div>
+                
+                <div className="space-y-2">
                   <Label htmlFor="edit-cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
                   <Input
                     id="edit-cnpj"
@@ -644,12 +730,22 @@ export default function CadastroClientes() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
+                  <Label htmlFor="edit-telefone" className="text-sm font-semibold text-foreground">Telefone</Label>
                   <Input
-                    id="edit-cod_cliente"
-                    value={clienteData.cod_cliente}
-                    onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
-                    placeholder="CLI001"
+                    id="edit-telefone"
+                    value={clienteData.telefone}
+                    onChange={(e) => handleInputChange("telefone", e.target.value)}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-contato" className="text-sm font-semibold text-foreground">Contato</Label>
+                  <Input
+                    id="edit-contato"
+                    value={clienteData.contato}
+                    onChange={(e) => handleInputChange("contato", e.target.value)}
+                    placeholder="Nome do contato"
                   />
                 </div>
                 
@@ -674,39 +770,152 @@ export default function CadastroClientes() {
                   />
                 </div>
                 
-                 <div className="space-y-2">
-                   <Label htmlFor="edit-contato" className="text-sm font-semibold text-foreground">Contato</Label>
-                   <Input
-                     id="edit-contato"
-                     value={clienteData.contato}
-                     onChange={(e) => handleInputChange("contato", e.target.value)}
-                     placeholder="Nome do contato"
-                   />
-                 </div>
-
-                 <div className="space-y-2">
-                   <Label htmlFor="edit-tipo_cliente" className="text-sm font-semibold text-foreground">Tipo Cliente</Label>
-                   <Select value={clienteData.tipo_cliente} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
-                     <SelectTrigger>
-                       <SelectValue placeholder="Selecione o tipo" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="CO">CO - Cliente Operacional</SelectItem>
-                       <SelectItem value="NC">NC - Não Contratual</SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <Label htmlFor="edit-endereco" className="text-sm font-semibold text-foreground">Endereço</Label>
-                   <Textarea
-                     id="edit-endereco"
-                     value={clienteData.endereco}
-                     onChange={(e) => handleInputChange("endereco", e.target.value)}
-                     placeholder="Endereço completo do cliente"
-                     rows={3}
-                   />
-                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-bairro" className="text-sm font-semibold text-foreground">Bairro</Label>
+                  <Input
+                    id="edit-bairro"
+                    value={clienteData.bairro}
+                    onChange={(e) => handleInputChange("bairro", e.target.value)}
+                    placeholder="Centro"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cep" className="text-sm font-semibold text-foreground">CEP</Label>
+                  <Input
+                    id="edit-cep"
+                    value={clienteData.cep}
+                    onChange={(e) => handleInputChange("cep", e.target.value)}
+                    placeholder="00000-000"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>
+                  <Input
+                    id="edit-cod_cliente"
+                    value={clienteData.cod_cliente}
+                    onChange={(e) => handleInputChange("cod_cliente", e.target.value)}
+                    placeholder="CLI001"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-numero_contrato" className="text-sm font-semibold text-foreground">Número Contrato</Label>
+                  <Input
+                    id="edit-numero_contrato"
+                    value={clienteData.numero_contrato}
+                    onChange={(e) => handleInputChange("numero_contrato", e.target.value)}
+                    placeholder="2024/00001"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dia_faturamento" className="text-sm font-semibold text-foreground">Dia Faturamento</Label>
+                  <Input
+                    id="edit-dia_faturamento"
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={clienteData.dia_faturamento}
+                    onChange={(e) => handleInputChange("dia_faturamento", e.target.value)}
+                    placeholder="10"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-integracao" className="text-sm font-semibold text-foreground">Integração</Label>
+                  <Input
+                    id="edit-integracao"
+                    value={clienteData.integracao}
+                    onChange={(e) => handleInputChange("integracao", e.target.value)}
+                    placeholder="API/MANUAL/OUTROS"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-valor_franquia" className="text-sm font-semibold text-foreground">Valor Franquia</Label>
+                  <Input
+                    id="edit-valor_franquia"
+                    type="number"
+                    step="0.01"
+                    value={clienteData.valor_franquia}
+                    onChange={(e) => handleInputChange("valor_franquia", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-volume_franquia" className="text-sm font-semibold text-foreground">Volume Franquia</Label>
+                  <Input
+                    id="edit-volume_franquia"
+                    type="number"
+                    value={clienteData.volume_franquia}
+                    onChange={(e) => handleInputChange("volume_franquia", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-valor_franquia_acima_volume" className="text-sm font-semibold text-foreground">Valor Franquia Acima Volume</Label>
+                  <Input
+                    id="edit-valor_franquia_acima_volume"
+                    type="number"
+                    step="0.01"
+                    value={clienteData.valor_franquia_acima_volume}
+                    onChange={(e) => handleInputChange("valor_franquia_acima_volume", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tipo_cliente" className="text-sm font-semibold text-foreground">Tipo Cliente</Label>
+                  <Select value={clienteData.tipo_cliente} onValueChange={(value) => handleInputChange("tipo_cliente", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CO">CO - Cliente Operacional</SelectItem>
+                      <SelectItem value="NC">NC - Não Contratual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-portal_laudos"
+                    checked={clienteData.portal_laudos}
+                    onCheckedChange={(checked) => handleInputChange("portal_laudos", checked)}
+                  />
+                  <Label htmlFor="edit-portal_laudos" className="text-sm font-semibold text-foreground">Portal de Laudos</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-possui_franquia"
+                    checked={clienteData.possui_franquia}
+                    onCheckedChange={(checked) => handleInputChange("possui_franquia", checked)}
+                  />
+                  <Label htmlFor="edit-possui_franquia" className="text-sm font-semibold text-foreground">Possui Franquia</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-frequencia_continua"
+                    checked={clienteData.frequencia_continua}
+                    onCheckedChange={(checked) => handleInputChange("frequencia_continua", checked)}
+                  />
+                  <Label htmlFor="edit-frequencia_continua" className="text-sm font-semibold text-foreground">Frequência Contínua</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-frequencia_por_volume"
+                    checked={clienteData.frequencia_por_volume}
+                    onCheckedChange={(checked) => handleInputChange("frequencia_por_volume", checked)}
+                  />
+                  <Label htmlFor="edit-frequencia_por_volume" className="text-sm font-semibold text-foreground">Frequência por Volume</Label>
+                </div>
                 
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -716,6 +925,17 @@ export default function CadastroClientes() {
                   />
                   <Label htmlFor="edit-ativo" className="text-sm font-semibold text-foreground">Cliente Ativo</Label>
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-endereco" className="text-sm font-semibold text-foreground">Endereço Completo</Label>
+                <Textarea
+                  id="edit-endereco"
+                  value={clienteData.endereco}
+                  onChange={(e) => handleInputChange("endereco", e.target.value)}
+                  placeholder="Endereço completo do cliente"
+                  rows={3}
+                />
               </div>
               
               <div className="flex gap-2 pt-4">
