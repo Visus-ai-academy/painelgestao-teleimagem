@@ -180,10 +180,7 @@ serve(async (req) => {
       
       const { data, error } = await supabase
         .from('clientes')
-        .upsert(batch, { 
-          onConflict: 'cnpj',
-          ignoreDuplicates: false 
-        })
+        .insert(batch)
         .select('id')
 
       if (error) {
