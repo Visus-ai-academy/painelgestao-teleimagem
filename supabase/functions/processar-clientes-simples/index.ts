@@ -125,24 +125,23 @@ serve(async (req) => {
           })
         }
 
-        // Skip if no name (any name field) - mais flexível
-        const hasValidName = cliente.nome || cliente.nome_fantasia || cliente.nome_mobilemed
-        if (!hasValidName || (typeof hasValidName === 'string' && hasValidName.trim() === '')) {
-          console.log(`Pulando linha ${i + 2}: sem nome válido - dados:`, {
-            nome: cliente.nome,
-            nome_mobilemed: cliente.nome_mobilemed,
-            nome_fantasia: cliente.nome_fantasia,
-            hasValidName: hasValidName
-          })
-          errorCount++
+        // Aceitar todos os registros - apenas pular linhas completamente vazias
+        const isCompletelyEmpty = !row.some(cell => cell && cell.toString().trim() !== '')
+        if (isCompletelyEmpty) {
+          console.log(`Pulando linha ${i + 2}: linha completamente vazia`)
           continue
         }
 
-        // Use best available name
+        // Use best available name, but allow empty names too
         if (!cliente.nome && cliente.nome_fantasia) {
           cliente.nome = cliente.nome_fantasia
         } else if (!cliente.nome && cliente.nome_mobilemed) {
           cliente.nome = cliente.nome_mobilemed
+        }
+        
+        // If still no name, use a placeholder or leave empty
+        if (!cliente.nome || cliente.nome.trim() === '') {
+          cliente.nome = cliente.nome_mobilemed || cliente.nome_fantasia || `Cliente_${i + 2}`
         }
 
         // Clean and format CNPJ if present
