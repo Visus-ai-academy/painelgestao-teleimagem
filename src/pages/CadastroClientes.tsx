@@ -93,6 +93,17 @@ export default function CadastroClientes() {
 
   useEffect(() => {
     carregarClientes();
+    
+    // Listener para evento de edição
+    const handleEditCliente = (e: CustomEvent) => {
+      handleEditarCliente(e.detail);
+    };
+    
+    window.addEventListener('editCliente', handleEditCliente as EventListener);
+    
+    return () => {
+      window.removeEventListener('editCliente', handleEditCliente as EventListener);
+    };
   }, []);
 
   const handleSalvarCliente = async () => {

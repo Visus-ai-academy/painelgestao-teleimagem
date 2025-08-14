@@ -3,7 +3,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Search, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Filter, Edit } from "lucide-react";
 import { format } from "date-fns";
 
 interface CadastroDataTableProps {
@@ -96,20 +97,21 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         ];
       case 'clientes':
         return [
-          { key: 'nome', label: 'Nome Fantasia', filterable: true },
-          { key: 'nome_mobilemed', label: 'Nome Mobilemed', filterable: true },
-          { key: 'cnpj', label: 'CNPJ', filterable: true },
-          { key: 'email', label: 'E-mail', filterable: true },
-          { key: 'contato', label: 'Contato', filterable: true },
-          { key: 'endereco', label: 'Endereço', filterable: true },
-          { key: 'cidade', label: 'Cidade', filterable: true },
-          { key: 'estado', label: 'Estado', filterable: true },
-          { key: 'bairro', label: 'Bairro', filterable: true },
-          { key: 'cep', label: 'CEP', filterable: true },
-          { key: 'tipo_cliente', label: 'Tipo Cliente', filterable: true },
-          { key: 'status', label: 'Status', filterable: true },
-          { key: 'data_inicio_contrato', label: 'Data Início', filterable: false },
-          { key: 'data_termino_contrato', label: 'Data Término', filterable: false }
+          { key: 'nome_mobilemed', label: 'Nome MobileMed', filterable: true, width: '200px' },
+          { key: 'nome', label: 'Nome Fantasia', filterable: true, width: '200px' },
+          { key: 'cnpj', label: 'CNPJ', filterable: true, width: '150px' },
+          { key: 'email', label: 'E-mail', filterable: true, width: '200px' },
+          { key: 'contato', label: 'Contato', filterable: true, width: '150px' },
+          { key: 'cidade', label: 'Cidade', filterable: true, width: '120px' },
+          { key: 'estado', label: 'UF', filterable: true, width: '60px' },
+          { key: 'endereco', label: 'Endereço', filterable: true, width: '250px' },
+          { key: 'bairro', label: 'Bairro', filterable: true, width: '120px' },
+          { key: 'cep', label: 'CEP', filterable: true, width: '100px' },
+          { key: 'tipo_cliente', label: 'Tipo', filterable: true, width: '80px' },
+          { key: 'status', label: 'Status', filterable: true, width: '80px' },
+          { key: 'data_inicio_contrato', label: 'Data Início', filterable: false, width: '110px' },
+          { key: 'data_termino_contrato', label: 'Data Término', filterable: false, width: '110px' },
+          { key: 'actions', label: 'Ações', filterable: false, width: '100px' }
         ];
       default:
         return [
@@ -157,7 +159,15 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return item.status || (item.ativo ? "Ativo" : "Inativo");
       case 'data_inicio_contrato':
       case 'data_termino_contrato':
-        return item[key] ? format(new Date(item[key]), 'dd/MM/yyyy') : '-';
+        if (!item[key]) return '-';
+        try {
+          const date = new Date(item[key]);
+          // Verificar se é uma data válida e não é a época Unix (1969/1970)
+          if (isNaN(date.getTime()) || date.getFullYear() < 1970) return '-';
+          return format(date, 'dd/MM/yyyy');
+        } catch {
+          return '-';
+        }
       case 'created_at':
         return format(new Date(item.created_at), 'dd/MM/yyyy');
       default:
@@ -270,51 +280,74 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
           <Table className="min-w-max">
             <TableHeader>
               <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col.key} className="sticky top-0 bg-background min-w-[150px] whitespace-nowrap">
-                    <div className="space-y-2">
-                      <div className="font-medium">{col.label}</div>
-                      {col.filterable && (
-                        <div className="relative">
-                          <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
-                          <Input
-                            placeholder="Filtrar..."
-                            value={columnFilters[col.key] || ''}
-                            onChange={(e) => updateColumnFilter(col.key, e.target.value)}
-                            className="pl-7 h-7 text-xs min-w-[120px]"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedData.slice(0, visibleCount).map((item) => (
-                <TableRow key={item.id}>
-                  {columns.map((col) => (
-                    <TableCell key={col.key} className="min-w-[150px] whitespace-nowrap">
-                      {(col.key === 'permite_quebra' || col.key === 'ativo' || col.key === 'status') ? (
-                        <Badge variant={
-                          col.key === 'permite_quebra' 
-                            ? (item.permite_quebra ? "default" : "secondary")
-                            : col.key === 'status'
-                            ? (item.status === 'Ativo' || item.ativo ? "default" : "secondary")
-                            : (item.ativo ? "default" : "secondary")
-                        }>
-                          {getCellValue(item, col.key)}
-                        </Badge>
-                      ) : (
-                        <span className={col.key === columns[0].key ? "font-medium" : ""}>
-                          {getCellValue(item, col.key)}
-                        </span>
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+                 {columns.map((col) => (
+                   <TableHead 
+                     key={col.key} 
+                     className="sticky top-0 bg-background whitespace-nowrap"
+                     style={{ width: col.width || '150px' }}
+                   >
+                     <div className="space-y-2">
+                       <div className="font-medium">{col.label}</div>
+                       {col.filterable && (
+                         <div className="relative">
+                           <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
+                           <Input
+                             placeholder="Filtrar..."
+                             value={columnFilters[col.key] || ''}
+                             onChange={(e) => updateColumnFilter(col.key, e.target.value)}
+                             className="pl-7 h-7 text-xs"
+                             style={{ width: '100%' }}
+                             onClick={(e) => e.stopPropagation()}
+                           />
+                         </div>
+                       )}
+                     </div>
+                   </TableHead>
+                 ))}
+               </TableRow>
+             </TableHeader>
+             <TableBody>
+               {filteredAndSortedData.slice(0, visibleCount).map((item) => (
+                 <TableRow key={item.id}>
+                   {columns.map((col) => (
+                     <TableCell 
+                       key={col.key} 
+                       className="whitespace-nowrap"
+                       style={{ width: col.width || '150px' }}
+                     >
+                       {col.key === 'actions' ? (
+                         <div className="flex gap-1">
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             onClick={() => {
+                               // Emit edit event
+                               window.dispatchEvent(new CustomEvent('editCliente', { detail: item }));
+                             }}
+                             className="h-7 px-2"
+                           >
+                             <Edit className="h-3 w-3" />
+                           </Button>
+                         </div>
+                       ) : (col.key === 'permite_quebra' || col.key === 'ativo' || col.key === 'status') ? (
+                         <Badge variant={
+                           col.key === 'permite_quebra' 
+                             ? (item.permite_quebra ? "default" : "secondary")
+                             : col.key === 'status'
+                             ? (item.status === 'Ativo' || item.ativo ? "default" : "secondary")
+                             : (item.ativo ? "default" : "secondary")
+                         }>
+                           {getCellValue(item, col.key)}
+                         </Badge>
+                       ) : (
+                         <span className={col.key === columns[0].key ? "font-medium" : ""}>
+                           {getCellValue(item, col.key)}
+                         </span>
+                       )}
+                     </TableCell>
+                   ))}
+                 </TableRow>
+               ))}
             </TableBody>
           </Table>
         </div>

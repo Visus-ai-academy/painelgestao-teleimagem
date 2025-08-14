@@ -107,19 +107,41 @@ serve(async (req) => {
           status: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo', // STATUS - coluna 15
           ativo: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo'),
           
-          // Datas
+          // Datas - tratamento mais robusto
           data_inicio_contrato: row[13] && row[13] !== '' ? (() => {
             try {
-              const date = new Date(row[13]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+              let dateValue = row[13];
+              
+              // Se for um número (Excel timestamp)
+              if (typeof dateValue === 'number') {
+                // Excel epoch is 1900-01-01, JavaScript epoch is 1970-01-01
+                // Excel has 25567 days difference + 2 days for Excel bug
+                const date = new Date((dateValue - 25569) * 86400 * 1000);
+                return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
+              }
+              
+              // Se for string, tentar parsear
+              const date = new Date(dateValue);
+              return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
             } catch {
               return null;
             }
           })() : null, // DATA_INICIO - coluna 13
           data_termino_contrato: row[14] && row[14] !== '' ? (() => {
             try {
-              const date = new Date(row[14]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+              let dateValue = row[14];
+              
+              // Se for um número (Excel timestamp)
+              if (typeof dateValue === 'number') {
+                // Excel epoch is 1900-01-01, JavaScript epoch is 1970-01-01
+                // Excel has 25567 days difference + 2 days for Excel bug
+                const date = new Date((dateValue - 25569) * 86400 * 1000);
+                return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
+              }
+              
+              // Se for string, tentar parsear
+              const date = new Date(dateValue);
+              return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
             } catch {
               return null;
             }
@@ -175,13 +197,18 @@ serve(async (req) => {
           cliente.nome = cliente.nome_mobilemed || cliente.nome_fantasia || `Cliente_${i + 2}`
         }
 
-        // Clean and format CNPJ if present
+        // Clean and format CNPJ/CPF if present
         if (cliente.cnpj) {
           let cnpjLimpo = cliente.cnpj.toString().replace(/[^\d]/g, '')
           if (cnpjLimpo.length === 14) {
+            // CNPJ format: XX.XXX.XXX/XXXX-XX
             cliente.cnpj = `${cnpjLimpo.substring(0,2)}.${cnpjLimpo.substring(2,5)}.${cnpjLimpo.substring(5,8)}/${cnpjLimpo.substring(8,12)}-${cnpjLimpo.substring(12,14)}`
           } else if (cnpjLimpo.length === 11) {
+            // CPF format: XXX.XXX.XXX-XX
             cliente.cnpj = `${cnpjLimpo.substring(0,3)}.${cnpjLimpo.substring(3,6)}.${cnpjLimpo.substring(6,9)}-${cnpjLimpo.substring(9,11)}`
+          } else if (cnpjLimpo.length > 0) {
+            // Keep original if doesn't match expected lengths but has numbers
+            cliente.cnpj = cnpjLimpo
           }
         }
 
