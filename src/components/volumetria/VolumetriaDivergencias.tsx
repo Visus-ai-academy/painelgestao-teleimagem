@@ -210,12 +210,9 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     try {
       setExporting(true);
       
-      // Converter de formato "2025-06" para "jun/25" para consultar o banco
-      const [ano, mes] = referencia.split('-');
-      const mesesAbrev = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-      const mesAbrev = mesesAbrev[parseInt(mes) - 1];
-      const anoAbrev = ano.slice(2);
-      const periodoReferenciaBanco = `${mesAbrev}/${anoAbrev}`;
+      // CORREÇÃO: O período no banco está no formato "2025-06", não "jun/25"
+      // Usar diretamente o formato selecionado
+      const periodoReferenciaBanco = referencia; // Já está no formato correto "2025-06"
       
       console.log('🔍 Processando divergências para período:', {
         referenciaSelecionada: referencia,
