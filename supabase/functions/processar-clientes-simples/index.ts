@@ -67,51 +67,41 @@ serve(async (req) => {
       try {
         // Mapeamento completo do novo cadastro de clientes
         const cliente = {
-          // Campos existentes (mantidos para compatibilidade)
-          nome: row[1] || null, // Nome_Fantasia -> nome (campo principal)
-          contato: row[0] || null, // NOME_MOBILEMED -> contato (temporário)
-          endereco: row[5] || null, // Endereço
-          cidade: row[8] || null, // Cidade
-          estado: row[9] || null, // UF
-          email: row[10] || null, // E-MAIL ENVIO NF
-          cnpj: row[3] || null, // CNPJ
-          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE (corrigido)
-          status: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo',
-          ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo'),
+          // Campos existentes - baseado no template CSV: Nome,email,cnpj,contato,endereço,Status,data inicio,data termino,cod cliente
+          nome: row[0] || null, // Contagem de Cliente (Nome Fantasia)
+          email: row[1] || null, // email  
+          cnpj: row[2] || null, // cnpj
+          contato: row[3] || null, // contato
+          endereco: row[4] || null, // endereço
+          status: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo') ? 'Ativo' : 'Inativo',
+          ativo: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo'),
+          data_inicio_contrato: row[6] && row[6] !== '' ? (() => {
+            try {
+              const date = new Date(row[6]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // data inicio contrato
+          data_termino_contrato: row[7] && row[7] !== '' ? (() => {
+            try {
+              const date = new Date(row[7]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // data termino de vigência
+          cod_cliente: row[8] || null, // cod cliente
           
-          // Novos campos específicos
-          nome_mobilemed: row[0] || null, // NOME_MOBILEMED
-          nome_fantasia: row[1] || null, // Nome_Fantasia
-          numero_contrato: row[2] || null, // Contrato
-          razao_social: row[4] || null, // Razão Social
-          bairro: row[6] || null, // Bairro
-          cep: row[7] || null, // CEP
-          email_envio_nf: row[10] || null, // E-MAIL ENVIO NF (corrigido)
-          dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO (corrigido)
-          data_inicio_contrato: row[14] && row[14] !== '' ? (() => {
-            try {
-              const date = new Date(row[14]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // DATA_INICIO
-          data_termino_contrato: row[16] && row[16] !== '' ? (() => {
-            try {
-              const date = new Date(row[16]);
-              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // DATA_TERMINO
-          integracao: row[17] || null, // Integração
-          portal_laudos: row[18] === 'SIM' || row[18] === 'sim' || row[18] === 'S', // Portal de Laudos
-          possui_franquia: row[19] === 'SIM' || row[19] === 'sim' || row[19] === 'S', // Possui Franquia
-          valor_franquia: row[20] ? parseFloat(row[20]) : 0, // Valor Franquia
-          frequencia_continua: row[21] === 'SIM' || row[21] === 'sim' || row[21] === 'S', // Frequencia Contínua
-          frequencia_por_volume: row[22] === 'SIM' || row[22] === 'sim' || row[22] === 'S', // Frequência por volume
-          volume_franquia: row[23] ? parseInt(row[23]) : 0, // Volume Franquia
-          valor_franquia_acima_volume: row[24] ? parseFloat(row[24]) : 0 // R$ Valor Franquia Acima Volume
+          // Campos adicionais
+          nome_mobilemed: row[0] || null,
+          nome_fantasia: row[0] || null,
+          tipo_cliente: 'CO',
+          cidade: null,
+          estado: null,
+          telefone: null,
+          bairro: null,
+          cep: null
         }
 
         // Debug: Log first few rows to understand the data structure
@@ -119,7 +109,7 @@ serve(async (req) => {
           console.log(`Linha ${i + 2} dados:`, {
             row_length: row.length,
             first_10_columns: row.slice(0, 10),
-            status_valor: row[15],
+            status_valor: row[5],
             status_processado: cliente.status,
             nome_mobilemed: cliente.nome_mobilemed,
             nome_fantasia: cliente.nome_fantasia,
