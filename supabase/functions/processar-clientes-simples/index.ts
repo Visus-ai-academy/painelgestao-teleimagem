@@ -75,7 +75,7 @@ serve(async (req) => {
           estado: row[9] || null, // UF
           email: row[10] || null, // E-MAIL ENVIO NF
           cnpj: row[3] || null, // CNPJ
-          tipo_cliente: row[12] || 'CO', // TIPO_CLIENTE (posição correta)
+          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE (corrigido)
           status: (row[15] === 'ATIVO' || row[15] === 'Ativo') ? 'Ativo' : 'Inativo',
           ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo'),
           
@@ -86,8 +86,8 @@ serve(async (req) => {
           razao_social: row[4] || null, // Razão Social
           bairro: row[6] || null, // Bairro
           cep: row[7] || null, // CEP
-          email_envio_nf: row[11] || null, // E-MAIL ENVIO NF
-          dia_faturamento: row[13] ? parseInt(row[13]) : null, // DIA_FATURAMENTO
+          email_envio_nf: row[10] || null, // E-MAIL ENVIO NF (corrigido)
+          dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO (corrigido)
           data_inicio_contrato: row[14] && row[14] !== '' ? (() => {
             try {
               const date = new Date(row[14]);
