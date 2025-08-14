@@ -118,22 +118,31 @@ serve(async (req) => {
         if (i < 3) {
           console.log(`Linha ${i + 2} dados:`, {
             row_length: row.length,
-            first_5_columns: row.slice(0, 5),
+            first_10_columns: row.slice(0, 10),
             nome_mobilemed: cliente.nome_mobilemed,
             nome_fantasia: cliente.nome_fantasia,
             nome: cliente.nome
           })
         }
 
-        // Skip if no name (required field) - usar nome como campo obrigatório (nome_fantasia)
-        if (!cliente.nome || cliente.nome.trim() === '') {
-          console.log(`Pulando linha ${i + 2}: sem nome - dados:`, {
+        // Skip if no name (any name field) - mais flexível
+        const hasValidName = cliente.nome || cliente.nome_fantasia || cliente.nome_mobilemed
+        if (!hasValidName || (typeof hasValidName === 'string' && hasValidName.trim() === '')) {
+          console.log(`Pulando linha ${i + 2}: sem nome válido - dados:`, {
             nome: cliente.nome,
             nome_mobilemed: cliente.nome_mobilemed,
-            nome_fantasia: cliente.nome_fantasia
+            nome_fantasia: cliente.nome_fantasia,
+            hasValidName: hasValidName
           })
           errorCount++
           continue
+        }
+
+        // Use best available name
+        if (!cliente.nome && cliente.nome_fantasia) {
+          cliente.nome = cliente.nome_fantasia
+        } else if (!cliente.nome && cliente.nome_mobilemed) {
+          cliente.nome = cliente.nome_mobilemed
         }
 
         // Clean and format CNPJ if present
