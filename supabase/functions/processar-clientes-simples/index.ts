@@ -201,14 +201,17 @@ serve(async (req) => {
         if (cliente.cnpj) {
           let cnpjLimpo = cliente.cnpj.toString().replace(/[^\d]/g, '')
           if (cnpjLimpo.length === 14) {
-            // CNPJ format: XX.XXX.XXX/XXXX-XX
+            // CNPJ format: 00.000.000/0000-00
             cliente.cnpj = `${cnpjLimpo.substring(0,2)}.${cnpjLimpo.substring(2,5)}.${cnpjLimpo.substring(5,8)}/${cnpjLimpo.substring(8,12)}-${cnpjLimpo.substring(12,14)}`
           } else if (cnpjLimpo.length === 11) {
-            // CPF format: XXX.XXX.XXX-XX
+            // CPF format: 000.000.000-00
             cliente.cnpj = `${cnpjLimpo.substring(0,3)}.${cnpjLimpo.substring(3,6)}.${cnpjLimpo.substring(6,9)}-${cnpjLimpo.substring(9,11)}`
           } else if (cnpjLimpo.length > 0) {
             // Keep original if doesn't match expected lengths but has numbers
             cliente.cnpj = cnpjLimpo
+          } else {
+            // Se não tem números, deixar vazio
+            cliente.cnpj = null
           }
         }
 

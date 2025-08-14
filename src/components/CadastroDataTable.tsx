@@ -159,19 +159,19 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         return item.status || (item.ativo ? "Ativo" : "Inativo");
       case 'data_inicio_contrato':
       case 'data_termino_contrato':
-        if (!item[key]) return '-';
+        if (!item[key]) return '';
         try {
           const date = new Date(item[key]);
           // Verificar se é uma data válida e não é a época Unix (1969/1970)
-          if (isNaN(date.getTime()) || date.getFullYear() < 1970) return '-';
+          if (isNaN(date.getTime()) || date.getFullYear() < 1970) return '';
           return format(date, 'dd/MM/yyyy');
         } catch {
-          return '-';
+          return '';
         }
       case 'created_at':
         return format(new Date(item.created_at), 'dd/MM/yyyy');
       default:
-        return item[key] || '-';
+        return item[key] || '';
     }
   };
 
