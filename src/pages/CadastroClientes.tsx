@@ -240,7 +240,7 @@ export default function CadastroClientes() {
 
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6 max-w-full">{/* Removido limite de largura */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
@@ -252,13 +252,46 @@ export default function CadastroClientes() {
       </div>
 
       {/* Ações e Cadastro Manual */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <Button 
           onClick={() => setShowNovoCliente(!showNovoCliente)}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
           Novo Cliente
+        </Button>
+        
+        <Button 
+          onClick={async () => {
+            try {
+              const { data, error } = await supabase.functions
+                .invoke('limpar-clientes');
+              
+              if (error) throw error;
+              
+              if (data.success) {
+                toast({
+                  title: "Base limpa com sucesso!",
+                  description: data.message,
+                });
+                carregarClientes();
+                refreshStats();
+              } else {
+                throw new Error(data.error || 'Erro na limpeza');
+              }
+            } catch (error: any) {
+              toast({
+                title: "Erro ao limpar base",
+                description: error.message,
+                variant: "destructive"
+              });
+            }
+          }}
+          variant="destructive"
+          className="flex items-center gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          Limpar Base
         </Button>
         
         <FileUpload 
@@ -331,7 +364,7 @@ export default function CadastroClientes() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{/* Aumentado para 4 colunas em telas grandes */}
               <div className="space-y-2">
                 <Label htmlFor="nome" className="text-sm font-semibold text-foreground">Nome*</Label>
                 <Input

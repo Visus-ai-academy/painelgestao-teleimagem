@@ -75,7 +75,7 @@ serve(async (req) => {
           estado: row[9] || null, // UF
           email: row[10] || null, // E-MAIL ENVIO NF
           cnpj: row[3] || null, // CNPJ
-          tipo_cliente: row[12] || 'CO', // TIPO_CLIENTE
+          tipo_cliente: row[12] || 'CO', // TIPO_CLIENTE (posição correta)
           status: (row[15] === 'ATIVO' || row[15] === 'Ativo') ? 'Ativo' : 'Inativo',
           ativo: (row[15] === 'ATIVO' || row[15] === 'Ativo'),
           
