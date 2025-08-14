@@ -21,7 +21,21 @@ serve(async (req) => {
 
     console.log('Iniciando limpeza da tabela clientes...')
 
-    // Clear all clients
+    // Clear contracts first (foreign key constraint)
+    const { error: contractsError } = await supabase
+      .from('contratos_clientes')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+
+    if (contractsError) {
+      console.error('Erro ao limpar contratos:', contractsError)
+      return new Response(
+        JSON.stringify({ success: false, error: contractsError.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Then clear all clients
     const { error: clearError } = await supabase
       .from('clientes')
       .delete()
