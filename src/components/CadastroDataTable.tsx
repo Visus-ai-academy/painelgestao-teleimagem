@@ -266,54 +266,58 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
       </div>
       
       <div ref={scrollRef} onScroll={handleScroll} className="border rounded-md max-h-[500px] overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((col) => (
-                <TableHead key={col.key} className="sticky top-0 bg-background">
-                  <div className="space-y-2">
-                    <div className="font-medium">{col.label}</div>
-                    {col.filterable && (
-                      <div className="relative">
-                        <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
-                        <Input
-                          placeholder="Filtrar..."
-                          value={columnFilters[col.key] || ''}
-                          onChange={(e) => updateColumnFilter(col.key, e.target.value)}
-                          className="pl-7 h-7 text-xs"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAndSortedData.slice(0, visibleCount).map((item) => (
-              <TableRow key={item.id}>
+        <div className="overflow-x-auto">
+          <Table className="min-w-max">
+            <TableHeader>
+              <TableRow>
                 {columns.map((col) => (
-                  <TableCell key={col.key}>
-                    {(col.key === 'permite_quebra' || col.key === 'ativo') ? (
-                      <Badge variant={
-                        col.key === 'permite_quebra' 
-                          ? (item.permite_quebra ? "default" : "secondary")
-                          : (item.ativo ? "default" : "secondary")
-                      }>
-                        {getCellValue(item, col.key)}
-                      </Badge>
-                    ) : (
-                      <span className={col.key === columns[0].key ? "font-medium" : ""}>
-                        {getCellValue(item, col.key)}
-                      </span>
-                    )}
-                  </TableCell>
+                  <TableHead key={col.key} className="sticky top-0 bg-background min-w-[150px] whitespace-nowrap">
+                    <div className="space-y-2">
+                      <div className="font-medium">{col.label}</div>
+                      {col.filterable && (
+                        <div className="relative">
+                          <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3" />
+                          <Input
+                            placeholder="Filtrar..."
+                            value={columnFilters[col.key] || ''}
+                            onChange={(e) => updateColumnFilter(col.key, e.target.value)}
+                            className="pl-7 h-7 text-xs min-w-[120px]"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </TableHead>
                 ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredAndSortedData.slice(0, visibleCount).map((item) => (
+                <TableRow key={item.id}>
+                  {columns.map((col) => (
+                    <TableCell key={col.key} className="min-w-[150px] whitespace-nowrap">
+                      {(col.key === 'permite_quebra' || col.key === 'ativo' || col.key === 'status') ? (
+                        <Badge variant={
+                          col.key === 'permite_quebra' 
+                            ? (item.permite_quebra ? "default" : "secondary")
+                            : col.key === 'status'
+                            ? (item.status === 'Ativo' || item.ativo ? "default" : "secondary")
+                            : (item.ativo ? "default" : "secondary")
+                        }>
+                          {getCellValue(item, col.key)}
+                        </Badge>
+                      ) : (
+                        <span className={col.key === columns[0].key ? "font-medium" : ""}>
+                          {getCellValue(item, col.key)}
+                        </span>
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       
       {filteredAndSortedData.length === 0 && (searchTerm || Object.values(columnFilters).some(f => f)) && (
