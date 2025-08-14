@@ -21,7 +21,21 @@ serve(async (req) => {
 
     console.log('Iniciando limpeza da tabela clientes...')
 
-    // Clear contracts first (foreign key constraint)
+    // Clear prices first (foreign key constraint)
+    const { error: precosError } = await supabase
+      .from('precos_servicos')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+
+    if (precosError) {
+      console.error('Erro ao limpar preços:', precosError)
+      return new Response(
+        JSON.stringify({ success: false, error: precosError.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Clear contracts second (foreign key constraint)
     const { error: contractsError } = await supabase
       .from('contratos_clientes')
       .delete()
