@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -3362,18 +3362,18 @@ export type Database = {
         Returns: number
       }
       calcular_capacidade_produtiva: {
-        Args: { p_medico_id: string; p_dias?: number }
+        Args: { p_dias?: number; p_medico_id: string }
         Returns: Json
       }
       calcular_preco_exame: {
         Args: {
-          p_cliente_id: string
-          p_modalidade: string
-          p_especialidade: string
-          p_prioridade: string
           p_categoria: string
-          p_volume_total: number
+          p_cliente_id: string
+          p_especialidade: string
           p_is_plantao?: boolean
+          p_modalidade: string
+          p_prioridade: string
+          p_volume_total: number
         }
         Returns: number
       }
@@ -3395,10 +3395,10 @@ export type Database = {
       }
       check_rate_limit: {
         Args: {
-          user_id: string
           action_type: string
           max_attempts?: number
           time_window_minutes?: number
+          user_id: string
         }
         Returns: boolean
       }
@@ -3413,10 +3413,10 @@ export type Database = {
       create_security_alert: {
         Args: {
           p_alert_type: string
-          p_severity: string
-          p_title: string
           p_description: string
           p_metadata?: Json
+          p_severity: string
+          p_title: string
         }
         Returns: string
       }
@@ -3446,9 +3446,9 @@ export type Database = {
       }
       fazer_checkin_ativacao: {
         Args: {
+          p_dispositivo_info?: Json
           p_escala_id: string
           p_ip_address?: unknown
-          p_dispositivo_info?: Json
         }
         Returns: Json
       }
@@ -3457,73 +3457,73 @@ export type Database = {
         Returns: Json
       }
       fechar_periodo_faturamento: {
-        Args: { p_periodo_referencia: string; p_observacoes?: string }
+        Args: { p_observacoes?: string; p_periodo_referencia: string }
         Returns: Json
       }
       get_all_volumetria_data: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_clientes_com_volumetria: {
         Args: Record<PropertyKey, never>
         Returns: {
+          ativo: boolean
+          cidade: string
+          cnpj: string
+          contato: string
+          email: string
+          endereco: string
+          estado: string
           id: string
           nome: string
-          endereco: string
-          cidade: string
-          estado: string
           status: string
-          ativo: boolean
-          contato: string
           telefone: string
-          email: string
-          cnpj: string
-          volume_exames: number
           total_registros: number
+          volume_exames: number
         }[]
       }
       get_clientes_stats_completos: {
         Args: Record<PropertyKey, never>
         Returns: {
           empresa: string
-          total_registros: number
-          total_laudos: number
           laudos_atrasados: number
           percentual_atraso: number
+          total_laudos: number
+          total_registros: number
         }[]
       }
       get_laudos_atrasados_completos: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          NOME_PACIENTE: string
-          ESTUDO_DESCRICAO: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
           CATEGORIA: string
-          PRIORIDADE: string
-          MEDICO: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
+          EMPRESA: string
+          ESPECIALIDADE: string
+          ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_nome_cliente_mapeado: {
@@ -3532,25 +3532,25 @@ export type Database = {
       }
       get_paginated_data: {
         Args: {
-          table_name: string
+          filter_conditions?: string
+          order_by?: string
           page_number?: number
           page_size?: number
-          order_by?: string
-          filter_conditions?: string
+          table_name: string
         }
         Returns: {
           data: Json
-          total_count: number
           page_info: Json
+          total_count: number
         }[]
       }
       get_periodo_faturamento: {
         Args: { data_referencia: string }
         Returns: {
-          inicio_periodo: string
-          fim_periodo: string
-          mes_referencia: string
           ano_referencia: number
+          fim_periodo: string
+          inicio_periodo: string
+          mes_referencia: string
         }[]
       }
       get_tempo_medio_atraso_clientes: {
@@ -3568,108 +3568,108 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           arquivo_fonte: string
-          total_records: number
           records_with_value: number
           records_zeroed: number
+          total_records: number
           total_value: number
         }[]
       }
       get_volumetria_complete_data: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_volumetria_cursor_complete: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_volumetria_dashboard_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_exames: number
-          total_registros: number
-          total_atrasados: number
+          clientes_unicos: string[]
+          especialidades_unicas: string[]
+          medicos_unicos: string[]
+          modalidades_unicas: string[]
           percentual_atraso: number
+          prioridades_unicas: string[]
+          total_atrasados: number
           total_clientes: number
           total_clientes_volumetria: number
-          total_modalidades: number
           total_especialidades: number
+          total_exames: number
           total_medicos: number
+          total_modalidades: number
           total_prioridades: number
-          clientes_unicos: string[]
-          modalidades_unicas: string[]
-          especialidades_unicas: string[]
-          prioridades_unicas: string[]
-          medicos_unicos: string[]
+          total_registros: number
         }[]
       }
       get_volumetria_force_complete: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_volumetria_stats: {
         Args: {
-          p_empresa?: string
-          p_data_inicio?: string
           p_data_fim?: string
+          p_data_inicio?: string
+          p_empresa?: string
         }
         Returns: {
+          percentual_atraso: number
+          total_atrasados: number
           total_exames: number
           total_registros: number
-          total_atrasados: number
-          percentual_atraso: number
         }[]
       }
       get_volumetria_total_atraso: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_laudos: number
-          total_atrasados: number
           percentual_atraso: number
+          total_atrasados: number
+          total_laudos: number
         }[]
       }
       get_volumetria_total_count: {
@@ -3679,40 +3679,40 @@ export type Database = {
       get_volumetria_unlimited: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          id: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       get_volumetria_unlimited_force: {
         Args: Record<PropertyKey, never>
         Returns: {
-          EMPRESA: string
-          MODALIDADE: string
-          ESPECIALIDADE: string
-          MEDICO: string
-          PRIORIDADE: string
           CATEGORIA: string
-          VALORES: number
           DATA_LAUDO: string
-          HORA_LAUDO: string
           DATA_PRAZO: string
-          HORA_PRAZO: string
           data_referencia: string
-          NOME_PACIENTE: string
+          EMPRESA: string
+          ESPECIALIDADE: string
           ESTUDO_DESCRICAO: string
+          HORA_LAUDO: string
+          HORA_PRAZO: string
+          MEDICO: string
+          MODALIDADE: string
+          NOME_PACIENTE: string
+          PRIORIDADE: string
+          VALORES: number
         }[]
       }
       has_metrics_access: {
@@ -3721,8 +3721,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -3749,8 +3749,8 @@ export type Database = {
       limpar_dados_volumetria: {
         Args: { arquivos_fonte: string[] }
         Returns: {
-          registros_removidos: number
           arquivos_processados: string[]
+          registros_removidos: number
         }[]
       }
       limpar_nome_cliente: {
@@ -3765,40 +3765,40 @@ export type Database = {
         Args: { p_medico_id: string }
         Returns: {
           cobertura_id: string
-          escala_id: string
-          medico_ofereceu_nome: string
-          data_inicio: string
           data_fim: string
-          turno: string
+          data_inicio: string
+          dias_restantes_aceite: number
+          escala_id: string
           especialidade: string
+          medico_ofereceu_nome: string
           modalidade: string
           motivo: string
-          dias_restantes_aceite: number
+          turno: string
         }[]
       }
       log_audit_event: {
         Args: {
-          p_table_name: string
+          p_new_data?: Json
+          p_old_data?: Json
           p_operation: string
           p_record_id: string
-          p_old_data?: Json
-          p_new_data?: Json
           p_severity?: string
+          p_table_name: string
         }
         Returns: string
       }
       log_data_access: {
         Args: {
-          p_resource_type: string
-          p_resource_id?: string
           p_action?: string
-          p_sensitive?: boolean
           p_classification?: string
+          p_resource_id?: string
+          p_resource_type: string
+          p_sensitive?: boolean
         }
         Returns: string
       }
       log_suspicious_access: {
-        Args: { resource_type: string; access_pattern: string; metadata?: Json }
+        Args: { access_pattern: string; metadata?: Json; resource_type: string }
         Returns: undefined
       }
       normalizar_clientes_cedi: {
@@ -3808,24 +3808,24 @@ export type Database = {
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
+          alerta_ativo: boolean
           ativacao_id: string
-          medico_id: string
-          medico_nome: string
-          escala_id: string
           data_ativacao: string
+          escala_id: string
           horario_checkin: string
           horario_checkout: string
+          medico_id: string
+          medico_nome: string
           status_ativacao: string
-          alerta_ativo: boolean
           tempo_online: unknown
         }[]
       }
       oferecer_escala_cobertura: {
         Args: {
+          p_data_fim: string
+          p_data_inicio: string
           p_escala_id: string
           p_medico_id: string
-          p_data_inicio: string
-          p_data_fim: string
           p_motivo?: string
           p_tipo_cobertura?: string
         }
@@ -3840,7 +3840,7 @@ export type Database = {
         Returns: boolean
       }
       prepare_partition_structure: {
-        Args: { table_name: string; partition_date: string }
+        Args: { partition_date: string; table_name: string }
         Returns: Json
       }
       processar_checkout_automatico: {
@@ -3865,11 +3865,11 @@ export type Database = {
       }
       replicar_escala_medico: {
         Args: {
-          p_medico_id: string
-          p_mes_origem: number
-          p_ano_origem: number
-          p_mes_destino: number
           p_ano_destino: number
+          p_ano_origem: number
+          p_medico_id: string
+          p_mes_destino: number
+          p_mes_origem: number
         }
         Returns: Json
       }
@@ -3877,8 +3877,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           area: string
-          status: string
           details: string
+          status: string
         }[]
       }
       sincronizar_precos_servicos_contratos: {
