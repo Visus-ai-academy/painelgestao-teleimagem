@@ -164,6 +164,12 @@ serve(async (req) => {
     }
 
     console.log(`Processados: ${processedCount}, Erros: ${errorCount}`)
+    console.log(`Total de clientes para inserir: ${processedClients.length}`)
+    
+    // Log sample client for debug
+    if (processedClients.length > 0) {
+      console.log('Exemplo de cliente processado:', processedClients[0])
+    }
 
     // Insert in batches
     let insertedCount = 0
