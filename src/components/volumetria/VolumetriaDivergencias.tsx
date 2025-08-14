@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import type { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
 
 // Tipos para linhas
@@ -168,9 +170,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const [linhas, setLinhas] = useState<LinhaDivergencia[]>([]);
 
   // Filtros básicos para evitar sobrecarga
-  const today = new Date();
-  const defaultRef = format(today, 'yyyy-MM');
-  const [referencia, setReferencia] = useState<string>(defaultRef);
+  // Inicializar com o último período disponível, não o atual
+  const [referencia, setReferencia] = useState<string>('2025-06');
   const [cliente, setCliente] = useState<string>('todos');
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     })();
   }, []);
 
-  // Ajuste inicial: usar o último período disponível da fonte (se existir)
+  // Carregar período mais recente disponível na inicialização
   useEffect(() => {
     (async () => {
       try {
@@ -193,9 +194,31 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           .not('periodo_referencia', 'is', null)
           .order('periodo_referencia', { ascending: false })
           .limit(1);
-        const ref = data?.[0]?.periodo_referencia as string | undefined;
-        if (ref && ref !== referencia) setReferencia(ref);
-      } catch {}
+        
+        if (data && data.length > 0) {
+          const ultimoPeriodo = data[0].periodo_referencia as string;
+          console.log('🔍 Último período encontrado:', ultimoPeriodo);
+          
+          // Converter de formato "jun/25" para "2025-06"
+          if (ultimoPeriodo && ultimoPeriodo.includes('/')) {
+            const [mes, ano] = ultimoPeriodo.split('/');
+            const mesesMap: Record<string, string> = {
+              'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04', 'mai': '05', 'jun': '06',
+              'jul': '07', 'ago': '08', 'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
+            };
+            const mesNum = mesesMap[mes];
+            if (mesNum && ano) {
+              const anoCompleto = ano.length === 2 ? `20${ano}` : ano;
+              const refFormatada = `${anoCompleto}-${mesNum}`;
+              console.log('🔄 Convertendo período:', ultimoPeriodo, '->', refFormatada);
+              setReferencia(refFormatada);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar último período:', error);
+        // Manter valor padrão em caso de erro
+      }
     })();
   }, []);
 
@@ -204,10 +227,20 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const carregar = async () => {
     try {
       setLoading(true);
-      // Calcular início e fim do mês de referência selecionado
-      const refDate = new Date(referencia + "-01");
-      const start = format(startOfMonth(refDate), 'yyyy-MM-dd');
-      const end = format(endOfMonth(refDate), 'yyyy-MM-dd');
+      
+      // Converter de formato "2025-06" para "jun/25" para consultar o banco
+      const [ano, mes] = referencia.split('-');
+      const mesesAbrev = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      const mesAbrev = mesesAbrev[parseInt(mes) - 1];
+      const anoAbrev = ano.slice(2);
+      const periodoReferenciaBanco = `${mesAbrev}/${anoAbrev}`;
+      
+      console.log('🔍 Buscando dados para período:', {
+        referenciaSelecionada: referencia,
+        periodoReferenciaBanco,
+        cliente: cliente !== 'todos' ? cliente : 'todos'
+      });
+      
       // 1) Ler dados do SISTEMA (volumetria processada no banco) por período/cliente
       let sysQuery = supabase.from('volumetria_mobilemed').select(`
         "EMPRESA", "MODALIDADE", "ESPECIALIDADE", "ESTUDO_DESCRICAO", 
@@ -217,7 +250,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         "HORA_TRANSFERENCIA", "HORA_LAUDO", "DATA_PRAZO", "HORA_PRAZO",
         "STATUS", "CATEGORIA"
       `);
-      sysQuery = sysQuery.eq('periodo_referencia', referencia);
+      
+      sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
       if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
       
       // Limitar a 10.000 registros para evitar timeout
@@ -430,6 +464,58 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     });
   }, [linhas, only]);
 
+  // Função para exportar divergências para Excel
+  const handleExportExcel = () => {
+    if (linhasFiltradas.length === 0) return;
+    
+    const exportData = linhasFiltradas.map(linha => ({
+      'Tipo': linha.tipo === 'arquivo_nao_no_sistema' ? 'Só no Arquivo' :
+              linha.tipo === 'sistema_nao_no_arquivo' ? 'Só no Sistema' :
+              linha.tipo === 'quantidade_diferente' ? 'Quantidade diferente' :
+              linha.tipo === 'categoria_diferente' ? 'Categoria diferente' : linha.tipo,
+      'Empresa': linha.EMPRESA,
+      'Unidade Origem': linha.UNIDADE_ORIGEM,
+      'Cliente': linha.CLIENTE,
+      'Nome Paciente': linha.NOME_PACIENTE,
+      'Código Paciente': linha.CODIGO_PACIENTE,
+      'Estudo Descrição': linha.ESTUDO_DESCRICAO,
+      'Accession Number': linha.ACCESSION_NUMBER,
+      'Modalidade': linha.MODALIDADE,
+      'Prioridade': linha.PRIORIDADE,
+      'Valores': linha.VALORES,
+      'Especialidade': linha.ESPECIALIDADE,
+      'Médico': linha.MEDICO,
+      'Duplicado': linha.DUPLICADO,
+      'Data Realização': linha.DATA_REALIZACAO,
+      'Hora Realização': linha.HORA_REALIZACAO,
+      'Data Transferência': linha.DATA_TRANSFERENCIA,
+      'Hora Transferência': linha.HORA_TRANSFERENCIA,
+      'Data Laudo': linha.DATA_LAUDO,
+      'Hora Laudo': linha.HORA_LAUDO,
+      'Data Prazo': linha.DATA_PRAZO,
+      'Hora Prazo': linha.HORA_PRAZO,
+      'Status': linha.STATUS,
+      'Total Arquivo': linha.total_arquivo ?? 0,
+      'Total Sistema': linha.total_sistema ?? 0,
+      'Categoria Arquivo': linha.categoria_arquivo || '',
+      'Categoria Sistema': linha.categoria_sistema || ''
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Ajustar largura das colunas
+    const colWidths = exportData[0] ? Object.keys(exportData[0]).map(key => ({
+      wch: Math.max(key.length, 12)
+    })) : [];
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Divergencias_Exames');
+    
+    const fileName = `divergencias_exames_${referencia}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -457,6 +543,17 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           </div>
 
           <Button onClick={carregar} disabled={loading}>{loading ? 'Carregando...' : 'Atualizar'}</Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={handleExportExcel} 
+            disabled={linhasFiltradas.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Exportar Excel ({linhasFiltradas.length})
+          </Button>
+          
           <div className="flex gap-2 text-sm">
             <Badge variant="secondary">Arquivo≠Sistema: {counts.qtd}</Badge>
             <Badge variant="outline">Categoria≠: {counts.cat}</Badge>
