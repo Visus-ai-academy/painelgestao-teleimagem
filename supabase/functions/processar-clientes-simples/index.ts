@@ -96,8 +96,22 @@ serve(async (req) => {
           cep: row[7] || null, // CEP
           email_envio_nf: row[11] || null, // E-MAIL ENVIO NF
           dia_faturamento: row[13] ? parseInt(row[13]) : null, // DIA_FATURAMENTO
-          data_inicio_contrato: row[14] ? new Date(row[14]).toISOString().split('T')[0] : null, // DATA_INICIO
-          data_termino_contrato: row[16] ? new Date(row[16]).toISOString().split('T')[0] : null, // DATA_TERMINO
+          data_inicio_contrato: row[14] && row[14] !== '' ? (() => {
+            try {
+              const date = new Date(row[14]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // DATA_INICIO
+          data_termino_contrato: row[16] && row[16] !== '' ? (() => {
+            try {
+              const date = new Date(row[16]);
+              return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+            } catch {
+              return null;
+            }
+          })() : null, // DATA_TERMINO
           integracao: row[17] || null, // Integração
           portal_laudos: row[18] === 'SIM' || row[18] === 'sim' || row[18] === 'S', // Portal de Laudos
           possui_franquia: row[19] === 'SIM' || row[19] === 'sim' || row[19] === 'S', // Possui Franquia
