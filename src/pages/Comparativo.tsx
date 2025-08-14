@@ -44,18 +44,48 @@ export default function Comparativo() {
   // Salvar alterações
   useEffect(() => {
     try {
-      if (uploaded) localStorage.setItem(STORAGE_KEYS.uploaded, JSON.stringify(uploaded));
-      else localStorage.removeItem(STORAGE_KEYS.uploaded);
+      // Verifica tamanho dos dados antes de salvar para evitar QuotaExceededError
+      if (uploaded) {
+        const uploadedString = JSON.stringify(uploaded);
+        if (uploadedString.length > 5000000) { // Limite de 5MB
+          console.warn('Dados uploaded muito grandes para localStorage');
+        } else {
+          localStorage.setItem(STORAGE_KEYS.uploaded, uploadedString);
+        }
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.uploaded);
+      }
 
-      if (uploadedExams) localStorage.setItem(STORAGE_KEYS.uploadedExams, JSON.stringify(uploadedExams));
-      else localStorage.removeItem(STORAGE_KEYS.uploadedExams);
+      if (uploadedExams) {
+        const examsString = JSON.stringify(uploadedExams);
+        if (examsString.length > 5000000) { // Limite de 5MB
+          console.warn('Dados uploadedExams muito grandes para localStorage');
+        } else {
+          localStorage.setItem(STORAGE_KEYS.uploadedExams, examsString);
+        }
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.uploadedExams);
+      }
 
       if (lastFileName) localStorage.setItem(STORAGE_KEYS.lastFileName, JSON.stringify(lastFileName));
       else localStorage.removeItem(STORAGE_KEYS.lastFileName);
 
-      localStorage.setItem(STORAGE_KEYS.divergencias, JSON.stringify(divergencias || []));
+      const divergenciasString = JSON.stringify(divergencias || []);
+      if (divergenciasString.length > 1000000) { // Limite de 1MB para divergências
+        console.warn('Dados divergencias muito grandes para localStorage');
+      } else {
+        localStorage.setItem(STORAGE_KEYS.divergencias, divergenciasString);
+      }
     } catch (e) {
-      console.warn('Falha ao salvar comparativo no storage', e);
+      console.warn('Falha ao salvar comparativo no storage - limpando dados antigos', e);
+      // Em caso de erro de quota, limpa dados antigos
+      try {
+        Object.values(STORAGE_KEYS).forEach(key => {
+          localStorage.removeItem(key);
+        });
+      } catch (cleanupError) {
+        console.error('Erro ao limpar localStorage:', cleanupError);
+      }
     }
   }, [uploaded, uploadedExams, lastFileName, divergencias]);
 

@@ -254,10 +254,10 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       sysQuery = sysQuery.eq('periodo_referencia', periodoReferenciaBanco);
       if (cliente !== 'todos') sysQuery = sysQuery.eq('EMPRESA', cliente);
       
-      // Limitar a 10.000 registros para evitar timeout
+      // Limitar a 5.000 registros para evitar travamento da página
       const { data: systemRows, error: sysErr } = await sysQuery
         .order('created_at', { ascending: false })
-        .limit(10000);
+        .limit(5000);
       if (sysErr) throw sysErr;
 
       // Mapear por chave agregada
@@ -441,7 +441,19 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     }
   };
   useEffect(() => {
-    carregar();
+    // Evita carregamento desnecessário se não há dados de upload
+    if (!uploadedExams || uploadedExams.length === 0) {
+      console.warn('Não há dados de upload para comparar');
+      setLinhas([]);
+      return;
+    }
+    
+    // Debounce para evitar múltiplas chamadas
+    const timer = setTimeout(() => {
+      carregar();
+    }, 300);
+    
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente, referencia, Object.keys(clientesMap).length, uploadedExams]);
 
