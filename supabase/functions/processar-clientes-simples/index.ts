@@ -65,60 +65,60 @@ serve(async (req) => {
       }
 
       try {
-        // Seguindo exatamente a ordem do template: Contagem de Cliente (Nome Fantasia),email,cnpj,contato,endereço,Status,data inicio contrato,data termino de vigência,cod cliente
+        // Mapeamento baseado no arquivo real com 24 colunas conforme logs:
+        // 0: NOME_MOBILEMED, 1: Nome Fantasia, 2: Contrato, 3: CNPJ, 4: Razão Social, 5: Endereço, 6: Bairro, 7: CEP, 8: Cidade, 9: UF, 10: E-MAIL ENVIO NF, 11: TIPO_CLIENTE, 12: DIA_FATURAMENTO, 13: DATA_INICIO, 14: DATA_TERMINO, 15: STATUS
         const cliente = {
-          // Campos principais seguindo ordem do template
-          nome: row[0] || null, // Contagem de Cliente (Nome Fantasia) - coluna 0
-          email: row[1] || null, // email - coluna 1
-          cnpj: row[2] || null, // cnpj - coluna 2
-          contato: row[3] || null, // contato - coluna 3
-          endereco: row[4] || null, // endereço - coluna 4
-          status: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo') ? 'Ativo' : 'Inativo', // Status - coluna 5
-          ativo: (row[5] === 'A' || row[5] === 'ATIVO' || row[5] === 'Ativo' || row[5] === 'ativo'),
+          // Campos principais seguindo a estrutura real do arquivo
+          nome: row[1] || row[0] || null, // Nome Fantasia (coluna 1) ou NOME_MOBILEMED (coluna 0) como fallback
+          nome_fantasia: row[1] || null, // Nome Fantasia - coluna 1
+          nome_mobilemed: row[0] || null, // NOME_MOBILEMED - coluna 0
+          email: row[10] || null, // E-MAIL ENVIO NF - coluna 10
+          email_envio_nf: row[10] || null, // E-MAIL ENVIO NF - coluna 10
+          cnpj: row[3] || null, // CNPJ - coluna 3
+          contato: row[3] || null, // Usando CNPJ como contato temporariamente (corrigir se necessário)
+          endereco: row[5] || null, // Endereço - coluna 5
+          cidade: row[8] || null, // Cidade - coluna 8
+          estado: row[9] || null, // UF - coluna 9
+          bairro: row[6] || null, // Bairro - coluna 6
+          cep: row[7] || null, // CEP - coluna 7
+          numero_contrato: row[2] || null, // Contrato - coluna 2
+          razao_social: row[4] || null, // Razão Social - coluna 4
+          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE - coluna 11
+          dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO - coluna 12
+          cod_cliente: row[8] || null, // Cidade como cod_cliente
+          
+          // Status processamento
+          status: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo', // STATUS - coluna 15
+          ativo: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo'),
           
           // Datas
-          data_inicio_contrato: row[6] && row[6] !== '' ? (() => {
+          data_inicio_contrato: row[13] && row[13] !== '' ? (() => {
             try {
-              const date = new Date(row[6]);
+              const date = new Date(row[13]);
               return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
             } catch {
               return null;
             }
-          })() : null, // data inicio contrato - coluna 6
-          data_termino_contrato: row[7] && row[7] !== '' ? (() => {
+          })() : null, // DATA_INICIO - coluna 13
+          data_termino_contrato: row[14] && row[14] !== '' ? (() => {
             try {
-              const date = new Date(row[7]);
+              const date = new Date(row[14]);
               return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
             } catch {
               return null;
             }
-          })() : null, // data termino de vigência - coluna 7
+          })() : null, // DATA_TERMINO - coluna 14
           
-          cod_cliente: row[8] || null, // cod cliente - coluna 8
-          
-          // Campos auxiliares para compatibilidade
-          nome_fantasia: row[0] || null, // Igual ao nome
-          nome_mobilemed: row[0] || null, // Igual ao nome
-          numero_contrato: row[8] || null, // Igual ao cod_cliente
-          razao_social: row[0] || null, // Igual ao nome por padrão
-          tipo_cliente: 'CO', // Padrão
-          
-          // Campos opcionais não presentes no template atual
-          cidade: null,
-          estado: null,
-          bairro: null,
-          cep: null,
+          // Campos opcionais com valores padrão
           telefone: null,
-          dia_faturamento: null,
-          integracao: null,
-          portal_laudos: false,
-          possui_franquia: false,
-          valor_franquia: 0,
-          frequencia_continua: false,
-          frequencia_por_volume: false,
-          volume_franquia: 0,
-          valor_franquia_acima_volume: 0,
-          email_envio_nf: row[1] || null // Igual ao email
+          integracao: row[16] || null, // Integração - coluna 16 se existir
+          portal_laudos: row[17] === 'S' || row[17] === 'Sim' || row[17] === 'SIM' || false, // Portal de Laudos - coluna 17
+          possui_franquia: row[18] === 'S' || row[18] === 'Sim' || row[18] === 'SIM' || false, // Possui Franquia - coluna 18
+          valor_franquia: row[19] ? parseFloat(row[19]) : 0, // Valor Franquia - coluna 19
+          frequencia_continua: row[20] === 'S' || row[20] === 'Sim' || row[20] === 'SIM' || false, // Frequencia Contínua - coluna 20
+          frequencia_por_volume: row[21] === 'S' || row[21] === 'Sim' || row[21] === 'SIM' || false, // Frequência por volume - coluna 21
+          volume_franquia: row[22] ? parseInt(row[22]) : 0, // Volume Franquia - coluna 22
+          valor_franquia_acima_volume: row[23] ? parseFloat(row[23]) : 0 // R$ Valor Franquia Acima Volume - coluna 23
         }
 
         // Debug: Log first few rows to understand the data structure
@@ -134,7 +134,9 @@ serve(async (req) => {
             email: cliente.email,
             cnpj: cliente.cnpj,
             cidade: cliente.cidade,
-            estado: cliente.estado
+            estado: cliente.estado,
+            endereco: cliente.endereco,
+            tipo_cliente: cliente.tipo_cliente
           })
         }
 
