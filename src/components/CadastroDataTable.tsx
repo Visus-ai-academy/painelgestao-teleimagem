@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Edit } from "lucide-react";
+import { Search, Filter, Edit, X } from "lucide-react";
 import { format } from "date-fns";
 
 interface CadastroDataTableProps {
@@ -217,6 +217,15 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
     }));
   };
 
+  // Função para limpar todos os filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setColumnFilters({});
+  };
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = searchTerm || Object.values(columnFilters).some(filter => filter);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -263,15 +272,27 @@ export function CadastroDataTable({ data, loading, error, type, title }: Cadastr
         </Badge>
       </div>
       
-      {/* Campo de pesquisa global */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Pesquisar em todas as colunas..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Campo de pesquisa global e botão limpar filtros */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Pesquisar em todas as colunas..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            onClick={clearAllFilters}
+            className="flex items-center gap-2"
+          >
+            <X className="h-4 w-4" />
+            Limpar Filtros
+          </Button>
+        )}
       </div>
       
       <div ref={scrollRef} onScroll={handleScroll} className="border rounded-md max-h-[500px] overflow-auto">
