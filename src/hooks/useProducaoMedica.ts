@@ -41,10 +41,17 @@ export interface CapacidadeVsDemanda {
     demanda_turno: number;
     capacidade_turno: number;
     utilizacao_turno: number;
-    medicos: {
-      nome: string;
+    especialidades: {
       especialidade: string;
-      capacidade_produtiva: number;
+      demanda_especialidade: number;
+      capacidade_especialidade: number;
+      utilizacao_especialidade: number;
+      medicos: {
+        nome: string;
+        especialidade: string;
+        capacidade_produtiva: number;
+        demanda_medico: number;
+      }[];
     }[];
   }[];
 }
@@ -193,11 +200,16 @@ export const useProducaoMedica = () => {
         dia_numero: number;
         turnos: Map<string, {
           demanda_turno: number;
-          medicos: Map<string, { capacidade_produtiva: number; especialidade: string }>;
+          especialidades: Map<string, {
+            demanda_especialidade: number;
+            capacidade_especialidade: number;
+            medicos: Map<string, { capacidade_produtiva: number; demanda_medico: number }>;
+          }>;
         }>;
-        // Para demanda: agrupar por data específica do mês para depois calcular média
-        demanda_por_data: Map<string, number>; // data -> soma valores
-        turnos_demanda_por_data: Map<string, Map<string, number>>; // data -> turno -> soma valores
+        // Para demanda: somar TODOS os valores por dia da semana (não fazer média)
+        demanda_total_dia: number;
+        turnos_demanda_total: Map<string, number>; // turno -> soma total valores
+        turnos_especialidades_demanda: Map<string, Map<string, number>>; // turno -> especialidade -> soma valores
       }>();
 
       let totalMesAtual = 0;
@@ -283,20 +295,20 @@ export const useProducaoMedica = () => {
           });
         }
 
-        const especialidadeData = especialidadesMap.get(especialidade);
-        especialidadeData.medicos.add(medico);
+        const especialidadeDataMap = especialidadesMap.get(especialidade);
+        especialidadeDataMap.medicos.add(medico);
         
         if (dataStr >= dateRanges.currentMonth && dataStr <= dateRanges.currentMonthEnd) {
-          especialidadeData.total_mes_atual += valores;
+          especialidadeDataMap.total_mes_atual += valores;
         }
         if (dataStr >= dateRanges.previousMonth && dataStr <= dateRanges.previousMonthEnd) {
-          especialidadeData.total_mes_anterior += valores;
+          especialidadeDataMap.total_mes_anterior += valores;
         }
         if (dataStr >= dateRanges.currentWeekStart && dataStr <= dateRanges.currentWeekEnd) {
-          especialidadeData.total_semana_atual += valores;
+          especialidadeDataMap.total_semana_atual += valores;
         }
         if (dataStr >= dateRanges.previousWeekStart && dataStr <= dateRanges.previousWeekEnd) {
-          especialidadeData.total_semana_anterior += valores;
+          especialidadeDataMap.total_semana_anterior += valores;
         }
 
         // Processar capacidade produtiva por dia/turno (usando DATA_LAUDO)
@@ -306,8 +318,9 @@ export const useProducaoMedica = () => {
             total_demanda_dia: 0,
             dia_numero: diaSemanaOrdem,
             turnos: new Map(),
-            demanda_por_data: new Map(),
-            turnos_demanda_por_data: new Map()
+            demanda_total_dia: 0,
+            turnos_demanda_total: new Map(),
+            turnos_especialidades_demanda: new Map()
           });
         }
         
@@ -317,17 +330,29 @@ export const useProducaoMedica = () => {
         if (!diaData.turnos.has(turno)) {
           diaData.turnos.set(turno, {
             demanda_turno: 0,
-            medicos: new Map()
+            especialidades: new Map()
           });
         }
         
         const turnoData = diaData.turnos.get(turno)!;
+
+        // Processar por especialidade dentro do turno
+        if (!turnoData.especialidades.has(especialidade)) {
+          turnoData.especialidades.set(especialidade, {
+            demanda_especialidade: 0,
+            capacidade_especialidade: 0,
+            medicos: new Map()
+          });
+        }
+
+        const especialidadeData = turnoData.especialidades.get(especialidade)!;
         
         // A capacidade produtiva é quanto o médico realizou em valor (soma VALORES)
-        if (!turnoData.medicos.has(medico)) {
-          turnoData.medicos.set(medico, { capacidade_produtiva: 0, especialidade });
+        if (!especialidadeData.medicos.has(medico)) {
+          especialidadeData.medicos.set(medico, { capacidade_produtiva: 0, demanda_medico: 0 });
         }
-        turnoData.medicos.get(medico)!.capacidade_produtiva += valores;
+        especialidadeData.medicos.get(medico)!.capacidade_produtiva += valores;
+        especialidadeData.capacidade_especialidade += valores;
 
         // Processar demanda usando DATA_TRANSFERENCIA e HORA_TRANSFERENCIA
         if (record.DATA_TRANSFERENCIA && record.HORA_TRANSFERENCIA) {
@@ -343,30 +368,46 @@ export const useProducaoMedica = () => {
               total_demanda_dia: 0,
               dia_numero: getDiaSemanaOrdem(diaSemanaTransferencia),
               turnos: new Map(),
-              demanda_por_data: new Map(),
-              turnos_demanda_por_data: new Map()
+              demanda_total_dia: 0,
+              turnos_demanda_total: new Map(),
+              turnos_especialidades_demanda: new Map()
             });
           }
 
           const diaDataDemanda = capacidadeDemandaMap.get(diaSemanaTransferenciaName)!;
 
-          // Agrupar por data específica para depois calcular média
-          if (!diaDataDemanda.demanda_por_data.has(dataTransferencia)) {
-            diaDataDemanda.demanda_por_data.set(dataTransferencia, 0);
-          }
-          diaDataDemanda.demanda_por_data.set(dataTransferencia, 
-            diaDataDemanda.demanda_por_data.get(dataTransferencia)! + valores);
+          // Somar TODOS os valores para demanda (não fazer média)
+          diaDataDemanda.demanda_total_dia += valores;
 
-          // Agrupar por data e turno para depois calcular média por turno
-          if (!diaDataDemanda.turnos_demanda_por_data.has(dataTransferencia)) {
-            diaDataDemanda.turnos_demanda_por_data.set(dataTransferencia, new Map());
+          // Somar por turno
+          if (!diaDataDemanda.turnos_demanda_total.has(turnoTransferencia)) {
+            diaDataDemanda.turnos_demanda_total.set(turnoTransferencia, 0);
           }
-          
-          const turnosData = diaDataDemanda.turnos_demanda_por_data.get(dataTransferencia)!;
-          if (!turnosData.has(turnoTransferencia)) {
-            turnosData.set(turnoTransferencia, 0);
+          diaDataDemanda.turnos_demanda_total.set(turnoTransferencia, 
+            diaDataDemanda.turnos_demanda_total.get(turnoTransferencia)! + valores);
+
+          // Somar por turno e especialidade
+          if (!diaDataDemanda.turnos_especialidades_demanda.has(turnoTransferencia)) {
+            diaDataDemanda.turnos_especialidades_demanda.set(turnoTransferencia, new Map());
           }
-          turnosData.set(turnoTransferencia, turnosData.get(turnoTransferencia)! + valores);
+          const turnoEspData = diaDataDemanda.turnos_especialidades_demanda.get(turnoTransferencia)!;
+          if (!turnoEspData.has(especialidade)) {
+            turnoEspData.set(especialidade, 0);
+          }
+          turnoEspData.set(especialidade, turnoEspData.get(especialidade)! + valores);
+
+          // Também atualizar a demanda na estrutura de especialidade/médico
+          if (diaDataDemanda.turnos.has(turnoTransferencia)) {
+            const turnoDataDemanda = diaDataDemanda.turnos.get(turnoTransferencia)!;
+            if (turnoDataDemanda.especialidades.has(especialidade)) {
+              const espDataDemanda = turnoDataDemanda.especialidades.get(especialidade)!;
+              espDataDemanda.demanda_especialidade += valores;
+              
+              if (espDataDemanda.medicos.has(medico)) {
+                espDataDemanda.medicos.get(medico)!.demanda_medico += valores;
+              }
+            }
+          }
         }
       });
 
@@ -403,57 +444,62 @@ export const useProducaoMedica = () => {
         media_por_medico: esp.medicos.size > 0 ? esp.total_mes_atual / esp.medicos.size : 0
       })).sort((a, b) => b.total_mes_atual - a.total_mes_atual);
 
-      // Calcular capacidade vs demanda com a estrutura correta: Dia → Turno → Médicos
+      // Calcular capacidade vs demanda com a estrutura hierárquica: Dia → Turno → Especialidade → Médicos
       const capacidade_vs_demanda: CapacidadeVsDemanda[] = Array.from(capacidadeDemandaMap.entries()).map(([dia, dados]) => {
         let totalCapacidadeDia = 0;
         
-        // Calcular média da demanda diária (soma dos valores por data / número de datas)
-        const valoresPorData = Array.from(dados.demanda_por_data.values());
-        const mediaDemandaDia = valoresPorData.length > 0 
-          ? valoresPorData.reduce((sum, val) => sum + val, 0) / valoresPorData.length 
-          : 0;
+        // A demanda total do dia é a soma de TODOS os valores transferidos nesse dia da semana
+        const totalDemandaDia = dados.demanda_total_dia;
         
         // Processar turnos do dia
         const turnos = Array.from(dados.turnos.entries()).map(([turnoNome, turnoData]) => {
-          // Calcular capacidade total do turno (soma de todos os médicos do turno)
-          const capacidadeTurno = Array.from(turnoData.medicos.values()).reduce((total, medicoData) => total + medicoData.capacidade_produtiva, 0);
-          totalCapacidadeDia += capacidadeTurno;
+          let capacidadeTurno = 0;
           
-          // Calcular média da demanda do turno
-          // Coletar todos os valores desse turno em todas as datas
-          const valoresTurno: number[] = [];
-          dados.turnos_demanda_por_data.forEach((turnosData) => {
-            if (turnosData.has(turnoNome)) {
-              valoresTurno.push(turnosData.get(turnoNome)!);
-            }
+          // A demanda do turno é a soma de todos os valores transferidos nesse turno
+          const demandaTurno = dados.turnos_demanda_total.get(turnoNome) || 0;
+          
+          // Processar especialidades dentro do turno
+          const especialidades = Array.from(turnoData.especialidades.entries()).map(([espNome, espData]) => {
+            // A demanda da especialidade é a soma dos valores transferidos dessa especialidade nesse turno
+            const demandaEspecialidade = dados.turnos_especialidades_demanda.get(turnoNome)?.get(espNome) || 0;
+            
+            const capacidadeEspecialidade = espData.capacidade_especialidade;
+            capacidadeTurno += capacidadeEspecialidade;
+            
+            // Processar médicos da especialidade
+            const medicos = Array.from(espData.medicos.entries()).map(([medicoNome, medicoData]) => ({
+              nome: medicoNome,
+              especialidade: espNome,
+              capacidade_produtiva: medicoData.capacidade_produtiva,
+              demanda_medico: medicoData.demanda_medico
+            }));
+            
+            return {
+              especialidade: espNome,
+              demanda_especialidade: demandaEspecialidade,
+              capacidade_especialidade: capacidadeEspecialidade,
+              utilizacao_especialidade: capacidadeEspecialidade > 0 ? (demandaEspecialidade / capacidadeEspecialidade) * 100 : 0,
+              medicos
+            };
           });
           
-          const mediaDemandaTurno = valoresTurno.length > 0 
-            ? valoresTurno.reduce((sum, val) => sum + val, 0) / valoresTurno.length 
-            : 0;
-          
-          // Processar médicos do turno
-          const medicos = Array.from(turnoData.medicos.entries()).map(([medicoNome, medicoData]) => ({
-            nome: medicoNome,
-            especialidade: medicoData.especialidade,
-            capacidade_produtiva: medicoData.capacidade_produtiva
-          }));
+          totalCapacidadeDia += capacidadeTurno;
           
           return {
             turno: turnoNome,
-            demanda_turno: mediaDemandaTurno,
+            demanda_turno: demandaTurno,
             capacidade_turno: capacidadeTurno,
-            utilizacao_turno: capacidadeTurno > 0 ? (mediaDemandaTurno / capacidadeTurno) * 100 : 0,
-            medicos
+            utilizacao_turno: capacidadeTurno > 0 ? (demandaTurno / capacidadeTurno) * 100 : 0,
+            especialidades
           };
         }).sort((a, b) => getOrdemTurno(a.turno) - getOrdemTurno(b.turno)); // Ordenar turnos: manhã, tarde, plantão
 
         return {
           dia_semana: dia,
           dia_numero: dados.dia_numero,
-          total_demanda_dia: mediaDemandaDia,
+          total_demanda_dia: totalDemandaDia,
           total_capacidade_dia: totalCapacidadeDia,
-          utilizacao_dia: totalCapacidadeDia > 0 ? (mediaDemandaDia / totalCapacidadeDia) * 100 : 0,
+          utilizacao_dia: totalCapacidadeDia > 0 ? (totalDemandaDia / totalCapacidadeDia) * 100 : 0,
           turnos
         };
       }).sort((a, b) => a.dia_numero - b.dia_numero); // Ordenar de segunda a domingo

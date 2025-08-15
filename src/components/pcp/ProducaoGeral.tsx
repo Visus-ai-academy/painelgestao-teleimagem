@@ -15,6 +15,7 @@ const ProducaoGeral: React.FC<ProducaoGeralProps> = ({ data }) => {
   const { resumo_geral, capacidade_vs_demanda } = data;
   const [expandedDias, setExpandedDias] = useState<Set<string>>(new Set());
   const [expandedTurnos, setExpandedTurnos] = useState<Set<string>>(new Set());
+  const [expandedEspecialidades, setExpandedEspecialidades] = useState<Set<string>>(new Set());
 
   const toggleDia = (dia: string) => {
     const newExpanded = new Set(expandedDias);
@@ -35,6 +36,17 @@ const ProducaoGeral: React.FC<ProducaoGeralProps> = ({ data }) => {
       newExpanded.add(key);
     }
     setExpandedTurnos(newExpanded);
+  };
+
+  const toggleEspecialidade = (dia: string, turno: string, especialidade: string) => {
+    const key = `${dia}-${turno}-${especialidade}`;
+    const newExpanded = new Set(expandedEspecialidades);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedEspecialidades(newExpanded);
   };
 
   const formatNumber = (num: number) => num.toLocaleString('pt-BR');
@@ -208,49 +220,99 @@ const ProducaoGeral: React.FC<ProducaoGeralProps> = ({ data }) => {
                                 </div>
                               </div>
                               
-                              {/* Médicos do turno */}
-                              {isTurnoExpanded && (
-                                <div className="mt-3 pl-6 border-l border-muted">
-                                  <h6 className="font-medium mb-2">Médicos do Turno</h6>
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="text-xs">Médico</TableHead>
-                                        <TableHead className="text-xs">Especialidade</TableHead>
-                                        <TableHead className="text-xs text-right">Capacidade Produtiva</TableHead>
-                                        <TableHead className="text-xs text-right">% do Turno</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {turno.medicos.map((medico) => (
-                                        <TableRow key={medico.nome}>
-                                          <TableCell className="text-xs">{medico.nome}</TableCell>
-                                          <TableCell className="text-xs">{medico.especialidade}</TableCell>
-                                          <TableCell className="text-xs text-right">
-                                            {formatNumber(Math.round(medico.capacidade_produtiva))}
-                                          </TableCell>
-                                          <TableCell className="text-xs text-right">
-                                            <Badge variant="outline" className="text-xs">
-                                              {turno.capacidade_turno > 0 
-                                                ? ((medico.capacidade_produtiva / turno.capacidade_turno) * 100).toFixed(1)
-                                                : '0'
-                                              }%
-                                            </Badge>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                      {/* Linha de totais do turno */}
-                                      <TableRow className="bg-muted/50 font-medium">
-                                        <TableCell className="text-xs" colSpan={2}>Total do Turno</TableCell>
-                                        <TableCell className="text-xs text-right">
-                                          {formatNumber(Math.round(turno.capacidade_turno))}
-                                        </TableCell>
-                                        <TableCell className="text-xs text-right">100%</TableCell>
-                                      </TableRow>
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              )}
+                               {/* Especialidades do turno */}
+                               {isTurnoExpanded && (
+                                 <div className="mt-3 pl-6 border-l border-muted">
+                                   <h6 className="font-medium mb-2">Especialidades do Turno</h6>
+                                   <div className="space-y-3">
+                                     {turno.especialidades.map((especialidade) => {
+                                       const isEspecialidadeExpanded = expandedEspecialidades.has(`${item.dia_semana}-${turno.turno}-${especialidade.especialidade}`);
+                                       
+                                       return (
+                                         <div key={especialidade.especialidade} className="border rounded-lg p-3">
+                                           <div 
+                                             className="flex justify-between items-center cursor-pointer hover:bg-muted/50 p-2 rounded"
+                                             onClick={() => toggleEspecialidade(item.dia_semana, turno.turno, especialidade.especialidade)}
+                                           >
+                                             <div className="flex items-center space-x-2">
+                                               <Button
+                                                 variant="ghost"
+                                                 size="sm"
+                                                 className="h-6 w-6 p-0"
+                                               >
+                                                 {isEspecialidadeExpanded ? (
+                                                   <ChevronDown className="h-4 w-4" />
+                                                 ) : (
+                                                   <ChevronRight className="h-4 w-4" />
+                                                 )}
+                                               </Button>
+                                               <span className="font-medium">{especialidade.especialidade}</span>
+                                             </div>
+                                             <div className="text-right">
+                                               <div className="text-sm">
+                                                 Demanda: {formatNumber(Math.round(especialidade.demanda_especialidade))} | 
+                                                 Capacidade: {formatNumber(Math.round(especialidade.capacidade_especialidade))}
+                                               </div>
+                                               <Badge variant={especialidade.utilizacao_especialidade > 100 ? 'destructive' : 'secondary'}>
+                                                 {especialidade.utilizacao_especialidade.toFixed(1)}%
+                                               </Badge>
+                                             </div>
+                                           </div>
+                                           
+                                           {/* Médicos da especialidade */}
+                                           {isEspecialidadeExpanded && (
+                                             <div className="mt-3 pl-6 border-l border-muted">
+                                               <h6 className="font-medium mb-2 text-sm">Médicos da Especialidade</h6>
+                                               <Table>
+                                                 <TableHeader>
+                                                   <TableRow>
+                                                     <TableHead className="text-xs">Médico</TableHead>
+                                                     <TableHead className="text-xs text-right">Demanda</TableHead>
+                                                     <TableHead className="text-xs text-right">Capacidade Produtiva</TableHead>
+                                                     <TableHead className="text-xs text-right">% da Especialidade</TableHead>
+                                                   </TableRow>
+                                                 </TableHeader>
+                                                 <TableBody>
+                                                   {especialidade.medicos.map((medico) => (
+                                                     <TableRow key={medico.nome}>
+                                                       <TableCell className="text-xs">{medico.nome}</TableCell>
+                                                       <TableCell className="text-xs text-right">
+                                                         {formatNumber(Math.round(medico.demanda_medico))}
+                                                       </TableCell>
+                                                       <TableCell className="text-xs text-right">
+                                                         {formatNumber(Math.round(medico.capacidade_produtiva))}
+                                                       </TableCell>
+                                                       <TableCell className="text-xs text-right">
+                                                         <Badge variant="outline" className="text-xs">
+                                                           {especialidade.capacidade_especialidade > 0 
+                                                             ? ((medico.capacidade_produtiva / especialidade.capacidade_especialidade) * 100).toFixed(1)
+                                                             : '0'
+                                                           }%
+                                                         </Badge>
+                                                       </TableCell>
+                                                     </TableRow>
+                                                   ))}
+                                                   {/* Linha de totais da especialidade */}
+                                                   <TableRow className="bg-muted/50 font-medium">
+                                                     <TableCell className="text-xs">Total da Especialidade</TableCell>
+                                                     <TableCell className="text-xs text-right">
+                                                       {formatNumber(Math.round(especialidade.demanda_especialidade))}
+                                                     </TableCell>
+                                                     <TableCell className="text-xs text-right">
+                                                       {formatNumber(Math.round(especialidade.capacidade_especialidade))}
+                                                     </TableCell>
+                                                     <TableCell className="text-xs text-right">100%</TableCell>
+                                                   </TableRow>
+                                                 </TableBody>
+                                               </Table>
+                                             </div>
+                                           )}
+                                         </div>
+                                       );
+                                     })}
+                                   </div>
+                                 </div>
+                               )}
                             </div>
                           );
                         })}
