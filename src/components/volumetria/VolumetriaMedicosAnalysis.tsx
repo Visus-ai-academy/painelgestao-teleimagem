@@ -16,7 +16,8 @@ interface MedicoData {
   detalhes?: {
     modalidades: { [key: string]: { exames: number; registros: number } };
     especialidades: { [key: string]: { exames: number; registros: number } };
-    prioridades: { [key: string]: { exames: number; registros: number } };
+    prioridades?: { [key: string]: { exames: number; registros: number } };
+    categorias?: { [key: string]: { exames: number; registros: number } };
   };
 }
 
@@ -261,7 +262,7 @@ export function VolumetriaMedicosAnalysis({
                         {expandedMedicos.has(medico.nome) && medico.detalhes && (
                           <TableRow key={`${medico.nome}-details`}>
                             <TableCell colSpan={7} className="p-4 bg-muted/20">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {/* Modalidades */}
                                 <div>
                                   <h4 className="font-semibold mb-2 text-sm">Por Modalidade</h4>
@@ -282,6 +283,32 @@ export function VolumetriaMedicosAnalysis({
                                     {Object.entries(medico.detalhes.especialidades).map(([especialidade, data]) => (
                                       <div key={especialidade} className="flex justify-between text-xs">
                                         <span className="text-muted-foreground">{especialidade}</span>
+                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Prioridades */}
+                                <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Por Prioridade</h4>
+                                  <div className="space-y-1">
+                                    {Object.entries(medico.detalhes.prioridades || {}).map(([prioridade, data]) => (
+                                      <div key={prioridade} className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{prioridade}</span>
+                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Categorias */}
+                                <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Por Categoria</h4>
+                                  <div className="space-y-1">
+                                    {Object.entries(medico.detalhes.categorias || {}).map(([categoria, data]) => (
+                                      <div key={categoria} className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">{categoria}</span>
                                         <span className="font-medium">{data.exames.toLocaleString()} exames</span>
                                       </div>
                                     ))}
