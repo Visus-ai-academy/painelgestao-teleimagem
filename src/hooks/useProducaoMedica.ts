@@ -32,9 +32,20 @@ export interface ProducaoEspecialidade {
 
 export interface CapacidadeVsDemanda {
   dia_semana: string;
+  dia_numero: number;
   capacidade: number;
   demanda: number;
   utilizacao: number;
+  especialidades: {
+    nome: string;
+    capacidade: number;
+    demanda: number;
+    medicos: {
+      nome: string;
+      capacidade: number;
+      demanda: number;
+    }[];
+  }[];
 }
 
 export interface ProducaoData {
@@ -71,8 +82,13 @@ const getTurnoFromHour = (hora: string, diaSemana: number): string => {
 };
 
 const getDiaSemanaName = (diaSemana: number): string => {
-  const dias = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const dias = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   return dias[diaSemana];
+};
+
+const getDiaSemanaOrdem = (diaSemana: number): number => {
+  // Converter para ordem Segunda=1, Domingo=7
+  return diaSemana === 0 ? 7 : diaSemana;
 };
 
 export const useProducaoMedica = () => {
@@ -165,7 +181,16 @@ export const useProducaoMedica = () => {
 
       const medicosMap = new Map<string, MedicoTemp>();
       const especialidadesMap = new Map<string, any>();
-      const capacidadeDemandaMap = new Map<string, { capacidade: number; demanda: number }>();
+      const capacidadeDemandaMap = new Map<string, { 
+        capacidade: number; 
+        demanda: number; 
+        dia_numero: number;
+        especialidades: Map<string, {
+          capacidade: number;
+          demanda: number;
+          medicos: Map<string, { capacidade: number; demanda: number }>;
+        }>;
+      }>();
 
       let totalMesAtual = 0;
       let totalMesAnterior = 0;
@@ -267,10 +292,37 @@ export const useProducaoMedica = () => {
         }
 
         // Processar capacidade vs demanda
+        const diaSemanaOrdem = getDiaSemanaOrdem(diaSemana);
         if (!capacidadeDemandaMap.has(diaSemanaName)) {
-          capacidadeDemandaMap.set(diaSemanaName, { capacidade: 0, demanda: 0 });
+          capacidadeDemandaMap.set(diaSemanaName, { 
+            capacidade: 0, 
+            demanda: 0, 
+            dia_numero: diaSemanaOrdem,
+            especialidades: new Map()
+          });
         }
-        capacidadeDemandaMap.get(diaSemanaName)!.demanda += valores;
+        
+        const diaData = capacidadeDemandaMap.get(diaSemanaName)!;
+        diaData.demanda += valores;
+        
+        // Processar por especialidade dentro do dia
+        if (!diaData.especialidades.has(especialidade)) {
+          diaData.especialidades.set(especialidade, {
+            capacidade: 0,
+            demanda: 0,
+            medicos: new Map()
+          });
+        }
+        
+        const espDiaData = diaData.especialidades.get(especialidade)!;
+        espDiaData.demanda += valores;
+        
+        // Processar por médico dentro da especialidade
+        if (!espDiaData.medicos.has(medico)) {
+          espDiaData.medicos.set(medico, { capacidade: 0, demanda: 0 });
+        }
+        
+        espDiaData.medicos.get(medico)!.demanda += valores;
       });
 
       // Converter mapas para arrays
@@ -306,16 +358,47 @@ export const useProducaoMedica = () => {
         media_por_medico: esp.medicos.size > 0 ? esp.total_mes_atual / esp.medicos.size : 0
       })).sort((a, b) => b.total_mes_atual - a.total_mes_atual);
 
-      // Calcular capacidade vs demanda
+      // Calcular capacidade vs demanda com detalhes
       const capacidade_vs_demanda: CapacidadeVsDemanda[] = Array.from(capacidadeDemandaMap.entries()).map(([dia, dados]) => {
-        const capacidade = medicos.reduce((total, medico) => total + medico.capacidade_produtiva / 30, 0); // Capacidade diária
+        // Calcular capacidade total do dia baseada nos médicos ativos
+        const capacidadeTotal = medicos.reduce((total, medico) => {
+          // Capacidade diária baseada na média mensal / 30
+          return total + (medico.media_mensal || 0);
+        }, 0);
+        
+        // Processar especialidades
+        const especialidades = Array.from(dados.especialidades.entries()).map(([espNome, espData]) => {
+          // Calcular capacidade da especialidade
+          const medicosEspecialidade = medicos.filter(m => m.especialidade === espNome);
+          const capacidadeEsp = medicosEspecialidade.reduce((total, medico) => total + (medico.media_mensal || 0), 0);
+          
+          // Processar médicos da especialidade
+          const medicosDetalhes = Array.from(espData.medicos.entries()).map(([medicoNome, medicoData]) => {
+            const medicoInfo = medicos.find(m => m.nome === medicoNome);
+            return {
+              nome: medicoNome,
+              capacidade: medicoInfo?.media_mensal || 0,
+              demanda: medicoData.demanda
+            };
+          });
+          
+          return {
+            nome: espNome,
+            capacidade: capacidadeEsp,
+            demanda: espData.demanda,
+            medicos: medicosDetalhes
+          };
+        });
+
         return {
           dia_semana: dia,
-          capacidade,
+          dia_numero: dados.dia_numero,
+          capacidade: capacidadeTotal,
           demanda: dados.demanda,
-          utilizacao: capacidade > 0 ? (dados.demanda / capacidade) * 100 : 0
+          utilizacao: capacidadeTotal > 0 ? (dados.demanda / capacidadeTotal) * 100 : 0,
+          especialidades
         };
-      });
+      }).sort((a, b) => a.dia_numero - b.dia_numero); // Ordenar de segunda a domingo
 
       const variacao_mensal = totalMesAnterior > 0 ? ((totalMesAtual - totalMesAnterior) / totalMesAnterior) * 100 : 0;
       const variacao_semanal = totalSemanaAnterior > 0 ? ((totalSemanaAtual - totalSemanaAnterior) / totalSemanaAnterior) * 100 : 0;
