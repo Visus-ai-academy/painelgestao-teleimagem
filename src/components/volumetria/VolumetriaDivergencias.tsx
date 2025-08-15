@@ -314,7 +314,10 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(especialidade),
             canonical(cleanExamName(exameDescricao)),
             canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo)
+            toYMD(dataExame || dataLaudo),
+            canonical(r.ACCESSION_NUMBER || r.accession_number || ''),
+            canonical(r.MEDICO || r.medico || ''),
+            canonical(r.PRIORIDADE || r.prioridade || '')
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
@@ -357,7 +360,10 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(r.especialidade),
             canonical(cleanExamName(exameDescricao)),
             canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo)
+            toYMD(dataExame || dataLaudo),
+            canonical((r as any).accessionNumber || (r as any).ACCESSION_NUMBER || ''),
+            canonical((r as any).medico || (r as any).MEDICO || ''),
+            canonical((r as any).prioridade || (r as any).PRIORIDADE || '')
           ].join('|');
           
           const cur = mapArquivo.get(key) || { total: 0, amostra: r };
