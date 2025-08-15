@@ -262,54 +262,54 @@ export function VolumetriaMedicosAnalysis({
                         {expandedMedicos.has(medico.nome) && medico.detalhes && (
                           <TableRow key={`${medico.nome}-details`}>
                             <TableCell colSpan={7} className="p-4 bg-muted/20">
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                 {/* Modalidades */}
-                                <div>
+                                <div className="min-w-0">
                                   <h4 className="font-semibold mb-2 text-sm">Por Modalidade</h4>
                                   <div className="space-y-1">
                                     {Object.entries(medico.detalhes.modalidades).map(([modalidade, data]) => (
                                       <div key={modalidade} className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">{modalidade}</span>
-                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                        <span className="text-muted-foreground truncate mr-2">{modalidade}</span>
+                                        <span className="font-medium text-nowrap">{data.exames.toLocaleString()}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
                                 
                                 {/* Especialidades */}
-                                <div>
+                                <div className="min-w-0">
                                   <h4 className="font-semibold mb-2 text-sm">Por Especialidade</h4>
                                   <div className="space-y-1">
                                     {Object.entries(medico.detalhes.especialidades).map(([especialidade, data]) => (
                                       <div key={especialidade} className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">{especialidade}</span>
-                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                        <span className="text-muted-foreground truncate mr-2">{especialidade}</span>
+                                        <span className="font-medium text-nowrap">{data.exames.toLocaleString()}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
 
                                 {/* Prioridades */}
-                                <div>
+                                <div className="min-w-0">
                                   <h4 className="font-semibold mb-2 text-sm">Por Prioridade</h4>
                                   <div className="space-y-1">
                                     {Object.entries(medico.detalhes.prioridades || {}).map(([prioridade, data]) => (
                                       <div key={prioridade} className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">{prioridade}</span>
-                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                        <span className="text-muted-foreground truncate mr-2">{prioridade}</span>
+                                        <span className="font-medium text-nowrap">{data.exames.toLocaleString()}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
 
                                 {/* Categorias */}
-                                <div>
+                                <div className="min-w-0">
                                   <h4 className="font-semibold mb-2 text-sm">Por Categoria</h4>
                                   <div className="space-y-1">
                                     {Object.entries(medico.detalhes.categorias || {}).map(([categoria, data]) => (
                                       <div key={categoria} className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">{categoria}</span>
-                                        <span className="font-medium">{data.exames.toLocaleString()} exames</span>
+                                        <span className="text-muted-foreground truncate mr-2">{categoria}</span>
+                                        <span className="font-medium text-nowrap">{data.exames.toLocaleString()}</span>
                                       </div>
                                     ))}
                                   </div>

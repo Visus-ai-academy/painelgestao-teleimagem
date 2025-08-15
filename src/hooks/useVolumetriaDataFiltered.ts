@@ -67,6 +67,7 @@ interface MedicoData {
     modalidades: { [key: string]: { exames: number; registros: number } };
     especialidades: { [key: string]: { exames: number; registros: number } };
     prioridades: { [key: string]: { exames: number; registros: number } };
+    categorias: { [key: string]: { exames: number; registros: number } };
   };
 }
 
@@ -340,7 +341,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             total_registros: 0,
             modalidades: {},
             especialidades: {},
-            prioridades: {}
+            prioridades: {},
+            categorias: {}
           };
           
           current.total_exames += item.VALORES || 0;
@@ -371,6 +373,15 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             }
             current.prioridades[item.PRIORIDADE].exames += item.VALORES || 0;
             current.prioridades[item.PRIORIDADE].registros += 1;
+          }
+          
+          // Detalhes por categoria (usando ESPECIALIDADE como categoria por enquanto)
+          if (item.ESPECIALIDADE) {
+            if (!current.categorias[item.ESPECIALIDADE]) {
+              current.categorias[item.ESPECIALIDADE] = { exames: 0, registros: 0 };
+            }
+            current.categorias[item.ESPECIALIDADE].exames += item.VALORES || 0;
+            current.categorias[item.ESPECIALIDADE].registros += 1;
           }
           
           medicosMap.set(item.MEDICO, current);
@@ -406,7 +417,8 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
         detalhes: {
           modalidades: data.modalidades,
           especialidades: data.especialidades,
-          prioridades: data.prioridades
+          prioridades: data.prioridades,
+          categorias: data.categorias
         }
       })).sort((a, b) => b.total_exames - a.total_exames);
 
