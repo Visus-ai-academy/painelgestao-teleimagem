@@ -92,6 +92,12 @@ const getDiaSemanaOrdem = (diaSemana: number): number => {
   return diaSemana === 0 ? 7 : diaSemana;
 };
 
+const getOrdemTurno = (turno: string): number => {
+  if (turno.includes('manhã')) return 1;
+  if (turno.includes('tarde')) return 2;
+  return 3; // Plantão
+};
+
 export const useProducaoMedica = () => {
   const [data, setData] = useState<ProducaoData>({
     resumo_geral: {
@@ -189,8 +195,9 @@ export const useProducaoMedica = () => {
           demanda_turno: number;
           medicos: Map<string, { capacidade_produtiva: number; especialidade: string }>;
         }>;
-        demanda_dias: number[];
-        turnos_demanda: Map<string, number[]>;
+        // Para demanda: agrupar por data específica do mês para depois calcular média
+        demanda_por_data: Map<string, number>; // data -> soma valores
+        turnos_demanda_por_data: Map<string, Map<string, number>>; // data -> turno -> soma valores
       }>();
 
       let totalMesAtual = 0;
@@ -299,8 +306,8 @@ export const useProducaoMedica = () => {
             total_demanda_dia: 0,
             dia_numero: diaSemanaOrdem,
             turnos: new Map(),
-            demanda_dias: [], // Para calcular média da demanda
-            turnos_demanda: new Map() // Para calcular média por turno
+            demanda_por_data: new Map(),
+            turnos_demanda_por_data: new Map()
           });
         }
         
@@ -324,8 +331,9 @@ export const useProducaoMedica = () => {
 
         // Processar demanda usando DATA_TRANSFERENCIA e HORA_TRANSFERENCIA
         if (record.DATA_TRANSFERENCIA && record.HORA_TRANSFERENCIA) {
-          const dataTransferencia = new Date(record.DATA_TRANSFERENCIA);
-          const diaSemanaTransferencia = dataTransferencia.getDay();
+          const dataTransferencia = record.DATA_TRANSFERENCIA;
+          const dataTransferenciaObj = new Date(dataTransferencia);
+          const diaSemanaTransferencia = dataTransferenciaObj.getDay();
           const diaSemanaTransferenciaName = getDiaSemanaName(diaSemanaTransferencia);
           const turnoTransferencia = getTurnoFromHour(record.HORA_TRANSFERENCIA, diaSemanaTransferencia);
 
@@ -335,22 +343,30 @@ export const useProducaoMedica = () => {
               total_demanda_dia: 0,
               dia_numero: getDiaSemanaOrdem(diaSemanaTransferencia),
               turnos: new Map(),
-              demanda_dias: [],
-              turnos_demanda: new Map()
+              demanda_por_data: new Map(),
+              turnos_demanda_por_data: new Map()
             });
           }
 
           const diaDataDemanda = capacidadeDemandaMap.get(diaSemanaTransferenciaName)!;
 
-          // Adicionar valor para cálculo da média de demanda
-          diaDataDemanda.demanda_dias.push(valores);
-
-          // Inicializar turno para demanda se não existir
-          if (!diaDataDemanda.turnos_demanda.has(turnoTransferencia)) {
-            diaDataDemanda.turnos_demanda.set(turnoTransferencia, []);
+          // Agrupar por data específica para depois calcular média
+          if (!diaDataDemanda.demanda_por_data.has(dataTransferencia)) {
+            diaDataDemanda.demanda_por_data.set(dataTransferencia, 0);
           }
+          diaDataDemanda.demanda_por_data.set(dataTransferencia, 
+            diaDataDemanda.demanda_por_data.get(dataTransferencia)! + valores);
 
-          diaDataDemanda.turnos_demanda.get(turnoTransferencia)!.push(valores);
+          // Agrupar por data e turno para depois calcular média por turno
+          if (!diaDataDemanda.turnos_demanda_por_data.has(dataTransferencia)) {
+            diaDataDemanda.turnos_demanda_por_data.set(dataTransferencia, new Map());
+          }
+          
+          const turnosData = diaDataDemanda.turnos_demanda_por_data.get(dataTransferencia)!;
+          if (!turnosData.has(turnoTransferencia)) {
+            turnosData.set(turnoTransferencia, 0);
+          }
+          turnosData.set(turnoTransferencia, turnosData.get(turnoTransferencia)! + valores);
         }
       });
 
@@ -391,9 +407,10 @@ export const useProducaoMedica = () => {
       const capacidade_vs_demanda: CapacidadeVsDemanda[] = Array.from(capacidadeDemandaMap.entries()).map(([dia, dados]) => {
         let totalCapacidadeDia = 0;
         
-        // Calcular média da demanda diária
-        const mediaDemandaDia = dados.demanda_dias.length > 0 
-          ? dados.demanda_dias.reduce((sum, val) => sum + val, 0) / dados.demanda_dias.length 
+        // Calcular média da demanda diária (soma dos valores por data / número de datas)
+        const valoresPorData = Array.from(dados.demanda_por_data.values());
+        const mediaDemandaDia = valoresPorData.length > 0 
+          ? valoresPorData.reduce((sum, val) => sum + val, 0) / valoresPorData.length 
           : 0;
         
         // Processar turnos do dia
@@ -403,7 +420,14 @@ export const useProducaoMedica = () => {
           totalCapacidadeDia += capacidadeTurno;
           
           // Calcular média da demanda do turno
-          const valoresTurno = dados.turnos_demanda.get(turnoNome) || [];
+          // Coletar todos os valores desse turno em todas as datas
+          const valoresTurno: number[] = [];
+          dados.turnos_demanda_por_data.forEach((turnosData) => {
+            if (turnosData.has(turnoNome)) {
+              valoresTurno.push(turnosData.get(turnoNome)!);
+            }
+          });
+          
           const mediaDemandaTurno = valoresTurno.length > 0 
             ? valoresTurno.reduce((sum, val) => sum + val, 0) / valoresTurno.length 
             : 0;
@@ -422,7 +446,7 @@ export const useProducaoMedica = () => {
             utilizacao_turno: capacidadeTurno > 0 ? (mediaDemandaTurno / capacidadeTurno) * 100 : 0,
             medicos
           };
-        });
+        }).sort((a, b) => getOrdemTurno(a.turno) - getOrdemTurno(b.turno)); // Ordenar turnos: manhã, tarde, plantão
 
         return {
           dia_semana: dia,
