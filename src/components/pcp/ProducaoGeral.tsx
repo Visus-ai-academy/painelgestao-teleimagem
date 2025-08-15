@@ -133,8 +133,8 @@ const ProducaoGeral: React.FC<ProducaoGeralProps> = ({ data }) => {
                     </div>
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="text-sm font-medium">Demanda: {formatNumber(Math.round(item.demanda))}</div>
-                        <div className="text-sm text-muted-foreground">Capacidade: {formatNumber(Math.round(item.capacidade))}</div>
+                        <div className="text-sm font-medium">Demanda: {formatNumber(Math.round(item.total_demanda))}</div>
+                        <div className="text-sm text-muted-foreground">Capacidade: {formatNumber(Math.round(item.total_capacidade))}</div>
                       </div>
                       <Badge variant={item.utilizacao > 100 ? 'destructive' : item.utilizacao > 80 ? 'default' : 'secondary'}>
                         {item.utilizacao.toFixed(1)}%
@@ -154,58 +154,83 @@ const ProducaoGeral: React.FC<ProducaoGeralProps> = ({ data }) => {
                     )}
                   </div>
 
-                  {/* Detalhes expandidos */}
+                  {/* Detalhes expandidos por Especialidade e Turno */}
                   {isExpanded && (
                     <div className="mt-4 pl-8 border-l-2 border-muted">
                       <h5 className="font-medium mb-3">Detalhamento por Especialidade</h5>
                       <div className="space-y-4">
                         {item.especialidades.map((esp) => (
                           <div key={esp.nome} className="bg-muted/20 p-3 rounded">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="font-medium">{esp.nome}</span>
-                              <div className="text-sm">
-                                <span className="text-muted-foreground">
-                                  D: {formatNumber(Math.round(esp.demanda))} | 
-                                  C: {formatNumber(Math.round(esp.capacidade))} | 
-                                  Utilização: {esp.capacidade > 0 ? ((esp.demanda / esp.capacidade) * 100).toFixed(1) : '0'}%
-                                </span>
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="font-medium text-lg">{esp.nome}</span>
+                              <div className="text-right">
+                                <div className="text-sm font-medium">
+                                  Demanda: {formatNumber(Math.round(esp.demanda_especialidade))}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  Capacidade: {formatNumber(Math.round(esp.capacidade_especialidade))}
+                                </div>
+                                <Badge variant={esp.utilizacao_especialidade > 100 ? 'destructive' : 'secondary'}>
+                                  {esp.utilizacao_especialidade.toFixed(1)}%
+                                </Badge>
                               </div>
                             </div>
                             
-                            {/* Médicos da especialidade */}
-                            <div className="mt-3">
-                              <h6 className="text-sm font-medium mb-2">Médicos:</h6>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Médico</TableHead>
-                                    <TableHead className="text-xs text-right">Demanda</TableHead>
-                                    <TableHead className="text-xs text-right">Capacidade</TableHead>
-                                    <TableHead className="text-xs text-right">Utilização</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {esp.medicos.map((medico) => (
-                                    <TableRow key={medico.nome}>
-                                      <TableCell className="text-xs">{medico.nome}</TableCell>
-                                      <TableCell className="text-xs text-right">{formatNumber(Math.round(medico.demanda))}</TableCell>
-                                      <TableCell className="text-xs text-right">{formatNumber(Math.round(medico.capacidade))}</TableCell>
-                                      <TableCell className="text-xs text-right">
-                                        <Badge 
-                                          variant={
-                                            medico.capacidade > 0 && (medico.demanda / medico.capacidade) > 1 
-                                              ? 'destructive' 
-                                              : 'secondary'
-                                          }
-                                          className="text-xs"
-                                        >
-                                          {medico.capacidade > 0 ? ((medico.demanda / medico.capacidade) * 100).toFixed(1) : '0'}%
-                                        </Badge>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                            {/* Turnos da especialidade */}
+                            <div className="space-y-3">
+                              {esp.turnos.map((turno) => (
+                                <div key={turno.turno} className="bg-background p-3 rounded border">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="font-medium">{turno.turno}</span>
+                                    <div className="text-sm">
+                                      <span className="text-muted-foreground">
+                                        Demanda: {formatNumber(Math.round(turno.demanda_turno))} | 
+                                        Capacidade: {formatNumber(Math.round(turno.capacidade_turno))} | 
+                                        Utilização: {turno.capacidade_turno > 0 ? ((turno.demanda_turno / turno.capacidade_turno) * 100).toFixed(1) : '0'}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Médicos do turno */}
+                                  <div className="mt-2">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="text-xs">Médico</TableHead>
+                                          <TableHead className="text-xs text-right">Capacidade Produtiva</TableHead>
+                                          <TableHead className="text-xs text-right">% do Turno</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {turno.medicos.map((medico) => (
+                                          <TableRow key={medico.nome}>
+                                            <TableCell className="text-xs">{medico.nome}</TableCell>
+                                            <TableCell className="text-xs text-right">
+                                              {formatNumber(Math.round(medico.capacidade_produtiva))}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-right">
+                                              <Badge variant="outline" className="text-xs">
+                                                {turno.capacidade_turno > 0 
+                                                  ? ((medico.capacidade_produtiva / turno.capacidade_turno) * 100).toFixed(1)
+                                                  : '0'
+                                                }%
+                                              </Badge>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                        {/* Linha de totais do turno */}
+                                        <TableRow className="bg-muted/50 font-medium">
+                                          <TableCell className="text-xs">Total do Turno</TableCell>
+                                          <TableCell className="text-xs text-right">
+                                            {formatNumber(Math.round(turno.capacidade_turno))}
+                                          </TableCell>
+                                          <TableCell className="text-xs text-right">100%</TableCell>
+                                        </TableRow>
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
