@@ -210,112 +210,18 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     try {
       setExporting(true);
       
-      // CORREÇÃO: O período no banco está no formato "2025-06", não "jun/25"
-      // Usar diretamente o formato selecionado
-      const periodoReferenciaBanco = referencia; // Já está no formato correto "2025-06"
+      const periodoReferenciaBanco = referencia;
+      console.log('🔍 Processando divergências para período:', referencia);
       
-      console.log('🔍 Processando divergências para período:', {
-        referenciaSelecionada: referencia,
-        periodoReferenciaBanco,
-        cliente: cliente !== 'todos' ? cliente : 'todos'
-      });
-      
-      // Removido teste desnecessário que pode causar travamento
-      
-      // USAR A MESMA FONTE DE DADOS DO RESUMO - ctx.detailedData
-      console.log('🔍 Usando contexto para dados do sistema (mesma fonte do resumo)');
+      // Usar dados do contexto
       const systemData = ctx?.detailedData || [];
-      console.log('🏥 Total de registros detalhados do contexto:', systemData.length);
+      console.log('🏥 Total de registros detalhados:', systemData.length);
       
       if (!systemData || systemData.length === 0) {
-        console.log('❌ Nenhum dado detalhado encontrado no contexto');
         throw new Error('Nenhum dado encontrado no contexto. Atualize a tela.');
       }
 
-      // Mapear por chave agregada
-      type AggSys = { total: number; amostra?: any };
-      const mapSistema = new Map<string, AggSys>();
-      
-      systemData.forEach((r: any, index) => {
-        const empresaRaw = r.EMPRESA || r.empresa || r.Empresa || '';
-        const empresaNormalizada = normalizeCliente(empresaRaw);
-        
-        // Filtrar por cliente se especificado
-        if (cliente !== 'todos') {
-          const clienteNormalizado = normalizeCliente(cliente);
-          if (empresaNormalizada !== clienteNormalizado) {
-            return; // Pular registro que não é do cliente selecionado
-          }
-        }
-        
-        // Filtrar por período usando mesma lógica do resumo
-        const inMonth = (val: any) => {
-          if (!val) return true;
-          const s = String(val);
-          let ym = '';
-          if (/^\d{4}-\d{2}-\d{2}/.test(s)) ym = s.slice(0,7);
-          else {
-            const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
-            if (m) ym = `${m[3].length===2?`20${m[3]}`:m[3]}-${m[2].padStart(2,'0')}`;
-          }
-          return ym ? ym === referencia : true;
-        };
-        
-        const dataRef = r.data_referencia || r.DATA_REFERENCIA;
-        if (dataRef && !inMonth(dataRef)) {
-          return;
-        }
-        
-        const pacienteNome = r.NOME_PACIENTE || r.paciente || r.PACIENTE || '';
-        const exameDescricao = r.ESTUDO_DESCRICAO || r.NOME_EXAME || r.exame || r.EXAME || '';
-        const modalidade = r.MODALIDADE || r.modalidade || '';
-        const especialidade = r.ESPECIALIDADE || r.especialidade || '';
-        const dataLaudo = r.DATA_LAUDO || r.data_laudo;
-        const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
-        
-        const chave = [
-          empresaNormalizada,
-          normalizeModalidade(modalidade),
-          canonical(especialidade),
-          canonical(cleanExamName(exameDescricao)),
-          canonical(pacienteNome),
-          toYMD(dataExame || dataLaudo)
-        ].join('|');
-        
-        // Logs reduzidos para evitar travamento - apenas primeiros 3 registros
-        if (index < 3) {
-          console.log('🏥 Processando registro do sistema:', {
-            index,
-            empresa: empresaNormalizada,
-            total: mapSistema.size
-          });
-        }
-        
-        const valores = Number(r.VALORES || r.valores || 1);
-        
-        if (mapSistema.has(chave)) {
-          mapSistema.get(chave)!.total += valores;
-        } else {
-          mapSistema.set(chave, {
-            total: valores,
-            amostra: {
-              empresa: empresaNormalizada,
-              paciente: pacienteNome,
-              exame: exameDescricao,
-              modalidade: normalizeModalidade(modalidade),
-              especialidade: canonical(especialidade),
-              dataExame: toYMD(dataExame || dataLaudo),
-              origem: 'sistema'
-            }
-          });
-        }
-      });
-      
-      console.log('🏥 Total de chaves únicas no sistema (contexto):', mapSistema.size);
-      
-      // 2) Ler dados do ARQUIVO (enviado na tela)
-      type AggFile = { total: number; amostra?: UploadedExamRow };
-      const mapArquivo = new Map<string, AggFile>();
+      // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
       const inMonth = (val: any) => {
         if (!val) return true;
         const s = String(val);
@@ -327,66 +233,118 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         }
         return ym ? ym === referencia : true;
       };
-      console.log('🔍 Total de registros do arquivo disponíveis:', uploadedExams?.length || 0);
-      
-      (uploadedExams || []).forEach((r, index) => {
-        const clienteNormalizado = normalizeCliente(r.cliente);
-        if (cliente !== 'todos' && clienteNormalizado !== normalizeCliente(cliente)) return;
-        if (!inMonth((r as any).data_exame || (r as any).data_laudo)) return;
+
+      // Filtrar dados do sistema primeiro
+      const systemDataFiltered = systemData.filter((r: any) => {
+        const empresaRaw = r.EMPRESA || r.empresa || r.Empresa || '';
+        const empresaNormalizada = normalizeCliente(empresaRaw);
         
-        // Usar mesmos campos que o sistema para garantir correspondência
-        const pacienteNome = (r as any).paciente || (r as any).nome_paciente || (r as any).NOME_PACIENTE;
-        const exameDescricao = r.exame || (r as any).estudo_descricao || (r as any).ESTUDO_DESCRICAO;
-        const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
-        const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
-        
-        // Log reduzido apenas para primeiros 3 registros
-        if (index < 3) {
-          console.log('📁 Processando registro do arquivo:', {
-            index,
-            cliente: r.cliente,
-            total: mapArquivo.size
-          });
+        if (cliente !== 'todos') {
+          const clienteNormalizado = normalizeCliente(cliente);
+          if (empresaNormalizada !== clienteNormalizado) return false;
         }
         
-        const key = [
-          clienteNormalizado,
-          normalizeModalidade(r.modalidade),
-          canonical(r.especialidade),
-          canonical(cleanExamName(exameDescricao)),
-          canonical(pacienteNome),
-          toYMD(dataExame || dataLaudo)
-        ].join('|');
-        
-        const cur = mapArquivo.get(key) || { total: 0, amostra: r };
-        cur.total += Number(r.quant || (r as any).quantidade || (r as any).valores || 1);
-        if (!cur.amostra) cur.amostra = r;
-        mapArquivo.set(key, cur);
+        const dataRef = r.data_referencia || r.DATA_REFERENCIA;
+        return !dataRef || inMonth(dataRef);
       });
+
+      // Filtrar dados do arquivo primeiro
+      const fileDataFiltered = (uploadedExams || []).filter((r) => {
+        const clienteNormalizado = normalizeCliente(r.cliente);
+        if (cliente !== 'todos' && clienteNormalizado !== normalizeCliente(cliente)) return false;
+        return inMonth((r as any).data_exame || (r as any).data_laudo);
+      });
+
+      console.log('📊 Dados filtrados - Sistema:', systemDataFiltered.length, 'Arquivo:', fileDataFiltered.length);
+
+      // OTIMIZAÇÃO: Processar em batches assíncronos
+      const BATCH_SIZE = 1000;
       
-      console.log('📊 Total de chaves únicas no arquivo:', mapArquivo.size);
+      // Processar sistema em batches
+      type AggSys = { total: number; amostra?: any };
+      const mapSistema = new Map<string, AggSys>();
+      
+      for (let i = 0; i < systemDataFiltered.length; i += BATCH_SIZE) {
+        const batch = systemDataFiltered.slice(i, i + BATCH_SIZE);
+        
+        batch.forEach((r: any) => {
+          const empresaNormalizada = normalizeCliente(r.EMPRESA || r.empresa || r.Empresa || '');
+          const pacienteNome = r.NOME_PACIENTE || r.paciente || r.PACIENTE || '';
+          const exameDescricao = r.ESTUDO_DESCRICAO || r.NOME_EXAME || r.exame || r.EXAME || '';
+          const modalidade = r.MODALIDADE || r.modalidade || '';
+          const especialidade = r.ESPECIALIDADE || r.especialidade || '';
+          const dataLaudo = r.DATA_LAUDO || r.data_laudo;
+          const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
+          
+          const chave = [
+            empresaNormalizada,
+            normalizeModalidade(modalidade),
+            canonical(especialidade),
+            canonical(cleanExamName(exameDescricao)),
+            canonical(pacienteNome),
+            toYMD(dataExame || dataLaudo)
+          ].join('|');
+          
+          const valores = Number(r.VALORES || r.valores || 1);
+          
+          if (mapSistema.has(chave)) {
+            mapSistema.get(chave)!.total += valores;
+          } else {
+            mapSistema.set(chave, {
+              total: valores,
+              amostra: r
+            });
+          }
+        });
+        
+        // Aguardar próximo frame para não travar a UI
+        if (i + BATCH_SIZE < systemDataFiltered.length) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      
+      console.log('🏥 Sistema processado - chaves únicas:', mapSistema.size);
+      
+      // Processar arquivo em batches
+      type AggFile = { total: number; amostra?: UploadedExamRow };
+      const mapArquivo = new Map<string, AggFile>();
+      
+      for (let i = 0; i < fileDataFiltered.length; i += BATCH_SIZE) {
+        const batch = fileDataFiltered.slice(i, i + BATCH_SIZE);
+        
+        batch.forEach((r) => {
+          const clienteNormalizado = normalizeCliente(r.cliente);
+          const pacienteNome = (r as any).paciente || (r as any).nome_paciente || (r as any).NOME_PACIENTE;
+          const exameDescricao = r.exame || (r as any).estudo_descricao || (r as any).ESTUDO_DESCRICAO;
+          const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
+          const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
+          
+          const key = [
+            clienteNormalizado,
+            normalizeModalidade(r.modalidade),
+            canonical(r.especialidade),
+            canonical(cleanExamName(exameDescricao)),
+            canonical(pacienteNome),
+            toYMD(dataExame || dataLaudo)
+          ].join('|');
+          
+          const cur = mapArquivo.get(key) || { total: 0, amostra: r };
+          cur.total += Number(r.quant || (r as any).quantidade || (r as any).valores || 1);
+          if (!cur.amostra) cur.amostra = r;
+          mapArquivo.set(key, cur);
+        });
+        
+        // Aguardar próximo frame para não travar a UI
+        if (i + BATCH_SIZE < fileDataFiltered.length) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      
+      console.log('📁 Arquivo processado - chaves únicas:', mapArquivo.size);
 
-      // Construir divergências
-      const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
+      // OTIMIZAÇÃO: Construir divergências de forma mais eficiente
       const divergencias: LinhaDivergencia[] = [];
-
-      const splitKey = (k: string) => k.split('|');
-      const findSistemaCandidato = (k: string) => {
-        const [cli, mod, esp, exame, pac, data] = splitKey(k);
-        for (const ks of mapSistema.keys()) {
-          const [cliS, modS, espS, exameS, pacS] = splitKey(ks);
-          if (cli===cliS && mod===modS && esp===espS && exame===exameS && pac===pacS) return {ks, motivo:'data_diferente'};
-        }
-        for (const ks of mapSistema.keys()) {
-          const [cliS, modS, _espS, exameS, pacS, dataS] = splitKey(ks);
-          if (cli===cliS && mod===modS && exame===exameS && pac===pacS && data===dataS) return {ks, motivo:'especialidade_diferente'};
-        }
-        for (const ks of mapSistema.keys()) {
-          const [cliS, modS, espS, _exameS, pacS, dataS] = splitKey(ks);
-          if (cli===cliS && mod===modS && esp===espS && pac===pacS && data===dataS) return {ks, motivo:'descricao_exame_variavel'};
-        }
-        return null;
-      };
+      const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
 
       const toLinhaFromArquivo = (key: string, a: AggFile): LinhaDivergencia => {
         const r = a.amostra as any as UploadedExamRow;
@@ -395,7 +353,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           chave: key,
           EMPRESA: r.cliente || '-',
           NOME_PACIENTE: (r as any).paciente || '-',
-          CODIGO_PACIENTE: String((r as any).codigoPaciente ?? '-') ,
+          CODIGO_PACIENTE: String((r as any).codigoPaciente ?? '-'),
           ESTUDO_DESCRICAO: (r as any).exame || '-',
           ACCESSION_NUMBER: (r as any).accessionNumber || '-',
           MODALIDADE: r.modalidade || '-',
@@ -420,6 +378,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           categoria_arquivo: (r as any).categoria || undefined,
         };
       };
+      
       const toLinhaFromSistema = (key: string, s: AggSys): LinhaDivergencia => {
         const r = s.amostra as any as VolumetriaRow;
         return {
@@ -427,7 +386,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           chave: key,
           EMPRESA: r.EMPRESA || '-',
           NOME_PACIENTE: r.NOME_PACIENTE || '-',
-          CODIGO_PACIENTE: String(r.CODIGO_PACIENTE ?? '-') ,
+          CODIGO_PACIENTE: String(r.CODIGO_PACIENTE ?? '-'),
           ESTUDO_DESCRICAO: r.ESTUDO_DESCRICAO || '-',
           ACCESSION_NUMBER: r.ACCESSION_NUMBER || '-',
           MODALIDADE: r.MODALIDADE || '-',
@@ -435,7 +394,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           VALORES: Number(s.total || 0),
           ESPECIALIDADE: r.ESPECIALIDADE || '-',
           MEDICO: r.MEDICO || '-',
-          DUPLICADO: String(r.DUPLICADO ?? '-') ,
+          DUPLICADO: String(r.DUPLICADO ?? '-'),
           DATA_REALIZACAO: r.DATA_REALIZACAO || '-',
           HORA_REALIZACAO: r.HORA_REALIZACAO || '-',
           DATA_TRANSFERENCIA: r.DATA_TRANSFERENCIA || '-',
@@ -453,44 +412,47 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         };
       };
 
-      // Log de análise otimizado
-      console.log('🔍 Análise de divergências concluída:', {
-        totalChaves: allKeys.size,
-        chavesSistema: mapSistema.size,
-        chavesArquivo: mapArquivo.size
-      });
-
-      allKeys.forEach((k) => {
-        const a = mapArquivo.get(k);
-        const s = mapSistema.get(k);
+      // OTIMIZAÇÃO: Processar divergências em batches para evitar travamento
+      const allKeysArray = Array.from(allKeys);
+      const DIVERGENCE_BATCH_SIZE = 500;
+      
+      console.log('🔍 Processando', allKeysArray.length, 'chaves para divergências');
+      
+      for (let i = 0; i < allKeysArray.length; i += DIVERGENCE_BATCH_SIZE) {
+        const keyBatch = allKeysArray.slice(i, i + DIVERGENCE_BATCH_SIZE);
         
-        if (a && !s) {
-          const cand = findSistemaCandidato(k);
-          // Log reduzido apenas para debugging crítico
-          if (cand && divergencias.length < 5) {
-            console.warn('[Divergência: Só no Arquivo] possível causa:', cand.motivo);
+        keyBatch.forEach((k) => {
+          const a = mapArquivo.get(k);
+          const s = mapSistema.get(k);
+          
+          if (a && !s) {
+            divergencias.push(toLinhaFromArquivo(k, a));
+          } else if (!a && s) {
+            divergencias.push(toLinhaFromSistema(k, s));
+          } else if (a && s) {
+            const catA = canonical(((a.amostra as any) || {}).categoria || '');
+            const catS = canonical(((s.amostra as any) || {}).CATEGORIA || '');
+            if (catA && catS && catA !== catS) {
+              const base = toLinhaFromArquivo(k, a);
+              base.tipo = 'categoria_diferente';
+              base.total_sistema = s.total;
+              base.categoria_arquivo = (a.amostra as any).categoria || '';
+              base.categoria_sistema = (s.amostra as any).CATEGORIA || '';
+              divergencias.push(base);
+            } else if (a.total !== s.total) {
+              const base = toLinhaFromArquivo(k, a);
+              base.tipo = 'quantidade_diferente';
+              base.total_sistema = s.total;
+              divergencias.push(base);
+            }
           }
-          divergencias.push(toLinhaFromArquivo(k, a));
-        } else if (!a && s) {
-          divergencias.push(toLinhaFromSistema(k, s));
-        } else if (a && s) {
-          const catA = canonical(((a.amostra as any) || {}).categoria || '');
-          const catS = canonical(((s.amostra as any) || {}).CATEGORIA || '');
-          if (catA && catS && catA !== catS) {
-            const base = toLinhaFromArquivo(k, a);
-            base.tipo = 'categoria_diferente';
-            base.total_sistema = s.total;
-            base.categoria_arquivo = (a.amostra as any).categoria || '';
-            base.categoria_sistema = (s.amostra as any).CATEGORIA || '';
-            divergencias.push(base);
-          } else if (a.total !== s.total) {
-            const base = toLinhaFromArquivo(k, a);
-            base.tipo = 'quantidade_diferente';
-            base.total_sistema = s.total;
-            divergencias.push(base);
-          }
+        });
+        
+        // Aguardar próximo frame se não é o último batch
+        if (i + DIVERGENCE_BATCH_SIZE < allKeysArray.length) {
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
-      });
+      }
 
       // Gerar Excel com as divergências
       if (divergencias.length === 0) {
