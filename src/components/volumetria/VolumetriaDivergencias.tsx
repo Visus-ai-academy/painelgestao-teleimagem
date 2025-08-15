@@ -126,15 +126,6 @@ function formatDateBR(val?: string | number) {
     return `${day}/${month}/${year}`;
   }
   
-  // dd/mm/yyyy hh:mm format (extract date part)
-  const brWithTime = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})\s+\d{1,2}:\d{2}/);
-  if (brWithTime) {
-    const day = brWithTime[1].padStart(2,'0');
-    const month = brWithTime[2].padStart(2,'0');
-    const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
-    return `${day}/${month}/${year}`;
-  }
-  
   // Try Date parse fallback
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
@@ -166,21 +157,12 @@ function toYMD(val?: any) {
   // ISO yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   
-  // dd/mm/yyyy or dd-mm-yyyy
+  // dd/mm/yyyy or dd-mm-yyyy (DATA_LAUDO now only contains date)
   const br = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
   if (br) {
     const year = br[3].length === 2 ? `20${br[3]}` : br[3];
     const month = br[2].padStart(2,'0');
     const day = br[1].padStart(2,'0');
-    return `${year}-${month}-${day}`;
-  }
-  
-  // dd/mm/yyyy hh:mm format (extract date part)
-  const brWithTime = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\s+\d{1,2}:\d{2}/);
-  if (brWithTime) {
-    const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
-    const month = brWithTime[2].padStart(2,'0');
-    const day = brWithTime[1].padStart(2,'0');
     return `${year}-${month}-${day}`;
   }
   
