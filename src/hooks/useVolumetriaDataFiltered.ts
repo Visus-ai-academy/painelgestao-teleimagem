@@ -13,6 +13,7 @@ export interface VolumetriaFilters {
   cliente: string;
   modalidade: string;
   especialidade: string;
+  categoria?: string;
   prioridade: string;
   medico: string;
 }
@@ -167,6 +168,11 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
       if (filters.especialidade !== 'todos') {
         allData = allData.filter(item => item.ESPECIALIDADE === filters.especialidade);
         console.log(`👨‍⚕️ Filtro especialidade aplicado: ${filters.especialidade}, restaram ${allData.length} registros`);
+      }
+      
+      if (filters.categoria && filters.categoria !== 'todos') {
+        allData = allData.filter(item => item.CATEGORIA === filters.categoria);
+        console.log(`🏷️ Filtro categoria aplicado: ${filters.categoria}, restaram ${allData.length} registros`);
       }
       
       if (filters.prioridade !== 'todos') {
@@ -375,13 +381,13 @@ export function useVolumetriaDataFiltered(filters: VolumetriaFilters) {
             current.prioridades[item.PRIORIDADE].registros += 1;
           }
           
-          // Detalhes por categoria (usando ESPECIALIDADE como categoria por enquanto)
-          if (item.ESPECIALIDADE) {
-            if (!current.categorias[item.ESPECIALIDADE]) {
-              current.categorias[item.ESPECIALIDADE] = { exames: 0, registros: 0 };
+          // Detalhes por categoria (usando o campo CATEGORIA específico)
+          if (item.CATEGORIA) {
+            if (!current.categorias[item.CATEGORIA]) {
+              current.categorias[item.CATEGORIA] = { exames: 0, registros: 0 };
             }
-            current.categorias[item.ESPECIALIDADE].exames += item.VALORES || 0;
-            current.categorias[item.ESPECIALIDADE].registros += 1;
+            current.categorias[item.CATEGORIA].exames += item.VALORES || 0;
+            current.categorias[item.CATEGORIA].registros += 1;
           }
           
           medicosMap.set(item.MEDICO, current);
