@@ -220,15 +220,23 @@ export const useProducaoMedica = () => {
       let totalSemanaAtual = 0;
       let totalSemanaAnterior = 0;
 
+      // Contadores para debug
+      let registrosProcessados = 0;
+      let registrosComTransferencia = 0;
+      let registrosComLaudo = 0;
+      
       volumetriaData?.forEach((record) => {
+        registrosProcessados++;
         const dataLaudo = record.DATA_LAUDO;
         const horaLaudo = record.HORA_LAUDO;
         const medico = record.MEDICO;
         const especialidade = record.ESPECIALIDADE;
         const valores = record.VALORES || 0;
 
+        
         if (!dataLaudo || !medico || !especialidade) return;
-
+        
+        registrosComLaudo++;
         const dateLaudo = new Date(dataLaudo);
         const diaSemana = dateLaudo.getDay();
         const diaSemanaName = getDiaSemanaName(diaSemana);
@@ -363,6 +371,7 @@ export const useProducaoMedica = () => {
 
         // Processar demanda usando DATA_TRANSFERENCIA e HORA_TRANSFERENCIA
         if (record.DATA_TRANSFERENCIA && record.HORA_TRANSFERENCIA) {
+          registrosComTransferencia++;
           const dataTransferencia = record.DATA_TRANSFERENCIA;
           const dataTransferenciaObj = new Date(dataTransferencia);
           const diaSemanaTransferencia = dataTransferenciaObj.getDay();
@@ -564,6 +573,31 @@ export const useProducaoMedica = () => {
 
       const variacao_mensal = totalMesAnterior > 0 ? ((totalMesAtual - totalMesAnterior) / totalMesAnterior) * 100 : 0;
       const variacao_semanal = totalSemanaAnterior > 0 ? ((totalSemanaAtual - totalSemanaAnterior) / totalSemanaAnterior) * 100 : 0;
+
+      // Debug: Mostrar estatísticas de processamento
+      console.log('🔍 [PRODUÇÃO DEBUG] Estatísticas de processamento:', {
+        registrosProcessados,
+        registrosComLaudo,
+        registrosComTransferencia,
+        percentualComTransferencia: registrosComLaudo > 0 ? (registrosComTransferencia / registrosComLaudo * 100).toFixed(1) + '%' : '0%',
+        diasDaSemanaEncontrados: Array.from(capacidadeDemandaMap.keys()),
+        totalDiasDaSemana: capacidadeDemandaMap.size
+      });
+
+      // Debug: Mostrar amostra de dados por dia da semana
+      capacidadeDemandaMap.forEach((dados, dia) => {
+        console.log(`🔍 [${dia}] Dados:`, {
+          diasComDemanda: dados.demanda_por_data.size,
+          diasComCapacidade: dados.capacidade_por_data.size,
+          mediaDemanda: dados.demanda_por_data.size > 0 ? 
+            Array.from(dados.demanda_por_data.values()).reduce((a, b) => a + b, 0) / dados.demanda_por_data.size : 0,
+          mediaCapacidade: dados.capacidade_por_data.size > 0 ? 
+            Array.from(dados.capacidade_por_data.values()).reduce((a, b) => a + b, 0) / dados.capacidade_por_data.size : 0,
+          turnosEncontrados: Array.from(dados.turnos_demanda_por_data.values()).flatMap(t => Array.from(t.keys())),
+          primeiraDataDemanda: dados.demanda_por_data.size > 0 ? Array.from(dados.demanda_por_data.keys())[0] : 'nenhuma',
+          primeiraDataCapacidade: dados.capacidade_por_data.size > 0 ? Array.from(dados.capacidade_por_data.keys())[0] : 'nenhuma'
+        });
+      });
 
       setData({
         resumo_geral: {
