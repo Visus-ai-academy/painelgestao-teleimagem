@@ -316,7 +316,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(r.MEDICO || r.medico || ''),
             normalizeModalidade(modalidade),
             canonical(especialidade),
-            canonical(r.PRIORIDADE || r.prioridade || '')
+            normalizePrioridade(r.PRIORIDADE || r.prioridade || '')
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
@@ -370,7 +370,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical((r as any).medico || (r as any).MEDICO || ''),
             normalizeModalidade(r.modalidade),
             canonical(r.especialidade),
-            canonical((r as any).prioridade || (r as any).PRIORIDADE || '')
+            normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || '')
           ].join('|');
           
           if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
