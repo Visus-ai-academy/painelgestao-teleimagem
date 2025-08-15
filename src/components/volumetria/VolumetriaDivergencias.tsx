@@ -96,46 +96,95 @@ function cleanExamName(name?: string) {
   return raw.replace(/\s+X[1-9]\b/gi, '').replace(/\s+XE\b/gi, '').replace(/\s+/g, ' ').trim();
 }
 
-function formatDateBR(val?: string) {
-  if (!val) return '-';
-  const s = String(val).trim();
+function formatDateBR(val?: string | number) {
+  if (!val && val !== 0) return '-';
+  let s = String(val).trim();
   if (!s) return '-';
-  // ISO or yyyy-mm-dd
+  
+  // Excel serial number (handle numeric dates from Excel)
+  const num = Number(s);
+  if (!isNaN(num) && num > 25000 && num < 60000) {
+    // Excel date serial conversion
+    const baseDate = new Date(1899, 11, 30); // Excel's base date
+    const convertedDate = new Date(baseDate.getTime() + num * 24 * 60 * 60 * 1000);
+    const dd = String(convertedDate.getDate()).padStart(2,'0');
+    const mm = String(convertedDate.getMonth() + 1).padStart(2,'0');
+    const yyyy = String(convertedDate.getFullYear());
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  
+  // ISO format yyyy-mm-dd
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
-  // dd/mm/yyyy keep
+  
+  // dd/mm/yyyy format (keep)
   const br = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})$/);
-  if (br) return `${br[1].padStart(2,'0')}/${br[2].padStart(2,'0')}/${br[3].length===2?`20${br[3]}`:br[3]}`;
-  // try Date parse fallback
+  if (br) {
+    const day = br[1].padStart(2,'0');
+    const month = br[2].padStart(2,'0');
+    const year = br[3].length === 2 ? `20${br[3]}` : br[3];
+    return `${day}/${month}/${year}`;
+  }
+  
+  // dd/mm/yyyy hh:mm format (extract date part)
+  const brWithTime = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2,4})\s+\d{1,2}:\d{2}/);
+  if (brWithTime) {
+    const day = brWithTime[1].padStart(2,'0');
+    const month = brWithTime[2].padStart(2,'0');
+    const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Try Date parse fallback
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
-    const yy = String(d.getFullYear());
-    return `${dd}/${mm}/${yy}`;
+    const yyyy = String(d.getFullYear());
+    return `${dd}/${mm}/${yyyy}`;
   }
-  return s;
+  
+  return '-'; // Return '-' for invalid dates instead of raw value
 }
 
 function toYMD(val?: any) {
   if (val === null || val === undefined) return '';
-  const s = String(val).trim();
+  let s = String(val).trim();
   if (!s) return '';
-  // ISO yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  // dd/mm/yyyy or dd-mm-yyyy
-  const br = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
-  if (br) return `${br[3].length===2?`20${br[3]}`:br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
-  // Excel serial number (approx range)
+  
+  // Excel serial number (handle numeric dates from Excel first)
   const num = Number(s);
   if (!isNaN(num) && num > 25000 && num < 60000) {
-    const base = new Date(Date.UTC(1899, 11, 30));
-    const d = new Date(base.getTime() + Math.round(num) * 86400000);
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2,'0');
-    const day = String(d.getUTCDate()).padStart(2,'0');
+    const baseDate = new Date(1899, 11, 30); // Excel's epoch
+    const convertedDate = new Date(baseDate.getTime() + num * 24 * 60 * 60 * 1000);
+    const y = convertedDate.getFullYear();
+    const m = String(convertedDate.getMonth() + 1).padStart(2,'0');
+    const day = String(convertedDate.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  
+  // ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  
+  // dd/mm/yyyy or dd-mm-yyyy
+  const br = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if (br) {
+    const year = br[3].length === 2 ? `20${br[3]}` : br[3];
+    const month = br[2].padStart(2,'0');
+    const day = br[1].padStart(2,'0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  // dd/mm/yyyy hh:mm format (extract date part)
+  const brWithTime = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\s+\d{1,2}:\d{2}/);
+  if (brWithTime) {
+    const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
+    const month = brWithTime[2].padStart(2,'0');
+    const day = brWithTime[1].padStart(2,'0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Try Date parse fallback
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
     const y = d.getFullYear();
@@ -143,6 +192,7 @@ function toYMD(val?: any) {
     const day = String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  
   return '';
 }
 
@@ -362,11 +412,11 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           ESPECIALIDADE: r.especialidade || '-',
           MEDICO: (r as any).medico || '-',
           DUPLICADO: '-',
-          DATA_REALIZACAO: ((r as any).data_exame || '-') as string,
+          DATA_REALIZACAO: formatDateBR((r as any).data_exame),
           HORA_REALIZACAO: '-',
           DATA_TRANSFERENCIA: '-',
           HORA_TRANSFERENCIA: '-',
-          DATA_LAUDO: ((r as any).data_laudo || '-') as string,
+          DATA_LAUDO: formatDateBR((r as any).data_laudo),
           HORA_LAUDO: '-',
           DATA_PRAZO: '-',
           HORA_PRAZO: '-',
@@ -395,11 +445,11 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           ESPECIALIDADE: r.ESPECIALIDADE || '-',
           MEDICO: r.MEDICO || '-',
           DUPLICADO: String(r.DUPLICADO ?? '-'),
-          DATA_REALIZACAO: r.DATA_REALIZACAO || '-',
+          DATA_REALIZACAO: formatDateBR(r.DATA_REALIZACAO),
           HORA_REALIZACAO: r.HORA_REALIZACAO || '-',
-          DATA_TRANSFERENCIA: r.DATA_TRANSFERENCIA || '-',
+          DATA_TRANSFERENCIA: formatDateBR(r.DATA_TRANSFERENCIA),
           HORA_TRANSFERENCIA: r.HORA_TRANSFERENCIA || '-',
-          DATA_LAUDO: r.DATA_LAUDO || '-',
+          DATA_LAUDO: formatDateBR(r.DATA_LAUDO),
           HORA_LAUDO: r.HORA_LAUDO || '-',
           DATA_PRAZO: r.DATA_PRAZO || '-',
           HORA_PRAZO: r.HORA_PRAZO || '-',
