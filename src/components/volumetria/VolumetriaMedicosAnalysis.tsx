@@ -221,18 +221,17 @@ export function VolumetriaMedicosAnalysis({
             </CardHeader>
             <CardContent>
               <div className="h-96 overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Médico</TableHead>
-                      <TableHead className="text-right">Exames</TableHead>
-                      <TableHead className="text-right">Registros</TableHead>
-                      <TableHead className="text-right">% do Total</TableHead>
-                      <TableHead className="text-center">Categoria</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Médico</TableHead>
+                        <TableHead className="text-right">Exames</TableHead>
+                        <TableHead className="text-right">% do Total</TableHead>
+                        <TableHead className="text-center">Categoria</TableHead>
+                      </TableRow>
+                    </TableHeader>
                   <TableBody>
                     {medicos.map((medico, index) => (
                       <>
@@ -253,7 +252,6 @@ export function VolumetriaMedicosAnalysis({
                           <TableCell className="font-medium">{index + 1}</TableCell>
                           <TableCell className="font-medium">{medico.nome}</TableCell>
                           <TableCell className="text-right">{medico.total_exames.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{medico.total_registros.toLocaleString()}</TableCell>
                           <TableCell className="text-right">{formatPercentual(medico.percentual)}</TableCell>
                           <TableCell className="text-center">{getPerformanceBadge(medico.percentual)}</TableCell>
                         </TableRow>
@@ -261,7 +259,7 @@ export function VolumetriaMedicosAnalysis({
                         {/* Linha expandida com detalhes */}
                         {expandedMedicos.has(medico.nome) && medico.detalhes && (
                           <TableRow key={`${medico.nome}-details`}>
-                            <TableCell colSpan={7} className="p-4 bg-muted/20">
+                            <TableCell colSpan={6} className="p-4 bg-muted/20">
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                 {/* Modalidades */}
                                 <div className="min-w-0">
