@@ -314,13 +314,19 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(especialidade),
             canonical(cleanExamName(exameDescricao)),
             canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo),
-            canonical(r.ACCESSION_NUMBER || r.accession_number || ''),
-            canonical(r.MEDICO || r.medico || ''),
-            canonical(r.PRIORIDADE || r.prioridade || '')
+            toYMD(dataExame || dataLaudo)
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
+          
+          if (r.NOME_PACIENTE === 'Daniel Soares' && r.ESTUDO_DESCRICAO?.includes('TC COLUNA CERVICAL')) {
+            console.log('🔍 DEBUG Sistema - Daniel Soares TC COLUNA CERVICAL:', {
+              chave,
+              valores,
+              dataOriginal: dataExame || dataLaudo,
+              dataFormatada: toYMD(dataExame || dataLaudo)
+            });
+          }
           
           if (mapSistema.has(chave)) {
             mapSistema.get(chave)!.total += valores;
@@ -360,11 +366,17 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(r.especialidade),
             canonical(cleanExamName(exameDescricao)),
             canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo),
-            canonical((r as any).accessionNumber || (r as any).ACCESSION_NUMBER || ''),
-            canonical((r as any).medico || (r as any).MEDICO || ''),
-            canonical((r as any).prioridade || (r as any).PRIORIDADE || '')
+            toYMD(dataExame || dataLaudo)
           ].join('|');
+          
+          if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
+            console.log('🔍 DEBUG Arquivo - Daniel Soares TC COLUNA CERVICAL:', {
+              key,
+              quantidade: Number(r.quant || (r as any).quantidade || (r as any).valores || 1),
+              dataOriginal: dataExame || dataLaudo,
+              dataFormatada: toYMD(dataExame || dataLaudo)
+            });
+          }
           
           const cur = mapArquivo.get(key) || { total: 0, amostra: r };
           cur.total += Number(r.quant || (r as any).quantidade || (r as any).valores || 1);
