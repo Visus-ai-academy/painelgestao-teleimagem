@@ -355,6 +355,19 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
         }
       }
       
+      // Aplicar correção de modalidade (Regra v030: DX→RX, CR→RX, mamografia→MG)
+      try {
+        const { data: correcaoResult } = await supabaseClient.functions.invoke('aplicar-correcao-modalidade-rx', {
+          body: { arquivo_fonte: arquivo_fonte }
+        });
+        
+        if (correcaoResult) {
+          console.log(`✅ Correção modalidade: ${correcaoResult.registros_corrigidos_rx} → RX, ${correcaoResult.registros_corrigidos_mg} → MG`);
+        }
+      } catch (correcaoError) {
+        console.warn('⚠️ Erro na correção de modalidade (ignorado):', correcaoError);
+      }
+
       // Aplicar de-para de valores para todos os arquivos de volumetria
       if (arquivo_fonte.includes('volumetria')) {
         const { data: deParaResult } = await supabaseClient.rpc('aplicar_de_para_automatico', { 

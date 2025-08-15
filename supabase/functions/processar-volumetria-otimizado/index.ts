@@ -451,6 +451,25 @@ serve(async (req) => {
       }
     }
 
+    // 🔧 APLICAR CORREÇÃO DE MODALIDADE (Regra v030: DX→RX, CR→RX, mamografia→MG)
+    if (totalInserted > 0) {
+      console.log('🔧 Aplicando correção de modalidade DX/CR → RX...');
+      try {
+        const { data: correcaoResult, error: correcaoError } = await supabaseClient.functions.invoke('aplicar-correcao-modalidade-rx', {
+          body: { arquivo_fonte: arquivo_fonte }
+        });
+        
+        if (correcaoError) {
+          console.warn('⚠️ Erro na correção de modalidade:', correcaoError);
+        } else if (correcaoResult) {
+          console.log('✅ Correção de modalidade aplicada:', correcaoResult);
+          resultado.alertas.push(`Correção modalidade: ${correcaoResult.registros_corrigidos_rx} → RX, ${correcaoResult.registros_corrigidos_mg} → MG`);
+        }
+      } catch (correcaoException) {
+        console.warn('⚠️ Exceção na correção de modalidade:', correcaoException);
+      }
+    }
+
     // 🏷️ APLICAR TIPIFICAÇÃO DE FATURAMENTO (Regras F005/F006)
     if (totalInserted > 0) {
       console.log('🏷️ Aplicando tipificação de faturamento...');
