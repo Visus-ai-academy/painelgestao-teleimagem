@@ -309,12 +309,14 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
           
           const chave = [
-            empresaNormalizada,
+            canonical(pacienteNome),
+            canonical(cleanExamName(exameDescricao)),
+            toYMD(dataExame || ''),
+            toYMD(dataLaudo || ''),
+            canonical(r.MEDICO || r.medico || ''),
             normalizeModalidade(modalidade),
             canonical(especialidade),
-            canonical(cleanExamName(exameDescricao)),
-            canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo)
+            canonical(r.PRIORIDADE || r.prioridade || '')
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
@@ -361,12 +363,14 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
           
           const key = [
-            clienteNormalizado,
+            canonical(pacienteNome),
+            canonical(cleanExamName(exameDescricao)),
+            toYMD(dataExame || ''),
+            toYMD(dataLaudo || ''),
+            canonical((r as any).medico || (r as any).MEDICO || ''),
             normalizeModalidade(r.modalidade),
             canonical(r.especialidade),
-            canonical(cleanExamName(exameDescricao)),
-            canonical(pacienteNome),
-            toYMD(dataExame || dataLaudo)
+            canonical((r as any).prioridade || (r as any).PRIORIDADE || '')
           ].join('|');
           
           if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
