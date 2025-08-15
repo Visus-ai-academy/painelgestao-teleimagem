@@ -253,6 +253,20 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         throw new Error('Nenhum dado encontrado no contexto. Atualize a tela.');
       }
 
+      // Funções auxiliares para normalização
+      const normalizeModalidade = (mod: string) => canonical(mod || '');
+      const normalizeCliente = (cli: string) => canonical(cli || '');
+      const cleanExamName = (name: string) => canonical(name || '');
+      
+      // Normalizar prioridade para resolver divergências incorretas
+      const normalizePrioridade = (prio: string) => {
+        const prioNorm = canonical(prio || '');
+        if (prioNorm === 'URGENCIA' || prioNorm === 'URGENTE') return 'URGENTE';
+        if (prioNorm === 'ROTINA') return 'ROTINA';
+        if (prioNorm === 'EMERGENCIA' || prioNorm === 'EMERGENCIAL') return 'EMERGENCIA';
+        return prioNorm;
+      };
+
       // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
       const inMonth = (val: any) => {
         if (!val) return true;
