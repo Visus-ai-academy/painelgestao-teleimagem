@@ -312,11 +312,11 @@ export const useProducaoMedica = () => {
         
         const turnoData = diaData.turnos.get(turno)!;
         
-        // A demanda é o total de valores que entraram no turno
-        diaData.total_demanda_dia += valores;
-        turnoData.demanda_turno += valores;
+        // A demanda é a quantidade de exames que entraram (conta registros)
+        diaData.total_demanda_dia += 1;
+        turnoData.demanda_turno += 1;
         
-        // A capacidade produtiva é quanto o médico realizou (mesma coluna VALORES)
+        // A capacidade produtiva é quanto o médico realizou em valor (soma VALORES)
         if (!turnoData.medicos.has(medico)) {
           turnoData.medicos.set(medico, { capacidade_produtiva: 0, especialidade });
         }
