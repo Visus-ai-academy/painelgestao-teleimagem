@@ -78,6 +78,7 @@ const menuItems: MenuItem[] = [
     requiredRoles: ['manager', 'admin'],
     subItems: [
       { title: "Escala", url: "/operacional/escala", requiredRoles: ['manager', 'admin'] },
+      { title: "PCP", url: "/operacional/pcp", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 

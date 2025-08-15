@@ -20,6 +20,7 @@ import Operacional from "./pages/Operacional";
 import OperacionalProducao from "./pages/OperacionalProducao";
 import OperacionalQualidade from "./pages/OperacionalQualidade";
 import Escala from "./pages/Escala";
+import PCP from "./pages/PCP";
 import Financeiro from "./pages/Financeiro";
 import Comparativo from "./pages/Comparativo";
 import GerarFaturamento from "./pages/GerarFaturamento";
@@ -132,6 +133,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <Escala />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/operacional/pcp" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <PCP />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
