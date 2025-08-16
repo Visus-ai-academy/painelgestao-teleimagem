@@ -277,10 +277,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       // Normalizar nome do médico removendo apenas códigos entre parênteses
       const normalizeMedico = (medico: string) => {
         let norm = canonical(medico || '');
-        // Remover códigos entre parênteses como (E1), (E2), (E3), etc
-        norm = norm.replace(/\s*\([E]\d+\)\s*$/g, '');
-        // Remover códigos mais genéricos entre parênteses no final
-        norm = norm.replace(/\s*\(\d+\)\s*$/g, '');
+        // Remover códigos entre parênteses como (E1), (E2), (E3), etc - usando regex mais ampla
+        norm = norm.replace(/\s*\([^)]*\)\s*/g, '');
         // Remover DR/DRA no início se presente
         norm = norm.replace(/^DR[A]?\s+/, '');
         // Remover pontos finais
