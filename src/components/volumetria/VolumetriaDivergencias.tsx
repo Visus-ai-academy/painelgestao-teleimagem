@@ -268,23 +268,17 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return prioNorm;
       };
 
-      // Normalizar nome do médico removendo sufixos e códigos
+      // Normalizar nome do médico removendo apenas códigos entre parênteses
       const normalizeMedico = (medico: string) => {
         let norm = canonical(medico || '');
-        // Remover códigos entre parênteses como (E2), (123), etc
-        norm = norm.replace(/\s*\([^)]*\)\s*$/g, '');
-        // Remover códigos no final como E2, 123 sem parênteses
-        norm = norm.replace(/\s+[A-Z0-9]+$/g, '');
+        // Remover códigos entre parênteses como (E1), (E2), (E3), etc
+        norm = norm.replace(/\s*\([E]\d+\)\s*$/g, '');
+        // Remover códigos mais genéricos entre parênteses no final
+        norm = norm.replace(/\s*\(\d+\)\s*$/g, '');
         // Remover DR/DRA no início se presente
         norm = norm.replace(/^DR[A]?\s+/, '');
         // Remover pontos finais
         norm = norm.replace(/\.$/, '');
-        
-        // Para garantir compatibilidade, usar apenas as duas primeiras palavras do nome
-        const palavras = norm.trim().split(/\s+/).filter(p => p.length > 0);
-        if (palavras.length >= 2) {
-          return palavras.slice(0, 2).join(' ');
-        }
         return norm.trim();
       };
 
