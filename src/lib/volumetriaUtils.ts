@@ -630,7 +630,13 @@ export async function processVolumetriaOtimizado(
   console.log('📅 Período para processamento:', periodo);
   
   try {
-    // TODOS os arquivos usam o mesmo processamento local (igual aos arquivos 1 e 2)
+    // Para arquivos retroativos, usar OBRIGATORIAMENTE a edge function que aplica as regras
+    if (arquivoFonte.includes('retroativo') && periodo) {
+      console.log('🔧 ARQUIVO RETROATIVO: Usando edge function para aplicar regras v002 e v003 obrigatoriamente');
+      return await processVolumetriaComEdgeFunction(file, arquivoFonte, periodo, onProgress);
+    }
+    
+    // Para arquivos não-retroativos, usar processamento local
     console.log('🔧 Usando processamento local padrão');
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     
