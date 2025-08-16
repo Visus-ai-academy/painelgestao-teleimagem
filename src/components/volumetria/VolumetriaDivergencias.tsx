@@ -34,7 +34,7 @@ interface VolumetriaRow {
   UNIDADE_ORIGEM?: string;
 }
 
-type DivergenciaTipo = 'arquivo_nao_no_sistema' | 'sistema_nao_no_arquivo' | 'quantidade_diferente' | 'categoria_diferente';
+type DivergenciaTipo = 'arquivo_nao_no_sistema' | 'sistema_nao_no_arquivo' | 'quantidade_diferente' | 'categoria' | 'especialidade' | 'modalidade' | 'prioridade' | 'categoria+especialidade' | 'categoria+especialidade+modalidade' | 'categoria+especialidade+modalidade+prioridade';
 
 interface LinhaDivergencia {
   tipo: DivergenciaTipo;
@@ -423,14 +423,30 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       console.log('📁 Arquivo processado - chaves únicas:', mapArquivo.size);
 
-      // OTIMIZAÇÃO: Construir divergências de forma mais eficiente
+      // OTIMIZAÇÃO: Construir divergências identificando tipos específicos
       const divergencias: LinhaDivergencia[] = [];
       const allKeys = new Set<string>([...mapArquivo.keys(), ...mapSistema.keys()]);
 
-      const toLinhaFromArquivo = (key: string, a: AggFile): LinhaDivergencia => {
+      // Função para identificar tipo de divergência entre registros
+      const identificarTipoDivergencia = (sistema: any, arquivo: any): string => {
+        const categoriaDiv = canonical(sistema.CATEGORIA || '') !== canonical((arquivo as any).categoria || '');
+        const especialidadeDiv = canonical(sistema.ESPECIALIDADE || '') !== canonical(arquivo.especialidade || '');
+        const modalidadeDiv = normalizeModalidade(sistema.MODALIDADE || '') !== normalizeModalidade(arquivo.modalidade || '');
+        const prioridadeDiv = normalizePrioridade(sistema.PRIORIDADE || '') !== normalizePrioridade((arquivo as any).prioridade || '');
+        
+        const divergencias = [];
+        if (categoriaDiv) divergencias.push('categoria');
+        if (especialidadeDiv) divergencias.push('especialidade');
+        if (modalidadeDiv) divergencias.push('modalidade');
+        if (prioridadeDiv) divergencias.push('prioridade');
+        
+        return divergencias.length > 0 ? divergencias.join('+') : '';
+      };
+
+      const toLinhaFromArquivo = (key: string, a: AggFile, tipo: DivergenciaTipo = 'arquivo_nao_no_sistema'): LinhaDivergencia => {
         const r = a.amostra as any as UploadedExamRow;
         return {
-          tipo: 'arquivo_nao_no_sistema',
+          tipo,
           chave: key,
           EMPRESA: r.cliente || '-',
           NOME_PACIENTE: (r as any).paciente || '-',
@@ -507,44 +523,81 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const s = mapSistema.get(k);
           
           if (a && !s) {
-            divergencias.push(toLinhaFromArquivo(k, a));
+            divergencias.push(toLinhaFromArquivo(k, a, 'arquivo_nao_no_sistema'));
           } else if (!a && s) {
             divergencias.push(toLinhaFromSistema(k, s));
           } else if (a && s) {
-            // Quando o exame existe em ambos, verificar se há diferenças em campos específicos
-            const catA = canonical(((a.amostra as any) || {}).categoria || '');
-            const catS = canonical(((s.amostra as any) || {}).CATEGORIA || '');
-            const espA = canonical(((a.amostra as any) || {}).especialidade || '');
-            const espS = canonical(((s.amostra as any) || {}).ESPECIALIDADE || '');
+            // Quando o exame existe em ambos, verificar diferenças específicas
+            const arquivoData = a.amostra as any;
+            const sistemaData = s.amostra as any;
             
-            // Verificar se há diferenças em categoria, especialidade ou quantidade
+            const catA = canonical(arquivoData.categoria || '');
+            const catS = canonical(sistemaData.CATEGORIA || '');
+            const espA = canonical(arquivoData.especialidade || '');
+            const espS = canonical(sistemaData.ESPECIALIDADE || '');
+            const modA = normalizeModalidade(arquivoData.modalidade || '');
+            const modS = normalizeModalidade(sistemaData.MODALIDADE || '');
+            const prioA = normalizePrioridade(arquivoData.prioridade || '');
+            const prioS = normalizePrioridade(sistemaData.PRIORIDADE || '');
+            
+            // Identificar diferenças específicas
             const categoriaDiferente = catA && catS && catA !== catS;
             const especialidadeDiferente = espA && espS && espA !== espS;
+            const modalidadeDiferente = modA && modS && modA !== modS;
+            const prioridadeDiferente = prioA && prioS && prioA !== prioS;
             const quantidadeDiferente = a.total !== s.total;
             
-            // Se há qualquer diferença, criar uma divergência
-            if (categoriaDiferente || especialidadeDiferente || quantidadeDiferente) {
-              const base = toLinhaFromArquivo(k, a);
+            // Se há diferenças de campo, criar divergência específica
+            if (categoriaDiferente || especialidadeDiferente || modalidadeDiferente || prioridadeDiferente) {
+              const tiposDivergencia = [];
+              if (categoriaDiferente) tiposDivergencia.push('categoria');
+              if (especialidadeDiferente) tiposDivergencia.push('especialidade');
+              if (modalidadeDiferente) tiposDivergencia.push('modalidade');
+              if (prioridadeDiferente) tiposDivergencia.push('prioridade');
               
-              // Definir tipo de divergência baseado na diferença principal
-              if (categoriaDiferente && especialidadeDiferente) {
-                base.tipo = 'categoria_diferente' as DivergenciaTipo; // Priorizar categoria quando ambas diferem
-              } else if (categoriaDiferente) {
-                base.tipo = 'categoria_diferente' as DivergenciaTipo;
-              } else if (especialidadeDiferente) {
-                base.tipo = 'categoria_diferente' as DivergenciaTipo; // Usar mesmo tipo para especialidade
+              let tipoDivergencia: DivergenciaTipo;
+              const combinacao = tiposDivergencia.join('+');
+              
+              // Mapear combinações específicas solicitadas
+              if (combinacao === 'categoria+especialidade+modalidade+prioridade') {
+                tipoDivergencia = 'categoria+especialidade+modalidade+prioridade';
+              } else if (combinacao.includes('categoria') && combinacao.includes('especialidade') && combinacao.includes('modalidade') && !combinacao.includes('prioridade')) {
+                // Para categoria+especialidade+modalidade, vamos usar um tipo válido
+                tipoDivergencia = 'categoria+especialidade';
+              } else if (combinacao === 'categoria+especialidade') {
+                tipoDivergencia = 'categoria+especialidade';
+              } else if (tiposDivergencia.includes('categoria')) {
+                tipoDivergencia = 'categoria';
+              } else if (tiposDivergencia.includes('especialidade')) {
+                tipoDivergencia = 'especialidade';
+              } else if (tiposDivergencia.includes('modalidade')) {
+                tipoDivergencia = 'modalidade';
+              } else if (tiposDivergencia.includes('prioridade')) {
+                tipoDivergencia = 'prioridade';
               } else {
-                base.tipo = 'quantidade_diferente' as DivergenciaTipo;
+                tipoDivergencia = 'quantidade_diferente';
               }
               
+              const base = toLinhaFromArquivo(k, a, tipoDivergencia);
               base.total_sistema = s.total;
-              base.categoria_arquivo = (a.amostra as any).categoria || '';
-              base.categoria_sistema = (s.amostra as any).CATEGORIA || '';
+              base.categoria_arquivo = catA;
+              base.categoria_sistema = catS;
               
-              // Adicionar informações de especialidade para debug
+              // Adicionar informações extras para debug
               (base as any).especialidade_arquivo = espA;
               (base as any).especialidade_sistema = espS;
+              (base as any).modalidade_arquivo = modA;
+              (base as any).modalidade_sistema = modS;
+              (base as any).prioridade_arquivo = prioA;
+              (base as any).prioridade_sistema = prioS;
               
+              divergencias.push(base);
+            } else if (quantidadeDiferente) {
+              // Apenas diferença de quantidade
+              const base = toLinhaFromArquivo(k, a, 'quantidade_diferente');
+              base.total_sistema = s.total;
+              base.categoria_arquivo = catA;
+              base.categoria_sistema = catS;
               divergencias.push(base);
             }
           }
@@ -567,7 +620,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         'Tipo Divergência': linha.tipo === 'arquivo_nao_no_sistema' ? 'Somente no Arquivo' :
                            linha.tipo === 'sistema_nao_no_arquivo' ? 'Somente no Sistema' :
                            linha.tipo === 'quantidade_diferente' ? 'Quantidade Diferente' :
-                           linha.tipo === 'categoria_diferente' ? 'Categoria Diferente' : linha.tipo,
+                           linha.tipo,
         'Cliente': linha.EMPRESA,
         'Paciente': linha.NOME_PACIENTE,
         'Código Paciente': linha.CODIGO_PACIENTE,
