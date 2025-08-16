@@ -333,15 +333,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataLaudo = r.DATA_LAUDO || r.data_laudo;
           const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
           
-          // Criar chave base SEM especialidade e categoria para identificar o mesmo exame
+          // Criar chave base com APENAS os 5 campos essenciais: paciente, exame, data realização, data laudo, médico
           const chaveBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            normalizeMedico(r.MEDICO || r.medico || ''),
-            normalizeModalidade(modalidade),
-            normalizePrioridade(r.PRIORIDADE || r.prioridade || '')
+            normalizeMedico(r.MEDICO || r.medico || '')
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
@@ -394,15 +392,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
           const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
           
-          // Usar a mesma chave base SEM especialidade para identificar o mesmo exame
+          // Usar a mesma chave base com APENAS os 5 campos essenciais: paciente, exame, data realização, data laudo, médico
           const keyBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            normalizeMedico((r as any).medico || (r as any).MEDICO || ''),
-            normalizeModalidade(r.modalidade),
-            normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || '')
+            normalizeMedico((r as any).medico || (r as any).MEDICO || '')
           ].join('|');
           
           if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
