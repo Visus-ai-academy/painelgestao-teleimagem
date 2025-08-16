@@ -125,6 +125,20 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       return String(value).trim() || undefined;
     };
 
+    const normalizeMedico = (value: any): string | undefined => {
+      if (value === null || value === undefined || value === '') return undefined;
+      
+      let medico = String(value).trim();
+      // Remover códigos entre parênteses como (E1), (E2), (E3), etc
+      medico = medico.replace(/\s*\([^)]*\)\s*/g, '');
+      // Remover DR/DRA no início se presente
+      medico = medico.replace(/^DR[A]?\s+/i, '');
+      // Remover pontos finais
+      medico = medico.replace(/\.$/, '');
+      
+      return medico.trim() || undefined;
+    };
+
     const cleanExameName = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
       
@@ -149,7 +163,7 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       MODALIDADE: safeString(row['MODALIDADE']),
       PRIORIDADE: safeString(row['PRIORIDADE']),
       ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
-      MEDICO: safeString(row['MEDICO']),
+      MEDICO: normalizeMedico(row['MEDICO']),
       DUPLICADO: safeString(row['DUPLICADO']),
       STATUS: safeString(row['STATUS']),
       MEDICO_REASSINATURA: safeString(row['MEDICO_REASSINATURA']),
