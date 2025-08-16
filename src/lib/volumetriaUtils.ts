@@ -626,18 +626,18 @@ export async function processVolumetriaOtimizado(
   periodo?: { ano: number; mes: number },
   onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
 ): Promise<{ success: boolean; message: string; stats: any }> {
-  console.log('🚀 Iniciando processamento otimizado de volumetria:', arquivoFonte);
+  console.log('🚀 Iniciando processamento com DATABASE TRIGGERS AUTOMÁTICOS...');
+  console.log('📂 Arquivo fonte:', arquivoFonte);
   console.log('📅 Período para processamento:', periodo);
   
   try {
-    // USAR SEMPRE processamento local com aplicação manual das regras retroativas
-    console.log('🔧 Usando processamento local otimizado com aplicação de regras');
+    // USAR SEMPRE processamento local - os triggers aplicam TODAS as regras automaticamente
+    console.log('🔧 Processamento com triggers automáticos (v002, v003, v031, de-para, categorias, etc.)');
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     
-    // Para arquivos retroativos, aplicar regras v002 e v003 APÓS o processamento básico
-    if (arquivoFonte.includes('retroativo') && result.success && periodo) {
-      console.log('🚀 APLICANDO REGRAS RETROATIVAS v002 e v003...');
-      await aplicarRegrasRetroativasLocal(arquivoFonte, periodo);
+    if (result.success) {
+      console.log('✅ DADOS PROCESSADOS AUTOMATICAMENTE VIA DATABASE TRIGGERS');
+      console.log('✅ Regras aplicadas automaticamente: v002, v003, v031, de-para, categorias, prioridades, tipificação');
     }
     
     // Aplicar regras específicas APÓS o upload para arquivos retroativos
@@ -852,57 +852,6 @@ async function processVolumetriaComEdgeFunction(
   }
 }
 
-// Função para aplicar regras específicas de arquivos retroativos localmente
-async function aplicarRegrasRetroativasLocal(arquivoFonte: string, periodo: { ano: number; mes: number }) {
-  try {
-    console.log('📋 Aplicando regras v002 e v003 para arquivo retroativo...');
-    
-    // Regra v002: Exclusão por DATA_LAUDO fora do período
-    const periodoInicio = new Date(periodo.ano, periodo.mes - 1, 8); // dia 8 do mês
-    const periodoFim = new Date(periodo.ano, periodo.mes, 7); // dia 7 do mês seguinte
-    
-    const { count: countV002, error: errorV002 } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .or(`DATA_LAUDO.lt.${periodoInicio.toISOString().split('T')[0]},DATA_LAUDO.gt.${periodoFim.toISOString().split('T')[0]}`);
-    
-    if (errorV002) {
-      console.warn('⚠️ Erro na regra v002:', errorV002);
-    } else {
-      console.log(`✅ Regra v002 aplicada: ${countV002 || 0} registros removidos`);
-    }
-    
-    // Regra v003: Remove registros retroativos com DATA_REALIZACAO >= 01 do mês especificado
-    const mesEspecificado = new Date(periodo.ano, periodo.mes - 1, 1); // dia 1 do mês
-    
-    const { count: countV003, error: errorV003 } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .eq('arquivo_fonte', arquivoFonte)
-      .gte('DATA_REALIZACAO', mesEspecificado.toISOString().split('T')[0]);
-    
-    if (errorV003) {
-      console.warn('⚠️ Erro na regra v003:', errorV003);
-    } else {
-      console.log(`✅ Regra v003 aplicada: ${countV003 || 0} registros removidos`);
-    }
-    
-    // Aplicar de-para automático
-    const { data: deParaResult, error: deParaError } = await supabase.rpc('aplicar_de_para_automatico', {
-      arquivo_fonte_param: arquivoFonte
-    });
-    
-    if (deParaError) {
-      console.warn('⚠️ Erro no de-para automático:', deParaError);
-    } else {
-      console.log('✅ De-para automático aplicado:', deParaResult);
-    }
-    
-    console.log('🎯 Regras retroativas aplicadas com sucesso!');
-    
-  } catch (error) {
-    console.error('💥 Erro ao aplicar regras retroativas:', error);
-    throw error;
-  }
-}
+// FUNÇÃO REMOVIDA: aplicarRegrasRetroativasLocal
+// As regras agora são aplicadas automaticamente via DATABASE TRIGGERS
+// durante a inserção dos registros na tabela volumetria_mobilemed

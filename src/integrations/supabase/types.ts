@@ -3604,6 +3604,14 @@ export type Database = {
           mes_referencia: string
         }[]
       }
+      get_regras_aplicadas_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          regra: string
+          total_aplicacoes: number
+          ultima_aplicacao: string
+        }[]
+      }
       get_tempo_medio_atraso_clientes: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3922,6 +3930,10 @@ export type Database = {
           p_mes_destino: number
           p_mes_origem: number
         }
+        Returns: Json
+      }
+      reprocessar_volumetria_existente: {
+        Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
       security_health_check: {
