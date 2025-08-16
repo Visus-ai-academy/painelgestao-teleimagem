@@ -273,8 +273,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         let norm = canonical(medico || '');
         // Remover códigos entre parênteses como (E2), (123), etc
         norm = norm.replace(/\s*\([^)]*\)\s*$/g, '');
+        // Remover códigos no final como E2, 123 sem parênteses
+        norm = norm.replace(/\s+[A-Z0-9]+$/g, '');
         // Remover DR/DRA no início se presente
         norm = norm.replace(/^DR[A]?\s+/, '');
+        // Remover pontos finais
+        norm = norm.replace(/\.$/, '');
         return norm.trim();
       };
 
@@ -344,9 +348,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           
           const valores = Number(r.VALORES || r.valores || 1);
           
-          if (r.NOME_PACIENTE === 'Daniel Soares' && r.ESTUDO_DESCRICAO?.includes('TC COLUNA CERVICAL')) {
-            console.log('🔍 DEBUG Sistema - Daniel Soares TC COLUNA CERVICAL:', {
+          if (r.NOME_PACIENTE === 'Zely Correa Prestes Nunes' && r.ESTUDO_DESCRICAO?.includes('TC CRANIO')) {
+            console.log('🔍 DEBUG Sistema - Zely TC CRANIO:', {
               chaveBase,
+              medicoOriginal: r.MEDICO || r.medico || '',
+              medicoNormalizado: normalizeMedico(r.MEDICO || r.medico || ''),
+              prioridadeOriginal: r.PRIORIDADE || r.prioridade || '',
+              prioridadeNormalizada: normalizePrioridade(r.PRIORIDADE || r.prioridade || ''),
               especialidade,
               categoria: (r as any).CATEGORIA,
               valores,
@@ -401,9 +409,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             normalizeMedico((r as any).medico || (r as any).MEDICO || '')
           ].join('|');
           
-          if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
-            console.log('🔍 DEBUG Arquivo - Daniel Soares TC COLUNA CERVICAL:', {
+          if (pacienteNome === 'Zely Correa Prestes Nunes' && exameDescricao?.includes('TC CRANIO')) {
+            console.log('🔍 DEBUG Arquivo - Zely TC CRANIO:', {
               keyBase,
+              medicoOriginal: (r as any).medico || (r as any).MEDICO || '',
+              medicoNormalizado: normalizeMedico((r as any).medico || (r as any).MEDICO || ''),
+              prioridadeOriginal: (r as any).prioridade || (r as any).PRIORIDADE || '',
+              prioridadeNormalizada: normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || ''),
               especialidade: r.especialidade,
               categoria: (r as any).categoria,
               quantidade: Number(r.quant || (r as any).quantidade || (r as any).valores || 1),
