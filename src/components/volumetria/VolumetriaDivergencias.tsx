@@ -323,14 +323,14 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataLaudo = r.DATA_LAUDO || r.data_laudo;
           const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
           
-          const chave = [
+          // Criar chave base SEM especialidade e categoria para identificar o mesmo exame
+          const chaveBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
             canonical(r.MEDICO || r.medico || ''),
             normalizeModalidade(modalidade),
-            canonical(especialidade),
             normalizePrioridade(r.PRIORIDADE || r.prioridade || '')
           ].join('|');
           
@@ -338,17 +338,24 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           
           if (r.NOME_PACIENTE === 'Daniel Soares' && r.ESTUDO_DESCRICAO?.includes('TC COLUNA CERVICAL')) {
             console.log('🔍 DEBUG Sistema - Daniel Soares TC COLUNA CERVICAL:', {
-              chave,
+              chaveBase,
+              especialidade,
+              categoria: (r as any).CATEGORIA,
               valores,
               dataOriginal: dataExame || dataLaudo,
               dataFormatada: toYMD(dataExame || dataLaudo)
             });
           }
           
-          if (mapSistema.has(chave)) {
-            mapSistema.get(chave)!.total += valores;
+          if (mapSistema.has(chaveBase)) {
+            const existing = mapSistema.get(chaveBase)!;
+            existing.total += valores;
+            // Manter a primeira amostra ou atualizar se esta tem mais informações
+            if (!existing.amostra?.CATEGORIA && (r as any).CATEGORIA) {
+              existing.amostra = r;
+            }
           } else {
-            mapSistema.set(chave, {
+            mapSistema.set(chaveBase, {
               total: valores,
               amostra: r
             });
@@ -377,30 +384,35 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
           const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
           
-          const key = [
+          // Usar a mesma chave base SEM especialidade para identificar o mesmo exame
+          const keyBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
             canonical((r as any).medico || (r as any).MEDICO || ''),
             normalizeModalidade(r.modalidade),
-            canonical(r.especialidade),
             normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || '')
           ].join('|');
           
           if (pacienteNome === 'Daniel Soares' && exameDescricao?.includes('TC COLUNA CERVICAL')) {
             console.log('🔍 DEBUG Arquivo - Daniel Soares TC COLUNA CERVICAL:', {
-              key,
+              keyBase,
+              especialidade: r.especialidade,
+              categoria: (r as any).categoria,
               quantidade: Number(r.quant || (r as any).quantidade || (r as any).valores || 1),
               dataOriginal: dataExame || dataLaudo,
               dataFormatada: toYMD(dataExame || dataLaudo)
             });
           }
           
-          const cur = mapArquivo.get(key) || { total: 0, amostra: r };
+          const cur = mapArquivo.get(keyBase) || { total: 0, amostra: r };
           cur.total += Number(r.quant || (r as any).quantidade || (r as any).valores || 1);
-          if (!cur.amostra) cur.amostra = r;
-          mapArquivo.set(key, cur);
+          // Manter a primeira amostra ou atualizar se esta tem mais informações
+          if (!cur.amostra || !((cur.amostra as any).categoria) && (r as any).categoria) {
+            cur.amostra = r;
+          }
+          mapArquivo.set(keyBase, cur);
         });
         
         // Aguardar próximo frame para não travar a UI
