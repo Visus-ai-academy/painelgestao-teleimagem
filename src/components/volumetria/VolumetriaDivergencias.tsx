@@ -268,6 +268,16 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return prioNorm;
       };
 
+      // Normalizar nome do médico removendo sufixos e códigos
+      const normalizeMedico = (medico: string) => {
+        let norm = canonical(medico || '');
+        // Remover códigos entre parênteses como (E2), (123), etc
+        norm = norm.replace(/\s*\([^)]*\)\s*$/g, '');
+        // Remover DR/DRA no início se presente
+        norm = norm.replace(/^DR[A]?\s+/, '');
+        return norm.trim();
+      };
+
       // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
       const inMonth = (val: any) => {
         if (!val) return true;
@@ -329,7 +339,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            canonical(r.MEDICO || r.medico || ''),
+            normalizeMedico(r.MEDICO || r.medico || ''),
             normalizeModalidade(modalidade),
             normalizePrioridade(r.PRIORIDADE || r.prioridade || '')
           ].join('|');
@@ -390,7 +400,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            canonical((r as any).medico || (r as any).MEDICO || ''),
+            normalizeMedico((r as any).medico || (r as any).MEDICO || ''),
             normalizeModalidade(r.modalidade),
             normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || '')
           ].join('|');
