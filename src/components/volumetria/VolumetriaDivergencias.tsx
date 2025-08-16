@@ -62,11 +62,17 @@ interface LinhaDivergencia {
   STATUS: string;
   UNIDADE_ORIGEM: string;
   CLIENTE: string;
-  // extras
+  // extras - informações de divergência
   total_arquivo?: number;
   total_sistema?: number;
   categoria_arquivo?: string;
   categoria_sistema?: string;
+  especialidade_arquivo?: string;
+  especialidade_sistema?: string;
+  modalidade_arquivo?: string;
+  modalidade_sistema?: string;
+  prioridade_arquivo?: string;
+  prioridade_sistema?: string;
 }
 
 function canonical(val?: string) {
@@ -595,16 +601,16 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
               
               const base = toLinhaFromArquivo(k, a, tipoDivergencia);
               base.total_sistema = s.total;
+              
+              // Preencher todas as colunas de divergência
               base.categoria_arquivo = catA;
               base.categoria_sistema = catS;
-              
-              // Adicionar informações extras para debug
-              (base as any).especialidade_arquivo = espA;
-              (base as any).especialidade_sistema = espS;
-              (base as any).modalidade_arquivo = modA;
-              (base as any).modalidade_sistema = modS;
-              (base as any).prioridade_arquivo = prioA;
-              (base as any).prioridade_sistema = prioS;
+              base.especialidade_arquivo = espA;
+              base.especialidade_sistema = espS;
+              base.modalidade_arquivo = modA;
+              base.modalidade_sistema = modS;
+              base.prioridade_arquivo = prioA;
+              base.prioridade_sistema = prioS;
               
               divergencias.push(base);
             } else if (quantidadeDiferente) {
@@ -658,6 +664,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         'Valores Sistema': linha.total_sistema || 0,
         'Categoria Arquivo': linha.categoria_arquivo || '-',
         'Categoria Sistema': linha.categoria_sistema || '-',
+        'Especialidade Arquivo': linha.especialidade_arquivo || '-',
+        'Especialidade Sistema': linha.especialidade_sistema || '-',
+        'Modalidade Arquivo': linha.modalidade_arquivo || '-',
+        'Modalidade Sistema': linha.modalidade_sistema || '-',
+        'Prioridade Arquivo': linha.prioridade_arquivo || '-',
+        'Prioridade Sistema': linha.prioridade_sistema || '-',
       }));
 
       // Criar planilha
