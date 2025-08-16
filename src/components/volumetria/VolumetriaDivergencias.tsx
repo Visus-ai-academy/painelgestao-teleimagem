@@ -264,6 +264,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         if (prioNorm === 'URGENCIA' || prioNorm === 'URGENTE') return 'URGENTE';
         if (prioNorm === 'ROTINA') return 'ROTINA';
         if (prioNorm === 'EMERGENCIA' || prioNorm === 'EMERGENCIAL') return 'EMERGENCIA';
+        if (prioNorm === 'PLANTAO') return 'PLANTAO';
         return prioNorm;
       };
 
