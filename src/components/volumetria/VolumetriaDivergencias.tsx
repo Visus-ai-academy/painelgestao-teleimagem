@@ -532,11 +532,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const a = mapArquivo.get(k);
           const s = mapSistema.get(k);
           
-          if (a && !s) {
-            divergencias.push(toLinhaFromArquivo(k, a, 'arquivo_nao_no_sistema'));
-          } else if (!a && s) {
-            divergencias.push(toLinhaFromSistema(k, s));
-          } else if (a && s) {
+          if (a && s) {
+            // PRIMEIRO: Quando o exame existe em ambos, verificar diferenças específicas
             // Quando o exame existe em ambos, verificar diferenças específicas
             const arquivoData = a.amostra as any;
             const sistemaData = s.amostra as any;
@@ -610,6 +607,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
               base.categoria_sistema = catS;
               divergencias.push(base);
             }
+          } else if (a && !s) {
+            // Só no arquivo
+            divergencias.push(toLinhaFromArquivo(k, a, 'arquivo_nao_no_sistema'));
+          } else if (!a && s) {
+            // Só no sistema
+            divergencias.push(toLinhaFromSistema(k, s));
           }
         });
         
