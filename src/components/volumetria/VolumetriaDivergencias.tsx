@@ -279,6 +279,12 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         norm = norm.replace(/^DR[A]?\s+/, '');
         // Remover pontos finais
         norm = norm.replace(/\.$/, '');
+        
+        // Para garantir compatibilidade, usar apenas as duas primeiras palavras do nome
+        const palavras = norm.trim().split(/\s+/).filter(p => p.length > 0);
+        if (palavras.length >= 2) {
+          return palavras.slice(0, 2).join(' ');
+        }
         return norm.trim();
       };
 
