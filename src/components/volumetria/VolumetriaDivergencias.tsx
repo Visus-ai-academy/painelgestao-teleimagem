@@ -499,19 +499,40 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           } else if (!a && s) {
             divergencias.push(toLinhaFromSistema(k, s));
           } else if (a && s) {
+            // Quando o exame existe em ambos, verificar se há diferenças em campos específicos
             const catA = canonical(((a.amostra as any) || {}).categoria || '');
             const catS = canonical(((s.amostra as any) || {}).CATEGORIA || '');
-            if (catA && catS && catA !== catS) {
+            const espA = canonical(((a.amostra as any) || {}).especialidade || '');
+            const espS = canonical(((s.amostra as any) || {}).ESPECIALIDADE || '');
+            
+            // Verificar se há diferenças em categoria, especialidade ou quantidade
+            const categoriaDiferente = catA && catS && catA !== catS;
+            const especialidadeDiferente = espA && espS && espA !== espS;
+            const quantidadeDiferente = a.total !== s.total;
+            
+            // Se há qualquer diferença, criar uma divergência
+            if (categoriaDiferente || especialidadeDiferente || quantidadeDiferente) {
               const base = toLinhaFromArquivo(k, a);
-              base.tipo = 'categoria_diferente';
+              
+              // Definir tipo de divergência baseado na diferença principal
+              if (categoriaDiferente && especialidadeDiferente) {
+                base.tipo = 'categoria_diferente' as DivergenciaTipo; // Priorizar categoria quando ambas diferem
+              } else if (categoriaDiferente) {
+                base.tipo = 'categoria_diferente' as DivergenciaTipo;
+              } else if (especialidadeDiferente) {
+                base.tipo = 'categoria_diferente' as DivergenciaTipo; // Usar mesmo tipo para especialidade
+              } else {
+                base.tipo = 'quantidade_diferente' as DivergenciaTipo;
+              }
+              
               base.total_sistema = s.total;
               base.categoria_arquivo = (a.amostra as any).categoria || '';
               base.categoria_sistema = (s.amostra as any).CATEGORIA || '';
-              divergencias.push(base);
-            } else if (a.total !== s.total) {
-              const base = toLinhaFromArquivo(k, a);
-              base.tipo = 'quantidade_diferente';
-              base.total_sistema = s.total;
+              
+              // Adicionar informações de especialidade para debug
+              (base as any).especialidade_arquivo = espA;
+              (base as any).especialidade_sistema = espS;
+              
               divergencias.push(base);
             }
           }
