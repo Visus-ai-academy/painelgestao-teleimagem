@@ -489,7 +489,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
 export function useVolumetria() {
   const context = useContext(VolumetriaContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useVolumetria deve ser usado dentro de VolumetriaProvider');
   }
   return context;
