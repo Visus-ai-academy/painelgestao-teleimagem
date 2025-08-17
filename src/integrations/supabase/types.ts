@@ -3428,6 +3428,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      aplicar_regras_quebra_exames: {
+        Args: { arquivo_fonte_param?: string }
+        Returns: Json
+      }
       aplicar_validacao_cliente_volumetria: {
         Args: { lote_upload_param?: string }
         Returns: Json
