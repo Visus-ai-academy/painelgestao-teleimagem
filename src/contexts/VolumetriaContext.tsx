@@ -150,16 +150,23 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       console.log('🔍 [CONTEXTO DEBUG CEDI_RJ] Stats completas:', cediStats);
       
       console.log('🚀 FASE 3: Carregando TODOS os dados detalhados via leitura paginada da tabela...');
+      console.log('🔧 COMPARATIVO: Carregando dados por data_referencia, não por data de realização');
       
       // CARREGAR DADOS DETALHADOS EM LOTES PARA TRAZER 100% DOS REGISTROS
       const allDetails: any[] = [];
       let offset = 0;
       const limit = 1000; // Ajuste para respeitar o limite de retorno do PostgREST/Supabase
       while (true) {
-        const { data: batch, error: batchError } = await supabase
+        let query = supabase
           .from('volumetria_mobilemed')
           .select('*')
           .range(offset, offset + limit - 1);
+
+        // Para comparativo, carregar TODOS os dados SEM filtro de período
+        // Pois precisamos de todos os dados históricos que foram processados
+        console.log(`📦 Carregando lote ${offset} - ${offset + limit - 1} (SEM filtro de período para comparativo)`);
+
+        const { data: batch, error: batchError } = await query;
 
         if (batchError) {
           throw new Error(`Erro nos dados detalhados: ${batchError.message}`);
