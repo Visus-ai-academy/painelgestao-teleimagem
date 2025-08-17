@@ -190,13 +190,24 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       HORA_REASSINATURA: row['HORA_REASSINATURA'] ? convertTime(String(row['HORA_REASSINATURA'])) : undefined,
     };
 
-    // Definir data_referencia baseado no tipo de arquivo
-    if (arquivoFonte === 'data_laudo') {
-      record.data_referencia = record.DATA_LAUDO;
-    } else if (arquivoFonte === 'data_exame') {
-      record.data_referencia = record.DATA_REALIZACAO;
+    // REGRA v024: Definir data_referencia baseado no período de processamento escolhido
+    // Independente da data de realização/laudo, a data_referencia deve ser do período selecionado
+    if (periodProcessamento && periodProcessamento.ano && periodProcessamento.mes) {
+      const mesFormatado = String(periodProcessamento.mes).padStart(2, '0');
+      record.data_referencia = new Date(`${periodProcessamento.ano}-${mesFormatado}-01`);
+      
+      // Definir periodo_referencia também
+      const mesNomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      record.periodo_referencia = `${mesNomes[periodProcessamento.mes - 1]}/${String(periodProcessamento.ano).slice(-2)}`;
     } else {
-      record.data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
+      // Fallback: usar data do arquivo se período não especificado
+      if (arquivoFonte === 'data_laudo') {
+        record.data_referencia = record.DATA_LAUDO;
+      } else if (arquivoFonte === 'data_exame') {
+        record.data_referencia = record.DATA_REALIZACAO;
+      } else {
+        record.data_referencia = record.DATA_LAUDO || record.DATA_REALIZACAO;
+      }
     }
 
     return record;
@@ -217,7 +228,13 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log('📦 Dados recebidos:', JSON.stringify(requestData));
     
-    const { file_path, arquivo_fonte, periodo } = requestData;
+    const { file_path, arquivo_fonte, periodo, periodo_processamento } = requestData;
+    
+    // Usar periodo_processamento se fornecido, senão fallback para periodo
+    const periodProcessamento = periodo_processamento || (periodo ? {
+      ano: new Date().getFullYear(),
+      mes: parseInt(periodo.split('-')[1]) || new Date().getMonth() + 1
+    } : null);
     
     if (!file_path || !arquivo_fonte) {
       throw new Error('Parâmetros obrigatórios: file_path, arquivo_fonte');
