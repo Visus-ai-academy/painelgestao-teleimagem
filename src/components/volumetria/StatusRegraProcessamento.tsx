@@ -26,13 +26,7 @@ const TIPOS_ARQUIVO = [
 ];
 
 const REGRAS_MONITORADAS = [
-  // REGRAS DE VOLUMETRIA - Baseadas no Controle de Regras
-  {
-    nome: 'Proteção Temporal de Dados',
-    descricao: 'Impede edição de dados com mais de 5 dias do mês anterior e dados futuros',
-    funcao: 'can_edit_data',
-    id: 'v001'
-  },
+  // REGRAS DE VOLUMETRIA - Aplicadas durante processamento
   {
     nome: 'Exclusão DATA_LAUDO fora período',
     descricao: 'Remove registros com DATA_LAUDO fora do período de faturamento (retroativos)',
