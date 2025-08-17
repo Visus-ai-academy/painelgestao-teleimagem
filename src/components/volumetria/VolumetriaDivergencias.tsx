@@ -287,58 +287,66 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return norm.trim();
       };
 
-      // Função para criar uma "assinatura" do médico baseada em iniciais + sobrenome principal
+      // Função para criar uma "assinatura" do médico baseada apenas em título + primeiro nome + primeira inicial do meio
       const criarAssinaturaMedico = (medico: string) => {
-        const norm = normalizeMedico(medico);
-        if (!norm) return '';
+        if (!medico) return '';
         
-        const parts = norm.split(/\s+/).filter(p => p.length > 0);
+        // Remover códigos entre parênteses
+        let nome = medico.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+        
+        // Normalizar espaços múltiplos
+        nome = nome.replace(/\s+/g, ' ');
+        
+        // Converter para maiúsculas e dividir em partes
+        const parts = nome.toUpperCase().split(' ').filter(part => part.length > 0);
+        
         if (parts.length === 0) return '';
         
-        // Se tiver apenas um nome, retornar ele
-        if (parts.length === 1) return parts[0];
-        
-        // Expandir abreviações comuns
-        const expandirAbreviacoes = (part: string) => {
-          const abreviacoes: Record<string, string> = {
-            'S': 'SILVA', 'A': 'ALVES', 'C': 'COSTA', 'F': 'FERREIRA',
-            'M': 'MARTINS', 'R': 'RIBEIRO', 'L': 'LIMA', 'P': 'PEREIRA'
-          };
-          const clean = part.replace(/\.$/, '');
-          return abreviacoes[clean] || clean;
-        };
-        
-        // Processar cada parte expandindo abreviações
-        const processedParts = parts.map(part => {
-          // Pular preposições comuns
-          if (['DA', 'DE', 'DO', 'DOS', 'DAS'].includes(part)) return part;
-          // Expandir se for abreviação de 1 char + ponto opcional
-          if (part.length <= 2 && part.match(/^[A-Z]\.?$/)) {
-            return expandirAbreviacoes(part);
-          }
-          return part;
-        });
-        
-        // Primeiro nome
-        const firstName = processedParts[0];
-        
-        // Encontrar o sobrenome principal (último nome significativo, ignorando preposições)
-        let mainLastName = processedParts[processedParts.length - 1];
-        
-        // Se o último é muito curto, tentar o penúltimo
-        if (mainLastName.length <= 2 && processedParts.length > 2) {
-          mainLastName = processedParts[processedParts.length - 2];
+        // Identificar título (DR/DRA)
+        let titulo = '';
+        let startIndex = 0;
+        if (parts[0] === 'DR' || parts[0] === 'DR.' || parts[0] === 'DRA' || parts[0] === 'DRA.') {
+          titulo = 'DR';
+          startIndex = 1;
         }
         
-        // Pegar iniciais dos nomes do meio, incluindo preposições importantes
-        const middleParts = processedParts.slice(1, -1);
-        const middleSignature = middleParts.map(part => {
-          if (['DA', 'DE', 'DO', 'DOS', 'DAS'].includes(part)) return part.charAt(0); // D para "da", "de", etc
-          return part.charAt(0); // Primeira letra do nome
-        }).join('');
+        // Pegar apenas os nomes após o título
+        const nameparts = parts.slice(startIndex);
         
-        // Criar assinatura: PRIMEIRO + INICIAIS_MEIO + SOBRENOME_PRINCIPAL
-        return `${firstName}${middleSignature}${mainLastName}`;
+        if (nameparts.length === 0) return titulo;
+        if (nameparts.length === 1) return titulo + nameparts[0];
+        
+        // Primeiro nome
+        const firstName = nameparts[0];
+        
+        // Primeira inicial do meio (se houver)
+        let middleInitial = '';
+        if (nameparts.length > 1) {
+          const secondPart = nameparts[1];
+          // Se for preposição, pular para a próxima parte
+          if (['DA', 'DE', 'DO', 'DOS', 'DAS'].includes(secondPart) && nameparts.length > 2) {
+            middleInitial = nameparts[2].charAt(0);
+          } else {
+            middleInitial = secondPart.charAt(0);
+          }
+        }
+        
+        // Criar assinatura: TITULO + PRIMEIRO_NOME + INICIAL_MEIO
+        const signature = `${titulo}${firstName}${middleInitial}`;
+        
+        // Debug para casos específicos
+        if (medico.includes('Guilherme') || medico.includes('Efraim')) {
+          console.log('🔍 DEBUG Assinatura Médico:', {
+            original: medico,
+            parts: parts,
+            titulo,
+            firstName,
+            middleInitial,
+            signature
+          });
+        }
+        
+        return signature;
       };
 
       // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
