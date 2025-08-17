@@ -194,11 +194,11 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-orange-600">{stat.registros_atualizados}</div>
-                    <div className="text-muted-foreground">Atual.</div>
+                    <div className="text-muted-foreground">Regras</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium text-red-600">{stat.registros_erro}</div>
-                    <div className="text-muted-foreground">Erro</div>
+                    <div className="font-medium text-amber-600">{stat.registros_erro}</div>
+                    <div className="text-muted-foreground">Excl.</div>
                   </div>
                 </div>
               </div>
