@@ -32,43 +32,46 @@ export function ClientValidationStatus() {
 
       if (clientesError) throw clientesError;
 
-      // Buscar estatísticas de preços - SEM LIMITAÇÕES
-      const { data: precosData, error: precosError } = await supabase
+      // Buscar estatísticas de preços - FORÇAR BUSCA COMPLETA
+      const { count: totalPrecos, error: precosCountError } = await supabase
         .from('precos_servicos')
-        .select('cliente_id', { count: 'exact' });
+        .select('*', { count: 'exact', head: true });
 
-      if (precosError) throw precosError;
+      if (precosCountError) throw precosCountError;
 
-      // Buscar último upload de clientes bem-sucedido primeiro
-      const { data: successUpload } = await supabase
-        .from('upload_logs')
-        .select('*')
-        .eq('file_type', 'clientes')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Contar preços com cliente
+      const { count: precosComCliente, error: precosComClienteError } = await supabase
+        .from('precos_servicos')
+        .select('*', { count: 'exact', head: true })
+        .not('cliente_id', 'is', null);
 
-      // Se não houver upload bem-sucedido, buscar o mais recente independente do status
+      if (precosComClienteError) throw precosComClienteError;
+
+      // Contar preços sem cliente  
+      const { count: precosSemCliente, error: precosSemClienteError } = await supabase
+        .from('precos_servicos')
+        .select('*', { count: 'exact', head: true })
+        .is('cliente_id', null);
+
+      if (precosSemClienteError) throw precosSemClienteError;
+
+      // Buscar último upload de clientes - corrigir ordenação
       const { data: uploadData, error: uploadError } = await supabase
         .from('upload_logs')
         .select('*')
-        .eq('file_type', 'clientes')
+        .or('file_type.eq.clientes,file_type.eq.clientes_simples')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (uploadError) throw uploadError;
 
-      const precosComCliente = precosData?.filter(p => p.cliente_id !== null).length || 0;
-      const precosSemCliente = precosData?.filter(p => p.cliente_id === null).length || 0;
-
       setStats({
         totalClientes: clientesData?.length || 0,
-        totalPrecos: precosData?.length || 0,
-        precosComCliente,
-        precosSemCliente,
-        ultimoUploadClientes: successUpload || uploadData // Priorizar upload bem-sucedido
+        totalPrecos: totalPrecos || 0,
+        precosComCliente: precosComCliente || 0,
+        precosSemCliente: precosSemCliente || 0,
+        ultimoUploadClientes: uploadData
       });
 
     } catch (error) {
