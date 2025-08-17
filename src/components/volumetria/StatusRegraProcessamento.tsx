@@ -400,9 +400,9 @@ export function StatusRegraProcessamento() {
       return <Badge variant="destructive">Erro</Badge>;
     }
     if (arquivo.foiAplicada) {
-      return <Badge variant="default" className="bg-success text-success-foreground">OK</Badge>;
+      return <Badge className="bg-success text-success-foreground hover:bg-success/90">OK</Badge>;
     }
-    return <Badge variant="secondary">Pendente</Badge>;
+    return <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">Pendente</Badge>;
   };
 
   const getNomeArquivoAmigavel = (tipoArquivo: string) => {

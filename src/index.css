@@ -38,6 +38,14 @@ All colors MUST be HSL.
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
+    /* Success Colors - Blue for OK status */
+    --success: 217 91% 60%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Colors - Orange for pending */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 217 91% 60%;
@@ -93,6 +101,14 @@ All colors MUST be HSL.
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+
+    /* Success Colors - Blue for OK status (dark mode) */
+    --success: 217 91% 60%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Colors - Orange for pending (dark mode) */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
 
     --border: 220 39% 15%;
     --input: 220 39% 15%;
