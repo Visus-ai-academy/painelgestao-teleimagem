@@ -254,6 +254,9 @@ export default function Comparativo() {
       <div>
         <h1 className="text-3xl font-bold">Comparativo de Clientes</h1>
         <p className="text-muted-foreground mt-1">Analise comparativa de volumetria por cliente.</p>
+        <p className="text-sm text-blue-600 mt-2">
+          💡 Para ver o exame RX TORNOZELO DIREITO do CDI.URUACU, selecione o período "2023-09" no comparativo.
+        </p>
       </div>
 
       <Card>

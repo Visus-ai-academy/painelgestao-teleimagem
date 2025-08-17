@@ -66,6 +66,8 @@ interface VolumetriaContextType {
   // Expor dados detalhados para componentes
   getDetailedData: () => any[];
   getFilteredData: (filters?: any) => any[];
+  // Método para filtrar dados por período específico para comparativo
+  getDataByPeriod: (periodo?: string) => any[];
 }
 
 const VolumetriaContext = createContext<VolumetriaContextType | undefined>(undefined);
@@ -398,6 +400,28 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     });
   }, [data.detailedData]);
 
+  // Filtrar dados por período específico (para comparativo)
+  const getDataByPeriod = useCallback((periodo?: string) => {
+    if (!periodo || periodo === 'todos') {
+      return data.detailedData;
+    }
+    
+    // Converter período para formato de filtro de data_referencia
+    // Exemplo: "2023-09" filtra data_referencia do mês 09/2023
+    return data.detailedData.filter(item => {
+      const dataRef = item.data_referencia;
+      if (!dataRef) return false;
+      
+      // Se período é no formato YYYY-MM, filtrar por mês
+      if (periodo.match(/^\d{4}-\d{2}$/)) {
+        const dataRefStr = new Date(dataRef).toISOString().slice(0, 7); // YYYY-MM
+        return dataRefStr === periodo;
+      }
+      
+      return true;
+    });
+  }, [data.detailedData]);
+
   useEffect(() => {
     console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Carregamento completo...');
     console.log('🔥 Timestamp atual:', new Date().toISOString());
@@ -476,7 +500,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   // Auto-refresh removido - atualização apenas via realtime e upload manual
 
   return (
-    <VolumetriaContext.Provider value={{ data, refreshData, clearData, getDetailedData, getFilteredData }}>
+    <VolumetriaContext.Provider value={{ data, refreshData, clearData, getDetailedData, getFilteredData, getDataByPeriod }}>
       {children}
     </VolumetriaContext.Provider>
   );
