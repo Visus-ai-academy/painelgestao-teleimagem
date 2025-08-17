@@ -372,21 +372,27 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Forçando carregamento DEFINITIVO...');
+    console.log('🔥 Timestamp atual:', new Date().toISOString());
     // FORÇAR INVALIDAÇÃO COMPLETA
     isLoadingRef.current = false;
     lastLoadTime.current = 0;
-    setData(prev => ({ ...prev, loading: true }));
+    setData(prev => ({ 
+      ...prev, 
+      loading: true,
+      clientesStats: [], // Limpar cache
+      detailedData: []    // Limpar cache
+    }));
     
     // EXECUTAR IMEDIATAMENTE sem debounce
     setTimeout(() => {
-      console.log('🚀 TIMEOUT EXECUTADO - Chamando loadStats com força total');
+      console.log('🚀 DISPARANDO loadStats() forçado...');
       loadStats();
     }, 100);
     
     // Disponibilizar contexto globalmente para atualização após upload
     (window as any).volumetriaContext = { refreshData };
     console.log('🌍 Contexto disponibilizado globalmente');
-  }, [loadStats]);
+  }, [loadStats, refreshData]);
 
   // Real-time subscription otimizada - com debounce
   useEffect(() => {
