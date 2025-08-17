@@ -274,35 +274,56 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return prioNorm;
       };
 
-      // Normalizar nome do médico removendo códigos entre parênteses e padronizando nomes/iniciais
+      // Normalizar nome do médico com lógica inteligente para matching
       const normalizeMedico = (medico: string) => {
         let norm = canonical(medico || '');
-        // Remover códigos entre parênteses como (E1), (E2), (E3), etc - usando regex mais ampla
+        // Remover códigos entre parênteses como (E1), (E2), (E3), etc
         norm = norm.replace(/\s*\([^)]*\)\s*/g, '');
         // Remover DR/DRA no início se presente
         norm = norm.replace(/^DR[A]?\s+/, '');
         // Remover pontos finais
         norm = norm.replace(/\.$/, '');
         
-        // Normalizar nomes do meio - converter para inicial quando necessário
-        // Ex: "LARA MACATRAO DURANTE BACELAR" -> "LARA M DURANTE BACELAR"
-        const parts = norm.trim().split(/\s+/);
+        return norm.trim();
+      };
+
+      // Função para criar uma "assinatura" do médico baseada em iniciais + sobrenome principal
+      const criarAssinaturaMedico = (medico: string) => {
+        const norm = normalizeMedico(medico);
+        if (!norm) return '';
+        
+        const parts = norm.split(/\s+/).filter(p => p.length > 0);
+        if (parts.length === 0) return '';
+        
+        // Se tiver apenas um nome, retornar ele
+        if (parts.length === 1) return parts[0];
+        
+        // Primeiro nome + iniciais dos nomes do meio + último sobrenome significativo (não extras como Vicente)
+        const firstName = parts[0];
+        
+        // Encontrar o sobrenome principal (geralmente o penúltimo ou último nome mais longo)
+        let mainLastName = parts[parts.length - 1];
         if (parts.length > 2) {
-          // Manter primeiro e último nome, converter nomes do meio para inicial
-          const firstName = parts[0];
-          const lastName = parts[parts.length - 1];
-          const middleNames = parts.slice(1, -1);
-          
-          // Converter nomes do meio para iniciais se tiverem mais de 2 caracteres
-          const normalizedMiddle = middleNames.map(name => {
-            // Se já é uma inicial (1-2 chars), manter. Se é nome completo, converter para inicial
-            return name.length <= 2 ? name.replace(/\.$/, '') : name.charAt(0);
-          }).join(' ');
-          
-          norm = [firstName, normalizedMiddle, lastName].filter(p => p).join(' ');
+          // Se há vários nomes, pegar o penúltimo como sobrenome principal se for maior que 3 chars
+          const penultimate = parts[parts.length - 2];
+          if (penultimate.length > 3) {
+            mainLastName = penultimate;
+          }
         }
         
-        return norm.trim();
+        // Pegar iniciais dos nomes do meio (excluindo primeiro e último)
+        const middleNames = parts.slice(1, -1);
+        if (parts.length > 2 && mainLastName === parts[parts.length - 2]) {
+          // Se usamos penúltimo como principal, excluir também o último
+          middleNames.pop();
+        }
+        
+        const middleInitials = middleNames.map(name => {
+          return name.length <= 2 ? name.replace(/\.$/, '') : name.charAt(0);
+        }).join('');
+        
+        // Criar assinatura: PRIMEIRO + INICIAIS_MEIO + SOBRENOME_PRINCIPAL
+        return `${firstName}${middleInitials}${mainLastName}`;
       };
 
       // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
@@ -360,22 +381,24 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataLaudo = r.DATA_LAUDO || r.data_laudo;
           const dataExame = r.DATA_EXAME || r.data_exame || r.DATA_REALIZACAO;
           
-          // Criar chave base com APENAS os 5 campos essenciais: paciente, exame, data realização, data laudo, médico
+          // Criar chave base usando assinatura do médico para matching inteligente
           const chaveBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            normalizeMedico(r.MEDICO || r.medico || '')
+            criarAssinaturaMedico(r.MEDICO || r.medico || '')
           ].join('|');
           
           const valores = Number(r.VALORES || r.valores || 1);
           
-          if (r.NOME_PACIENTE === 'Zely Correa Prestes Nunes' && r.ESTUDO_DESCRICAO?.includes('TC CRANIO')) {
-            console.log('🔍 DEBUG Sistema - Zely TC CRANIO:', {
+          // Debug para casos específicos de médicos
+          if ((r.NOME_PACIENTE === 'Zely Correa Prestes Nunes' && r.ESTUDO_DESCRICAO?.includes('TC CRANIO')) ||
+              (r.MEDICO || r.medico || '').includes('Guilherme')) {
+            console.log('🔍 DEBUG Sistema - Médico:', {
               chaveBase,
               medicoOriginal: r.MEDICO || r.medico || '',
-              medicoNormalizado: normalizeMedico(r.MEDICO || r.medico || ''),
+              assinaturaMedico: criarAssinaturaMedico(r.MEDICO || r.medico || ''),
               prioridadeOriginal: r.PRIORIDADE || r.prioridade || '',
               prioridadeNormalizada: normalizePrioridade(r.PRIORIDADE || r.prioridade || ''),
               especialidade,
@@ -423,20 +446,23 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const dataExame = (r as any).data_exame || (r as any).data_realizacao || (r as any).DATA_REALIZACAO;
           const dataLaudo = (r as any).data_laudo || (r as any).DATA_LAUDO;
           
-          // Usar a mesma chave base com APENAS os 5 campos essenciais: paciente, exame, data realização, data laudo, médico
+          // Usar a mesma assinatura do médico para matching inteligente
           const keyBase = [
             canonical(pacienteNome),
             canonical(cleanExamName(exameDescricao)),
             toYMD(dataExame || ''),
             toYMD(dataLaudo || ''),
-            normalizeMedico((r as any).medico || (r as any).MEDICO || '')
+            criarAssinaturaMedico((r as any).medico || (r as any).MEDICO || '')
           ].join('|');
           
-          if (pacienteNome === 'Zely Correa Prestes Nunes' && exameDescricao?.includes('TC CRANIO')) {
-            console.log('🔍 DEBUG Arquivo - Zely TC CRANIO:', {
+          
+          // Debug para casos específicos de médicos
+          if ((pacienteNome === 'Zely Correa Prestes Nunes' && exameDescricao?.includes('TC CRANIO')) ||
+              ((r as any).medico || (r as any).MEDICO || '').includes('Guilherme')) {
+            console.log('🔍 DEBUG Arquivo - Médico:', {
               keyBase,
               medicoOriginal: (r as any).medico || (r as any).MEDICO || '',
-              medicoNormalizado: normalizeMedico((r as any).medico || (r as any).MEDICO || ''),
+              assinaturaMedico: criarAssinaturaMedico((r as any).medico || (r as any).MEDICO || ''),
               prioridadeOriginal: (r as any).prioridade || (r as any).PRIORIDADE || '',
               prioridadeNormalizada: normalizePrioridade((r as any).prioridade || (r as any).PRIORIDADE || ''),
               especialidade: r.especialidade,
