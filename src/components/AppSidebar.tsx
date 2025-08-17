@@ -80,7 +80,6 @@ const menuItems: MenuItem[] = [
       { title: "Escala", url: "/operacional/escala", requiredRoles: ['manager', 'admin'] },
       { title: "PCP", url: "/operacional/pcp", requiredRoles: ['manager', 'admin'] },
       { title: "Dados MobileMed", url: "/operacional/dados-volumetria", requiredRoles: ['manager', 'admin'] },
-      { title: "Comparativo", url: "/operacional/comparativo", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 

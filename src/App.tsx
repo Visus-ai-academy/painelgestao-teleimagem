@@ -156,15 +156,6 @@ const App = () => {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/operacional/comparativo" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
-                    <Comparativo />
-                  </RoleProtectedRoute>
-                </Layout>
-              </ProtectedRoute>
-            } />
             <Route path="/financeiro/*" element={
               <ProtectedRoute>
                 <Layout>
