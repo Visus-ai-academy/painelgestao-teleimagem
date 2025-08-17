@@ -3079,6 +3079,7 @@ export type Database = {
           ACCESSION_NUMBER: string | null
           arquivo_fonte: string
           CATEGORIA: string | null
+          Cliente_Nome_Fantasia: string | null
           CODIGO_INTERNO: number | null
           CODIGO_PACIENTE: string | null
           COMPLEMENTAR: string | null
@@ -3109,7 +3110,6 @@ export type Database = {
           MEDICO: string | null
           MEDICO_REASSINATURA: string | null
           MODALIDADE: string | null
-          nome_fantasia: string | null
           NOME_PACIENTE: string
           periodo_referencia: string | null
           POSSUI_IMAGENS_CHAVE: string | null
@@ -3126,6 +3126,7 @@ export type Database = {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte: string
           CATEGORIA?: string | null
+          Cliente_Nome_Fantasia?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
@@ -3156,7 +3157,6 @@ export type Database = {
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
-          nome_fantasia?: string | null
           NOME_PACIENTE: string
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
@@ -3173,6 +3173,7 @@ export type Database = {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte?: string
           CATEGORIA?: string | null
+          Cliente_Nome_Fantasia?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
           COMPLEMENTAR?: string | null
@@ -3203,7 +3204,6 @@ export type Database = {
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
-          nome_fantasia?: string | null
           NOME_PACIENTE?: string
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
