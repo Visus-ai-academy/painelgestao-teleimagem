@@ -226,13 +226,35 @@ serve(async (req) => {
       console.warn('⚠️ Exceção na normalização CEDIDIAG (ignorada):', normEx);
     }
 
+    
     const nextStartRow = endRow;
     const hasMore = nextStartRow < totalDataRows;
     const progress = Math.round((endRow / totalDataRows) * 100);
 
+    // ===== APLICAÇÃO AUTOMÁTICA DE REGRAS ===== 
+    // Quando terminar o upload (último batch), aplicar regras automaticamente
+    let regrasAplicadas = 0;
+    if (!hasMore && inserted > 0) {
+      console.log('🎯 ÚLTIMO BATCH - Aplicando regras automaticamente...');
+      try {
+        const { data: resultadoRegras, error: erroRegras } = await supabaseClient.functions.invoke('aplicar-regras-lote', {
+          body: { arquivo_fonte }
+        });
+        
+        if (erroRegras) {
+          console.error('❌ Erro ao aplicar regras:', erroRegras);
+        } else {
+          console.log('✅ Regras aplicadas automaticamente:', resultadoRegras);
+          regrasAplicadas = resultadoRegras?.total_processado || 0;
+        }
+      } catch (regrasError) {
+        console.error('❌ Exceção ao aplicar regras:', regrasError);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
-      message: `Batch ${Math.floor(start_row / batch_size) + 1} processado: ${inserted} inseridos, ${deParaUpdated} de-para aplicados`,
+      message: `Batch ${Math.floor(start_row / batch_size) + 1} processado: ${inserted} inseridos, ${deParaUpdated} de-para aplicados${!hasMore && regrasAplicadas > 0 ? `, ${regrasAplicadas} regras aplicadas` : ''}`,
       batch_info: {
         start_row,
         end_row: endRow,
@@ -241,6 +263,7 @@ serve(async (req) => {
         inserted,
         errors,
         de_para_updated: deParaUpdated,
+        regras_aplicadas: regrasAplicadas,
         progress_percent: progress,
         has_more: hasMore,
         next_start_row: hasMore ? nextStartRow : null
