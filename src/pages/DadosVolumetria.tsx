@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { 
   Zap,
-  BarChart3,
-  Play
+  BarChart3
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
@@ -22,37 +19,7 @@ const PERIODO_ATUAL = "2025-06";
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
-  const [isProcessingRules, setIsProcessingRules] = useState(false);
   const { toast } = useToast();
-
-  const handleApplyRulesToAll = async () => {
-    if (isProcessingRules) return;
-    
-    setIsProcessingRules(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
-        body: { arquivo_fonte: null } // null = todos os arquivos
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Regras Aplicadas",
-        description: `Regras de quebra aplicadas com sucesso em todos os arquivos. ${data.total_processado} registros processados.`,
-      });
-      
-      setRefreshUploadStatus(prev => prev + 1);
-    } catch (error) {
-      console.error('Erro ao aplicar regras:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao aplicar regras. Verifique o console para mais detalhes.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingRules(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -73,29 +40,6 @@ export default function DadosVolumetria() {
               onClearPeriodo={() => setPeriodoFaturamentoVolumetria(null)}
             />
           </div>
-
-          {/* Aplicar Regras em Todos os Arquivos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                Aplicar Regras de Quebra
-              </CardTitle>
-              <CardDescription>
-                Aplica todas as regras de quebra de exames nos 4 arquivos de volumetria
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={handleApplyRulesToAll}
-                disabled={isProcessingRules}
-                className="w-full"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                {isProcessingRules ? "Aplicando Regras..." : "Aplicar Regras em Todos os Arquivos"}
-              </Button>
-            </CardContent>
-          </Card>
 
           {/* Upload de Dados */}
           <div className="grid md:grid-cols-2 gap-6">
