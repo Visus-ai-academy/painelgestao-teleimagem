@@ -32,10 +32,10 @@ export function ClientValidationStatus() {
 
       if (clientesError) throw clientesError;
 
-      // Buscar estatísticas de preços
+      // Buscar estatísticas de preços - SEM LIMITAÇÕES
       const { data: precosData, error: precosError } = await supabase
         .from('precos_servicos')
-        .select('cliente_id');
+        .select('cliente_id', { count: 'exact' });
 
       if (precosError) throw precosError;
 
