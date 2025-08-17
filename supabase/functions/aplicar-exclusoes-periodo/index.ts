@@ -97,7 +97,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao')
-      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
 
     if (!errorV031_1) {
       const deletedV031_1 = countV031_1 || 0;
@@ -111,7 +111,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
 
     if (!errorV031_2) {
       const deletedV031_2 = countV031_2 || 0;
@@ -125,7 +125,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_onco_padrao')
-      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gt.${realizacaoFimMes},data_laudo.lt.${laudoInicioJanela},data_laudo.gt.${laudoFimJanela}`);
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
 
     if (!errorV031_3) {
       const deletedV031_3 = countV031_3 || 0;

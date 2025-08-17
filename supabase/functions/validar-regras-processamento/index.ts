@@ -294,7 +294,7 @@ function validarRegra(registro: VolumetriaRecord, regra: RegraValidacao): { vali
         
         if (regra.campo === 'DATA_LAUDO') {
           const dataLaudo = converterParaData(registro.DATA_LAUDO);
-          if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento)) {
+          if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo.getTime() > fimFaturamento.getTime())) {
             return { valido: false, erro: `DATA_LAUDO (${dataLaudo.toLocaleDateString('pt-BR')}) fora do período de faturamento (${inicioFaturamento.toLocaleDateString('pt-BR')} a ${fimFaturamento.toLocaleDateString('pt-BR')})` };
           }
         }

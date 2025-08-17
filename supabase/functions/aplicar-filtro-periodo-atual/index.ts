@@ -115,7 +115,7 @@ export default async function handler(req: Request): Promise<Response> {
         .from('volumetria_mobilemed')
         .delete({ count: 'exact' })
         .eq('arquivo_fonte', arquivo)
-        .or(`DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gt.${fimLaudo}`);
+        .or(`DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gte.${new Date(new Date(fimLaudo).getTime() + 86400000).toISOString().split('T')[0]}`);
 
       if (errorLaudo) {
         console.error(`❌ Erro ao filtrar DATA_LAUDO em ${arquivo}:`, errorLaudo);
