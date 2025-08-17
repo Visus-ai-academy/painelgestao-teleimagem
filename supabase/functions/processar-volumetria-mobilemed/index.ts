@@ -337,8 +337,23 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     try {
       console.log('🔧 Aplicando regras rápidas...');
       
-      // Exclusões por período devem ser aplicadas manualmente, não automaticamente no upload
-      console.log('ℹ️ Para arquivos retroativos, exclusões por período devem ser aplicadas manualmente após upload');
+      // Para arquivos 3 e 4 (retroativos), aplicar automaticamente as exclusões por período
+      if (arquivo_fonte.includes('retroativo') && periodo) {
+        console.log('🔧 Aplicando exclusões por período automaticamente...');
+        try {
+          const periodoReferencia = `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(periodo.ano, periodo.mes - 1))}/${periodo.ano.toString().slice(-2)}`;
+          
+          const { data: exclusoesResult } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
+            body: { periodo_referencia: periodoReferencia }
+          });
+          
+          if (exclusoesResult) {
+            console.log('✅ Exclusões por período aplicadas:', exclusoesResult);
+          }
+        } catch (exclusoesError) {
+          console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+        }
+      }
       
       // Aplicar correção de modalidade (Regra v030: DX→RX, CR→RX, mamografia→MG)
       try {
