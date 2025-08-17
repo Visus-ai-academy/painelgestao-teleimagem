@@ -387,19 +387,25 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       return data.detailedData;
     }
     
-    // Converter período para formato de filtro de data_referencia
-    // Exemplo: "2023-09" filtra data_referencia do mês 09/2023
+    // Usar periodo_referencia ao invés de data_referencia para filtrar
+    // Exemplo: "jun/25" filtra pelo periodo_referencia
     return data.detailedData.filter(item => {
-      const dataRef = item.data_referencia;
-      if (!dataRef) return false;
+      const periodoRef = item.periodo_referencia;
+      if (!periodoRef) return false;
       
-      // Se período é no formato YYYY-MM, filtrar por mês
+      // Se período é no formato YYYY-MM, converter para o formato do banco (ex: "jun/25")
       if (periodo.match(/^\d{4}-\d{2}$/)) {
-        const dataRefStr = new Date(dataRef).toISOString().slice(0, 7); // YYYY-MM
-        return dataRefStr === periodo;
+        const [year, month] = periodo.split('-');
+        const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 
+                           'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const monthName = monthNames[parseInt(month) - 1];
+        const yearShort = year.slice(-2);
+        const expectedPeriodo = `${monthName}/${yearShort}`;
+        return periodoRef === expectedPeriodo;
       }
       
-      return true;
+      // Comparação direta para formatos como "jun/25"
+      return periodoRef === periodo;
     });
   }, [data.detailedData]);
 
