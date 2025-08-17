@@ -185,25 +185,6 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
       console.log(`🎉🔥 DADOS CARREGADOS: ${allDetails.length} registros detalhados 🔥🎉`);
       
-      // DEBUG ESPECÍFICO: Procurar o exame que não aparece
-      const exameProblemático = allDetails.find((item: any) => 
-        item.EMPRESA === 'CDI.URUACU' && 
-        item.NOME_PACIENTE === 'Eber Da Silva Pereira' && 
-        item.ESTUDO_DESCRICAO === 'RX TORNOZELO DIREITO'
-      );
-      
-      console.log('🚨 EXAME PROBLEMÁTICO ENCONTRADO NOS DADOS CARREGADOS:', exameProblemático ? 'SIM' : 'NÃO');
-      if (exameProblemático) {
-        console.log('🚨 DADOS DO EXAME PROBLEMÁTICO:', JSON.stringify(exameProblemático, null, 2));
-      } else {
-        console.log('🚨 EXAME NÃO ENCONTRADO - Verificando se existem outros registros do CDI.URUACU...');
-        const todosCDI = allDetails.filter((item: any) => item.EMPRESA === 'CDI.URUACU');
-        console.log('🚨 TOTAL CDI.URUACU nos dados carregados:', todosCDI.length);
-        if (todosCDI.length > 0) {
-          console.log('🚨 PRIMEIROS 3 registros CDI.URUACU:', todosCDI.slice(0, 3));
-        }
-      }
-      
       if (allDetails.length > 0) {
         const totalExamesCalc = allDetails.reduce((sum: number, item: any) => sum + (Number(item.VALORES) || 0), 0);
         console.log(`📊 Total exames somados: ${totalExamesCalc}`);
