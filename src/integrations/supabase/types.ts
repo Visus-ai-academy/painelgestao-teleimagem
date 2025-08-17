@@ -3904,6 +3904,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      normalizar_medico: {
+        Args: { medico_nome: string }
+        Returns: string
+      }
       obter_status_ativacao_atual: {
         Args: { p_medico_id?: string }
         Returns: {
