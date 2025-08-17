@@ -365,6 +365,11 @@ export function VolumetriaClientesComparison({
 
   const handleExportList = () => {
     try {
+      console.log('🔍 [EXCEL DEBUG] Iniciando exportação...');
+      console.log('🔍 [EXCEL DEBUG] Clientes exibidos:', clientesExibidos.length);
+      console.log('🔍 [EXCEL DEBUG] Upload map exists:', !!uploadedMap);
+      console.log('🔍 [EXCEL DEBUG] Sistema clientes:', sistemaClientes.length);
+      
       // Resumo dos totais por cliente
       const resumoRows: any[] = [];
       clientesExibidos.forEach((c) => {
@@ -372,6 +377,8 @@ export function VolumetriaClientesComparison({
         const totalSistema = c.total_exames;
         const totalArquivo = up?.total_exames ?? 0;
         const divergencia = totalSistema !== totalArquivo;
+        
+        console.log(`🔍 [EXCEL DEBUG] Cliente: ${c.cliente}, Sistema: ${totalSistema}, Arquivo: ${totalArquivo}`);
         
         resumoRows.push({
           Cliente: c.cliente,
@@ -382,6 +389,8 @@ export function VolumetriaClientesComparison({
           'Percentual Arquivo/Sistema': totalSistema > 0 ? `${((totalArquivo / totalSistema) * 100).toFixed(1)}%` : 'N/A'
         });
       });
+
+      console.log('🔍 [EXCEL DEBUG] Resumo rows:', resumoRows.length);
 
       // Detalhamento completo por modalidade
       const modalidadeRows: any[] = [];
@@ -405,6 +414,8 @@ export function VolumetriaClientesComparison({
           });
         });
       });
+
+      console.log('🔍 [EXCEL DEBUG] Modalidade rows:', modalidadeRows.length);
 
       // Detalhamento completo por especialidade
       const especialidadeRows: any[] = [];
@@ -497,6 +508,29 @@ export function VolumetriaClientesComparison({
           });
         });
       });
+
+      // Log final para debug
+      console.log('🔍 [EXCEL DEBUG] Total rows por aba:', {
+        resumo: resumoRows.length,
+        modalidades: modalidadeRows.length,
+        especialidades: especialidadeRows.length,
+        exames: exameRows.length,
+        categorias: categoriaRows.length,
+        prioridades: prioridadeRows.length
+      });
+
+      // Verificar se há dados do sistema
+      const temDadosSistema = resumoRows.some(r => r['Total Sistema'] > 0);
+      console.log('🔍 [EXCEL DEBUG] Tem dados do sistema:', temDadosSistema);
+
+      if (!temDadosSistema) {
+        toast({ 
+          title: 'Aviso', 
+          description: 'Nenhum dado do sistema foi encontrado para comparação. Verifique se o período está carregado.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
       // Criar workbook com múltiplas abas
       const wb = XLSX.utils.book_new();
