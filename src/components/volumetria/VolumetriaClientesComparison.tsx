@@ -424,10 +424,19 @@ export function VolumetriaClientesComparison({
       console.log('🔍 [EXCEL DEBUG] Clientes exibidos:', clientesExibidos.length);
       console.log('🔍 [EXCEL DEBUG] Upload map exists:', !!uploadedMap);
       console.log('🔍 [EXCEL DEBUG] Sistema clientes:', sistemaClientes.length);
+      console.log('🔍 [EXCEL DEBUG] Filtro atual:', filtro);
+      console.log('🔍 [EXCEL DEBUG] Divergências count:', divergencias.length);
+      
+      // Para divergências, usar sempre os dados originais do sistema em vez dos filtrados
+      const clientesParaExport = filtro === 'divergencias' ? 
+        sistemaClientes.filter(c => divergencias.some(d => normalize(d.cliente) === normalize(c.cliente))) :
+        clientesExibidos;
+      
+      console.log('🔍 [EXCEL DEBUG] Clientes para export:', clientesParaExport.length);
       
       // Resumo dos totais por cliente
       const resumoRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const totalSistema = c.total_exames;
         const totalArquivo = up?.total_exames ?? 0;
@@ -444,12 +453,28 @@ export function VolumetriaClientesComparison({
           'Percentual Arquivo/Sistema': totalSistema > 0 ? `${((totalArquivo / totalSistema) * 100).toFixed(1)}%` : 'N/A'
         });
       });
+      
+      // Adicionar clientes que só existem no arquivo (missing_in_system)
+      if (filtro === 'divergencias') {
+        const clientesMissingInSystem = divergencias.filter(d => d.tipo === 'missing_in_system');
+        clientesMissingInSystem.forEach((d) => {
+          const up = uploadedMap?.get(normalize(d.cliente));
+          resumoRows.push({
+            Cliente: d.cliente,
+            'Total Sistema': 0,
+            'Total Arquivo': up?.total_exames ?? 0,
+            'Diferença': up?.total_exames ?? 0,
+            'Status': 'DIVERGENTE (SÓ NO ARQUIVO)',
+            'Percentual Arquivo/Sistema': 'N/A'
+          });
+        });
+      }
 
       console.log('🔍 [EXCEL DEBUG] Resumo rows:', resumoRows.length);
 
       // Detalhamento completo por modalidade
       const modalidadeRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const keys = Array.from(new Set([
           ...Object.keys(c.modalidades || {}),
@@ -474,7 +499,7 @@ export function VolumetriaClientesComparison({
 
       // Detalhamento completo por especialidade
       const especialidadeRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const keys = Array.from(new Set([
           ...Object.keys(c.especialidades || {}),
@@ -497,7 +522,7 @@ export function VolumetriaClientesComparison({
 
       // Detalhamento completo por exames
       const exameRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const keys = Array.from(new Set([
           ...Object.keys(c.exames || {}),
@@ -520,7 +545,7 @@ export function VolumetriaClientesComparison({
 
       // Detalhamento por categorias
       const categoriaRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const keys = Array.from(new Set([
           ...Object.keys(c.categorias || {}),
@@ -543,7 +568,7 @@ export function VolumetriaClientesComparison({
 
       // Detalhamento por prioridades
       const prioridadeRows: any[] = [];
-      clientesExibidos.forEach((c) => {
+      clientesParaExport.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
         const keys = Array.from(new Set([
           ...Object.keys(c.prioridades || {}),
