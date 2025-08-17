@@ -55,6 +55,8 @@ interface VolumetriaData {
     total_especialidades: number;
     total_medicos: number;
     total_prioridades: number;
+    periodo_ativo?: string;  // ✅ PERÍODO ATIVO
+    ultima_atualizacao?: string;  // ✅ TIMESTAMP ATUALIZAÇÃO
   };
   loading: boolean;
 }
@@ -273,7 +275,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           total_modalidades: Number(dashboardStats.total_modalidades),
           total_especialidades: Number(dashboardStats.total_especialidades),
           total_medicos: Number(dashboardStats.total_medicos),
-          total_prioridades: Number(dashboardStats.total_prioridades)
+          total_prioridades: Number(dashboardStats.total_prioridades),
+          periodo_ativo: periodoSistema,  // ✅ PERÍODO ATIVO
+          ultima_atualizacao: new Date().toISOString()  // ✅ TIMESTAMP ATUALIZAÇÃO
         },
         loading: false
       });

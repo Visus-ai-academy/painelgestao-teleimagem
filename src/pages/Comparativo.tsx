@@ -9,6 +9,9 @@ import { Download, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useVolumetria } from "@/contexts/VolumetriaContext";
+import { Badge } from "@/components/ui/badge";
+
 export default function Comparativo() {
   const [uploaded, setUploaded] = useState<UploadedRow[] | null>(null);
   const [uploadedExams, setUploadedExams] = useState<UploadedExamRow[] | null>(null);
@@ -16,6 +19,7 @@ export default function Comparativo() {
   const [isUploading, setIsUploading] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
   const { toast } = useToast();
+  const { data: volumetriaData, refreshData } = useVolumetria();
 
   // Persistência simples para manter o comparativo ao sair/voltar da tela
   const STORAGE_KEYS = {
@@ -254,6 +258,27 @@ export default function Comparativo() {
       <div>
         <h1 className="text-3xl font-bold">Comparativo de Clientes</h1>
         <p className="text-muted-foreground mt-1">Analise comparativa de volumetria por cliente.</p>
+        
+        {/* Indicador de dados atualizados */}
+        <div className="flex items-center gap-4 mt-3">
+          <Badge variant="outline" className="text-xs">
+            Período Ativo: {volumetriaData.dashboardStats?.periodo_ativo || 'N/A'}
+          </Badge>
+          {volumetriaData.dashboardStats?.ultima_atualizacao && (
+            <Badge variant="secondary" className="text-xs">
+              Atualizado: {new Date(volumetriaData.dashboardStats.ultima_atualizacao).toLocaleString('pt-BR')}
+            </Badge>
+          )}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => refreshData()} 
+            disabled={volumetriaData.loading}
+            className="text-xs"
+          >
+            {volumetriaData.loading ? '🔄 Atualizando...' : '🔄 Forçar Atualização'}
+          </Button>
+        </div>
       </div>
 
       <Card>
