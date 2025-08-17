@@ -397,13 +397,23 @@ export function StatusRegraProcessamento() {
   const getPeriodoReferencia = () => {
     if (!periodoReferencia) return 'Não identificado';
     
-    // Converter de "2025-06" para "jun-25"
-    const [ano, mes] = periodoReferencia.split('-');
-    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    const mesAbrev = meses[parseInt(mes) - 1];
-    const anoAbrev = ano.slice(-2);
-    
-    return `${mesAbrev}-${anoAbrev}`;
+    try {
+      // Converter de "2025-06" para "jun-25"
+      const [ano, mes] = periodoReferencia.toString().split('-');
+      const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      const mesIndex = parseInt(mes, 10) - 1;
+      
+      if (mesIndex >= 0 && mesIndex < 12 && ano) {
+        const mesAbrev = meses[mesIndex];
+        const anoAbrev = ano.slice(-2);
+        return `${mesAbrev}-${anoAbrev}`;
+      }
+      
+      return periodoReferencia; // Fallback para formato original
+    } catch (error) {
+      console.warn('Erro ao converter período de referência:', error);
+      return periodoReferencia || 'Não identificado';
+    }
   };
 
   return (
