@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, AlertCircle, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RegraStatus {
+  idRegra: string;
   nomeRegra: string;
   descricaoRegra: string;
   arquivos: {
@@ -248,6 +249,7 @@ export function StatusRegraProcessamento() {
         });
 
         return {
+          idRegra: regra.id,
           nomeRegra: regra.nome,
           descricaoRegra: regra.descricao,
           arquivos: arquivosStatus
@@ -351,8 +353,13 @@ export function StatusRegraProcessamento() {
                 <tr key={index} className="border-b hover:bg-muted/50">
                   <td className="p-3">
                     <div>
-                      <div className="font-medium">{regra.nomeRegra}</div>
-                      <div className="text-sm text-muted-foreground">{regra.descricaoRegra}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <Badge variant="outline" className="text-xs font-mono px-2 py-1">
+                          {regra.idRegra}
+                        </Badge>
+                        <span>{regra.nomeRegra}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">{regra.descricaoRegra}</div>
                     </div>
                   </td>
                   {TIPOS_ARQUIVO.map(tipo => {
