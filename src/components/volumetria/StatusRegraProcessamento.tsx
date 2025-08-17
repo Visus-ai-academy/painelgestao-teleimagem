@@ -173,10 +173,23 @@ const REGRAS_MONITORADAS = [
 export function StatusRegraProcessamento() {
   const [statusRegras, setStatusRegras] = useState<RegraStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodoReferencia, setPeriodoReferencia] = useState<string>('');
 
   const fetchStatusRegras = async () => {
     try {
       setLoading(true);
+      
+      // Buscar período de referência real dos dados processados
+      const { data: periodoData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('periodo_referencia')
+        .not('periodo_referencia', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (periodoData && periodoData.length > 0) {
+        setPeriodoReferencia(periodoData[0].periodo_referencia);
+      }
       
       // Buscar apenas os uploads mais recentes por tipo de arquivo (otimizado)
       const { data: uploads, error } = await supabase
@@ -382,11 +395,7 @@ export function StatusRegraProcessamento() {
   }
 
   const getPeriodoReferencia = () => {
-    const agora = new Date();
-    const ano = agora.getFullYear().toString().slice(-2);
-    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    const mes = meses[agora.getMonth()];
-    return `${mes}/${ano}`;
+    return periodoReferencia || 'Não identificado';
   };
 
   return (
