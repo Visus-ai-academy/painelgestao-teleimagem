@@ -381,6 +381,14 @@ export function StatusRegraProcessamento() {
     );
   }
 
+  const getPeriodoReferencia = () => {
+    const agora = new Date();
+    const ano = agora.getFullYear().toString().slice(-2);
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const mes = meses[agora.getMonth()];
+    return `${mes}/${ano}`;
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -388,6 +396,14 @@ export function StatusRegraProcessamento() {
         <p className="text-sm text-muted-foreground">
           Monitoramento em tempo real da aplicação das regras de negócio por arquivo processado
         </p>
+        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-md border">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+            📅 Período de Referência: <span className="font-bold">{getPeriodoReferencia()}</span>
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+            Status baseado nos uploads das últimas 24 horas
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
