@@ -428,12 +428,32 @@ export function VolumetriaClientesComparison({
       console.log('🔍 [EXCEL DEBUG] Divergências count:', divergencias.length);
       console.log('🔍 [EXCEL DEBUG] Sistema clientes sample:', sistemaClientes.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
       
+      // VALIDAÇÃO CRÍTICA: Verificar se há dados do sistema carregados
+      if (sistemaClientes.length === 0) {
+        toast({ 
+          title: 'Erro', 
+          description: 'Nenhum dado do sistema está carregado. Aguarde o carregamento dos dados ou verifique se o período está selecionado corretamente.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // VALIDAÇÃO: Verificar se há arquivo carregado
+      if (!uploadedMap || uploadedMap.size === 0) {
+        toast({ 
+          title: 'Erro', 
+          description: 'Nenhum arquivo foi carregado para comparação. Faça o upload de um arquivo primeiro.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
       // CRÍTICO: Para divergências, usar SEMPRE todos os dados do sistema que tenham divergências
       // E incluir também clientes que só existem no arquivo
       let clientesParaExport: ClienteAggregated[] = [];
       
       if (filtro === 'divergencias') {
-        // 1. Clientes do sistema que têm divergências
+        // 1. Clientes do sistema que têm divergências (exceto missing_in_system)
         const clientesSistemaComDivergencia = sistemaClientes.filter(c => 
           divergencias.some(d => normalize(d.cliente) === normalize(c.cliente) && d.tipo !== 'missing_in_system')
         );
@@ -454,7 +474,18 @@ export function VolumetriaClientesComparison({
         clientesParaExport = [...clientesSistemaComDivergencia, ...clientesSoNoArquivo];
         console.log('🔍 [EXCEL DEBUG] Clientes sistema com divergência:', clientesSistemaComDivergencia.length);
         console.log('🔍 [EXCEL DEBUG] Clientes só no arquivo:', clientesSoNoArquivo.length);
+        
+        // VALIDAÇÃO: Se não há divergências, avisar o usuário
+        if (clientesParaExport.length === 0) {
+          toast({ 
+            title: 'Aviso', 
+            description: 'Não foram encontradas divergências para exportar. O sistema e arquivo estão em sincronia.',
+            variant: 'default'
+          });
+          return;
+        }
       } else {
+        // Para filtro 'todos', usar a união completa (clientesExibidos)
         clientesParaExport = clientesExibidos;
       }
       
