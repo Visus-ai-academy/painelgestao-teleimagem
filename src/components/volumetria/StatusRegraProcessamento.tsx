@@ -177,29 +177,22 @@ export function StatusRegraProcessamento() {
     try {
       setLoading(true);
       
-      // Buscar informações dos últimos uploads por tipo de arquivo
+      // Buscar apenas os uploads mais recentes por tipo de arquivo (otimizado)
       const { data: uploads, error } = await supabase
         .from('processamento_uploads')
-        .select('tipo_arquivo, status, registros_processados, registros_erro, created_at')
+        .select('tipo_arquivo, status, registros_processados, registros_erro, registros_inseridos, created_at')
         .in('tipo_arquivo', TIPOS_ARQUIVO)
-        .order('created_at', { ascending: false });
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Últimas 24h
+        .order('created_at', { ascending: false })
+        .limit(20); // Apenas os mais recentes
 
       if (error) {
         console.error('Erro ao buscar uploads:', error);
         return;
       }
 
-      // Buscar logs de auditoria para verificar aplicação das regras
-      const { data: auditLogs, error: auditError } = await supabase
-        .from('audit_logs')
-        .select('operation, new_data, timestamp, severity')
-        .like('operation', '%REGRA_%')
-        .order('timestamp', { ascending: false })
-        .limit(1000);
-
-      if (auditError) {
-        console.error('Erro ao buscar logs de auditoria:', auditError);
-      }
+      // Removido busca pesada de logs de auditoria que causava timeout
+      // O status será determinado diretamente pelos dados de upload
 
       // Processar status de cada regra
       const regrasStatus: RegraStatus[] = REGRAS_MONITORADAS.map(regra => {
@@ -207,10 +200,6 @@ export function StatusRegraProcessamento() {
         
         TIPOS_ARQUIVO.forEach(tipoArquivo => {
           const uploadInfo = uploads?.find(u => u.tipo_arquivo === tipoArquivo);
-          const regraLogs = auditLogs?.filter(log => 
-            log.operation.includes(regra.funcao) || 
-            log.operation.includes(regra.nome.toUpperCase().replace(/\s/g, '_'))
-          );
 
           // Determinar se deve aplicar baseado no tipo de arquivo e regra
           let deveAplicar = true;
@@ -232,42 +221,45 @@ export function StatusRegraProcessamento() {
 
           // Verificar se foi aplicada - apenas se deve aplicar
           let foiAplicada = false;
-          let erros: string[] = [];
+          let informacoes: string[] = [];
           
-          if (deveAplicar) {
-            // Regras que EXCLUEM/FILTRAM registros - "erros" são exclusões corretas
+          if (deveAplicar && uploadInfo) {
+            // Regras que EXCLUEM/FILTRAM registros - exclusões são aplicações corretas
             const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
             
-            // Regras que TRANSFORMAM dados - "erros" podem ser correções aplicadas
+            // Regras que TRANSFORMAM dados - transformações são aplicações corretas
             const regrasTransformacao = ['v022', 'v026', 'v027', 'v030', 'extra_001', 'extra_002', 'extra_003'];
             
-            // Regras que VALIDAM dados - "erros" são rejeições corretas
+            // Regras que VALIDAM dados - rejeições são aplicações corretas
             const regrasValidacao = ['v013', 'extra_006'];
             
             if (regrasExclusao.includes(regra.id)) {
-              foiAplicada = uploadInfo?.status === 'concluido';
-              if (uploadInfo?.registros_erro > 0) {
-                erros = [`${uploadInfo.registros_erro} registros excluídos pela regra`];
+              // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
+              foiAplicada = uploadInfo.status === 'concluido';
+              if (uploadInfo.registros_erro > 0) {
+                informacoes = [`${uploadInfo.registros_erro} registros excluídos (regra aplicada)`];
               }
             } else if (regrasTransformacao.includes(regra.id)) {
-              foiAplicada = uploadInfo?.status === 'concluido';
-              if (uploadInfo?.registros_erro > 0) {
-                erros = [`${uploadInfo.registros_erro} registros transformados`];
+              foiAplicada = uploadInfo.status === 'concluido';
+              if (uploadInfo.registros_erro > 0) {
+                informacoes = [`${uploadInfo.registros_erro} registros transformados`];
               }
             } else if (regrasValidacao.includes(regra.id)) {
-              foiAplicada = uploadInfo?.status === 'concluido';
-              if (uploadInfo?.registros_erro > 0) {
-                erros = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
+              foiAplicada = uploadInfo.status === 'concluido';
+              if (uploadInfo.registros_erro > 0) {
+                informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
               }
             } else {
-              // Para outras regras (performance, cache, etc), considerar erro se registros_erro > 0
-              foiAplicada = uploadInfo?.status === 'concluido' && 
-                           uploadInfo?.registros_erro === 0;
+              // Para outras regras (performance, cache, etc), sucesso significa sem erros
+              foiAplicada = uploadInfo.status === 'concluido' && uploadInfo.registros_erro === 0;
               
-              if (uploadInfo?.registros_erro > 0) {
-                erros = [`${uploadInfo.registros_erro} erros encontrados`];
+              if (uploadInfo.registros_erro > 0) {
+                informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
               }
             }
+          } else if (deveAplicar && !uploadInfo) {
+            // Se deve aplicar mas não há upload info, considerar pendente
+            foiAplicada = false;
           } else {
             // Se não deve aplicar, considerar como "aplicada" (N/A)
             foiAplicada = true;
@@ -277,7 +269,7 @@ export function StatusRegraProcessamento() {
             deveAplicar,
             foiAplicada,
             ultimaAplicacao: uploadInfo?.created_at,
-            erros
+            erros: informacoes // Renomeado para ser mais claro
           };
         });
 
@@ -321,16 +313,14 @@ export function StatusRegraProcessamento() {
     };
   }, []);
 
-  const getStatusIcon = (deveAplicar: boolean, foiAplicada: boolean, erros?: string[]) => {
+  const getStatusIcon = (deveAplicar: boolean, foiAplicada: boolean, informacoes?: string[]) => {
     if (!deveAplicar) return <Minus className="h-4 w-4 text-muted-foreground" />;
-    if (erros && erros.length > 0) return <XCircle className="h-4 w-4 text-destructive" />;
     if (foiAplicada) return <CheckCircle className="h-4 w-4 text-success" />;
     return <AlertCircle className="h-4 w-4 text-warning" />;
   };
 
-  const getStatusBadge = (deveAplicar: boolean, foiAplicada: boolean, erros?: string[]) => {
+  const getStatusBadge = (deveAplicar: boolean, foiAplicada: boolean, informacoes?: string[]) => {
     if (!deveAplicar) return <Badge variant="outline">N/A</Badge>;
-    if (erros && erros.length > 0) return <Badge variant="destructive">Erro</Badge>;
     if (foiAplicada) return <Badge variant="default" className="bg-success">Aplicada</Badge>;
     return <Badge variant="outline">Pendente</Badge>;
   };
@@ -413,7 +403,7 @@ export function StatusRegraProcessamento() {
                             {getStatusBadge(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.erros)}
                           </div>
                           {arquivo.erros && arquivo.erros.length > 0 && (
-                            <div className="text-xs text-destructive">
+                            <div className="text-xs text-muted-foreground">
                               {arquivo.erros[0]}
                             </div>
                           )}
