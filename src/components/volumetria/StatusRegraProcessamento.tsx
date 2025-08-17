@@ -395,7 +395,15 @@ export function StatusRegraProcessamento() {
   }
 
   const getPeriodoReferencia = () => {
-    return periodoReferencia || 'Não identificado';
+    if (!periodoReferencia) return 'Não identificado';
+    
+    // Converter de "2025-06" para "jun-25"
+    const [ano, mes] = periodoReferencia.split('-');
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const mesAbrev = meses[parseInt(mes) - 1];
+    const anoAbrev = ano.slice(-2);
+    
+    return `${mesAbrev}-${anoAbrev}`;
   };
 
   return (
