@@ -65,98 +65,35 @@ serve(async (req) => {
       }
 
       try {
-        // Mapeamento baseado na sequência correta de colunas fornecida pelo usuário:
-        // 0: NOME_MOBILEMED, 1: Nome Fantasia, 2: Contrato, 3: CNPJ, 4: Razão Social, 5: Endereço, 6: Bairro, 7: CEP, 8: Cidade, 9: UF, 10: E-MAIL ENVIO NF, 11: TIPO_CLIENTE, 12: DIA_FATURAMENTO, 13: DATA_INICIO, 14: DATA_TERMINO, 15: STATUS
+        // Mapeamento correto baseado no arquivo do usuário (11 colunas):
+        // 0: NOME_MOBILEMED, 1: Nome_Fantasia, 2: CNPJ, 3: Razão Social, 4: Endereço, 5: Bairro, 6: CEP, 7: Cidade, 8: UF, 9: E-MAIL ENVIO NF, 10: TIPO_CLIENTE
         const cliente = {
-          // nome preenchido apenas com Nome Fantasia (coluna 1)
-          nome: row[1] || null, // Nome Fantasia - coluna 1
-          nome_fantasia: row[1] || null, // Nome Fantasia - coluna 1
-          nome_mobilemed: row[0] || null, // NOME_MOBILEMED - coluna 0
-          email: row[10] || null, // E-MAIL ENVIO NF - coluna 10
-          email_envio_nf: row[10] || null, // E-MAIL ENVIO NF - coluna 10
-          cnpj: row[3] || null, // CNPJ - coluna 3
+          nome: row[0] || null, // NOME_MOBILEMED é o campo principal - coluna 0
+          nome_fantasia: row[1] || null, // Nome_Fantasia - coluna 1
+          nome_mobilemed: row[0] || null, // NOME_MOBILEMED - coluna 0  
+          email: row[9] || null, // E-MAIL ENVIO NF - coluna 9
+          email_envio_nf: row[9] || null, // E-MAIL ENVIO NF - coluna 9
+          cnpj: row[2] || null, // CNPJ - coluna 2
           contato: null, // Não existe no arquivo - deixar em branco
-          endereco: row[5] || null, // Endereço - coluna 5
-          cidade: row[8] || null, // Cidade - coluna 8
-          estado: row[9] || null, // UF - coluna 9
-          bairro: row[6] || null, // Bairro - coluna 6
-          cep: row[7] || null, // CEP - coluna 7
-          numero_contrato: row[2] || null, // Contrato - coluna 2
-          razao_social: row[4] || null, // Razão Social - coluna 4
-          tipo_cliente: row[11] || 'CO', // TIPO_CLIENTE - coluna 11
-          dia_faturamento: row[12] ? parseInt(row[12]) : null, // DIA_FATURAMENTO - coluna 12
+          endereco: row[4] || null, // Endereço - coluna 4
+          cidade: row[7] || null, // Cidade - coluna 7
+          estado: row[8] || null, // UF - coluna 8
+          bairro: row[5] || null, // Bairro - coluna 5
+          cep: row[6] || null, // CEP - coluna 6
+          razao_social: row[3] || null, // Razão Social - coluna 3
+          tipo_cliente: row[10] || 'CO', // TIPO_CLIENTE - coluna 10
           
-          // Gerar cod_cliente sequencial baseado na data de início
-          cod_cliente: (() => {
-            if (row[13] && row[13] !== '') {
-              try {
-                const date = new Date(row[13]);
-                if (!isNaN(date.getTime())) {
-                  const year = date.getFullYear().toString().slice(-2);
-                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                  return `CLI${year}${month}${(i + 1).toString().padStart(3, '0')}`;
-                }
-              } catch (error) {
-                // Se erro na data, usar apenas sequencial
-              }
-            }
-            return `CLI${(i + 1).toString().padStart(6, '0')}`;
-          })(),
+          // Gerar cod_cliente sequencial
+          cod_cliente: `CLI${(i + 1).toString().padStart(6, '0')}`,
           
-          // Status processamento
-          status: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo') ? 'Ativo' : 'Inativo', // STATUS - coluna 15
-          ativo: (row[15] === 'A' || row[15] === 'ATIVO' || row[15] === 'Ativo' || row[15] === 'ativo'),
+          // Status - todos inativos por padrão (usuário pode editar depois)
+          status: 'Ativo', // Padrão ativo
+          ativo: true, // Padrão ativo
           
-          // Datas - tratamento mais robusto
-          data_inicio_contrato: row[13] && row[13] !== '' ? (() => {
-            try {
-              let dateValue = row[13];
-              
-              // Se for um número (Excel timestamp)
-              if (typeof dateValue === 'number') {
-                // Excel epoch is 1900-01-01, JavaScript epoch is 1970-01-01
-                // Excel has 25567 days difference + 2 days for Excel bug
-                const date = new Date((dateValue - 25569) * 86400 * 1000);
-                return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
-              }
-              
-              // Se for string, tentar parsear
-              const date = new Date(dateValue);
-              return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // DATA_INICIO - coluna 13
-          data_termino_contrato: row[14] && row[14] !== '' ? (() => {
-            try {
-              let dateValue = row[14];
-              
-              // Se for um número (Excel timestamp)
-              if (typeof dateValue === 'number') {
-                // Excel epoch is 1900-01-01, JavaScript epoch is 1970-01-01
-                // Excel has 25567 days difference + 2 days for Excel bug
-                const date = new Date((dateValue - 25569) * 86400 * 1000);
-                return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
-              }
-              
-              // Se for string, tentar parsear
-              const date = new Date(dateValue);
-              return isNaN(date.getTime()) || date.getFullYear() < 1970 ? null : date.toISOString().split('T')[0];
-            } catch {
-              return null;
-            }
-          })() : null, // DATA_TERMINO - coluna 14
-          
-          // Campos opcionais com valores padrão
+          // Campos não presentes no arquivo atual - usar valores padrão
           telefone: null,
-          integracao: row[16] || null, // Integração - coluna 16 se existir
-          portal_laudos: row[17] === 'S' || row[17] === 'Sim' || row[17] === 'SIM' || false, // Portal de Laudos - coluna 17
-          possui_franquia: row[18] === 'S' || row[18] === 'Sim' || row[18] === 'SIM' || false, // Possui Franquia - coluna 18
-          valor_franquia: row[19] ? parseFloat(row[19]) : 0, // Valor Franquia - coluna 19
-          frequencia_continua: row[20] === 'S' || row[20] === 'Sim' || row[20] === 'SIM' || false, // Frequencia Contínua - coluna 20
-          frequencia_por_volume: row[21] === 'S' || row[21] === 'Sim' || row[21] === 'SIM' || false, // Frequência por volume - coluna 21
-          volume_franquia: row[22] ? parseInt(row[22]) : 0, // Volume Franquia - coluna 22
-          valor_franquia_acima_volume: row[23] ? parseFloat(row[23]) : 0 // R$ Valor Franquia Acima Volume - coluna 23
+          data_inicio_contrato: null,
+          data_termino_contrato: null
         }
 
         // Debug: Log first few rows to understand the data structure
