@@ -212,30 +212,7 @@ export function ClientValidationStatus() {
             </Alert>
           )}
 
-          {/* Status do Último Upload de Clientes */}
-          {stats.ultimoUploadClientes && (
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Último Upload de Clientes</h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm">
-                    <strong>Arquivo:</strong> {stats.ultimoUploadClientes.filename}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {new Date(stats.ultimoUploadClientes.created_at).toLocaleString('pt-BR')}
-                  </div>
-                </div>
-                <Badge variant={stats.ultimoUploadClientes.status === 'success' ? 'default' : 'destructive'}>
-                  {stats.ultimoUploadClientes.status}
-                </Badge>
-              </div>
-              {stats.ultimoUploadClientes.error_message && (
-                <div className="text-sm text-destructive mt-2">
-                  <strong>Erro:</strong> {stats.ultimoUploadClientes.error_message}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Seção do último upload removida - dados inconsistentes */}
 
           {/* Ações */}
           <div className="flex gap-2">

@@ -16,6 +16,7 @@ import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { ClientValidationStatus } from '@/components/ClientValidationStatus';
+import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
 
 
 import { 
@@ -599,6 +600,9 @@ export default function GerenciarCadastros() {
             
             {/* Status de Validação de Clientes */}
             <ClientValidationStatus />
+
+            {/* Análise de Preços Sem Cliente */}
+            <PrecosSemClienteAnalise />
 
             {/* Upload Preço Clientes */}
             <Card>
