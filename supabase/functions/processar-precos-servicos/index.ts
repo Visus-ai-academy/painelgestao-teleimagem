@@ -278,7 +278,22 @@ serve(async (req) => {
       console.error('❌ Erro ao sincronizar preços com contratos:', error.message)
     }
 
-    // 7. Finalizar log
+    // 7. Aplicar validação/correlação automática de clientes
+    try {
+      console.log('🔄 Aplicando validação automática de clientes...')
+      const { data: validationResult, error: validationError } = await supabaseClient
+        .rpc('aplicar_validacao_cliente_volumetria', { lote_upload_param: null })
+
+      if (validationError) {
+        console.error('❌ Erro na validação automática:', validationError)
+      } else {
+        console.log('✅ Validação automática concluída:', validationResult)
+      }
+    } catch (error) {
+      console.error('❌ Erro ao executar validação automática:', error.message)
+    }
+
+    // 8. Finalizar log
     const status = registrosInseridos > 0 ? 'success' : 'failed'
     const errorDetails = erros.length > 0 ? erros.slice(0, 10).join('; ') : null
 
