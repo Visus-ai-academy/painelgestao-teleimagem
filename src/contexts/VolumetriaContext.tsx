@@ -137,7 +137,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       
       if (clientesError) {
         console.error('❌ Erro nas estatísticas de clientes:', clientesError);
-        throw new Error(`Erro nas estatísticas de clientes: ${clientesError.message}`);
+        console.error('❌ Detalhes do erro:', clientesError);
+        // Não parar o fluxo, continuar sem os stats de clientes
+        console.warn('⚠️ Continuando sem estatísticas de clientes específicas...');
       }
       
       console.log(`✅ Estatísticas de ${clientesStats?.length || 0} clientes carregadas`);
