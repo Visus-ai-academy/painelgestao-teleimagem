@@ -103,9 +103,64 @@ export function VolumetriaClientesComparison({
   // Agregar dados do sistema (definitivos) a partir do contexto
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
     try {
+      console.log('🔍 [COMPARATIVO DEBUG] Context completo:', context);
       // Priorizar estatísticas definitivas por cliente (100% do banco)
       const stats = (context as any)?.clientesStats || [];
-      console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats.length, stats.slice(0, 3));
+      console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats?.length, stats?.slice(0, 3));
+      
+      if (!stats || stats.length === 0) {
+        console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
+        // Fallback direto para dados detalhados se stats estiver vazio
+        if (context.detailedData && context.detailedData.length > 0) {
+          const map = new Map<string, ClienteAggregated>();
+          console.log('🔍 [COMPARATIVO DEBUG] Usando detailedData como fallback:', context.detailedData.length, 'registros');
+          
+          (context.detailedData as any[]).forEach((item) => {
+            const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
+            const cliente = String(clienteRaw).trim();
+            if (!cliente) return;
+            
+            const key = normalizeClientName(cliente).toLowerCase();
+            if (!map.has(key)) {
+              map.set(key, {
+                cliente,
+                total_exames: 0,
+                modalidades: {},
+                especialidades: {},
+                prioridades: {},
+                categorias: {},
+                exames: {},
+              });
+            }
+            
+            const ref = map.get(key)!;
+            const rawVal = (item as any).VALORES ?? 1;
+            const inc = Number.isFinite(Number(rawVal)) ? Number(rawVal) : 1;
+            ref.total_exames += inc;
+            
+            // Adicionar detalhes
+            const mod = canonicalModalidade((item as any).MODALIDADE);
+            const esp = canonical((item as any).ESPECIALIDADE);
+            const pri = canonicalPrioridade((item as any).PRIORIDADE);
+            const cat = canonical((item as any).CATEGORIA);
+            const exame = canonical((item as any).ESTUDO_DESCRICAO);
+            
+            if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
+            if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
+            if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
+            if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + inc;
+            if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + inc;
+          });
+          
+          const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+          console.log('🔍 [COMPARATIVO DEBUG] Fallback concluído:', resultado.length, 'clientes');
+          return resultado;
+        }
+        
+        console.error('❌ [COMPARATIVO] Nenhuma fonte de dados disponível!');
+        return [];
+      }
+      
       const map = new Map<string, ClienteAggregated>();
 
       // 1) Criar base com totais por cliente vindos do RPC completo
