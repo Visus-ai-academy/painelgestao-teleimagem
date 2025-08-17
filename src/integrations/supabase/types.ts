@@ -3604,6 +3604,16 @@ export type Database = {
           mes_referencia: string
         }[]
       }
+      get_regras_aplicadas_detalhadas: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          registros_processados: number
+          registros_rejeitados: number
+          regra: string
+          total_aplicacoes: number
+          ultima_aplicacao: string
+        }[]
+      }
       get_regras_aplicadas_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
