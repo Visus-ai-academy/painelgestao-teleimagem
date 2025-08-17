@@ -34,9 +34,9 @@ function calcularDataLimiteLaudo(periodoReferencia: string) {
     throw new Error(`Período inválido: ${periodoReferencia}`);
   }
   
-  // Data limite: dia 7 do mês SEGUINTE ao período
-  // Para Jun/25: limite é 07/07/2025 (laudos após essa data devem ser excluídos)
-  const dataLimiteLaudo = new Date(ano, mes, 7);
+  // Data limite: dia 7 do mês SEGUINTE ao período (INCLUSIVE)
+  // Para Jun/25: limite é 07/07/2025 (laudos APÓS 07/07/2025 devem ser excluídos)
+  const dataLimiteLaudo = new Date(ano, mes - 1, 7);
   
   const result = {
     dataLimiteLaudo: dataLimiteLaudo.toISOString().split('T')[0]
@@ -75,7 +75,7 @@ export default async function handler(req: Request): Promise<Response> {
     const detalhes = [];
 
     // REGRA v031: Filtro de DATA_LAUDO para arquivos NÃO-RETROATIVOS
-    // Excluir laudos após dia 7 do mês seguinte ao período
+    // Excluir laudos APÓS dia 7 do mês seguinte ao período (dia 7 é permitido)
     console.log(`📝 Regra v031: Exclusão por DATA_LAUDO para arquivos não-retroativos`);
     
     // Aplicar v031 em volumetria_padrao
