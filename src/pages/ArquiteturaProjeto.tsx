@@ -10,6 +10,7 @@ import {
   Node,
   Edge,
   MarkerType,
+  BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,640 +19,260 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const nodeTypes = {};
 
 const ArquiteturaProjeto = () => {
-  const [activeTab, setActiveTab] = useState("mindmap");
+  const [activeTab, setActiveTab] = useState("sistema");
 
-  // 1. MAPA MENTAL - Overview e Navegação
-  const mindMapNodes: Node[] = useMemo(() => [
-    // NÚCLEO CENTRAL
+  // 1. SISTEMA COMPLETO - FLUXO DE PROCESSAMENTO
+  const sistemaNodes: Node[] = useMemo(() => [
+    // ENTRADA DE DADOS
     {
-      id: 'sistema-central',
+      id: 'upload-volumetria',
+      type: 'default',
+      position: { x: 50, y: 100 },
+      data: { label: '📤 UPLOAD VOLUMETRIA\n(Arquivos 1,2,3,4)' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 160, height: 70 }
+    },
+    {
+      id: 'mobilemed-futuro',
+      type: 'default',
+      position: { x: 250, y: 100 },
+      data: { label: '🔮 MOBILEMED\n(FUTURO - Online)' },
+      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 160, height: 70 }
+    },
+
+    // PROCESSAMENTO
+    {
+      id: 'processamento-volumetria',
+      type: 'default',
+      position: { x: 150, y: 220 },
+      data: { label: '⚙️ PROCESSAMENTO\nREGRAS & TRATAMENTOS' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 70 }
+    },
+    {
+      id: 'tipo-cliente-faturamento',
+      type: 'default',
+      position: { x: 150, y: 320 },
+      data: { label: '🏷️ APLICAR TIPO CLIENTE\n(NC/CO) & FATURAMENTO\n(CO-FT/NC-FT/NC-NF)' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 180, height: 80 }
+    },
+    {
+      id: 'volumetria-periodo',
+      type: 'default',
+      position: { x: 150, y: 440 },
+      data: { label: '📊 VOLUMETRIA\nDO PERÍODO' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 70 }
+    },
+
+    // CADASTROS
+    {
+      id: 'cadastros',
+      type: 'default',
+      position: { x: 450, y: 200 },
+      data: { label: '📋 CADASTROS' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 160, height: 60 }
+    },
+    {
+      id: 'clientes',
       type: 'default',
       position: { x: 400, y: 300 },
-      data: { label: '🏗️ TELEIMAGEM\nSISTEMA' },
-      style: { 
-        backgroundColor: '#1e40af', 
-        color: 'white', 
-        borderColor: '#1d4ed8', 
-        width: 150, 
-        height: 80,
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }
-    },
-
-    // RAMO AUTENTICAÇÃO E SEGURANÇA (Topo)
-    {
-      id: 'auth-branch',
-      type: 'default',
-      position: { x: 400, y: 120 },
-      data: { label: '🔐 AUTENTICAÇÃO\n& SEGURANÇA' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
-    },
-    {
-      id: 'auth-supabase',
-      type: 'default',
-      position: { x: 250, y: 50 },
-      data: { label: 'Supabase Auth' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
-    },
-    {
-      id: 'auth-context',
-      type: 'default',
-      position: { x: 400, y: 30 },
-      data: { label: 'AuthContext' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
-    },
-    {
-      id: 'roles-permissions',
-      type: 'default',
-      position: { x: 550, y: 50 },
-      data: { label: 'Roles & RLS' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 110 }
-    },
-
-    // RAMO OPERACIONAL (Esquerda Superior)
-    {
-      id: 'operacional-branch',
-      type: 'default',
-      position: { x: 120, y: 200 },
-      data: { label: '⚙️ OPERACIONAL' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140, height: 60 }
-    },
-    {
-      id: 'escala-medica',
-      type: 'default',
-      position: { x: 20, y: 120 },
-      data: { label: '📅 Escala Médica' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
-    },
-    {
-      id: 'producao',
-      type: 'default',
-      position: { x: 20, y: 180 },
-      data: { label: '📊 Produção' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
-    },
-    {
-      id: 'qualidade',
-      type: 'default',
-      position: { x: 20, y: 240 },
-      data: { label: '✅ Qualidade' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
-    },
-    {
-      id: 'volumetria',
-      type: 'default',
-      position: { x: 20, y: 300 },
-      data: { label: '📈 Volumetria' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 110 }
-    },
-
-    // RAMO FINANCEIRO (Direita Superior)
-    {
-      id: 'financeiro-branch',
-      type: 'default',
-      position: { x: 680, y: 200 },
-      data: { label: '💰 FINANCEIRO' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
-    },
-    {
-      id: 'faturamento',
-      type: 'default',
-      position: { x: 780, y: 120 },
-      data: { label: '🧾 Faturamento' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
-    },
-    {
-      id: 'pagamentos',
-      type: 'default',
-      position: { x: 780, y: 180 },
-      data: { label: '💳 Pagamentos' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
-    },
-    {
-      id: 'cobranca',
-      type: 'default',
-      position: { x: 780, y: 240 },
-      data: { label: '📬 Cobrança' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
-    },
-    {
-      id: 'omie-integration',
-      type: 'default',
-      position: { x: 780, y: 300 },
-      data: { label: '🔗 Integração Omie' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 110 }
-    },
-
-    // RAMO PEOPLE/RH (Esquerda Inferior)
-    {
-      id: 'people-branch',
-      type: 'default',
-      position: { x: 120, y: 450 },
-      data: { label: '👥 PEOPLE / RH' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
-    },
-    {
-      id: 'colaboradores',
-      type: 'default',
-      position: { x: 20, y: 400 },
-      data: { label: '👤 Colaboradores' },
-      style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
-    },
-    {
-      id: 'carreira',
-      type: 'default',
-      position: { x: 20, y: 460 },
-      data: { label: '📈 P. Carreira' },
-      style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
-    },
-    {
-      id: 'treinamento',
-      type: 'default',
-      position: { x: 20, y: 520 },
-      data: { label: '🎓 Treinamento' },
-      style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
-    },
-    {
-      id: 'medicos-gestao',
-      type: 'default',
-      position: { x: 20, y: 580 },
-      data: { label: '👨‍⚕️ Gestão Médicos' },
-      style: { backgroundColor: '#fffbeb', borderColor: '#d97706', width: 110 }
-    },
-
-    // RAMO GESTÃO/ADMIN (Direita Inferior)
-    {
-      id: 'gestao-branch',
-      type: 'default',
-      position: { x: 680, y: 450 },
-      data: { label: '⚡ GESTÃO' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 140, height: 60 }
-    },
-    {
-      id: 'usuarios',
-      type: 'default',
-      position: { x: 780, y: 380 },
-      data: { label: '👨‍💼 Usuários' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
-    },
-    {
-      id: 'listas',
-      type: 'default',
-      position: { x: 780, y: 440 },
-      data: { label: '📋 Listas Mestras' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
+      data: { label: '🏥 Clientes' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
     },
     {
       id: 'contratos',
       type: 'default',
-      position: { x: 780, y: 500 },
+      position: { x: 520, y: 300 },
       data: { label: '📄 Contratos' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
     },
     {
-      id: 'configuracoes',
+      id: 'precos',
       type: 'default',
-      position: { x: 780, y: 560 },
-      data: { label: '⚙️ Configurações' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 110 }
-    },
-
-    // RAMO DADOS E UPLOADS (Inferior Central)
-    {
-      id: 'dados-branch',
-      type: 'default',
-      position: { x: 400, y: 550 },
-      data: { label: '📊 DADOS & UPLOADS' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140, height: 60 }
-    },
-    {
-      id: 'upload-dados',
-      type: 'default',
-      position: { x: 300, y: 620 },
-      data: { label: '📤 Upload Dados' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
-    },
-    {
-      id: 'dashboard',
-      type: 'default',
-      position: { x: 400, y: 650 },
-      data: { label: '🏠 Dashboard' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
-    },
-    {
-      id: 'relatorios',
-      type: 'default',
-      position: { x: 500, y: 620 },
-      data: { label: '📊 Relatórios' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
-    },
-    {
-      id: 'importacao-inteligente',
-      type: 'default',
-      position: { x: 300, y: 680 },
-      data: { label: '🧠 Importação\nInteligente' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
-    },
-    {
-      id: 'mapeamento-visual',
-      type: 'default',
-      position: { x: 500, y: 680 },
-      data: { label: '🗺️ Mapeamento\nVisual' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 110 }
-    }
-  ], []);
-
-  const mindMapEdges: Edge[] = useMemo(() => [
-    // Conexões do núcleo central para os ramos principais
-    { id: 'e-auth', source: 'sistema-central', target: 'auth-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'e-op', source: 'sistema-central', target: 'operacional-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'e-fin', source: 'sistema-central', target: 'financeiro-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'e-people', source: 'sistema-central', target: 'people-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'e-gestao', source: 'sistema-central', target: 'gestao-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'e-dados', source: 'sistema-central', target: 'dados-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-
-    // Ramificações da autenticação e segurança
-    { id: 'e-auth1', source: 'auth-branch', target: 'auth-supabase', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'e-auth2', source: 'auth-branch', target: 'auth-context', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'e-auth3', source: 'auth-branch', target: 'roles-permissions', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-
-    // Ramificações operacional
-    { id: 'e-op1', source: 'operacional-branch', target: 'escala-medica', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'e-op2', source: 'operacional-branch', target: 'producao', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'e-op3', source: 'operacional-branch', target: 'qualidade', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'e-op4', source: 'operacional-branch', target: 'volumetria', type: 'smoothstep', style: { stroke: '#22c55e' } },
-
-    // Ramificações financeiro
-    { id: 'e-fin1', source: 'financeiro-branch', target: 'faturamento', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'e-fin2', source: 'financeiro-branch', target: 'pagamentos', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'e-fin3', source: 'financeiro-branch', target: 'cobranca', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'e-fin4', source: 'financeiro-branch', target: 'omie-integration', type: 'smoothstep', style: { stroke: '#a855f7' } },
-
-    // Ramificações people
-    { id: 'e-people1', source: 'people-branch', target: 'colaboradores', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'e-people2', source: 'people-branch', target: 'carreira', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'e-people3', source: 'people-branch', target: 'treinamento', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'e-people4', source: 'people-branch', target: 'medicos-gestao', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-
-    // Ramificações gestão
-    { id: 'e-gestao1', source: 'gestao-branch', target: 'usuarios', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e-gestao2', source: 'gestao-branch', target: 'listas', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e-gestao3', source: 'gestao-branch', target: 'contratos', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'e-gestao4', source: 'gestao-branch', target: 'configuracoes', type: 'smoothstep', style: { stroke: '#ef4444' } },
-
-    // Ramificações dados e uploads
-    { id: 'e-dados1', source: 'dados-branch', target: 'upload-dados', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e-dados2', source: 'dados-branch', target: 'dashboard', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e-dados3', source: 'dados-branch', target: 'relatorios', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e-dados4', source: 'dados-branch', target: 'importacao-inteligente', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'e-dados5', source: 'dados-branch', target: 'mapeamento-visual', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-  ], []);
-
-  // 2. ERD INTERATIVO - Relações Detalhadas do Banco
-  const erdNodes: Node[] = useMemo(() => [
-    // NÚCLEO CENTRAL DATABASE
-    {
-      id: 'db-central',
-      type: 'default',
-      position: { x: 400, y: 300 },
-      data: { label: '🗄️ SUPABASE\nDATABASE' },
-      style: { 
-        backgroundColor: '#1e3a8a', 
-        color: 'white', 
-        borderColor: '#1d4ed8', 
-        width: 150, 
-        height: 80,
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }
-    },
-
-    // RAMO USUÁRIOS E PERMISSÕES (Topo)
-    {
-      id: 'users-branch',
-      type: 'default',
-      position: { x: 400, y: 120 },
-      data: { label: '👥 USUÁRIOS' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
-    },
-    {
-      id: 'profiles',
-      type: 'default',
-      position: { x: 280, y: 50 },
-      data: { label: 'profiles' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    },
-    {
-      id: 'user-roles',
-      type: 'default',
-      position: { x: 380, y: 30 },
-      data: { label: 'user_roles' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    },
-    {
-      id: 'menu-permissions',
-      type: 'default',
-      position: { x: 480, y: 50 },
-      data: { label: 'user_menu_\npermissions' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    },
-
-    // RAMO MÉDICOS E ESCALAS (Esquerda Superior)
-    {
-      id: 'medicos-branch',
-      type: 'default',
-      position: { x: 150, y: 200 },
-      data: { label: '👨‍⚕️ MÉDICOS' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140, height: 60 }
+      position: { x: 400, y: 370 },
+      data: { label: '💰 Preços' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
     },
     {
       id: 'medicos',
       type: 'default',
-      position: { x: 50, y: 120 },
-      data: { label: 'medicos' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 90 }
+      position: { x: 520, y: 370 },
+      data: { label: '👨‍⚕️ Médicos' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
     },
     {
-      id: 'escalas',
+      id: 'parametros',
       type: 'default',
-      position: { x: 50, y: 180 },
-      data: { label: 'escalas_medicas' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 90 }
-    },
-    {
-      id: 'valores-repasse',
-      type: 'default',
-      position: { x: 50, y: 240 },
-      data: { label: 'medicos_valores_\nrepasse' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 90 }
-    },
-    {
-      id: 'pagamentos-med',
-      type: 'default',
-      position: { x: 50, y: 300 },
-      data: { label: 'pagamentos_\nmedicos' },
-      style: { backgroundColor: '#f0fdf4', borderColor: '#16a34a', width: 90 }
+      position: { x: 460, y: 440 },
+      data: { label: '⚙️ Parâmetros\nContratos' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 100, height: 50 }
     },
 
-    // RAMO FATURAMENTO (Direita Superior)
+    // PROCESSAMENTO CENTRAL
     {
-      id: 'billing-branch',
+      id: 'geracao-faturamento',
       type: 'default',
-      position: { x: 650, y: 200 },
-      data: { label: '💰 FATURAMENTO' },
+      position: { x: 750, y: 350 },
+      data: { label: '🧾 GERAÇÃO\nFATURAMENTO' },
+      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 160, height: 70 }
+    },
+    {
+      id: 'pagamento-medicos',
+      type: 'default',
+      position: { x: 750, y: 500 },
+      data: { label: '💳 PAGAMENTO\nMÉDICOS' },
+      style: { backgroundColor: '#16a34a', color: 'white', borderColor: '#15803d', width: 160, height: 70 }
+    },
+    {
+      id: 'volumetria-onco',
+      type: 'default',
+      position: { x: 550, y: 500 },
+      data: { label: '🎯 VOLUMETRIA\nONCO (Referência)' },
+      style: { backgroundColor: '#f97316', color: 'white', borderColor: '#ea580c', width: 160, height: 70 }
+    },
+
+    // SAÍDAS
+    {
+      id: 'relatorios-email',
+      type: 'default',
+      position: { x: 1000, y: 250 },
+      data: { label: '📧 RELATÓRIOS\nE-MAIL' },
       style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
     },
     {
-      id: 'faturamento-table',
+      id: 'emissao-nf',
       type: 'default',
-      position: { x: 750, y: 120 },
-      data: { label: 'faturamento' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 90 }
+      position: { x: 1000, y: 350 },
+      data: { label: '🧾 EMISSÃO\nNOTA FISCAL' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 140, height: 60 }
     },
     {
-      id: 'regua-cobranca',
+      id: 'contas-pagar',
       type: 'default',
-      position: { x: 750, y: 180 },
-      data: { label: 'regua_cobranca' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 90 }
-    },
-    {
-      id: 'emails-cobranca',
-      type: 'default',
-      position: { x: 750, y: 240 },
-      data: { label: 'emails_cobranca' },
-      style: { backgroundColor: '#faf5ff', borderColor: '#9333ea', width: 90 }
+      position: { x: 1000, y: 500 },
+      data: { label: '💰 CONTAS\nA PAGAR' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 140, height: 60 }
     },
 
-    // RAMO CLIENTES E EXAMES (Esquerda Inferior)
+    // INTEGRAÇÕES
     {
-      id: 'clients-branch',
+      id: 'omie-nf',
       type: 'default',
-      position: { x: 150, y: 450 },
-      data: { label: '🏥 CLIENTES' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140, height: 60 }
+      position: { x: 1200, y: 350 },
+      data: { label: '🔗 OMIE\n(NF)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
     },
     {
-      id: 'clientes-table',
+      id: 'omie-pagamentos',
       type: 'default',
-      position: { x: 50, y: 400 },
-      data: { label: 'clientes' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 90 }
+      position: { x: 1200, y: 500 },
+      data: { label: '🔗 OMIE\n(Pagamentos)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
     },
     {
-      id: 'exames',
+      id: 'clicksign',
       type: 'default',
-      position: { x: 50, y: 460 },
-      data: { label: 'exames' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 90 }
-    },
-    {
-      id: 'documentos',
-      type: 'default',
-      position: { x: 50, y: 520 },
-      data: { label: 'documentos_\nclientes' },
-      style: { backgroundColor: '#eff6ff', borderColor: '#2563eb', width: 90 }
+      position: { x: 1200, y: 250 },
+      data: { label: '🔗 CLICKSIGN\n(Contratos)' },
+      style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
     },
 
-    // RAMO CONFIGURAÇÕES (Direita Inferior)
+    // ÁREAS FUNCIONAIS
     {
-      id: 'config-branch',
+      id: 'gestao-escalas',
       type: 'default',
-      position: { x: 650, y: 450 },
-      data: { label: '⚙️ CONFIGURAÇÕES' },
-      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 140, height: 60 }
+      position: { x: 100, y: 600 },
+      data: { label: '📅 GESTÃO\nESCALAS' },
+      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
     },
     {
-      id: 'especialidades',
+      id: 'area-people',
       type: 'default',
-      position: { x: 750, y: 380 },
-      data: { label: 'especialidades' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 90 }
+      position: { x: 250, y: 600 },
+      data: { label: '👥 ÁREA\nPEOPLE' },
+      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
     },
     {
-      id: 'modalidades',
+      id: 'area-pcp',
       type: 'default',
-      position: { x: 750, y: 430 },
-      data: { label: 'modalidades' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 90 }
+      position: { x: 400, y: 600 },
+      data: { label: '📊 ÁREA\nPCP' },
+      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
     },
     {
-      id: 'categorias-exame',
+      id: 'dashboards',
       type: 'default',
-      position: { x: 750, y: 480 },
-      data: { label: 'categorias_exame' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 90 }
+      position: { x: 550, y: 600 },
+      data: { label: '📈 DASHBOARDS' },
+      style: { backgroundColor: '#fecaca', borderColor: '#ef4444', width: 120, height: 60 }
     },
     {
-      id: 'categorias-medico',
+      id: 'mysuite-futuro',
       type: 'default',
-      position: { x: 750, y: 530 },
-      data: { label: 'categorias_medico' },
-      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 90 }
-    },
-
-    // RAMO SISTEMA E AUDITORIA (Inferior Central)
-    {
-      id: 'system-branch',
-      type: 'default',
-      position: { x: 400, y: 550 },
-      data: { label: '🔧 SISTEMA & AUDITORIA' },
-      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 140, height: 60 }
+      position: { x: 700, y: 600 },
+      data: { label: '🔮 MYSUITE\n(FUTURO)' },
+      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 120, height: 60 }
     },
     {
-      id: 'upload-logs',
+      id: 'gerador-contratos',
       type: 'default',
-      position: { x: 250, y: 620 },
-      data: { label: 'upload_logs' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
+      position: { x: 850, y: 600 },
+      data: { label: '📝 GERADOR\nCONTRATOS' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120, height: 60 }
     },
-    {
-      id: 'audit-logs',
-      type: 'default',
-      position: { x: 350, y: 620 },
-      data: { label: 'audit_logs' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-    {
-      id: 'security-alerts',
-      type: 'default',
-      position: { x: 450, y: 620 },
-      data: { label: 'security_alerts' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-    {
-      id: 'data-access-logs',
-      type: 'default',
-      position: { x: 550, y: 620 },
-      data: { label: 'data_access_\nlogs' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-    {
-      id: 'config-protecao',
-      type: 'default',
-      position: { x: 300, y: 680 },
-      data: { label: 'configuracao_\nprotecao' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-    {
-      id: 'prioridades',
-      type: 'default',
-      position: { x: 400, y: 680 },
-      data: { label: 'prioridades' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-    {
-      id: 'field-mappings',
-      type: 'default',
-      position: { x: 500, y: 680 },
-      data: { label: 'field_mappings' },
-      style: { backgroundColor: '#f3f4f6', borderColor: '#4b5563', width: 90 }
-    },
-
-    // RAMO IMPORTS E TEMPLATES (Superior Central)
-    {
-      id: 'imports-branch',
-      type: 'default',
-      position: { x: 400, y: 400 },
-      data: { label: '📥 IMPORTS' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 140, height: 60 }
-    },
-    {
-      id: 'import-templates',
-      type: 'default',
-      position: { x: 300, y: 330 },
-      data: { label: 'import_\ntemplates' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    },
-    {
-      id: 'import-history',
-      type: 'default',
-      position: { x: 400, y: 330 },
-      data: { label: 'import_history' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    },
-    {
-      id: 'controle-origem',
-      type: 'default',
-      position: { x: 500, y: 330 },
-      data: { label: 'controle_dados_\norigem' },
-      style: { backgroundColor: '#fff7ed', borderColor: '#fb923c', width: 90 }
-    }
   ], []);
 
-  const erdEdges: Edge[] = useMemo(() => [
-    // Conexões do núcleo central para os ramos principais
-    { id: 'db-users', source: 'db-central', target: 'users-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'db-medicos', source: 'db-central', target: 'medicos-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'db-billing', source: 'db-central', target: 'billing-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'db-clients', source: 'db-central', target: 'clients-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'db-config', source: 'db-central', target: 'config-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-    { id: 'db-system', source: 'db-central', target: 'system-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-
-    // Ramificações usuários
-    { id: 'u1', source: 'users-branch', target: 'profiles', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'u2', source: 'users-branch', target: 'user-roles', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'u3', source: 'users-branch', target: 'menu-permissions', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-
-    // Ramificações médicos
-    { id: 'm1', source: 'medicos-branch', target: 'medicos', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'm2', source: 'medicos-branch', target: 'escalas', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'm3', source: 'medicos-branch', target: 'valores-repasse', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'm4', source: 'medicos-branch', target: 'pagamentos-med', type: 'smoothstep', style: { stroke: '#22c55e' } },
-
-    // Ramificações faturamento
-    { id: 'b1', source: 'billing-branch', target: 'faturamento-table', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'b2', source: 'billing-branch', target: 'regua-cobranca', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'b3', source: 'billing-branch', target: 'emails-cobranca', type: 'smoothstep', style: { stroke: '#a855f7' } },
-
-    // Ramificações clientes
-    { id: 'c1', source: 'clients-branch', target: 'clientes-table', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'c2', source: 'clients-branch', target: 'exames', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'c3', source: 'clients-branch', target: 'documentos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-
-    // Ramificações configurações
-    { id: 'cfg1', source: 'config-branch', target: 'especialidades', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'cfg2', source: 'config-branch', target: 'modalidades', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'cfg3', source: 'config-branch', target: 'categorias-exame', type: 'smoothstep', style: { stroke: '#ef4444' } },
-    { id: 'cfg4', source: 'config-branch', target: 'categorias-medico', type: 'smoothstep', style: { stroke: '#ef4444' } },
-
-    // Ramificações sistema e auditoria
-    { id: 's1', source: 'system-branch', target: 'upload-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's2', source: 'system-branch', target: 'audit-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's3', source: 'system-branch', target: 'security-alerts', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's4', source: 'system-branch', target: 'data-access-logs', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's5', source: 'system-branch', target: 'config-protecao', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's6', source: 'system-branch', target: 'prioridades', type: 'smoothstep', style: { stroke: '#6b7280' } },
-    { id: 's7', source: 'system-branch', target: 'field-mappings', type: 'smoothstep', style: { stroke: '#6b7280' } },
-
-    // Ramificações imports
-    { id: 'imp1', source: 'imports-branch', target: 'import-templates', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'imp2', source: 'imports-branch', target: 'import-history', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-    { id: 'imp3', source: 'imports-branch', target: 'controle-origem', type: 'smoothstep', style: { stroke: '#f59e0b' } },
-
-    // Conexão adicional para imports
-    { id: 'db-imports', source: 'db-central', target: 'imports-branch', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#374151' } },
-
-    // Relacionamentos entre tabelas (Foreign Keys)
-    { id: 'fk1', source: 'medicos', target: 'escalas', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'medico_id' },
-    { id: 'fk2', source: 'medicos', target: 'exames', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'medico_id' },
-    { id: 'fk3', source: 'clientes-table', target: 'exames', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'cliente_id' },
-    { id: 'fk4', source: 'faturamento-table', target: 'regua-cobranca', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'fatura_id' },
-    { id: 'fk5', source: 'medicos', target: 'valores-repasse', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'medico_id' },
-    { id: 'fk6', source: 'medicos', target: 'pagamentos-med', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'medico_id' },
-    { id: 'fk7', source: 'profiles', target: 'user-roles', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'user_id' },
-    { id: 'fk8', source: 'profiles', target: 'menu-permissions', type: 'smoothstep', style: { stroke: '#ef4444', strokeWidth: 2 }, label: 'user_id' },
+  const sistemaEdges: Edge[] = useMemo(() => [
+    // Fluxo principal de dados
+    { id: 'e1', source: 'upload-volumetria', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#f59e0b' } },
+    { id: 'e2', source: 'mobilemed-futuro', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#6b7280', strokeDasharray: '5,5' } },
+    { id: 'e3', source: 'processamento-volumetria', target: 'tipo-cliente-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#dc2626' } },
+    { id: 'e4', source: 'tipo-cliente-faturamento', target: 'volumetria-periodo', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    
+    // Conexões com cadastros
+    { id: 'e5', source: 'cadastros', target: 'clientes', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e6', source: 'cadastros', target: 'contratos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e7', source: 'cadastros', target: 'precos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e8', source: 'cadastros', target: 'medicos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e9', source: 'cadastros', target: 'parametros', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    
+    // Processamento de faturamento
+    { id: 'e10', source: 'volumetria-periodo', target: 'geracao-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#a855f7' } },
+    { id: 'e11', source: 'contratos', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e12', source: 'precos', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'e13', source: 'parametros', target: 'geracao-faturamento', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    
+    // Processamento de pagamentos médicos
+    { id: 'e14', source: 'volumetria-periodo', target: 'pagamento-medicos', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#16a34a' } },
+    { id: 'e15', source: 'volumetria-onco', target: 'pagamento-medicos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f97316' } },
+    { id: 'e16', source: 'medicos', target: 'pagamento-medicos', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    
+    // Saídas do faturamento
+    { id: 'e17', source: 'geracao-faturamento', target: 'relatorios-email', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
+    { id: 'e18', source: 'geracao-faturamento', target: 'emissao-nf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
+    { id: 'e19', source: 'pagamento-medicos', target: 'contas-pagar', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#16a34a' } },
+    
+    // Integrações
+    { id: 'e20', source: 'emissao-nf', target: 'omie-nf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e21', source: 'contas-pagar', target: 'omie-pagamentos', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e22', source: 'relatorios-email', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#1f2937' } },
+    { id: 'e23', source: 'gerador-contratos', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b' } },
+    
+    // Áreas funcionais
+    { id: 'e24', source: 'medicos', target: 'gestao-escalas', type: 'smoothstep', style: { stroke: '#ef4444' } },
+    { id: 'e25', source: 'medicos', target: 'area-people', type: 'smoothstep', style: { stroke: '#ef4444' } },
+    { id: 'e26', source: 'volumetria-periodo', target: 'area-pcp', type: 'smoothstep', style: { stroke: '#ef4444' } },
+    { id: 'e27', source: 'volumetria-periodo', target: 'dashboards', type: 'smoothstep', style: { stroke: '#ef4444' } },
+    { id: 'e28', source: 'dashboards', target: 'mysuite-futuro', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
+    { id: 'e29', source: 'contratos', target: 'gerador-contratos', type: 'smoothstep', style: { stroke: '#f59e0b' } },
   ], []);
 
-  // 3. DIAGRAMA DE ARQUITETURA TÉCNICA
-  const architectureNodes: Node[] = useMemo(() => [
-    // FRONTEND LAYER
+  // 2. INTEGRAÇÕES - FUTURAS E ATUAIS
+  const integracoesNodes: Node[] = useMemo(() => [
+    // SISTEMA CENTRAL
     {
-      id: 'frontend-layer',
+      id: 'sistema-teleimagem',
       type: 'default',
-      position: { x: 400, y: 50 },
-      data: { label: '🌐 FRONTEND\nReact + TypeScript' },
+      position: { x: 500, y: 300 },
+      data: { label: '🏗️ SISTEMA\nTELEIMAGEM' },
       style: { 
         backgroundColor: '#1e40af', 
         color: 'white', 
@@ -662,697 +283,376 @@ const ArquiteturaProjeto = () => {
         fontWeight: 'bold'
       }
     },
-    
-    // UI Components
+
+    // INTEGRAÇÕES IMPLEMENTADAS
     {
-      id: 'ui-components',
+      id: 'supabase',
       type: 'default',
       position: { x: 200, y: 150 },
-      data: { label: '🎨 UI Components\n(Shadcn/ui)' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140 }
-    },
-    {
-      id: 'pages',
-      type: 'default',
-      position: { x: 400, y: 150 },
-      data: { label: '📄 Pages\n(React Router)' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140 }
-    },
-    {
-      id: 'state-management',
-      type: 'default',
-      position: { x: 600, y: 150 },
-      data: { label: '⚡ State\n(React Query)' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 140 }
-    },
-
-    // BACKEND LAYER
-    {
-      id: 'backend-layer',
-      type: 'default',
-      position: { x: 400, y: 300 },
-      data: { label: '🚀 BACKEND\nSupabase' },
-      style: { 
-        backgroundColor: '#059669', 
-        color: 'white', 
-        borderColor: '#047857', 
-        width: 180, 
-        height: 80,
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }
-    },
-
-    // Backend Services
-    {
-      id: 'auth-service',
-      type: 'default',
-      position: { x: 150, y: 400 },
-      data: { label: '🔐 Authentication\n(Supabase Auth)' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140 }
-    },
-    {
-      id: 'database-service',
-      type: 'default',
-      position: { x: 320, y: 400 },
-      data: { label: '🗄️ Database\n(PostgreSQL)' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140 }
-    },
-    {
-      id: 'storage-service',
-      type: 'default',
-      position: { x: 490, y: 400 },
-      data: { label: '📁 Storage\n(Supabase Storage)' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140 }
-    },
-    {
-      id: 'edge-functions',
-      type: 'default',
-      position: { x: 660, y: 400 },
-      data: { label: '⚡ Edge Functions\n(Deno)' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 140 }
-    },
-
-    // EXTERNAL INTEGRATIONS
-    {
-      id: 'integrations',
-      type: 'default',
-      position: { x: 400, y: 550 },
-      data: { label: '🔗 INTEGRAÇÕES\nExternas' },
-      style: { 
-        backgroundColor: '#7c3aed', 
-        color: 'white', 
-        borderColor: '#6d28d9', 
-        width: 180, 
-        height: 80,
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }
-    },
-
-    // External Services
-    {
-      id: 'email-service',
-      type: 'default',
-      position: { x: 80, y: 650 },
-      data: { label: '📧 Email\n(Resend)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'pdf-service',
-      type: 'default',
-      position: { x: 220, y: 650 },
-      data: { label: '📄 PDF\n(jsPDF/html2canvas)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'clicksign',
-      type: 'default',
-      position: { x: 360, y: 650 },
-      data: { label: '✍️ Assinatura\n(ClickSign)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+      data: { label: '✅ SUPABASE\nAuth + Database' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
     },
     {
       id: 'omie',
       type: 'default',
-      position: { x: 500, y: 650 },
-      data: { label: '💼 ERP\n(Omie)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+      position: { x: 800, y: 150 },
+      data: { label: '✅ OMIE ERP\nNF + Pagamentos' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
     },
+    {
+      id: 'clicksign',
+      type: 'default',
+      position: { x: 200, y: 450 },
+      data: { label: '✅ CLICKSIGN\nAssinatura Contratos' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+    },
+    {
+      id: 'resend',
+      type: 'default',
+      position: { x: 800, y: 450 },
+      data: { label: '✅ RESEND\nEnvio E-mails' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 160, height: 70 }
+    },
+
+    // INTEGRAÇÕES FUTURAS
     {
       id: 'mobilemed',
       type: 'default',
-      position: { x: 640, y: 650 },
-      data: { label: '🏥 Sistema\n(Mobilemed)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+      position: { x: 350, y: 100 },
+      data: { label: '🔮 MOBILEMED\nDados Online/Diários' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 160, height: 70 }
     },
     {
-      id: 'maps-service',
+      id: 'mysuite',
       type: 'default',
-      position: { x: 780, y: 650 },
-      data: { label: '🗺️ Maps\n(Leaflet)' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
+      position: { x: 650, y: 100 },
+      data: { label: '🔮 MYSUITE\nAnálise Qualidade' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 160, height: 70 }
     },
 
-    // PERFORMANCE & MONITORING
+    // FUNCIONALIDADES ESPECÍFICAS
     {
-      id: 'monitoring',
+      id: 'upload-manual',
       type: 'default',
-      position: { x: 80, y: 750 },
-      data: { label: '📊 Performance\nMonitoring' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+      position: { x: 50, y: 300 },
+      data: { label: '📤 UPLOAD MANUAL\nArquivos 1,2,3,4' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 140, height: 70 }
     },
     {
-      id: 'backup-service',
+      id: 'gerador-pdf',
       type: 'default',
-      position: { x: 220, y: 750 },
-      data: { label: '💾 Backup\nManager' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+      position: { x: 950, y: 300 },
+      data: { label: '📄 GERADOR PDF\nRelatórios + Contratos' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 140, height: 70 }
     },
     {
-      id: 'security-monitor',
+      id: 'seguranca',
       type: 'default',
-      position: { x: 360, y: 750 },
-      data: { label: '🔒 Security\nMonitor' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
+      position: { x: 350, y: 500 },
+      data: { label: '🔐 SEGURANÇA\nRLS + Audit + 2FA' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 160, height: 70 }
     },
     {
-      id: 'lgpd-compliance',
-      type: 'default',
-      position: { x: 500, y: 750 },
-      data: { label: '🛡️ LGPD\nCompliance' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    }
-  ], []);
-
-  const architectureEdges: Edge[] = useMemo(() => [
-    // Frontend to Backend
-    { id: 'fe-be', source: 'frontend-layer', target: 'backend-layer', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#374151' } },
-    
-    // Frontend components
-    { id: 'fe-ui', source: 'frontend-layer', target: 'ui-components', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'fe-pages', source: 'frontend-layer', target: 'pages', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-    { id: 'fe-state', source: 'frontend-layer', target: 'state-management', type: 'smoothstep', style: { stroke: '#3b82f6' } },
-
-    // Backend services
-    { id: 'be-auth', source: 'backend-layer', target: 'auth-service', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'be-db', source: 'backend-layer', target: 'database-service', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'be-storage', source: 'backend-layer', target: 'storage-service', type: 'smoothstep', style: { stroke: '#22c55e' } },
-    { id: 'be-edge', source: 'backend-layer', target: 'edge-functions', type: 'smoothstep', style: { stroke: '#22c55e' } },
-
-    // Backend to Integrations
-    { id: 'be-int', source: 'backend-layer', target: 'integrations', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#374151' } },
-    
-    // External integrations
-    { id: 'int-email', source: 'integrations', target: 'email-service', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'int-pdf', source: 'integrations', target: 'pdf-service', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'int-click', source: 'integrations', target: 'clicksign', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'int-omie', source: 'integrations', target: 'omie', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'int-mobilemed', source: 'integrations', target: 'mobilemed', type: 'smoothstep', style: { stroke: '#a855f7' } },
-    { id: 'int-maps', source: 'integrations', target: 'maps-service', type: 'smoothstep', style: { stroke: '#a855f7' } },
-
-    // Performance & Monitoring connections
-    { id: 'edge-monitoring', source: 'edge-functions', target: 'monitoring', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
-    { id: 'edge-backup', source: 'edge-functions', target: 'backup-service', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
-    { id: 'edge-security', source: 'edge-functions', target: 'security-monitor', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
-    { id: 'edge-lgpd', source: 'edge-functions', target: 'lgpd-compliance', type: 'smoothstep', style: { stroke: '#f97316', strokeDasharray: '5,5' } },
-
-    // Direct connections
-    { id: 'pages-auth', source: 'pages', target: 'auth-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
-    { id: 'pages-db', source: 'pages', target: 'database-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
-    { id: 'state-db', source: 'state-management', target: 'database-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
-    { id: 'edge-email', source: 'edge-functions', target: 'email-service', type: 'smoothstep', style: { stroke: '#9ca3af', strokeDasharray: '5,5' } },
-    { id: 'mobilemed-volumetria', source: 'mobilemed', target: 'database-service', type: 'smoothstep', style: { stroke: '#10b981', strokeDasharray: '10,5' }, label: 'Dados Volumetria' },
-    { id: 'omie-faturamento', source: 'omie', target: 'database-service', type: 'smoothstep', style: { stroke: '#10b981', strokeDasharray: '10,5' }, label: 'Sincronização ERP' },
-  ], []);
-
-  // 4. FLUXOS DE PROCESSO PRINCIPAIS
-  const processNodes: Node[] = useMemo(() => [
-    // FLUXO DE UPLOAD E PROCESSAMENTO
-    {
-      id: 'start-upload',
-      type: 'input',
-      position: { x: 50, y: 50 },
-      data: { label: '📤 Upload\nArquivos' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'validate-file',
-      type: 'default',
-      position: { x: 250, y: 50 },
-      data: { label: '✅ Validar\nFormato' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'process-data',
-      type: 'default',
-      position: { x: 450, y: 50 },
-      data: { label: '⚙️ Processar\nDados' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'save-db',
-      type: 'default',
-      position: { x: 650, y: 50 },
-      data: { label: '💾 Salvar\nBanco' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
-    },
-    {
-      id: 'log-result',
-      type: 'output',
-      position: { x: 850, y: 50 },
-      data: { label: '📋 Log\nResultado' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    },
-
-    // FLUXO DE AUTENTICAÇÃO
-    {
-      id: 'login-start',
-      type: 'input',
-      position: { x: 50, y: 200 },
-      data: { label: '🔐 Login\nUsuário' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'auth-validate',
-      type: 'default',
-      position: { x: 250, y: 200 },
-      data: { label: '🔍 Validar\nCredenciais' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'check-roles',
-      type: 'default',
-      position: { x: 450, y: 200 },
-      data: { label: '👤 Verificar\nPermissões' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'redirect-dashboard',
-      type: 'output',
-      position: { x: 650, y: 200 },
-      data: { label: '🏠 Redirecionar\nDashboard' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
-    },
-
-    // FLUXO DE FATURAMENTO
-    {
-      id: 'generate-billing',
-      type: 'input',
-      position: { x: 50, y: 350 },
-      data: { label: '💰 Gerar\nFaturamento' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'collect-exams',
-      type: 'default',
-      position: { x: 250, y: 350 },
-      data: { label: '📊 Coletar\nExames' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'calculate-values',
-      type: 'default',
-      position: { x: 450, y: 350 },
-      data: { label: '🧮 Calcular\nValores' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'create-invoice',
-      type: 'default',
-      position: { x: 650, y: 350 },
-      data: { label: '🧾 Criar\nFatura' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
-    },
-    {
-      id: 'send-email',
-      type: 'output',
-      position: { x: 850, y: 350 },
-      data: { label: '📧 Enviar\nEmail' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    },
-
-    // FLUXO DE ESCALA MÉDICA
-    {
-      id: 'schedule-start',
-      type: 'input',
-      position: { x: 50, y: 500 },
-      data: { label: '📅 Agendar\nEscala' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'check-availability',
-      type: 'default',
-      position: { x: 250, y: 500 },
-      data: { label: '🔍 Verificar\nDisponibilidade' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'assign-doctor',
-      type: 'default',
-      position: { x: 450, y: 500 },
-      data: { label: '👨‍⚕️ Designar\nMédico' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'confirm-schedule',
+      id: 'analytics',
       type: 'default',
       position: { x: 650, y: 500 },
-      data: { label: '✅ Confirmar\nEscala' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
+      data: { label: '📊 ANALYTICS\nDashboards + Métricas' },
+      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 160, height: 70 }
     },
-    {
-      id: 'notify-team',
-      type: 'output',
-      position: { x: 850, y: 500 },
-      data: { label: '📱 Notificar\nEquipe' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    },
-
-    // FLUXO DE IMPORTAÇÃO INTELIGENTE
-    {
-      id: 'import-start',
-      type: 'input',
-      position: { x: 50, y: 650 },
-      data: { label: '📤 Importar\nArquivo' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'detect-format',
-      type: 'default',
-      position: { x: 250, y: 650 },
-      data: { label: '🧠 Detectar\nFormato' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'apply-mapping',
-      type: 'default',
-      position: { x: 450, y: 650 },
-      data: { label: '🗺️ Aplicar\nMapeamento' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'validate-data',
-      type: 'default',
-      position: { x: 650, y: 650 },
-      data: { label: '✅ Validar\nDados' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
-    },
-    {
-      id: 'import-complete',
-      type: 'output',
-      position: { x: 850, y: 650 },
-      data: { label: '✨ Importação\nCompleta' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    },
-
-    // FLUXO DE SEGURANÇA E AUDITORIA
-    {
-      id: 'security-event',
-      type: 'input',
-      position: { x: 50, y: 800 },
-      data: { label: '🚨 Evento\nSegurança' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 120 }
-    },
-    {
-      id: 'analyze-threat',
-      type: 'default',
-      position: { x: 250, y: 800 },
-      data: { label: '🔍 Analisar\nAmeaça' },
-      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120 }
-    },
-    {
-      id: 'create-alert',
-      type: 'default',
-      position: { x: 450, y: 800 },
-      data: { label: '⚠️ Criar\nAlerta' },
-      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 120 }
-    },
-    {
-      id: 'log-audit',
-      type: 'default',
-      position: { x: 650, y: 800 },
-      data: { label: '📝 Log\nAuditoria' },
-      style: { backgroundColor: '#dcfce7', borderColor: '#22c55e', width: 120 }
-    },
-    {
-      id: 'notify-admin',
-      type: 'output',
-      position: { x: 850, y: 800 },
-      data: { label: '📧 Notificar\nAdmin' },
-      style: { backgroundColor: '#fed7c7', borderColor: '#f97316', width: 120 }
-    }
   ], []);
 
-  const processEdges: Edge[] = useMemo(() => [
-    // Fluxo de Upload
-    { id: 'up1', source: 'start-upload', target: 'validate-file', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'up2', source: 'validate-file', target: 'process-data', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'up3', source: 'process-data', target: 'save-db', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'up4', source: 'save-db', target: 'log-result', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-
-    // Fluxo de Auth
-    { id: 'auth1', source: 'login-start', target: 'auth-validate', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'auth2', source: 'auth-validate', target: 'check-roles', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'auth3', source: 'check-roles', target: 'redirect-dashboard', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-
-    // Fluxo de Faturamento
-    { id: 'bill1', source: 'generate-billing', target: 'collect-exams', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'bill2', source: 'collect-exams', target: 'calculate-values', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'bill3', source: 'calculate-values', target: 'create-invoice', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'bill4', source: 'create-invoice', target: 'send-email', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-
-    // Fluxo de Escala
-    { id: 'sched1', source: 'schedule-start', target: 'check-availability', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sched2', source: 'check-availability', target: 'assign-doctor', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sched3', source: 'assign-doctor', target: 'confirm-schedule', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sched4', source: 'confirm-schedule', target: 'notify-team', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-
-    // Fluxo de Importação Inteligente
-    { id: 'imp1', source: 'import-start', target: 'detect-format', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'imp2', source: 'detect-format', target: 'apply-mapping', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'imp3', source: 'apply-mapping', target: 'validate-data', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'imp4', source: 'validate-data', target: 'import-complete', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-
-    // Fluxo de Segurança
-    { id: 'sec1', source: 'security-event', target: 'analyze-threat', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sec2', source: 'analyze-threat', target: 'create-alert', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sec3', source: 'create-alert', target: 'log-audit', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'sec4', source: 'log-audit', target: 'notify-admin', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+  const integracoesEdges: Edge[] = useMemo(() => [
+    // Integrações implementadas
+    { id: 'i1', source: 'sistema-teleimagem', target: 'supabase', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i2', source: 'sistema-teleimagem', target: 'omie', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i3', source: 'sistema-teleimagem', target: 'clicksign', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    { id: 'i4', source: 'sistema-teleimagem', target: 'resend', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    
+    // Integrações futuras
+    { id: 'i5', source: 'sistema-teleimagem', target: 'mobilemed', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '8,8' } },
+    { id: 'i6', source: 'sistema-teleimagem', target: 'mysuite', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#f59e0b', strokeDasharray: '8,8' } },
+    
+    // Funcionalidades
+    { id: 'i7', source: 'upload-manual', target: 'sistema-teleimagem', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'i8', source: 'sistema-teleimagem', target: 'gerador-pdf', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#3b82f6' } },
+    { id: 'i9', source: 'sistema-teleimagem', target: 'seguranca', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#dc2626' } },
+    { id: 'i10', source: 'sistema-teleimagem', target: 'analytics', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#a855f7' } },
   ], []);
 
-  // Estados dos flows
-  const [mindMapNodesState, setMindMapNodes, onMindMapNodesChange] = useNodesState(mindMapNodes);
-  const [mindMapEdgesState, setMindMapEdges, onMindMapEdgesChange] = useEdgesState(mindMapEdges);
-  
-  const [erdNodesState, setErdNodes, onErdNodesChange] = useNodesState(erdNodes);
-  const [erdEdgesState, setErdEdges, onErdEdgesChange] = useEdgesState(erdEdges);
+  // 3. ARQUITETURA TÉCNICA
+  const arquiteturaNodes: Node[] = useMemo(() => [
+    // FRONTEND
+    {
+      id: 'frontend',
+      type: 'default',
+      position: { x: 400, y: 50 },
+      data: { label: '🌐 FRONTEND\nReact + TypeScript' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 180, height: 70 }
+    },
+    {
+      id: 'vite',
+      type: 'default',
+      position: { x: 200, y: 150 },
+      data: { label: '⚡ Vite\nBuild Tool' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+    },
+    {
+      id: 'tailwind',
+      type: 'default',
+      position: { x: 340, y: 150 },
+      data: { label: '🎨 Tailwind CSS\nStyling' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+    },
+    {
+      id: 'shadcn',
+      type: 'default',
+      position: { x: 480, y: 150 },
+      data: { label: '🧩 Shadcn/ui\nComponents' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+    },
+    {
+      id: 'router',
+      type: 'default',
+      position: { x: 620, y: 150 },
+      data: { label: '🛣️ React Router\nNavigation' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 120, height: 60 }
+    },
 
-  const [archNodesState, setArchNodes, onArchNodesChange] = useNodesState(architectureNodes);
-  const [archEdgesState, setArchEdges, onArchEdgesChange] = useEdgesState(architectureEdges);
+    // BACKEND
+    {
+      id: 'backend',
+      type: 'default',
+      position: { x: 400, y: 300 },
+      data: { label: '🚀 BACKEND\nSupabase' },
+      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 180, height: 70 }
+    },
+    {
+      id: 'postgresql',
+      type: 'default',
+      position: { x: 150, y: 400 },
+      data: { label: '🐘 PostgreSQL\nDatabase' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+    },
+    {
+      id: 'edge-functions',
+      type: 'default',
+      position: { x: 290, y: 400 },
+      data: { label: '⚡ Edge Functions\nServerless' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+    },
+    {
+      id: 'rls',
+      type: 'default',
+      position: { x: 430, y: 400 },
+      data: { label: '🔒 RLS\nSecurity' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+    },
+    {
+      id: 'realtime',
+      type: 'default',
+      position: { x: 570, y: 400 },
+      data: { label: '🔄 Realtime\nSubscriptions' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+    },
+    {
+      id: 'storage',
+      type: 'default',
+      position: { x: 710, y: 400 },
+      data: { label: '💾 Storage\nFiles' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 120, height: 60 }
+    },
 
-  const [processNodesState, setProcessNodes, onProcessNodesChange] = useNodesState(processNodes);
-  const [processEdgesState, setProcessEdges, onProcessEdgesChange] = useEdgesState(processEdges);
+    // INTEGRAÇÕES EXTERNAS
+    {
+      id: 'external',
+      type: 'default',
+      position: { x: 400, y: 550 },
+      data: { label: '🔗 INTEGRAÇÕES\nExternas' },
+      style: { backgroundColor: '#7c2d12', color: 'white', borderColor: '#92400e', width: 180, height: 70 }
+    },
+    {
+      id: 'omie-ext',
+      type: 'default',
+      position: { x: 200, y: 650 },
+      data: { label: '🏢 Omie ERP' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+    },
+    {
+      id: 'clicksign-ext',
+      type: 'default',
+      position: { x: 320, y: 650 },
+      data: { label: '✍️ ClickSign' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+    },
+    {
+      id: 'resend-ext',
+      type: 'default',
+      position: { x: 440, y: 650 },
+      data: { label: '📧 Resend' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 100, height: 50 }
+    },
+    {
+      id: 'mobilemed-ext',
+      type: 'default',
+      position: { x: 560, y: 650 },
+      data: { label: '🏥 MobileMed' },
+      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 100, height: 50 }
+    },
+    {
+      id: 'mysuite-ext',
+      type: 'default',
+      position: { x: 680, y: 650 },
+      data: { label: '📊 MySuite' },
+      style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 100, height: 50 }
+    },
+  ], []);
 
-  const onConnectMindMap = useCallback((params: any) => setMindMapEdges((eds) => addEdge(params, eds)), [setMindMapEdges]);
-  const onConnectErd = useCallback((params: any) => setErdEdges((eds) => addEdge(params, eds)), [setErdEdges]);
-  const onConnectArch = useCallback((params: any) => setArchEdges((eds) => addEdge(params, eds)), [setArchEdges]);
-  const onConnectProcess = useCallback((params: any) => setProcessEdges((eds) => addEdge(params, eds)), [setProcessEdges]);
+  const arquiteturaEdges: Edge[] = useMemo(() => [
+    // Frontend connections
+    { id: 'a1', source: 'frontend', target: 'vite', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'a2', source: 'frontend', target: 'tailwind', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'a3', source: 'frontend', target: 'shadcn', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    { id: 'a4', source: 'frontend', target: 'router', type: 'smoothstep', style: { stroke: '#3b82f6' } },
+    
+    // Frontend to Backend
+    { id: 'a5', source: 'frontend', target: 'backend', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#059669' } },
+    
+    // Backend connections
+    { id: 'a6', source: 'backend', target: 'postgresql', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    { id: 'a7', source: 'backend', target: 'edge-functions', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    { id: 'a8', source: 'backend', target: 'rls', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    { id: 'a9', source: 'backend', target: 'realtime', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    { id: 'a10', source: 'backend', target: 'storage', type: 'smoothstep', style: { stroke: '#16a34a' } },
+    
+    // Backend to External
+    { id: 'a11', source: 'backend', target: 'external', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#7c2d12' } },
+    
+    // External connections
+    { id: 'a12', source: 'external', target: 'omie-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'a13', source: 'external', target: 'clicksign-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'a14', source: 'external', target: 'resend-ext', type: 'smoothstep', style: { stroke: '#f59e0b' } },
+    { id: 'a15', source: 'external', target: 'mobilemed-ext', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
+    { id: 'a16', source: 'external', target: 'mysuite-ext', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
+  ], []);
+
+  // Estados para os flows
+  const [sistemaNodesState, setSistemaNodes, onSistemaNodesChange] = useNodesState(sistemaNodes);
+  const [sistemaEdgesState, setSistemaEdges, onSistemaEdgesChange] = useEdgesState(sistemaEdges);
+
+  const [integracoesNodesState, setIntegracoesNodes, onIntegracoesNodesChange] = useNodesState(integracoesNodes);
+  const [integracoesEdgesState, setIntegracoesEdges, onIntegracoesEdgesChange] = useEdgesState(integracoesEdges);
+
+  const [arquiteturaNodesState, setArquiteturaNodes, onArquiteturaNodesChange] = useNodesState(arquiteturaNodes);
+  const [arquiteturaEdgesState, setArquiteturaEdges, onArquiteturaEdgesChange] = useEdgesState(arquiteturaEdges);
+
+  // Callbacks para conectar nodes
+  const onSistemaConnect = useCallback(
+    (params: any) => setSistemaEdges((eds) => addEdge(params, eds)),
+    [setSistemaEdges]
+  );
+
+  const onIntegracoesConnect = useCallback(
+    (params: any) => setIntegracoesEdges((eds) => addEdge(params, eds)),
+    [setIntegracoesEdges]
+  );
+
+  const onArquiteturaConnect = useCallback(
+    (params: any) => setArquiteturaEdges((eds) => addEdge(params, eds)),
+    [setArquiteturaEdges]
+  );
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <div className="p-6 border-b">
+    <div className="min-h-screen bg-background p-6">
+      <div className="mx-auto max-w-7xl">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>🏗️</span>
-              Arquitetura do Projeto - 4 Visualizações Complementares
+            <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Arquitetura do Sistema Teleimagem
             </CardTitle>
-            <CardDescription>
-              Explore o sistema através de diferentes perspectivas: conceitual, técnica, dados e processos.
+            <CardDescription className="text-center text-lg">
+              Visualização completa da estrutura, fluxos e integrações do sistema
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="sistema">🔄 Fluxo do Sistema</TabsTrigger>
+                <TabsTrigger value="integracoes">🔗 Integrações</TabsTrigger>
+                <TabsTrigger value="arquitetura">🏗️ Arquitetura Técnica</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="sistema" className="mt-6">
+                <div className="h-[800px] w-full border rounded-lg bg-gray-50">
+                  <ReactFlow
+                    nodes={sistemaNodesState}
+                    edges={sistemaEdgesState}
+                    onNodesChange={onSistemaNodesChange}
+                    onEdgesChange={onSistemaEdgesChange}
+                    onConnect={onSistemaConnect}
+                    nodeTypes={nodeTypes}
+                    fitView
+                    attributionPosition="top-right"
+                  >
+                    <MiniMap />
+                    <Controls />
+                    <Background gap={12} size={1} />
+                  </ReactFlow>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p><strong>Fluxo Principal:</strong> Upload → Processamento → Aplicação Tipos → Volumetria → Faturamento → Saídas</p>
+                  <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="integracoes" className="mt-6">
+                <div className="h-[600px] w-full border rounded-lg bg-gray-50">
+                  <ReactFlow
+                    nodes={integracoesNodesState}
+                    edges={integracoesEdgesState}
+                    onNodesChange={onIntegracoesNodesChange}
+                    onEdgesChange={onIntegracoesEdgesChange}
+                    onConnect={onIntegracoesConnect}
+                    nodeTypes={nodeTypes}
+                    fitView
+                    attributionPosition="top-right"
+                  >
+                    <MiniMap />
+                    <Controls />
+                    <Background gap={12} size={1} />
+                  </ReactFlow>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p><strong>✅ Verde:</strong> Integrações Implementadas | <strong>🔮 Laranja:</strong> Integrações Futuras</p>
+                  <p><strong>Atual:</strong> Supabase, Omie, ClickSign, Resend | <strong>Futuro:</strong> MobileMed, MySuite</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="arquitetura" className="mt-6">
+                <div className="h-[700px] w-full border rounded-lg bg-gray-50">
+                  <ReactFlow
+                    nodes={arquiteturaNodesState}
+                    edges={arquiteturaEdgesState}
+                    onNodesChange={onArquiteturaNodesChange}
+                    onEdgesChange={onArquiteturaEdgesChange}
+                    onConnect={onArquiteturaConnect}
+                    nodeTypes={nodeTypes}
+                    fitView
+                    attributionPosition="top-right"
+                  >
+                    <MiniMap />
+                    <Controls />
+                    <Background gap={12} size={1} />
+                  </ReactFlow>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p><strong>Camadas:</strong> Frontend (React) → Backend (Supabase) → Integrações Externas</p>
+                  <p><strong>Tecnologias:</strong> TypeScript, Vite, Tailwind, PostgreSQL, Edge Functions</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
         </Card>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1">
-        <div className="px-6 border-b">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
-            <TabsTrigger value="mindmap">🧠 Mapa Mental</TabsTrigger>
-            <TabsTrigger value="erd">🗄️ ERD</TabsTrigger>
-            <TabsTrigger value="architecture">🏗️ Arquitetura</TabsTrigger>
-            <TabsTrigger value="process">⚡ Processos</TabsTrigger>
-          </TabsList>
-        </div>
-
-        {/* 1. MAPA MENTAL - Overview e Navegação */}
-        <TabsContent value="mindmap" className="flex-1 relative m-0">
-          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              <strong>🧠 Mapa Mental:</strong> Overview conceitual com núcleo central e ramificações por área (Operacional, Financeiro, People, Gestão, Dados)
-            </p>
-          </div>
-          <ReactFlow
-            nodes={mindMapNodesState}
-            edges={mindMapEdgesState}
-            onNodesChange={onMindMapNodesChange}
-            onEdgesChange={onMindMapEdgesChange}
-            onConnect={onConnectMindMap}
-            fitView
-            attributionPosition="top-right"
-            nodeTypes={nodeTypes}
-            style={{ backgroundColor: "#fefefe" }}
-            defaultEdgeOptions={{ style: { strokeWidth: 2 }, type: 'smoothstep' }}
-          >
-            <MiniMap zoomable pannable style={{ backgroundColor: '#f9fafb' }} className="border rounded-lg" />
-            <Controls className="border rounded-lg bg-background" />
-            <Background color="#f1f5f9" gap={20} size={2} />
-          </ReactFlow>
-          
-          <div className="absolute bottom-4 left-4 right-4 p-4 bg-white/90 backdrop-blur border rounded-lg shadow-lg">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-600 rounded"></div>
-                <span>Sistema Central</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-200 border border-green-500 rounded"></div>
-                <span>Operacional</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-200 border border-purple-500 rounded"></div>
-                <span>Financeiro</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-yellow-200 border border-yellow-500 rounded"></div>
-                <span>Autenticação & People</span>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* 2. ERD INTERATIVO - Relações Detalhadas do Banco */}
-        <TabsContent value="erd" className="flex-1 relative m-0">
-          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              <strong>🗄️ ERD Interativo:</strong> Diagrama entidade-relacionamento do banco com todas as tabelas Supabase, foreign keys em vermelho e agrupamento por contexto
-            </p>
-          </div>
-          <ReactFlow
-            nodes={erdNodesState}
-            edges={erdEdgesState}
-            onNodesChange={onErdNodesChange}
-            onEdgesChange={onErdEdgesChange}
-            onConnect={onConnectErd}
-            fitView
-            attributionPosition="top-right"
-            nodeTypes={nodeTypes}
-            style={{ backgroundColor: "#fefefe" }}
-            defaultEdgeOptions={{ style: { strokeWidth: 2 }, type: 'smoothstep' }}
-          >
-            <MiniMap zoomable pannable style={{ backgroundColor: '#f9fafb' }} className="border rounded-lg" />
-            <Controls className="border rounded-lg bg-background" />
-            <Background color="#f1f5f9" gap={20} size={2} />
-          </ReactFlow>
-          
-          <div className="absolute bottom-4 left-4 right-4 p-4 bg-white/90 backdrop-blur border rounded-lg shadow-lg">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-800 rounded"></div>
-                <span>Database Central</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-yellow-200 border border-yellow-500 rounded"></div>
-                <span>Usuários & Auth</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-200 border border-green-500 rounded"></div>
-                <span>Médicos & Escalas</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded"></div>
-                <span>Foreign Keys</span>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* 3. DIAGRAMA DE ARQUITETURA TÉCNICA */}
-        <TabsContent value="architecture" className="flex-1 relative m-0">
-          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              <strong>🏗️ Arquitetura Técnica:</strong> Camadas Frontend (React), Backend (Supabase), e Integrações Externas (Email, PDF, ClickSign, Omie, Mobilemed) com conexões diretas
-            </p>
-          </div>
-          <ReactFlow
-            nodes={archNodesState}
-            edges={archEdgesState}
-            onNodesChange={onArchNodesChange}
-            onEdgesChange={onArchEdgesChange}
-            onConnect={onConnectArch}
-            fitView
-            attributionPosition="top-right"
-            nodeTypes={nodeTypes}
-            style={{ backgroundColor: "#fefefe" }}
-            defaultEdgeOptions={{ style: { strokeWidth: 2 }, type: 'smoothstep' }}
-          >
-            <MiniMap zoomable pannable style={{ backgroundColor: '#f9fafb' }} className="border rounded-lg" />
-            <Controls className="border rounded-lg bg-background" />
-            <Background color="#f1f5f9" gap={20} size={2} />
-          </ReactFlow>
-          
-          <div className="absolute bottom-4 left-4 right-4 p-4 bg-white/90 backdrop-blur border rounded-lg shadow-lg">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-600 rounded"></div>
-                <span>Frontend (React)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-600 rounded"></div>
-                <span>Backend (Supabase)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-600 rounded"></div>
-                <span>Integrações Externas</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gray-400 rounded border-dashed border-2"></div>
-                <span>Conexões Diretas</span>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* 4. FLUXOS DE PROCESSO PRINCIPAIS */}
-        <TabsContent value="process" className="flex-1 relative m-0">
-          <div className="absolute top-4 left-4 right-4 z-10 p-3 bg-white/95 backdrop-blur border rounded-lg shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              <strong>⚡ Fluxos de Processo:</strong> Workflows principais: Upload/Processamento, Autenticação, Faturamento e Escala Médica com steps sequenciais
-            </p>
-          </div>
-          <ReactFlow
-            nodes={processNodesState}
-            edges={processEdgesState}
-            onNodesChange={onProcessNodesChange}
-            onEdgesChange={onProcessEdgesChange}
-            onConnect={onConnectProcess}
-            fitView
-            attributionPosition="top-right"
-            nodeTypes={nodeTypes}
-            style={{ backgroundColor: "#fefefe" }}
-            defaultEdgeOptions={{ style: { strokeWidth: 2 }, type: 'smoothstep' }}
-          >
-            <MiniMap zoomable pannable style={{ backgroundColor: '#f9fafb' }} className="border rounded-lg" />
-            <Controls className="border rounded-lg bg-background" />
-            <Background color="#f1f5f9" gap={20} size={2} />
-          </ReactFlow>
-          
-          <div className="absolute bottom-4 left-4 right-4 p-4 bg-white/90 backdrop-blur border rounded-lg shadow-lg">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-yellow-200 border border-yellow-500 rounded"></div>
-                <span>Início do Processo</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-200 border border-blue-500 rounded"></div>
-                <span>Validação</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-200 border border-purple-500 rounded"></div>
-                <span>Processamento</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-200 border border-green-500 rounded"></div>
-                <span>Confirmação</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-orange-200 border border-orange-500 rounded"></div>
-                <span>Finalização</span>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
