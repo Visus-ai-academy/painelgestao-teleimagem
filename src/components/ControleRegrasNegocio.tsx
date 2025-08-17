@@ -206,6 +206,102 @@ export function ControleRegrasNegocio() {
       ordem_execucao: 13,
       tipo_regra: 'negocio'
     },
+    {
+      id: 'v015',
+      nome: 'Normalização Nome Cliente',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Aplica limpeza e normalização de nomes de clientes: remove sufixos como "- TELE", "-CT", "-MR", "_PLANTÃO", "_RMX" e mapeia variações como CEDI-* para CEDIDIAG.',
+      status: 'ativa',
+      implementadaEm: '2024-02-15',
+      observacoes: 'Trigger: trigger_limpar_nome_cliente, Função: limpar_nome_cliente()',
+      ordem_execucao: 14,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v017',
+      nome: 'Normalização Nome Médico',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Remove códigos entre parênteses (E1, E2, E3), prefixos DR/DRA, pontos finais e limpa espaços extras dos nomes de médicos.',
+      status: 'ativa',
+      implementadaEm: '2024-02-16',
+      observacoes: 'Trigger: trigger_normalizar_medico, Função: normalizar_medico()',
+      ordem_execucao: 15,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v018',
+      nome: 'De-Para Prioridades',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Aplica mapeamento de prioridades usando tabela de_para_prioridade para padronizar valores de prioridade.',
+      status: 'ativa',
+      implementadaEm: '2024-02-17',
+      observacoes: 'Trigger: aplicar_prioridades_de_para, Tabela: de_para_prioridade',
+      ordem_execucao: 16,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v019',
+      nome: 'Aplicação Valor Onco',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Aplica valores específicos para exames oncológicos baseado em regras especiais para a categoria "onco".',
+      status: 'ativa',
+      implementadaEm: '2024-02-18',
+      observacoes: 'Trigger: aplicar_valor_onco, aplicado apenas para arquivo volumetria_onco_padrao',
+      ordem_execucao: 17,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v020',
+      nome: 'Regras de Exclusão Dinâmica',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Aplica regras de exclusão configuradas dinamicamente baseadas em critérios JSON (empresa, modalidade, especialidade, categoria, médico).',
+      status: 'ativa',
+      implementadaEm: '2024-02-19',
+      observacoes: 'Trigger: aplicar_regras_exclusao_dinamicas, Tabela: regras_exclusao_faturamento',
+      ordem_execucao: 18,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'v021',
+      nome: 'Validação Cliente Volumetria',
+      modulo: 'volumetria',
+      categoria: 'validacao',
+      criterio: 'Valida se cliente existe no cadastro e está ativo antes de processar dados de volumetria.',
+      status: 'ativa',
+      implementadaEm: '2024-02-20',
+      observacoes: 'Edge function: aplicar-validacao-cliente, RPC: aplicar_validacao_cliente_volumetria',
+      ordem_execucao: 19,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v023',
+      nome: 'Aplicação Especialidade Automática',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Define especialidade automaticamente baseado em regras de negócio quando não informada no arquivo.',
+      status: 'ativa',
+      implementadaEm: '2024-02-21',
+      observacoes: 'Trigger: aplicar_especialidade_automatica',
+      ordem_execucao: 20,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v024',
+      nome: 'Definição Data Referência',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Define data de referência baseada no período de processamento selecionado para garantir consistência temporal dos dados.',
+      status: 'ativa',
+      implementadaEm: '2024-02-22',
+      observacoes: 'Função: set_data_referencia_volumetria, aplicada durante o upload',
+      ordem_execucao: 21,
+      tipo_regra: 'negocio'
+    },
 
     // FATURAMENTO - Ordem de execução
     {
