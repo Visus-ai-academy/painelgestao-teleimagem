@@ -92,13 +92,18 @@ function formatBreakdown(map: Breakdown, maxItems = 4) {
 export function VolumetriaClientesComparison({
   uploaded,
   onDivergencesComputed,
+  periodoSelecionado,  // ✅ NOVO PARÂMETRO
 }: {
   uploaded?: UploadedRow[];
   onDivergencesComputed?: (divs: Divergencia[]) => void;
+  periodoSelecionado?: string | null;  // ✅ TIPO DO NOVO PARÂMETRO
 }) {
-  const { data: context } = useVolumetria();
+  const { data: context, getDataByPeriod } = useVolumetria();
   const { toast } = useToast();
   const [filtro, setFiltro] = useState<'todos' | 'divergencias'>('todos');
+
+  // Obter dados filtrados por período selecionado
+  const dadosPeriodo = periodoSelecionado ? getDataByPeriod(periodoSelecionado) : context.detailedData;
 
   // Agregar dados do sistema (definitivos) a partir do contexto
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
@@ -111,11 +116,12 @@ export function VolumetriaClientesComparison({
       if (!stats || stats.length === 0) {
         console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
         // Fallback direto para dados detalhados se stats estiver vazio
-        if (context.detailedData && context.detailedData.length > 0) {
+        if (dadosPeriodo && dadosPeriodo.length > 0) {
           const map = new Map<string, ClienteAggregated>();
-          console.log('🔍 [COMPARATIVO DEBUG] Usando detailedData como fallback:', context.detailedData.length, 'registros');
+          console.log('🔍 [COMPARATIVO DEBUG] Usando dados filtrados por período:', dadosPeriodo.length, 'registros');
+          console.log('🔍 [COMPARATIVO DEBUG] Período selecionado:', periodoSelecionado || 'ativo');
           
-          (context.detailedData as any[]).forEach((item) => {
+          (dadosPeriodo as any[]).forEach((item) => {
             const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
             const cliente = String(clienteRaw).trim();
             if (!cliente) return;
@@ -234,7 +240,7 @@ export function VolumetriaClientesComparison({
       toast({ title: 'Erro', description: 'Falha ao preparar dados do sistema.', variant: 'destructive' });
       return [];
     }
-  }, [context.clientesStats, context.detailedData, toast]);
+  }, [context.clientesStats, dadosPeriodo, periodoSelecionado, toast]);
 
   // Agregar dados do arquivo (se houver)
   const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
