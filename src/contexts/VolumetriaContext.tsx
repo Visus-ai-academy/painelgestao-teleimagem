@@ -371,9 +371,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, [data.detailedData]);
 
   useEffect(() => {
-    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Forçando carregamento DEFINITIVO...');
+    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Debug RX TORNOZELO DIREITO...');
     console.log('🔥 Timestamp atual:', new Date().toISOString());
-    console.log('🔥 QUEBRAS APLICADAS - Refresh total dos dados');
+    console.log('🔥 INVESTIGANDO: RX TORNOZELO DIREITO - CDI.URUACU');
     // FORÇAR INVALIDAÇÃO COMPLETA
     isLoadingRef.current = false;
     lastLoadTime.current = 0;
