@@ -638,6 +638,24 @@ export async function processVolumetriaOtimizado(
     if (result.success) {
       console.log('✅ DADOS PROCESSADOS AUTOMATICAMENTE VIA DATABASE TRIGGERS');
       console.log('✅ Regras aplicadas automaticamente: v002, v003, v031, de-para, categorias, prioridades, tipificação');
+      
+      // Aplicar quebras automaticamente após processamento
+      console.log('🔧 Aplicando quebras de exames automaticamente...');
+      try {
+        // Usar o lote_upload do processamento
+        const loteUpload = `${arquivoFonte}_${Date.now()}`;
+        const { data: resultQuebras, error: errorQuebras } = await supabase.functions.invoke('aplicar-quebras-automatico', {
+          body: { lote_upload: loteUpload }
+        });
+
+        if (errorQuebras) {
+          console.error('⚠️ Erro ao aplicar quebras automáticas:', errorQuebras);
+        } else {
+          console.log(`✅ Quebras aplicadas: ${resultQuebras.registros_quebrados} exames quebrados automaticamente`);
+        }
+      } catch (error) {
+        console.error('⚠️ Erro ao aplicar quebras automáticas:', error);
+      }
     }
     
     // Aplicar regras específicas APÓS o upload para arquivos retroativos
