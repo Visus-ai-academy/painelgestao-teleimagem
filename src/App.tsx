@@ -23,6 +23,7 @@ import Escala from "./pages/Escala";
 import PCP from "./pages/PCP";
 import Financeiro from "./pages/Financeiro";
 import Comparativo from "./pages/Comparativo";
+import DadosVolumetria from "./pages/DadosVolumetria";
 import GerarFaturamento from "./pages/GerarFaturamento";
 import ReguaCobranca from "./pages/ReguaCobranca";
 import PagamentosMedicos from "./pages/PagamentosMedicos";
@@ -146,6 +147,24 @@ const App = () => {
                 </Layout>
               </ProtectedRoute>
             } />
+            <Route path="/operacional/dados-volumetria" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <DadosVolumetria />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/operacional/comparativo" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <Comparativo />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
             <Route path="/financeiro/*" element={
               <ProtectedRoute>
                 <Layout>
@@ -160,15 +179,6 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <GerarFaturamento />
-                  </RoleProtectedRoute>
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/financeiro/comparativo" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
-                    <Comparativo />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>

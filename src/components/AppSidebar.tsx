@@ -79,8 +79,8 @@ const menuItems: MenuItem[] = [
     subItems: [
       { title: "Escala", url: "/operacional/escala", requiredRoles: ['manager', 'admin'] },
       { title: "PCP", url: "/operacional/pcp", requiredRoles: ['manager', 'admin'] },
-      { title: "Dados MobileMed", url: "/financeiro/gerar-faturamento", requiredRoles: ['manager', 'admin'] },
-      { title: "Comparativo", url: "/financeiro/comparativo", requiredRoles: ['manager', 'admin'] },
+      { title: "Dados MobileMed", url: "/operacional/dados-volumetria", requiredRoles: ['manager', 'admin'] },
+      { title: "Comparativo", url: "/operacional/comparativo", requiredRoles: ['manager', 'admin'] },
     ]
   },
   { 

@@ -102,7 +102,7 @@ const getStatusPeriodo = (periodo: string): 'editavel' | 'fechado' | 'historico'
 };
 
 export default function GerarFaturamento() {
-  const [activeTab, setActiveTab] = useState("faturamento");
+  const [activeTab, setActiveTab] = useState("demonstrativo");
   
   // Estados persistentes que não devem zerar ao trocar de aba
   const [relatoriosGerados, setRelatoriosGerados] = useState(() => {
@@ -1108,11 +1108,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="teste-volumetria" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Dados MobileMed
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
             <FileBarChart2 className="h-4 w-4" />
             Demonstrativo
