@@ -236,15 +236,28 @@ export function StatusRegraProcessamento() {
             deveAplicar = false;
           }
 
-          // Verificar se foi aplicada
-          const foiAplicada = uploadInfo?.status === 'concluido' && 
-                             uploadInfo?.registros_erro === 0;
+          // Verificar se foi aplicada - apenas se deve aplicar
+          let foiAplicada = false;
+          let erros: string[] = [];
+          
+          if (deveAplicar) {
+            foiAplicada = uploadInfo?.status === 'concluido' && 
+                         uploadInfo?.registros_erro === 0;
+            
+            // Só mostrar erros se a regra deve ser aplicada neste arquivo
+            if (uploadInfo?.registros_erro > 0) {
+              erros = [`${uploadInfo.registros_erro} erros encontrados`];
+            }
+          } else {
+            // Se não deve aplicar, considerar como "aplicada" (N/A)
+            foiAplicada = true;
+          }
 
           arquivosStatus[tipoArquivo] = {
             deveAplicar,
-            foiAplicada: foiAplicada || false,
+            foiAplicada,
             ultimaAplicacao: uploadInfo?.created_at,
-            erros: uploadInfo?.registros_erro > 0 ? [`${uploadInfo.registros_erro} erros encontrados`] : []
+            erros
           };
         });
 
