@@ -257,13 +257,24 @@ export function StatusRegraProcessamento() {
             } else if (regrasAutomaticas.includes(regra.id)) {
               // Regras automáticas sempre são aplicadas se o processamento foi concluído
               foiAplicada = uploadInfo.status === 'concluido';
-              informacoes = ['Regra aplicada automaticamente durante processamento'];
               
-              // Apenas algumas regras podem ter erro real
-              if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
-                hasError = true;
-                informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
-                foiAplicada = false;
+              // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
+              if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008'].includes(regra.id)) {
+                if (uploadInfo.registros_erro > 0) {
+                  informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
+                } else {
+                  informacoes = ['Regra aplicada - nenhum registro necessitou processamento'];
+                }
+              } else {
+                // Para outras regras automáticas (cache, batching, mapping)
+                informacoes = ['Regra aplicada automaticamente durante processamento'];
+                
+                // Apenas algumas regras podem ter erro real
+                if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
+                  hasError = true;
+                  informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                  foiAplicada = false;
+                }
               }
             } else {
               // Para outras regras, sucesso significa sem erros
