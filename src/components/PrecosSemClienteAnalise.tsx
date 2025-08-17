@@ -9,6 +9,7 @@ interface ClienteNaoAssociado {
   nome_planilha: string;
   total_registros: number;
   possiveis_matches: string[];
+  exemplo_registro: any;
 }
 
 export function PrecosSemClienteAnalise() {
@@ -20,48 +21,83 @@ export function PrecosSemClienteAnalise() {
     try {
       setLoading(true);
       
-      // Executar a validação para obter os nomes não encontrados
-      const { data: validacao, error: validacaoError } = await supabase.functions.invoke(
-        'aplicar-validacao-cliente', 
-        { body: { lote_upload: null } }
-      );
+      console.log('🔍 Analisando preços sem cliente...');
 
-      if (validacaoError) {
-        throw new Error(`Erro na validação: ${validacaoError.message}`);
+      // Buscar preços sem cliente_id que tenham informação do cliente original na descrição
+      const { data: precosSemCliente, error } = await supabase
+        .from('precos_servicos')
+        .select('*')
+        .is('cliente_id', null)
+        .not('descricao', 'is', null)
+        .like('descricao', 'Cliente original:%')
+        .limit(100);
+
+      if (error) {
+        throw new Error(`Erro ao buscar preços: ${error.message}`);
       }
 
-      console.log('🔍 Resultado da validação:', validacao);
+      console.log('📊 Preços sem cliente encontrados:', precosSemCliente?.length || 0);
 
-      if (validacao.clientes_nao_encontrados && validacao.clientes_nao_encontrados.length > 0) {
-        // Buscar clientes similares para cada nome não encontrado
-        const analisePromises = validacao.clientes_nao_encontrados.map(async (nomeNaoEncontrado: string) => {
-          // Buscar clientes com nomes similares
-          const { data: clientesSimilares } = await supabase
-            .from('clientes')
-            .select('nome, nome_fantasia, nome_mobilemed')
-            .or(`nome.ilike.%${nomeNaoEncontrado}%,nome_fantasia.ilike.%${nomeNaoEncontrado}%,nome_mobilemed.ilike.%${nomeNaoEncontrado}%`)
-            .limit(5);
-
-          const possiveisMatches = clientesSimilares?.map(c => 
-            `${c.nome} | ${c.nome_fantasia || 'N/A'} | ${c.nome_mobilemed || 'N/A'}`
-          ) || [];
-
-          return {
-            nome_planilha: nomeNaoEncontrado,
-            total_registros: 1, // Por enquanto, apenas indicamos que existe
-            possiveis_matches: possiveisMatches
-          };
-        });
-
-        const resultadoAnalise = await Promise.all(analisePromises);
-        setAnalise(resultadoAnalise);
-      } else {
-        setAnalise([]);
+      if (!precosSemCliente || precosSemCliente.length === 0) {
         toast({
           title: "Informação",
-          description: "Nenhum cliente não associado foi encontrado na validação.",
+          description: "Nenhum preço sem cliente foi encontrado com informações de cliente original.",
         });
+        setAnalise([]);
+        return;
       }
+
+      // Agrupar por nome de cliente original
+      const grupos = new Map<string, any[]>();
+      
+      precosSemCliente.forEach(preco => {
+        // Extrair nome do cliente da descrição "Cliente original: NOME_CLIENTE"
+        const match = preco.descricao?.match(/Cliente original:\s*(.+)/);
+        if (match) {
+          const nomeCliente = match[1].trim();
+          if (!grupos.has(nomeCliente)) {
+            grupos.set(nomeCliente, []);
+          }
+          grupos.get(nomeCliente)?.push(preco);
+        }
+      });
+
+      console.log('📋 Grupos de clientes encontrados:', grupos.size);
+
+      // Para cada grupo, buscar possíveis correspondências
+      const analisePromises = Array.from(grupos.entries()).map(async ([nomeCliente, registros]) => {
+        console.log(`🔍 Buscando correspondências para: ${nomeCliente}`);
+        
+        // Buscar clientes similares usando ILIKE para busca flexível
+        const { data: clientesSimilares } = await supabase
+          .from('clientes')
+          .select('nome, nome_fantasia, nome_mobilemed')
+          .or(`nome.ilike.%${nomeCliente}%,nome_fantasia.ilike.%${nomeCliente}%,nome_mobilemed.ilike.%${nomeCliente}%`)
+          .limit(5);
+
+        const possiveisMatches = clientesSimilares?.map(c => 
+          `Nome: ${c.nome || 'N/A'} | Fantasia: ${c.nome_fantasia || 'N/A'} | MobileMed: ${c.nome_mobilemed || 'N/A'}`
+        ) || [];
+
+        return {
+          nome_planilha: nomeCliente,
+          total_registros: registros.length,
+          possiveis_matches: possiveisMatches,
+          exemplo_registro: registros[0]
+        };
+      });
+
+      const resultadoAnalise = await Promise.all(analisePromises);
+      
+      // Ordenar por número de registros (maior primeiro)
+      resultadoAnalise.sort((a, b) => b.total_registros - a.total_registros);
+      
+      setAnalise(resultadoAnalise);
+      
+      toast({
+        title: "Análise Concluída",
+        description: `Encontrados ${resultadoAnalise.length} nomes de clientes não associados em ${precosSemCliente.length} registros de preços.`,
+      });
 
     } catch (error) {
       console.error('❌ Erro na análise:', error);
@@ -99,30 +135,36 @@ export function PrecosSemClienteAnalise() {
             {analise.map((item, index) => (
               <Card key={index} className="border-l-4 border-l-orange-500">
                 <CardContent className="pt-4">
-                  <div className="space-y-2">
-                    <div className="font-semibold text-destructive">
-                      Nome na Planilha de Preços: "{item.nome_planilha}"
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="font-semibold text-destructive">
+                        Nome na Planilha: "{item.nome_planilha}"
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.total_registros} registro{item.total_registros > 1 ? 's' : ''}
+                      </div>
                     </div>
+                    
+                    {item.exemplo_registro && (
+                      <div className="text-xs bg-gray-50 p-2 rounded">
+                        <div><strong>Exemplo:</strong> {item.exemplo_registro.modalidade} | {item.exemplo_registro.especialidade} | {item.exemplo_registro.categoria} | R$ {item.exemplo_registro.valor_base}</div>
+                      </div>
+                    )}
                     
                     {item.possiveis_matches.length > 0 ? (
                       <div>
                         <div className="text-sm font-medium mb-2">Possíveis correspondências no cadastro:</div>
                         <div className="space-y-1">
-                          {item.possiveis_matches.map((match, idx) => {
-                            const [nome, fantasia, mobilemed] = match.split(' | ');
-                            return (
-                              <div key={idx} className="text-sm bg-gray-50 p-2 rounded">
-                                <div><strong>Nome:</strong> {nome}</div>
-                                <div><strong>Nome Fantasia:</strong> {fantasia}</div>
-                                <div><strong>Nome MobileMed:</strong> {mobilemed}</div>
-                              </div>
-                            );
-                          })}
+                          {item.possiveis_matches.map((match, idx) => (
+                            <div key={idx} className="text-sm bg-blue-50 p-2 rounded">
+                              {match}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">
-                        Nenhum cliente similar encontrado no cadastro
+                        ❌ Nenhum cliente similar encontrado no cadastro
                       </div>
                     )}
                   </div>
