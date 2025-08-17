@@ -25,50 +25,152 @@ const TIPOS_ARQUIVO = [
 ];
 
 const REGRAS_MONITORADAS = [
+  // REGRAS DE VOLUMETRIA - Baseadas no Controle de Regras
   {
-    nome: 'Normalização Cliente',
-    descricao: 'Aplicação da limpeza de nomes de clientes',
-    funcao: 'trigger_limpar_nome_cliente'
+    nome: 'Proteção Temporal de Dados',
+    descricao: 'Impede edição de dados com mais de 5 dias do mês anterior e dados futuros',
+    funcao: 'can_edit_data',
+    id: 'v001'
   },
   {
-    nome: 'Correção Modalidades',
-    descricao: 'Correção de modalidades CR/DX para RX/MG e OT para DO',
-    funcao: 'aplicar_correcao_modalidades'
+    nome: 'Exclusão DATA_LAUDO fora período',
+    descricao: 'Remove registros com DATA_LAUDO fora do período de faturamento (retroativos)',
+    funcao: 'aplicar_regras_retroativas',
+    id: 'v002'
   },
   {
-    nome: 'Aplicação Categorias',
-    descricao: 'Definição de categorias baseada no cadastro de exames',
-    funcao: 'aplicar_categorias_trigger'
+    nome: 'Exclusão DATA_REALIZACAO >= período',
+    descricao: 'Remove registros retroativos com DATA_REALIZACAO >= 01 do mês',
+    funcao: 'aplicar_regras_retroativas',
+    id: 'v003'
+  },
+  {
+    nome: 'Filtro período atual não-retroativos',
+    descricao: 'Remove registros com datas fora do período para arquivos não-retroativos',
+    funcao: 'aplicar_regras_periodo_atual',
+    id: 'v031'
+  },
+  {
+    nome: 'Validação Formato Excel',
+    descricao: 'Valida estrutura dos arquivos Excel e colunas obrigatórias',
+    funcao: 'file_validation',
+    id: 'v013'
+  },
+  {
+    nome: 'Limpeza Caracteres Especiais',
+    descricao: 'Remove caracteres especiais e normaliza encoding UTF-8',
+    funcao: 'data_cleaning',
+    id: 'v022'
+  },
+  {
+    nome: 'Mapeamento De Para Valores',
+    descricao: 'Preenche valores zerados usando tabela de referência',
+    funcao: 'aplicar_de_para_trigger',
+    id: 'v026'
+  },
+  {
+    nome: 'Regras Quebra de Exames',
+    descricao: 'Quebra exames compostos em exames individuais',
+    funcao: 'trigger_marcar_para_quebra',
+    id: 'v027'
+  },
+  {
+    nome: 'Processamento Categorias',
+    descricao: 'Categoriza exames baseado na tabela de categorias',
+    funcao: 'aplicar_categorias_trigger',
+    id: 'v028'
+  },
+  {
+    nome: 'Tratamento Exames Fora Padrão',
+    descricao: 'Identifica e trata exames que não seguem o padrão',
+    funcao: 'exames_fora_padrao',
+    id: 'v029'
+  },
+  {
+    nome: 'Correção Modalidade RX',
+    descricao: 'Corrige modalidades CR/DX para RX/MG e OT para DO',
+    funcao: 'aplicar_correcao_modalidades',
+    id: 'v030'
+  },
+  {
+    nome: 'Mapeamento Dinâmico Campos',
+    descricao: 'Mapeia colunas do arquivo para campos do banco usando field_mappings',
+    funcao: 'field_mapping',
+    id: 'v014'
+  },
+  {
+    nome: 'Processamento em Lotes',
+    descricao: 'Processa uploads em lotes de 1000 registros para otimizar performance',
+    funcao: 'batch_processing',
+    id: 'v016'
+  },
+  {
+    nome: 'Cache de Performance',
+    descricao: 'Utiliza cache para otimizar consultas grandes',
+    funcao: 'volumetria_cache',
+    id: 'v008'
+  },
+  {
+    nome: 'Tipificação Faturamento NC Originais',
+    descricao: 'Define tipificação para 10 clientes NC originais',
+    funcao: 'aplicar_tipificacao_faturamento',
+    id: 'f005'
+  },
+  {
+    nome: 'Tipificação Faturamento NC Adicionais',
+    descricao: 'Define tipificação para 3 clientes NC adicionais',
+    funcao: 'aplicar_tipificacao_faturamento',
+    id: 'f006'
+  },
+  
+  // TRATAMENTOS ADICIONAIS IDENTIFICADOS NAS FUNÇÕES
+  {
+    nome: 'Normalização Nome Cliente',
+    descricao: 'Aplica limpeza e normalização de nomes de clientes',
+    funcao: 'trigger_limpar_nome_cliente',
+    id: 'extra_001'
+  },
+  {
+    nome: 'Normalização Nome Médico',
+    descricao: 'Remove códigos entre parênteses e normaliza nomes de médicos',
+    funcao: 'trigger_normalizar_medico',
+    id: 'extra_002'
   },
   {
     nome: 'De-Para Prioridades',
-    descricao: 'Mapeamento de prioridades conforme tabela de-para',
-    funcao: 'aplicar_prioridades_de_para'
+    descricao: 'Aplica mapeamento de prioridades conforme tabela de-para',
+    funcao: 'aplicar_prioridades_de_para',
+    id: 'extra_003'
   },
   {
-    nome: 'Valores de Referência',
-    descricao: 'Aplicação de valores de referência para exames sem valor',
-    funcao: 'aplicar_de_para_trigger'
+    nome: 'Aplicação Valor Onco',
+    descricao: 'Aplica valores específicos para exames oncológicos',
+    funcao: 'aplicar_valor_onco',
+    id: 'extra_004'
   },
   {
-    nome: 'Tipificação Faturamento',
-    descricao: 'Definição do tipo de faturamento baseado em regras',
-    funcao: 'aplicar_tipificacao_faturamento'
+    nome: 'Regras Exclusão Dinâmicas',
+    descricao: 'Aplica regras de exclusão configuradas dinamicamente',
+    funcao: 'aplicar_regras_exclusao_dinamicas',
+    id: 'extra_005'
   },
   {
-    nome: 'Quebra de Exames',
-    descricao: 'Marcação de exames para quebra posterior',
-    funcao: 'trigger_marcar_para_quebra'
+    nome: 'Validação Cliente Volumetria',
+    descricao: 'Valida se cliente existe e está ativo para processamento',
+    funcao: 'aplicar_validacao_cliente_volumetria',
+    id: 'extra_006'
   },
   {
-    nome: 'Regras Periodo Atual',
-    descricao: 'Validação de dados do período atual',
-    funcao: 'aplicar_regras_periodo_atual'
+    nome: 'Aplicação Especialidade Automática',
+    descricao: 'Define especialidade automaticamente baseado em regras',
+    funcao: 'aplicar_especialidade_automatica',
+    id: 'extra_007'
   },
   {
-    nome: 'Regras Retroativas',
-    descricao: 'Validação de dados retroativos',
-    funcao: 'aplicar_regras_retroativas'
+    nome: 'Definição Data Referência',
+    descricao: 'Define data de referência baseada no período de processamento',
+    funcao: 'set_data_referencia_volumetria',
+    id: 'extra_008'
   }
 ];
 
@@ -115,12 +217,21 @@ export function StatusRegraProcessamento() {
             log.operation.includes(regra.nome.toUpperCase().replace(/\s/g, '_'))
           );
 
-          // Determinar se deve aplicar baseado no tipo de arquivo
+          // Determinar se deve aplicar baseado no tipo de arquivo e regra
           let deveAplicar = true;
-          if (regra.nome === 'Regras Retroativas' && !tipoArquivo.includes('retroativo')) {
+          
+          // Regras específicas para retroativos
+          if ((regra.id === 'v002' || regra.id === 'v003') && !tipoArquivo.includes('retroativo')) {
             deveAplicar = false;
           }
-          if (regra.nome === 'Regras Periodo Atual' && tipoArquivo.includes('retroativo')) {
+          
+          // Regras específicas para não-retroativos
+          if (regra.id === 'v031' && tipoArquivo.includes('retroativo')) {
+            deveAplicar = false;
+          }
+          
+          // Regras que só se aplicam a arquivos onco (não temos esse tipo nos 4 arquivos principais)
+          if (regra.funcao === 'aplicar_valor_onco' && !tipoArquivo.includes('onco')) {
             deveAplicar = false;
           }
 
