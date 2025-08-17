@@ -3079,6 +3079,7 @@ export type Database = {
           ACCESSION_NUMBER: string | null
           arquivo_fonte: string
           CATEGORIA: string | null
+          cliente_nome_fantasia: string | null
           Cliente_Nome_Fantasia: string | null
           CODIGO_INTERNO: number | null
           CODIGO_PACIENTE: string | null
@@ -3116,6 +3117,7 @@ export type Database = {
           PRIORIDADE: string | null
           SEGUNDA_ASSINATURA: string | null
           STATUS: string | null
+          tipo_cliente: string | null
           tipo_dados: string
           tipo_faturamento: string | null
           unidade_origem: string | null
@@ -3126,6 +3128,7 @@ export type Database = {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte: string
           CATEGORIA?: string | null
+          cliente_nome_fantasia?: string | null
           Cliente_Nome_Fantasia?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
@@ -3163,6 +3166,7 @@ export type Database = {
           PRIORIDADE?: string | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
+          tipo_cliente?: string | null
           tipo_dados?: string
           tipo_faturamento?: string | null
           unidade_origem?: string | null
@@ -3173,6 +3177,7 @@ export type Database = {
           ACCESSION_NUMBER?: string | null
           arquivo_fonte?: string
           CATEGORIA?: string | null
+          cliente_nome_fantasia?: string | null
           Cliente_Nome_Fantasia?: string | null
           CODIGO_INTERNO?: number | null
           CODIGO_PACIENTE?: string | null
@@ -3210,6 +3215,7 @@ export type Database = {
           PRIORIDADE?: string | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
+          tipo_cliente?: string | null
           tipo_dados?: string
           tipo_faturamento?: string | null
           unidade_origem?: string | null

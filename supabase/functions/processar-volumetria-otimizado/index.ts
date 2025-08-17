@@ -505,7 +505,29 @@ serve(async (req) => {
       }
     }
 
-    // Normalizar nomes CEDI-* para CEDIDIAG (última etapa)
+    // 🔍 APLICAR VALIDAÇÃO DE CLIENTE (Nova etapa obrigatória)
+    if (totalInserted > 0) {
+      console.log('🔍 Aplicando validação de cliente e definindo tipo de faturamento...');
+      try {
+        const { data: validacaoResult, error: validacaoError } = await supabaseClient.functions.invoke('aplicar-validacao-cliente', {
+          body: { lote_upload: loteUpload }
+        });
+        
+        if (validacaoError) {
+          console.warn('⚠️ Erro na validação de cliente:', validacaoError);
+          resultado.alertas.push(`Validação de cliente: Erro - ${validacaoError.message}`);
+        } else if (validacaoResult) {
+          console.log('✅ Validação de cliente aplicada:', validacaoResult);
+          resultado.alertas.push(`Validação: ${validacaoResult.registros_atualizados} clientes validados, ${validacaoResult.registros_sem_cliente} sem cadastro`);
+          if (validacaoResult.clientes_nao_encontrados && validacaoResult.clientes_nao_encontrados.length > 0) {
+            resultado.alertas.push(`Clientes não encontrados: ${validacaoResult.clientes_nao_encontrados.slice(0, 5).join(', ')}${validacaoResult.clientes_nao_encontrados.length > 5 ? '...' : ''}`);
+          }
+        }
+      } catch (validacaoException) {
+        console.warn('⚠️ Exceção na validação de cliente:', validacaoException);
+        resultado.alertas.push(`Validação de cliente: Exceção - ${validacaoException.message}`);
+      }
+    }
     try {
       const { error: normError } = await supabaseClient
         .from('volumetria_mobilemed')
