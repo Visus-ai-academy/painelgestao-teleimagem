@@ -6,11 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Definição dos tipos de faturamento
-type TipoFaturamento = "CO-FT" | "NC-NF" | "NC-FT";
+// Tipos de Faturamento Definidos:
+// CO-FT: CO com faturamento
+// NC-FT: NC faturado
+// NC-NF: NC não faturado
+type TipoFaturamento = "CO-FT" | "NC-FT" | "NC-NF";
 
-// Lista de clientes NC (não consolidados) - Regra F005
-const CLIENTES_NC_ORIGINAL = [
+// Lista de clientes NC (Cliente do tipo NC)
+const CLIENTES_NC = [
   "CDICARDIO",
   "CDIGOIAS", 
   "CISP",
@@ -20,113 +23,28 @@ const CLIENTES_NC_ORIGINAL = [
   "GOLD",
   "PRODIMAGEM",
   "TRANSDUSON",
-  "ZANELLO"
-];
-
-// Lista de clientes NC adicionais - Regra F006
-const CLIENTES_NC_ADICIONAIS = [
+  "ZANELLO",
   "CEMVALENCA",
   "RMPADUA",
   "RADI-IMAGEM"
 ];
 
-// Todos os clientes NC
-const CLIENTES_NC = [...CLIENTES_NC_ORIGINAL, ...CLIENTES_NC_ADICIONAIS];
-
-// Especialidades que geram faturamento para clientes NC (NC-FT)
-const ESPECIALIDADES_NC_FATURADAS = ["CARDIO"];
-
-// Médicos específicos que geram NC-FT para clientes NC adicionais - Regra F006
-const MEDICOS_NC_FATURADOS = [
-  "Dr. Antonio Gualberto Chianca Filho",
-  "Dr. Daniel Chrispim",
-  "Dr. Efraim Da Silva Ferreira",
-  "Dr. Felipe Falcão de Sá",
-  "Dr. Guilherme N. Schincariol",
-  "Dr. Gustavo Andreis",
-  "Dr. João Carlos Dantas do Amaral",
-  "Dr. João Fernando Miranda Pompermayer",
-  "Dr. Leonardo de Paula Ribeiro Figueiredo",
-  "Dr. Raphael Sanfelice João",
-  "Dr. Thiago P. Martins",
-  "Dr. Virgílio Oliveira Barreto",
-  "Dra. Adriana Giubilei Pimenta",
-  "Dra. Aline Andrade Dorea",
-  "Dra. Camila Amaral Campos",
-  "Dra. Cynthia Mendes Vieira de Morais",
-  "Dra. Fernanda Gama Barbosa",
-  "Dra. Kenia Menezes Fernandes",
-  "Dra. Lara M. Durante Bacelar",
-  "Dr. Aguinaldo Cunha Zuppani",
-  "Dr. Alex Gueiros de Barros",
-  "Dr. Eduardo Caminha Nunes",
-  "Dr. Márcio D'Andréa Rossi",
-  "Dr. Rubens Pereira Moura Filho",
-  "Dr. Wesley Walber da Silva",
-  "Dra. Luna Azambuja Satte Alam",
-  "Dra. Roberta Bertoldo Sabatini Treml",
-  "Dra. Thais Nogueira D. Gastaldi",
-  "Dra. Vanessa da Costa Maldonado"
-];
-
-// REGRA F007 - Clientes especiais com lógica própria
-const CLIENTES_F007 = ["CBU", "CEDI_RJ", "CEDI_RO", "CEDI_UNIMED", "RADMED"];
-const MEDICO_EXCECAO_F007 = "Dr. Rodrigo Vaz de Lima";
-// Clientes NC fixos (sempre NC-FT)
-const CLIENTES_NC_FIXOS = ["CICOMANGRA", "VOTUPORANGA"];
+// Função para determinar o tipo de cliente
+function determinarTipoCliente(cliente: string): "CO" | "NC" {
+  return CLIENTES_NC.includes(cliente) ? "NC" : "CO";
+}
 
 // Função para determinar o tipo de faturamento
-function determinarTipoFaturamento(
-  cliente: string,
-  especialidade?: string,
-  prioridade?: string,
-  medico?: string,
-  estudoDescricao?: string
-): TipoFaturamento {
-  // Clientes NC fixos (sempre NC-FT)
-  if (CLIENTES_NC_FIXOS.includes(cliente)) return "NC-FT";
-  // REGRA F007 - Clientes especiais (aplicação prioritária)
-  if (CLIENTES_F007.includes(cliente)) {
-    if (prioridade === "PLANTÃO") return "CO-FT";
-    if (especialidade === "MEDICINA INTERNA" && medico !== MEDICO_EXCECAO_F007) {
-      return "CO-FT";
-    }
-    return "NC-NF";
+function determinarTipoFaturamento(cliente: string): TipoFaturamento {
+  const tipoCliente = determinarTipoCliente(cliente);
+  
+  if (tipoCliente === "CO") {
+    return "CO-FT"; // CO com faturamento
+  } else {
+    // Para clientes NC, determinar se é faturado ou não faturado
+    // Por enquanto, todos os NC são não faturados por padrão
+    return "NC-NF"; // NC não faturado
   }
-
-  // Clientes CO (consolidados) - sempre CO-FT
-  if (!CLIENTES_NC.includes(cliente)) {
-    return "CO-FT";
-  }
-  // REGRA F005 - Clientes NC originais
-  if (CLIENTES_NC_ORIGINAL.includes(cliente)) {
-    const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
-    const ehPlantao = prioridade === "PLANTÃO";
-
-    if (temEspecialidadeFaturada || ehPlantao || (estudoDescricao && ["ANGIOTC VENOSA TORAX CARDIOLOGIA", "RM CRANIO NEUROBRAIN"].includes(estudoDescricao))) {
-      return "NC-FT";
-    }
-    return "NC-NF";
-  }
-
-  // REGRA F006 - Clientes NC adicionais (CEMVALENCA, RMPADUA, RADI-IMAGEM)
-  if (CLIENTES_NC_ADICIONAIS.includes(cliente)) {
-    const temEspecialidadeFaturada = especialidade && ESPECIALIDADES_NC_FATURADAS.includes(especialidade);
-    const ehPlantao = prioridade === "PLANTÃO";
-    const temMedicoFaturado = medico && MEDICOS_NC_FATURADOS.includes(medico);
-    
-    // Exceção especial para RADI-IMAGEM: incluir especialidade MAMA
-    const temMamaRadiImagem = cliente === "RADI-IMAGEM" && especialidade === "MAMA";
-
-    // NC-FT: especialidades específicas OU prioridade plantão OU médicos específicos OU MAMA para RADI-IMAGEM
-    if (temEspecialidadeFaturada || ehPlantao || temMedicoFaturado || temMamaRadiImagem) {
-      return "NC-FT";
-    }
-    return "NC-NF";
-  }
-
-  // Fallback (não deveria chegar aqui)
-  return "NC-NF";
 }
 
 serve(async (req) => {
@@ -196,13 +114,7 @@ serve(async (req) => {
 
       // Preparar atualizações em massa
       const updates = lote.map(registro => {
-        const tipoFaturamento = determinarTipoFaturamento(
-          registro.EMPRESA,
-          registro.ESPECIALIDADE,
-          registro.PRIORIDADE,
-          registro.MEDICO,
-          registro.ESTUDO_DESCRICAO
-        );
+        const tipoFaturamento = determinarTipoFaturamento(registro.EMPRESA);
 
         registrosProcessados++;
 
@@ -256,7 +168,7 @@ serve(async (req) => {
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
       estatisticas_tipos: estatisticas,
-      regras_aplicadas: ['F005 - Clientes NC Originais', 'F006 - Clientes NC Adicionais', 'V001 - Clientes NC fixos (CICOMANGRA, VOTUPORANGA)', 'F007 - Clientes especiais (CBU, CEDI_RJ, CEDI_RO, CEDI_UNIMED, RADMED)'],
+      regras_aplicadas: ['Determinação do Tipo de Cliente: CO (cliente do tipo CO) / NC (Cliente do tipo NC)', 'Tipos de Faturamento: CO-FT (CO com faturamento) / NC-FT (NC faturado) / NC-NF (NC não faturado)'],
       data_processamento: new Date().toISOString()
     };
 
