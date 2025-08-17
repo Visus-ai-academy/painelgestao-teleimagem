@@ -6,6 +6,7 @@ import {
   BarChart3
 } from "lucide-react";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
+import { TesteQuebraExames } from "@/components/TesteQuebraExames";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
@@ -39,6 +40,11 @@ export default function DadosVolumetria() {
               onPeriodoSelected={setPeriodoFaturamentoVolumetria}
               onClearPeriodo={() => setPeriodoFaturamentoVolumetria(null)}
             />
+          </div>
+
+          {/* Teste Quebra de Exames */}
+          <div className="flex justify-center">
+            <TesteQuebraExames />
           </div>
 
           {/* Upload de Dados */}

@@ -63,11 +63,10 @@ serve(async (req) => {
 
     const { arquivo_fonte } = await req.json();
 
-    if (!arquivo_fonte) {
-      throw new Error('Parâmetro arquivo_fonte é obrigatório');
-    }
+    console.log(`Iniciando aplicação de regras de quebra para: ${arquivo_fonte || 'TODOS'}`);
 
-    console.log(`Iniciando aplicação de regras de quebra para: ${arquivo_fonte}`);
+    // Se arquivo_fonte não for especificado, processar todos
+    const whereClause = arquivo_fonte ? { arquivo_fonte } : {};
 
     // 1. Buscar todas as regras de quebra ativas
     const { data: regrasQuebra, error: errorRegras } = await supabase
@@ -112,12 +111,18 @@ serve(async (req) => {
       
       console.log(`Processando exame: ${exameOriginal} (${quantidadeQuebras} quebras)`);
 
-      // 4. Buscar todos os registros deste exame original no arquivo específico
-      const { data: registrosOriginais, error: errorRegistros } = await supabase
+      // 4. Buscar todos os registros deste exame original
+      const queryBuilder = supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('ESTUDO_DESCRICAO', exameOriginal)
-        .eq('arquivo_fonte', arquivo_fonte);
+        .eq('ESTUDO_DESCRICAO', exameOriginal);
+      
+      // Aplicar filtro por arquivo_fonte se especificado
+      if (arquivo_fonte) {
+        queryBuilder.eq('arquivo_fonte', arquivo_fonte);
+      }
+      
+      const { data: registrosOriginais, error: errorRegistros } = await queryBuilder;
 
       if (errorRegistros) {
         console.error(`Erro ao buscar registros para ${exameOriginal}:`, errorRegistros.message);
@@ -194,9 +199,9 @@ serve(async (req) => {
       .insert({
         table_name: 'volumetria_mobilemed',
         operation: 'APLICAR_QUEBRAS',
-        record_id: arquivo_fonte,
+        record_id: arquivo_fonte || 'TODOS',
         new_data: {
-          arquivo_fonte,
+          arquivo_fonte: arquivo_fonte || 'TODOS',
           registros_processados: totalProcessados,
           registros_quebrados: totalQuebrados,
           erros,
@@ -212,7 +217,7 @@ serve(async (req) => {
 
     const resultado = {
       sucesso: true,
-      arquivo_fonte,
+      arquivo_fonte: arquivo_fonte || 'TODOS',
       registros_processados: totalProcessados,
       registros_quebrados: totalQuebrados,
       erros,
