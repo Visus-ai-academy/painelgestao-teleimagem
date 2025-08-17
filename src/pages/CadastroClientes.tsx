@@ -26,6 +26,8 @@ interface Cliente {
   email: string;
   email_envio_nf?: string;
   cnpj?: string;
+  cpf?: string;
+  tipo_pessoa?: string;
   telefone?: string;
   endereco?: string;
   bairro?: string;
@@ -68,6 +70,8 @@ export default function CadastroClientes() {
     email: "",
     email_envio_nf: "",
     cnpj: "",
+    cpf: "",
+    tipo_pessoa: "",
     telefone: "",
     endereco: "",
     bairro: "",
@@ -177,6 +181,8 @@ export default function CadastroClientes() {
         email: "",
         email_envio_nf: "",
         cnpj: "",
+        cpf: "",
+        tipo_pessoa: "",
         telefone: "",
         endereco: "",
         bairro: "",
@@ -221,6 +227,8 @@ export default function CadastroClientes() {
       email: cliente.email,
       email_envio_nf: cliente.email_envio_nf || "",
       cnpj: cliente.cnpj || "",
+      cpf: cliente.cpf || "",
+      tipo_pessoa: cliente.tipo_pessoa || "",
       telefone: cliente.telefone || "",
       endereco: cliente.endereco || "",
       bairro: cliente.bairro || "",
@@ -377,10 +385,11 @@ export default function CadastroClientes() {
           expectedFormat={[
             'Nome do cliente',
             'Email do cliente',
-            'CNPJ (opcional)',
+            'CNPJ/CPF (será identificado automaticamente)',
             'Endereço (opcional)',
             'Contato (opcional)',
             'Código cliente (opcional)',
+            'Contrato (múltiplos contratos por cliente)',
             'Data início contrato (opcional)',
             'Data término vigência (opcional)',
             'Status ativo (opcional)'
@@ -407,7 +416,7 @@ export default function CadastroClientes() {
               if (data.success) {
                 toast({
                   title: "Upload realizado com sucesso!",
-                  description: `${data.registros_processados} clientes foram processados.`,
+                  description: `${data.registros_processados} clientes e ${data.contratos_inseridos || 0} contratos foram processados.`,
                 });
               } else {
                 throw new Error(data.error || 'Erro no processamento');
@@ -462,14 +471,41 @@ export default function CadastroClientes() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  value={clienteData.cnpj}
-                  onChange={(e) => handleInputChange("cnpj", e.target.value)}
-                  placeholder="00.000.000/0000-00"
-                />
+                <Label htmlFor="tipo_pessoa" className="text-sm font-semibold text-foreground">Tipo de Pessoa</Label>
+                <Select value={clienteData.tipo_pessoa} onValueChange={(value) => handleInputChange("tipo_pessoa", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PJ">Pessoa Jurídica (PJ)</SelectItem>
+                    <SelectItem value="PF">Pessoa Física (PF)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              
+              {clienteData.tipo_pessoa === "PJ" && (
+                <div className="space-y-2">
+                  <Label htmlFor="cnpj" className="text-sm font-semibold text-foreground">CNPJ</Label>
+                  <Input
+                    id="cnpj"
+                    value={clienteData.cnpj}
+                    onChange={(e) => handleInputChange("cnpj", e.target.value)}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+              )}
+              
+              {clienteData.tipo_pessoa === "PF" && (
+                <div className="space-y-2">
+                  <Label htmlFor="cpf" className="text-sm font-semibold text-foreground">CPF</Label>
+                  <Input
+                    id="cpf"
+                    value={clienteData.cpf}
+                    onChange={(e) => handleInputChange("cpf", e.target.value)}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="cod_cliente" className="text-sm font-semibold text-foreground">Código Cliente</Label>

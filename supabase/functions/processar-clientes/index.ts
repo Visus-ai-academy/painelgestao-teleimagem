@@ -145,7 +145,11 @@ serve(async (req) => {
 
     // Map data using dynamic field mappings automatically
     console.log('=== MAPEANDO DADOS ===')
-    const clientes = jsonData.map((row: any, index: number) => {
+    
+    // Estrutura para agrupar clientes por nome e seus contratos
+    const clientesContratos = new Map<string, any>();
+    
+    jsonData.forEach((row: any, index: number) => {
       const clienteData: any = {}
       
       // LOG DETALHADO DOS DADOS BRUTOS
@@ -179,16 +183,17 @@ serve(async (req) => {
       const email = clienteData.email || '';
       const telefone = clienteData.telefone || null;
       const endereco = clienteData.endereco || null;
-      const cnpj = clienteData.cnpj || null;
+      const documento = clienteData.cnpj || null; // Campo pode conter CNPJ ou CPF
       const contato = clienteData.contato || null;
       const cod_cliente = clienteData.cod_cliente || null;
       const data_inicio_contrato = clienteData.data_inicio_contrato || null;
       const data_termino_vigencia = clienteData.data_termino_vigencia || null;
+      const numero_contrato = clienteData.numero_contrato || clienteData.Contrato || null;
       // Buscar pelo campo mapeado Status
       const status = clienteData.Status || 'A'; // Padrão: Ativo
       
       if (index < 3) {
-        console.log(`Campos extraídos - Nome: "${nome}", Email: "${email}", Status: "${status}"`)
+        console.log(`Campos extraídos - Nome: "${nome}", Email: "${email}", Status: "${status}", Contrato: "${numero_contrato}", Documento: "${documento}"`)
       }
       
       // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
@@ -215,25 +220,64 @@ serve(async (req) => {
         }
       }
       
-      const clienteFinal = {
-        nome: String(nome).trim(),
-        email: String(email).trim(),
-        telefone: telefone,
-        endereco: endereco,
-        cnpj: cnpj,
-        contato: contato,
-        cod_cliente: cod_cliente,
-        data_inicio_contrato: data_inicio_contrato,
-        data_termino_vigencia: data_termino_vigencia,
-        ativo: ativo
-      };
+      // Detectar tipo de documento (PJ/PF)
+      let cnpj = null;
+      let cpf = null;
+      let tipo_pessoa = null;
       
-      if (index < 3) {
-        console.log(`Cliente ${index} FINAL:`, JSON.stringify(clienteFinal, null, 2))
+      if (documento && documento.toString().trim() !== '') {
+        const docLimpo = documento.toString().replace(/[^0-9]/g, '');
+        if (docLimpo.length === 11) {
+          cpf = documento;
+          tipo_pessoa = 'PF';
+        } else if (docLimpo.length === 14) {
+          cnpj = documento;
+          tipo_pessoa = 'PJ';
+        }
       }
       
-      return clienteFinal;
-    })
+      const clienteKey = nome.trim();
+      
+      // Se cliente já existe, apenas adicionar contrato
+      if (clientesContratos.has(clienteKey)) {
+        const clienteExistente = clientesContratos.get(clienteKey);
+        if (numero_contrato && numero_contrato.trim() !== '') {
+          clienteExistente.contratos.push({
+            numero_contrato: numero_contrato.trim(),
+            data_inicio: data_inicio_contrato,
+            data_fim: data_termino_vigencia
+          });
+        }
+      } else {
+        // Criar novo cliente
+        const clienteFinal = {
+          nome: String(nome).trim(),
+          email: String(email).trim(),
+          telefone: telefone,
+          endereco: endereco,
+          cnpj: cnpj,
+          cpf: cpf,
+          tipo_pessoa: tipo_pessoa,
+          contato: contato,
+          cod_cliente: cod_cliente,
+          ativo: ativo,
+          contratos: numero_contrato && numero_contrato.trim() !== '' ? [{
+            numero_contrato: numero_contrato.trim(),
+            data_inicio: data_inicio_contrato,
+            data_fim: data_termino_vigencia
+          }] : []
+        };
+        
+        clientesContratos.set(clienteKey, clienteFinal);
+        
+        if (index < 3) {
+          console.log(`Cliente ${index} FINAL:`, JSON.stringify(clienteFinal, null, 2))
+        }
+      }
+    });
+    
+    // Converter Map para Array
+    const clientes = Array.from(clientesContratos.values());
 
     console.log('=== ANÁLISE FINAL DOS DADOS ===')
     console.log('Total de linhas do arquivo original:', jsonData.length)
@@ -282,9 +326,15 @@ serve(async (req) => {
     console.log('=== INSERINDO NOVOS CLIENTES ===')
     console.log('Total de clientes para inserir:', clientesParaInserir.length)
     
+    // Separar dados do cliente dos contratos
+    const clientesLimpos = clientesParaInserir.map(cliente => {
+      const { contratos, ...clienteDados } = cliente;
+      return clienteDados;
+    });
+    
     const { data: insertData, error: insertError } = await supabaseClient
       .from('clientes')
-      .insert(clientesParaInserir)
+      .insert(clientesLimpos)
       .select()
 
     if (insertError) {
@@ -293,6 +343,36 @@ serve(async (req) => {
     }
 
     console.log('Clientes inseridos com sucesso:', insertData?.length || 0)
+    
+    // Inserir contratos para cada cliente
+    console.log('=== INSERINDO CONTRATOS ===')
+    let totalContratos = 0;
+    
+    for (const clienteInserido of insertData || []) {
+      const clienteOriginal = clientesParaInserir.find(c => c.nome === clienteInserido.nome);
+      if (clienteOriginal && clienteOriginal.contratos && clienteOriginal.contratos.length > 0) {
+        const contratosParaInserir = clienteOriginal.contratos.map((contrato: any) => ({
+          cliente_id: clienteInserido.id,
+          numero_contrato: contrato.numero_contrato,
+          data_inicio: contrato.data_inicio || new Date().toISOString().split('T')[0],
+          data_fim: contrato.data_fim,
+          status: 'ativo'
+        }));
+        
+        const { error: contratoError } = await supabaseClient
+          .from('contratos_clientes')
+          .insert(contratosParaInserir);
+          
+        if (contratoError) {
+          console.log(`Erro ao inserir contratos para cliente ${clienteInserido.nome}:`, contratoError);
+        } else {
+          totalContratos += contratosParaInserir.length;
+          console.log(`Inseridos ${contratosParaInserir.length} contratos para cliente ${clienteInserido.nome}`);
+        }
+      }
+    }
+    
+    console.log('Total de contratos inseridos:', totalContratos);
 
     // Update log
     await supabaseClient
@@ -308,6 +388,7 @@ serve(async (req) => {
     console.log('- Arquivo original:', jsonData.length, 'linhas')
     console.log('- Clientes processados:', clientesParaInserir.length)
     console.log('- Clientes inseridos:', insertData?.length || 0)
+    console.log('- Contratos inseridos:', totalContratos)
 
     return new Response(
       JSON.stringify({
@@ -315,8 +396,9 @@ serve(async (req) => {
         arquivo_original_linhas: jsonData.length,
         registros_processados: clientesParaInserir.length,
         registros_inseridos: insertData?.length || 0,
+        contratos_inseridos: totalContratos,
         registros_duplicados: 0,
-        mensagem: `${clientesParaInserir.length} de ${jsonData.length} clientes processados com sucesso`
+        mensagem: `${clientesParaInserir.length} clientes e ${totalContratos} contratos processados com sucesso`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

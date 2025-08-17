@@ -434,6 +434,7 @@ export type Database = {
           cnpj: string | null
           cod_cliente: string | null
           contato: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
           data_inicio_contrato: string | null
@@ -458,6 +459,7 @@ export type Database = {
           status: string
           telefone: string | null
           tipo_cliente: string | null
+          tipo_pessoa: string | null
           updated_at: string
           valor_franquia: number | null
           valor_franquia_acima_volume: number | null
@@ -471,6 +473,7 @@ export type Database = {
           cnpj?: string | null
           cod_cliente?: string | null
           contato?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_inicio_contrato?: string | null
@@ -495,6 +498,7 @@ export type Database = {
           status?: string
           telefone?: string | null
           tipo_cliente?: string | null
+          tipo_pessoa?: string | null
           updated_at?: string
           valor_franquia?: number | null
           valor_franquia_acima_volume?: number | null
@@ -508,6 +512,7 @@ export type Database = {
           cnpj?: string | null
           cod_cliente?: string | null
           contato?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_inicio_contrato?: string | null
@@ -532,6 +537,7 @@ export type Database = {
           status?: string
           telefone?: string | null
           tipo_cliente?: string | null
+          tipo_pessoa?: string | null
           updated_at?: string
           valor_franquia?: number | null
           valor_franquia_acima_volume?: number | null
@@ -3474,6 +3480,10 @@ export type Database = {
       criar_contratos_clientes_automatico: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      detectar_tipo_documento: {
+        Args: { documento: string }
+        Returns: string
       }
       diagnosticar_limitacoes_supabase: {
         Args: Record<PropertyKey, never>
