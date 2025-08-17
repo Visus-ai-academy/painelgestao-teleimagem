@@ -104,9 +104,34 @@ export function VolumetriaClientesComparison({
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
     try {
       console.log('🔍 [COMPARATIVO DEBUG] Context completo:', context);
+      console.log('🔍 [COMPARATIVO DEBUG] Procurando exame específico: CDI.URUACU - Eber Da Silva Pereira - RX TORNOZELO DIREITO');
+      
       // Priorizar estatísticas definitivas por cliente (100% do banco)
       const stats = (context as any)?.clientesStats || [];
       console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats?.length, stats?.slice(0, 3));
+      
+      // TESTE ESPECÍFICO: Verificar se o exame específico está nos dados detalhados
+      if (context.detailedData && context.detailedData.length > 0) {
+        const exameEspecifico = context.detailedData.find((item: any) => 
+          item.EMPRESA === 'CDI.URUACU' && 
+          item.NOME_PACIENTE === 'Eber Da Silva Pereira' && 
+          item.ESTUDO_DESCRICAO === 'RX TORNOZELO DIREITO'
+        );
+        console.log('🎯 EXAME ESPECÍFICO ENCONTRADO NO DETAILED DATA:', exameEspecifico ? 'SIM' : 'NÃO');
+        if (exameEspecifico) {
+          console.log('🎯 DADOS COMPLETOS DO EXAME:', JSON.stringify(exameEspecifico, null, 2));
+        }
+        
+        // Verificar normalização do cliente
+        const clienteNormalizado = normalizeClientName('CDI.URUACU');
+        console.log('🔧 CLIENTE NORMALIZADO:', clienteNormalizado);
+        
+        // Verificar todos os registros do CDI.URUACU
+        const todosCDI = context.detailedData.filter((item: any) => 
+          item.EMPRESA === 'CDI.URUACU'
+        );
+        console.log('🏢 TOTAL REGISTROS CDI.URUACU NO DETAILED DATA:', todosCDI.length);
+      }
       
       if (!stats || stats.length === 0) {
         console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
