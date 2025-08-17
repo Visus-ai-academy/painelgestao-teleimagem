@@ -8,6 +8,7 @@ import { SimpleFileUpload } from '@/components/SimpleFileUpload';
 import { CadastroDataTable } from '@/components/CadastroDataTable';
 import { ValoresReferenciaTable } from '@/components/ValoresReferenciaTable';
 import { DeParaPrioridadeUpload } from '@/components/DePara/DeParaPrioridadeUpload';
+import { DeParaPrioridadeList } from '@/components/DePara/DeParaPrioridadeList';
 import { FileText, DollarSign, Shield, UserCheck, Database, Trash2, AlertTriangle, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -950,8 +951,9 @@ export default function GerenciarCadastros() {
                 Este mapeamento é aplicado automaticamente durante o processamento dos dados de volumetria.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <DeParaPrioridadeUpload />
+              <DeParaPrioridadeList />
             </CardContent>
           </Card>
         </TabsContent>
