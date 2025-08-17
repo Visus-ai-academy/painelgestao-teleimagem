@@ -274,7 +274,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return prioNorm;
       };
 
-      // Normalizar nome do médico removendo apenas códigos entre parênteses
+      // Normalizar nome do médico removendo códigos entre parênteses e padronizando nomes/iniciais
       const normalizeMedico = (medico: string) => {
         let norm = canonical(medico || '');
         // Remover códigos entre parênteses como (E1), (E2), (E3), etc - usando regex mais ampla
@@ -283,6 +283,25 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         norm = norm.replace(/^DR[A]?\s+/, '');
         // Remover pontos finais
         norm = norm.replace(/\.$/, '');
+        
+        // Normalizar nomes do meio - converter para inicial quando necessário
+        // Ex: "LARA MACATRAO DURANTE BACELAR" -> "LARA M DURANTE BACELAR"
+        const parts = norm.trim().split(/\s+/);
+        if (parts.length > 2) {
+          // Manter primeiro e último nome, converter nomes do meio para inicial
+          const firstName = parts[0];
+          const lastName = parts[parts.length - 1];
+          const middleNames = parts.slice(1, -1);
+          
+          // Converter nomes do meio para iniciais se tiverem mais de 2 caracteres
+          const normalizedMiddle = middleNames.map(name => {
+            // Se já é uma inicial (1-2 chars), manter. Se é nome completo, converter para inicial
+            return name.length <= 2 ? name.replace(/\.$/, '') : name.charAt(0);
+          }).join(' ');
+          
+          norm = [firstName, normalizedMiddle, lastName].filter(p => p).join(' ');
+        }
+        
         return norm.trim();
       };
 
