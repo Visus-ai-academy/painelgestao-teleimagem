@@ -90,16 +90,20 @@ export function ClientValidationStatus() {
     try {
       setLoading(true);
       
-      // Chamar função para aplicar validação de cliente em todos os preços
-      const { data, error } = await supabase.functions.invoke('aplicar-validacao-cliente', {
-        body: { lote_upload: null } // Processar todos os registros
+      console.log('🔄 Iniciando reprocessamento usando nome_fantasia exclusivamente...');
+      
+      // Chamar função de validação que usa exclusivamente nome_fantasia
+      const { data, error } = await supabase.rpc('aplicar_validacao_cliente_volumetria', {
+        lote_upload_param: null
       });
 
       if (error) throw error;
 
+      console.log('✅ Reprocessamento concluído:', data);
+
       toast({
         title: "Sucesso",
-        description: `Validação aplicada com sucesso! ${data.registros_atualizados} preços atualizados.`,
+        description: `${(data as any)?.registros_atualizados || 0} preços foram associados usando nome_fantasia. ${(data as any)?.registros_sem_cliente || 0} registros sem correlação.`,
       });
 
       // Recarregar estatísticas
