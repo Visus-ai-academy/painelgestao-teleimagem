@@ -365,40 +365,174 @@ export function VolumetriaClientesComparison({
 
   const handleExportList = () => {
     try {
-      const rows: any[] = [];
+      // Resumo dos totais por cliente
+      const resumoRows: any[] = [];
       clientesExibidos.forEach((c) => {
         const up = uploadedMap?.get(normalize(c.cliente));
-        rows.push({
-          section: 'Cliente',
-          cliente: c.cliente,
-          total_sistema: c.total_exames,
-          total_arquivo: up?.total_exames ?? 0,
+        const totalSistema = c.total_exames;
+        const totalArquivo = up?.total_exames ?? 0;
+        const divergencia = totalSistema !== totalArquivo;
+        
+        resumoRows.push({
+          Cliente: c.cliente,
+          'Total Sistema': totalSistema,
+          'Total Arquivo': totalArquivo,
+          'Diferença': totalArquivo - totalSistema,
+          'Status': divergencia ? 'DIVERGENTE' : 'OK',
+          'Percentual Arquivo/Sistema': totalSistema > 0 ? `${((totalArquivo / totalSistema) * 100).toFixed(1)}%` : 'N/A'
         });
-        const buildRows = (label: string, sys: Record<string, number>, upMap?: Record<string, number>) => {
-          const keys = Array.from(new Set([
-            ...Object.keys(sys || {}),
-            ...(upMap ? Object.keys(upMap) : []),
-          ])).sort();
-          keys.forEach((k) => {
-            rows.push({
-              section: label,
-              cliente: c.cliente,
-              item: k,
-              sist: (sys?.[k] || 0),
-              arq: (upMap?.[k] || 0),
-            });
-          });
-        };
-        buildRows('Modalidade', c.modalidades, up?.modalidades);
-        buildRows('Especialidade', c.especialidades, up?.especialidades);
-        buildRows('Categoria', c.categorias, up?.categorias);
-        buildRows('Prioridade', c.prioridades, up?.prioridades);
-        buildRows('Exame', c.exames, up?.exames);
       });
+
+      // Detalhamento completo por modalidade
+      const modalidadeRows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        const keys = Array.from(new Set([
+          ...Object.keys(c.modalidades || {}),
+          ...(up?.modalidades ? Object.keys(up.modalidades) : []),
+        ])).sort();
+        
+        keys.forEach((modalidade) => {
+          const sistemaVal = c.modalidades[modalidade] || 0;
+          const arquivoVal = up?.modalidades?.[modalidade] || 0;
+          modalidadeRows.push({
+            Cliente: c.cliente,
+            Modalidade: modalidade,
+            'Qtd Sistema': sistemaVal,
+            'Qtd Arquivo': arquivoVal,
+            'Diferença': arquivoVal - sistemaVal,
+            'Status': sistemaVal !== arquivoVal ? 'DIVERGENTE' : 'OK'
+          });
+        });
+      });
+
+      // Detalhamento completo por especialidade
+      const especialidadeRows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        const keys = Array.from(new Set([
+          ...Object.keys(c.especialidades || {}),
+          ...(up?.especialidades ? Object.keys(up.especialidades) : []),
+        ])).sort();
+        
+        keys.forEach((especialidade) => {
+          const sistemaVal = c.especialidades[especialidade] || 0;
+          const arquivoVal = up?.especialidades?.[especialidade] || 0;
+          especialidadeRows.push({
+            Cliente: c.cliente,
+            Especialidade: especialidade,
+            'Qtd Sistema': sistemaVal,
+            'Qtd Arquivo': arquivoVal,
+            'Diferença': arquivoVal - sistemaVal,
+            'Status': sistemaVal !== arquivoVal ? 'DIVERGENTE' : 'OK'
+          });
+        });
+      });
+
+      // Detalhamento completo por exames
+      const exameRows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        const keys = Array.from(new Set([
+          ...Object.keys(c.exames || {}),
+          ...(up?.exames ? Object.keys(up.exames) : []),
+        ])).sort();
+        
+        keys.forEach((exame) => {
+          const sistemaVal = c.exames[exame] || 0;
+          const arquivoVal = up?.exames?.[exame] || 0;
+          exameRows.push({
+            Cliente: c.cliente,
+            Exame: exame,
+            'Qtd Sistema': sistemaVal,
+            'Qtd Arquivo': arquivoVal,
+            'Diferença': arquivoVal - sistemaVal,
+            'Status': sistemaVal !== arquivoVal ? 'DIVERGENTE' : 'OK'
+          });
+        });
+      });
+
+      // Detalhamento por categorias
+      const categoriaRows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        const keys = Array.from(new Set([
+          ...Object.keys(c.categorias || {}),
+          ...(up?.categorias ? Object.keys(up.categorias) : []),
+        ])).sort();
+        
+        keys.forEach((categoria) => {
+          const sistemaVal = c.categorias[categoria] || 0;
+          const arquivoVal = up?.categorias?.[categoria] || 0;
+          categoriaRows.push({
+            Cliente: c.cliente,
+            Categoria: categoria,
+            'Qtd Sistema': sistemaVal,
+            'Qtd Arquivo': arquivoVal,
+            'Diferença': arquivoVal - sistemaVal,
+            'Status': sistemaVal !== arquivoVal ? 'DIVERGENTE' : 'OK'
+          });
+        });
+      });
+
+      // Detalhamento por prioridades
+      const prioridadeRows: any[] = [];
+      clientesExibidos.forEach((c) => {
+        const up = uploadedMap?.get(normalize(c.cliente));
+        const keys = Array.from(new Set([
+          ...Object.keys(c.prioridades || {}),
+          ...(up?.prioridades ? Object.keys(up.prioridades) : []),
+        ])).sort();
+        
+        keys.forEach((prioridade) => {
+          const sistemaVal = c.prioridades[prioridade] || 0;
+          const arquivoVal = up?.prioridades?.[prioridade] || 0;
+          prioridadeRows.push({
+            Cliente: c.cliente,
+            Prioridade: prioridade,
+            'Qtd Sistema': sistemaVal,
+            'Qtd Arquivo': arquivoVal,
+            'Diferença': arquivoVal - sistemaVal,
+            'Status': sistemaVal !== arquivoVal ? 'DIVERGENTE' : 'OK'
+          });
+        });
+      });
+
+      // Criar workbook com múltiplas abas
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, 'comparativo');
-      XLSX.writeFile(wb, `comparativo_clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
+      
+      // Aba 1: Resumo
+      const wsResumo = XLSX.utils.json_to_sheet(resumoRows);
+      XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Clientes');
+      
+      // Aba 2: Modalidades
+      const wsModalidades = XLSX.utils.json_to_sheet(modalidadeRows);
+      XLSX.utils.book_append_sheet(wb, wsModalidades, 'Modalidades');
+      
+      // Aba 3: Especialidades
+      const wsEspecialidades = XLSX.utils.json_to_sheet(especialidadeRows);
+      XLSX.utils.book_append_sheet(wb, wsEspecialidades, 'Especialidades');
+      
+      // Aba 4: Exames
+      const wsExames = XLSX.utils.json_to_sheet(exameRows);
+      XLSX.utils.book_append_sheet(wb, wsExames, 'Exames');
+      
+      // Aba 5: Categorias
+      const wsCategorias = XLSX.utils.json_to_sheet(categoriaRows);
+      XLSX.utils.book_append_sheet(wb, wsCategorias, 'Categorias');
+      
+      // Aba 6: Prioridades
+      const wsPrioridades = XLSX.utils.json_to_sheet(prioridadeRows);
+      XLSX.utils.book_append_sheet(wb, wsPrioridades, 'Prioridades');
+
+      const fileName = `comparativo_detalhado_${periodoSelecionado || 'ativo'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast({ 
+        title: 'Relatório Exportado', 
+        description: `Arquivo ${fileName} gerado com 6 abas de comparação detalhada.`,
+        variant: 'default'
+      });
     } catch (e) {
       console.error('Erro ao exportar lista:', e);
       toast({ title: 'Erro', description: 'Falha ao exportar a lista.', variant: 'destructive' });
