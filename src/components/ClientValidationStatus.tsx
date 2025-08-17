@@ -39,7 +39,17 @@ export function ClientValidationStatus() {
 
       if (precosError) throw precosError;
 
-      // Buscar último upload de clientes
+      // Buscar último upload de clientes bem-sucedido primeiro
+      const { data: successUpload } = await supabase
+        .from('upload_logs')
+        .select('*')
+        .eq('file_type', 'clientes')
+        .eq('status', 'success')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Se não houver upload bem-sucedido, buscar o mais recente independente do status
       const { data: uploadData, error: uploadError } = await supabase
         .from('upload_logs')
         .select('*')
@@ -58,7 +68,7 @@ export function ClientValidationStatus() {
         totalPrecos: precosData?.length || 0,
         precosComCliente,
         precosSemCliente,
-        ultimoUploadClientes: uploadData
+        ultimoUploadClientes: successUpload || uploadData // Priorizar upload bem-sucedido
       });
 
     } catch (error) {
