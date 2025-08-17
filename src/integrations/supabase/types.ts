@@ -3115,6 +3115,7 @@ export type Database = {
           periodo_referencia: string | null
           POSSUI_IMAGENS_CHAVE: string | null
           PRIORIDADE: string | null
+          processamento_pendente: boolean | null
           SEGUNDA_ASSINATURA: string | null
           STATUS: string | null
           tipo_cliente: string | null
@@ -3164,6 +3165,7 @@ export type Database = {
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
           PRIORIDADE?: string | null
+          processamento_pendente?: boolean | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
           tipo_cliente?: string | null
@@ -3213,6 +3215,7 @@ export type Database = {
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
           PRIORIDADE?: string | null
+          processamento_pendente?: boolean | null
           SEGUNDA_ASSINATURA?: string | null
           STATUS?: string | null
           tipo_cliente?: string | null
