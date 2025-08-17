@@ -3109,6 +3109,7 @@ export type Database = {
           MEDICO: string | null
           MEDICO_REASSINATURA: string | null
           MODALIDADE: string | null
+          nome_fantasia: string | null
           NOME_PACIENTE: string
           periodo_referencia: string | null
           POSSUI_IMAGENS_CHAVE: string | null
@@ -3117,6 +3118,7 @@ export type Database = {
           STATUS: string | null
           tipo_dados: string
           tipo_faturamento: string | null
+          unidade_origem: string | null
           updated_at: string
           VALORES: number | null
         }
@@ -3154,6 +3156,7 @@ export type Database = {
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
+          nome_fantasia?: string | null
           NOME_PACIENTE: string
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
@@ -3162,6 +3165,7 @@ export type Database = {
           STATUS?: string | null
           tipo_dados?: string
           tipo_faturamento?: string | null
+          unidade_origem?: string | null
           updated_at?: string
           VALORES?: number | null
         }
@@ -3199,6 +3203,7 @@ export type Database = {
           MEDICO?: string | null
           MEDICO_REASSINATURA?: string | null
           MODALIDADE?: string | null
+          nome_fantasia?: string | null
           NOME_PACIENTE?: string
           periodo_referencia?: string | null
           POSSUI_IMAGENS_CHAVE?: string | null
@@ -3207,6 +3212,7 @@ export type Database = {
           STATUS?: string | null
           tipo_dados?: string
           tipo_faturamento?: string | null
+          unidade_origem?: string | null
           updated_at?: string
           VALORES?: number | null
         }
@@ -3417,6 +3423,10 @@ export type Database = {
       archive_old_volumetria_data: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      buscar_nome_fantasia_cliente: {
+        Args: { p_unidade_origem: string }
+        Returns: string
       }
       calcular_capacidade_produtiva: {
         Args: { p_dias?: number; p_medico_id: string }
