@@ -3431,6 +3431,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      aplicar_quebras_pendentes: {
+        Args: { arquivo_fonte_param?: string }
+        Returns: Json
+      }
       aplicar_regras_quebra_exames: {
         Args: { arquivo_fonte_param?: string }
         Returns: Json

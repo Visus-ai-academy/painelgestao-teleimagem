@@ -1,24 +1,27 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, AlertCircle, Minus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+// Interface para o status de uma regra
 interface RegraStatus {
   idRegra: string;
   nomeRegra: string;
-  descricaoRegra: string;
+  descricao: string;
   arquivos: {
-    [key: string]: {
+    [tipoArquivo: string]: {
       deveAplicar: boolean;
       foiAplicada: boolean;
-      hasError?: boolean;
+      hasError: boolean;
       ultimaAplicacao?: string;
       erros?: string[];
     };
   };
 }
 
+// Tipos de arquivo que monitoramos
 const TIPOS_ARQUIVO = [
   'volumetria_padrao',
   'volumetria_fora_padrao', 
@@ -26,116 +29,114 @@ const TIPOS_ARQUIVO = [
   'volumetria_fora_padrao_retroativo'
 ];
 
+// Regras que monitoramos
 const REGRAS_MONITORADAS = [
-  // REGRAS DE VOLUMETRIA - Aplicadas durante processamento
   {
-    nome: 'Exclusão DATA_LAUDO fora período',
-    descricao: 'Remove registros com DATA_LAUDO fora do período de faturamento (retroativos)',
+    nome: 'v002 Regras Retroativas Laudo',
+    descricao: 'Aplica filtros de período para arquivos retroativos com base na data do laudo',
     funcao: 'aplicar_regras_retroativas',
     id: 'v002'
   },
   {
-    nome: 'Exclusão DATA_REALIZACAO >= período',
-    descricao: 'Remove registros retroativos com DATA_REALIZACAO >= 01 do mês',
+    nome: 'v003 Regras Retroativas Realização',
+    descricao: 'Aplica filtros de período para arquivos retroativos com base na data de realização',
     funcao: 'aplicar_regras_retroativas',
     id: 'v003'
   },
   {
-    nome: 'Filtro período atual não-retroativos',
-    descricao: 'Remove registros com datas fora do período para arquivos não-retroativos',
-    funcao: 'aplicar_regras_periodo_atual',
-    id: 'v031'
+    nome: 'v008 Cache Volumetria',
+    descricao: 'Sistema de cache para otimização de consultas em volumetria',
+    funcao: 'cache_volumetria',
+    id: 'v008'
   },
   {
-    nome: 'Validação Formato Excel',
-    descricao: 'Valida estrutura dos arquivos Excel e colunas obrigatórias',
-    funcao: 'file_validation',
+    nome: 'v013 Validação Volumetria',
+    descricao: 'Validação de regras de negócio nos dados de volumetria',
+    funcao: 'validar_regras_volumetria',
     id: 'v013'
   },
   {
-    nome: 'Limpeza Caracteres Especiais',
-    descricao: 'Remove caracteres especiais e normaliza encoding UTF-8',
-    funcao: 'data_cleaning',
+    nome: 'v014 Batching Otimizado',
+    descricao: 'Processamento em lotes otimizado para grandes volumes',
+    funcao: 'batch_processing_otimizado',
+    id: 'v014'
+  },
+  {
+    nome: 'v016 Mapping Automático',
+    descricao: 'Mapeamento automático de campos e estruturas',
+    funcao: 'auto_mapping_fields',
+    id: 'v016'
+  },
+  {
+    nome: 'v022 Normalização Cliente',
+    descricao: 'Normaliza e limpa nomes de clientes conforme regras estabelecidas',
+    funcao: 'limpar_nome_cliente',
     id: 'v022'
   },
   {
-    nome: 'Mapeamento De Para Valores',
-    descricao: 'Preenche valores zerados usando tabela de referência',
-    funcao: 'aplicar_de_para_trigger',
+    nome: 'v026 Correção Modalidades',
+    descricao: 'Corrige modalidades CR/DX para RX ou MG e OT para DO',
+    funcao: 'aplicar_correcao_modalidades',
     id: 'v026'
   },
   {
-    nome: 'Regras Quebra de Exames',
-    descricao: 'Quebra exames compostos em exames individuais',
-    funcao: 'trigger_marcar_para_quebra',
+    nome: 'v027 Regras Quebra de Exames',
+    descricao: 'Aplica regras de quebra configuradas para dividir exames compostos',
+    funcao: 'aplicar_quebra_exames',
     id: 'v027'
   },
   {
-    nome: 'Processamento Categorias',
-    descricao: 'Categoriza exames baseado na tabela de categorias',
+    nome: 'v028 Aplicação Categorias',
+    descricao: 'Define categorias automaticamente baseado no cadastro de exames',
     funcao: 'aplicar_categorias_trigger',
     id: 'v028'
   },
   {
-    nome: 'Tratamento Exames Fora Padrão',
-    descricao: 'Identifica e trata exames que não seguem o padrão',
-    funcao: 'exames_fora_padrao',
+    nome: 'v029 De-Para Prioridades',
+    descricao: 'Aplica mapeamento de prioridades conforme tabela de-para',
+    funcao: 'aplicar_prioridades_de_para',
     id: 'v029'
   },
   {
-    nome: 'Correção Modalidade RX',
-    descricao: 'Corrige modalidades CR/DX para RX/MG e OT para DO',
-    funcao: 'aplicar_correcao_modalidades',
+    nome: 'v030 Correção Modalidade Específica',
+    descricao: 'Aplicação de correções específicas de modalidade baseadas em estudo',
+    funcao: 'aplicar_correcao_modalidade_especifica',
     id: 'v030'
   },
   {
-    nome: 'Mapeamento Dinâmico Campos',
-    descricao: 'Mapeia colunas do arquivo para campos do banco usando field_mappings',
-    funcao: 'field_mapping',
-    id: 'v014'
+    nome: 'v031 Regras Período Atual',
+    descricao: 'Aplica validações de período para arquivos do mês corrente',
+    funcao: 'aplicar_regras_periodo_atual',
+    id: 'v031'
   },
   {
-    nome: 'Processamento em Lotes',
-    descricao: 'Processa uploads em lotes de 1000 registros para otimizar performance',
-    funcao: 'batch_processing',
-    id: 'v016'
-  },
-  {
-    nome: 'Cache de Performance',
-    descricao: 'Utiliza cache para otimizar consultas grandes',
-    funcao: 'volumetria_cache',
-    id: 'v008'
-  },
-  {
-    nome: 'Tipificação Faturamento NC Originais',
-    descricao: 'Define tipificação para 10 clientes NC originais',
-    funcao: 'aplicar_tipificacao_faturamento',
+    nome: 'f005 Aplicação De-Para Valores',
+    descricao: 'Aplica valores de referência para exames com valores zerados',
+    funcao: 'aplicar_de_para_trigger',
     id: 'f005'
   },
   {
-    nome: 'Tipificação Faturamento NC Adicionais',
-    descricao: 'Define tipificação para 3 clientes NC adicionais',
+    nome: 'f006 Tipificação Faturamento',
+    descricao: 'Define tipo de faturamento automaticamente (oncologia, urgência, etc)',
     funcao: 'aplicar_tipificacao_faturamento',
     id: 'f006'
   },
-  
-  // TRATAMENTOS ADICIONAIS IDENTIFICADOS NAS FUNÇÕES
   {
-    nome: 'Normalização Nome Cliente',
-    descricao: 'Aplica limpeza e normalização de nomes de clientes',
+    nome: 'Limpeza Nome Cliente',
+    descricao: 'Remove sufixos e aplica mapeamentos específicos nos nomes de clientes',
     funcao: 'trigger_limpar_nome_cliente',
     id: 'extra_001'
   },
   {
-    nome: 'Normalização Nome Médico',
-    descricao: 'Remove códigos entre parênteses e normaliza nomes de médicos',
+    nome: 'Normalização Médico',
+    descricao: 'Remove códigos e normaliza nomes de médicos',
     funcao: 'trigger_normalizar_medico',
     id: 'extra_002'
   },
   {
-    nome: 'De-Para Prioridades',
-    descricao: 'Aplica mapeamento de prioridades conforme tabela de-para',
-    funcao: 'aplicar_prioridades_de_para',
+    nome: 'Trigger Processamento Volumetria',
+    descricao: 'Orchestrador principal que executa todas as regras de processamento',
+    funcao: 'trigger_volumetria_processamento',
     id: 'extra_003'
   },
   {
@@ -205,8 +206,17 @@ export function StatusRegraProcessamento() {
         return;
       }
 
-      // Removido busca pesada de logs de auditoria que causava timeout
-      // O status será determinado diretamente pelos dados de upload
+      // Buscar registros pendentes de quebra para a regra v027
+      const { data: pendentesData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('arquivo_fonte, count')
+        .eq('processamento_pendente', true)
+        .in('arquivo_fonte', TIPOS_ARQUIVO);
+
+      const pendentesMap = pendentesData?.reduce((acc: any, item: any) => {
+        acc[item.arquivo_fonte] = (acc[item.arquivo_fonte] || 0) + 1;
+        return acc;
+      }, {}) || {};
 
       // Processar status de cada regra
       const regrasStatus: RegraStatus[] = REGRAS_MONITORADAS.map(regra => {
@@ -239,63 +249,76 @@ export function StatusRegraProcessamento() {
           let informacoes: string[] = [];
           
           if (deveAplicar && uploadInfo) {
-            // Regras que EXCLUEM/FILTRAM registros - exclusões são aplicações corretas
-            const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
-            
-            // Regras que TRANSFORMAM dados - transformações são aplicações corretas  
-            const regrasTransformacao = ['v022', 'v026', 'v027', 'v030', 'extra_001', 'extra_002', 'extra_003'];
-            
-            // Regras que VALIDAM dados - rejeições são aplicações corretas
-            const regrasValidacao = ['v013', 'extra_006'];
-            
-            // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
-            const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004'];
-            
-            if (regrasExclusao.includes(regra.id)) {
-              // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
-              foiAplicada = uploadInfo.status === 'concluido';
-              if (uploadInfo.registros_erro > 0) {
-                informacoes = [`${uploadInfo.registros_erro} registros excluídos (regra aplicada)`];
-              }
-            } else if (regrasTransformacao.includes(regra.id)) {
-              foiAplicada = uploadInfo.status === 'concluido';
-              if (uploadInfo.registros_erro > 0) {
-                informacoes = [`${uploadInfo.registros_erro} registros transformados`];
-              }
-            } else if (regrasValidacao.includes(regra.id)) {
-              foiAplicada = uploadInfo.status === 'concluido';
-              if (uploadInfo.registros_erro > 0) {
-                informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
-              }
-            } else if (regrasAutomaticas.includes(regra.id)) {
-              // Regras automáticas sempre são aplicadas se o processamento foi concluído
-              foiAplicada = uploadInfo.status === 'concluido';
-              
-              // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
-              if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008'].includes(regra.id)) {
-                if (uploadInfo.registros_erro > 0) {
-                  informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
-                } else {
-                  informacoes = ['Regra aplicada - nenhum registro necessitou processamento'];
-                }
+            // REGRA ESPECIAL v027 - Verificar se há registros pendentes de quebra
+            if (regra.id === 'v027') {
+              const pendentesQuebra = pendentesMap[tipoArquivo] || 0;
+              if (pendentesQuebra > 0) {
+                foiAplicada = false;
+                hasError = true;
+                informacoes = [`${pendentesQuebra} registros pendentes de quebra`];
               } else {
-                // Para outras regras automáticas (cache, batching, mapping)
-                informacoes = ['Regra aplicada automaticamente durante processamento'];
-                
-                // Apenas algumas regras podem ter erro real
-                if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
-                  hasError = true;
-                  informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
-                  foiAplicada = false;
-                }
+                foiAplicada = uploadInfo.status === 'concluido';
+                informacoes = ['Todas as quebras foram aplicadas'];
               }
             } else {
-              // Para outras regras, sucesso significa sem erros
-              foiAplicada = uploadInfo.status === 'concluido' && uploadInfo.registros_erro === 0;
+              // Regras que EXCLUEM/FILTRAM registros - exclusões são aplicações corretas
+              const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
               
-              if (uploadInfo.registros_erro > 0) {
-                hasError = true;
-                informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+              // Regras que TRANSFORMAM dados - transformações são aplicações corretas  
+              const regrasTransformacao = ['v022', 'v026', 'v030', 'extra_001', 'extra_002', 'extra_003'];
+              
+              // Regras que VALIDAM dados - rejeições são aplicações corretas
+              const regrasValidacao = ['v013', 'extra_006'];
+              
+              // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
+              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004'];
+              
+              if (regrasExclusao.includes(regra.id)) {
+                // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
+                foiAplicada = uploadInfo.status === 'concluido';
+                if (uploadInfo.registros_erro > 0) {
+                  informacoes = [`${uploadInfo.registros_erro} registros excluídos (regra aplicada)`];
+                }
+              } else if (regrasTransformacao.includes(regra.id)) {
+                foiAplicada = uploadInfo.status === 'concluido';
+                if (uploadInfo.registros_erro > 0) {
+                  informacoes = [`${uploadInfo.registros_erro} registros transformados`];
+                }
+              } else if (regrasValidacao.includes(regra.id)) {
+                foiAplicada = uploadInfo.status === 'concluido';
+                if (uploadInfo.registros_erro > 0) {
+                  informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
+                }
+              } else if (regrasAutomaticas.includes(regra.id)) {
+                // Regras automáticas sempre são aplicadas se o processamento foi concluído
+                foiAplicada = uploadInfo.status === 'concluido';
+                
+                // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
+                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008'].includes(regra.id)) {
+                  if (uploadInfo.registros_erro > 0) {
+                    informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
+                  } else {
+                    informacoes = ['Regra aplicada - nenhum registro necessitou processamento'];
+                  }
+                } else {
+                  // Para outras regras automáticas (cache, batching, mapping)
+                  informacoes = ['Regra aplicada automaticamente durante processamento'];
+                  
+                  // Apenas algumas regras podem ter erro real
+                  if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
+                    hasError = true;
+                    informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                    foiAplicada = false;
+                  }
+                }
+              } else {
+                // Para outras regras, sucesso significa sem erros
+                foiAplicada = uploadInfo.status === 'concluido' && uploadInfo.registros_erro === 0;
+                
+                if (uploadInfo.registros_erro > 0) {
+                  hasError = true;
+                  informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                }
               }
             }
           } else if (deveAplicar && !uploadInfo) {
@@ -318,7 +341,7 @@ export function StatusRegraProcessamento() {
         return {
           idRegra: regra.id,
           nomeRegra: regra.nome,
-          descricaoRegra: regra.descricao,
+          descricao: regra.descricao,
           arquivos: arquivosStatus
         };
       });
@@ -333,10 +356,10 @@ export function StatusRegraProcessamento() {
 
   useEffect(() => {
     fetchStatusRegras();
-    
-    // Configurar atualização em tempo real
+
+    // Configurar listener para mudanças em tempo real
     const channel = supabase
-      .channel('regras_processamento_changes')
+      .channel('status-regras-processamento')
       .on(
         'postgres_changes',
         {
@@ -345,6 +368,7 @@ export function StatusRegraProcessamento() {
           table: 'processamento_uploads'
         },
         () => {
+          console.log('📊 Detecção de mudança em processamento_uploads - atualizando status...');
           fetchStatusRegras();
         }
       )
@@ -355,44 +379,41 @@ export function StatusRegraProcessamento() {
     };
   }, []);
 
-  const getStatusIcon = (deveAplicar: boolean, foiAplicada: boolean, hasError: boolean = false) => {
-    if (!deveAplicar) return <Minus className="h-4 w-4 text-muted-foreground" />;
-    if (hasError) return <XCircle className="h-4 w-4 text-red-500" />;
-    if (foiAplicada) return <CheckCircle className="h-4 w-4 text-blue-500" />;
-    return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+  const getStatusIcon = (arquivo: any) => {
+    if (!arquivo.deveAplicar) {
+      return <span className="text-muted-foreground">N/A</span>;
+    }
+    if (arquivo.hasError) {
+      return <XCircle className="h-4 w-4 text-destructive" />;
+    }
+    if (arquivo.foiAplicada) {
+      return <CheckCircle className="h-4 w-4 text-success" />;
+    }
+    return <Clock className="h-4 w-4 text-warning" />;
   };
 
-  const getStatusBadge = (deveAplicar: boolean, foiAplicada: boolean, hasError: boolean = false) => {
-    if (!deveAplicar) return <Badge variant="outline">N/A</Badge>;
-    if (hasError) return <Badge variant="destructive">Erro</Badge>;
-    if (foiAplicada) return <Badge className="bg-blue-500 hover:bg-blue-600">OK</Badge>;
-    return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pendente</Badge>;
+  const getStatusBadge = (arquivo: any) => {
+    if (!arquivo.deveAplicar) {
+      return <Badge variant="outline">N/A</Badge>;
+    }
+    if (arquivo.hasError) {
+      return <Badge variant="destructive">Erro</Badge>;
+    }
+    if (arquivo.foiAplicada) {
+      return <Badge variant="default" className="bg-success text-success-foreground">OK</Badge>;
+    }
+    return <Badge variant="secondary">Pendente</Badge>;
   };
 
   const getNomeArquivoAmigavel = (tipoArquivo: string) => {
-    const nomes = {
-      'volumetria_padrao': 'Arquivo 1 (Padrão)',
-      'volumetria_fora_padrao': 'Arquivo 2 (Fora Padrão)',
-      'volumetria_padrao_retroativo': 'Arquivo 3 (Retro Padrão)',
-      'volumetria_fora_padrao_retroativo': 'Arquivo 4 (Retro Fora Padrão)'
+    const nomes: { [key: string]: string } = {
+      'volumetria_padrao': 'Padrão',
+      'volumetria_fora_padrao': 'Fora Padrão',
+      'volumetria_padrao_retroativo': 'Padrão Retro',
+      'volumetria_fora_padrao_retroativo': 'Fora Padrão Retro'
     };
-    return nomes[tipoArquivo as keyof typeof nomes] || tipoArquivo;
+    return nomes[tipoArquivo] || tipoArquivo;
   };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Status de Aplicação das Regras</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center items-center h-32">
-            <div className="text-muted-foreground">Carregando status das regras...</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const getPeriodoReferencia = () => {
     if (!periodoReferencia) return 'Não identificado';
@@ -419,77 +440,79 @@ export function StatusRegraProcessamento() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Status de Aplicação das Regras no Processamento</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Monitoramento em tempo real da aplicação das regras de negócio por arquivo processado
-        </p>
-        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-md border">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-            📅 Período de Referência: <span className="font-bold">{getPeriodoReferencia()}</span>
-          </p>
-          <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
-            Status baseado nos uploads das últimas 24 horas
-          </p>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-primary" />
+          Status de Aplicação das Regras no Processamento
+        </CardTitle>
+        <CardDescription>
+          Monitoramento em tempo real da aplicação das regras de negócio durante o processamento de volumetria.
+          <br />
+          <strong>Período de Referência:</strong> {getPeriodoReferencia()}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-3 font-medium">Regra</th>
-                {TIPOS_ARQUIVO.map(tipo => (
-                  <th key={tipo} className="text-center p-3 font-medium min-w-[160px]">
-                    {getNomeArquivoAmigavel(tipo)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {statusRegras.map((regra, index) => (
-                <tr key={index} className="border-b hover:bg-muted/50">
-                  <td className="p-3">
-                    <div>
-                      <div className="flex items-center gap-2 font-medium">
-                        <Badge variant="outline" className="text-xs font-mono px-2 py-1">
-                          {regra.idRegra}
-                        </Badge>
-                        <span>{regra.nomeRegra}</span>
+        {loading ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-muted-foreground">Carregando status das regras...</div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[280px]">Regra</TableHead>
+                  {TIPOS_ARQUIVO.map(tipo => (
+                    <TableHead key={tipo} className="text-center">
+                      {getNomeArquivoAmigavel(tipo)}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {statusRegras.map((regra) => (
+                  <TableRow key={regra.idRegra}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-sm">{regra.nomeRegra}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {regra.descricao}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground mt-1">{regra.descricaoRegra}</div>
-                    </div>
-                  </td>
-                  {TIPOS_ARQUIVO.map(tipo => {
-                    const arquivo = regra.arquivos[tipo];
-                    return (
-                      <td key={tipo} className="p-3 text-center">
-                        <div className="space-y-2">
-                          <div className="flex justify-center items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Aplicar:</span>
-                            {arquivo.deveAplicar ? (
-                              <Badge variant="outline" className="text-xs">Sim</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">Não</Badge>
+                    </TableCell>
+                    {TIPOS_ARQUIVO.map(tipoArquivo => {
+                      const arquivo = regra.arquivos[tipoArquivo];
+                      return (
+                        <TableCell key={tipoArquivo} className="text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1">
+                              {getStatusIcon(arquivo)}
+                              {getStatusBadge(arquivo)}
+                            </div>
+                            {arquivo.erros && arquivo.erros.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {arquivo.erros[0]}
+                              </div>
+                            )}
+                            {arquivo.ultimaAplicacao && (
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(arquivo.ultimaAplicacao).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
                             )}
                           </div>
-                          <div className="flex justify-center items-center gap-2">
-                            {getStatusIcon(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.hasError)}
-                            {getStatusBadge(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.hasError)}
-                          </div>
-                          {arquivo.erros && arquivo.erros.length > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              {arquivo.erros[0]}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
