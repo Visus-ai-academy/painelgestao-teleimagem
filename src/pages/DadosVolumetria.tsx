@@ -11,6 +11,7 @@ import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadS
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
+import { useToast } from "@/hooks/use-toast";
 
 // Período atual - onde estão os dados carregados (junho/2025)
 const PERIODO_ATUAL = "2025-06";
@@ -18,6 +19,7 @@ const PERIODO_ATUAL = "2025-06";
 export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
+  const { toast } = useToast();
 
   return (
     <div className="space-y-6">
@@ -40,21 +42,77 @@ export default function DadosVolumetria() {
           </div>
 
           {/* Upload de Dados */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Upload de Volumetria</h3>
-              <VolumetriaUpload 
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <VolumetriaUpload
                 arquivoFonte="volumetria_padrao"
-                onSuccess={() => setRefreshUploadStatus(prev => prev + 1)}
-                periodoFaturamento={periodoFaturamentoVolumetria}
+                disabled={!periodoFaturamentoVolumetria}
+                periodoFaturamento={periodoFaturamentoVolumetria || undefined}
+                onSuccess={() => {
+                  toast({
+                    title: "Upload Concluído",
+                    description: "Dados de volumetria padrão processados com sucesso!",
+                  });
+                  setRefreshUploadStatus(prev => prev + 1);
+                }}
               />
             </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Status dos Uploads</h3>
-              <VolumetriaStatusPanel />
+
+            <div>
+              <VolumetriaUpload
+                arquivoFonte="volumetria_fora_padrao"
+                disabled={!periodoFaturamentoVolumetria}
+                periodoFaturamento={periodoFaturamentoVolumetria || undefined}
+                onSuccess={() => {
+                  toast({
+                    title: "Upload Concluído",
+                    description: "Dados de volumetria fora do padrão processados com sucesso!",
+                  });
+                  setRefreshUploadStatus(prev => prev + 1);
+                }}
+              />
+            </div>
+
+            <div>
+              <VolumetriaUpload
+                arquivoFonte="volumetria_padrao_retroativo"
+                disabled={!periodoFaturamentoVolumetria}
+                periodoFaturamento={periodoFaturamentoVolumetria || undefined}
+                onSuccess={() => {
+                  toast({
+                    title: "Upload Concluído",
+                    description: "Dados de volumetria padrão retroativa processados com sucesso!",
+                  });
+                  setRefreshUploadStatus(prev => prev + 1);
+                }}
+              />
+            </div>
+
+            <div>
+              <VolumetriaUpload
+                arquivoFonte="volumetria_fora_padrao_retroativo"
+                disabled={!periodoFaturamentoVolumetria}
+                periodoFaturamento={periodoFaturamentoVolumetria || undefined}
+                onSuccess={() => {
+                  toast({
+                    title: "Upload Concluído",
+                    description: "Dados de volumetria fora do padrão retroativa processados com sucesso!",
+                  });
+                  setRefreshUploadStatus(prev => prev + 1);
+                }}
+              />
             </div>
           </div>
+
+          {/* Status dos Uploads */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Status dos Uploads</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VolumetriaStatusPanel />
+            </CardContent>
+          </Card>
 
           {/* Estatísticas dos Uploads */}
           <Card>
