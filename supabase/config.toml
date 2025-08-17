@@ -65,13 +65,35 @@ verify_jwt = true
 
 # SECURED: Previously public endpoints now require JWT
 [functions.webhook-clicksign]
-verify_jwt = true  # SECURITY FIX: Now requires authentication
+verify_jwt = true
 
 [functions.ativar-regua-cobranca]
-verify_jwt = true  # SECURITY FIX: No longer public
+verify_jwt = true
 
 [functions.aplicar-exclusoes-periodo]
-verify_jwt = true  # SECURITY FIX: No longer public
+verify_jwt = true
 
 [functions.limpar-clientes]
+verify_jwt = true
+
+# SECURITY: Critical admin functions require JWT
+[functions.admin-update-password]
+verify_jwt = true
+
+[functions.data-encryption]
+verify_jwt = true
+
+[functions.backup-manager]
+verify_jwt = true
+
+[functions.lgpd-compliance]
+verify_jwt = true
+
+[functions.limpar-precos-base]
+verify_jwt = true
+
+[functions.limpar-todos-precos]
+verify_jwt = true
+
+[functions.security-monitor]
 verify_jwt = true
