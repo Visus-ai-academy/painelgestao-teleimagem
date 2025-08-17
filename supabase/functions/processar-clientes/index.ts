@@ -178,101 +178,102 @@ serve(async (req) => {
         console.log(`Cliente ${index} após mapeamento:`, JSON.stringify(clienteData, null, 2))
       }
       
-      // Campos obrigatórios mapeados dinamicamente
-      const nome = clienteData.nome || '';
-      const email = clienteData.email || '';
-      const telefone = clienteData.telefone || null;
+      // Extrair campos usando os mapeamentos corretos
+      const nome_mobilemed = clienteData.nome_mobilemed || '';
+      const nome_fantasia = clienteData.nome_fantasia || '';
+      const cnpj = clienteData.cnpj || null;
+      const razao_social = clienteData.razao_social || '';
       const endereco = clienteData.endereco || null;
-      const documento = clienteData.cnpj || null; // Campo pode conter CNPJ ou CPF
-      const contato = clienteData.contato || null;
-      const cod_cliente = clienteData.cod_cliente || null;
-      const data_inicio_contrato = clienteData.data_inicio_contrato || null;
-      const data_termino_vigencia = clienteData.data_termino_vigencia || null;
-      const numero_contrato = clienteData.numero_contrato || clienteData.Contrato || null;
-      // Buscar pelo campo mapeado Status
-      const status = clienteData.Status || 'A'; // Padrão: Ativo
+      const bairro = clienteData.bairro || null;
+      const cep = clienteData.cep || null;
+      const cidade = clienteData.cidade || null;
+      const estado = clienteData.estado || null; // UF
+      const email = clienteData.email || null;
+      const email_envio_nf = clienteData.email_envio_nf || null;
+      const tipo_cliente = clienteData.tipo_cliente || 'CO';
       
       if (index < 3) {
-        console.log(`Campos extraídos - Nome: "${nome}", Email: "${email}", Status: "${status}", Contrato: "${numero_contrato}", Documento: "${documento}"`)
+        console.log(`Campos extraídos:`)
+        console.log(`  NOME_MOBILEMED: "${nome_mobilemed}"`)
+        console.log(`  Nome_Fantasia: "${nome_fantasia}"`)
+        console.log(`  CNPJ: "${cnpj}"`)
+        console.log(`  Razão Social: "${razao_social}"`)
+        console.log(`  Endereço: "${endereco}"`)
+        console.log(`  Bairro: "${bairro}"`)
+        console.log(`  CEP: "${cep}"`)
+        console.log(`  Cidade: "${cidade}"`)
+        console.log(`  UF: "${estado}"`)
+        console.log(`  E-MAIL: "${email}"`)
+        console.log(`  ENVIO NF: "${email_envio_nf}"`)
+        console.log(`  TIPO_CLIENTE: "${tipo_cliente}"`)
       }
       
-      // Transform status codes: I = Inativo (false), A = Ativo (true), C = Cancelado (false)
+      // Determinar status (ativo/inativo) baseado no TIPO_CLIENTE
       let ativo = true; // Padrão
-      
-      // Se o campo foi mapeado como boolean direto
-      if (typeof clienteData.Status === 'boolean') {
-        ativo = clienteData.Status;
-      } else if (typeof clienteData.Status === 'string') {
-        // Se veio como string, processar
-        const statusStr = String(clienteData.Status).toUpperCase();
-        if (statusStr === 'I' || statusStr === 'C' || statusStr === 'INATIVO' || statusStr === 'FALSE') {
+      if (tipo_cliente) {
+        const tipoStr = String(tipo_cliente).toUpperCase();
+        // CO = Cliente Ativo, NC = Não Cliente (inativo)
+        if (tipoStr === 'NC' || tipoStr === 'I' || tipoStr === 'C') {
           ativo = false;
-        } else if (statusStr === 'A' || statusStr === 'ATIVO' || statusStr === 'TRUE') {
-          ativo = true;
-        }
-      } else {
-        // Se não foi mapeado, usar o campo original (status)
-        const statusStr = String(status).toUpperCase();
-        if (statusStr === 'I' || statusStr === 'C' || statusStr === 'INATIVO' || statusStr === 'FALSE') {
-          ativo = false;
-        } else if (statusStr === 'A' || statusStr === 'ATIVO' || statusStr === 'TRUE') {
+        } else if (tipoStr === 'CO' || tipoStr === 'A') {
           ativo = true;
         }
       }
       
-      // Detectar tipo de documento (PJ/PF)
-      let cnpj = null;
+      // Detectar tipo de documento (PJ/PF) usando o CNPJ mapeado
+      let cnpj_final = null;
       let cpf = null;
       let tipo_pessoa = null;
       
-      if (documento && documento.toString().trim() !== '') {
-        const docLimpo = documento.toString().replace(/[^0-9]/g, '');
+      if (cnpj && cnpj.toString().trim() !== '') {
+        const docLimpo = cnpj.toString().replace(/[^0-9]/g, '');
         if (docLimpo.length === 11) {
-          cpf = documento;
+          cpf = cnpj;
           tipo_pessoa = 'PF';
         } else if (docLimpo.length === 14) {
-          cnpj = documento;
+          cnpj_final = cnpj;
+          tipo_pessoa = 'PJ';
+        } else {
+          // Se não é nem CPF nem CNPJ válido, assumir CNPJ
+          cnpj_final = cnpj;
           tipo_pessoa = 'PJ';
         }
       }
       
-      const clienteKey = nome.trim();
+      // Usar NOME_MOBILEMED como chave principal, com fallback para nome_fantasia
+      const clienteKey = (nome_mobilemed || nome_fantasia || '').trim();
       
-      // Se cliente já existe, apenas adicionar contrato
-      if (clientesContratos.has(clienteKey)) {
-        const clienteExistente = clientesContratos.get(clienteKey);
-        if (numero_contrato && numero_contrato.trim() !== '') {
-          clienteExistente.contratos.push({
-            numero_contrato: numero_contrato.trim(),
-            data_inicio: data_inicio_contrato,
-            data_fim: data_termino_vigencia
-          });
-        }
-      } else {
-        // Criar novo cliente
-        const clienteFinal = {
-          nome: String(nome).trim(),
-          email: String(email).trim(),
-          telefone: telefone,
-          endereco: endereco,
-          cnpj: cnpj,
-          cpf: cpf,
-          tipo_pessoa: tipo_pessoa,
-          contato: contato,
-          cod_cliente: cod_cliente,
-          ativo: ativo,
-          contratos: numero_contrato && numero_contrato.trim() !== '' ? [{
-            numero_contrato: numero_contrato.trim(),
-            data_inicio: data_inicio_contrato,
-            data_fim: data_termino_vigencia
-          }] : []
-        };
-        
-        clientesContratos.set(clienteKey, clienteFinal);
-        
-        if (index < 3) {
-          console.log(`Cliente ${index} FINAL:`, JSON.stringify(clienteFinal, null, 2))
-        }
+      // Pular linhas vazias
+      if (!clienteKey || clienteKey === '') {
+        console.log(`Linha ${index} ignorada - sem nome válido`)
+        return;
+      }
+      
+      // Criar cliente com os campos corretos
+      const clienteFinal = {
+        nome: nome_mobilemed,  // NOME_MOBILEMED é o campo principal
+        nome_fantasia: nome_fantasia,
+        nome_mobilemed: nome_mobilemed,
+        cnpj: cnpj_final,
+        cpf: cpf,
+        razao_social: razao_social,
+        endereco: endereco,
+        bairro: bairro,
+        cep: cep,
+        cidade: cidade,
+        estado: estado,
+        email: email,
+        email_envio_nf: email_envio_nf,
+        tipo_cliente: tipo_cliente,
+        tipo_pessoa: tipo_pessoa,
+        ativo: ativo,
+        status: ativo ? 'Ativo' : 'Inativo'
+      };
+      
+      clientesContratos.set(clienteKey, clienteFinal);
+      
+      if (index < 3) {
+        console.log(`Cliente ${index} FINAL:`, JSON.stringify(clienteFinal, null, 2))
       }
     });
     
