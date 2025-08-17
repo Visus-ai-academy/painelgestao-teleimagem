@@ -3422,6 +3422,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      aplicar_quebra_exames_processamento: {
+        Args: {
+          registro_original: Database["public"]["Tables"]["volumetria_mobilemed"]["Row"]
+        }
+        Returns: undefined
+      }
       aplicar_validacao_cliente_volumetria: {
         Args: { lote_upload_param?: string }
         Returns: Json
