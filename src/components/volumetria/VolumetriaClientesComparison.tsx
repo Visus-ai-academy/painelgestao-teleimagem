@@ -426,11 +426,37 @@ export function VolumetriaClientesComparison({
       console.log('🔍 [EXCEL DEBUG] Sistema clientes:', sistemaClientes.length);
       console.log('🔍 [EXCEL DEBUG] Filtro atual:', filtro);
       console.log('🔍 [EXCEL DEBUG] Divergências count:', divergencias.length);
+      console.log('🔍 [EXCEL DEBUG] Sistema clientes sample:', sistemaClientes.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
       
-      // Para divergências, usar sempre os dados originais do sistema em vez dos filtrados
-      const clientesParaExport = filtro === 'divergencias' ? 
-        sistemaClientes.filter(c => divergencias.some(d => normalize(d.cliente) === normalize(c.cliente))) :
-        clientesExibidos;
+      // CRÍTICO: Para divergências, usar SEMPRE todos os dados do sistema que tenham divergências
+      // E incluir também clientes que só existem no arquivo
+      let clientesParaExport: ClienteAggregated[] = [];
+      
+      if (filtro === 'divergencias') {
+        // 1. Clientes do sistema que têm divergências
+        const clientesSistemaComDivergencia = sistemaClientes.filter(c => 
+          divergencias.some(d => normalize(d.cliente) === normalize(c.cliente) && d.tipo !== 'missing_in_system')
+        );
+        
+        // 2. Clientes que só existem no arquivo (criar entradas fake do sistema com 0)
+        const clientesSoNoArquivo = divergencias
+          .filter(d => d.tipo === 'missing_in_system')
+          .map(d => ({
+            cliente: d.cliente,
+            total_exames: 0,
+            modalidades: {},
+            especialidades: {},
+            prioridades: {},
+            categorias: {},
+            exames: {},
+          }));
+        
+        clientesParaExport = [...clientesSistemaComDivergencia, ...clientesSoNoArquivo];
+        console.log('🔍 [EXCEL DEBUG] Clientes sistema com divergência:', clientesSistemaComDivergencia.length);
+        console.log('🔍 [EXCEL DEBUG] Clientes só no arquivo:', clientesSoNoArquivo.length);
+      } else {
+        clientesParaExport = clientesExibidos;
+      }
       
       console.log('🔍 [EXCEL DEBUG] Clientes para export:', clientesParaExport.length);
       
