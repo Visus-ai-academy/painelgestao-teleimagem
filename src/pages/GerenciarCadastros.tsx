@@ -15,6 +15,7 @@ import { CompactUploadStatus } from '@/components/CompactUploadStatus';
 import { UploadStatusPanel } from '@/components/UploadStatusPanel';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
+import { ClientValidationStatus } from '@/components/ClientValidationStatus';
 
 
 import { 
@@ -595,6 +596,9 @@ export default function GerenciarCadastros() {
         {/* Preços de Serviços */}
         <TabsContent value="precos">
           <div className="space-y-6">
+            
+            {/* Status de Validação de Clientes */}
+            <ClientValidationStatus />
 
             {/* Upload Preço Clientes */}
             <Card>
