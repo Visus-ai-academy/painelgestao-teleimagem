@@ -47,12 +47,12 @@ export function useClienteStats() {
       
       const cnpjUnicos = new Set(cnpjData?.map(item => item.cnpj) || []).size;
 
-  // Total com Nome_Fantasia preenchido (usando contato como proxy)
-  const { count: totalNomeFantasia } = await supabase
-    .from('clientes')
-    .select('*', { count: 'exact', head: true })
-    .not('contato', 'is', null)
-    .neq('contato', '');
+      // Total com Nome_Fantasia preenchido
+      const { count: totalNomeFantasia } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .not('nome_fantasia', 'is', null)
+        .neq('nome_fantasia', '');
 
   // Tipos de cliente CO e NC baseado no campo tipo_cliente
   const { count: tipoClienteCO } = await supabase
