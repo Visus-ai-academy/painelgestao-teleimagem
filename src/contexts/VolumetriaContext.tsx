@@ -371,9 +371,22 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, [data.detailedData]);
 
   useEffect(() => {
-    console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Debug RX TORNOZELO DIREITO...');
+    console.log('🔥 DEBUG COMPARATIVO - Verificando RX TORNOZELO DIREITO...');
     console.log('🔥 Timestamp atual:', new Date().toISOString());
-    console.log('🔥 INVESTIGANDO: RX TORNOZELO DIREITO - CDI.URUACU');
+    console.log('🔥 EXAME ESPECÍFICO: RX TORNOZELO DIREITO - CDI.URUACU - Eber Da Silva Pereira');
+    
+    // Debug específico para o exame em questão
+    if (data.detailedData && data.detailedData.length > 0) {
+      const exameEspecifico = data.detailedData.find((item: any) => 
+        item.EMPRESA === 'CDI.URUACU' && 
+        item.NOME_PACIENTE === 'Eber Da Silva Pereira' && 
+        item.ESTUDO_DESCRICAO === 'RX TORNOZELO DIREITO'
+      );
+      console.log('🔍 ENCONTRADO NO DETAILED DATA:', exameEspecifico ? 'SIM' : 'NÃO');
+      if (exameEspecifico) {
+        console.log('🔍 DADOS DO EXAME ENCONTRADO:', exameEspecifico);
+      }
+    }
     // FORÇAR INVALIDAÇÃO COMPLETA
     isLoadingRef.current = false;
     lastLoadTime.current = 0;
