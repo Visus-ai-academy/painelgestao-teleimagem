@@ -105,12 +105,14 @@ export function VolumetriaClientesComparison({
     try {
       // Priorizar estatísticas definitivas por cliente (100% do banco)
       const stats = (context as any)?.clientesStats || [];
+      console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats.length, stats.slice(0, 3));
       const map = new Map<string, ClienteAggregated>();
 
       // 1) Criar base com totais por cliente vindos do RPC completo
       (stats as any[]).forEach((s) => {
         const cliente = String(s.empresa || s.cliente || '').trim();
         if (!cliente) return;
+        console.log('🔍 [COMPARATIVO DEBUG] Processando cliente:', cliente, 'laudos:', s.total_laudos);
         map.set(normalizeClientName(cliente).toLowerCase(), {
           cliente,
           total_exames: Number(s.total_laudos) || 0,
@@ -121,6 +123,8 @@ export function VolumetriaClientesComparison({
           exames: {},
         });
       });
+      
+      console.log('🔍 [COMPARATIVO DEBUG] Total clientes processados:', map.size);
 
       // 2) Se houver dados detalhados, preencher detalhamentos e criar fallback de totais
       if (context.detailedData && context.detailedData.length > 0) {

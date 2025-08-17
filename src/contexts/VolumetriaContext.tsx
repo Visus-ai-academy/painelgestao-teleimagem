@@ -136,10 +136,12 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const { data: clientesStats, error: clientesError } = await supabase.rpc('get_clientes_stats_completos');
       
       if (clientesError) {
+        console.error('❌ Erro nas estatísticas de clientes:', clientesError);
         throw new Error(`Erro nas estatísticas de clientes: ${clientesError.message}`);
       }
       
       console.log(`✅ Estatísticas de ${clientesStats?.length || 0} clientes carregadas`);
+      console.log('🔍 [CONTEXTO DEBUG] ClientesStats carregadas:', clientesStats?.slice(0, 5));
       
       // Buscar CEDI_RJ especificamente para debug
       const cediStats = clientesStats?.find((c: any) => c.empresa === 'CEDI_RJ');
