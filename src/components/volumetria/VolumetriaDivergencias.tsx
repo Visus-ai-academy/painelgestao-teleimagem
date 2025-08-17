@@ -251,12 +251,33 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       const periodoReferenciaBanco = referencia;
       console.log('🔍 Processando divergências para período:', referencia);
       
-      // Usar dados do contexto
+      // VALIDAÇÃO CRÍTICA 1: Verificar se há arquivo carregado
+      if (!uploadedExams || uploadedExams.length === 0) {
+        alert('⚠️ ERRO: Nenhum arquivo foi carregado para comparação. Faça o upload de um arquivo primeiro na aba "Por Exame".');
+        return;
+      }
+      console.log('📁 Arquivo carregado com', uploadedExams.length, 'registros');
+      
+      // VALIDAÇÃO CRÍTICA 2: Verificar se há dados do sistema no contexto
       const systemData = ctx?.detailedData || [];
-      console.log('🏥 Total de registros detalhados:', systemData.length);
+      console.log('🏥 Total de registros detalhados do sistema:', systemData.length);
       
       if (!systemData || systemData.length === 0) {
-        throw new Error('Nenhum dado encontrado no contexto. Atualize a tela.');
+        alert('⚠️ ERRO: Nenhum dado do sistema está carregado. Os dados do sistema são necessários para fazer a comparação. Aguarde o carregamento dos dados ou atualize a página.');
+        return;
+      }
+      
+      // VALIDAÇÃO CRÍTICA 3: Verificar se o contexto tem dados válidos
+      console.log('🔍 DEBUG Contexto atual:', {
+        detailedDataLength: ctx?.detailedData?.length || 0,
+        clientesLength: ctx?.clientes?.length || 0,
+        loading: ctx?.loading,
+        hasVolumetriaData: !!ctx?.detailedData?.length
+      });
+      
+      if (ctx?.loading) {
+        alert('⚠️ AVISO: Os dados do sistema ainda estão carregando. Aguarde alguns segundos e tente novamente.');
+        return;
       }
 
       // Funções auxiliares para normalização
@@ -710,11 +731,37 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return;
       }
 
-      // Preparar dados para Excel
-      const dadosExcel = divergencias.map(linha => ({
+      console.log('📊 RESULTADO FINAL - Total de divergências encontradas:', divergencias.length);
+      console.log('📊 Tipos de divergências:', 
+        Object.fromEntries(
+          [...new Set(divergencias.map(d => d.tipo))].map(tipo => [
+            tipo, 
+            divergencias.filter(d => d.tipo === tipo).length
+          ])
+        )
+      );
+
+      // VALIDAÇÃO CRÍTICA: Verificar se realmente há divergências
+      if (divergencias.length === 0) {
+        console.warn('⚠️ AVISO: Nenhuma divergência foi encontrada!');
+        console.log('📊 DEBUG: Dados carregados - Sistema:', mapSistema.size, 'chaves | Arquivo:', mapArquivo.size, 'chaves');
+        
+        // Se não há divergências mas há dados em ambos os lados, é problema de matching
+        if (mapSistema.size > 0 && mapArquivo.size > 0) {
+          console.log('🔍 DEBUG: Primeiras 5 chaves do sistema:', Array.from(mapSistema.keys()).slice(0, 5));
+          console.log('🔍 DEBUG: Primeiras 5 chaves do arquivo:', Array.from(mapArquivo.keys()).slice(0, 5));
+        }
+      }
+
+      // Preparar dados para Excel - INCLUINDO CASOS SEM DIVERGÊNCIAS PARA DEBUG
+      const dadosExcel = divergencias.length > 0 ? divergencias.map(linha => ({
         'Tipo Divergência': linha.tipo === 'arquivo_nao_no_sistema' ? 'Somente no Arquivo' :
                            linha.tipo === 'sistema_nao_no_arquivo' ? 'Somente no Sistema' :
                            linha.tipo === 'quantidade_diferente' ? 'Quantidade Diferente' :
+                           linha.tipo === 'categoria' ? 'Categoria Diferente' :
+                           linha.tipo === 'especialidade' ? 'Especialidade Diferente' :
+                           linha.tipo === 'modalidade' ? 'Modalidade Diferente' :
+                           linha.tipo === 'prioridade' ? 'Prioridade Diferente' :
                            linha.tipo,
         'Cliente': linha.EMPRESA,
         'Paciente': linha.NOME_PACIENTE,
@@ -725,8 +772,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         'Especialidade': linha.ESPECIALIDADE,
         'Prioridade': linha.PRIORIDADE,
         'Médico': linha.MEDICO,
-        'Data Realização': formatDateBR(linha.DATA_REALIZACAO),
-        'Data Laudo': formatDateBR(linha.DATA_LAUDO),
+        'Data Realização': linha.DATA_REALIZACAO,
+        'Data Laudo': linha.DATA_LAUDO,
         'Status': linha.STATUS,
         'Valores Arquivo': linha.total_arquivo || 0,
         'Valores Sistema': linha.total_sistema || 0,
@@ -738,7 +785,34 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         'Modalidade Sistema': linha.modalidade_sistema || '-',
         'Prioridade Arquivo': linha.prioridade_arquivo || '-',
         'Prioridade Sistema': linha.prioridade_sistema || '-',
-      }));
+      })) : [
+        // Se não há divergências, exportar dados para análise manual
+        {
+          'Tipo Divergência': 'ANÁLISE - Nenhuma divergência encontrada',
+          'Cliente': 'Sistema tem ' + mapSistema.size + ' registros únicos',
+          'Paciente': 'Arquivo tem ' + mapArquivo.size + ' registros únicos',
+          'Código Paciente': 'Período: ' + referencia,
+          'Exame': 'Cliente: ' + cliente,
+          'Accession Number': '-',
+          'Modalidade': '-',
+          'Especialidade': '-',
+          'Prioridade': '-',
+          'Médico': '-',
+          'Data Realização': '-',
+          'Data Laudo': '-',
+          'Status': '-',
+          'Valores Arquivo': 0,
+          'Valores Sistema': 0,
+          'Categoria Arquivo': '-',
+          'Categoria Sistema': '-',
+          'Especialidade Arquivo': '-',
+          'Especialidade Sistema': '-',
+          'Modalidade Arquivo': '-',
+          'Modalidade Sistema': '-',
+          'Prioridade Arquivo': '-',
+          'Prioridade Sistema': '-',
+        }
+      ];
 
       // Criar planilha
       const wb = XLSX.utils.book_new();
