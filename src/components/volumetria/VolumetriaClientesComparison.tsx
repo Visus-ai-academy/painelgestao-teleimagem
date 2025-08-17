@@ -109,19 +109,69 @@ export function VolumetriaClientesComparison({
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
     try {
       console.log('🔍 [COMPARATIVO DEBUG] Context completo:', context);
-      // Priorizar estatísticas definitivas por cliente (100% do banco)
+      console.log('🔍 [COMPARATIVO DEBUG] Período selecionado:', periodoSelecionado);
+      
+      // Se há período selecionado, usar dados filtrados
+      if (periodoSelecionado && dadosPeriodo && dadosPeriodo.length > 0) {
+        console.log('🔍 [COMPARATIVO DEBUG] Usando dados filtrados por período:', dadosPeriodo.length, 'registros');
+        
+        const map = new Map<string, ClienteAggregated>();
+        
+        (dadosPeriodo as any[]).forEach((item) => {
+          const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
+          const cliente = String(clienteRaw).trim();
+          if (!cliente) return;
+          
+          const key = normalizeClientName(cliente).toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, {
+              cliente,
+              total_exames: 0,
+              modalidades: {},
+              especialidades: {},
+              prioridades: {},
+              categorias: {},
+              exames: {},
+            });
+          }
+          
+          const ref = map.get(key)!;
+          const rawVal = (item as any).VALORES ?? 1;
+          const inc = Number.isFinite(Number(rawVal)) ? Number(rawVal) : 1;
+          ref.total_exames += inc;
+          
+          // Adicionar detalhes
+          const mod = canonicalModalidade((item as any).MODALIDADE);
+          const esp = canonical((item as any).ESPECIALIDADE);
+          const pri = canonicalPrioridade((item as any).PRIORIDADE);
+          const cat = canonical((item as any).CATEGORIA);
+          const exame = canonical((item as any).ESTUDO_DESCRICAO);
+          
+          if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
+          if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
+          if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
+          if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + inc;
+          if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + inc;
+        });
+        
+        const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+        console.log('🔍 [COMPARATIVO DEBUG] Resultado período específico:', resultado.length, 'clientes');
+        console.log('🔍 [COMPARATIVO DEBUG] Primeiros 3 clientes do período:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
+        return resultado;
+      }
+      
+      // Usar estatísticas definitivas por cliente (100% do banco) para período ativo
       const stats = (context as any)?.clientesStats || [];
       console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats?.length, stats?.slice(0, 3));
       
       if (!stats || stats.length === 0) {
         console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
         // Fallback direto para dados detalhados se stats estiver vazio
-        if (dadosPeriodo && dadosPeriodo.length > 0) {
+        if (context.detailedData && context.detailedData.length > 0) {
           const map = new Map<string, ClienteAggregated>();
-          console.log('🔍 [COMPARATIVO DEBUG] Usando dados filtrados por período:', dadosPeriodo.length, 'registros');
-          console.log('🔍 [COMPARATIVO DEBUG] Período selecionado:', periodoSelecionado || 'ativo');
+          console.log('🔍 [COMPARATIVO DEBUG] Usando dados detalhados:', context.detailedData.length, 'registros');
           
-          (dadosPeriodo as any[]).forEach((item) => {
+          (context.detailedData as any[]).forEach((item) => {
             const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
             const cliente = String(clienteRaw).trim();
             if (!cliente) return;
@@ -140,16 +190,16 @@ export function VolumetriaClientesComparison({
             }
             
             const ref = map.get(key)!;
-            const rawVal = (item as any).VALORES ?? 1;
+            const rawVal = (item as any).VALORES ?? (item as any).VALOR ?? (item as any).QUANTIDADE ?? (item as any).QTD ?? (item as any).QTDE ?? 1;
             const inc = Number.isFinite(Number(rawVal)) ? Number(rawVal) : 1;
             ref.total_exames += inc;
             
             // Adicionar detalhes
-            const mod = canonicalModalidade((item as any).MODALIDADE);
-            const esp = canonical((item as any).ESPECIALIDADE);
-            const pri = canonicalPrioridade((item as any).PRIORIDADE);
-            const cat = canonical((item as any).CATEGORIA);
-            const exame = canonical((item as any).ESTUDO_DESCRICAO);
+            const mod = canonicalModalidade((item as any).MODALIDADE ?? (item as any).modalidade ?? (item as any).Modalidade);
+            const esp = canonical((item as any).ESPECIALIDADE ?? (item as any).especialidade ?? (item as any).Especialidade);
+            const pri = canonicalPrioridade((item as any).PRIORIDADE ?? (item as any).prioridade ?? (item as any).Prioridade);
+            const cat = canonical((item as any).CATEGORIA ?? (item as any).categoria ?? (item as any).Categoria);
+            const exame = canonical((item as any).ESTUDO_DESCRICAO ?? (item as any).NOME_EXAME ?? (item as any).EXAME ?? (item as any).ESTUDO ?? (item as any).nome_exame ?? (item as any).Nome_Est ?? (item as any).nome_est);
             
             if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
             if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
@@ -160,6 +210,7 @@ export function VolumetriaClientesComparison({
           
           const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
           console.log('🔍 [COMPARATIVO DEBUG] Fallback concluído:', resultado.length, 'clientes');
+          console.log('🔍 [COMPARATIVO DEBUG] Primeiros 3 clientes fallback:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
           return resultado;
         }
         
@@ -173,7 +224,7 @@ export function VolumetriaClientesComparison({
       (stats as any[]).forEach((s) => {
         const cliente = String(s.empresa || s.cliente || '').trim();
         if (!cliente) return;
-        console.log('🔍 [COMPARATIVO DEBUG] Processando cliente:', cliente, 'laudos:', s.total_laudos);
+        console.log('🔍 [COMPARATIVO DEBUG] Processando cliente stats:', cliente, 'laudos:', s.total_laudos);
         map.set(normalizeClientName(cliente).toLowerCase(), {
           cliente,
           total_exames: Number(s.total_laudos) || 0,
@@ -189,6 +240,7 @@ export function VolumetriaClientesComparison({
 
       // 2) Se houver dados detalhados, preencher detalhamentos e criar fallback de totais
       if (context.detailedData && context.detailedData.length > 0) {
+        console.log('🔍 [COMPARATIVO DEBUG] Preenchendo detalhamentos com dados detalhados:', context.detailedData.length);
         const detailsTotals = new Map<string, number>();
         (context.detailedData as any[]).forEach((item) => {
           const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? (item as any).Empresa ?? (item as any).CLIENTE ?? (item as any).cliente ?? (item as any).Cliente ?? '';
@@ -233,14 +285,17 @@ export function VolumetriaClientesComparison({
           }
         }
       }
- 
-      return Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+
+      const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+      console.log('🔍 [COMPARATIVO DEBUG] Resultado final sistema:', resultado.length, 'clientes');
+      console.log('🔍 [COMPARATIVO DEBUG] Primeiros 5 clientes sistema:', resultado.slice(0, 5).map(c => ({ nome: c.cliente, total: c.total_exames })));
+      return resultado;
     } catch (e) {
       console.error('Erro ao agregar dados do sistema para comparativo:', e);
       toast({ title: 'Erro', description: 'Falha ao preparar dados do sistema.', variant: 'destructive' });
       return [];
     }
-  }, [context.clientesStats, dadosPeriodo, periodoSelecionado, toast]);
+  }, [context.clientesStats, context.detailedData, dadosPeriodo, periodoSelecionado, toast]);
 
   // Agregar dados do arquivo (se houver)
   const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
