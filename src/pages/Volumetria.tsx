@@ -11,8 +11,9 @@ import { VolumetriaExecutiveSummary } from "@/components/volumetria/VolumetriaEx
 import { VolumetriaMedicosAnalysis } from "@/components/volumetria/VolumetriaMedicosAnalysis";
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
-import { BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
+import { BarChart3, Users, Clock, TrendingUp, FileText, Settings } from "lucide-react";
 import { useVolumetriaDataFiltered } from "@/hooks/useVolumetriaDataFiltered";
+import { ReprocessarTodasRegras } from "@/components/volumetria/ReprocessarTodasRegras";
 
 
 export default function Volumetria() {
@@ -121,6 +122,10 @@ export default function Volumetria() {
                 <TrendingUp className="h-4 w-4" />
                 Clientes Atrasados
               </TabsTrigger>
+              <TabsTrigger value="processamento" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Processamento
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="resumo" className="space-y-6">
@@ -181,6 +186,10 @@ export default function Volumetria() {
               <VolumetriaClientesAtrasados />
             </TabsContent>
 
+            <TabsContent value="processamento" className="space-y-6">
+              <ReprocessarTodasRegras />
+            </TabsContent>
+            
           </Tabs>
         ) : (
           <VolumetriaNoData 

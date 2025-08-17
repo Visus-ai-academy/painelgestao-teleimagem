@@ -3997,6 +3997,10 @@ export type Database = {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
+      reprocessar_volumetria_sem_regras: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       security_health_check: {
         Args: Record<PropertyKey, never>
         Returns: {
