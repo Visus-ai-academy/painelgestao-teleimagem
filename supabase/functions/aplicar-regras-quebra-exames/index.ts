@@ -146,15 +146,19 @@ serve(async (req) => {
           console.log(`Quebrando registro ID ${registroOriginal.id}: ${valorOriginal} -> ${valorQuebrado} x ${quantidadeQuebras}`);
 
           // 6. Criar registros quebrados
-          const registrosQuebrados = configsQuebra.map((config) => ({
-            ...registroOriginal,
-            id: undefined, // Gerar novo ID
-            ESTUDO_DESCRICAO: config.exame_quebrado,
-            VALORES: valorQuebrado,
-            CATEGORIA: config.categoria_quebrada || 'SC',
-            created_at: undefined,
-            updated_at: undefined
-          }));
+          const registrosQuebrados = configsQuebra.map((config) => {
+            const novoRegistro = { ...registroOriginal };
+            delete novoRegistro.id; // Remove ID para gerar novo
+            delete novoRegistro.created_at; // Remove timestamps
+            delete novoRegistro.updated_at;
+            
+            return {
+              ...novoRegistro,
+              ESTUDO_DESCRICAO: config.exame_quebrado,
+              VALORES: valorQuebrado,
+              CATEGORIA: config.categoria_quebrada || registroOriginal.CATEGORIA || 'SC'
+            };
+          });
 
           // 7. Inserir registros quebrados
           const { error: errorInsert } = await supabase
@@ -235,11 +239,18 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Erro geral no processamento de quebras:', error);
+    
+    const errorMessage = error.message || 'Erro interno do servidor';
+    const errorStack = error.stack || 'Stack trace não disponível';
+    
+    console.error('Stack trace:', errorStack);
+    
     return new Response(
       JSON.stringify({ 
         sucesso: false, 
-        erro: error.message,
-        detalhes: error.stack 
+        erro: errorMessage,
+        detalhes: errorStack,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
