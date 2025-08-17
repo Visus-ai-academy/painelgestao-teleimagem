@@ -298,32 +298,47 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         // Se tiver apenas um nome, retornar ele
         if (parts.length === 1) return parts[0];
         
-        // Primeiro nome + iniciais dos nomes do meio + último sobrenome significativo (não extras como Vicente)
-        const firstName = parts[0];
+        // Expandir abreviações comuns
+        const expandirAbreviacoes = (part: string) => {
+          const abreviacoes: Record<string, string> = {
+            'S': 'SILVA', 'A': 'ALVES', 'C': 'COSTA', 'F': 'FERREIRA',
+            'M': 'MARTINS', 'R': 'RIBEIRO', 'L': 'LIMA', 'P': 'PEREIRA'
+          };
+          const clean = part.replace(/\.$/, '');
+          return abreviacoes[clean] || clean;
+        };
         
-        // Encontrar o sobrenome principal (geralmente o penúltimo ou último nome mais longo)
-        let mainLastName = parts[parts.length - 1];
-        if (parts.length > 2) {
-          // Se há vários nomes, pegar o penúltimo como sobrenome principal se for maior que 3 chars
-          const penultimate = parts[parts.length - 2];
-          if (penultimate.length > 3) {
-            mainLastName = penultimate;
+        // Processar cada parte expandindo abreviações
+        const processedParts = parts.map(part => {
+          // Pular preposições comuns
+          if (['DA', 'DE', 'DO', 'DOS', 'DAS'].includes(part)) return part;
+          // Expandir se for abreviação de 1 char + ponto opcional
+          if (part.length <= 2 && part.match(/^[A-Z]\.?$/)) {
+            return expandirAbreviacoes(part);
           }
+          return part;
+        });
+        
+        // Primeiro nome
+        const firstName = processedParts[0];
+        
+        // Encontrar o sobrenome principal (último nome significativo, ignorando preposições)
+        let mainLastName = processedParts[processedParts.length - 1];
+        
+        // Se o último é muito curto, tentar o penúltimo
+        if (mainLastName.length <= 2 && processedParts.length > 2) {
+          mainLastName = processedParts[processedParts.length - 2];
         }
         
-        // Pegar iniciais dos nomes do meio (excluindo primeiro e último)
-        const middleNames = parts.slice(1, -1);
-        if (parts.length > 2 && mainLastName === parts[parts.length - 2]) {
-          // Se usamos penúltimo como principal, excluir também o último
-          middleNames.pop();
-        }
-        
-        const middleInitials = middleNames.map(name => {
-          return name.length <= 2 ? name.replace(/\.$/, '') : name.charAt(0);
+        // Pegar iniciais dos nomes do meio, incluindo preposições importantes
+        const middleParts = processedParts.slice(1, -1);
+        const middleSignature = middleParts.map(part => {
+          if (['DA', 'DE', 'DO', 'DOS', 'DAS'].includes(part)) return part.charAt(0); // D para "da", "de", etc
+          return part.charAt(0); // Primeira letra do nome
         }).join('');
         
         // Criar assinatura: PRIMEIRO + INICIAIS_MEIO + SOBRENOME_PRINCIPAL
-        return `${firstName}${middleInitials}${mainLastName}`;
+        return `${firstName}${middleSignature}${mainLastName}`;
       };
 
       // OTIMIZAÇÃO: Filtrar dados antes do processamento pesado
@@ -394,7 +409,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           
           // Debug para casos específicos de médicos
           if ((r.NOME_PACIENTE === 'Zely Correa Prestes Nunes' && r.ESTUDO_DESCRICAO?.includes('TC CRANIO')) ||
-              (r.MEDICO || r.medico || '').includes('Guilherme')) {
+              (r.MEDICO || r.medico || '').includes('Guilherme') ||
+              (r.MEDICO || r.medico || '').includes('Efraim')) {
             console.log('🔍 DEBUG Sistema - Médico:', {
               chaveBase,
               medicoOriginal: r.MEDICO || r.medico || '',
@@ -458,7 +474,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           
           // Debug para casos específicos de médicos
           if ((pacienteNome === 'Zely Correa Prestes Nunes' && exameDescricao?.includes('TC CRANIO')) ||
-              ((r as any).medico || (r as any).MEDICO || '').includes('Guilherme')) {
+              ((r as any).medico || (r as any).MEDICO || '').includes('Guilherme') ||
+              ((r as any).medico || (r as any).MEDICO || '').includes('Efraim')) {
             console.log('🔍 DEBUG Arquivo - Médico:', {
               keyBase,
               medicoOriginal: (r as any).medico || (r as any).MEDICO || '',
