@@ -166,7 +166,7 @@ const REGRAS_MONITORADAS = [
   {
     nome: 'Definição Data Referência',
     descricao: 'Define data de referência baseada no período de processamento',
-    funcao: 'set_data_referencia_volumetria',
+    funcao: 'aplicar_data_referencia_por_periodo',
     id: 'extra_008'
   }
 ];

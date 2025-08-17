@@ -3417,6 +3417,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      aplicar_data_referencia_por_periodo: {
+        Args: {
+          p_ano: number
+          p_arquivo_fonte?: string
+          p_lote_upload?: string
+          p_mes: number
+        }
+        Returns: Json
+      }
       aplicar_de_para_automatico: {
         Args: { arquivo_fonte_param: string }
         Returns: Json

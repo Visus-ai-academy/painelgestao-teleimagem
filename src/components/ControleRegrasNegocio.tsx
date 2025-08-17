@@ -298,7 +298,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Define data de referência baseada no período de processamento selecionado para garantir consistência temporal dos dados.',
       status: 'ativa',
       implementadaEm: '2024-02-22',
-      observacoes: 'Função: set_data_referencia_volumetria, aplicada durante o upload',
+      observacoes: 'Função SQL: aplicar_data_referencia_por_periodo + trigger_aplicar_data_referencia, aplicada durante o upload',
       ordem_execucao: 21,
       tipo_regra: 'negocio'
     },

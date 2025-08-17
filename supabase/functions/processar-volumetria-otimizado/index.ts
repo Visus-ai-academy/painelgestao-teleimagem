@@ -103,7 +103,7 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, periodProcessamento?: { ano: number; mes: number } | null): VolumetriaRecord | null {
   try {
     if (!row || typeof row !== 'object') return null;
 
@@ -350,7 +350,7 @@ serve(async (req) => {
             dbgFoundInFile++;
           }
 
-          const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
+          const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, periodProcessamento);
           if (record && record.EMPRESA && record.NOME_PACIENTE) {
             records.push(record);
             if ((record.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE) {
