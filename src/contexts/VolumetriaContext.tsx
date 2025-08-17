@@ -151,10 +151,27 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const cediStats = clientesStats?.find((c: any) => c.empresa === 'CEDI_RJ');
       console.log('🔍 [CONTEXTO DEBUG CEDI_RJ] Stats completas:', cediStats);
       
-      console.log('🚀 FASE 3: Carregando dados processados e aprovados do período de apuração...');
-      console.log('🔧 CRITÉRIO: data_referencia do período + dados que passaram pelas regras');
+      console.log('🚀 FASE 3: Carregando período de referência ativo...');
       
-      // CARREGAR DADOS DETALHADOS FILTRADOS POR PERÍODO DE APURAÇÃO
+      // BUSCAR PERÍODO ATIVO DO SISTEMA
+      const { data: periodoAtivo, error: periodoError } = await supabase
+        .from('periodo_referencia_ativo')
+        .select('periodo_referencia')
+        .eq('ativo', true)
+        .single();
+      
+      if (periodoError) {
+        console.error('❌ Erro ao buscar período ativo:', periodoError);
+        throw new Error(`Erro no período ativo: ${periodoError.message}`);
+      }
+      
+      const periodoSistema = periodoAtivo.periodo_referencia;
+      console.log('✅ Período ativo do sistema:', periodoSistema);
+      
+      console.log('🚀 FASE 4: Carregando dados filtrados por período ativo...');
+      console.log(`🔧 FILTRO: periodo_referencia = '${periodoSistema}'`);
+      
+      // CARREGAR APENAS DADOS DO PERÍODO ATIVO
       const allDetails: any[] = [];
       let offset = 0;
       const limit = 1000;
@@ -163,12 +180,10 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         let query = supabase
           .from('volumetria_mobilemed')
           .select('*')
+          .eq('periodo_referencia', periodoSistema)  // ✅ FILTRO POR PERÍODO ATIVO
           .range(offset, offset + limit - 1);
 
-        // FILTRO CORRETO: Dados processados do período (data_referencia)
-        // Incluindo exames retroativos que foram processados para este período
-        // TODO: Adicionar filtro por período quando disponível no contexto
-        console.log(`📦 Carregando dados processados do período - lote ${offset}`);
+        console.log(`📦 Carregando dados do período ${periodoSistema} - lote ${offset}`);
 
         const { data: batch, error: batchError } = await query;
 
@@ -177,7 +192,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         }
         if (!batch || batch.length === 0) break;
         allDetails.push(...batch);
-        console.log(`📦 Dados processados carregados: ${batch.length} (total: ${allDetails.length})`);
+        console.log(`📦 Dados carregados: ${batch.length} (total: ${allDetails.length})`);
         if (batch.length < limit) break;
         offset += limit;
         await new Promise((r) => setTimeout(r, 5));

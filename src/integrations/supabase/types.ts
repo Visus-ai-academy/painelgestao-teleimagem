@@ -2269,6 +2269,42 @@ export type Database = {
         }
         Relationships: []
       }
+      periodo_referencia_ativo: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          data_fim: string
+          data_inicio: string
+          descricao: string | null
+          id: string
+          periodo_referencia: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_fim: string
+          data_inicio: string
+          descricao?: string | null
+          id?: string
+          periodo_referencia: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          periodo_referencia?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       precos_servicos: {
         Row: {
           aplicar_incremental: boolean
