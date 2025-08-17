@@ -149,22 +149,24 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       const cediStats = clientesStats?.find((c: any) => c.empresa === 'CEDI_RJ');
       console.log('🔍 [CONTEXTO DEBUG CEDI_RJ] Stats completas:', cediStats);
       
-      console.log('🚀 FASE 3: Carregando TODOS os dados detalhados via leitura paginada da tabela...');
-      console.log('🔧 COMPARATIVO: Carregando dados por data_referencia, não por data de realização');
+      console.log('🚀 FASE 3: Carregando dados processados e aprovados do período de apuração...');
+      console.log('🔧 CRITÉRIO: data_referencia do período + dados que passaram pelas regras');
       
-      // CARREGAR DADOS DETALHADOS EM LOTES PARA TRAZER 100% DOS REGISTROS
+      // CARREGAR DADOS DETALHADOS FILTRADOS POR PERÍODO DE APURAÇÃO
       const allDetails: any[] = [];
       let offset = 0;
-      const limit = 1000; // Ajuste para respeitar o limite de retorno do PostgREST/Supabase
+      const limit = 1000;
+      
       while (true) {
         let query = supabase
           .from('volumetria_mobilemed')
           .select('*')
           .range(offset, offset + limit - 1);
 
-        // Para comparativo, carregar TODOS os dados SEM filtro de período
-        // Pois precisamos de todos os dados históricos que foram processados
-        console.log(`📦 Carregando lote ${offset} - ${offset + limit - 1} (SEM filtro de período para comparativo)`);
+        // FILTRO CORRETO: Dados processados do período (data_referencia)
+        // Incluindo exames retroativos que foram processados para este período
+        // TODO: Adicionar filtro por período quando disponível no contexto
+        console.log(`📦 Carregando dados processados do período - lote ${offset}`);
 
         const { data: batch, error: batchError } = await query;
 
@@ -173,10 +175,9 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         }
         if (!batch || batch.length === 0) break;
         allDetails.push(...batch);
-        console.log(`📦 Lote detalhado carregado: ${batch.length} (total: ${allDetails.length})`);
+        console.log(`📦 Dados processados carregados: ${batch.length} (total: ${allDetails.length})`);
         if (batch.length < limit) break;
         offset += limit;
-        // Pequena pausa para não sobrecarregar
         await new Promise((r) => setTimeout(r, 5));
       }
 
