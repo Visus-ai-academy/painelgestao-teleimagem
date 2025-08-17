@@ -241,12 +241,22 @@ export function StatusRegraProcessamento() {
           let erros: string[] = [];
           
           if (deveAplicar) {
-            foiAplicada = uploadInfo?.status === 'concluido' && 
-                         uploadInfo?.registros_erro === 0;
-            
-            // Só mostrar erros se a regra deve ser aplicada neste arquivo
-            if (uploadInfo?.registros_erro > 0) {
-              erros = [`${uploadInfo.registros_erro} erros encontrados`];
+            // Para regras de exclusão (v002, v003, v031), considerar aplicada se status concluído
+            // independente de registros_erro (que são exclusões, não erros)
+            if (regra.id === 'v002' || regra.id === 'v003' || regra.id === 'v031') {
+              foiAplicada = uploadInfo?.status === 'concluido';
+              // Para regras de exclusão, "erros" são na verdade exclusões
+              if (uploadInfo?.registros_erro > 0) {
+                erros = [`${uploadInfo.registros_erro} registros excluídos pela regra`];
+              }
+            } else {
+              // Para outras regras, considerar erro se registros_erro > 0
+              foiAplicada = uploadInfo?.status === 'concluido' && 
+                           uploadInfo?.registros_erro === 0;
+              
+              if (uploadInfo?.registros_erro > 0) {
+                erros = [`${uploadInfo.registros_erro} erros encontrados`];
+              }
             }
           } else {
             // Se não deve aplicar, considerar como "aplicada" (N/A)
