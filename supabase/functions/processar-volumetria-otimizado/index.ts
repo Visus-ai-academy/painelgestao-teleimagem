@@ -566,12 +566,72 @@ serve(async (req) => {
 
     console.log('🎯 PROCESSAMENTO FINALIZADO!');
 
+    // PROCESSAMENTO EM BACKGROUND: Aplicar regras após upload sem travar
+    const backgroundProcessing = async () => {
+      try {
+        console.log('🔄 INICIANDO PROCESSAMENTO EM BACKGROUND...');
+        
+        // Aguardar um pouco para garantir que dados foram inseridos
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Aplicar regras sequencialmente
+        const regras = [
+          'aplicar-exclusoes-periodo',
+          'aplicar-filtro-data-laudo', 
+          'aplicar-regras-tratamento',
+          'aplicar-correcao-modalidade-rx',
+          'aplicar-tipificacao-faturamento',
+          'aplicar-validacao-cliente',
+          'aplicar-regras-quebra-exames'
+        ];
+        
+        for (const regra of regras) {
+          try {
+            console.log(`🔧 Aplicando regra: ${regra}`);
+            const { data, error } = await supabaseClient.functions.invoke(regra, {
+              body: { arquivo_fonte }
+            });
+            
+            if (error) {
+              console.error(`❌ Erro na regra ${regra}:`, error);
+            } else {
+              console.log(`✅ Regra ${regra} aplicada com sucesso`);
+            }
+          } catch (err) {
+            console.error(`💥 Falha crítica na regra ${regra}:`, err);
+          }
+        }
+        
+        // Atualizar log com processamento concluído
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({
+            detalhes_erro: JSON.stringify({
+              status: 'Concluído com regras aplicadas',
+              regras_aplicadas: regras,
+              processamento_background: true
+            })
+          })
+          .eq('id', uploadLog.id);
+          
+        console.log('🎉 PROCESSAMENTO EM BACKGROUND CONCLUÍDO!');
+        
+      } catch (backgroundError) {
+        console.error('💥 ERRO NO PROCESSAMENTO EM BACKGROUND:', backgroundError);
+      }
+    };
+    
+    // Iniciar processamento em background SEM aguardar
+    EdgeRuntime.waitUntil(backgroundProcessing());
+
     return new Response(JSON.stringify({
       success: true,
       total_registros: jsonData.length,
       registros_inseridos: totalInserted,
       registros_erro: totalErrors,
-      upload_id: uploadLog.id
+      upload_id: uploadLog.id,
+      background_processing: true,
+      message: 'Upload concluído! Regras sendo aplicadas em background...'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
