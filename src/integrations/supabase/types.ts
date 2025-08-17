@@ -3416,6 +3416,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      aplicar_validacao_cliente_volumetria: {
+        Args: { lote_upload_param?: string }
+        Returns: Json
+      }
       aplicar_valores_de_para: {
         Args: Record<PropertyKey, never>
         Returns: Json
