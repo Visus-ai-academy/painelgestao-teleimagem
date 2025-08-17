@@ -12,6 +12,7 @@ interface RegraStatus {
     [key: string]: {
       deveAplicar: boolean;
       foiAplicada: boolean;
+      hasError?: boolean;
       ultimaAplicacao?: string;
       erros?: string[];
     };
@@ -221,17 +222,21 @@ export function StatusRegraProcessamento() {
 
           // Verificar se foi aplicada - apenas se deve aplicar
           let foiAplicada = false;
+          let hasError = false;
           let informacoes: string[] = [];
           
           if (deveAplicar && uploadInfo) {
             // Regras que EXCLUEM/FILTRAM registros - exclusões são aplicações corretas
             const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
             
-            // Regras que TRANSFORMAM dados - transformações são aplicações corretas
+            // Regras que TRANSFORMAM dados - transformações são aplicações corretas  
             const regrasTransformacao = ['v022', 'v026', 'v027', 'v030', 'extra_001', 'extra_002', 'extra_003'];
             
             // Regras que VALIDAM dados - rejeições são aplicações corretas
             const regrasValidacao = ['v013', 'extra_006'];
+            
+            // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
+            const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004'];
             
             if (regrasExclusao.includes(regra.id)) {
               // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
@@ -249,11 +254,23 @@ export function StatusRegraProcessamento() {
               if (uploadInfo.registros_erro > 0) {
                 informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
               }
+            } else if (regrasAutomaticas.includes(regra.id)) {
+              // Regras automáticas sempre são aplicadas se o processamento foi concluído
+              foiAplicada = uploadInfo.status === 'concluido';
+              informacoes = ['Regra aplicada automaticamente durante processamento'];
+              
+              // Apenas algumas regras podem ter erro real
+              if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
+                hasError = true;
+                informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                foiAplicada = false;
+              }
             } else {
-              // Para outras regras (performance, cache, etc), sucesso significa sem erros
+              // Para outras regras, sucesso significa sem erros
               foiAplicada = uploadInfo.status === 'concluido' && uploadInfo.registros_erro === 0;
               
               if (uploadInfo.registros_erro > 0) {
+                hasError = true;
                 informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
               }
             }
@@ -268,8 +285,9 @@ export function StatusRegraProcessamento() {
           arquivosStatus[tipoArquivo] = {
             deveAplicar,
             foiAplicada,
+            hasError,
             ultimaAplicacao: uploadInfo?.created_at,
-            erros: informacoes // Renomeado para ser mais claro
+            erros: informacoes
           };
         });
 
@@ -313,16 +331,18 @@ export function StatusRegraProcessamento() {
     };
   }, []);
 
-  const getStatusIcon = (deveAplicar: boolean, foiAplicada: boolean, informacoes?: string[]) => {
+  const getStatusIcon = (deveAplicar: boolean, foiAplicada: boolean, hasError: boolean = false) => {
     if (!deveAplicar) return <Minus className="h-4 w-4 text-muted-foreground" />;
-    if (foiAplicada) return <CheckCircle className="h-4 w-4 text-success" />;
-    return <AlertCircle className="h-4 w-4 text-warning" />;
+    if (hasError) return <XCircle className="h-4 w-4 text-red-500" />;
+    if (foiAplicada) return <CheckCircle className="h-4 w-4 text-blue-500" />;
+    return <AlertCircle className="h-4 w-4 text-yellow-500" />;
   };
 
-  const getStatusBadge = (deveAplicar: boolean, foiAplicada: boolean, informacoes?: string[]) => {
+  const getStatusBadge = (deveAplicar: boolean, foiAplicada: boolean, hasError: boolean = false) => {
     if (!deveAplicar) return <Badge variant="outline">N/A</Badge>;
-    if (foiAplicada) return <Badge variant="default" className="bg-success">Aplicada</Badge>;
-    return <Badge variant="outline">Pendente</Badge>;
+    if (hasError) return <Badge variant="destructive">Erro</Badge>;
+    if (foiAplicada) return <Badge className="bg-blue-500 hover:bg-blue-600">OK</Badge>;
+    return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pendente</Badge>;
   };
 
   const getNomeArquivoAmigavel = (tipoArquivo: string) => {
@@ -399,8 +419,8 @@ export function StatusRegraProcessamento() {
                             )}
                           </div>
                           <div className="flex justify-center items-center gap-2">
-                            {getStatusIcon(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.erros)}
-                            {getStatusBadge(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.erros)}
+                            {getStatusIcon(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.hasError)}
+                            {getStatusBadge(arquivo.deveAplicar, arquivo.foiAplicada, arquivo.hasError)}
                           </div>
                           {arquivo.erros && arquivo.erros.length > 0 && (
                             <div className="text-xs text-muted-foreground">
