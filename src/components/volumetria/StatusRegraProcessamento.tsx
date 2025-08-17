@@ -241,16 +241,32 @@ export function StatusRegraProcessamento() {
           let erros: string[] = [];
           
           if (deveAplicar) {
-            // Para regras de exclusão (v002, v003, v031), considerar aplicada se status concluído
-            // independente de registros_erro (que são exclusões, não erros)
-            if (regra.id === 'v002' || regra.id === 'v003' || regra.id === 'v031') {
+            // Regras que EXCLUEM/FILTRAM registros - "erros" são exclusões corretas
+            const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
+            
+            // Regras que TRANSFORMAM dados - "erros" podem ser correções aplicadas
+            const regrasTransformacao = ['v022', 'v026', 'v027', 'v030', 'extra_001', 'extra_002', 'extra_003'];
+            
+            // Regras que VALIDAM dados - "erros" são rejeições corretas
+            const regrasValidacao = ['v013', 'extra_006'];
+            
+            if (regrasExclusao.includes(regra.id)) {
               foiAplicada = uploadInfo?.status === 'concluido';
-              // Para regras de exclusão, "erros" são na verdade exclusões
               if (uploadInfo?.registros_erro > 0) {
                 erros = [`${uploadInfo.registros_erro} registros excluídos pela regra`];
               }
+            } else if (regrasTransformacao.includes(regra.id)) {
+              foiAplicada = uploadInfo?.status === 'concluido';
+              if (uploadInfo?.registros_erro > 0) {
+                erros = [`${uploadInfo.registros_erro} registros transformados`];
+              }
+            } else if (regrasValidacao.includes(regra.id)) {
+              foiAplicada = uploadInfo?.status === 'concluido';
+              if (uploadInfo?.registros_erro > 0) {
+                erros = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
+              }
             } else {
-              // Para outras regras, considerar erro se registros_erro > 0
+              // Para outras regras (performance, cache, etc), considerar erro se registros_erro > 0
               foiAplicada = uploadInfo?.status === 'concluido' && 
                            uploadInfo?.registros_erro === 0;
               
