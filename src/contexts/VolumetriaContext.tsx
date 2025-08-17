@@ -373,6 +373,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('🔥 USEEFFECT DO CONTEXTO EXECUTADO - Forçando carregamento DEFINITIVO...');
     console.log('🔥 Timestamp atual:', new Date().toISOString());
+    console.log('🔥 QUEBRAS APLICADAS - Refresh total dos dados');
     // FORÇAR INVALIDAÇÃO COMPLETA
     isLoadingRef.current = false;
     lastLoadTime.current = 0;
@@ -385,7 +386,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     
     // EXECUTAR IMEDIATAMENTE sem debounce
     setTimeout(() => {
-      console.log('🚀 DISPARANDO loadStats() forçado...');
+      console.log('🚀 DISPARANDO loadStats() forçado após quebras...');
       loadStats();
     }, 100);
     
