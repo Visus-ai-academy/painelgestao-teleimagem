@@ -158,7 +158,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gt.${fimFaturamento}`);
+      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gte.${new Date(new Date(fimFaturamento).getTime() + 86400000).toISOString().split('T')[0]}`);
 
     if (error3_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 3):', error3_laudo);
@@ -193,7 +193,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gt.${fimFaturamento}`);
+      .or(`data_laudo.lt.${inicioFaturamento},data_laudo.gte.${new Date(new Date(fimFaturamento).getTime() + 86400000).toISOString().split('T')[0]}`);
 
     if (error4_laudo) {
       console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 4):', error4_laudo);
