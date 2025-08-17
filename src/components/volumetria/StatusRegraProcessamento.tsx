@@ -411,7 +411,7 @@ export function StatusRegraProcessamento() {
                       <td key={tipo} className="p-3 text-center">
                         <div className="space-y-2">
                           <div className="flex justify-center items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Deve:</span>
+                            <span className="text-xs text-muted-foreground">Aplicar:</span>
                             {arquivo.deveAplicar ? (
                               <Badge variant="outline" className="text-xs">Sim</Badge>
                             ) : (
