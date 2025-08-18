@@ -88,16 +88,12 @@ export function ComparativoPeriodoSelector({
   }, [toast]);
 
   const handlePeriodoChange = (valor: string) => {
-    if (valor === 'ativo') {
-      onPeriodoChange(null); // Usar período ativo do sistema
-    } else {
-      onPeriodoChange(valor);
-    }
+    onPeriodoChange(valor);
   };
 
   const getDisplayValue = () => {
     if (!periodoSelecionado) {
-      return 'ativo'; // Período ativo do sistema
+      return periodoAtivo; // Usar período ativo no formato jun/25
     }
     return periodoSelecionado;
   };
@@ -121,17 +117,11 @@ export function ComparativoPeriodoSelector({
               <SelectValue placeholder="Selecione o período..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ativo">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default" className="text-xs px-1">ATIVO</Badge>
-                  <span>{periodoAtivo}</span>
-                </div>
-              </SelectItem>
               {periodosDisponiveis.map((periodo) => (
                 <SelectItem key={periodo} value={periodo}>
                   <div className="flex items-center gap-2">
                     {periodo === periodoAtivo && (
-                      <Badge variant="outline" className="text-xs px-1">ATIVO</Badge>
+                      <Badge variant="default" className="text-xs px-1">ATIVO</Badge>
                     )}
                     <span>{periodo}</span>
                   </div>
@@ -143,8 +133,8 @@ export function ComparativoPeriodoSelector({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onPeriodoChange(null)}
-            disabled={!periodoSelecionado}
+            onClick={() => onPeriodoChange(periodoAtivo)}
+            disabled={periodoSelecionado === periodoAtivo}
             title="Voltar ao período ativo"
           >
             <RotateCcw className="h-4 w-4" />
@@ -152,7 +142,7 @@ export function ComparativoPeriodoSelector({
         </div>
 
         <div className="text-xs text-muted-foreground">
-          {!periodoSelecionado ? (
+          {periodoSelecionado === periodoAtivo ? (
             <span className="text-blue-700">📊 Usando período ativo do sistema: <strong>{periodoAtivo}</strong></span>
           ) : (
             <span className="text-orange-700">⚠️ Comparativo usando período: <strong>{periodoSelecionado}</strong></span>

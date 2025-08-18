@@ -180,7 +180,7 @@ function formatarDataBR(data: any): string {
   return `${dia}/${mes}/${ano}`;
 }
 
-export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
+export default function VolumetriaDivergencias({ uploadedExams, periodoSelecionado }: { uploadedExams?: UploadedExamRow[], periodoSelecionado?: string }) {
   const { data: ctx } = useVolumetria();
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
@@ -206,10 +206,10 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     })();
   }, []);
 
-  // Obter período ativo do contexto (removendo lógica duplicada)
-  const periodoAtivo = ctx.dashboardStats?.periodo_ativo || 'jun/25';
+  // Obter período selecionado do prop ou usar o ativo do contexto
+  const periodoAtivo = periodoSelecionado || ctx.dashboardStats?.periodo_ativo || 'jun/25';
   
-  console.log('🎯 VolumetriaDivergencias - Período ativo do contexto:', periodoAtivo);
+  console.log('🎯 VolumetriaDivergencias - Período selecionado:', periodoAtivo);
 
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 

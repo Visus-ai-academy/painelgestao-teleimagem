@@ -31,7 +31,7 @@ export default function Comparativo() {
     divergencias: 'comparativo_divergencias',
   } as const;
 
-  // Restaurar ao montar
+  // Restaurar ao montar e inicializar período ativo
   useEffect(() => {
     try {
       const u = localStorage.getItem(STORAGE_KEYS.uploaded);
@@ -42,10 +42,15 @@ export default function Comparativo() {
       if (ue) setUploadedExams(JSON.parse(ue));
       if (lf) setLastFileName(JSON.parse(lf));
       if (dv) setDivergencias(JSON.parse(dv));
+      
+      // Inicializar com período ativo se não tiver selecionado
+      if (!periodoComparativo && volumetriaData.dashboardStats?.periodo_ativo) {
+        setPeriodoComparativo(volumetriaData.dashboardStats.periodo_ativo);
+      }
     } catch (e) {
       console.warn('Falha ao restaurar comparativo do storage', e);
     }
-  }, []);
+  }, [volumetriaData.dashboardStats?.periodo_ativo]);
 
   // Salvar alterações
   useEffect(() => {
@@ -347,7 +352,10 @@ export default function Comparativo() {
           <VolumetriaExamesComparison uploadedExams={uploadedExams || undefined} />
         </TabsContent>
         <TabsContent value="divergencias">
-          <VolumetriaDivergencias uploadedExams={uploadedExams || undefined} />
+          <VolumetriaDivergencias 
+            uploadedExams={uploadedExams || undefined} 
+            periodoSelecionado={periodoComparativo}
+          />
         </TabsContent>
       </Tabs>
     </div>
