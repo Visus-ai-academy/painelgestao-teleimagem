@@ -411,7 +411,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
 
       console.log('🔧 FILTRO: Aplicando filtro de período:', referencia);
 
-      // Filtrar dados do sistema pelo período de referência selecionado
+      // Filtrar dados do sistema pelo cliente selecionado (período já foi filtrado na consulta SQL)
       const systemDataFiltered = systemData.filter((r: any) => {
         const empresaRaw = r.EMPRESA || r.empresa || r.Empresa || '';
         const empresaNormalizada = normalizeCliente(empresaRaw);
@@ -421,12 +421,9 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           if (empresaNormalizada !== clienteNormalizado) return false;
         }
         
-        // IMPORTANTE: Filtrar pelo período de referência
-        const periodoRef = r.periodo_referencia || r.PERIODO_REFERENCIA;
-        if (periodoRef && periodoRef !== referencia) return false;
-        
-        const dataRef = r.data_referencia || r.DATA_REFERENCIA;
-        return !dataRef || inMonth(dataRef);
+        // NÃO filtrar por período aqui - já foi filtrado na consulta SQL
+        // O período está correto porque foi buscado especificamente com .eq('periodo_referencia', periodoFormatado)
+        return true;
       });
 
       // Filtrar dados do arquivo pelo período
