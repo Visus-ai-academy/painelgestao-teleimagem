@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { arquivo_fonte } = await req.json();
+    const { arquivo_fonte, periodo_referencia } = await req.json();
     
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -23,11 +23,11 @@ serve(async (req) => {
 
     console.log(`🔄 APLICANDO REGRAS EM LOTE PARA: ${arquivo_fonte || 'TODOS'}`);
 
-    // Sequência de regras a serem aplicadas (regras de filtro de data desativadas temporariamente)
+    // Sequência de regras a serem aplicadas
     const regras = [
       'aplicar-exclusao-clientes-especificos',
-      // 'aplicar-exclusoes-periodo', // DESATIVADO - estava excluindo registros válidos 
-      // 'aplicar-filtro-data-laudo',  // DESATIVADO - estava excluindo registros válidos
+      'aplicar-exclusoes-periodo',
+      'aplicar-filtro-data-laudo', 
       'aplicar-regras-tratamento',
       'aplicar-correcao-modalidade-rx',
       'aplicar-correcao-modalidade-ot',
@@ -43,9 +43,12 @@ serve(async (req) => {
       try {
         console.log(`🔧 Aplicando regra: ${regra}`);
         
-        const { data, error } = await supabaseClient.functions.invoke(regra, {
-          body: { arquivo_fonte }
-        });
+        // Diferentes regras precisam de parâmetros diferentes
+        const body = regra === 'aplicar-exclusoes-periodo' || regra === 'aplicar-filtro-data-laudo' 
+          ? { arquivo_fonte, periodo_referencia }
+          : { arquivo_fonte };
+        
+        const { data, error } = await supabaseClient.functions.invoke(regra, { body });
 
         if (error) {
           console.error(`❌ Erro na regra ${regra}:`, error);

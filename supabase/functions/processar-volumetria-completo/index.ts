@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    const { file_path, arquivo_fonte, start_row = 0, batch_size = 1 } = requestBody; // ULTRA minimalista: apenas 1 registro
+    const { file_path, arquivo_fonte, start_row = 0, batch_size = 1, periodo_referencia } = requestBody; // ULTRA minimalista: apenas 1 registro
 
     console.log(`=== PROCESSAMENTO ULTRA MINIMALISTA - BATCH ${Math.floor(start_row / batch_size) + 1} ===`);
     console.log(`📂 Arquivo: ${file_path}`);
@@ -238,7 +238,7 @@ serve(async (req) => {
       console.log('🎯 ÚLTIMO BATCH - Aplicando regras automaticamente...');
       try {
         const { data: resultadoRegras, error: erroRegras } = await supabaseClient.functions.invoke('aplicar-regras-lote', {
-          body: { arquivo_fonte }
+          body: { arquivo_fonte, periodo_referencia }
         });
         
         if (erroRegras) {

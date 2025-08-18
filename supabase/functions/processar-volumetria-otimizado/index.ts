@@ -494,7 +494,7 @@ serve(async (req) => {
           console.warn('⚠️ Erro na correção de modalidade:', correcaoError);
         } else if (correcaoResult) {
           console.log('✅ Correção de modalidade aplicada:', correcaoResult);
-          resultado.alertas.push(`Correção modalidade: ${correcaoResult.registros_corrigidos_rx} → RX, ${correcaoResult.registros_corrigidos_mg} → MG`);
+          // resultado.alertas.push(`Correção modalidade: ${correcaoResult.registros_corrigidos_rx} → RX, ${correcaoResult.registros_corrigidos_mg} → MG`);
         }
       } catch (correcaoException) {
         console.warn('⚠️ Exceção na correção de modalidade:', correcaoException);
@@ -532,17 +532,18 @@ serve(async (req) => {
         
         if (validacaoError) {
           console.warn('⚠️ Erro na validação de cliente:', validacaoError);
-          resultado.alertas.push(`Validação de cliente: Erro - ${validacaoError.message}`);
+          console.warn('⚠️ Erro na validação de cliente:', validacaoError);
         } else if (validacaoResult) {
           console.log('✅ Validação de cliente aplicada:', validacaoResult);
-          resultado.alertas.push(`Validação: ${validacaoResult.registros_atualizados} clientes validados, ${validacaoResult.registros_sem_cliente} sem cadastro`);
+          // resultado.alertas.push(`Validação: ${validacaoResult.registros_atualizados} clientes validados, ${validacaoResult.registros_sem_cliente} sem cadastro`);
           if (validacaoResult.clientes_nao_encontrados && validacaoResult.clientes_nao_encontrados.length > 0) {
-            resultado.alertas.push(`Clientes não encontrados: ${validacaoResult.clientes_nao_encontrados.slice(0, 5).join(', ')}${validacaoResult.clientes_nao_encontrados.length > 5 ? '...' : ''}`);
+            // resultado.alertas.push(`Clientes não encontrados: ${validacaoResult.clientes_nao_encontrados.slice(0, 5).join(', ')}${validacaoResult.clientes_nao_encontrados.length > 5 ? '...' : ''}`);
+            console.log(`🔍 Clientes não encontrados: ${validacaoResult.clientes_nao_encontrados.slice(0, 5).join(', ')}${validacaoResult.clientes_nao_encontrados.length > 5 ? '...' : ''}`);
           }
         }
       } catch (validacaoException) {
         console.warn('⚠️ Exceção na validação de cliente:', validacaoException);
-        resultado.alertas.push(`Validação de cliente: Exceção - ${validacaoException.message}`);
+        console.warn('⚠️ Exceção na validação de cliente:', validacaoException);
       }
     }
     try {
@@ -606,9 +607,17 @@ serve(async (req) => {
         for (const regra of regras) {
           try {
             console.log(`🔧 Aplicando regra: ${regra}`);
-            const { data, error } = await supabaseClient.functions.invoke(regra, {
-              body: { arquivo_fonte }
-            });
+            
+            // Converter período se necessário para regras que precisam
+            let body = { arquivo_fonte };
+            if ((regra === 'aplicar-exclusoes-periodo' || regra === 'aplicar-filtro-data-laudo') && periodo) {
+              const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+              const periodoReferencia = `${meses[periodo.mes - 1]}/${periodo.ano.toString().slice(-2)}`;
+              body = { arquivo_fonte, periodo_referencia: periodoReferencia };
+              console.log(`📅 Período convertido: ${periodoReferencia}`);
+            }
+            
+            const { data, error } = await supabaseClient.functions.invoke(regra, { body });
             
             if (error) {
               console.error(`❌ Erro na regra ${regra}:`, error);
