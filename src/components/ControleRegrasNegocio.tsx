@@ -298,6 +298,18 @@ export function ControleRegrasNegocio() {
       criterio: 'Define data de referência baseada no período de processamento selecionado para garantir consistência temporal dos dados.',
       status: 'ativa',
       implementadaEm: '2024-02-22',
+      observacoes: 'Edge function: set-data-referencia-volumetria',
+      ordem_execucao: 21,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'v032',
+      nome: 'Exclusão de Clientes Específicos',
+      modulo: 'volumetria',
+      categoria: 'exclusao',
+      criterio: 'Exclui registros de clientes específicos: RADIOCOR_LOCAL, CLINICADIA_TC, CLINICA RADIOCOR, CLIRAM_LOCAL.',
+      status: 'ativa',
+      implementadaEm: '2024-03-15',
       observacoes: 'Função SQL: aplicar_data_referencia_por_periodo + trigger_aplicar_data_referencia, aplicada durante o upload',
       ordem_execucao: 21,
       tipo_regra: 'negocio'
