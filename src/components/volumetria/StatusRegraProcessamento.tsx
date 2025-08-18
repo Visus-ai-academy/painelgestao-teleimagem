@@ -174,6 +174,12 @@ const REGRAS_MONITORADAS = [
     descricao: 'Exclui registros de clientes específicos que não devem ser processados na volumetria',
     funcao: 'aplicar_exclusao_clientes_especificos',
     id: 'v032'
+  },
+  {
+    nome: 'v033 Substituição Especialidade/Categoria',
+    descricao: 'Substitui especialidade e categoria por valores do cadastro de exames para especialidades específicas',
+    funcao: 'aplicar_substituicao_especialidade_categoria',
+    id: 'v033'
   }
 ];
 

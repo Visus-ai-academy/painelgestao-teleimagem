@@ -310,8 +310,20 @@ export function ControleRegrasNegocio() {
       criterio: 'Exclui registros de clientes específicos: RADIOCOR_LOCAL, CLINICADIA_TC, CLINICA RADIOCOR, CLIRAM_LOCAL.',
       status: 'ativa',
       implementadaEm: '2024-03-15',
-      observacoes: 'Função SQL: aplicar_data_referencia_por_periodo + trigger_aplicar_data_referencia, aplicada durante o upload',
-      ordem_execucao: 21,
+      observacoes: 'Edge function: aplicar-exclusao-clientes-especificos',
+      ordem_execucao: 22,
+      tipo_regra: 'exclusao'
+    },
+    {
+      id: 'v033',
+      nome: 'Substituição de Especialidade/Categoria por Cadastro de Exames',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Para exames com especialidades "Cardio com Score", "Corpo" ou "Onco Medicina Interna", substitui a especialidade e categoria pelos valores cadastrados na tabela cadastro_exames baseado no nome do exame.',
+      status: 'ativa',
+      implementadaEm: '2025-01-18',
+      observacoes: 'Aplica-se aos arquivos 1,2,3,4 durante o processamento - Edge function: aplicar-substituicao-especialidade-categoria',
+      ordem_execucao: 23,
       tipo_regra: 'negocio'
     },
 
