@@ -278,16 +278,14 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const gerarExcelDivergencias = async () => {
-    console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - NOVA IMPLEMENTAÇÃO');
-    console.log('📝 uploadedExams recebido:', uploadedExams?.length || 0, 'registros');
-    console.log('📊 Primeiros 3 itens do uploadedExams:', uploadedExams?.slice(0, 3));
+    console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - EXCEL GENERATION');
     
     try {
       setExporting(true);
       
       // VALIDAÇÃO 1: Verificar arquivo carregado
       if (!uploadedExams || uploadedExams.length === 0) {
-        alert('⚠️ ERRO: Nenhum arquivo foi carregado. Faça upload na aba "Por Exame" primeiro.');
+        alert('⚠️ ERRO: Nenhum arquivo foi carregado. Faça upload primeiro.');
         return;
       }
       console.log('📁 Arquivo validado:', uploadedExams.length, 'registros');
@@ -310,27 +308,131 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         .eq('periodo_referencia', periodoFormatado);
       
       if (error || !systemData || systemData.length === 0) {
-        // Tentar busca alternativa por data_referencia
-        const { data: systemDataAlt, error: errorAlt } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .gte('data_referencia', `${ano}-${mes}-01`)
-          .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
-        
-        if (errorAlt || !systemDataAlt || systemDataAlt.length === 0) {
-          alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}.`);
-          return;
+        alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}.`);
+        return;
+      }
+      
+      console.log('✅ Dados do sistema encontrados:', systemData.length, 'registros');
+      
+      // PROCESSAMENTO DAS DIVERGÊNCIAS
+      const divergenciasFinais: any[] = [];
+      
+      // 1. DADOS APENAS NO ARQUIVO (não estão no sistema)
+      const arquivoMap = new Map<string, any>();
+      uploadedExams.forEach(item => {
+        const chave = `${normalizar(item.paciente || '')}_${normalizar(item.exame || '')}_${normalizarData(item.data_exame)}_${normalizar(item.medico || '')}`;
+        if (!arquivoMap.has(chave)) {
+          arquivoMap.set(chave, {
+            ...item,
+            quantidade_total: item.quant || 1
+          });
+        } else {
+          const existing = arquivoMap.get(chave);
+          existing.quantidade_total += (item.quant || 1);
         }
-        
-        console.log('✅ Dados do sistema encontrados via data_referencia:', systemDataAlt.length);
-        var dadosSistema = systemDataAlt;
-      } else {
-        console.log('✅ Dados do sistema encontrados via periodo_referencia:', systemData.length);
-        var dadosSistema = systemData;
+      });
+      
+      const sistemaMap = new Map<string, any>();
+      systemData.forEach(item => {
+        const chave = `${normalizar(item.NOME_PACIENTE || '')}_${normalizar(item.ESTUDO_DESCRICAO || '')}_${normalizarData(item.DATA_REALIZACAO)}_${normalizar(item.MEDICO || '')}`;
+        if (!sistemaMap.has(chave)) {
+          sistemaMap.set(chave, {
+            ...item,
+            quantidade_total: item.VALORES || 1
+          });
+        } else {
+          const existing = sistemaMap.get(chave);
+          existing.quantidade_total += (item.VALORES || 1);
+        }
+      });
+      
+      console.log('📊 Mapas criados - Arquivo:', arquivoMap.size, '| Sistema:', sistemaMap.size);
+      
+      // 2. IDENTIFICAR DIVERGÊNCIAS
+      let contadorDiv = 0;
+      
+      // Dados apenas no arquivo
+      arquivoMap.forEach((itemArquivo, chave) => {
+        if (!sistemaMap.has(chave)) {
+          contadorDiv++;
+          divergenciasFinais.push({
+            tipo: 'arquivo_nao_no_sistema',
+            chave,
+            'Tipo Divergência': 'Dados apenas no arquivo',
+            'Cliente': itemArquivo.cliente || '-',
+            'Paciente': itemArquivo.paciente || '-',
+            'Código Paciente': itemArquivo.codigoPaciente || '-',
+            'Exame': itemArquivo.exame || '-',
+            'Modalidade': itemArquivo.modalidade || '-',
+            'Especialidade': itemArquivo.especialidade || '-',
+            'Prioridade': itemArquivo.prioridade || '-',
+            'Médico': itemArquivo.medico || '-',
+            'Data Realização': formatarDataBR(itemArquivo.data_exame),
+            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+            'Qtd Arquivo': itemArquivo.quantidade_total,
+            'Qtd Sistema': 0,
+          });
+        }
+      });
+      
+      // Dados apenas no sistema
+      sistemaMap.forEach((itemSistema, chave) => {
+        if (!arquivoMap.has(chave)) {
+          contadorDiv++;
+          divergenciasFinais.push({
+            tipo: 'sistema_nao_no_arquivo',
+            chave,
+            'Tipo Divergência': 'Dados apenas no sistema',
+            'Cliente': itemSistema.EMPRESA || '-',
+            'Paciente': itemSistema.NOME_PACIENTE || '-',
+            'Código Paciente': itemSistema.CODIGO_PACIENTE || '-',
+            'Exame': itemSistema.ESTUDO_DESCRICAO || '-',
+            'Modalidade': itemSistema.MODALIDADE || '-',
+            'Especialidade': itemSistema.ESPECIALIDADE || '-',
+            'Prioridade': itemSistema.PRIORIDADE || '-',
+            'Médico': itemSistema.MEDICO || '-',
+            'Data Realização': itemSistema.DATA_REALIZACAO || '-',
+            'Data Laudo': itemSistema.DATA_LAUDO || '-',
+            'Qtd Arquivo': 0,
+            'Qtd Sistema': itemSistema.quantidade_total,
+          });
+        }
+      });
+      
+      // Dados em ambos mas com quantidades diferentes
+      arquivoMap.forEach((itemArquivo, chave) => {
+        const itemSistema = sistemaMap.get(chave);
+        if (itemSistema && itemArquivo.quantidade_total !== itemSistema.quantidade_total) {
+          contadorDiv++;
+          divergenciasFinais.push({
+            tipo: 'quantidade_diferente',
+            chave,
+            'Tipo Divergência': 'Quantidade diferente',
+            'Cliente': itemArquivo.cliente || '-',
+            'Paciente': itemArquivo.paciente || '-',
+            'Código Paciente': itemArquivo.codigoPaciente || '-',
+            'Exame': itemArquivo.exame || '-',
+            'Modalidade': itemArquivo.modalidade || '-',
+            'Especialidade': itemArquivo.especialidade || '-',
+            'Prioridade': itemArquivo.prioridade || '-',
+            'Médico': itemArquivo.medico || '-',
+            'Data Realização': formatarDataBR(itemArquivo.data_exame),
+            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+            'Qtd Arquivo': itemArquivo.quantidade_total,
+            'Qtd Sistema': itemSistema.quantidade_total,
+          });
+        }
+      });
+      
+      console.log('📈 Total de divergências encontradas:', contadorDiv);
+      
+      if (divergenciasFinais.length === 0) {
+        alert('✅ Nenhuma divergência encontrada entre arquivo e sistema!');
+        return;
       }
       
       // FILTRAR dados por cliente se necessário
-      const sistemaFiltrado = dadosSistema.filter((item: any) => {
+      const sistemaFiltrado = systemData.filter((item: any) => {
         if (cliente === 'todos') return true;
         const empresaNormalizada = normalizarCliente(item.EMPRESA || '');
         return empresaNormalizada === normalizarCliente(cliente);
