@@ -274,14 +274,23 @@ export function VolumetriaClientesComparison({
       // 2) Se houver dados detalhados, preencher detalhamentos e criar fallback de totais
       if (context.detailedData && context.detailedData.length > 0) {
         console.log('🔍 [COMPARATIVO DEBUG] Preenchendo detalhamentos com dados detalhados:', context.detailedData.length);
+        console.log('🔍 [COMPARATIVO DEBUG] Primeiros 5 registros detalhados:', context.detailedData.slice(0, 5));
+        
         const detailsTotals = new Map<string, number>();
-        (context.detailedData as any[]).forEach((item) => {
+        (context.detailedData as any[]).forEach((item, index) => {
           const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? (item as any).Empresa ?? (item as any).CLIENTE ?? (item as any).cliente ?? (item as any).Cliente ?? '';
           const cliente = String(clienteRaw).trim();
+          
+          if (index < 10) {
+            console.log(`🔍 [DETALHADO ${index}] Cliente:`, cliente, 'VALORES:', (item as any).VALORES, 'MODALIDADE:', (item as any).MODALIDADE);
+          }
+          
           if (!cliente) return;
           const key = normalizeClientName(cliente).toLowerCase();
+          
+          // CRÍTICO: Se cliente não existe no map de stats, criar entrada
           if (!map.has(key)) {
-            // Cliente não veio nas stats por algum motivo; cria com total 0 (será atualizado pelo fallback)
+            console.log('🆕 [NOVO CLIENTE] Criando entrada para cliente não encontrado nas stats:', cliente);
             map.set(key, {
               cliente,
               total_exames: 0,
@@ -292,29 +301,44 @@ export function VolumetriaClientesComparison({
               exames: {},
             });
           }
+          
           const ref = map.get(key)!;
           const anyItem: any = item;
           // Usar valor numérico real do registro detalhado quando disponível
           const rawVal = (anyItem.VALORES ?? anyItem.VALOR ?? anyItem.QUANTIDADE ?? anyItem.QTD ?? anyItem.QTDE ?? 1);
           const incNum = Number(rawVal);
           const inc = Number.isFinite(incNum) ? incNum : 1;
+          
           // Acumular totais de fallback a partir do detalhado
           detailsTotals.set(key, (detailsTotals.get(key) || 0) + inc);
+          
           const mod = canonicalModalidade(anyItem.MODALIDADE ?? anyItem.modalidade ?? anyItem.Modalidade);
           const esp = canonical(anyItem.ESPECIALIDADE ?? anyItem.especialidade ?? anyItem.Especialidade);
           const pri = canonicalPrioridade(anyItem.PRIORIDADE ?? anyItem.prioridade ?? anyItem.Prioridade);
           const cat = canonical(anyItem.CATEGORIA ?? anyItem.categoria ?? anyItem.Categoria);
           const exame = canonical(anyItem.ESTUDO_DESCRICAO ?? anyItem.NOME_EXAME ?? anyItem.EXAME ?? anyItem.ESTUDO ?? anyItem.nome_exame ?? anyItem.Nome_Est ?? anyItem.nome_est);
+          
+          // Debug para AKCPALMAS
+          if (cliente.includes('AKCPALMAS') && index < 5) {
+            console.log('🔍 [AKCPALMAS DEBUG]', {
+              mod, esp, pri, cat, exame, inc,
+              modalidade_antes: ref.modalidades[mod] || 0,
+              especialidade_antes: ref.especialidades[esp] || 0
+            });
+          }
+          
           if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + inc;
           if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + inc;
           if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + inc;
           if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + inc;
           if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + inc;
         });
+        
         // Fallback: quando stats não trouxe o total do cliente, usar a soma dos detalhados
         for (const [key, ref] of map.entries()) {
           if (!ref.total_exames || ref.total_exames === 0) {
             ref.total_exames = detailsTotals.get(key) || 0;
+            console.log('🔄 [FALLBACK] Cliente', ref.cliente, 'total stats era 0, usando detalhado:', ref.total_exames);
           }
         }
       }
