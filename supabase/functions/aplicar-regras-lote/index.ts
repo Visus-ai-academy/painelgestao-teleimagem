@@ -23,11 +23,11 @@ serve(async (req) => {
 
     console.log(`🔄 APLICANDO REGRAS EM LOTE PARA: ${arquivo_fonte || 'TODOS'}`);
 
-    // Sequência de regras a serem aplicadas
+    // Sequência de regras a serem aplicadas (regras de filtro de data desativadas temporariamente)
     const regras = [
       'aplicar-exclusao-clientes-especificos',
-      'aplicar-exclusoes-periodo',
-      'aplicar-filtro-data-laudo', 
+      // 'aplicar-exclusoes-periodo', // DESATIVADO - estava excluindo registros válidos 
+      // 'aplicar-filtro-data-laudo',  // DESATIVADO - estava excluindo registros válidos
       'aplicar-regras-tratamento',
       'aplicar-correcao-modalidade-rx',
       'aplicar-correcao-modalidade-ot',
