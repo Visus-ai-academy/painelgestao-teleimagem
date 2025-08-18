@@ -503,6 +503,16 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       console.log('🏥 Sistema processado - chaves únicas:', mapSistema.size);
       
+      // DEBUG: Mostrar algumas chaves do sistema para comparação
+      const primeirasDezChavesSistema = Array.from(mapSistema.keys()).slice(0, 10);
+      console.log('🔍 Primeiras 10 chaves do SISTEMA:', primeirasDezChavesSistema);
+      
+      if (mapSistema.size === 0) {
+        console.error('⚠️ CRÍTICO: Nenhuma chave foi criada para dados do sistema!');
+        alert('⚠️ ERRO CRÍTICO: Falha ao processar dados do sistema. Nenhuma chave foi gerada.');
+        return;
+      }
+      
       // Processar arquivo em batches
       type AggFile = { total: number; amostra?: UploadedExamRow };
       const mapArquivo = new Map<string, AggFile>();
@@ -561,6 +571,16 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       }
       
       console.log('📁 Arquivo processado - chaves únicas:', mapArquivo.size);
+      
+      // DEBUG: Mostrar algumas chaves do arquivo para comparação
+      const primeirasDezChavesArquivo = Array.from(mapArquivo.keys()).slice(0, 10);
+      console.log('🔍 Primeiras 10 chaves do ARQUIVO:', primeirasDezChavesArquivo);
+      
+      if (mapArquivo.size === 0) {
+        console.error('⚠️ CRÍTICO: Nenhuma chave foi criada para dados do arquivo!');
+        alert('⚠️ ERRO CRÍTICO: Falha ao processar dados do arquivo. Nenhuma chave foi gerada.');
+        return;
+      }
 
       // OTIMIZAÇÃO: Construir divergências identificando tipos específicos
       const divergencias: LinhaDivergencia[] = [];
@@ -652,7 +672,32 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       const allKeysArray = Array.from(allKeys);
       const DIVERGENCE_BATCH_SIZE = 500;
       
-      console.log('🔍 Processando', allKeysArray.length, 'chaves para divergências');
+       console.log('🔍 Processando', allKeysArray.length, 'chaves para divergências');
+       
+       // DEBUG: Verificar se há sobreposição entre as chaves
+       const chavesComuns = Array.from(mapArquivo.keys()).filter(k => mapSistema.has(k));
+       console.log('🎯 CHAVES COMUNS encontradas:', chavesComuns.length);
+       console.log('🎯 Primeiras 3 chaves comuns:', chavesComuns.slice(0, 3));
+       
+       // DEBUG: Verificar diferença específica para entender o problema
+       if (chavesComuns.length === 0) {
+         console.log('❌ PROBLEMA: Nenhuma chave comum encontrada!');
+         console.log('🔍 Primeira chave do arquivo:', Array.from(mapArquivo.keys())[0]);
+         console.log('🔍 Primeira chave do sistema:', Array.from(mapSistema.keys())[0]);
+         
+         // Comparar formato das chaves para ver diferenças
+         const primeiraChaveArquivo = Array.from(mapArquivo.keys())[0];
+         const primeiraChaveSistema = Array.from(mapSistema.keys())[0];
+         
+         if (primeiraChaveArquivo && primeiraChaveSistema) {
+           const partesArquivo = primeiraChaveArquivo.split('|');
+           const partesSistema = primeiraChaveSistema.split('|');
+           
+           console.log('📊 Comparação de estrutura das chaves:');
+           console.log('Arquivo partes:', partesArquivo);
+           console.log('Sistema partes:', partesSistema);
+         }
+       }
       
       for (let i = 0; i < allKeysArray.length; i += DIVERGENCE_BATCH_SIZE) {
         const keyBatch = allKeysArray.slice(i, i + DIVERGENCE_BATCH_SIZE);
@@ -766,6 +811,40 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           ])
         )
       );
+      
+      // CRÍTICO: Se todas as divergências são "arquivo_nao_no_sistema", há um problema no matching
+      const divergenciasSoArquivo = divergencias.filter(d => d.tipo === 'arquivo_nao_no_sistema');
+      if (divergenciasSoArquivo.length === divergencias.length && divergencias.length > 0) {
+        console.error('🚨 PROBLEMA IDENTIFICADO: Todas as divergências são "arquivo_nao_no_sistema"');
+        console.error('🚨 Isso significa que o sistema de matching de chaves está falhando');
+        console.error('🚨 Dados do sistema:', mapSistema.size, 'registros');
+        console.error('🚨 Dados do arquivo:', mapArquivo.size, 'registros');
+        console.error('🚨 Chaves comuns:', chavesComuns.length);
+        
+        // Análise específica do problema
+        const amostraChaveArquivo = Array.from(mapArquivo.keys())[0];
+        const amostraChaveSistema = Array.from(mapSistema.keys())[0];
+        
+        console.error('🔍 ANÁLISE DE CHAVES:');
+        console.error('Primeira chave do arquivo:', amostraChaveArquivo);
+        console.error('Primeira chave do sistema:', amostraChaveSistema);
+        
+        if (amostraChaveArquivo && amostraChaveSistema) {
+          const partesArq = amostraChaveArquivo.split('|');
+          const partesSis = amostraChaveSistema.split('|');
+          console.error('Partes arquivo:', partesArq);
+          console.error('Partes sistema:', partesSis);
+          
+          // Verificar diferenças parte por parte
+          for (let i = 0; i < Math.max(partesArq.length, partesSis.length); i++) {
+            const parteArq = partesArq[i] || 'FALTANDO';
+            const parteSis = partesSis[i] || 'FALTANDO';
+            if (parteArq !== parteSis) {
+              console.error(`Diferença na parte ${i}: Arquivo="${parteArq}" vs Sistema="${parteSis}"`);
+            }
+          }
+        }
+      }
 
       // VALIDAÇÃO CRÍTICA: Verificar se realmente há divergências
       if (divergencias.length === 0) {
