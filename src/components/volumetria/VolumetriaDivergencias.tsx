@@ -185,7 +185,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const [clientesMap, setClientesMap] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   
-  const [referencia, setReferencia] = useState<string>('2025-06');
+  // Usar período ativo do contexto (sem filtro local duplicado)
   const [cliente, setCliente] = useState<string>('todos');
 
   // DEBUG: Log sempre que uploadedExams mudar
@@ -206,46 +206,21 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
     })();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('volumetria_mobilemed')
-          .select('periodo_referencia')
-          .not('periodo_referencia', 'is', null)
-          .order('periodo_referencia', { ascending: false })
-          .limit(1);
-        
-        if (data && data.length > 0) {
-          const ultimoPeriodo = data[0].periodo_referencia as string;
-          
-          if (ultimoPeriodo && ultimoPeriodo.includes('/')) {
-            const [mes, ano] = ultimoPeriodo.split('/');
-            const mesesMap: Record<string, string> = {
-              'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04', 'mai': '05', 'jun': '06',
-              'jul': '07', 'ago': '08', 'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
-            };
-            const mesNum = mesesMap[mes];
-            if (mesNum && ano) {
-              const anoCompleto = ano.length === 2 ? `20${ano}` : ano;
-              const refFormatada = `${anoCompleto}-${mesNum}`;
-              setReferencia(refFormatada);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao buscar último período:', error);
-      }
-    })();
-  }, []);
+  // Obter período ativo do contexto (removendo lógica duplicada)
+  const periodoAtivo = ctx.dashboardStats?.periodo_ativo || 'jun/25';
+  
+  console.log('🎯 VolumetriaDivergencias - Período ativo do contexto:', periodoAtivo);
 
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const gerarExcelDivergencias = async () => {
-    console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - VERSÃO CORRIGIDA DEFINITIVA');
-    
-    try {
-      setExporting(true);
+      console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - USANDO PERÍODO DO CONTEXTO');
+      console.log('🎯 Período ativo selecionado:', periodoAtivo);
+      
+      try {
+        setExporting(true);
+        
+        // USAR PERÍODO DO CONTEXTO em vez do filtro local
       
       // VALIDAÇÃO 1: Verificar arquivo carregado
       if (!uploadedExams || uploadedExams.length === 0) {
@@ -255,16 +230,36 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       console.log('📁 Arquivo validado:', uploadedExams.length, 'registros');
       console.log('📊 Primeiros 3 registros do arquivo:', uploadedExams.slice(0, 3));
       
-      // VALIDAÇÃO 2: Buscar dados do sistema
-      console.log('🔍 Buscando dados do sistema para período:', referencia);
-      
-      const [ano, mes] = referencia.split('-');
-      const mesesNome = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-      const mesNome = mesesNome[parseInt(mes) - 1];
-      const anoShort = ano.substring(2, 4);
-      const periodoFormatado = `${mesNome}/${anoShort}`;
-      
-      console.log('🔄 Período convertido:', referencia, '->', periodoFormatado);
+        // CONVERSÃO DO PERÍODO DO CONTEXTO PARA FORMATO DE BUSCA
+        console.log('🔄 Convertendo período do contexto para busca...');
+        console.log('📅 Período original do contexto:', periodoAtivo);
+        
+        let periodoFormatado = periodoAtivo; // Usar diretamente o formato do contexto (jun/25)
+        let ano = '', mes = '';
+        
+        // Se vier no formato "jun/25", converter para ano/mês para buscas alternativas
+        if (periodoAtivo && periodoAtivo.includes('/')) {
+          const [mesNome, anoShort] = periodoAtivo.split('/');
+          const mesesMap: Record<string, string> = {
+            'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04', 'mai': '05', 'jun': '06',
+            'jul': '07', 'ago': '08', 'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
+          };
+          mes = mesesMap[mesNome] || '06';
+          ano = anoShort.length === 2 ? `20${anoShort}` : anoShort;
+          
+          console.log('🔄 Conversão realizada:', {
+            original: periodoAtivo,
+            ano, 
+            mes,
+            periodoFormatado
+          });
+        } else {
+          // Fallback para o formato atual se não conseguir converter
+          console.log('⚠️ Formato de período não reconhecido, usando fallback');
+          ano = '2025';
+          mes = '06';
+          periodoFormatado = 'jun/25';
+        }
       
       // BUSCA ESTRATÉGICA DOS DADOS DO SISTEMA - VERSÃO CORRIGIDA
       console.log('🔍 Estratégias de busca dos dados do sistema:');
@@ -1109,8 +1104,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       XLSX.utils.book_append_sheet(wb, ws, 'Divergências Reais');
       
-      // Nome do arquivo
-      const nomeArquivo = `divergencias_REAIS_${referencia}_${cliente !== 'todos' ? cliente : 'todos'}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+      // Nome do arquivo usando período do contexto
+      const nomeArquivo = `divergencias_REAIS_${periodoAtivo.replace('/', '-')}_${cliente !== 'todos' ? cliente : 'todos'}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
       
       // Download
       XLSX.writeFile(wb, nomeArquivo);
@@ -1135,31 +1130,13 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           <span>Divergências de Exames</span>
         </CardTitle>
         <CardDescription>
-          Gerar relatório Excel com divergências entre arquivo enviado e dados do sistema
+          Gerar relatório Excel com divergências entre arquivo enviado e dados do sistema.
+          <br />
+          <strong>Período ativo:</strong> {periodoAtivo}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex gap-4 mb-6">
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">Período de Referência</label>
-            <Select value={referencia} onValueChange={setReferencia}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2025-06">Junho/2025</SelectItem>
-                <SelectItem value="2025-05">Maio/2025</SelectItem>
-                <SelectItem value="2025-04">Abril/2025</SelectItem>
-                <SelectItem value="2025-03">Março/2025</SelectItem>
-                <SelectItem value="2025-02">Fevereiro/2025</SelectItem>
-                <SelectItem value="2025-01">Janeiro/2025</SelectItem>
-                <SelectItem value="2024-12">Dezembro/2024</SelectItem>
-                <SelectItem value="2024-11">Novembro/2024</SelectItem>
-                <SelectItem value="2024-10">Outubro/2024</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
           <div className="flex-1">
             <label className="block text-sm font-medium mb-1">Cliente</label>
             <Select value={cliente} onValueChange={setCliente}>
