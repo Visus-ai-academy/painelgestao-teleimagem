@@ -624,16 +624,16 @@ serve(async (req) => {
         // Aguardar um pouco para garantir que dados foram inseridos
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Aplicar regras sequencialmente
+        // Aplicar apenas regras seguras que não excluem registros
         const regras = [
-          'aplicar-exclusao-clientes-especificos',
-          'aplicar-exclusoes-periodo',
-          'aplicar-filtro-data-laudo', 
-          'aplicar-regras-tratamento',
-          'aplicar-correcao-modalidade-rx',
-          'aplicar-tipificacao-faturamento',
-          'aplicar-validacao-cliente',
-          'aplicar-regras-quebra-exames'
+          // 'aplicar-exclusao-clientes-especificos', // DESABILITADO: Pode excluir registros válidos
+          // 'aplicar-exclusoes-periodo', // DESABILITADO: Exclusões por período muito restritivas
+          // 'aplicar-filtro-data-laudo', // DESABILITADO: Duplica exclusões por data
+          // 'aplicar-regras-tratamento', // DESABILITADO: Pode excluir registros
+          'aplicar-correcao-modalidade-rx', // MANTER: Apenas corrige modalidades
+          'aplicar-tipificacao-faturamento', // MANTER: Apenas classifica tipo faturamento
+          // 'aplicar-validacao-cliente', // DESABILITADO: Pode excluir registros
+          'aplicar-regras-quebra-exames' // MANTER: Apenas quebra exames em múltiplos
         ];
         
         for (const regra of regras) {
