@@ -258,38 +258,44 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       }
       console.log('📁 Arquivo carregado com', uploadedExams.length, 'registros');
       
-      // VALIDAÇÃO CRÍTICA 2: Verificar se há dados do sistema no contexto
-      let systemData = ctx?.detailedData || [];
-      console.log('🏥 Total de registros detalhados do sistema (inicial):', systemData.length);
+      // VALIDAÇÃO CRÍTICA 2: Buscar dados do sistema diretamente
+      console.log('🔍 Buscando dados do sistema para período:', periodoReferenciaBanco);
       
-      // Se não há dados detalhados, buscar diretamente da tabela volumetria_mobilemed
-      if (!systemData || systemData.length === 0) {
-        console.log('⚠️ Dados do contexto não disponíveis, buscando diretamente do banco...');
+      // Converter período para formato do banco
+      const [ano, mes] = periodoReferenciaBanco.split('-');
+      const mesesNome = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      const mesNome = mesesNome[parseInt(mes) - 1];
+      const anoShort = ano.substring(2, 4);
+      const periodoFormatado = `${mesNome}/${anoShort}`;
+      
+      console.log('🔄 Convertendo período:', periodoReferenciaBanco, '->', periodoFormatado);
+      
+      let systemData: any[] = [];
+      
+      try {
+        const { data: fetchedData, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('periodo_referencia', periodoFormatado);
         
-        try {
-          const { data: directData, error } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('periodo_referencia', periodoReferenciaBanco.replace('-', '/').replace('2025-', '').replace('2024-', '') + '/' + periodoReferenciaBanco.substring(2, 4));
-          
-          if (error) {
-            console.error('Erro ao buscar dados diretos:', error);
-            alert('⚠️ ERRO: Não foi possível carregar os dados do sistema. Verifique sua conexão e tente novamente.');
-            return;
-          }
-          
-          systemData = directData || [];
-          console.log('🔄 Dados carregados diretamente do banco:', systemData.length, 'registros');
-          
-          if (systemData.length === 0) {
-            alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoReferenciaBanco}. Verifique se há dados processados para este período.`);
-            return;
-          }
-        } catch (error) {
+        if (error) {
           console.error('Erro ao buscar dados do sistema:', error);
-          alert('⚠️ ERRO: Falha ao carregar dados do sistema. Tente novamente em alguns segundos.');
+          alert('⚠️ ERRO: Não foi possível carregar os dados do sistema. Verifique sua conexão e tente novamente.');
           return;
         }
+        
+        systemData = fetchedData || [];
+        
+        if (systemData.length === 0) {
+          alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}. Verifique se há dados processados para este período.`);
+          return;
+        }
+        
+        console.log('🔄 Dados do sistema carregados:', systemData.length, 'registros para período', periodoFormatado);
+      } catch (error) {
+        console.error('Erro ao buscar dados do sistema:', error);
+        alert('⚠️ ERRO: Falha ao carregar dados do sistema. Tente novamente em alguns segundos.');
+        return;
       }
       
       console.log('🔍 DEBUG Sistema dados finais:', {
