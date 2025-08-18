@@ -273,33 +273,43 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       let systemData: any[] = [];
       
       try {
-        // PRIMEIRO: Tentar buscar com o período formatado exato
-        let { data: fetchedData, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .eq('periodo_referencia', periodoFormatado);
+        // ESTRATÉGIA UNIFICADA: Usar o mesmo método que o contexto VolumetriaContext
+        console.log('🔍 Buscando dados usando contexto VolumetriaContext para período:', periodoReferenciaBanco);
         
-        // Se não encontrar dados, tentar buscar por data_referencia também
-        if (!fetchedData || fetchedData.length === 0) {
-          console.log('🔍 Período formatado não retornou dados, tentando filtrar por data_referencia');
-          
-          const { data: fetchedDataByDate, error: errorByDate } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .gte('data_referencia', `${ano}-${mes}-01`)
-            .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
-          
-          if (!errorByDate && fetchedDataByDate && fetchedDataByDate.length > 0) {
-            console.log('✅ Encontrados dados por data_referencia:', fetchedDataByDate.length);
-            fetchedData = fetchedDataByDate;
-            error = null;
-          }
+        // Usar getDataByPeriod do contexto se disponível
+        let fetchedData: any[] = [];
+        if (ctx && typeof (ctx as any).getDataByPeriod === 'function') {
+          fetchedData = (ctx as any).getDataByPeriod(periodoReferenciaBanco) || [];
+          console.log('✅ Dados obtidos via contexto:', fetchedData.length);
         }
         
-        if (error) {
-          console.error('Erro ao buscar dados do sistema:', error);
-          alert('⚠️ ERRO: Não foi possível carregar os dados do sistema. Verifique sua conexão e tente novamente.');
-          return;
+        // Se não conseguiu pelo contexto, buscar diretamente
+        if (fetchedData.length === 0) {
+          console.log('🔄 Contexto vazio, buscando diretamente por período formatado:', periodoFormatado);
+          const { data: fetchedDataDirect, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .eq('periodo_referencia', periodoFormatado);
+          
+          if (!error && fetchedDataDirect) {
+            fetchedData = fetchedDataDirect;
+            console.log('✅ Dados diretos encontrados:', fetchedData.length);
+          }
+          
+          // Se ainda não encontrou, tentar por data_referencia
+          if (fetchedData.length === 0) {
+            console.log('🔄 Tentando busca por data_referencia');
+            const { data: fetchedDataByDate, error: errorByDate } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .gte('data_referencia', `${ano}-${mes}-01`)
+              .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
+            
+            if (!errorByDate && fetchedDataByDate) {
+              fetchedData = fetchedDataByDate;
+              console.log('✅ Dados por data_referencia encontrados:', fetchedData.length);
+            }
+          }
         }
         
         systemData = fetchedData || [];

@@ -102,8 +102,16 @@ export function VolumetriaClientesComparison({
   const { toast } = useToast();
   const [filtro, setFiltro] = useState<'todos' | 'divergencias'>('todos');
 
-  // Obter dados filtrados por período selecionado
-  const dadosPeriodo = periodoSelecionado ? getDataByPeriod(periodoSelecionado) : context.detailedData;
+  // CORREÇÃO CRÍTICA: Usar sempre dados do período selecionado ou dados detalhados atuais
+  const dadosPeriodo = useMemo(() => {
+    if (periodoSelecionado && getDataByPeriod) {
+      const dados = getDataByPeriod(periodoSelecionado);
+      console.log('🔍 [COMPARATIVO] Dados do período selecionado:', periodoSelecionado, 'total:', dados?.length);
+      return dados;
+    }
+    console.log('🔍 [COMPARATIVO] Usando dados detalhados do contexto:', context.detailedData?.length);
+    return context.detailedData;
+  }, [periodoSelecionado, getDataByPeriod, context.detailedData]);
 
   // Agregar dados do sistema (definitivos) a partir do contexto
   const sistemaClientes = useMemo<ClienteAggregated[]>(() => {
@@ -111,9 +119,10 @@ export function VolumetriaClientesComparison({
       console.log('🔍 [COMPARATIVO DEBUG] Context completo:', context);
       console.log('🔍 [COMPARATIVO DEBUG] Período selecionado:', periodoSelecionado);
       
-      // Se há período selecionado, usar dados filtrados
-      if (periodoSelecionado && dadosPeriodo && dadosPeriodo.length > 0) {
-        console.log('🔍 [COMPARATIVO DEBUG] Usando dados filtrados por período:', dadosPeriodo.length, 'registros');
+      // SEMPRE usar dados do período se disponíveis (seja período selecionado ou dados atuais)
+      if (dadosPeriodo && dadosPeriodo.length > 0) {
+        console.log('🔍 [COMPARATIVO DEBUG] Processando dados do período:', dadosPeriodo.length, 'registros');
+        console.log('🔍 [COMPARATIVO DEBUG] Período:', periodoSelecionado || 'atual');
         
         const map = new Map<string, ClienteAggregated>();
         
