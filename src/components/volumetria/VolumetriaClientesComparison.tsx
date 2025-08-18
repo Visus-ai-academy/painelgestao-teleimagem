@@ -222,14 +222,17 @@ export function VolumetriaClientesComparison({
       const stats = (context as any)?.clientesStats || [];
       console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats?.length, stats?.slice(0, 3));
       
+      
       if (!stats || stats.length === 0) {
         console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
-        // Fallback direto para dados detalhados se stats estiver vazio
-        if (context.detailedData && context.detailedData.length > 0) {
+        // CORREÇÃO: Usar dados detalhados direto quando stats está vazio
+        const dadosParaUsar = uploadedExams && uploadedExams.length > 0 ? uploadedExams : context.detailedData || [];
+        
+        if (dadosParaUsar && dadosParaUsar.length > 0) {
+          console.log('✅ Usando dados detalhados:', dadosParaUsar.length, 'registros');
           const map = new Map<string, ClienteAggregated>();
-          console.log('🔍 [COMPARATIVO DEBUG] Usando dados detalhados:', context.detailedData.length, 'registros');
           
-          (context.detailedData as any[]).forEach((item) => {
+          (dadosParaUsar as any[]).forEach((item, index) => {
             const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
             const cliente = String(clienteRaw).trim();
             if (!cliente) return;
@@ -252,6 +255,18 @@ export function VolumetriaClientesComparison({
             const inc = Number.isFinite(Number(rawVal)) ? Number(rawVal) : 1;
             ref.total_exames += inc;
             
+            // Debug para AKCPALMAS
+            if (cliente.includes('AKCPALMAS') && index < 10) {
+              console.log(`🔍 [AKCPALMAS DEBUG ${index}]`, {
+                modalidade: (item as any).MODALIDADE,
+                especialidade: (item as any).ESPECIALIDADE,
+                prioridade: (item as any).PRIORIDADE,
+                categoria: (item as any).CATEGORIA,
+                exame: (item as any).ESTUDO_DESCRICAO,
+                valores: inc
+              });
+            }
+            
             // Adicionar detalhes
             const mod = canonicalModalidade((item as any).MODALIDADE ?? (item as any).modalidade ?? (item as any).Modalidade);
             const esp = canonical((item as any).ESPECIALIDADE ?? (item as any).especialidade ?? (item as any).Especialidade);
@@ -267,8 +282,10 @@ export function VolumetriaClientesComparison({
           });
           
           const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
-          console.log('🔍 [COMPARATIVO DEBUG] Fallback concluído:', resultado.length, 'clientes');
-          console.log('🔍 [COMPARATIVO DEBUG] Primeiros 3 clientes fallback:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
+          console.log('✅ [COMPARATIVO] Resultado corrigido:', resultado.length, 'clientes');
+          resultado.forEach(cliente => {
+            console.log(`🏢 ${cliente.cliente}: ${cliente.total_exames} exames, ${Object.keys(cliente.modalidades).length} modalidades, ${Object.keys(cliente.especialidades).length} especialidades`);
+          });
           return resultado;
         }
         
