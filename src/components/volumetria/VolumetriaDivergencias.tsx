@@ -53,6 +53,65 @@ function normalizarCliente(nome: string): string {
   return limpo;
 }
 
+function normalizarMedico(nome: string): string {
+  if (!nome) return '';
+  
+  let nomeNormalizado = nome
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/^DR\.?\s+|^DRA\.?\s+/g, '') // Remove Dr./Dra. do início
+    .replace(/\s*\([^)]*\)\s*/g, '') // Remove códigos entre parênteses
+    .replace(/\.$/, '') // Remove ponto final
+    .trim();
+  
+  // Dividir em palavras
+  const palavras = nomeNormalizado.split(/\s+/).filter(p => p.length > 0);
+  
+  if (palavras.length === 0) return '';
+  if (palavras.length === 1) return palavras[0];
+  
+  // Pegar primeiro nome e primeira letra dos demais
+  const primeiroNome = palavras[0];
+  const iniciais = palavras.slice(1)
+    .filter(p => p.length > 2) // Ignorar conectores como DE, DA, DO
+    .map(p => p[0])
+    .join(' ');
+  
+  return iniciais ? `${primeiroNome} ${iniciais}` : primeiroNome;
+}
+
+function normalizarExame(nome: string): string {
+  if (!nome) return '';
+  
+  let exameNormalizado = nome
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^A-Z0-9\s]/g, ' ') // Substitui especiais por espaço
+    .replace(/\s+/g, ' ') // Unifica espaços
+    .trim();
+  
+  // Normalizações específicas de exames
+  const mapeamentos: Record<string, string> = {
+    'RADIOGRAFIA': 'RX',
+    'RAIO X': 'RX',
+    'TOMOGRAFIA COMPUTADORIZADA': 'TC',
+    'RESSONANCIA MAGNETICA': 'RM',
+    'ULTRASSONOGRAFIA': 'US',
+    'ECOGRAFIA': 'US'
+  };
+  
+  // Aplicar mapeamentos
+  Object.entries(mapeamentos).forEach(([original, substituto]) => {
+    exameNormalizado = exameNormalizado.replace(new RegExp(original, 'g'), substituto);
+  });
+  
+  return exameNormalizado;
+}
+
 function normalizarData(data: any): string {
   if (!data) return '';
   
@@ -228,13 +287,14 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       // PROCESSAMENTO DEFINITIVO DAS DIVERGÊNCIAS
       console.log('🔧 Iniciando processamento de divergências...');
       
-      // Criar função de chave normalizada
-      const criarChave = (paciente: string, exame: string, dataExame: any, medico: string) => {
+      // Criar função de chave normalizada para comparação
+      const criarChave = (paciente: string, exame: string, dataExame: any, dataLaudo: any, medico: string) => {
         const p = normalizar(paciente || '');
-        const e = normalizar(exame || '');
-        const d = normalizarData(dataExame);
-        const m = normalizar(medico || '');
-        return `${p}|${e}|${d}|${m}`;
+        const e = normalizarExame(exame || '');
+        const dr = normalizarData(dataExame);
+        const dl = normalizarData(dataLaudo);
+        const m = normalizarMedico(medico || '');
+        return `${p}|${e}|${dr}|${dl}|${m}`;
       };
       
       // FILTRAR dados por cliente se necessário
@@ -258,7 +318,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       arquivoFiltrado.forEach((item, index) => {
         try {
-          const chave = criarChave(item.paciente || '', item.exame || '', item.data_exame, item.medico || '');
+          const chave = criarChave(item.paciente || '', item.exame || '', item.data_exame, item.data_laudo, item.medico || '');
           
           if (index < 3) {
             console.log(`📝 ARQUIVO [${index}]:`, {
@@ -267,6 +327,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
               paciente: item.paciente,
               exame: item.exame,
               data_exame: item.data_exame,
+              data_laudo: item.data_laudo,
               medico: item.medico
             });
           }
@@ -295,7 +356,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       sistemaFiltrado.forEach((item, index) => {
         try {
-          const chave = criarChave(item.NOME_PACIENTE || '', item.ESTUDO_DESCRICAO || '', item.DATA_REALIZACAO, item.MEDICO || '');
+          const chave = criarChave(item.NOME_PACIENTE || '', item.ESTUDO_DESCRICAO || '', item.DATA_REALIZACAO, item.DATA_LAUDO, item.MEDICO || '');
           
           if (index < 3) {
             console.log(`💾 SISTEMA [${index}]:`, {
@@ -304,6 +365,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
               paciente: item.NOME_PACIENTE,
               exame: item.ESTUDO_DESCRICAO,
               data_realizacao: item.DATA_REALIZACAO,
+              data_laudo: item.DATA_LAUDO,
               medico: item.MEDICO
             });
           }
@@ -367,14 +429,19 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             'Paciente': itemArquivo.paciente || '-',
             'Código Paciente': itemArquivo.codigoPaciente || '-',
             'Exame': itemArquivo.exame || '-',
-            'Modalidade': itemArquivo.modalidade || '-',
-            'Especialidade': itemArquivo.especialidade || '-',
-            'Prioridade': itemArquivo.prioridade || '-',
-            'Médico': itemArquivo.medico || '-',
             'Data Realização': formatarDataBR(itemArquivo.data_exame),
             'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+            'Médico': itemArquivo.medico || '-',
             'Qtd Arquivo': itemArquivo.quantidade,
             'Qtd Sistema': 0,
+            'Modalidade Sistema': '-',
+            'Modalidade Arquivo': itemArquivo.modalidade || '-',
+            'Especialidade Sistema': '-',
+            'Especialidade Arquivo': itemArquivo.especialidade || '-',
+            'Categoria Sistema': '-',
+            'Categoria Arquivo': itemArquivo.categoria || '-',
+            'Prioridade Sistema': '-',
+            'Prioridade Arquivo': itemArquivo.prioridade || '-',
             'Observação': 'Exame no arquivo mas não encontrado no sistema'
           });
         }
@@ -403,14 +470,19 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
             'Paciente': itemSistema.NOME_PACIENTE || '-',
             'Código Paciente': itemSistema.CODIGO_PACIENTE || '-',
             'Exame': itemSistema.ESTUDO_DESCRICAO || '-',
-            'Modalidade': itemSistema.MODALIDADE || '-',
-            'Especialidade': itemSistema.ESPECIALIDADE || '-',
-            'Prioridade': itemSistema.PRIORIDADE || '-',
-            'Médico': itemSistema.MEDICO || '-',
             'Data Realização': itemSistema.DATA_REALIZACAO || '-',
             'Data Laudo': itemSistema.DATA_LAUDO || '-',
+            'Médico': itemSistema.MEDICO || '-',
             'Qtd Arquivo': 0,
             'Qtd Sistema': itemSistema.quantidade,
+            'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+            'Modalidade Arquivo': '-',
+            'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+            'Especialidade Arquivo': '-',
+            'Categoria Sistema': itemSistema.CATEGORIA || '-',
+            'Categoria Arquivo': '-',
+            'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+            'Prioridade Arquivo': '-',
             'Observação': 'Exame no sistema mas não encontrado no arquivo'
           });
         }
@@ -421,40 +493,243 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       // 3. Chaves comuns mas com quantidades diferentes
       console.log('🔍 Analisando quantidades diferentes...');
       let quantidadesDiferentes = 0;
+      
+      // 4. Divergências específicas de modalidade, especialidade, categoria e prioridade
+      console.log('🔍 Analisando divergências específicas...');
+      let divergenciasModalidade = 0;
+      let divergenciasEspecialidade = 0;
+      let divergenciasCategoria = 0;
+      let divergenciasPrioridade = 0;
+      let divergenciasModalidadeEspecialidade = 0;
+      let divergenciasModalidadeCategoria = 0;
+      
       mapaArquivo.forEach((itemArquivo, chave) => {
         const itemSistema = mapaSistema.get(chave);
-        if (itemSistema && itemArquivo.quantidade !== itemSistema.quantidade) {
-          quantidadesDiferentes++;
-          contadorDivergencias++;
-          
-          if (quantidadesDiferentes <= 3) {
-            console.log(`⚖️ QUANTIDADE DIFERENTE [${quantidadesDiferentes}]:`, {
-              chave,
-              arquivo: itemArquivo.quantidade,
-              sistema: itemSistema.quantidade
+        
+        if (itemSistema) {
+          // Verificar divergências de quantidade
+          if (itemArquivo.quantidade !== itemSistema.quantidade) {
+            quantidadesDiferentes++;
+            contadorDivergencias++;
+            
+            if (quantidadesDiferentes <= 3) {
+              console.log(`⚖️ QUANTIDADE DIFERENTE [${quantidadesDiferentes}]:`, {
+                chave,
+                arquivo: itemArquivo.quantidade,
+                sistema: itemSistema.quantidade
+              });
+            }
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Quantidade diferente',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Arquivo: ${itemArquivo.quantidade}, Sistema: ${itemSistema.quantidade}`
             });
           }
           
-          divergenciasReais.push({
-            'Tipo Divergência': 'Quantidade diferente',
-            'Cliente': itemArquivo.cliente || '-',
-            'Paciente': itemArquivo.paciente || '-',
-            'Código Paciente': itemArquivo.codigoPaciente || '-',
-            'Exame': itemArquivo.exame || '-',
-            'Modalidade': itemArquivo.modalidade || '-',
-            'Especialidade': itemArquivo.especialidade || '-',
-            'Prioridade': itemArquivo.prioridade || '-',
-            'Médico': itemArquivo.medico || '-',
-            'Data Realização': formatarDataBR(itemArquivo.data_exame),
-            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
-            'Qtd Arquivo': itemArquivo.quantidade,
-            'Qtd Sistema': itemSistema.quantidade,
-            'Observação': `Arquivo: ${itemArquivo.quantidade}, Sistema: ${itemSistema.quantidade}`
-          });
+          // Verificar divergências específicas
+          const modalidadeSistema = normalizar(itemSistema.MODALIDADE || '');
+          const modalidadeArquivo = normalizar(itemArquivo.modalidade || '');
+          const especialidadeSistema = normalizar(itemSistema.ESPECIALIDADE || '');
+          const especialidadeArquivo = normalizar(itemArquivo.especialidade || '');
+          const categoriaSistema = normalizar(itemSistema.CATEGORIA || '');
+          const categoriaArquivo = normalizar(itemArquivo.categoria || '');
+          const prioridadeSistema = normalizar(itemSistema.PRIORIDADE || '');
+          const prioridadeArquivo = normalizar(itemArquivo.prioridade || '');
+          
+          // Divergência de Modalidade
+          if (modalidadeSistema !== modalidadeArquivo) {
+            divergenciasModalidade++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Modalidade',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Sistema: ${itemSistema.MODALIDADE || '-'}, Arquivo: ${itemArquivo.modalidade || '-'}`
+            });
+          }
+          
+          // Divergência de Especialidade
+          if (especialidadeSistema !== especialidadeArquivo) {
+            divergenciasEspecialidade++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Especialidade',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Sistema: ${itemSistema.ESPECIALIDADE || '-'}, Arquivo: ${itemArquivo.especialidade || '-'}`
+            });
+          }
+          
+          // Divergência de Categoria
+          if (categoriaSistema !== categoriaArquivo) {
+            divergenciasCategoria++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Categoria',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Sistema: ${itemSistema.CATEGORIA || '-'}, Arquivo: ${itemArquivo.categoria || '-'}`
+            });
+          }
+          
+          // Divergência de Prioridade
+          if (prioridadeSistema !== prioridadeArquivo) {
+            divergenciasPrioridade++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Prioridade',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Sistema: ${itemSistema.PRIORIDADE || '-'}, Arquivo: ${itemArquivo.prioridade || '-'}`
+            });
+          }
+          
+          // Divergência de Modalidade + Especialidade
+          if (modalidadeSistema !== modalidadeArquivo && especialidadeSistema !== especialidadeArquivo) {
+            divergenciasModalidadeEspecialidade++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Modalidade+Especialidade',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Modalidade - Sistema: ${itemSistema.MODALIDADE || '-'}, Arquivo: ${itemArquivo.modalidade || '-'} | Especialidade - Sistema: ${itemSistema.ESPECIALIDADE || '-'}, Arquivo: ${itemArquivo.especialidade || '-'}`
+            });
+          }
+          
+          // Divergência de Modalidade + Categoria
+          if (modalidadeSistema !== modalidadeArquivo && categoriaSistema !== categoriaArquivo) {
+            divergenciasModalidadeCategoria++;
+            contadorDivergencias++;
+            
+            divergenciasReais.push({
+              'Tipo Divergência': 'Divergência de Modalidade+Categoria',
+              'Cliente': itemArquivo.cliente || '-',
+              'Paciente': itemArquivo.paciente || '-',
+              'Código Paciente': itemArquivo.codigoPaciente || '-',
+              'Exame': itemArquivo.exame || '-',
+              'Data Realização': formatarDataBR(itemArquivo.data_exame),
+              'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+              'Médico': itemArquivo.medico || '-',
+              'Qtd Arquivo': itemArquivo.quantidade,
+              'Qtd Sistema': itemSistema.quantidade,
+              'Modalidade Sistema': itemSistema.MODALIDADE || '-',
+              'Modalidade Arquivo': itemArquivo.modalidade || '-',
+              'Especialidade Sistema': itemSistema.ESPECIALIDADE || '-',
+              'Especialidade Arquivo': itemArquivo.especialidade || '-',
+              'Categoria Sistema': itemSistema.CATEGORIA || '-',
+              'Categoria Arquivo': itemArquivo.categoria || '-',
+              'Prioridade Sistema': itemSistema.PRIORIDADE || '-',
+              'Prioridade Arquivo': itemArquivo.prioridade || '-',
+              'Observação': `Modalidade - Sistema: ${itemSistema.MODALIDADE || '-'}, Arquivo: ${itemArquivo.modalidade || '-'} | Categoria - Sistema: ${itemSistema.CATEGORIA || '-'}, Arquivo: ${itemArquivo.categoria || '-'}`
+            });
+          }
         }
       });
       
       console.log(`📊 Encontradas ${quantidadesDiferentes} diferenças de quantidade`);
+      console.log(`📊 Encontradas ${divergenciasModalidade} divergências de modalidade`);
+      console.log(`📊 Encontradas ${divergenciasEspecialidade} divergências de especialidade`);
+      console.log(`📊 Encontradas ${divergenciasCategoria} divergências de categoria`);
+      console.log(`📊 Encontradas ${divergenciasPrioridade} divergências de prioridade`);
+      console.log(`📊 Encontradas ${divergenciasModalidadeEspecialidade} divergências de modalidade+especialidade`);
+      console.log(`📊 Encontradas ${divergenciasModalidadeCategoria} divergências de modalidade+categoria`);
       
       // RESUMO FINAL
       console.log('📋 RESUMO FINAL DAS DIVERGÊNCIAS:');
@@ -480,17 +755,22 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         { wch: 25 }, // Tipo Divergência
         { wch: 20 }, // Cliente
         { wch: 30 }, // Paciente
-        { wch: 15 }, // Código
+        { wch: 15 }, // Código Paciente
         { wch: 35 }, // Exame
-        { wch: 12 }, // Modalidade
-        { wch: 20 }, // Especialidade
-        { wch: 12 }, // Prioridade
-        { wch: 25 }, // Médico
         { wch: 15 }, // Data Realização
         { wch: 15 }, // Data Laudo
+        { wch: 25 }, // Médico
         { wch: 12 }, // Qtd Arquivo
         { wch: 12 }, // Qtd Sistema
-        { wch: 40 }, // Observação
+        { wch: 18 }, // Modalidade Sistema
+        { wch: 18 }, // Modalidade Arquivo
+        { wch: 20 }, // Especialidade Sistema
+        { wch: 20 }, // Especialidade Arquivo
+        { wch: 18 }, // Categoria Sistema
+        { wch: 18 }, // Categoria Arquivo
+        { wch: 18 }, // Prioridade Sistema
+        { wch: 18 }, // Prioridade Arquivo
+        { wch: 50 }, // Observação
       ];
       
       XLSX.utils.book_append_sheet(wb, ws, 'Divergências Reais');
