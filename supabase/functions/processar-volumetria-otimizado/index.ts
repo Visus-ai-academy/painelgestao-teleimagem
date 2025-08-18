@@ -617,67 +617,103 @@ serve(async (req) => {
     console.log('🎯 PROCESSAMENTO FINALIZADO!');
 
     // PROCESSAMENTO EM BACKGROUND: Aplicar regras após upload sem travar
-    // DESABILITADO: Processamento automático em background
-    // As regras devem ser aplicadas manualmente através da interface de controle
-    // para que o usuário tenha controle total sobre quando e quais regras aplicar
-    
     const backgroundProcessing = async () => {
       try {
-        console.log('🔄 PROCESSAMENTO EM BACKGROUND DESABILITADO');
-        console.log('📋 Para aplicar regras, use o painel "Status das Regras" na interface');
+        console.log('🔄 INICIANDO PROCESSAMENTO AUTOMÁTICO EM BACKGROUND...');
         
         // Aguardar um pouco para garantir que dados foram inseridos
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // APENAS regras que NÃO excluem registros - apenas correções
-        const regrasSeguras = [
-          'aplicar-correcao-modalidade-rx', // Apenas corrige modalidades DX/CR→RX
-          'aplicar-correcao-modalidade-ot'  // Apenas corrige modalidades OT→DO
+        // Aplicar regras em ordem específica (após triggers automáticos)
+        const regrasOrdenadas = [
+          // FASE 1: Exclusões (aplicar primeiro)
+          'aplicar-exclusao-clientes-especificos', // Remove clientes _local
+          'aplicar-exclusoes-periodo',             // Aplica regras v002, v003, v031
+          'aplicar-filtro-data-laudo',             // Remove registros com data_laudo inválida
+          
+          // FASE 2: Tratamentos (após exclusões)
+          'aplicar-regras-tratamento',             // Aplica regras específicas por arquivo
+          'aplicar-validacao-cliente',             // Valida se clientes existem no cadastro
+          
+          // FASE 3: Tipificação e quebras (por último)
+          'aplicar-tipificacao-faturamento',       // Classifica tipo de faturamento
+          'aplicar-regras-quebra-exames'           // Quebra exames em múltiplos
         ];
         
-        for (const regra of regrasSeguras) {
+        for (const regra of regrasOrdenadas) {
           try {
-            console.log(`🔧 Aplicando correção segura: ${regra}`);
+            console.log(`🔧 Aplicando regra automática: ${regra}`);
             
-            const body = { arquivo_fonte };
+            // Preparar parâmetros específicos para cada regra
+            let body = { arquivo_fonte };
+            
+            if ((regra === 'aplicar-exclusoes-periodo' || regra === 'aplicar-filtro-data-laudo') && periodo) {
+              const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+              const periodoReferencia = `${meses[periodo.mes - 1]}/${periodo.ano.toString().slice(-2)}`;
+              body = { arquivo_fonte, periodo_referencia: periodoReferencia };
+              console.log(`📅 Período para ${regra}: ${periodoReferencia}`);
+            }
+            
+            if (regra === 'aplicar-validacao-cliente') {
+              body = { lote_upload: resultado.lote_upload };
+              console.log(`🏷️ Lote para validação: ${resultado.lote_upload}`);
+            }
+            
             const { data, error } = await supabaseClient.functions.invoke(regra, { body });
             
             if (error) {
               console.error(`❌ Erro na regra ${regra}:`, error);
             } else {
-              console.log(`✅ Regra ${regra} aplicada com sucesso`);
+              console.log(`✅ Regra ${regra} aplicada automaticamente:`, data);
             }
+            
+            // Pausa entre regras para evitar sobrecarga
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
           } catch (err) {
             console.error(`💥 Falha crítica na regra ${regra}:`, err);
           }
         }
         
-        // Atualizar log indicando que regras devem ser aplicadas manualmente
+        // Atualizar log final
         await supabaseClient
           .from('processamento_uploads')
           .update({
             status: 'concluido',
             detalhes_erro: JSON.stringify({
-              status: 'Upload concluído - Regras de negócio devem ser aplicadas manualmente',
-              regras_correcao_aplicadas: regrasSeguras,
-              regras_pendentes: [
-                'aplicar-exclusao-clientes-especificos',
-                'aplicar-exclusoes-periodo', 
-                'aplicar-filtro-data-laudo',
-                'aplicar-regras-tratamento',
-                'aplicar-validacao-cliente',
-                'aplicar-tipificacao-faturamento',
-                'aplicar-regras-quebra-exames'
+              status: 'Processamento automático concluído',
+              regras_aplicadas: regrasOrdenadas,
+              triggers_aplicados: [
+                'limpar_nome_cliente', 
+                'normalizar_medico', 
+                'correcao_modalidades', 
+                'aplicar_categorias', 
+                'aplicar_de_para_prioridades',
+                'aplicar_de_para_valores',
+                'tipificacao_faturamento'
               ],
-              instrucoes: 'Use o painel Status das Regras para aplicar as regras de negócio necessárias'
+              timestamp: new Date().toISOString()
             })
           })
           .eq('id', uploadLog.id);
           
-        console.log('🎉 UPLOAD CONCLUÍDO - Regras devem ser aplicadas manualmente!');
+        console.log('🎉 PROCESSAMENTO AUTOMÁTICO CONCLUÍDO COM SUCESSO!');
         
       } catch (backgroundError) {
-        console.error('💥 ERRO NO PROCESSAMENTO EM BACKGROUND:', backgroundError);
+        console.error('💥 ERRO NO PROCESSAMENTO AUTOMÁTICO:', backgroundError);
+        
+        // Atualizar log com erro
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({
+            status: 'erro',
+            detalhes_erro: JSON.stringify({
+              status: 'Erro no processamento automático',
+              erro: backgroundError.message,
+              timestamp: new Date().toISOString()
+            })
+          })
+          .eq('id', uploadLog.id);
       }
     };
     
