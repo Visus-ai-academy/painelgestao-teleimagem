@@ -112,26 +112,9 @@ function normalizarExame(nome: string): string {
     .toUpperCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^A-Z0-9\s]/g, ' ') // Substitui especiais por espaço
-    .replace(/\s+/g, ' ') // Unifica espaços
-    .trim();
-  
-  // Remover palavras específicas para comparativo
-  const palavrasRemover = [
-    'COMPARATIVO',
-    'REVISAO', 
-    'REVISÃO',
-    'CONTROLE',
-    'SEGUIMENTO'
-  ];
-  
-  palavrasRemover.forEach(palavra => {
-    // Remover a palavra isolada (com espaços ou no final da string)
-    exameNormalizado = exameNormalizado.replace(new RegExp(`\\b${palavra}\\b`, 'g'), '');
-  });
-  
-  // Limpar espaços extras após remoção de palavras
-  exameNormalizado = exameNormalizado.replace(/\s+/g, ' ').trim();
+  .replace(/[^A-Z0-9\s]/g, ' ') // Substitui especiais por espaço
+  .replace(/\s+/g, ' ') // Unifica espaços
+  .trim();
   
   // Normalizações específicas de exames
   const mapeamentos: Record<string, string> = {
