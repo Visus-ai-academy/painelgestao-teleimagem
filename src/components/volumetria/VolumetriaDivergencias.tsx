@@ -259,26 +259,46 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       console.log('📁 Arquivo carregado com', uploadedExams.length, 'registros');
       
       // VALIDAÇÃO CRÍTICA 2: Verificar se há dados do sistema no contexto
-      const systemData = ctx?.detailedData || [];
-      console.log('🏥 Total de registros detalhados do sistema:', systemData.length);
+      let systemData = ctx?.detailedData || [];
+      console.log('🏥 Total de registros detalhados do sistema (inicial):', systemData.length);
       
+      // Se não há dados detalhados, buscar diretamente da tabela volumetria_mobilemed
       if (!systemData || systemData.length === 0) {
-        alert('⚠️ ERRO: Nenhum dado do sistema está carregado. Os dados do sistema são necessários para fazer a comparação. Aguarde o carregamento dos dados ou atualize a página.');
-        return;
+        console.log('⚠️ Dados do contexto não disponíveis, buscando diretamente do banco...');
+        
+        try {
+          const { data: directData, error } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .eq('periodo_referencia', periodoReferenciaBanco.replace('-', '/').replace('2025-', '').replace('2024-', '') + '/' + periodoReferenciaBanco.substring(2, 4));
+          
+          if (error) {
+            console.error('Erro ao buscar dados diretos:', error);
+            alert('⚠️ ERRO: Não foi possível carregar os dados do sistema. Verifique sua conexão e tente novamente.');
+            return;
+          }
+          
+          systemData = directData || [];
+          console.log('🔄 Dados carregados diretamente do banco:', systemData.length, 'registros');
+          
+          if (systemData.length === 0) {
+            alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoReferenciaBanco}. Verifique se há dados processados para este período.`);
+            return;
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados do sistema:', error);
+          alert('⚠️ ERRO: Falha ao carregar dados do sistema. Tente novamente em alguns segundos.');
+          return;
+        }
       }
       
-      // VALIDAÇÃO CRÍTICA 3: Verificar se o contexto tem dados válidos
-      console.log('🔍 DEBUG Contexto atual:', {
-        detailedDataLength: ctx?.detailedData?.length || 0,
-        clientesLength: ctx?.clientes?.length || 0,
-        loading: ctx?.loading,
-        hasVolumetriaData: !!ctx?.detailedData?.length
+      console.log('🔍 DEBUG Sistema dados finais:', {
+        sistemaDadosLength: systemData.length,
+        arquivoDadosLength: uploadedExams.length,
+        periodo: periodoReferenciaBanco,
+        hasContext: !!ctx,
+        contextLoading: ctx?.loading
       });
-      
-      if (ctx?.loading) {
-        alert('⚠️ AVISO: Os dados do sistema ainda estão carregando. Aguarde alguns segundos e tente novamente.');
-        return;
-      }
 
       // Funções auxiliares para normalização
       const normalizeModalidade = (mod: string) => canonical(mod || '');
