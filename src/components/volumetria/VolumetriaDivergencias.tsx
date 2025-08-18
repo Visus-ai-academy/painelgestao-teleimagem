@@ -90,23 +90,17 @@ function normalizarMedico(nome: string): string {
   if (palavras.length === 0) return '';
   if (palavras.length === 1) return palavras[0];
   
-  // Estratégia mais robusta: PRIMEIRO NOME + todas as INICIAIS dos demais nomes
-  // Isso garante máxima compatibilidade entre diferentes abreviações
-  // Exemplo: "Guilherme Nogueira Schincariol Vicente" e "Guilherme N. Schincariol" 
-  // Ambos viram "GUILHERME NSV" e "GUILHERME NS" respectivamente
+  // Nova regra: PRIMEIRO NOME + PRIMEIRA INICIAL DO SEGUNDO NOME apenas
+  // Exemplo: "Guilherme Nogueira Schincariol Vicente" → "GUILHERME N"
+  // Exemplo: "Guilherme N. Schincariol" → "GUILHERME N"
   
   const primeiroNome = palavras[0];
-  const iniciais = [];
+  const segundaPalavra = palavras[1];
   
-  // Processar todos os nomes após o primeiro
-  for (let i = 1; i < palavras.length; i++) {
-    const palavra = palavras[i];
-    // Sempre pegar só a primeira letra
-    iniciais.push(palavra[0]);
-  }
+  // Pegar apenas a primeira letra da segunda palavra
+  const primeiraInicialSegundo = segundaPalavra[0];
   
-  // Resultado: PRIMEIRO + INICIAIS (concatenadas)
-  return primeiroNome + (iniciais.length > 0 ? ' ' + iniciais.join('') : '');
+  return `${primeiroNome} ${primeiraInicialSegundo}`;
 }
 
 function normalizarExame(nome: string): string {
