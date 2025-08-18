@@ -396,30 +396,44 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return signature;
       };
 
-      // CRITICAL: Não filtrar dados do sistema para garantir que todas as chaves sejam criadas
-      console.log('🚨 SISTEMA: Processando TODOS os dados do sistema sem filtros restritivos para evitar falha crítica');
-      
-      // Usar TODOS os dados do sistema sem filtro de período para garantir cobertura completa
+      // FILTRO DE PERÍODO CORRETO - Usar o período selecionado para comparação
+      const inMonth = (val: any) => {
+        if (!val) return true;
+        const s = String(val);
+        let ym = '';
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) ym = s.slice(0,7);
+        else {
+          const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+          if (m) ym = `${m[3].length===2?`20${m[3]}`:m[3]}-${m[2].padStart(2,'0')}`;
+        }
+        return ym ? ym === referencia : true;
+      };
+
+      console.log('🔧 FILTRO: Aplicando filtro de período:', referencia);
+
+      // Filtrar dados do sistema pelo período de referência selecionado
       const systemDataFiltered = systemData.filter((r: any) => {
         const empresaRaw = r.EMPRESA || r.empresa || r.Empresa || '';
         const empresaNormalizada = normalizeCliente(empresaRaw);
         
-        // Apenas filtrar por cliente se específico, mas não por período
         if (cliente !== 'todos') {
           const clienteNormalizado = normalizeCliente(cliente);
           if (empresaNormalizada !== clienteNormalizado) return false;
         }
         
-        // NÃO filtrar por período para garantir que dados sejam encontrados
-        return true;
+        // IMPORTANTE: Filtrar pelo período de referência
+        const periodoRef = r.periodo_referencia || r.PERIODO_REFERENCIA;
+        if (periodoRef && periodoRef !== referencia) return false;
+        
+        const dataRef = r.data_referencia || r.DATA_REFERENCIA;
+        return !dataRef || inMonth(dataRef);
       });
 
-      // Filtrar dados do arquivo (NÃO filtrar por período para garantir matching)
+      // Filtrar dados do arquivo pelo período
       const fileDataFiltered = (uploadedExams || []).filter((r) => {
         const clienteNormalizado = normalizeCliente(r.cliente);
         if (cliente !== 'todos' && clienteNormalizado !== normalizeCliente(cliente)) return false;
-        // NÃO filtrar por período para garantir cobertura completa
-        return true;
+        return inMonth((r as any).data_exame || (r as any).data_laudo);
       });
 
       console.log('📊 Dados filtrados - Sistema:', systemDataFiltered.length, 'Arquivo:', fileDataFiltered.length);
