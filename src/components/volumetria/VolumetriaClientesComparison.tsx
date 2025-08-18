@@ -120,17 +120,25 @@ export function VolumetriaClientesComparison({
     try {
       console.log('🔍 [COMPARATIVO DEBUG] Context completo:', context);
       console.log('🔍 [COMPARATIVO DEBUG] Período selecionado:', periodoSelecionado);
+      console.log('🔍 [COMPARATIVO DEBUG] dadosPeriodo length:', dadosPeriodo?.length);
+      console.log('🔍 [COMPARATIVO DEBUG] context.detailedData length:', context.detailedData?.length);
+      console.log('🔍 [COMPARATIVO DEBUG] context.clientesStats length:', context.clientesStats?.length);
       
-      // SEMPRE usar dados do período se disponíveis (seja período selecionado ou dados atuais)
-      if (dadosPeriodo && dadosPeriodo.length > 0) {
+      // Se há período selecionado, usar dados filtrados
+      if (periodoSelecionado && dadosPeriodo && dadosPeriodo.length > 0) {
         console.log('🔍 [COMPARATIVO DEBUG] Processando dados do período:', dadosPeriodo.length, 'registros');
-        console.log('🔍 [COMPARATIVO DEBUG] Período:', periodoSelecionado || 'atual');
+        console.log('🔍 [COMPARATIVO DEBUG] Primeiros 5 registros do período:', dadosPeriodo.slice(0, 5));
         
         const map = new Map<string, ClienteAggregated>();
         
-        (dadosPeriodo as any[]).forEach((item) => {
+        (dadosPeriodo as any[]).forEach((item, index) => {
           const clienteRaw = (item as any).EMPRESA ?? (item as any).empresa ?? '';
           const cliente = String(clienteRaw).trim();
+          
+          if (index < 10) {
+            console.log(`🔍 [DEBUG ${index}] Cliente:`, cliente, 'VALORES:', (item as any).VALORES, 'Item completo:', item);
+          }
+          
           if (!cliente) return;
           
           const key = normalizeClientName(cliente).toLowerCase();
@@ -151,6 +159,19 @@ export function VolumetriaClientesComparison({
           const inc = Number.isFinite(Number(rawVal)) ? Number(rawVal) : 1;
           ref.total_exames += inc;
           
+          // Debug para os primeiros registros
+          if (map.size <= 3) {
+            console.log('🔍 [AGREGAÇÃO DEBUG]', {
+              cliente,
+              key,
+              rawVal,
+              inc,
+              total_acumulado: ref.total_exames,
+              MODALIDADE: (item as any).MODALIDADE,
+              ESPECIALIDADE: (item as any).ESPECIALIDADE
+            });
+          }
+          
           // Adicionar detalhes
           const mod = canonicalModalidade((item as any).MODALIDADE);
           const esp = canonical((item as any).ESPECIALIDADE);
@@ -167,7 +188,8 @@ export function VolumetriaClientesComparison({
         
         const resultado = Array.from(map.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
         console.log('🔍 [COMPARATIVO DEBUG] Resultado período específico:', resultado.length, 'clientes');
-        console.log('🔍 [COMPARATIVO DEBUG] Primeiros 3 clientes do período:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
+        console.log('🔍 [COMPARATIVO DEBUG] TODOS os clientes do período:', resultado.map(c => ({ nome: c.cliente, total: c.total_exames, modalidades: Object.keys(c.modalidades).length })));
+        console.log('🔍 [COMPARATIVO DEBUG] Map final size:', map.size);
         return resultado;
       }
       
