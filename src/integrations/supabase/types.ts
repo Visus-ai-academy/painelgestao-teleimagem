@@ -3391,6 +3391,147 @@ export type Database = {
         }
         Relationships: []
       }
+      volumetria_staging: {
+        Row: {
+          ACCESSION_NUMBER: string | null
+          arquivo_fonte: string | null
+          CATEGORIA: string | null
+          CODIGO_INTERNO: string | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
+          created_at: string
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
+          data_referencia: string | null
+          DATA_TRANSFERENCIA: string | null
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string | null
+          erro_processamento: string | null
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
+          id: string
+          IMAGENS_CAPTURADAS: string | null
+          IMAGENS_CHAVES: string | null
+          lote_upload: string | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string | null
+          periodo_referencia: string | null
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          processado_em: string | null
+          processamento_pendente: boolean | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
+          status_processamento: string | null
+          tentativas_processamento: number | null
+          tipo_faturamento: string | null
+          updated_at: string
+          VALORES: number | null
+        }
+        Insert: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte?: string | null
+          CATEGORIA?: string | null
+          CODIGO_INTERNO?: string | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string | null
+          erro_processamento?: string | null
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: string | null
+          IMAGENS_CHAVES?: string | null
+          lote_upload?: string | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string | null
+          periodo_referencia?: string | null
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          processado_em?: string | null
+          processamento_pendente?: boolean | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          status_processamento?: string | null
+          tentativas_processamento?: number | null
+          tipo_faturamento?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Update: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte?: string | null
+          CATEGORIA?: string | null
+          CODIGO_INTERNO?: string | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string | null
+          erro_processamento?: string | null
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: string | null
+          IMAGENS_CHAVES?: string | null
+          lote_upload?: string | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string | null
+          periodo_referencia?: string | null
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          processado_em?: string | null
+          processamento_pendente?: boolean | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          status_processamento?: string | null
+          tentativas_processamento?: number | null
+          tipo_faturamento?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       mv_dashboard_summary: {
@@ -3917,6 +4058,10 @@ export type Database = {
       limpar_nome_cliente: {
         Args: { nome_cliente: string }
         Returns: string
+      }
+      limpar_staging_processado: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       limpar_todos_precos: {
         Args: Record<PropertyKey, never>
