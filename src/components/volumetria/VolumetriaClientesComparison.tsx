@@ -193,6 +193,31 @@ export function VolumetriaClientesComparison({
         return resultado;
       }
       
+      // ANÁLISE CRÍTICA DOS DADOS RECEBIDOS
+      console.log('🚨 [DEBUG CRÍTICO] Estado do contexto:', {
+        'clientesStats length': (context as any)?.clientesStats?.length || 0,
+        'detailedData length': context.detailedData?.length || 0,
+        'uploaded length': uploaded?.length || 0,
+        'uploadedExams length': uploadedExams?.length || 0,
+        'contexto loading': context.loading
+      });
+
+      // Verificar se detailedData existe e tem conteúdo
+      if (context.detailedData && context.detailedData.length > 0) {
+        console.log('✅ DetailedData disponível:', context.detailedData.length);
+        console.log('📊 Amostra detailedData:', context.detailedData.slice(0, 3));
+        
+        // Verificar distribuição por clientes
+        const clientesDetalhados = new Set();
+        context.detailedData.forEach((item: any) => {
+          const empresa = item.EMPRESA || item.empresa || '';
+          if (empresa) clientesDetalhados.add(empresa);
+        });
+        console.log('🏢 Clientes únicos em detailedData:', Array.from(clientesDetalhados));
+      } else {
+        console.error('❌ DetailedData está vazio ou não existe!');
+      }
+
       // Usar estatísticas definitivas por cliente (100% do banco) para período ativo
       const stats = (context as any)?.clientesStats || [];
       console.log('🔍 [COMPARATIVO DEBUG] Context clientesStats:', stats?.length, stats?.slice(0, 3));
