@@ -617,38 +617,29 @@ serve(async (req) => {
     console.log('🎯 PROCESSAMENTO FINALIZADO!');
 
     // PROCESSAMENTO EM BACKGROUND: Aplicar regras após upload sem travar
+    // DESABILITADO: Processamento automático em background
+    // As regras devem ser aplicadas manualmente através da interface de controle
+    // para que o usuário tenha controle total sobre quando e quais regras aplicar
+    
     const backgroundProcessing = async () => {
       try {
-        console.log('🔄 INICIANDO PROCESSAMENTO EM BACKGROUND...');
+        console.log('🔄 PROCESSAMENTO EM BACKGROUND DESABILITADO');
+        console.log('📋 Para aplicar regras, use o painel "Status das Regras" na interface');
         
         // Aguardar um pouco para garantir que dados foram inseridos
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Aplicar apenas regras seguras que não excluem registros
-        const regras = [
-          // 'aplicar-exclusao-clientes-especificos', // DESABILITADO: Pode excluir registros válidos
-          // 'aplicar-exclusoes-periodo', // DESABILITADO: Exclusões por período muito restritivas
-          // 'aplicar-filtro-data-laudo', // DESABILITADO: Duplica exclusões por data
-          // 'aplicar-regras-tratamento', // DESABILITADO: Pode excluir registros
-          'aplicar-correcao-modalidade-rx', // MANTER: Apenas corrige modalidades
-          'aplicar-tipificacao-faturamento', // MANTER: Apenas classifica tipo faturamento
-          // 'aplicar-validacao-cliente', // DESABILITADO: Pode excluir registros
-          'aplicar-regras-quebra-exames' // MANTER: Apenas quebra exames em múltiplos
+        // APENAS regras que NÃO excluem registros - apenas correções
+        const regrasSeguras = [
+          'aplicar-correcao-modalidade-rx', // Apenas corrige modalidades DX/CR→RX
+          'aplicar-correcao-modalidade-ot'  // Apenas corrige modalidades OT→DO
         ];
         
-        for (const regra of regras) {
+        for (const regra of regrasSeguras) {
           try {
-            console.log(`🔧 Aplicando regra: ${regra}`);
+            console.log(`🔧 Aplicando correção segura: ${regra}`);
             
-            // Converter período se necessário para regras que precisam
-            let body = { arquivo_fonte };
-            if ((regra === 'aplicar-exclusoes-periodo' || regra === 'aplicar-filtro-data-laudo') && periodo) {
-              const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-              const periodoReferencia = `${meses[periodo.mes - 1]}/${periodo.ano.toString().slice(-2)}`;
-              body = { arquivo_fonte, periodo_referencia: periodoReferencia };
-              console.log(`📅 Período convertido: ${periodoReferencia}`);
-            }
-            
+            const body = { arquivo_fonte };
             const { data, error } = await supabaseClient.functions.invoke(regra, { body });
             
             if (error) {
@@ -661,19 +652,29 @@ serve(async (req) => {
           }
         }
         
-        // Atualizar log com processamento concluído
+        // Atualizar log indicando que regras devem ser aplicadas manualmente
         await supabaseClient
           .from('processamento_uploads')
           .update({
+            status: 'concluido',
             detalhes_erro: JSON.stringify({
-              status: 'Concluído com regras aplicadas',
-              regras_aplicadas: regras,
-              processamento_background: true
+              status: 'Upload concluído - Regras de negócio devem ser aplicadas manualmente',
+              regras_correcao_aplicadas: regrasSeguras,
+              regras_pendentes: [
+                'aplicar-exclusao-clientes-especificos',
+                'aplicar-exclusoes-periodo', 
+                'aplicar-filtro-data-laudo',
+                'aplicar-regras-tratamento',
+                'aplicar-validacao-cliente',
+                'aplicar-tipificacao-faturamento',
+                'aplicar-regras-quebra-exames'
+              ],
+              instrucoes: 'Use o painel Status das Regras para aplicar as regras de negócio necessárias'
             })
           })
           .eq('id', uploadLog.id);
           
-        console.log('🎉 PROCESSAMENTO EM BACKGROUND CONCLUÍDO!');
+        console.log('🎉 UPLOAD CONCLUÍDO - Regras devem ser aplicadas manualmente!');
         
       } catch (backgroundError) {
         console.error('💥 ERRO NO PROCESSAMENTO EM BACKGROUND:', backgroundError);
