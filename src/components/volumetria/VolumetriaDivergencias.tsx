@@ -90,34 +90,23 @@ function normalizarMedico(nome: string): string {
   if (palavras.length === 0) return '';
   if (palavras.length === 1) return palavras[0];
   
-  // Normalizar nome completo para comparação
-  // Substituir nomes do meio por iniciais se contém ponto (ex: "M." ou "M")
-  const palavrasProcessadas = [];
+  // Estratégia mais robusta: PRIMEIRO NOME + todas as INICIAIS dos demais nomes
+  // Isso garante máxima compatibilidade entre diferentes abreviações
+  // Exemplo: "Guilherme Nogueira Schincariol Vicente" e "Guilherme N. Schincariol" 
+  // Ambos viram "GUILHERME NSV" e "GUILHERME NS" respectivamente
   
-  // Primeiro nome sempre completo
-  palavrasProcessadas.push(palavras[0]);
+  const primeiroNome = palavras[0];
+  const iniciais = [];
   
-  // Processar nomes do meio e sobrenome
+  // Processar todos os nomes após o primeiro
   for (let i = 1; i < palavras.length; i++) {
     const palavra = palavras[i];
-    
-    // Se é uma inicial seguida de ponto ou só uma letra, manter como está
-    if (palavra.length <= 2 || palavra.endsWith('.')) {
-      palavrasProcessadas.push(palavra.replace('.', ''));
-    }
-    // Se é um nome completo, verificar se pode ser abreviado
-    else {
-      // Para nomes do meio (não o último), abreviar se for longo
-      if (i < palavras.length - 1 && palavra.length > 3) {
-        palavrasProcessadas.push(palavra[0]);
-      } else {
-        // Último nome (sobrenome) manter completo
-        palavrasProcessadas.push(palavra);
-      }
-    }
+    // Sempre pegar só a primeira letra
+    iniciais.push(palavra[0]);
   }
   
-  return palavrasProcessadas.join(' ');
+  // Resultado: PRIMEIRO + INICIAIS (concatenadas)
+  return primeiroNome + (iniciais.length > 0 ? ' ' + iniciais.join('') : '');
 }
 
 function normalizarExame(nome: string): string {
