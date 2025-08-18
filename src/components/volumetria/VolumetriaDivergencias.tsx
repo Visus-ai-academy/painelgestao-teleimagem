@@ -90,14 +90,34 @@ function normalizarMedico(nome: string): string {
   if (palavras.length === 0) return '';
   if (palavras.length === 1) return palavras[0];
   
-  // Pegar primeiro nome e primeira letra dos demais
-  const primeiroNome = palavras[0];
-  const iniciais = palavras.slice(1)
-    .filter(p => p.length > 2) // Ignorar conectores como DE, DA, DO
-    .map(p => p[0])
-    .join(' ');
+  // Normalizar nome completo para comparação
+  // Substituir nomes do meio por iniciais se contém ponto (ex: "M." ou "M")
+  const palavrasProcessadas = [];
   
-  return iniciais ? `${primeiroNome} ${iniciais}` : primeiroNome;
+  // Primeiro nome sempre completo
+  palavrasProcessadas.push(palavras[0]);
+  
+  // Processar nomes do meio e sobrenome
+  for (let i = 1; i < palavras.length; i++) {
+    const palavra = palavras[i];
+    
+    // Se é uma inicial seguida de ponto ou só uma letra, manter como está
+    if (palavra.length <= 2 || palavra.endsWith('.')) {
+      palavrasProcessadas.push(palavra.replace('.', ''));
+    }
+    // Se é um nome completo, verificar se pode ser abreviado
+    else {
+      // Para nomes do meio (não o último), abreviar se for longo
+      if (i < palavras.length - 1 && palavra.length > 3) {
+        palavrasProcessadas.push(palavra[0]);
+      } else {
+        // Último nome (sobrenome) manter completo
+        palavrasProcessadas.push(palavra);
+      }
+    }
+  }
+  
+  return palavrasProcessadas.join(' ');
 }
 
 function normalizarExame(nome: string): string {
@@ -493,8 +513,8 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
             'Paciente': itemSistema.NOME_PACIENTE || '-',
             'Código Paciente': itemSistema.CODIGO_PACIENTE || '-',
             'Exame': itemSistema.ESTUDO_DESCRICAO || '-',
-            'Data Realização': itemSistema.DATA_REALIZACAO || '-',
-            'Data Laudo': itemSistema.DATA_LAUDO || '-',
+            'Data Realização': formatarDataBR(itemSistema.DATA_REALIZACAO),
+            'Data Laudo': formatarDataBR(itemSistema.DATA_LAUDO),
             'Médico': itemSistema.MEDICO || '-',
             'Qtd Arquivo': 0,
                'Qtd Sistema': itemSistema.VALORES || itemSistema.quantidade,
