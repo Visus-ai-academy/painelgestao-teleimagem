@@ -214,174 +214,31 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const gerarExcelDivergencias = async () => {
-      console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - USANDO PERÍODO DO CONTEXTO');
-      console.log('🎯 Período ativo selecionado:', periodoAtivo);
+      console.log('🚀 PROCESSAMENTO EXCEL - Utilizando comparativo já calculado');
       
       try {
         setExporting(true);
         
-        // USAR PERÍODO DO CONTEXTO em vez do filtro local
-      
-      // VALIDAÇÃO 1: Verificar arquivo carregado
-      if (!uploadedExams || uploadedExams.length === 0) {
-        alert('⚠️ ERRO: Nenhum arquivo foi carregado. Faça upload primeiro.');
-        return;
-      }
-      console.log('📁 Arquivo validado:', uploadedExams.length, 'registros');
-      console.log('📊 Primeiros 3 registros do arquivo:', uploadedExams.slice(0, 3));
-      
-        // CONVERSÃO DO PERÍODO DO CONTEXTO PARA FORMATO DE BUSCA
-        console.log('🔄 Convertendo período do contexto para busca...');
-        console.log('📅 Período original do contexto:', periodoAtivo);
-        
-        let periodoFormatado = periodoAtivo; // Usar diretamente o formato do contexto (jun/25)
-        let periodoFormatoDB = '2025-06'; // Formato YYYY-MM para busca no banco
-        let ano = '', mes = '';
-        
-        // Se vier no formato "jun/25", converter para ano/mês para buscas alternativas
-        if (periodoAtivo && periodoAtivo.includes('/')) {
-          const [mesNome, anoShort] = periodoAtivo.split('/');
-          const mesesMap: Record<string, string> = {
-            'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04', 'mai': '05', 'jun': '06',
-            'jul': '07', 'ago': '08', 'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
-          };
-          mes = mesesMap[mesNome] || '06';
-          ano = anoShort.length === 2 ? `20${anoShort}` : anoShort;
-          periodoFormatoDB = `${ano}-${mes}`;
-          
-          console.log('🔄 Conversão realizada:', {
-            original: periodoAtivo,
-            ano, 
-            mes,
-            periodoFormatado,
-            periodoFormatoDB
-          });
-        } else {
-          // Fallback para o formato atual se não conseguir converter
-          console.log('⚠️ Formato de período não reconhecido, usando fallback');
-          ano = '2025';
-          mes = '06';
-          periodoFormatado = 'jun/25';
-          periodoFormatoDB = '2025-06';
-        }
-      
-      // BUSCA ESTRATÉGICA DOS DADOS DO SISTEMA - PRIORIZAR FORMATO YYYY-MM
-      console.log('🔍 Estratégias de busca dos dados do sistema:');
-      console.log('1️⃣ Tentativa 1: periodo_referencia =', periodoFormatoDB);
-      
-      let dadosSistema: any[] = [];
-      
-      // Tentativa 1: Buscar por periodo_referencia no formato YYYY-MM (onde estão a maioria dos dados)
-      const { data: systemData1, error: error1 } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('periodo_referencia', periodoFormatoDB)
-        .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
-      
-      if (error1) {
-        console.error('❌ Erro na consulta 1:', error1);
-        alert(`⚠️ ERRO na consulta: ${error1.message}`);
-        return;
-      }
-      
-      console.log(`✅ Tentativa 1 - Encontrados: ${systemData1?.length || 0} registros com periodo_referencia = '${periodoFormatoDB}'`);
-      
-      if (systemData1 && systemData1.length > 50) {
-        console.log('✅ Dados suficientes encontrados na tentativa 1');
-        dadosSistema = systemData1;
-      } else {
-        console.log('⚠️ Poucos dados na tentativa 1. Tentando estratégia 2...');
-        
-        // Tentativa 2: Buscar por data_referencia (mes/ano)
-        console.log('2️⃣ Tentativa 2: data_referencia entre', `${ano}-${mes}-01`, 'e', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
-        
-        const { data: systemData2, error: error2 } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .gte('data_referencia', `${ano}-${mes}-01`)
-          .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`)
-          .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
-        
-        if (error2) {
-          console.error('❌ Erro na consulta 2:', error2);
+        // Verificar se já existe comparativo na memória dos componentes pais
+        if (!uploadedExams || uploadedExams.length === 0) {
+          alert('⚠️ ERRO: Nenhum arquivo foi carregado. Faça upload primeiro.');
+          return;
         }
         
-        console.log(`✅ Tentativa 2 - Encontrados: ${systemData2?.length || 0} registros por data_referencia`);
+        console.log('📁 Arquivo validado:', uploadedExams.length, 'registros');
         
-        if (systemData2 && systemData2.length > 100) {
-          console.log('✅ Dados suficientes encontrados na tentativa 2');
-          dadosSistema = systemData2;
-        } else {
-          console.log('⚠️ Poucos dados na tentativa 2. Tentando estratégia 3...');
-          
-          // Tentativa 3: Buscar por DATA_LAUDO no período (estratégia mais ampla)
-          console.log('3️⃣ Tentativa 3: DATA_LAUDO entre', `${ano}-${mes}-01`, 'e', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-07`);
-          
-          const { data: systemData3, error: error3 } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .gte('"DATA_LAUDO"', `${ano}-${mes}-01`)
-            .lte('"DATA_LAUDO"', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-07`)
-            .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
-          
-          if (error3) {
-            console.error('❌ Erro na consulta 3:', error3);
-          }
-          
-          console.log(`✅ Tentativa 3 - Encontrados: ${systemData3?.length || 0} registros por DATA_LAUDO`);
-          
-          if (systemData3 && systemData3.length > 50) {
-            console.log('✅ Dados suficientes encontrados na tentativa 3');
-            dadosSistema = systemData3;
-          } else {
-            console.log('⚠️ Tentativa 3 insuficiente. Tentando estratégia 4...');
-            
-            // Tentativa 4: Buscar todos os dados recentes (últimos 60 dias)
-            console.log('4️⃣ Tentativa 4: Todos os dados dos últimos 60 dias');
-            
-            const dataLimite = new Date();
-            dataLimite.setDate(dataLimite.getDate() - 60);
-            const dataLimiteISO = dataLimite.toISOString().split('T')[0];
-            
-            const { data: systemData4, error: error4 } = await supabase
-              .from('volumetria_mobilemed')
-              .select('*')
-              .gte('created_at', dataLimiteISO)
-              .order('created_at', { ascending: false })
-              .limit(50000);
-            
-            if (error4) {
-              console.error('❌ Erro na consulta 4:', error4);
-            }
-            
-            console.log(`✅ Tentativa 4 - Encontrados: ${systemData4?.length || 0} registros dos últimos 60 dias`);
-            
-            if (systemData4 && systemData4.length > 0) {
-              console.log('✅ Dados encontrados na tentativa 4 (fallback completo)');
-              dadosSistema = systemData4;
-            } else {
-              alert(`⚠️ ERRO CRÍTICO: Nenhum dado do sistema encontrado em todas as estratégias de busca.`);
-              return;
-            }
-          }
+        // USAR DADOS JÁ CARREGADOS DO CONTEXTO (sem nova consulta)
+        console.log('📊 Utilizando dados já carregados do contexto');
+        const dadosSistema = (ctx.detailedData as any[]) || [];
+        
+        console.log('📊 DADOS DISPONÍVEIS:');
+        console.log(`   📋 Sistema: ${dadosSistema.length} registros`);
+        console.log(`   📄 Arquivo: ${uploadedExams.length} registros`);
+        
+        if (dadosSistema.length === 0) {
+          alert('⚠️ ERRO: Nenhum dado do sistema encontrado no contexto.');
+          return;
         }
-      }
-      
-      // Combinar dados das tentativas 1 e 2 se ambas trouxeram resultados
-      if (systemData1 && systemData1.length > 0 && dadosSistema !== systemData1) {
-        console.log('🔄 Combinando dados de múltiplas consultas...');
-        const idsExistentes = new Set(dadosSistema.map(item => item.id));
-        const novosRegistros = systemData1.filter(item => !idsExistentes.has(item.id));
-        if (novosRegistros.length > 0) {
-          dadosSistema = [...dadosSistema, ...novosRegistros];
-          console.log(`✅ Adicionados ${novosRegistros.length} registros únicos da primeira consulta`);
-        }
-      }
-      
-      
-      console.log('📊 RESULTADO FINAL DA BUSCA:');
-      console.log(`📋 Total de registros do sistema carregados: ${dadosSistema.length}`);
-      console.log('📊 Primeiros 3 registros do sistema:', dadosSistema.slice(0, 3));
       
       // PROCESSAMENTO DEFINITIVO DAS DIVERGÊNCIAS
       console.log('🔧 Iniciando processamento de divergências...');
