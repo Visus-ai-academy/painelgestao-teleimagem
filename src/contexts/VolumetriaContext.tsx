@@ -171,10 +171,10 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       console.log('✅ Período ativo do sistema:', periodoSistema);
       
       console.log('🚀 FASE 4: Carregando dados filtrados por período ativo...');
-      console.log(`🔧 FILTRO: periodo_referencia = '${periodoSistema}'`);
+      console.log(`🔧 FILTRO INICIAL: periodo_referencia = '${periodoSistema}'`);
       
-      // CARREGAR APENAS DADOS DO PERÍODO ATIVO
-      const allDetails: any[] = [];
+      // CARREGAR APENAS DADOS DO PERÍODO ATIVO (PRIMEIRA TENTATIVA)
+      let allDetails: any[] = [];
       let offset = 0;
       const limit = 1000;
       
@@ -199,7 +199,41 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
         offset += limit;
         await new Promise((r) => setTimeout(r, 5));
       }
+      
+      console.log(`✅ RESULTADO PRIMEIRA TENTATIVA: ${allDetails.length} registros encontrados para período '${periodoSistema}'`);
+      
+      // ✅ CORREÇÃO CRÍTICA: Se não encontrou dados do período específico, carregar TODOS os dados
+      if (allDetails.length === 0 || allDetails.length < 100) {
+        console.log('⚠️ POUCOS DADOS ENCONTRADOS NO PERÍODO - Carregando TODOS os dados disponíveis...');
+        console.log('🔧 MUDANDO ESTRATÉGIA: Carregando dados sem filtro de período');
+        
+        allDetails = [];
+        offset = 0;
+        
+        while (true) {
+          let queryTodos = supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .range(offset, offset + limit - 1);
 
+          console.log(`📦 Carregando TODOS os dados - lote ${offset}`);
+
+          const { data: batch, error: batchError } = await queryTodos;
+
+          if (batchError) {
+            throw new Error(`Erro nos dados detalhados (todos): ${batchError.message}`);
+          }
+          if (!batch || batch.length === 0) break;
+          allDetails.push(...batch);
+          console.log(`📦 Dados carregados: ${batch.length} (total: ${allDetails.length})`);
+          if (batch.length < limit) break;
+          offset += limit;
+          await new Promise((r) => setTimeout(r, 5));
+        }
+        
+        console.log(`✅ RESULTADO SEGUNDA TENTATIVA: ${allDetails.length} registros carregados (TODOS)`);
+      }
+      
       console.log(`🎉🔥 DADOS CARREGADOS: ${allDetails.length} registros detalhados 🔥🎉`);
       
       if (allDetails.length > 0) {
