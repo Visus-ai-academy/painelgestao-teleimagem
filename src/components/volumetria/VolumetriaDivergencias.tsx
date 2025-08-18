@@ -273,10 +273,28 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       let systemData: any[] = [];
       
       try {
-        const { data: fetchedData, error } = await supabase
+        // PRIMEIRO: Tentar buscar com o período formatado exato
+        let { data: fetchedData, error } = await supabase
           .from('volumetria_mobilemed')
           .select('*')
           .eq('periodo_referencia', periodoFormatado);
+        
+        // Se não encontrar dados, tentar buscar por data_referencia também
+        if (!fetchedData || fetchedData.length === 0) {
+          console.log('🔍 Período formatado não retornou dados, tentando filtrar por data_referencia');
+          
+          const { data: fetchedDataByDate, error: errorByDate } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .gte('data_referencia', `${ano}-${mes}-01`)
+            .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
+          
+          if (!errorByDate && fetchedDataByDate && fetchedDataByDate.length > 0) {
+            console.log('✅ Encontrados dados por data_referencia:', fetchedDataByDate.length);
+            fetchedData = fetchedDataByDate;
+            error = null;
+          }
+        }
         
         if (error) {
           console.error('Erro ao buscar dados do sistema:', error);
