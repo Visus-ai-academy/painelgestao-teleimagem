@@ -31,6 +31,7 @@ serve(async (req) => {
       'aplicar-regras-tratamento',
       'aplicar-correcao-modalidade-rx',
       'aplicar-correcao-modalidade-ot',
+      'aplicar-substituicao-especialidade-categoria',
       'aplicar-tipificacao-faturamento',
       'aplicar-validacao-cliente',
       'aplicar-regras-quebra-exames'
@@ -44,7 +45,7 @@ serve(async (req) => {
         console.log(`🔧 Aplicando regra: ${regra}`);
         
         // Diferentes regras precisam de parâmetros diferentes
-        const body = regra === 'aplicar-exclusoes-periodo' || regra === 'aplicar-filtro-data-laudo' 
+        const body = ['aplicar-exclusoes-periodo', 'aplicar-filtro-data-laudo'].includes(regra)
           ? { arquivo_fonte, periodo_referencia }
           : { arquivo_fonte };
         
