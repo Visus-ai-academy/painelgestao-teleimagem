@@ -48,8 +48,8 @@ serve(async (req) => {
     const dataRows = jsonData.slice(1)
     console.log('Linhas de dados:', dataRows.length)
 
-    // Não limpar clientes - usar UPSERT para evitar duplicação
-    console.log('Processando clientes com UPSERT...')
+    // IMPORTANTE: Permitir registros duplicados - usar INSERT normal
+    console.log('Processando clientes com INSERT (permitindo duplicados)...')
 
     // Process data - direct mapping to known structure
     const processedClients = []
@@ -203,11 +203,11 @@ serve(async (req) => {
       if (error) {
         console.error(`Erro ao inserir lote ${Math.floor(i/batchSize) + 1}:`, error)
         
-        // Try individual inserts if batch fails
+        // Try individual inserts if batch fails - SEMPRE INSERT, nunca substituir
         for (const cliente of batch) {
           const { error: singleError } = await supabase
             .from('clientes')
-            .upsert([cliente], { onConflict: 'cnpj' })
+            .insert([cliente])
 
           if (singleError) {
             console.error('Erro individual:', singleError, cliente.nome)

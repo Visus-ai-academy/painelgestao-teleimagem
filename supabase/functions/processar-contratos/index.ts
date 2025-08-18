@@ -90,10 +90,10 @@ serve(async (req) => {
 
     console.log('Inserindo contratos no banco...')
 
-    // 3. Inserir contratos
+    // 3. Inserir contratos - SEMPRE INSERT, permitir duplicados
     const { data: contratosInseridos, error: contratosError } = await supabaseClient
       .from('contratos_clientes')
-      .upsert(contratosMock, { onConflict: 'cliente_id,modalidade,especialidade' })
+      .insert(contratosMock)
       .select()
 
     if (contratosError) {
