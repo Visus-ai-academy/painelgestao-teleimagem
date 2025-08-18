@@ -9,71 +9,7 @@ import { Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { UploadedExamRow } from "@/components/volumetria/VolumetriaExamesComparison";
 
-interface VolumetriaRow {
-  EMPRESA?: string;
-  NOME_PACIENTE?: string;
-  CODIGO_PACIENTE?: string | number;
-  ESTUDO_DESCRICAO?: string;
-  ACCESSION_NUMBER?: string;
-  MODALIDADE?: string;
-  PRIORIDADE?: string;
-  VALORES?: number;
-  ESPECIALIDADE?: string;
-  MEDICO?: string;
-  DUPLICADO?: string | boolean;
-  DATA_REALIZACAO?: string;
-  HORA_REALIZACAO?: string;
-  DATA_TRANSFERENCIA?: string;
-  HORA_TRANSFERENCIA?: string;
-  DATA_LAUDO?: string;
-  HORA_LAUDO?: string;
-  DATA_PRAZO?: string;
-  HORA_PRAZO?: string;
-  STATUS?: string;
-  UNIDADE_ORIGEM?: string;
-  CATEGORIA?: string;
-}
-
-type DivergenciaTipo = 'arquivo_nao_no_sistema' | 'sistema_nao_no_arquivo' | 'quantidade_diferente' | 'categoria' | 'especialidade' | 'modalidade' | 'prioridade';
-
-interface LinhaDivergencia {
-  tipo: DivergenciaTipo;
-  chave: string;
-  EMPRESA: string;
-  NOME_PACIENTE: string;
-  CODIGO_PACIENTE: string;
-  ESTUDO_DESCRICAO: string;
-  ACCESSION_NUMBER: string;
-  MODALIDADE: string;
-  PRIORIDADE: string;
-  VALORES: number | string;
-  ESPECIALIDADE: string;
-  MEDICO: string;
-  DUPLICADO: string;
-  DATA_REALIZACAO: string;
-  HORA_REALIZACAO: string;
-  DATA_TRANSFERENCIA: string;
-  HORA_TRANSFERENCIA: string;
-  DATA_LAUDO: string;
-  HORA_LAUDO: string;
-  DATA_PRAZO: string;
-  HORA_PRAZO: string;
-  STATUS: string;
-  UNIDADE_ORIGEM: string;
-  CLIENTE: string;
-  total_arquivo?: number;
-  total_sistema?: number;
-  categoria_arquivo?: string;
-  categoria_sistema?: string;
-  especialidade_arquivo?: string;
-  especialidade_sistema?: string;
-  modalidade_arquivo?: string;
-  modalidade_sistema?: string;
-  prioridade_arquivo?: string;
-  prioridade_sistema?: string;
-}
-
-// NOVA IMPLEMENTAÇÃO: Funções de normalização mais robustas
+// Funções de normalização
 function normalizar(texto: string): string {
   if (!texto) return '';
   return texto
@@ -115,28 +51,6 @@ function normalizarCliente(nome: string): string {
     .replace(/RMX$/, '');
     
   return limpo;
-}
-
-function normalizarModalidade(modalidade: string): string {
-  const normalizada = normalizar(modalidade);
-  if (normalizada === 'CT') return 'TC';
-  if (normalizada === 'MR') return 'RM';
-  return normalizada;
-}
-
-function normalizarPrioridade(prioridade: string): string {
-  const normalizada = normalizar(prioridade);
-  if (['URGENCIA', 'URGENTE'].includes(normalizada)) return 'URGENTE';
-  if (normalizada === 'ROTINA') return 'ROTINA';
-  if (['EMERGENCIA', 'EMERGENCIAL'].includes(normalizada)) return 'EMERGENCIA';
-  if (normalizada === 'PLANTAO') return 'PLANTAO';
-  return normalizada;
-}
-
-function normalizarExame(exame: string): string {
-  return normalizar(exame)
-    .replace(/\sX\d+$/gi, '') // Remove multiplicadores como " X2", " X3"
-    .replace(/\sXE$/gi, ''); // Remove " XE"
 }
 
 function normalizarData(data: any): string {
@@ -186,34 +100,6 @@ function formatarDataBR(data: any): string {
   
   const [ano, mes, dia] = dataISO.split('-');
   return `${dia}/${mes}/${ano}`;
-}
-
-// NOVA IMPLEMENTAÇÃO: Criação de chave mais robusta e específica
-function criarChaveComparacao(item: any, tipoItem: 'sistema' | 'arquivo'): string {
-  let paciente = '';
-  let exame = '';
-  let dataExame = '';
-  let dataLaudo = '';
-  let medico = '';
-  
-  if (tipoItem === 'sistema') {
-    paciente = normalizar(item.NOME_PACIENTE || '');
-    exame = normalizarExame(item.ESTUDO_DESCRICAO || '');
-    dataExame = normalizarData(item.DATA_REALIZACAO || item.DATA_EXAME);
-    dataLaudo = normalizarData(item.DATA_LAUDO);
-    medico = normalizar((item.MEDICO || '').replace(/^DR[A]?\s*/i, ''));
-  } else {
-    paciente = normalizar(item.paciente || item.nome_paciente || item.NOME_PACIENTE || '');
-    exame = normalizarExame(item.exame || item.estudo_descricao || item.ESTUDO_DESCRICAO || '');
-    dataExame = normalizarData(item.data_exame || item.data_realizacao || item.DATA_REALIZACAO);
-    dataLaudo = normalizarData(item.data_laudo || item.DATA_LAUDO);
-    medico = normalizar((item.medico || item.MEDICO || '').replace(/^DR[A]?\s*/i, ''));
-  }
-  
-  // Usar data de exame como prioridade, depois data de laudo
-  const dataFinal = dataExame || dataLaudo;
-  
-  return [paciente, exame, dataFinal, medico].join('|');
 }
 
 export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExams?: UploadedExamRow[] }) {
@@ -278,7 +164,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
   const gerarExcelDivergencias = async () => {
-    console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - EXCEL GENERATION');
+    console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - VERSÃO CORRIGIDA DEFINITIVA');
     
     try {
       setExporting(true);
@@ -289,6 +175,7 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         return;
       }
       console.log('📁 Arquivo validado:', uploadedExams.length, 'registros');
+      console.log('📊 Primeiros 3 registros do arquivo:', uploadedExams.slice(0, 3));
       
       // VALIDAÇÃO 2: Buscar dados do sistema
       console.log('🔍 Buscando dados do sistema para período:', referencia);
@@ -307,132 +194,51 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         .select('*')
         .eq('periodo_referencia', periodoFormatado);
       
-      if (error || !systemData || systemData.length === 0) {
-        alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}.`);
+      if (error) {
+        console.error('❌ Erro na consulta:', error);
+        alert(`⚠️ ERRO na consulta: ${error.message}`);
         return;
       }
       
-      console.log('✅ Dados do sistema encontrados:', systemData.length, 'registros');
+      let dadosSistema = systemData;
       
-      // PROCESSAMENTO DAS DIVERGÊNCIAS
-      const divergenciasFinais: any[] = [];
-      
-      // 1. DADOS APENAS NO ARQUIVO (não estão no sistema)
-      const arquivoMap = new Map<string, any>();
-      uploadedExams.forEach(item => {
-        const chave = `${normalizar(item.paciente || '')}_${normalizar(item.exame || '')}_${normalizarData(item.data_exame)}_${normalizar(item.medico || '')}`;
-        if (!arquivoMap.has(chave)) {
-          arquivoMap.set(chave, {
-            ...item,
-            quantidade_total: item.quant || 1
-          });
-        } else {
-          const existing = arquivoMap.get(chave);
-          existing.quantidade_total += (item.quant || 1);
+      if (!systemData || systemData.length === 0) {
+        console.log('⚠️ Nenhum dado encontrado com periodo_referencia. Tentando busca alternativa...');
+        
+        // Busca alternativa por data_referencia
+        const { data: systemDataAlt, error: errorAlt } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .gte('data_referencia', `${ano}-${mes}-01`)
+          .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
+        
+        if (errorAlt || !systemDataAlt || systemDataAlt.length === 0) {
+          alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}.`);
+          return;
         }
-      });
-      
-      const sistemaMap = new Map<string, any>();
-      systemData.forEach(item => {
-        const chave = `${normalizar(item.NOME_PACIENTE || '')}_${normalizar(item.ESTUDO_DESCRICAO || '')}_${normalizarData(item.DATA_REALIZACAO)}_${normalizar(item.MEDICO || '')}`;
-        if (!sistemaMap.has(chave)) {
-          sistemaMap.set(chave, {
-            ...item,
-            quantidade_total: item.VALORES || 1
-          });
-        } else {
-          const existing = sistemaMap.get(chave);
-          existing.quantidade_total += (item.VALORES || 1);
-        }
-      });
-      
-      console.log('📊 Mapas criados - Arquivo:', arquivoMap.size, '| Sistema:', sistemaMap.size);
-      
-      // 2. IDENTIFICAR DIVERGÊNCIAS
-      let contadorDiv = 0;
-      
-      // Dados apenas no arquivo
-      arquivoMap.forEach((itemArquivo, chave) => {
-        if (!sistemaMap.has(chave)) {
-          contadorDiv++;
-          divergenciasFinais.push({
-            tipo: 'arquivo_nao_no_sistema',
-            chave,
-            'Tipo Divergência': 'Dados apenas no arquivo',
-            'Cliente': itemArquivo.cliente || '-',
-            'Paciente': itemArquivo.paciente || '-',
-            'Código Paciente': itemArquivo.codigoPaciente || '-',
-            'Exame': itemArquivo.exame || '-',
-            'Modalidade': itemArquivo.modalidade || '-',
-            'Especialidade': itemArquivo.especialidade || '-',
-            'Prioridade': itemArquivo.prioridade || '-',
-            'Médico': itemArquivo.medico || '-',
-            'Data Realização': formatarDataBR(itemArquivo.data_exame),
-            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
-            'Qtd Arquivo': itemArquivo.quantidade_total,
-            'Qtd Sistema': 0,
-          });
-        }
-      });
-      
-      // Dados apenas no sistema
-      sistemaMap.forEach((itemSistema, chave) => {
-        if (!arquivoMap.has(chave)) {
-          contadorDiv++;
-          divergenciasFinais.push({
-            tipo: 'sistema_nao_no_arquivo',
-            chave,
-            'Tipo Divergência': 'Dados apenas no sistema',
-            'Cliente': itemSistema.EMPRESA || '-',
-            'Paciente': itemSistema.NOME_PACIENTE || '-',
-            'Código Paciente': itemSistema.CODIGO_PACIENTE || '-',
-            'Exame': itemSistema.ESTUDO_DESCRICAO || '-',
-            'Modalidade': itemSistema.MODALIDADE || '-',
-            'Especialidade': itemSistema.ESPECIALIDADE || '-',
-            'Prioridade': itemSistema.PRIORIDADE || '-',
-            'Médico': itemSistema.MEDICO || '-',
-            'Data Realização': itemSistema.DATA_REALIZACAO || '-',
-            'Data Laudo': itemSistema.DATA_LAUDO || '-',
-            'Qtd Arquivo': 0,
-            'Qtd Sistema': itemSistema.quantidade_total,
-          });
-        }
-      });
-      
-      // Dados em ambos mas com quantidades diferentes
-      arquivoMap.forEach((itemArquivo, chave) => {
-        const itemSistema = sistemaMap.get(chave);
-        if (itemSistema && itemArquivo.quantidade_total !== itemSistema.quantidade_total) {
-          contadorDiv++;
-          divergenciasFinais.push({
-            tipo: 'quantidade_diferente',
-            chave,
-            'Tipo Divergência': 'Quantidade diferente',
-            'Cliente': itemArquivo.cliente || '-',
-            'Paciente': itemArquivo.paciente || '-',
-            'Código Paciente': itemArquivo.codigoPaciente || '-',
-            'Exame': itemArquivo.exame || '-',
-            'Modalidade': itemArquivo.modalidade || '-',
-            'Especialidade': itemArquivo.especialidade || '-',
-            'Prioridade': itemArquivo.prioridade || '-',
-            'Médico': itemArquivo.medico || '-',
-            'Data Realização': formatarDataBR(itemArquivo.data_exame),
-            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
-            'Qtd Arquivo': itemArquivo.quantidade_total,
-            'Qtd Sistema': itemSistema.quantidade_total,
-          });
-        }
-      });
-      
-      console.log('📈 Total de divergências encontradas:', contadorDiv);
-      
-      if (divergenciasFinais.length === 0) {
-        alert('✅ Nenhuma divergência encontrada entre arquivo e sistema!');
-        return;
+        
+        console.log('✅ Dados do sistema encontrados via data_referencia:', systemDataAlt.length, 'registros');
+        dadosSistema = systemDataAlt;
+      } else {
+        console.log('✅ Dados do sistema encontrados via periodo_referencia:', dadosSistema.length, 'registros');
       }
+      
+      console.log('📊 Primeiros 3 registros do sistema:', dadosSistema.slice(0, 3));
+      
+      // PROCESSAMENTO DEFINITIVO DAS DIVERGÊNCIAS
+      console.log('🔧 Iniciando processamento de divergências...');
+      
+      // Criar função de chave normalizada
+      const criarChave = (paciente: string, exame: string, dataExame: any, medico: string) => {
+        const p = normalizar(paciente || '');
+        const e = normalizar(exame || '');
+        const d = normalizarData(dataExame);
+        const m = normalizar(medico || '');
+        return `${p}|${e}|${d}|${m}`;
+      };
       
       // FILTRAR dados por cliente se necessário
-      const sistemaFiltrado = systemData.filter((item: any) => {
+      const sistemaFiltrado = dadosSistema.filter((item: any) => {
         if (cliente === 'todos') return true;
         const empresaNormalizada = normalizarCliente(item.EMPRESA || '');
         return empresaNormalizada === normalizarCliente(cliente);
@@ -446,285 +252,233 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       console.log('📊 Dados filtrados - Sistema:', sistemaFiltrado.length, '| Arquivo:', arquivoFiltrado.length);
       
-      // NOVA IMPLEMENTAÇÃO: Criar mapas de agregação usando chaves robustas
-      console.log('🔧 Criando mapas de agregação...');
+      // MAPA DO ARQUIVO
+      const mapaArquivo = new Map<string, any>();
+      let processadosArquivo = 0;
       
-      // Mapa do sistema
-      const mapaSistema = new Map<string, { total: number; itens: any[] }>();
-      sistemaFiltrado.forEach((item: any, index: number) => {
-        const chave = criarChaveComparacao(item, 'sistema');
-        const valores = Number(item.VALORES || 1);
-        
-        // Debug detalhado para primeiros itens
-        if (index < 3) {
-          console.log(`🔍 SISTEMA [${index}]:`, {
-            item_original: item,
-            chave_gerada: chave,
-            paciente: item.NOME_PACIENTE,
-            exame: item.ESTUDO_DESCRICAO,
-            data_realizacao: item.DATA_REALIZACAO,
-            data_laudo: item.DATA_LAUDO,
-            medico: item.MEDICO,
-            valores
-          });
-        }
-        
-        if (mapaSistema.has(chave)) {
-          const existente = mapaSistema.get(chave)!;
-          existente.total += valores;
-          existente.itens.push(item);
-        } else {
-          mapaSistema.set(chave, { total: valores, itens: [item] });
-        }
-      });
-      
-      // Mapa do arquivo
-      const mapaArquivo = new Map<string, { total: number; itens: any[] }>();
-      arquivoFiltrado.forEach((item: any, index: number) => {
-        const chave = criarChaveComparacao(item, 'arquivo');
-        const quantidade = Number(item.quant || item.quantidade || item.valores || 1);
-        
-        // Debug detalhado para primeiros itens
-        if (index < 3) {
-          console.log(`🔍 ARQUIVO [${index}]:`, {
-            item_original: item,
-            chave_gerada: chave,
-            paciente: item.paciente || item.nome_paciente,
-            exame: item.exame || item.estudo_descricao,
-            data_exame: item.data_exame || item.data_realizacao,
-            data_laudo: item.data_laudo,
-            medico: item.medico,
-            quantidade
-          });
-        }
-        
-        if (mapaArquivo.has(chave)) {
-          const existente = mapaArquivo.get(chave)!;
-          existente.total += quantidade;
-          existente.itens.push(item);
-        } else {
-          mapaArquivo.set(chave, { total: quantidade, itens: [item] });
-        }
-      });
-      
-      console.log('📈 Mapas criados - Sistema:', mapaSistema.size, '| Arquivo:', mapaArquivo.size);
-      
-      // DEBUG: Verificar sobreposição
-      const chavesComuns = Array.from(mapaArquivo.keys()).filter(chave => mapaSistema.has(chave));
-      console.log('🎯 Chaves comuns encontradas:', chavesComuns.length);
-      
-      if (chavesComuns.length === 0) {
-        console.log('⚠️ PROBLEMA: Nenhuma chave comum! Analisando...');
-        console.log('🔍 Primeira chave arquivo:', Array.from(mapaArquivo.keys())[0]);
-        console.log('🔍 Primeira chave sistema:', Array.from(mapaSistema.keys())[0]);
-      }
-      
-      // NOVA IMPLEMENTAÇÃO: Identificar divergências
-      console.log('🕵️ Identificando divergências...');
-      const divergencias: LinhaDivergencia[] = [];
-      
-      // Todas as chaves únicas
-      const todasChaves = new Set([...mapaArquivo.keys(), ...mapaSistema.keys()]);
-      
-      for (const chave of todasChaves) {
-        const dadosArquivo = mapaArquivo.get(chave);
-        const dadosSistema = mapaSistema.get(chave);
-        
-        if (dadosArquivo && dadosSistema) {
-          // Existe em ambos - verificar divergências específicas
-          const itemArquivo = dadosArquivo.itens[0];
-          const itemSistema = dadosSistema.itens[0];
+      arquivoFiltrado.forEach((item, index) => {
+        try {
+          const chave = criarChave(item.paciente || '', item.exame || '', item.data_exame, item.medico || '');
           
-          // Comparar campos específicos
-          const catArq = normalizar(itemArquivo.categoria || '');
-          const catSis = normalizar(itemSistema.CATEGORIA || '');
-          const espArq = normalizar(itemArquivo.especialidade || '');
-          const espSis = normalizar(itemSistema.ESPECIALIDADE || '');
-          const modArq = normalizarModalidade(itemArquivo.modalidade || '');
-          const modSis = normalizarModalidade(itemSistema.MODALIDADE || '');
-          const prioArq = normalizarPrioridade(itemArquivo.prioridade || '');
-          const prioSis = normalizarPrioridade(itemSistema.PRIORIDADE || '');
-          
-          let tipoDivergencia: DivergenciaTipo | null = null;
-          
-          // Verificar diferenças
-          if (catArq !== catSis && catArq && catSis) {
-            tipoDivergencia = 'categoria';
-          } else if (espArq !== espSis && espArq && espSis) {
-            tipoDivergencia = 'especialidade';
-          } else if (modArq !== modSis && modArq && modSis) {
-            tipoDivergencia = 'modalidade';
-          } else if (prioArq !== prioSis && prioArq && prioSis) {
-            tipoDivergencia = 'prioridade';
-          } else if (dadosArquivo.total !== dadosSistema.total) {
-            tipoDivergencia = 'quantidade_diferente';
-          }
-          
-          if (tipoDivergencia) {
-            divergencias.push({
-              tipo: tipoDivergencia,
-              chave,
-              EMPRESA: itemArquivo.cliente || '-',
-              NOME_PACIENTE: itemArquivo.paciente || itemArquivo.nome_paciente || '-',
-              CODIGO_PACIENTE: String(itemArquivo.codigoPaciente || '-'),
-              ESTUDO_DESCRICAO: itemArquivo.exame || '-',
-              ACCESSION_NUMBER: itemArquivo.accessionNumber || '-',
-              MODALIDADE: itemArquivo.modalidade || '-',
-              PRIORIDADE: itemArquivo.prioridade || '-',
-              VALORES: dadosArquivo.total,
-              ESPECIALIDADE: itemArquivo.especialidade || '-',
-              MEDICO: itemArquivo.medico || '-',
-              DUPLICADO: '-',
-              DATA_REALIZACAO: formatarDataBR(itemArquivo.data_exame),
-              HORA_REALIZACAO: '-',
-              DATA_TRANSFERENCIA: '-',
-              HORA_TRANSFERENCIA: '-',
-              DATA_LAUDO: formatarDataBR(itemArquivo.data_laudo),
-              HORA_LAUDO: '-',
-              DATA_PRAZO: '-',
-              HORA_PRAZO: '-',
-              STATUS: '-',
-              UNIDADE_ORIGEM: '-',
-              CLIENTE: itemArquivo.cliente || '-',
-              total_arquivo: dadosArquivo.total,
-              total_sistema: dadosSistema.total,
-              categoria_arquivo: catArq,
-              categoria_sistema: catSis,
-              especialidade_arquivo: espArq,
-              especialidade_sistema: espSis,
-              modalidade_arquivo: modArq,
-              modalidade_sistema: modSis,
-              prioridade_arquivo: prioArq,
-              prioridade_sistema: prioSis,
+          if (index < 3) {
+            console.log(`📝 ARQUIVO [${index}]:`, {
+              original: item,
+              chave_gerada: chave,
+              paciente: item.paciente,
+              exame: item.exame,
+              data_exame: item.data_exame,
+              medico: item.medico
             });
           }
           
-        } else if (dadosArquivo && !dadosSistema) {
-          // Só no arquivo
-          const itemArquivo = dadosArquivo.itens[0];
-          divergencias.push({
-            tipo: 'arquivo_nao_no_sistema',
-            chave,
-            EMPRESA: itemArquivo.cliente || '-',
-            NOME_PACIENTE: itemArquivo.paciente || itemArquivo.nome_paciente || '-',
-            CODIGO_PACIENTE: String(itemArquivo.codigoPaciente || '-'),
-            ESTUDO_DESCRICAO: itemArquivo.exame || '-',
-            ACCESSION_NUMBER: itemArquivo.accessionNumber || '-',
-            MODALIDADE: itemArquivo.modalidade || '-',
-            PRIORIDADE: itemArquivo.prioridade || '-',
-            VALORES: dadosArquivo.total,
-            ESPECIALIDADE: itemArquivo.especialidade || '-',
-            MEDICO: itemArquivo.medico || '-',
-            DUPLICADO: '-',
-            DATA_REALIZACAO: formatarDataBR(itemArquivo.data_exame),
-            HORA_REALIZACAO: '-',
-            DATA_TRANSFERENCIA: '-',
-            HORA_TRANSFERENCIA: '-',
-            DATA_LAUDO: formatarDataBR(itemArquivo.data_laudo),
-            HORA_LAUDO: '-',
-            DATA_PRAZO: '-',
-            HORA_PRAZO: '-',
-            STATUS: '-',
-            UNIDADE_ORIGEM: '-',
-            CLIENTE: itemArquivo.cliente || '-',
-            total_arquivo: dadosArquivo.total,
-            total_sistema: 0,
-            categoria_arquivo: normalizar(itemArquivo.categoria || ''),
-          });
-          
-        } else if (!dadosArquivo && dadosSistema) {
-          // Só no sistema
-          const itemSistema = dadosSistema.itens[0];
-          divergencias.push({
-            tipo: 'sistema_nao_no_arquivo',
-            chave,
-            EMPRESA: itemSistema.EMPRESA || '-',
-            NOME_PACIENTE: itemSistema.NOME_PACIENTE || '-',
-            CODIGO_PACIENTE: String(itemSistema.CODIGO_PACIENTE || '-'),
-            ESTUDO_DESCRICAO: itemSistema.ESTUDO_DESCRICAO || '-',
-            ACCESSION_NUMBER: itemSistema.ACCESSION_NUMBER || '-',
-            MODALIDADE: itemSistema.MODALIDADE || '-',
-            PRIORIDADE: itemSistema.PRIORIDADE || '-',
-            VALORES: dadosSistema.total,
-            ESPECIALIDADE: itemSistema.ESPECIALIDADE || '-',
-            MEDICO: itemSistema.MEDICO || '-',
-            DUPLICADO: String(itemSistema.DUPLICADO || '-'),
-            DATA_REALIZACAO: formatarDataBR(itemSistema.DATA_REALIZACAO),
-            HORA_REALIZACAO: itemSistema.HORA_REALIZACAO || '-',
-            DATA_TRANSFERENCIA: formatarDataBR(itemSistema.DATA_TRANSFERENCIA),
-            HORA_TRANSFERENCIA: itemSistema.HORA_TRANSFERENCIA || '-',
-            DATA_LAUDO: formatarDataBR(itemSistema.DATA_LAUDO),
-            HORA_LAUDO: itemSistema.HORA_LAUDO || '-',
-            DATA_PRAZO: itemSistema.DATA_PRAZO || '-',
-            HORA_PRAZO: itemSistema.HORA_PRAZO || '-',
-            STATUS: itemSistema.STATUS || '-',
-            UNIDADE_ORIGEM: itemSistema.EMPRESA || '-',
-            CLIENTE: itemSistema.EMPRESA || '-',
-            total_arquivo: 0,
-            total_sistema: dadosSistema.total,
-            categoria_sistema: normalizar(itemSistema.CATEGORIA || ''),
-          });
+          if (mapaArquivo.has(chave)) {
+            const existing = mapaArquivo.get(chave);
+            existing.quantidade += (item.quant || 1);
+          } else {
+            mapaArquivo.set(chave, {
+              ...item,
+              quantidade: item.quant || 1,
+              chave
+            });
+          }
+          processadosArquivo++;
+        } catch (err) {
+          console.error('Erro ao processar item do arquivo:', item, err);
         }
+      });
+      
+      console.log('📋 Mapa do arquivo criado:', mapaArquivo.size, 'chaves únicas de', processadosArquivo, 'registros');
+      
+      // MAPA DO SISTEMA
+      const mapaSistema = new Map<string, any>();
+      let processadosSistema = 0;
+      
+      sistemaFiltrado.forEach((item, index) => {
+        try {
+          const chave = criarChave(item.NOME_PACIENTE || '', item.ESTUDO_DESCRICAO || '', item.DATA_REALIZACAO, item.MEDICO || '');
+          
+          if (index < 3) {
+            console.log(`💾 SISTEMA [${index}]:`, {
+              original: item,
+              chave_gerada: chave,
+              paciente: item.NOME_PACIENTE,
+              exame: item.ESTUDO_DESCRICAO,
+              data_realizacao: item.DATA_REALIZACAO,
+              medico: item.MEDICO
+            });
+          }
+          
+          if (mapaSistema.has(chave)) {
+            const existing = mapaSistema.get(chave);
+            existing.quantidade += (item.VALORES || 1);
+          } else {
+            mapaSistema.set(chave, {
+              ...item,
+              quantidade: item.VALORES || 1,
+              chave
+            });
+          }
+          processadosSistema++;
+        } catch (err) {
+          console.error('Erro ao processar item do sistema:', item, err);
+        }
+      });
+      
+      console.log('💽 Mapa do sistema criado:', mapaSistema.size, 'chaves únicas de', processadosSistema, 'registros');
+      
+      // DEBUG: Verificar se há chaves comuns
+      const chavesComuns: string[] = [];
+      mapaArquivo.forEach((_, chave) => {
+        if (mapaSistema.has(chave)) {
+          chavesComuns.push(chave);
+        }
+      });
+      
+      console.log('🎯 Chaves comuns encontradas:', chavesComuns.length);
+      
+      if (chavesComuns.length === 0) {
+        console.log('⚠️ ALERTA: Nenhuma chave comum encontrada!');
+        console.log('📝 Primeira chave do arquivo:', Array.from(mapaArquivo.keys())[0]);
+        console.log('💾 Primeira chave do sistema:', Array.from(mapaSistema.keys())[0]);
       }
       
-      console.log('📊 RESULTADO FINAL:');
-      console.log('- Total de divergências:', divergencias.length);
-      console.log('- Chaves sistema:', mapaSistema.size);
-      console.log('- Chaves arquivo:', mapaArquivo.size);
-      console.log('- Chaves comuns:', chavesComuns.length);
+      // IDENTIFICAR DIVERGÊNCIAS REAIS
+      const divergenciasReais: any[] = [];
+      let contadorDivergencias = 0;
       
-      // Contar tipos de divergências
-      const tipoContadores = divergencias.reduce((acc, div) => {
-        acc[div.tipo] = (acc[div.tipo] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      console.log('- Tipos:', tipoContadores);
+      // 1. Chaves que existem no arquivo MAS NÃO no sistema
+      console.log('🔍 Analisando chaves apenas no arquivo...');
+      let apenasNoArquivo = 0;
+      mapaArquivo.forEach((itemArquivo, chave) => {
+        if (!mapaSistema.has(chave)) {
+          apenasNoArquivo++;
+          contadorDivergencias++;
+          
+          if (apenasNoArquivo <= 3) {
+            console.log(`📋 APENAS NO ARQUIVO [${apenasNoArquivo}]:`, {
+              chave,
+              item: itemArquivo
+            });
+          }
+          
+          divergenciasReais.push({
+            'Tipo Divergência': 'Dados apenas no arquivo',
+            'Cliente': itemArquivo.cliente || '-',
+            'Paciente': itemArquivo.paciente || '-',
+            'Código Paciente': itemArquivo.codigoPaciente || '-',
+            'Exame': itemArquivo.exame || '-',
+            'Modalidade': itemArquivo.modalidade || '-',
+            'Especialidade': itemArquivo.especialidade || '-',
+            'Prioridade': itemArquivo.prioridade || '-',
+            'Médico': itemArquivo.medico || '-',
+            'Data Realização': formatarDataBR(itemArquivo.data_exame),
+            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+            'Qtd Arquivo': itemArquivo.quantidade,
+            'Qtd Sistema': 0,
+            'Observação': 'Exame no arquivo mas não encontrado no sistema'
+          });
+        }
+      });
       
-      if (divergencias.length === 0) {
-        alert('✅ Nenhuma divergência encontrada! Os dados do arquivo e sistema estão sincronizados.');
+      console.log(`📊 Encontradas ${apenasNoArquivo} chaves apenas no arquivo`);
+      
+      // 2. Chaves que existem no sistema MAS NÃO no arquivo  
+      console.log('🔍 Analisando chaves apenas no sistema...');
+      let apenasNoSistema = 0;
+      mapaSistema.forEach((itemSistema, chave) => {
+        if (!mapaArquivo.has(chave)) {
+          apenasNoSistema++;
+          contadorDivergencias++;
+          
+          if (apenasNoSistema <= 3) {
+            console.log(`💾 APENAS NO SISTEMA [${apenasNoSistema}]:`, {
+              chave,
+              item: itemSistema
+            });
+          }
+          
+          divergenciasReais.push({
+            'Tipo Divergência': 'Dados apenas no sistema',
+            'Cliente': itemSistema.EMPRESA || '-',
+            'Paciente': itemSistema.NOME_PACIENTE || '-',
+            'Código Paciente': itemSistema.CODIGO_PACIENTE || '-',
+            'Exame': itemSistema.ESTUDO_DESCRICAO || '-',
+            'Modalidade': itemSistema.MODALIDADE || '-',
+            'Especialidade': itemSistema.ESPECIALIDADE || '-',
+            'Prioridade': itemSistema.PRIORIDADE || '-',
+            'Médico': itemSistema.MEDICO || '-',
+            'Data Realização': itemSistema.DATA_REALIZACAO || '-',
+            'Data Laudo': itemSistema.DATA_LAUDO || '-',
+            'Qtd Arquivo': 0,
+            'Qtd Sistema': itemSistema.quantidade,
+            'Observação': 'Exame no sistema mas não encontrado no arquivo'
+          });
+        }
+      });
+      
+      console.log(`📊 Encontradas ${apenasNoSistema} chaves apenas no sistema`);
+      
+      // 3. Chaves comuns mas com quantidades diferentes
+      console.log('🔍 Analisando quantidades diferentes...');
+      let quantidadesDiferentes = 0;
+      mapaArquivo.forEach((itemArquivo, chave) => {
+        const itemSistema = mapaSistema.get(chave);
+        if (itemSistema && itemArquivo.quantidade !== itemSistema.quantidade) {
+          quantidadesDiferentes++;
+          contadorDivergencias++;
+          
+          if (quantidadesDiferentes <= 3) {
+            console.log(`⚖️ QUANTIDADE DIFERENTE [${quantidadesDiferentes}]:`, {
+              chave,
+              arquivo: itemArquivo.quantidade,
+              sistema: itemSistema.quantidade
+            });
+          }
+          
+          divergenciasReais.push({
+            'Tipo Divergência': 'Quantidade diferente',
+            'Cliente': itemArquivo.cliente || '-',
+            'Paciente': itemArquivo.paciente || '-',
+            'Código Paciente': itemArquivo.codigoPaciente || '-',
+            'Exame': itemArquivo.exame || '-',
+            'Modalidade': itemArquivo.modalidade || '-',
+            'Especialidade': itemArquivo.especialidade || '-',
+            'Prioridade': itemArquivo.prioridade || '-',
+            'Médico': itemArquivo.medico || '-',
+            'Data Realização': formatarDataBR(itemArquivo.data_exame),
+            'Data Laudo': formatarDataBR(itemArquivo.data_laudo),
+            'Qtd Arquivo': itemArquivo.quantidade,
+            'Qtd Sistema': itemSistema.quantidade,
+            'Observação': `Arquivo: ${itemArquivo.quantidade}, Sistema: ${itemSistema.quantidade}`
+          });
+        }
+      });
+      
+      console.log(`📊 Encontradas ${quantidadesDiferentes} diferenças de quantidade`);
+      
+      // RESUMO FINAL
+      console.log('📋 RESUMO FINAL DAS DIVERGÊNCIAS:');
+      console.log(`- Total de divergências REAIS: ${contadorDivergencias}`);
+      console.log(`- Apenas no arquivo: ${apenasNoArquivo}`);
+      console.log(`- Apenas no sistema: ${apenasNoSistema}`);
+      console.log(`- Quantidades diferentes: ${quantidadesDiferentes}`);
+      console.log(`- Chaves arquivo: ${mapaArquivo.size}`);
+      console.log(`- Chaves sistema: ${mapaSistema.size}`);
+      
+      if (divergenciasReais.length === 0) {
+        alert('✅ Parabéns! Não há divergências entre o arquivo e o sistema!');
         return;
       }
       
-      // NOVA IMPLEMENTAÇÃO: Gerar Excel com layout limpo
-      const dadosExcel = divergencias.map(div => ({
-        'Tipo Divergência': div.tipo === 'arquivo_nao_no_sistema' ? 'Somente no Arquivo' :
-                          div.tipo === 'sistema_nao_no_arquivo' ? 'Somente no Sistema' :
-                          div.tipo === 'quantidade_diferente' ? 'Quantidade Diferente' :
-                          div.tipo === 'categoria' ? 'Categoria Diferente' :
-                          div.tipo === 'especialidade' ? 'Especialidade Diferente' :
-                          div.tipo === 'modalidade' ? 'Modalidade Diferente' :
-                          div.tipo === 'prioridade' ? 'Prioridade Diferente' :
-                          div.tipo,
-        'Cliente': div.EMPRESA,
-        'Paciente': div.NOME_PACIENTE,
-        'Código Paciente': div.CODIGO_PACIENTE,
-        'Exame': div.ESTUDO_DESCRICAO,
-        'Modalidade': div.MODALIDADE,
-        'Especialidade': div.ESPECIALIDADE,
-        'Prioridade': div.PRIORIDADE,
-        'Médico': div.MEDICO,
-        'Data Realização': div.DATA_REALIZACAO,
-        'Data Laudo': div.DATA_LAUDO,
-        'Qtd Arquivo': div.total_arquivo || 0,
-        'Qtd Sistema': div.total_sistema || 0,
-        'Categoria Arquivo': div.categoria_arquivo || '-',
-        'Categoria Sistema': div.categoria_sistema || '-',
-        'Especialidade Arquivo': div.especialidade_arquivo || '-',
-        'Especialidade Sistema': div.especialidade_sistema || '-',
-        'Modalidade Arquivo': div.modalidade_arquivo || '-',
-        'Modalidade Sistema': div.modalidade_sistema || '-',
-        'Prioridade Arquivo': div.prioridade_arquivo || '-',
-        'Prioridade Sistema': div.prioridade_sistema || '-',
-      }));
-      
-      // Criar workbook
+      // GERAR ARQUIVO EXCEL
+      console.log('📁 Gerando arquivo Excel...');
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(dadosExcel);
+      const ws = XLSX.utils.json_to_sheet(divergenciasReais);
       
-      // Ajustar colunas
+      // Ajustar largura das colunas
       ws['!cols'] = [
-        { wch: 20 }, // Tipo Divergência
-        { wch: 25 }, // Cliente
+        { wch: 25 }, // Tipo Divergência
+        { wch: 20 }, // Cliente
         { wch: 30 }, // Paciente
         { wch: 15 }, // Código
         { wch: 35 }, // Exame
@@ -736,25 +490,21 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
         { wch: 15 }, // Data Laudo
         { wch: 12 }, // Qtd Arquivo
         { wch: 12 }, // Qtd Sistema
-        { wch: 15 }, // Categoria Arquivo
-        { wch: 15 }, // Categoria Sistema
-        { wch: 18 }, // Especialidade Arquivo
-        { wch: 18 }, // Especialidade Sistema
-        { wch: 15 }, // Modalidade Arquivo
-        { wch: 15 }, // Modalidade Sistema
-        { wch: 15 }, // Prioridade Arquivo
-        { wch: 15 }, // Prioridade Sistema
+        { wch: 40 }, // Observação
       ];
       
-      XLSX.utils.book_append_sheet(wb, ws, 'Divergências');
+      XLSX.utils.book_append_sheet(wb, ws, 'Divergências Reais');
       
       // Nome do arquivo
-      const nomeArquivo = `divergencias_${referencia}_${cliente !== 'todos' ? cliente : 'todos'}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+      const nomeArquivo = `divergencias_REAIS_${referencia}_${cliente !== 'todos' ? cliente : 'todos'}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
       
       // Download
       XLSX.writeFile(wb, nomeArquivo);
       
-      console.log(`✅ Excel gerado: ${nomeArquivo} com ${divergencias.length} divergências`);
+      console.log(`✅ Excel gerado com SUCESSO: ${nomeArquivo}`);
+      console.log(`📊 Total de divergências REAIS exportadas: ${divergenciasReais.length}`);
+      
+      alert(`✅ Excel gerado com sucesso!\n\nArquivo: ${nomeArquivo}\nDivergências encontradas: ${divergenciasReais.length}\n\n- Apenas no arquivo: ${apenasNoArquivo}\n- Apenas no sistema: ${apenasNoSistema}\n- Quantidades diferentes: ${quantidadesDiferentes}`);
       
     } catch (error) {
       console.error('❌ Erro ao gerar excel:', error);
