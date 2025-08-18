@@ -431,6 +431,23 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         try {
           const chave = criarChave(item.paciente || '', item.exame || '', item.data_exame, item.data_laudo, item.medico || '');
           
+          // Debug específico para o exemplo problemático
+          if (item.paciente && item.paciente.includes('Vilma') && item.exame === 'RM CARDIACA') {
+            console.log('🔍 DEBUG VILMA - ARQUIVO:', {
+              paciente_original: item.paciente,
+              paciente_normalizado: normalizar(item.paciente || ''),
+              exame_original: item.exame,
+              exame_normalizado: normalizarExame(item.exame || ''),
+              data_exame_original: item.data_exame,
+              data_exame_normalizada: normalizarData(item.data_exame),
+              data_laudo_original: item.data_laudo,
+              data_laudo_normalizada: normalizarData(item.data_laudo),
+              medico_original: item.medico,
+              medico_normalizado: normalizarMedico(item.medico || ''),
+              chave_final: chave
+            });
+          }
+          
           if (index < 3) {
             console.log(`📝 ARQUIVO [${index}]:`, {
               original: item,
@@ -468,6 +485,23 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
       sistemaFiltrado.forEach((item, index) => {
         try {
           const chave = criarChave(item.NOME_PACIENTE || '', item.ESTUDO_DESCRICAO || '', item.DATA_REALIZACAO, item.DATA_LAUDO, item.MEDICO || '');
+          
+          // Debug específico para o exemplo problemático
+          if (item.NOME_PACIENTE && item.NOME_PACIENTE.includes('Vilma') && item.ESTUDO_DESCRICAO === 'RM CARDIACA') {
+            console.log('🔍 DEBUG VILMA - SISTEMA:', {
+              paciente_original: item.NOME_PACIENTE,
+              paciente_normalizado: normalizar(item.NOME_PACIENTE || ''),
+              exame_original: item.ESTUDO_DESCRICAO,
+              exame_normalizado: normalizarExame(item.ESTUDO_DESCRICAO || ''),
+              data_realizacao_original: item.DATA_REALIZACAO,
+              data_realizacao_normalizada: normalizarData(item.DATA_REALIZACAO),
+              data_laudo_original: item.DATA_LAUDO,
+              data_laudo_normalizada: normalizarData(item.DATA_LAUDO),
+              medico_original: item.MEDICO,
+              medico_normalizado: normalizarMedico(item.MEDICO || ''),
+              chave_final: chave
+            });
+          }
           
           if (index < 3) {
             console.log(`💾 SISTEMA [${index}]:`, {
