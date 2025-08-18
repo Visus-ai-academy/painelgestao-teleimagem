@@ -91,12 +91,14 @@ function formatBreakdown(map: Breakdown, maxItems = 4) {
 
 export function VolumetriaClientesComparison({
   uploaded,
+  uploadedExams, // ✅ NOVO PARÂMETRO
   onDivergencesComputed,
-  periodoSelecionado,  // ✅ NOVO PARÂMETRO
+  periodoSelecionado,
 }: {
   uploaded?: UploadedRow[];
+  uploadedExams?: any[]; // ✅ NOVO PARÂMETRO
   onDivergencesComputed?: (divs: Divergencia[]) => void;
-  periodoSelecionado?: string | null;  // ✅ TIPO DO NOVO PARÂMETRO
+  periodoSelecionado?: string | null;
 }) {
   const { data: context, getDataByPeriod } = useVolumetria();
   const { toast } = useToast();
@@ -306,14 +308,25 @@ export function VolumetriaClientesComparison({
     }
   }, [context.clientesStats, context.detailedData, dadosPeriodo, periodoSelecionado, toast]);
 
-  // Agregar dados do arquivo (se houver)
+  // Agregar dados do arquivo - PRIORIZAR uploadedExams se disponível
   const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
-    if (!uploaded || uploaded.length === 0) return null;
+    // Usar primeiro uploadedExams (mais detalhado) se disponível
+    const sourceData = uploadedExams && uploadedExams.length > 0 ? uploadedExams : uploaded;
+    
+    if (!sourceData || sourceData.length === 0) return null;
+    
+    console.log('🔍 [COMPARATIVO] Processando dados do arquivo:', sourceData.length, 'registros');
+    console.log('🔍 [COMPARATIVO] Fonte:', uploadedExams && uploadedExams.length > 0 ? 'uploadedExams' : 'uploaded');
+    
     const agg = new Map<string, ClienteAggregated>();
-    uploaded.forEach((row) => {
+    
+    sourceData.forEach((row: any) => {
       const cliente = String(row.cliente || '').trim();
       if (!cliente) return;
-      const val = Number(row.totalExames) || 0;
+      
+      // Calcular valor: usar quant (de uploadedExams) ou totalExames (de uploaded)
+      const val = Number(row.quant || row.totalExames || 1) || 1;
+      
       if (!agg.has(cliente)) {
         agg.set(cliente, {
           cliente,
@@ -325,21 +338,29 @@ export function VolumetriaClientesComparison({
           exames: {},
         });
       }
+      
       const ref = agg.get(cliente)!;
       ref.total_exames += val;
+      
+      // Adicionar detalhes (normalizando campos)
       let mod = canonicalModalidade(row.modalidade);
       const esp = canonical(row.especialidade);
       const pri = canonicalPrioridade(row.prioridade);
       const cat = canonical(row.categoria);
       const exame = canonical(row.exame);
+      
       if (mod) ref.modalidades[mod] = (ref.modalidades[mod] || 0) + val;
       if (esp) ref.especialidades[esp] = (ref.especialidades[esp] || 0) + val;
       if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
       if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
       if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + val;
     });
-    return Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
-  }, [uploaded]);
+    
+    const resultado = Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
+    console.log('🔍 [COMPARATIVO] Resultado arquivo:', resultado.length, 'clientes');
+    console.log('🔍 [COMPARATIVO] Primeiros 3 clientes arquivo:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
+    return resultado;
+  }, [uploaded, uploadedExams]);
 
   const normalize = (s: string) => normalizeClientName(s).toLowerCase();
 

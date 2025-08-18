@@ -336,6 +336,7 @@ export default function Comparativo() {
             <CardContent>
               <VolumetriaClientesComparison
                 uploaded={uploaded || undefined}
+                uploadedExams={uploadedExams || undefined}
                 onDivergencesComputed={setDivergencias}
                 periodoSelecionado={periodoComparativo}
               />
