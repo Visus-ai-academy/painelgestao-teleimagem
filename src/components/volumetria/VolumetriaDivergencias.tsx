@@ -270,6 +270,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
 
   const gerarExcelDivergencias = async () => {
     console.log('🚀 INÍCIO PROCESSAMENTO DIVERGÊNCIAS - NOVA IMPLEMENTAÇÃO');
+    console.log('📝 uploadedExams recebido:', uploadedExams?.length || 0, 'registros');
+    console.log('📊 Primeiros 3 itens do uploadedExams:', uploadedExams?.slice(0, 3));
     
     try {
       setExporting(true);
@@ -338,9 +340,23 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       // Mapa do sistema
       const mapaSistema = new Map<string, { total: number; itens: any[] }>();
-      sistemaFiltrado.forEach((item: any) => {
+      sistemaFiltrado.forEach((item: any, index: number) => {
         const chave = criarChaveComparacao(item, 'sistema');
         const valores = Number(item.VALORES || 1);
+        
+        // Debug detalhado para primeiros itens
+        if (index < 3) {
+          console.log(`🔍 SISTEMA [${index}]:`, {
+            item_original: item,
+            chave_gerada: chave,
+            paciente: item.NOME_PACIENTE,
+            exame: item.ESTUDO_DESCRICAO,
+            data_realizacao: item.DATA_REALIZACAO,
+            data_laudo: item.DATA_LAUDO,
+            medico: item.MEDICO,
+            valores
+          });
+        }
         
         if (mapaSistema.has(chave)) {
           const existente = mapaSistema.get(chave)!;
@@ -353,9 +369,23 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       // Mapa do arquivo
       const mapaArquivo = new Map<string, { total: number; itens: any[] }>();
-      arquivoFiltrado.forEach((item: any) => {
+      arquivoFiltrado.forEach((item: any, index: number) => {
         const chave = criarChaveComparacao(item, 'arquivo');
         const quantidade = Number(item.quant || item.quantidade || item.valores || 1);
+        
+        // Debug detalhado para primeiros itens
+        if (index < 3) {
+          console.log(`🔍 ARQUIVO [${index}]:`, {
+            item_original: item,
+            chave_gerada: chave,
+            paciente: item.paciente || item.nome_paciente,
+            exame: item.exame || item.estudo_descricao,
+            data_exame: item.data_exame || item.data_realizacao,
+            data_laudo: item.data_laudo,
+            medico: item.medico,
+            quantidade
+          });
+        }
         
         if (mapaArquivo.has(chave)) {
           const existente = mapaArquivo.get(chave)!;
