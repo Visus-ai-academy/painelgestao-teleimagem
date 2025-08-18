@@ -21,6 +21,25 @@ function normalizar(texto: string): string {
     .trim();
 }
 
+function normalizarPrioridade(prioridade: string): string {
+  if (!prioridade) return '';
+  
+  const prioridadeNormalizada = normalizar(prioridade);
+  
+  // Mapeamentos de prioridades comuns
+  const mapeamentos: Record<string, string> = {
+    'URGENCIA': 'URGENCIA',
+    'URGENTE': 'URGENCIA', 
+    'URGENT': 'URGENCIA',
+    'ROTINA': 'ROTINA',
+    'ROUTINE': 'ROTINA',
+    'NORMAL': 'ROTINA',
+    'ELETIVO': 'ROTINA'
+  };
+  
+  return mapeamentos[prioridadeNormalizada] || prioridadeNormalizada;
+}
+
 function normalizarCliente(nome: string): string {
   let limpo = normalizar(nome);
   
@@ -247,39 +266,69 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
       
       console.log('🔄 Período convertido:', referencia, '->', periodoFormatado);
       
-      // Buscar dados do sistema
-      const { data: systemData, error } = await supabase
+      // BUSCA MELHORADA DOS DADOS DO SISTEMA
+      console.log('🔍 Estratégias de busca dos dados do sistema:');
+      console.log('1️⃣ Tentativa 1: periodo_referencia =', periodoFormatado);
+      
+      let dadosSistema: any[] = [];
+      
+      // Tentativa 1: Buscar por periodo_referencia
+      const { data: systemData1, error: error1 } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
         .eq('periodo_referencia', periodoFormatado);
       
-      if (error) {
-        console.error('❌ Erro na consulta:', error);
-        alert(`⚠️ ERRO na consulta: ${error.message}`);
+      if (error1) {
+        console.error('❌ Erro na consulta 1:', error1);
+        alert(`⚠️ ERRO na consulta: ${error1.message}`);
         return;
       }
       
-      let dadosSistema = systemData;
-      
-      if (!systemData || systemData.length === 0) {
-        console.log('⚠️ Nenhum dado encontrado com periodo_referencia. Tentando busca alternativa...');
+      if (systemData1 && systemData1.length > 0) {
+        console.log('✅ Dados encontrados na tentativa 1:', systemData1.length, 'registros');
+        dadosSistema = systemData1;
+      } else {
+        console.log('⚠️ Tentativa 1 falhou. Tentando estratégia 2...');
         
-        // Busca alternativa por data_referencia
-        const { data: systemDataAlt, error: errorAlt } = await supabase
+        // Tentativa 2: Buscar por data_referencia (mes/ano)
+        console.log('2️⃣ Tentativa 2: data_referencia entre', `${ano}-${mes}-01`, 'e', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
+        
+        const { data: systemData2, error: error2 } = await supabase
           .from('volumetria_mobilemed')
           .select('*')
           .gte('data_referencia', `${ano}-${mes}-01`)
           .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
         
-        if (errorAlt || !systemDataAlt || systemDataAlt.length === 0) {
-          alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado}.`);
-          return;
+        if (error2) {
+          console.error('❌ Erro na consulta 2:', error2);
         }
         
-        console.log('✅ Dados do sistema encontrados via data_referencia:', systemDataAlt.length, 'registros');
-        dadosSistema = systemDataAlt;
-      } else {
-        console.log('✅ Dados do sistema encontrados via periodo_referencia:', dadosSistema.length, 'registros');
+        if (systemData2 && systemData2.length > 0) {
+          console.log('✅ Dados encontrados na tentativa 2:', systemData2.length, 'registros');
+          dadosSistema = systemData2;
+        } else {
+          console.log('⚠️ Tentativa 2 falhou. Tentando estratégia 3...');
+          
+          // Tentativa 3: Buscar todos os dados e filtrar por período (fallback)
+          console.log('3️⃣ Tentativa 3: Carregando TODOS os dados disponíveis como fallback');
+          
+          const { data: systemData3, error: error3 } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .limit(50000); // Limite de segurança
+          
+          if (error3) {
+            console.error('❌ Erro na consulta 3:', error3);
+          }
+          
+          if (systemData3 && systemData3.length > 0) {
+            console.log('✅ Dados encontrados na tentativa 3:', systemData3.length, 'registros (TODOS)');
+            dadosSistema = systemData3;
+          } else {
+            alert(`⚠️ ERRO: Nenhum dado do sistema encontrado para o período ${periodoFormatado} em nenhuma estratégia.`);
+            return;
+          }
+        }
       }
       
       console.log('📊 Primeiros 3 registros do sistema:', dadosSistema.slice(0, 3));
@@ -550,8 +599,8 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
           const especialidadeArquivo = normalizar(itemArquivo.especialidade || '');
           const categoriaSistema = normalizar(itemSistema.CATEGORIA || '');
           const categoriaArquivo = normalizar(itemArquivo.categoria || '');
-          const prioridadeSistema = normalizar(itemSistema.PRIORIDADE || '');
-          const prioridadeArquivo = normalizar(itemArquivo.prioridade || '');
+          const prioridadeSistema = normalizarPrioridade(itemSistema.PRIORIDADE || '');
+          const prioridadeArquivo = normalizarPrioridade(itemArquivo.prioridade || '');
           
           // Divergência de Modalidade
           if (modalidadeSistema !== modalidadeArquivo) {
