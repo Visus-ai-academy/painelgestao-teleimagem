@@ -224,6 +224,15 @@ export default function VolumetriaDivergencias({ uploadedExams }: { uploadedExam
   const [referencia, setReferencia] = useState<string>('2025-06');
   const [cliente, setCliente] = useState<string>('todos');
 
+  // DEBUG: Log sempre que uploadedExams mudar
+  useEffect(() => {
+    console.log('🔄 VolumetriaDivergencias - uploadedExams mudou:', {
+      recebido: !!uploadedExams,
+      quantidade: uploadedExams?.length || 0,
+      primeiros_3: uploadedExams?.slice(0, 3)
+    });
+  }, [uploadedExams]);
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('clientes').select('id,nome').eq('ativo', true);
