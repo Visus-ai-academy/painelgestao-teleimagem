@@ -235,6 +235,7 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         console.log('📅 Período original do contexto:', periodoAtivo);
         
         let periodoFormatado = periodoAtivo; // Usar diretamente o formato do contexto (jun/25)
+        let periodoFormatoDB = '2025-06'; // Formato YYYY-MM para busca no banco
         let ano = '', mes = '';
         
         // Se vier no formato "jun/25", converter para ano/mês para buscas alternativas
@@ -246,12 +247,14 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
           };
           mes = mesesMap[mesNome] || '06';
           ano = anoShort.length === 2 ? `20${anoShort}` : anoShort;
+          periodoFormatoDB = `${ano}-${mes}`;
           
           console.log('🔄 Conversão realizada:', {
             original: periodoAtivo,
             ano, 
             mes,
-            periodoFormatado
+            periodoFormatado,
+            periodoFormatoDB
           });
         } else {
           // Fallback para o formato atual se não conseguir converter
@@ -259,19 +262,20 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
           ano = '2025';
           mes = '06';
           periodoFormatado = 'jun/25';
+          periodoFormatoDB = '2025-06';
         }
       
-      // BUSCA ESTRATÉGICA DOS DADOS DO SISTEMA - VERSÃO CORRIGIDA
+      // BUSCA ESTRATÉGICA DOS DADOS DO SISTEMA - PRIORIZAR FORMATO YYYY-MM
       console.log('🔍 Estratégias de busca dos dados do sistema:');
-      console.log('1️⃣ Tentativa 1: periodo_referencia =', periodoFormatado);
+      console.log('1️⃣ Tentativa 1: periodo_referencia =', periodoFormatoDB);
       
       let dadosSistema: any[] = [];
       
-      // Tentativa 1: Buscar por periodo_referencia
+      // Tentativa 1: Buscar por periodo_referencia no formato YYYY-MM (onde estão a maioria dos dados)
       const { data: systemData1, error: error1 } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('periodo_referencia', periodoFormatado);
+        .eq('periodo_referencia', periodoFormatoDB);
       
       if (error1) {
         console.error('❌ Erro na consulta 1:', error1);
@@ -279,9 +283,9 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         return;
       }
       
-      console.log(`✅ Tentativa 1 - Encontrados: ${systemData1?.length || 0} registros com periodo_referencia = '${periodoFormatado}'`);
+      console.log(`✅ Tentativa 1 - Encontrados: ${systemData1?.length || 0} registros com periodo_referencia = '${periodoFormatoDB}'`);
       
-      if (systemData1 && systemData1.length > 100) {
+      if (systemData1 && systemData1.length > 50) {
         console.log('✅ Dados suficientes encontrados na tentativa 1');
         dadosSistema = systemData1;
       } else {
