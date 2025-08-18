@@ -224,12 +224,13 @@ export function VolumetriaClientesComparison({
       
       
       if (!stats || stats.length === 0) {
-        console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, tentando carregar dados detalhados...');
-        // CORREÇÃO: Usar dados detalhados direto quando stats está vazio
-        const dadosParaUsar = uploadedExams && uploadedExams.length > 0 ? uploadedExams : context.detailedData || [];
+        console.warn('⚠️ [COMPARATIVO] ClientesStats vazio, usando dados processados...');
+        // PRIORIDADE 1: uploadedExams (dados processados com regras)
+        // PRIORIDADE 2: detailedData (dados brutos do contexto)
+        const dadosParaUsar = (uploadedExams && uploadedExams.length > 0) ? uploadedExams : (context.detailedData || []);
+        console.log('📊 Fonte de dados escolhida:', uploadedExams && uploadedExams.length > 0 ? 'uploadedExams (PROCESSADOS)' : 'detailedData (BRUTOS)', dadosParaUsar.length, 'registros');
         
         if (dadosParaUsar && dadosParaUsar.length > 0) {
-          console.log('✅ Usando dados detalhados:', dadosParaUsar.length, 'registros');
           const map = new Map<string, ClienteAggregated>();
           
           (dadosParaUsar as any[]).forEach((item, index) => {
