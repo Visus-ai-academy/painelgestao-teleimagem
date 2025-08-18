@@ -275,7 +275,8 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
       const { data: systemData1, error: error1 } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('periodo_referencia', periodoFormatoDB);
+        .eq('periodo_referencia', periodoFormatoDB)
+        .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
       
       if (error1) {
         console.error('❌ Erro na consulta 1:', error1);
@@ -298,7 +299,8 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
           .from('volumetria_mobilemed')
           .select('*')
           .gte('data_referencia', `${ano}-${mes}-01`)
-          .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`);
+          .lt('data_referencia', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-01`)
+          .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
         
         if (error2) {
           console.error('❌ Erro na consulta 2:', error2);
@@ -319,7 +321,8 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
             .from('volumetria_mobilemed')
             .select('*')
             .gte('"DATA_LAUDO"', `${ano}-${mes}-01`)
-            .lte('"DATA_LAUDO"', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-07`);
+            .lte('"DATA_LAUDO"', `${ano}-${String(parseInt(mes) + 1).padStart(2, '0')}-07`)
+            .limit(100000); // Aumentar limite para garantir que todos os dados sejam carregados
           
           if (error3) {
             console.error('❌ Erro na consulta 3:', error3);
