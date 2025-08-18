@@ -533,6 +533,10 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
       
       console.log('💽 Mapa do sistema criado:', mapaSistema.size, 'chaves únicas de', processadosSistema, 'registros');
       
+      // DEBUG: Mostrar exemplos de chaves do arquivo e sistema para debug
+      console.log('🔍 DEBUGGING - Primeiras 5 chaves do arquivo:', Array.from(mapaArquivo.keys()).slice(0, 5));
+      console.log('🔍 DEBUGGING - Primeiras 5 chaves do sistema:', Array.from(mapaSistema.keys()).slice(0, 5));
+      
       // DEBUG: Verificar se há chaves comuns
       const chavesComuns: string[] = [];
       mapaArquivo.forEach((_, chave) => {
@@ -547,6 +551,23 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         console.log('⚠️ ALERTA: Nenhuma chave comum encontrada!');
         console.log('📝 Primeira chave do arquivo:', Array.from(mapaArquivo.keys())[0]);
         console.log('💾 Primeira chave do sistema:', Array.from(mapaSistema.keys())[0]);
+        
+        // DEBUG: Verificar se há chaves do sistema que contêm a mesma base que as do arquivo
+        const primeiraChaveArquivo = Array.from(mapaArquivo.keys())[0];
+        if (primeiraChaveArquivo) {
+          const partesArquivo = primeiraChaveArquivo.split('|');
+          const pacienteArquivo = partesArquivo[0];
+          const exameArquivo = partesArquivo[1];
+          
+          console.log('🔍 Procurando no sistema chaves similares para:', pacienteArquivo, exameArquivo);
+          let encontradas = 0;
+          mapaSistema.forEach((valor, chaveSistema) => {
+            if (encontradas < 3 && (chaveSistema.includes(pacienteArquivo) || chaveSistema.includes(exameArquivo))) {
+              console.log('🔍 Chave similar encontrada no sistema:', chaveSistema);
+              encontradas++;
+            }
+          });
+        }
       }
       
       // IDENTIFICAR DIVERGÊNCIAS REAIS
