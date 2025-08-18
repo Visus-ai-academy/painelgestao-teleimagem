@@ -514,7 +514,7 @@ serve(async (req) => {
       }
     }
 
-    // 🔧 APLICAR CORREÇÃO DE MODALIDADE (Regra v030: DX→RX, CR→RX, mamografia→MG)
+    // 🔧 APLICAR CORREÇÃO DE MODALIDADE (Regra v026: DX→RX, CR→RX, mamografia→MG)
     if (totalInserted > 0) {
       console.log('🔧 Aplicando correção de modalidade DX/CR → RX...');
       try {
@@ -526,10 +526,63 @@ serve(async (req) => {
           console.warn('⚠️ Erro na correção de modalidade:', correcaoError);
         } else if (correcaoResult) {
           console.log('✅ Correção de modalidade aplicada:', correcaoResult);
-          // resultado.alertas.push(`Correção modalidade: ${correcaoResult.registros_corrigidos_rx} → RX, ${correcaoResult.registros_corrigidos_mg} → MG`);
         }
       } catch (correcaoException) {
         console.warn('⚠️ Exceção na correção de modalidade:', correcaoException);
+      }
+    }
+
+    // 🔧 APLICAR CORREÇÃO MODALIDADE ESPECÍFICA (Regra v030: CT, MR, US específicos)
+    if (totalInserted > 0) {
+      console.log('🔧 Aplicando correção modalidade específica...');
+      try {
+        const { data: correcaoEspecificaResult, error: correcaoEspecificaError } = await supabaseClient.functions.invoke('aplicar-correcao-modalidade-especifica', {
+          body: { arquivo_fonte: arquivo_fonte }
+        });
+        
+        if (correcaoEspecificaError) {
+          console.warn('⚠️ Erro na correção modalidade específica:', correcaoEspecificaError);
+        } else if (correcaoEspecificaResult) {
+          console.log(`✅ Correção modalidade específica: ${correcaoEspecificaResult.total_corrigidos} registros corrigidos`);
+        }
+      } catch (correcaoEspecificaException) {
+        console.warn('⚠️ Exceção na correção modalidade específica:', correcaoEspecificaException);
+      }
+    }
+
+    // 🔧 APLICAR REGRAS DE EXCLUSÃO DINÂMICAS (Regra extra_005)
+    if (totalInserted > 0) {
+      console.log('🔧 Aplicando regras de exclusão dinâmicas...');
+      try {
+        const { data: exclusaoDinamicaResult, error: exclusaoDinamicaError } = await supabaseClient.functions.invoke('aplicar-regras-exclusao-dinamicas', {
+          body: { arquivo_fonte: arquivo_fonte }
+        });
+        
+        if (exclusaoDinamicaError) {
+          console.warn('⚠️ Erro nas regras de exclusão dinâmicas:', exclusaoDinamicaError);
+        } else if (exclusaoDinamicaResult) {
+          console.log(`✅ Exclusão dinâmica: ${exclusaoDinamicaResult.total_registros_excluidos} registros excluídos`);
+        }
+      } catch (exclusaoDinamicaException) {
+        console.warn('⚠️ Exceção nas regras de exclusão dinâmicas:', exclusaoDinamicaException);
+      }
+    }
+
+    // 🔧 APLICAR ESPECIALIDADE AUTOMÁTICA (Regra extra_007)
+    if (totalInserted > 0) {
+      console.log('🔧 Aplicando especialidade automática...');
+      try {
+        const { data: especialidadeResult, error: especialidadeError } = await supabaseClient.functions.invoke('aplicar-especialidade-automatica', {
+          body: { arquivo_fonte: arquivo_fonte }
+        });
+        
+        if (especialidadeError) {
+          console.warn('⚠️ Erro na aplicação de especialidade automática:', especialidadeError);
+        } else if (especialidadeResult) {
+          console.log(`✅ Especialidade automática: ${especialidadeResult.registros_processados} registros processados`);
+        }
+      } catch (especialidadeException) {
+        console.warn('⚠️ Exceção na aplicação de especialidade automática:', especialidadeException);
       }
     }
 
