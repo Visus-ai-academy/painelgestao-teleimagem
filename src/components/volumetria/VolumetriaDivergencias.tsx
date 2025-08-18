@@ -116,6 +116,23 @@ function normalizarExame(nome: string): string {
     .replace(/\s+/g, ' ') // Unifica espaços
     .trim();
   
+  // Remover palavras específicas para comparativo
+  const palavrasRemover = [
+    'COMPARATIVO',
+    'REVISAO', 
+    'REVISÃO',
+    'CONTROLE',
+    'SEGUIMENTO'
+  ];
+  
+  palavrasRemover.forEach(palavra => {
+    // Remover a palavra isolada (com espaços ou no final da string)
+    exameNormalizado = exameNormalizado.replace(new RegExp(`\\b${palavra}\\b`, 'g'), '');
+  });
+  
+  // Limpar espaços extras após remoção de palavras
+  exameNormalizado = exameNormalizado.replace(/\s+/g, ' ').trim();
+  
   // Normalizações específicas de exames
   const mapeamentos: Record<string, string> = {
     'RADIOGRAFIA': 'RX',
