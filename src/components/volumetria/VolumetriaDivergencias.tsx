@@ -213,6 +213,13 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
   const periodoAtivo = periodoSelecionado || ctx.dashboardStats?.periodo_ativo || 'jun/25';
   
   console.log('🎯 VolumetriaDivergencias - Período selecionado:', periodoAtivo);
+  
+  // DEBUG: Testar normalização dos exames problemáticos
+  console.log('🧪 TESTE NORMALIZAÇÃO EXAMES:');
+  console.log('   "RM ARTICULACOES SACROILIACAS COMPARATIVO" →', normalizarExame('RM ARTICULACOES SACROILIACAS COMPARATIVO'));
+  console.log('   "RM ARTICULACOES SACROILIACAS" →', normalizarExame('RM ARTICULACOES SACROILIACAS'));
+  console.log('   "Gisele Costa De Almeida" →', normalizar('Gisele Costa De Almeida'));
+  console.log('   "Dra. Priscila Maciel Cavalcanti" →', normalizarMedico('Dra. Priscila Maciel Cavalcanti'));
 
   const clienteOptions = useMemo(() => ctx.clientes || [], [ctx.clientes]);
 
@@ -291,9 +298,9 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         try {
           const chave = criarChave(item.paciente || '', item.exame || '', item.data_exame, item.data_laudo, item.medico || '');
           
-          // Debug específico para o exemplo problemático
-          if (item.paciente && item.paciente.includes('Vilma') && item.exame === 'RM CARDIACA') {
-            console.log('🔍 DEBUG VILMA - ARQUIVO:', {
+          // Debug específico para o caso da Gisele
+          if (item.paciente && item.paciente.includes('Gisele') && item.exame?.includes('RM ARTICULACOES SACROILIACAS')) {
+            console.log('🔍 DEBUG GISELE - ARQUIVO:', {
               paciente_original: item.paciente,
               paciente_normalizado: normalizar(item.paciente || ''),
               exame_original: item.exame,
@@ -346,9 +353,9 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
         try {
           const chave = criarChave(item.NOME_PACIENTE || '', item.ESTUDO_DESCRICAO || '', item.DATA_REALIZACAO, item.DATA_LAUDO, item.MEDICO || '');
           
-          // Debug específico para o exemplo problemático
-          if (item.NOME_PACIENTE && item.NOME_PACIENTE.includes('Vilma') && item.ESTUDO_DESCRICAO === 'RM CARDIACA') {
-            console.log('🔍 DEBUG VILMA - SISTEMA:', {
+          // Debug específico para o caso da Gisele
+          if (item.NOME_PACIENTE && item.NOME_PACIENTE.includes('Gisele') && item.ESTUDO_DESCRICAO?.includes('RM ARTICULACOES SACROILIACAS')) {
+            console.log('🔍 DEBUG GISELE - SISTEMA:', {
               paciente_original: item.NOME_PACIENTE,
               paciente_normalizado: normalizar(item.NOME_PACIENTE || ''),
               exame_original: item.ESTUDO_DESCRICAO,
@@ -406,6 +413,33 @@ export default function VolumetriaDivergencias({ uploadedExams, periodoSeleciona
       });
       
       console.log('🎯 Chaves comuns encontradas:', chavesComuns.length);
+      
+      // DEBUG ESPECÍFICO: Procurar por Gisele nas chaves
+      const chavesGiseleArquivo: string[] = [];
+      const chavesGiseleSistema: string[] = [];
+      
+      mapaArquivo.forEach((item, chave) => {
+        if (item.paciente && item.paciente.includes('Gisele') && item.exame?.includes('RM ARTICULACOES SACROILIACAS')) {
+          chavesGiseleArquivo.push(chave);
+          console.log('🔍 CHAVE GISELE NO ARQUIVO:', chave);
+        }
+      });
+      
+      mapaSistema.forEach((item, chave) => {
+        if (item.NOME_PACIENTE && item.NOME_PACIENTE.includes('Gisele') && item.ESTUDO_DESCRICAO?.includes('RM ARTICULACOES SACROILIACAS')) {
+          chavesGiseleSistema.push(chave);
+          console.log('🔍 CHAVE GISELE NO SISTEMA:', chave);
+        }
+      });
+      
+      console.log('🎯 Chaves Gisele - Arquivo:', chavesGiseleArquivo.length, 'Sistema:', chavesGiseleSistema.length);
+      
+      if (chavesGiseleArquivo.length > 0 && chavesGiseleSistema.length > 0) {
+        console.log('🔍 COMPARAÇÃO DIRECT GISELE:');
+        console.log('   Arquivo:', chavesGiseleArquivo[0]);
+        console.log('   Sistema:', chavesGiseleSistema[0]);
+        console.log('   São iguais?', chavesGiseleArquivo[0] === chavesGiseleSistema[0]);
+      }
       
       if (chavesComuns.length === 0) {
         console.log('⚠️ ALERTA: Nenhuma chave comum encontrada!');
