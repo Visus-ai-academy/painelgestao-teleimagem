@@ -25,6 +25,7 @@ serve(async (req) => {
 
     // Sequência de regras a serem aplicadas
     const regras = [
+      'aplicar-exclusao-clientes-especificos',
       'aplicar-exclusoes-periodo',
       'aplicar-filtro-data-laudo', 
       'aplicar-regras-tratamento',

@@ -168,6 +168,12 @@ const REGRAS_MONITORADAS = [
     descricao: 'Define data de referência baseada no período de processamento',
     funcao: 'aplicar_data_referencia_por_periodo',
     id: 'extra_008'
+  },
+  {
+    nome: 'v032 Exclusão Clientes Específicos',
+    descricao: 'Exclui registros de clientes específicos que não devem ser processados na volumetria',
+    funcao: 'aplicar_exclusao_clientes_especificos',
+    id: 'v032'
   }
 ];
 
@@ -262,7 +268,7 @@ export function StatusRegraProcessamento() {
               }
             } else {
               // Regras que EXCLUEM/FILTRAM registros - exclusões são aplicações corretas
-              const regrasExclusao = ['v002', 'v003', 'v031', 'extra_005'];
+              const regrasExclusao = ['v002', 'v003', 'v031', 'v032', 'extra_005'];
               
               // Regras que TRANSFORMAM dados - transformações são aplicações corretas  
               const regrasTransformacao = ['v022', 'v026', 'v030', 'extra_001', 'extra_002', 'extra_003'];

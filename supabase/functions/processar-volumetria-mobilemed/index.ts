@@ -650,7 +650,28 @@ serve(async (req) => {
 
     console.log('✅ Processamento concluído:', resultado);
 
-    // Aplicar regras de exclusão automaticamente para arquivos 3 e 4
+    // Aplicar regras de exclusão automaticamente para todos os arquivos
+    console.log('🔧 Aplicando regras de exclusão automaticamente...');
+    
+    // 1. Aplicar exclusão de clientes específicos primeiro
+    try {
+      const { data: clientesResult, error: clientesError } = await supabaseClient.functions.invoke('aplicar-exclusao-clientes-especificos', {
+        body: { arquivo_fonte }
+      });
+      
+      if (clientesError) {
+        console.error('❌ Erro ao aplicar exclusão de clientes específicos:', clientesError);
+        resultado.alertas.push(`Erro ao aplicar exclusão de clientes específicos: ${clientesError.message}`);
+      } else if (clientesResult?.success) {
+        console.log(`✅ Exclusão de clientes específicos aplicada: ${clientesResult.total_excluidos} registros removidos`);
+        resultado.observacoes.push(`Exclusão de clientes específicos: ${clientesResult.total_excluidos} registros removidos`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao invocar função de exclusão de clientes específicos:', error);
+      resultado.alertas.push(`Erro na função de exclusão de clientes: ${error.message}`);
+    }
+
+    // 2. Aplicar regras de exclusão por período para arquivos 3 e 4
     if (arquivo_fonte === 'volumetria_padrao_retroativo' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
       console.log('🔧 Aplicando regras de exclusão por período automaticamente...');
       

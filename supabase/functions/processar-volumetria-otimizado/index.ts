@@ -593,6 +593,7 @@ serve(async (req) => {
         
         // Aplicar regras sequencialmente
         const regras = [
+          'aplicar-exclusao-clientes-especificos',
           'aplicar-exclusoes-periodo',
           'aplicar-filtro-data-laudo', 
           'aplicar-regras-tratamento',
