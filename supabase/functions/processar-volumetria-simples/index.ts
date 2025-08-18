@@ -109,7 +109,7 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
 
-    if (!empresaOriginal.trim() || !nomePaciente.trim()) return null;
+    // REMOVIDO: Não excluir registros por campos vazios - tratar como string vazia se necessário
 
     // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
     if (empresaOriginal.toLowerCase().includes('_local')) {
@@ -154,8 +154,8 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     };
 
     const record: VolumetriaRecord = {
-      EMPRESA: String(empresa).trim(),
-      NOME_PACIENTE: String(nomePaciente).trim(),
+      EMPRESA: String(empresa || 'SEM_EMPRESA').trim(), // CORREÇÃO: Não deixar vazio
+      NOME_PACIENTE: String(nomePaciente || 'SEM_NOME').trim(), // CORREÇÃO: Não deixar vazio
       arquivo_fonte: arquivoFonte,
       lote_upload: loteUpload,
       periodo_referencia: periodoReferencia,

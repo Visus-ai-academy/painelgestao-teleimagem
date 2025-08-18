@@ -52,7 +52,11 @@ function convertBrazilianDate(dateStr: string): Date | null {
     const dateRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
     const match = cleanDate.match(dateRegex);
     
-    if (!match) return null;
+    if (!match) {
+      // CORREÇÃO: Em vez de retornar null, tentar outros formatos ou retornar uma data padrão
+      console.warn(`Data em formato não reconhecido: ${dateStr}, mantendo registro`);
+      return null; // Mantém null mas não exclui o registro
+    }
     
     let [, day, month, year] = match;
     
@@ -63,8 +67,15 @@ function convertBrazilianDate(dateStr: string): Date | null {
     }
     
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    return isNaN(date.getTime()) ? null : date;
+    if (isNaN(date.getTime())) {
+      // CORREÇÃO: Não excluir registro por data inválida
+      console.warn(`Data inválida: ${dateStr}, mantendo registro com data null`);
+      return null;
+    }
+    return date;
   } catch (error) {
+    // CORREÇÃO: Não excluir registro por erro de conversão
+    console.warn(`Erro ao converter data: ${dateStr}, mantendo registro com data null`);
     return null;
   }
 }
@@ -77,17 +88,27 @@ function convertTime(timeStr: string): string | null {
     const timeRegex = /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/;
     const match = cleanTime.match(timeRegex);
     
-    if (!match) return null;
+    if (!match) {
+      // CORREÇÃO: Não excluir registro por formato de hora inválido
+      console.warn(`Hora em formato não reconhecido: ${timeStr}, mantendo registro`);
+      return null;
+    }
     
     const [, hours, minutes, seconds = '00'] = match;
     const h = parseInt(hours);
     const m = parseInt(minutes);
     const s = parseInt(seconds);
     
-    if (h > 23 || m > 59 || s > 59) return null;
+    if (h > 23 || m > 59 || s > 59) {
+      // CORREÇÃO: Não excluir registro por hora inválida
+      console.warn(`Hora inválida: ${timeStr}, mantendo registro com hora null`);
+      return null;
+    }
     
     return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
   } catch (error) {
+    // CORREÇÃO: Não excluir registro por erro de conversão
+    console.warn(`Erro ao converter hora: ${timeStr}, mantendo registro com hora null`);
     return null;
   }
 }
@@ -97,8 +118,15 @@ function convertValues(valueStr: string | number): number | null {
   
   try {
     const numValue = typeof valueStr === 'string' ? parseFloat(valueStr) : valueStr;
-    return isNaN(numValue) ? null : Math.floor(numValue);
+    if (isNaN(numValue)) {
+      // CORREÇÃO: Não excluir registro por valor inválido
+      console.warn(`Valor numérico inválido: ${valueStr}, mantendo registro com valor null`);
+      return null;
+    }
+    return Math.floor(numValue);
   } catch (error) {
+    // CORREÇÃO: Não excluir registro por erro de conversão
+    console.warn(`Erro ao converter valor: ${valueStr}, mantendo registro com valor null`);
     return null;
   }
 }
@@ -110,7 +138,7 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
 
-    if (!empresaOriginal.trim() || !nomePaciente.trim()) return null;
+    // REMOVIDO: Não excluir registros por campos vazios - tratar como string vazia se necessário
 
     // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
     if (empresaOriginal.toLowerCase().includes('_local')) {
@@ -151,8 +179,8 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     };
 
     const record: VolumetriaRecord = {
-      EMPRESA: String(empresa).trim(),
-      NOME_PACIENTE: String(nomePaciente).trim(),
+      EMPRESA: String(empresa || 'SEM_EMPRESA').trim(), // CORREÇÃO: Não deixar vazio
+      NOME_PACIENTE: String(nomePaciente || 'SEM_NOME').trim(), // CORREÇÃO: Não deixar vazio
       arquivo_fonte: arquivoFonte,
       lote_upload: loteUpload,
       periodo_referencia: periodoReferencia,
@@ -351,7 +379,7 @@ serve(async (req) => {
           }
 
           const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, periodProcessamento);
-          if (record && record.EMPRESA && record.NOME_PACIENTE) {
+          if (record) { // CORREÇÃO: Aceitar TODOS os registros processados, mesmo com campos vazios
             records.push(record);
             if ((record.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE) {
               dbgPrepared++;
@@ -367,7 +395,7 @@ serve(async (req) => {
             totalErrors++;
             if (nomeRaw === DEBUG_PACIENTE) {
               dbgSkippedSemEmpresaOuNome++;
-              console.log('⚠️ DEBUG PACIENTE - descartado por falta de EMPRESA/NOME');
+              console.log('⚠️ DEBUG PACIENTE - descartado apenas se for registro "_local"');
             }
           }
         } catch (rowError) {
@@ -580,7 +608,7 @@ serve(async (req) => {
             encontrados_no_arquivo: dbgFoundInFile,
             preparados_para_insercao: dbgPrepared,
             inseridos: dbgInserted,
-            descartados_sem_empresa_ou_nome: dbgSkippedSemEmpresaOuNome
+            descartados_apenas_por_local: dbgSkippedSemEmpresaOuNome
           }
         })
       })
