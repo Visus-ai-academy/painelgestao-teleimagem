@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertCircle, Calendar as CalendarIcon, Zap, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
 
 interface UploadStats {
   tipo_arquivo: string;
@@ -21,6 +22,7 @@ interface UploadStats {
 export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
   const [uploadStats, setUploadStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
@@ -119,6 +121,47 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
     return labels[tipo as keyof typeof labels] || tipo;
   };
 
+  const processarDadosPendentes = async () => {
+    if (processing) return;
+    
+    try {
+      setProcessing(true);
+      toast.loading("Processando dados pendentes...", { id: "processar-pendentes" });
+
+      const { data, error } = await supabase.functions.invoke('processar-dados-pendentes', {
+        body: {}
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success(`Processamento concluído: ${data.totalProcessados} uploads processados`, { 
+        id: "processar-pendentes" 
+      });
+      
+      // Atualizar a lista
+      await fetchUploadStats();
+      
+    } catch (error) {
+      console.error('Erro ao processar dados pendentes:', error);
+      toast.error(`Erro no processamento: ${error.message}`, { 
+        id: "processar-pendentes" 
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Detectar uploads travados (processando com contadores zerados)
+  const uploadsTravados = uploadStats.filter(stat => 
+    stat.status === 'processando' && 
+    stat.registros_inseridos === 0 && 
+    stat.registros_processados === 0
+  );
+
+  const temUploadsTravados = uploadsTravados.length > 0;
+
   if (loading) {
     return (
       <Card>
@@ -136,25 +179,43 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
     <Card>
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <CardTitle>Status dos Uploads Recentes - Dados MobileMed</CardTitle>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="justify-start min-w-[220px]">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {selectedDate
-                ? selectedDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
-                : 'Período de referência'}
+        <div className="flex gap-2">
+          {temUploadsTravados && (
+            <Button 
+              onClick={processarDadosPendentes}
+              disabled={processing}
+              variant="outline"
+              size="sm"
+              className="text-orange-600 border-orange-200 hover:bg-orange-50"
+            >
+              {processing ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="mr-2 h-4 w-4" />
+              )}
+              {processing ? 'Processando...' : 'Processar Pendentes'}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              initialFocus
-              className="p-3 pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
+          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="justify-start min-w-[220px]">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate
+                  ? selectedDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+                  : 'Período de referência'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </CardHeader>
       <CardContent>
         {uploadStats.length === 0 ? (
