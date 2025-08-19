@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'processar-volumetria-mobilemed',
+      'processar-volumetria-basico',
       {
         body: {
           file_path,
