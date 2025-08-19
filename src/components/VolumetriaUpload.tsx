@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -27,8 +27,81 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
   const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
   const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
   const [isLimitedProcessing, setIsLimitedProcessing] = useState(false);
+  const [hasPendingData, setHasPendingData] = useState(false);
+
   const { toast } = useToast();
   const { refreshData } = useVolumetria();
+
+  // Verificar se há dados pendentes no staging
+  const checkPendingData = async () => {
+    try {
+      const { count } = await supabase
+        .from('volumetria_staging')
+        .select('*', { count: 'exact' })
+        .eq('status_processamento', 'pendente');
+      
+      setHasPendingData((count || 0) > 0);
+    } catch (error) {
+      console.error('Erro ao verificar dados pendentes:', error);
+    }
+  };
+
+  // Processar dados pendentes
+  const processarDadosPendentes = async () => {
+    try {
+      setIsProcessing(true);
+      setProgress(20);
+
+      const { data, error } = await supabase.functions.invoke('processar-dados-pendentes', {
+        body: {}
+      });
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: `Erro ao processar dados pendentes: ${error.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data?.success) {
+        toast({
+          title: "Sucesso",
+          description: `${data.registros_inseridos} registros processados com sucesso!`
+        });
+        setHasPendingData(false);
+        if (onSuccess) onSuccess();
+      } else {
+        toast({
+          title: "Erro",
+          description: `Erro: ${data?.error || 'Erro desconhecido'}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao processar dados pendentes:', error);
+      toast({
+        title: "Erro",
+        description: 'Erro ao processar dados pendentes',
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+      setProgress(0);
+    }
+  };
+
+  // Verificar dados pendentes ao montar o componente
+  useEffect(() => {
+    checkPendingData();
+  }, []);
+
+  // Verificar dados pendentes periodicamente
+  useEffect(() => {
+    const interval = setInterval(checkPendingData, 30000); // A cada 30 segundos
+    return () => clearInterval(interval);
+  }, []);
 
   // 🔄 FUNÇÃO RESET SISTEMA PARA LIMPEZA COMPLETA
   const debugUploadFlow = async () => {
@@ -256,6 +329,30 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
           <span>Concluído: {stats.inserted} registros inseridos</span>
         </div>
       )}
+
+        {/* Botão para processar dados pendentes */}
+        {hasPendingData && !isProcessing && (
+          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Dados Pendentes Detectados
+                </h4>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                  Há dados no sistema que não foram processados completamente.
+                </p>
+              </div>
+              <Button
+                onClick={processarDadosPendentes}
+                size="sm"
+                variant="outline"
+                className="border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/50"
+              >
+                Processar Agora
+              </Button>
+            </div>
+          </div>
+        )}
 
       {/* Botão de Debug do Sistema */}
       <div className="border-t pt-4 mt-4">

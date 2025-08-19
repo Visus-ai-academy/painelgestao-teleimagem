@@ -112,3 +112,6 @@ verify_jwt = true
 
 [functions.limpar-staging-antigo]
 verify_jwt = true
+
+[functions.processar-dados-pendentes]
+verify_jwt = true
