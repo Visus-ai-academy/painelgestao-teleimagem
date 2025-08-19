@@ -38,7 +38,7 @@ serve(async (req) => {
         .eq('chave', 'periodo_referencia_ativo')
         .single();
       
-      periodoAtivo = periodoConfig?.valor || 'jul/25'; // fallback mais recente
+      periodoAtivo = periodoConfig?.valor || 'jun/25'; // fallback mais recente
     }
 
     const stagingResponse = await supabase.functions.invoke(
