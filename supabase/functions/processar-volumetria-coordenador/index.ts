@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'test-upload',
+      'upload-direto-sucesso',
       {
         body: {
           file_path,
