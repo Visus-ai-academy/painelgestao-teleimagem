@@ -765,6 +765,13 @@ export async function processVolumetriaComStaging(
   // 1. Upload do arquivo para o storage
   const fileName = `volumetria_uploads/${arquivoFonte}_${Date.now()}_${Math.random().toString(36).substring(7)}.xlsx`;
   console.log('📁 [STAGING] Caminho do arquivo que será usado:', fileName);
+  console.log('🔍 [STAGING] Verificação fileName:', {
+    fileName: fileName,
+    type: typeof fileName,
+    length: fileName.length,
+    arquivoFonte: arquivoFonte,
+    timestamp: Date.now()
+  });
   
   const { data: uploadData, error: uploadError } = await supabase.storage
     .from('uploads')
