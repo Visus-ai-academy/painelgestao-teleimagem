@@ -70,13 +70,13 @@ export function usePeriodoIntegrityLock() {
     try {
       console.log(`🔒 [INTEGRITY] Atualizando período para: ${novoPeriodo}`);
       
-      // Desativar período atual
+      // Desativar todos os períodos ativos primeiro
       await supabase
         .from('periodo_referencia_ativo')
         .update({ ativo: false })
         .eq('ativo', true);
 
-      // Ativar novo período (calcular datas baseadas no período)
+      // Preparar datas baseadas no período
       const [mesAbrev, anoAbrev] = novoPeriodo.split('/');
       const meses = {
         'jan': 0, 'fev': 1, 'mar': 2, 'abr': 3, 'mai': 4, 'jun': 5,
@@ -90,18 +90,40 @@ export function usePeriodoIntegrityLock() {
       const dataInicio = new Date(ano, mes - 1, 8);
       const dataFim = new Date(ano, mes, 7);
 
-      const { error } = await supabase
+      // Verificar se já existe registro para este período
+      const { data: existingPeriod } = await supabase
         .from('periodo_referencia_ativo')
-        .upsert({
-          periodo_referencia: novoPeriodo,
-          ativo: true,
-          data_inicio: dataInicio.toISOString().split('T')[0],
-          data_fim: dataFim.toISOString().split('T')[0],
-          descricao: `Período ativo: ${novoPeriodo}`,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'periodo_referencia'
-        });
+        .select('id')
+        .eq('periodo_referencia', novoPeriodo)
+        .maybeSingle();
+
+      let result;
+      if (existingPeriod) {
+        // Atualizar período existente
+        result = await supabase
+          .from('periodo_referencia_ativo')
+          .update({
+            ativo: true,
+            data_inicio: dataInicio.toISOString().split('T')[0],
+            data_fim: dataFim.toISOString().split('T')[0],
+            descricao: `Período ativo: ${novoPeriodo}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingPeriod.id);
+      } else {
+        // Inserir novo período
+        result = await supabase
+          .from('periodo_referencia_ativo')
+          .insert({
+            periodo_referencia: novoPeriodo,
+            ativo: true,
+            data_inicio: dataInicio.toISOString().split('T')[0],
+            data_fim: dataFim.toISOString().split('T')[0],
+            descricao: `Período ativo: ${novoPeriodo}`
+          });
+      }
+
+      const { error } = result;
 
       if (error) throw error;
 
