@@ -26,14 +26,14 @@ serve(async (req) => {
       mensagem: 'Sistema resetado com sucesso'
     };
 
-    // 1. RESETAR TODOS OS UPLOADS TRAVADOS
-    console.log('🔄 Resetando uploads travados...');
+    // 1. RESETAR APENAS UPLOADS REALMENTE TRAVADOS (mais de 30 minutos)
+    console.log('🔄 Resetando uploads realmente travados...');
     
     const { data: uploadsTravados, error: selectError } = await supabase
       .from('processamento_uploads')
       .select('*')
-      .in('status', ['processando', 'pendente', 'staging_concluido'])
-      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Mais de 5 minutos
+      .in('status', ['processando', 'pendente'])
+      .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // Mais de 30 minutos
 
     if (selectError) {
       console.error('❌ Erro ao buscar uploads:', selectError);
@@ -65,13 +65,14 @@ serve(async (req) => {
       console.log(`✅ ${uploadsTravados.length} uploads resetados`);
     }
 
-    // 2. LIMPAR STAGING ANTIGO
-    console.log('🧹 Limpando staging antigo...');
+    // 2. LIMPAR STAGING PROCESSADO (mais de 2 horas)
+    console.log('🧹 Limpando staging processado...');
     
     const { count: stagingCount, error: stagingError } = await supabase
       .from('volumetria_staging')
       .delete({ count: 'exact' })
-      .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()); // Mais de 10 minutos
+      .eq('status_processamento', 'concluido')
+      .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()); // Mais de 2 horas
 
     if (stagingError) {
       console.warn('⚠️ Erro ao limpar staging:', stagingError);
