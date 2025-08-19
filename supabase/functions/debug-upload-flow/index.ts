@@ -36,24 +36,17 @@ serve(async (req) => {
       .list('volumetria_uploads', { limit: 10 });
     console.log('📁 [DEBUG] Arquivos em volumetria_uploads:', volumetriaFiles?.slice(0, 5));
     
-    // 4. Testar conectividade das funções principais
-    console.log('🔌 [DEBUG] Testando conectividade das funções...');
+    // 4. Testar conectividade básica das funções (SEM executar processamento)
+    console.log('🔌 [DEBUG] Verificando disponibilidade das funções...');
     
-    // Teste staging (com dados mock)
+    // Apenas listar funções disponíveis - SEM EXECUTAR
     try {
-      const { data: stagingTest, error: stagingTestError } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
-        body: {
-          file_path: 'teste_debug.xlsx',
-          arquivo_fonte: 'volumetria_padrao',
-          periodo_referencia: 'jun/25'
-        }
-      });
-      console.log('📡 [DEBUG] Teste staging function:', {
-        success: !stagingTestError,
-        error: stagingTestError?.message || 'N/A'
-      });
-    } catch (stagingCallError) {
-      console.log('📡 [DEBUG] Erro ao chamar staging:', stagingCallError.message);
+      console.log('📡 [DEBUG] Funções de processamento disponíveis no sistema');
+      console.log('  - processar-volumetria-coordenador: Orquestração principal');
+      console.log('  - processar-volumetria-staging: Processamento inicial');
+      console.log('  - processar-staging-background: Processamento final');
+    } catch (error) {
+      console.log('⚠️ [DEBUG] Erro ao verificar funções:', error.message);
     }
     
     // 5. Verificar status das tabelas

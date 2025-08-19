@@ -30,9 +30,9 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
   const { toast } = useToast();
   const { refreshData } = useVolumetria();
 
-  // 🔄 FUNÇÃO RESET SISTEMA PARA LIMPEZA
+  // 🔄 FUNÇÃO RESET SISTEMA PARA LIMPEZA COMPLETA
   const debugUploadFlow = async () => {
-    console.log('🔄 [RESET] Resetando sistema...');
+    console.log('🔄 [RESET] Resetando sistema completamente...');
     
     try {
       const { data: resetResult } = await supabase.functions.invoke('resetar-sistema-upload');
@@ -42,8 +42,8 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       await refreshData();
       
       toast({
-        title: "Sistema resetado",
-        description: `${resetResult?.uploads_limpos || 0} uploads travados removidos`,
+        title: "Sistema resetado com sucesso",
+        description: `${resetResult?.uploads_limpos || 0} uploads travados removidos. Pronto para novos uploads.`,
       });
       
     } catch (error) {
