@@ -2461,6 +2461,54 @@ export type Database = {
         }
         Relationships: []
       }
+      processamento_streaming: {
+        Row: {
+          arquivo_fonte: string
+          chunk_atual: number | null
+          created_at: string | null
+          erro_detalhes: string | null
+          id: string
+          progresso_percentage: number | null
+          registros_por_chunk: number | null
+          status: string
+          tempo_fim: string | null
+          tempo_inicio: string | null
+          total_chunks: number | null
+          updated_at: string | null
+          upload_id: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          chunk_atual?: number | null
+          created_at?: string | null
+          erro_detalhes?: string | null
+          id?: string
+          progresso_percentage?: number | null
+          registros_por_chunk?: number | null
+          status?: string
+          tempo_fim?: string | null
+          tempo_inicio?: string | null
+          total_chunks?: number | null
+          updated_at?: string | null
+          upload_id: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          chunk_atual?: number | null
+          created_at?: string | null
+          erro_detalhes?: string | null
+          id?: string
+          progresso_percentage?: number | null
+          registros_por_chunk?: number | null
+          status?: string
+          tempo_fim?: string | null
+          tempo_inicio?: string | null
+          total_chunks?: number | null
+          updated_at?: string | null
+          upload_id?: string
+        }
+        Relationships: []
+      }
       processamento_uploads: {
         Row: {
           arquivo_nome: string
