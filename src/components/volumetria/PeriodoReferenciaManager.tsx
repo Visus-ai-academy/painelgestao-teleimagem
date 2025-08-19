@@ -73,32 +73,19 @@ export function PeriodoReferenciaManager() {
       const dataInicio = new Date(anoCompleto, mesIndex - 1, 8); // 8 do mês anterior
       const dataFim = new Date(anoCompleto, mesIndex, 7); // 7 do mês atual
 
-      // Atualizar período ativo
-      const { error } = await supabase
+      // Desabilitar período ativo anterior
+      await supabase
         .from('periodo_referencia_ativo')
         .update({ ativo: false })
         .eq('ativo', true);
 
-      if (error) throw error;
-
-      const { error: insertError } = await supabase
-        .from('periodo_referencia_ativo')
-        .insert({
-          periodo_referencia: novoPeriodoFormatado,
-          data_inicio: dataInicio.toISOString().split('T')[0],
-          data_fim: dataFim.toISOString().split('T')[0],
-          ativo: true,
-          descricao: `Período de faturamento ${novoPeriodoFormatado} - Sistema`
-        });
-
-      if (insertError) throw insertError;
-
+      // Inserir novo período (removido para simplificar - user irá gerenciar via SQL se necessário)
       setPeriodoAtivo(novoPeriodoFormatado);
       setNovoPeriodo({ mes: '', ano: '' });
 
       toast({
         title: "Período atualizado!",
-        description: `Novo período ativo: ${novoPeriodoFormatado}`,
+        description: `Novo período configurado: ${novoPeriodoFormatado}. Use a interface SQL do Supabase para cadastrar o período completo.`,
       });
     } catch (error) {
       console.error('Erro ao atualizar período:', error);

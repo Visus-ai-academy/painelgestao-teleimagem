@@ -3607,7 +3607,7 @@ export type Database = {
         Returns: Json
       }
       aplicar_de_para_automatico: {
-        Args: { arquivo_fonte_param: string }
+        Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
       aplicar_de_para_prioridade: {
