@@ -62,8 +62,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Processar registros em micro-lotes
-        const BATCH_SIZE = 10;
+        // Processar registros em lotes otimizados
+        const BATCH_SIZE = 100; // Aumentado de 10 para 100
         const finalRecords: any[] = [];
         const stagingIds: string[] = [];
 
@@ -90,17 +90,38 @@ serve(async (req) => {
               NOME_PACIENTE: record.NOME_PACIENTE || '',
               CODIGO_PACIENTE: record.CODIGO_PACIENTE,
               ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
+              ACCESSION_NUMBER: record.ACCESSION_NUMBER,
               MODALIDADE: modalidade,
               PRIORIDADE: record.PRIORIDADE || 'normal',
               VALORES: Number(record.VALORES) || 0,
               ESPECIALIDADE: record.ESPECIALIDADE,
               MEDICO: record.MEDICO,
+              DUPLICADO: record.DUPLICADO,
+              DATA_REALIZACAO: record.DATA_REALIZACAO,
+              HORA_REALIZACAO: record.HORA_REALIZACAO,
+              DATA_TRANSFERENCIA: record.DATA_TRANSFERENCIA,
+              HORA_TRANSFERENCIA: record.HORA_TRANSFERENCIA,
+              DATA_LAUDO: record.DATA_LAUDO,
+              HORA_LAUDO: record.HORA_LAUDO,
+              DATA_PRAZO: record.DATA_PRAZO,
+              HORA_PRAZO: record.HORA_PRAZO,
+              STATUS: record.STATUS,
+              DATA_REASSINATURA: record.DATA_REASSINATURA,
+              HORA_REASSINATURA: record.HORA_REASSINATURA,
+              MEDICO_REASSINATURA: record.MEDICO_REASSINATURA,
+              SEGUNDA_ASSINATURA: record.SEGUNDA_ASSINATURA,
+              POSSUI_IMAGENS_CHAVE: record.POSSUI_IMAGENS_CHAVE,
+              IMAGENS_CHAVES: record.IMAGENS_CHAVES,
+              IMAGENS_CAPTURADAS: record.IMAGENS_CAPTURADAS,
+              CODIGO_INTERNO: record.CODIGO_INTERNO,
+              DIGITADOR: record.DIGITADOR,
+              COMPLEMENTAR: record.COMPLEMENTAR,
               CATEGORIA: record.CATEGORIA || 'SC',
               data_referencia: new Date().toISOString().split('T')[0],
               periodo_referencia: record.periodo_referencia || 'jun/25',
               arquivo_fonte: record.arquivo_fonte,
               lote_upload: record.lote_upload,
-              tipo_faturamento: 'padrao',
+              tipo_faturamento: record.tipo_faturamento || 'padrao',
               processamento_pendente: false
             };
 

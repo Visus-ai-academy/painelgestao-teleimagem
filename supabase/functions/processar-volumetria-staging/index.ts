@@ -164,14 +164,19 @@ serve(async (req) => {
       const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024);
       console.log(`📏 [STAGING] Tamanho do arquivo: ${fileSizeKB} KB`);
       
-      // Ler Excel com configurações básicas
-      console.log('📖 [STAGING] Lendo workbook...');
+      // Ler Excel com configurações ultra-leves para arquivos grandes
+      console.log('📖 [STAGING] Lendo workbook com configurações otimizadas...');
       const workbook = XLSX.read(arrayBuffer, { 
         type: 'array',
         cellDates: false, // Evitar conversão automática de datas
         cellNF: false,
         cellHTML: false,
-        dense: false
+        dense: true, // Formato denso para economizar memória
+        sheetStubs: false, // Não processar células vazias
+        bookVBA: false, // Ignorar macros VBA
+        bookSheets: false, // Não carregar metadados das sheets
+        bookProps: false, // Não carregar propriedades do arquivo
+        raw: false // Não usar valores raw
       });
       
       if (!workbook.SheetNames.length) {
@@ -185,13 +190,17 @@ serve(async (req) => {
         throw new Error('Primeira planilha não encontrada');
       }
       
-      // Converter para JSON
+      // Para arquivos muito grandes, limitar o processamento
+      const MAX_ROWS = fileSizeKB > 8000 ? 3000 : (fileSizeKB > 5000 ? 10000 : 50000);
+      
+      // Converter para JSON com otimizações
       console.log('🔄 [STAGING] Convertendo planilha para JSON...');
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
         defval: '', // Usar string vazia para valores indefinidos
         blankrows: false,
         skipHidden: false,
-        raw: false // Não usar valores raw para evitar problemas de formato
+        raw: false, // Não usar valores raw para evitar problemas de formato
+        range: MAX_ROWS < 50000 ? `A1:Z${MAX_ROWS}` : undefined // Limitar range se necessário
       });
       
       totalLinhas = jsonData.length;
@@ -215,12 +224,12 @@ serve(async (req) => {
       
       console.log('✅ [STAGING] Colunas essenciais verificadas');
       
-      // 4. Processar em MICRO-LOTES para economizar memória
-      const BATCH_SIZE = fileSizeKB > 10000 ? 15 : (fileSizeKB > 5000 ? 30 : 50);
+      // 4. Processar em MICRO-LOTES para arquivos grandes
+      const BATCH_SIZE = fileSizeKB > 8000 ? 10 : (fileSizeKB > 5000 ? 20 : 30);
       let loteAtual = 1;
       const totalLotes = Math.ceil(totalLinhas / BATCH_SIZE);
       
-      console.log(`📦 [STAGING] Processando em ${totalLotes} micro-lotes de ${BATCH_SIZE} registros cada`);
+      console.log(`📦 [STAGING] Processando em ${totalLotes} micro-lotes de ${BATCH_SIZE} registros cada (otimizado para ${fileSizeKB}KB)`);
 
       for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
         const batch = jsonData.slice(i, i + BATCH_SIZE);
@@ -229,7 +238,7 @@ serve(async (req) => {
         
         const stagingRecords: any[] = [];
 
-        // Mapear dados do lote com campos reduzidos
+        // Mapear dados do lote com campos reduzidos para economizar memória
         for (let j = 0; j < batch.length; j++) {
           const row = batch[j] as any;
           
@@ -278,6 +287,7 @@ serve(async (req) => {
               .insert(stagingRecords);
             
             totalInseridos += stagingRecords.length;
+            console.log(`✅ [STAGING] Lote ${loteAtual} inserido: ${stagingRecords.length} registros`);
           } catch (insertError) {
             console.error('❌ [STAGING] Erro ao inserir lote:', insertError);
             totalErros += stagingRecords.length;
@@ -286,9 +296,9 @@ serve(async (req) => {
         
         loteAtual++;
         
-        // Pausa para liberação de memória
-        if (loteAtual % 5 === 0) {
-          if (globalThis.gc) globalThis.gc(); // Forçar garbage collection
+        // Pausa e garbage collection mais agressivos
+        if (loteAtual % 3 === 0) {
+          if (globalThis.gc) globalThis.gc(); // Forçar garbage collection se disponível
           await new Promise(resolve => setTimeout(resolve, 150));
         }
       }

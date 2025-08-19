@@ -106,14 +106,19 @@ serve(async (req) => {
     const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024);
     console.log(`📊 [STAGING-LIGHT] Processando ${fileSizeKB} KB de forma otimizada`);
     
-    // Configurações ultra-leves para Excel
+    // Configurações ULTRA-LEVES para arquivos grandes
+    console.log('📖 [STAGING-LIGHT] Lendo workbook com configurações otimizadas...');
     const workbook = XLSX.read(arrayBuffer, { 
       type: 'array',
       cellDates: false,
       cellNF: false,
       cellHTML: false,
-      dense: true, // Usar modo denso para economizar memória
-      sheetStubs: false // Não processar células vazias
+      dense: true, // Formato denso para economizar memória
+      sheetStubs: false, // Não processar células vazias
+      bookVBA: false, // Ignorar macros VBA
+      bookSheets: false, // Não carregar metadados das sheets
+      bookProps: false, // Não carregar propriedades do arquivo
+      raw: false // Não usar valores raw
     });
     
     if (!workbook.SheetNames.length) {
@@ -123,6 +128,9 @@ serve(async (req) => {
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     console.log('📋 [STAGING-LIGHT] Convertendo planilha...');
     
+    // Para arquivos muito grandes, limitar o range processado
+    const MAX_ROWS = fileSizeKB > 8000 ? 3000 : (fileSizeKB > 5000 ? 10000 : 50000);
+    
     // Conversão ultra-otimizada para arquivos grandes
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
@@ -130,7 +138,8 @@ serve(async (req) => {
       skipHidden: true,
       raw: false,
       dateNF: 'yyyy-mm-dd', // Formato de data simples
-      header: 1 // Usar primeira linha como header
+      header: 1, // Usar primeira linha como header
+      range: MAX_ROWS < 50000 ? `A1:Z${MAX_ROWS}` : undefined // Limitar range se necessário
     });
     
     const totalLinhas = jsonData.length;
@@ -153,13 +162,15 @@ serve(async (req) => {
     
     console.log('✅ [STAGING-LIGHT] Estrutura validada');
 
-    // 4. PROCESSAMENTO ULTRA-OTIMIZADO para arquivos muito grandes
-    const BATCH_SIZE = fileSizeKB > 10000 ? 25 : (fileSizeKB > 5000 ? 50 : 100);
+    // 4. PROCESSAMENTO ULTRA-CONSERVADOR para arquivos gigantes
+    const BATCH_SIZE = fileSizeKB > 8000 ? 10 : (fileSizeKB > 5000 ? 20 : 50);
     let totalInseridos = 0;
     let totalErros = 0;
     
-    // Processar em chunks menores para economizar memória
-    const CHUNK_SIZE = Math.min(1000, Math.floor(jsonData.length / 10)); // Máximo 1000 registros por chunk
+    console.log(`🔄 [STAGING-LIGHT] Usando lotes de ${BATCH_SIZE} registros para arquivo de ${fileSizeKB}KB`);
+    
+    // Processar em chunks menores para arquivos gigantes
+    const CHUNK_SIZE = Math.min(500, Math.floor(jsonData.length / 5)); // Máximo 500 registros por chunk
     
     for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
       const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, jsonData.length);
@@ -182,10 +193,10 @@ serve(async (req) => {
               continue;
             }
             
-            // Registro ultra-mínimo para economizar memória
+            // Registro ultra-mínimo para conservar memória
             stagingRecords.push({
-              EMPRESA: empresa,
-              NOME_PACIENTE: nomePaciente,
+              EMPRESA: empresa.substring(0, 100),
+              NOME_PACIENTE: nomePaciente.substring(0, 100),
               CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').substring(0, 50) || null,
               ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 100) || null,
               MODALIDADE: String(row['MODALIDADE'] || '').substring(0, 10) || null,
@@ -215,15 +226,18 @@ serve(async (req) => {
           }
         }
         
-        // Liberação de memória mais agressiva
-        if (totalInseridos % 200 === 0) {
+        // Liberação de memória mais agressiva a cada 100 registros
+        if ((chunkStart + i) % 100 === 0) {
           if (globalThis.gc) globalThis.gc(); // Forçar garbage collection se disponível
           await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
       
-      // Pausa entre chunks para liberar memória
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Pausa maior entre chunks para liberar memória
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Log de progresso
+      console.log(`📊 [STAGING-LIGHT] Progresso: ${Math.round(((chunkEnd / jsonData.length) * 100))}% - ${totalInseridos} inseridos`);
     }
     
     console.log(`📊 [STAGING-LIGHT] RESULTADO: ${totalInseridos} inseridos, ${totalErros} erros`);

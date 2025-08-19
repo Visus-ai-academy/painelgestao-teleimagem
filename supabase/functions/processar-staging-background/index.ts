@@ -92,8 +92,8 @@ serve(async (req) => {
     let totalInseridos = 0;
     let totalErros = 0;
 
-    // 5. Processar em lotes pequenos para inserção final
-    const BATCH_SIZE = 25;
+    // 5. Processar em lotes otimizados para inserção final  
+    const BATCH_SIZE = 100; // Aumentado de 25 para 100
     
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
@@ -128,11 +128,32 @@ serve(async (req) => {
             NOME_PACIENTE: record.NOME_PACIENTE,
             CODIGO_PACIENTE: record.CODIGO_PACIENTE,
             ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
+            ACCESSION_NUMBER: record.ACCESSION_NUMBER,
             MODALIDADE: modalidade,
             PRIORIDADE: record.PRIORIDADE || 'normal',
-            VALORES: record.VALORES || 0,
+            VALORES: Number(record.VALORES) || 0,
             ESPECIALIDADE: record.ESPECIALIDADE,
             MEDICO: record.MEDICO,
+            DUPLICADO: record.DUPLICADO,
+            DATA_REALIZACAO: record.DATA_REALIZACAO,
+            HORA_REALIZACAO: record.HORA_REALIZACAO,
+            DATA_TRANSFERENCIA: record.DATA_TRANSFERENCIA,
+            HORA_TRANSFERENCIA: record.HORA_TRANSFERENCIA,
+            DATA_LAUDO: record.DATA_LAUDO,
+            HORA_LAUDO: record.HORA_LAUDO,
+            DATA_PRAZO: record.DATA_PRAZO,
+            HORA_PRAZO: record.HORA_PRAZO,
+            STATUS: record.STATUS,
+            DATA_REASSINATURA: record.DATA_REASSINATURA,
+            HORA_REASSINATURA: record.HORA_REASSINATURA,
+            MEDICO_REASSINATURA: record.MEDICO_REASSINATURA,
+            SEGUNDA_ASSINATURA: record.SEGUNDA_ASSINATURA,
+            POSSUI_IMAGENS_CHAVE: record.POSSUI_IMAGENS_CHAVE,
+            IMAGENS_CHAVES: record.IMAGENS_CHAVES,
+            IMAGENS_CAPTURADAS: record.IMAGENS_CAPTURADAS,
+            CODIGO_INTERNO: record.CODIGO_INTERNO,
+            DIGITADOR: record.DIGITADOR,
+            COMPLEMENTAR: record.COMPLEMENTAR,
             CATEGORIA: record.CATEGORIA || 'SC',
             tipo_faturamento: record.tipo_faturamento || 'padrao',
             data_referencia: new Date().toISOString().split('T')[0],
