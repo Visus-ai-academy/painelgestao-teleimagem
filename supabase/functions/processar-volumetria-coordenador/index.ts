@@ -54,8 +54,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. ETAPA STAGING OTIMIZADA - Para arquivos grandes
-    console.log('📋 [COORDENADOR] Etapa 1: Processando com staging otimizado...');
+    // 1. ETAPA STAGING STREAMING - Para arquivos grandes
+    console.log('📋 [COORDENADOR] Etapa 1: Processando com staging streaming...');
     
     // VALIDAÇÃO CRÍTICA ANTES DE MONTAR PAYLOAD
     console.log('🔍 [COORDENADOR] Validando dados antes de criar payload:', {
@@ -77,61 +77,62 @@ serve(async (req) => {
       periodo_referencia: periodo_referencia || 'jun/25'
     };
     
-    console.log('📤 [COORDENADOR] Payload para staging otimizado:', JSON.stringify(stagingPayload, null, 2));
-    console.log('🔍 [COORDENADOR] Verificação final do payload:', {
-      payload_file_path: stagingPayload.file_path,
-      payload_file_path_tipo: typeof stagingPayload.file_path,
-      payload_arquivo_fonte: stagingPayload.arquivo_fonte
-    });
+    console.log('📤 [COORDENADOR] Payload para staging streaming:', JSON.stringify(stagingPayload, null, 2));
     
-    // Tentar primeiro com staging otimizado (para arquivos grandes)
+    // Tentar primeiro com staging streaming (para arquivos grandes)
     let stagingResult, stagingError;
     
-    // Log crítico antes da chamada
-    console.log('🚨 [COORDENADOR] ANTES DE CHAMAR STAGING-LIGHT - Dados finais:', {
-      stagingPayload_completo: stagingPayload,
-      file_path_no_payload: stagingPayload.file_path,
-      arquivo_fonte_no_payload: stagingPayload.arquivo_fonte
-    });
-    
     try {
-      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
+      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
         body: stagingPayload
       });
       stagingResult = data;
       stagingError = error;
       
       if (error) {
-        console.error('❌ [COORDENADOR] Staging otimizado retornou erro:', error);
+        console.error('❌ [COORDENADOR] Staging streaming retornou erro:', error);
         throw error;
       }
       
-      console.log('✅ [COORDENADOR] Staging otimizado usado com sucesso');
-    } catch (lightError) {
-      console.log('⚠️ [COORDENADOR] Staging otimizado falhou, tentando staging padrão:', lightError.message);
-      console.log('🚨 [COORDENADOR] ANTES DE CHAMAR STAGING PADRÃO - Dados finais:', {
-        stagingPayload_completo: stagingPayload,
-        file_path_no_payload: stagingPayload.file_path,
-        arquivo_fonte_no_payload: stagingPayload.arquivo_fonte
-      });
+      console.log('✅ [COORDENADOR] Staging streaming usado com sucesso');
+    } catch (streamingError) {
+      console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
       
-      // Fallback para staging padrão
+      // Fallback 1: Staging light
       try {
-        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
           body: stagingPayload
         });
         stagingResult = data;
         stagingError = error;
         
         if (error) {
-          console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+          console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
           throw error;
         }
         
-        console.log('✅ [COORDENADOR] Staging padrão usado como fallback');
-      } catch (standardError) {
-        console.error('❌ [COORDENADOR] Ambos stagings falharam:', standardError);
-        stagingError = standardError;
+        console.log('✅ [COORDENADOR] Staging light usado como fallback 1');
+      } catch (lightError) {
+        console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
+        
+        // Fallback 2: Staging padrão
+        try {
+          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+            body: stagingPayload
+          });
+          stagingResult = data;
+          stagingError = error;
+          
+          if (error) {
+            console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+            throw error;
+          }
+          
+          console.log('✅ [COORDENADOR] Staging padrão usado como fallback 2');
+        } catch (standardError) {
+          console.error('❌ [COORDENADOR] Todos os stagings falharam:', standardError);
+          stagingError = standardError;
+        }
       }
     }
 
