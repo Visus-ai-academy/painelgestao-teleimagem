@@ -80,96 +80,161 @@ serve(async (req) => {
     let errorCount = 0;
 
     // Processar em micro-batches ultra pequenos para economizar CPU
-    const BATCH_SIZE = 20; // Reduzido drasticamente
-    const MAX_BATCHES_PER_CYCLE = 25; // Processar no máximo 500 registros por ciclo
+    const BATCH_SIZE = 15; // Reduzido ainda mais
+    const MAX_BATCHES_PER_CYCLE = 20; // Processar no máximo 300 registros por ciclo
     
     let totalCycles = Math.ceil(dataRows.length / (BATCH_SIZE * MAX_BATCHES_PER_CYCLE));
     
-    for (let cycle = 0; cycle < totalCycles; cycle++) {
-      const cycleStart = cycle * BATCH_SIZE * MAX_BATCHES_PER_CYCLE;
-      const cycleEnd = Math.min(cycleStart + (BATCH_SIZE * MAX_BATCHES_PER_CYCLE), dataRows.length);
-      
-      console.log(`🔄 [COORDENADOR-V3] Ciclo ${cycle + 1}/${totalCycles}: processando registros ${cycleStart} a ${cycleEnd}`);
-      
-      for (let i = cycleStart; i < cycleEnd; i += BATCH_SIZE) {
-        const batch = dataRows.slice(i, Math.min(i + BATCH_SIZE, cycleEnd));
-        const recordsToInsert = [];
-
-        for (const row of batch) {
-          // Verificar se a linha existe e tem conteúdo
-          if (!Array.isArray(row) || row.length === 0) continue;
-          if (row.every(cell => !cell || cell === '')) continue;
-
-          const rowData = row as any[];
-          const record: any = {
-            arquivo_fonte: arquivo_fonte || 'volumetria_padrao',
-            periodo_referencia: periodo_referencia || 'jun/25',
-            lote_upload: upload_id || crypto.randomUUID()
-          };
-
-          // Mapear apenas campos essenciais para reduzir processamento
-          if (rowData && rowData.length >= 8) {
-            record["EMPRESA"] = (rowData[0] || '').toString().trim() || null;
-            record["NOME_PACIENTE"] = (rowData[1] || '').toString().trim() || null;
-            record["CODIGO_PACIENTE"] = (rowData[2] || '').toString().trim() || null;
-            record["ESTUDO_DESCRICAO"] = (rowData[3] || '').toString().trim() || null;
-            record["ACCESSION_NUMBER"] = (rowData[4] || '').toString().trim() || null;
-            record["MODALIDADE"] = (rowData[5] || '').toString().trim() || null;
-            record["PRIORIDADE"] = (rowData[6] || '').toString().trim() || null;
-            
-            // Conversão segura para número
-            const valorStr = (rowData[7] || '0').toString().replace(',', '.');
-            record["VALORES"] = isNaN(parseFloat(valorStr)) ? 0 : parseFloat(valorStr);
-            
-            // Campos opcionais só se existirem
-            if (rowData.length >= 16) {
-              record["ESPECIALIDADE"] = (rowData[8] || '').toString().trim() || null;
-              record["MEDICO"] = (rowData[9] || '').toString().trim() || null;
-              record["DATA_REALIZACAO"] = (rowData[10] || '').toString().trim() || null;
-              record["HORA_REALIZACAO"] = (rowData[11] || '').toString().trim() || null;
-              record["DATA_LAUDO"] = (rowData[12] || '').toString().trim() || null;
-              record["HORA_LAUDO"] = (rowData[13] || '').toString().trim() || null;
-              record["DATA_PRAZO"] = (rowData[14] || '').toString().trim() || null;
-              record["HORA_PRAZO"] = (rowData[15] || '').toString().trim() || null;
-            }
-          }
-
-          // Validação mínima com verificação de null/undefined
-          if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
-            recordsToInsert.push(record);
-          }
-        }
-
-        if (recordsToInsert.length > 0) {
-          try {
-            const { error: insertError } = await supabase
-              .from('volumetria_mobilemed')
-              .insert(recordsToInsert);
-
-            if (insertError) {
-              console.error(`❌ [COORDENADOR-V3] Erro no batch ${i}:`, insertError.message);
-              errorCount += recordsToInsert.length;
-            } else {
-              insertedCount += recordsToInsert.length;
-            }
-          } catch (err) {
-            console.error(`❌ [COORDENADOR-V3] Erro no insert:`, err);
-            errorCount += recordsToInsert.length;
-          }
-        }
-
-        processedCount += batch.length;
+    try {
+      for (let cycle = 0; cycle < totalCycles; cycle++) {
+        const cycleStart = cycle * BATCH_SIZE * MAX_BATCHES_PER_CYCLE;
+        const cycleEnd = Math.min(cycleStart + (BATCH_SIZE * MAX_BATCHES_PER_CYCLE), dataRows.length);
         
-        // Limpeza de memória e pausa mais longa entre batches
-        recordsToInsert.length = 0;
-        await new Promise(resolve => setTimeout(resolve, 25));
+        console.log(`🔄 [COORDENADOR-V4] Ciclo ${cycle + 1}/${totalCycles}: processando registros ${cycleStart} a ${cycleEnd}`);
+        
+        try {
+          for (let i = cycleStart; i < cycleEnd; i += BATCH_SIZE) {
+            let batch;
+            let recordsToInsert;
+            
+            try {
+              batch = dataRows.slice(i, Math.min(i + BATCH_SIZE, cycleEnd));
+              if (!Array.isArray(batch)) {
+                console.error(`❌ [COORDENADOR-V4] Batch não é array no índice ${i}`);
+                continue;
+              }
+              
+              recordsToInsert = [];
+
+              for (let rowIndex = 0; rowIndex < batch.length; rowIndex++) {
+                try {
+                  const row = batch[rowIndex];
+                  
+                  // Verificações super defensivas
+                  if (row === null || row === undefined) continue;
+                  if (!Array.isArray(row)) continue;
+                  if (row.length === 0) continue;
+                  if (row.every(cell => cell === null || cell === undefined || cell === '')) continue;
+
+                  const rowData = row;
+                  const record = {
+                    arquivo_fonte: arquivo_fonte || 'volumetria_padrao',
+                    periodo_referencia: periodo_referencia || 'jun/25',
+                    lote_upload: upload_id || crypto.randomUUID()
+                  };
+
+                  // Mapear campos com máxima proteção
+                  try {
+                    if (rowData && Array.isArray(rowData) && rowData.length >= 8) {
+                      // Função auxiliar para conversão segura
+                      const safeString = (val) => {
+                        if (val === null || val === undefined) return null;
+                        const str = String(val).trim();
+                        return str === '' ? null : str;
+                      };
+                      
+                      record["EMPRESA"] = safeString(rowData[0]);
+                      record["NOME_PACIENTE"] = safeString(rowData[1]);
+                      record["CODIGO_PACIENTE"] = safeString(rowData[2]);
+                      record["ESTUDO_DESCRICAO"] = safeString(rowData[3]);
+                      record["ACCESSION_NUMBER"] = safeString(rowData[4]);
+                      record["MODALIDADE"] = safeString(rowData[5]);
+                      record["PRIORIDADE"] = safeString(rowData[6]);
+                      
+                      // Conversão super segura para número
+                      try {
+                        const valorRaw = rowData[7];
+                        if (valorRaw === null || valorRaw === undefined) {
+                          record["VALORES"] = 0;
+                        } else {
+                          const valorStr = String(valorRaw).replace(',', '.');
+                          const valorNum = parseFloat(valorStr);
+                          record["VALORES"] = isNaN(valorNum) ? 0 : valorNum;
+                        }
+                      } catch (valorErr) {
+                        console.error(`❌ [COORDENADOR-V4] Erro conversão valor linha ${i + rowIndex}:`, valorErr);
+                        record["VALORES"] = 0;
+                      }
+                      
+                      // Campos opcionais com proteção máxima
+                      if (rowData.length >= 16) {
+                        try {
+                          record["ESPECIALIDADE"] = safeString(rowData[8]);
+                          record["MEDICO"] = safeString(rowData[9]);
+                          record["DATA_REALIZACAO"] = safeString(rowData[10]);
+                          record["HORA_REALIZACAO"] = safeString(rowData[11]);
+                          record["DATA_LAUDO"] = safeString(rowData[12]);
+                          record["HORA_LAUDO"] = safeString(rowData[13]);
+                          record["DATA_PRAZO"] = safeString(rowData[14]);
+                          record["HORA_PRAZO"] = safeString(rowData[15]);
+                        } catch (camposErr) {
+                          console.error(`❌ [COORDENADOR-V4] Erro campos opcionais linha ${i + rowIndex}:`, camposErr);
+                        }
+                      }
+                    }
+
+                    // Validação mínima ultra defensiva
+                    if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
+                      recordsToInsert.push(record);
+                    }
+                    
+                  } catch (recordErr) {
+                    console.error(`❌ [COORDENADOR-V4] Erro processamento record linha ${i + rowIndex}:`, recordErr);
+                    continue;
+                  }
+                  
+                } catch (rowErr) {
+                  console.error(`❌ [COORDENADOR-V4] Erro processamento row ${rowIndex}:`, rowErr);
+                  continue;
+                }
+              }
+
+              // Insert com proteção máxima
+              if (recordsToInsert && Array.isArray(recordsToInsert) && recordsToInsert.length > 0) {
+                try {
+                  const { error: insertError } = await supabase
+                    .from('volumetria_mobilemed')
+                    .insert(recordsToInsert);
+
+                  if (insertError) {
+                    console.error(`❌ [COORDENADOR-V4] Erro no batch ${i}:`, insertError.message);
+                    errorCount += recordsToInsert.length;
+                  } else {
+                    insertedCount += recordsToInsert.length;
+                  }
+                } catch (insertErr) {
+                  console.error(`❌ [COORDENADOR-V4] Erro no insert batch ${i}:`, insertErr);
+                  errorCount += recordsToInsert.length;
+                }
+              }
+
+              processedCount += batch.length;
+              
+            } catch (batchErr) {
+              console.error(`❌ [COORDENADOR-V4] Erro no batch ${i}:`, batchErr);
+              errorCount += BATCH_SIZE;
+            } finally {
+              // Limpeza agressiva de memória
+              batch = null;
+              recordsToInsert = null;
+              
+              // Pausa entre batches
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+          }
+        } catch (cycleErr) {
+          console.error(`❌ [COORDENADOR-V4] Erro no ciclo ${cycle}:`, cycleErr);
+        } finally {
+          // Pausa maior entre ciclos
+          if (cycle < totalCycles - 1) {
+            console.log(`⏸️ [COORDENADOR-V4] Pausa entre ciclos... ${insertedCount} inseridos até agora`);
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
       }
-      
-      // Pausa maior entre ciclos para reduzir carga de CPU
-      if (cycle < totalCycles - 1) {
-        console.log(`⏸️ [COORDENADOR-V3] Pausa entre ciclos... ${insertedCount} inseridos até agora`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    } catch (processErr) {
+      console.error(`💥 [COORDENADOR-V4] Erro no processamento geral:`, processErr);
+      throw processErr;
     }
 
     // Atualizar status do upload se foi fornecido
