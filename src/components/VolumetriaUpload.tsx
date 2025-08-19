@@ -30,36 +30,27 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
   const { toast } = useToast();
   const { refreshData } = useVolumetria();
 
-  // 🧪 FUNÇÃO DEBUG PARA TESTAR O FLUXO COMPLETO
+  // 🔄 FUNÇÃO RESET SISTEMA PARA LIMPEZA
   const debugUploadFlow = async () => {
-    console.log('🧪 [DEBUG] Testando fluxo de upload...');
+    console.log('🔄 [RESET] Resetando sistema...');
     
     try {
-      // 1. Testar função debug
-      const { data: debugResult } = await supabase.functions.invoke('debug-upload-flow');
-      console.log('✅ [DEBUG] Sistema:', debugResult);
+      const { data: resetResult } = await supabase.functions.invoke('resetar-sistema-upload');
+      console.log('✅ [RESET] Sistema limpo:', resetResult);
       
-      // 2. Testar função coordenador com dados mock
-      const { data: coordResult, error: coordError } = await supabase.functions.invoke('processar-volumetria-coordenador', {
-        body: {
-          file_path: 'teste_debug.xlsx',
-          arquivo_fonte: 'volumetria_padrao', 
-          periodo_referencia: 'jun/25'
-        }
-      });
-      
-      console.log('📋 [DEBUG] Resultado coordenador:', { coordResult, coordError });
+      // Refresh dos dados após reset
+      await refreshData();
       
       toast({
-        title: "Debug realizado",
-        description: "Verificar console para detalhes do sistema",
+        title: "Sistema resetado",
+        description: `${resetResult?.uploads_limpos || 0} uploads travados removidos`,
       });
       
     } catch (error) {
-      console.error('❌ [DEBUG] Erro no teste:', error);
+      console.error('❌ [RESET] Erro:', error);
       toast({
-        title: "Erro no debug",
-        description: error.message,
+        title: "Erro no reset",
+        description: error.message || "Erro desconhecido",
         variant: "destructive"
       });
     }
@@ -275,9 +266,9 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       <div className="border-t pt-4 mt-4">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium text-sm">Debug do Sistema</h4>
+            <h4 className="font-medium text-sm">Sistema de Manutenção</h4>
             <p className="text-xs text-muted-foreground">
-              Testar conectividade das funções e status do sistema
+              Resetar sistema e limpar uploads travados
             </p>
           </div>
           <Button
@@ -286,7 +277,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
             size="sm"
             className="text-xs"
           >
-            🧪 Debug Sistema
+            🔄 Reset Sistema
           </Button>
         </div>
       </div>

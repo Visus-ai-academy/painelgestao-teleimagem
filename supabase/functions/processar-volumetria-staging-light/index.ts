@@ -26,11 +26,13 @@ serve(async (req) => {
     const { file_path, arquivo_fonte, periodo_referencia } = requestBody;
     
     // VALIDAÇÕES CRÍTICAS
-    if (!file_path || typeof file_path !== 'string') {
-      throw new Error('file_path obrigatório e deve ser string');
+    if (!file_path || typeof file_path !== 'string' || file_path.trim() === '') {
+      console.error('❌ [STAGING-LIGHT] file_path inválido:', { file_path, type: typeof file_path });
+      throw new Error('ERRO CRÍTICO: file_path obrigatório, deve ser string não-vazia');
     }
-    if (!arquivo_fonte) {
-      throw new Error('arquivo_fonte obrigatório');
+    if (!arquivo_fonte || arquivo_fonte.trim() === '') {
+      console.error('❌ [STAGING-LIGHT] arquivo_fonte inválido:', { arquivo_fonte });
+      throw new Error('ERRO CRÍTICO: arquivo_fonte obrigatório');
     }
     
     console.log('🚀 [STAGING-LIGHT] Processamento otimizado iniciado:', {
