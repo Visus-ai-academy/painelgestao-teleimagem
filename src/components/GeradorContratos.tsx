@@ -4,12 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { FileText, Plus, Trash2, Download, Send, Loader2 } from "lucide-react";
+import { FileText, Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,17 +19,6 @@ interface Cliente {
   telefone?: string;
   razao_social?: string;
   nome_fantasia?: string;
-}
-
-interface PrecoServico {
-  modalidade: string;
-  especialidade: string;
-  categoria: string;
-  prioridade: string;
-  valor_base: number;
-  valor_urgencia?: number;
-  volume_inicial?: number;
-  volume_final?: number;
 }
 
 interface ConfiguracaoContrato {
@@ -56,11 +42,13 @@ interface GeradorContratosProps {
 
 export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps) {
   const [open, setOpen] = useState(false);
-  const [clienteSelecionado, setClienteSelecionado] = useState<string>("");
-  const [precosCliente, setPrecosCliente] = useState<PrecoServico[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingPrecos, setLoadingPrecos] = useState(false);
-  const [gerandoContrato, setGerandoContrato] = useState(false);
+  const [gerandoContratos, setGerandoContratos] = useState(false);
+  const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
+  const [resultados, setResultados] = useState<{ sucesso: number; erro: number; detalhes: string[] }>({
+    sucesso: 0,
+    erro: 0,
+    detalhes: []
+  });
 
   const [configuracao, setConfiguracao] = useState<ConfiguracaoContrato>({
     data_inicio: new Date().toISOString().split('T')[0],
@@ -76,38 +64,13 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
     observacoes: ""
   });
 
-  // Carregar preços do cliente selecionado
+  // Reset resultados quando abre o dialog
   useEffect(() => {
-    const carregarPrecos = async () => {
-      if (!clienteSelecionado) {
-        setPrecosCliente([]);
-        return;
-      }
-
-      try {
-        setLoadingPrecos(true);
-        const { data, error } = await supabase
-          .from('precos_servicos')
-          .select('*')
-          .eq('cliente_id', clienteSelecionado)
-          .order('modalidade', { ascending: true });
-
-        if (error) throw error;
-        setPrecosCliente(data || []);
-      } catch (error: any) {
-        console.error('Erro ao carregar preços:', error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os preços do cliente",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingPrecos(false);
-      }
-    };
-
-    carregarPrecos();
-  }, [clienteSelecionado]);
+    if (open) {
+      setResultados({ sucesso: 0, erro: 0, detalhes: [] });
+      setProgresso({ atual: 0, total: 0 });
+    }
+  }, [open]);
 
   const adicionarServico = () => {
     setConfiguracao(prev => ({
@@ -132,129 +95,103 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
     }));
   };
 
-  const gerarContrato = async () => {
-    if (!clienteSelecionado) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente para gerar o contrato",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const cliente = clientes.find(c => c.id === clienteSelecionado);
-    if (!cliente) {
-      toast({
-        title: "Erro",
-        description: "Cliente não encontrado",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const gerarContratosEmLote = async () => {
     try {
-      setGerandoContrato(true);
+      setGerandoContratos(true);
+      setProgresso({ atual: 0, total: clientes.length });
+      setResultados({ sucesso: 0, erro: 0, detalhes: [] });
 
-      // 1. Criar o contrato na base de dados
-      const contratoData = {
-        cliente_id: clienteSelecionado,
-        numero_contrato: `CT-${cliente.nome.substring(0, 3).toUpperCase()}-${Date.now()}`,
-        data_inicio: configuracao.data_inicio,
-        data_fim: configuracao.data_fim,
-        considera_plantao: configuracao.considera_plantao,
-        dia_vencimento: configuracao.dia_vencimento,
-        desconto_percentual: configuracao.desconto_percentual,
-        acrescimo_percentual: configuracao.acrescimo_percentual,
-        status: 'ativo',
-        servicos_contratados: configuracao.servicos_inclusos.filter(s => s.trim() !== ''),
-        configuracoes_franquia: {
-          tem_franquia: configuracao.valor_franquia > 0,
-          valor_franquia: configuracao.valor_franquia
-        },
-        configuracoes_integracao: {
-          cobra_integracao: configuracao.valor_integracao > 0,
-          valor_integracao: configuracao.valor_integracao
-        },
-        observacoes_contratuais: configuracao.observacoes,
-        clausulas_especiais: configuracao.clausulas_especiais
-      };
-
-      const { data: contratoInserido, error: contratoError } = await supabase
+      // Filtrar apenas clientes que não têm contrato
+      const { data: contratosExistentes } = await supabase
         .from('contratos_clientes')
-        .insert([contratoData])
-        .select()
-        .single();
+        .select('cliente_id');
 
-      if (contratoError) throw contratoError;
+      const clientesComContrato = new Set(contratosExistentes?.map(c => c.cliente_id) || []);
+      const clientesSemContrato = clientes.filter(cliente => !clientesComContrato.has(cliente.id));
 
-      // 2. Gerar documento PDF via Edge Function
-      const { data: documentoData, error: documentoError } = await supabase.functions
-        .invoke('gerar-contrato-cliente', {
-          body: {
-            contrato_id: contratoInserido.id,
-            cliente_id: clienteSelecionado,
-            configuracao,
-            precos_cliente: precosCliente
-          }
+      if (clientesSemContrato.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Todos os clientes já possuem contratos cadastrados",
+          variant: "default"
         });
+        setGerandoContratos(false);
+        return;
+      }
 
-      if (documentoError) throw documentoError;
+      setProgresso({ atual: 0, total: clientesSemContrato.length });
+      let sucessos = 0;
+      let erros = 0;
+      const detalhes: string[] = [];
 
-      // 3. Registrar documento gerado
-      if (documentoData.success) {
-        const { error: docError } = await supabase
-          .from('documentos_clientes')
-          .insert([{
-            cliente_id: clienteSelecionado,
-            tipo_documento: 'contrato',
-            nome_arquivo: `Contrato_${cliente.nome}_${contratoInserido.numero_contrato}.pdf`,
-            url_arquivo: documentoData.documento_url,
-            status_documento: 'anexado'
-          }]);
+      for (let i = 0; i < clientesSemContrato.length; i++) {
+        const cliente = clientesSemContrato[i];
+        
+        try {
+          setProgresso({ atual: i + 1, total: clientesSemContrato.length });
 
-        if (docError) {
-          console.warn('Erro ao registrar documento:', docError);
+          const contratoData = {
+            cliente_id: cliente.id,
+            numero_contrato: `CT-${cliente.nome.substring(0, 3).toUpperCase()}-${Date.now()}-${i}`,
+            data_inicio: configuracao.data_inicio,
+            data_fim: configuracao.data_fim,
+            considera_plantao: configuracao.considera_plantao,
+            dia_vencimento: configuracao.dia_vencimento,
+            desconto_percentual: configuracao.desconto_percentual,
+            acrescimo_percentual: configuracao.acrescimo_percentual,
+            status: 'ativo',
+            servicos_contratados: configuracao.servicos_inclusos.filter(s => s.trim() !== ''),
+            configuracoes_franquia: {
+              tem_franquia: configuracao.valor_franquia > 0,
+              valor_franquia: configuracao.valor_franquia
+            },
+            configuracoes_integracao: {
+              cobra_integracao: configuracao.valor_integracao > 0,
+              valor_integracao: configuracao.valor_integracao
+            },
+            observacoes_contratuais: configuracao.observacoes,
+            clausulas_especiais: configuracao.clausulas_especiais
+          };
+
+          const { error: contratoError } = await supabase
+            .from('contratos_clientes')
+            .insert([contratoData]);
+
+          if (contratoError) throw contratoError;
+
+          sucessos++;
+          detalhes.push(`✅ ${cliente.nome} - Contrato criado`);
+
+        } catch (error: any) {
+          erros++;
+          detalhes.push(`❌ ${cliente.nome} - Erro: ${error.message}`);
+          console.error(`Erro ao criar contrato para ${cliente.nome}:`, error);
         }
       }
 
+      setResultados({ sucesso: sucessos, erro: erros, detalhes });
+      
       toast({
-        title: "Contrato gerado com sucesso!",
-        description: `Contrato ${contratoInserido.numero_contrato} criado para ${cliente.nome}`,
+        title: "Geração de contratos concluída",
+        description: `${sucessos} contratos criados com sucesso. ${erros} erros encontrados.`,
+        variant: sucessos > 0 ? "default" : "destructive"
       });
 
-      setOpen(false);
-      onSuccess?.();
-
-      // Reset form
-      setClienteSelecionado("");
-      setConfiguracao({
-        data_inicio: new Date().toISOString().split('T')[0],
-        data_fim: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-        considera_plantao: false,
-        dia_vencimento: 10,
-        desconto_percentual: 0,
-        acrescimo_percentual: 0,
-        servicos_inclusos: ["Laudos médicos", "Portal de laudos", "Suporte técnico"],
-        clausulas_especiais: "",
-        valor_franquia: 0,
-        valor_integracao: 0,
-        observacoes: ""
-      });
+      if (sucessos > 0) {
+        onSuccess?.();
+      }
 
     } catch (error: any) {
-      console.error('Erro ao gerar contrato:', error);
+      console.error('Erro na geração em lote:', error);
       toast({
-        title: "Erro ao gerar contrato",
+        title: "Erro na geração em lote",
         description: error.message || "Ocorreu um erro inesperado",
         variant: "destructive"
       });
     } finally {
-      setGerandoContrato(false);
+      setGerandoContratos(false);
     }
   };
-
-  const clienteAtual = clientes.find(c => c.id === clienteSelecionado);
-  const valorTotalEstimado = precosCliente.reduce((total, preco) => total + preco.valor_base, 0);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -269,68 +206,49 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Gerador de Contratos Automático
+            Gerador de Contratos em Lote
           </DialogTitle>
           <DialogDescription>
-            Gere contratos automaticamente com base nos dados do cliente e tabela de preços
+            Crie contratos automaticamente para todos os clientes que ainda não possuem contrato
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Seleção do Cliente */}
+          {/* Resumo dos Clientes */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Selecionar Cliente</CardTitle>
+              <CardTitle className="text-lg">Resumo dos Clientes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <Label htmlFor="cliente">Cliente</Label>
-                  <Select value={clienteSelecionado} onValueChange={setClienteSelecionado}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um cliente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientes.map(cliente => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{cliente.nome}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {cliente.cnpj && `CNPJ: ${cliente.cnpj}`}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="text-2xl font-bold text-blue-600">{clientes.length}</div>
+                  <p className="text-sm text-muted-foreground">Total de Clientes</p>
                 </div>
-
-                {/* Informações do Cliente Selecionado */}
-                {clienteAtual && (
-                  <Card className="bg-muted/30">
-                    <CardContent className="pt-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium">Razão Social:</span>
-                          <span className="ml-2">{clienteAtual.razao_social || clienteAtual.nome}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">Email:</span>
-                          <span className="ml-2">{clienteAtual.email}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">CNPJ:</span>
-                          <span className="ml-2">{clienteAtual.cnpj || 'Não informado'}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">Telefone:</span>
-                          <span className="ml-2">{clienteAtual.telefone || 'Não informado'}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                <div>
+                  <div className="text-2xl font-bold text-green-600">{resultados.sucesso}</div>
+                  <p className="text-sm text-muted-foreground">Contratos Criados</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-600">{resultados.erro}</div>
+                  <p className="text-sm text-muted-foreground">Erros</p>
+                </div>
               </div>
+              
+              {progresso.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Progresso</span>
+                    <span>{progresso.atual} / {progresso.total}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${(progresso.atual / progresso.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -466,104 +384,75 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
             </CardContent>
           </Card>
 
-          {/* Preços do Cliente */}
-          {clienteSelecionado && (
+          {/* Resultados da Geração */}
+          {resultados.detalhes.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Preços Configurados</CardTitle>
-                <CardDescription>
-                  Tabela de preços que será incluída no contrato
-                </CardDescription>
+                <CardTitle className="text-lg">Resultados da Geração</CardTitle>
               </CardHeader>
               <CardContent>
-                {loadingPrecos ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    Carregando preços...
-                  </div>
-                ) : precosCliente.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-2 max-h-60 overflow-y-auto">
-                      {precosCliente.map((preco, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex gap-4 text-sm">
-                            <Badge variant="outline">{preco.modalidade}</Badge>
-                            <Badge variant="outline">{preco.especialidade}</Badge>
-                            <Badge variant="outline">{preco.categoria}</Badge>
-                            <span className="text-muted-foreground">{preco.prioridade}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">R$ {preco.valor_base.toFixed(2)}</div>
-                            {preco.valor_urgencia && (
-                              <div className="text-sm text-muted-foreground">
-                                Urgência: R$ {preco.valor_urgencia.toFixed(2)}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {resultados.detalhes.map((detalhe, index) => (
+                    <div key={index} className="text-sm font-mono">
+                      {detalhe}
                     </div>
-                    <Separator />
-                    <div className="flex justify-between items-center font-medium">
-                      <span>Valor Total Estimado:</span>
-                      <span className="text-lg">R$ {valorTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhum preço configurado para este cliente</p>
-                    <p className="text-sm">Configure os preços primeiro para gerar o contrato</p>
-                  </div>
-                )}
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Cláusulas Especiais e Observações */}
+          {/* Observações e Notas */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Cláusulas Especiais e Observações</CardTitle>
+              <CardTitle className="text-lg">Observações e Cláusulas Especiais</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="clausulas">Cláusulas Especiais</Label>
                 <Textarea
                   id="clausulas"
+                  placeholder="Digite cláusulas especiais que devem constar no contrato..."
                   value={configuracao.clausulas_especiais}
                   onChange={(e) => setConfiguracao(prev => ({ ...prev, clausulas_especiais: e.target.value }))}
-                  placeholder="Digite cláusulas específicas para este contrato..."
-                  rows={3}
+                  className="min-h-[100px]"
                 />
               </div>
               <div>
-                <Label htmlFor="observacoes">Observações Contratuais</Label>
+                <Label htmlFor="observacoes">Observações Internas</Label>
                 <Textarea
                   id="observacoes"
+                  placeholder="Observações para controle interno..."
                   value={configuracao.observacoes}
                   onChange={(e) => setConfiguracao(prev => ({ ...prev, observacoes: e.target.value }))}
-                  placeholder="Observações importantes sobre o contrato..."
-                  rows={3}
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Botões de Ação */}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+              disabled={gerandoContratos}
+            >
               Cancelar
             </Button>
-            <Button onClick={gerarContrato} disabled={!clienteSelecionado || gerandoContrato}>
-              {gerandoContrato ? (
+            <Button 
+              onClick={gerarContratosEmLote}
+              disabled={gerandoContratos || clientes.length === 0}
+              className="flex items-center gap-2"
+            >
+              {gerandoContratos ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Gerando Contrato...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Gerando Contratos...
                 </>
               ) : (
                 <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Gerar Contrato
+                  <FileText className="h-4 w-4" />
+                  Gerar Contratos para Todos ({clientes.length})
                 </>
               )}
             </Button>
