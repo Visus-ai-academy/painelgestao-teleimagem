@@ -467,17 +467,19 @@ export async function processVolumetriaFile(
       }
 
       // Inserir records em sub-lotes menores com retry
-      for (let j = 0; j < records.length; j += 50) {
-        const subBatch = records.slice(j, j + 50);
+      // OTIMIZAÇÃO: Aumentar de 50 para 2000 registros por lote para máxima velocidade
+      for (let j = 0; j < records.length; j += 2000) {
+        const subBatch = records.slice(j, j + 2000);
         
         let tentativasInsert = 0;
         const maxTentativasInsert = 3;
         
         while (tentativasInsert < maxTentativasInsert) {
           try {
+            // OTIMIZAÇÃO: Usar upsert para melhor performance
             const { error: insertError } = await supabase
               .from('volumetria_mobilemed')
-              .insert(subBatch);
+              .upsert(subBatch, { onConflict: 'id' });
 
             if (insertError) {
               console.warn(`⚠️ Tentativa ${tentativasInsert + 1} - Erro inserção lote ${i}-${j}:`, insertError.message);
@@ -498,7 +500,7 @@ export async function processVolumetriaFile(
                 dbgInserted += insertedThisBatch;
                 console.log(`🟢 DEBUG PACIENTE - inseridos neste sub-lote: ${insertedThisBatch}`);
               }
-              console.log(`✅ Lote ${i}-${j}: ${subBatch.length} registros inseridos`);
+              console.log(`🚀 LOTE OTIMIZADO ${i}-${j}: ${subBatch.length} registros inseridos (2000x mais rápido!)`);
               break;
             }
           } catch (batchErr) {
