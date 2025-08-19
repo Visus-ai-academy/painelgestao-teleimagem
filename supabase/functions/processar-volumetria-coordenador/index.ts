@@ -13,9 +13,28 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte, periodo_referencia, periodo_processamento } = await req.json();
+    // VALIDAR REQUEST BODY
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (jsonError) {
+      console.error('❌ [COORDENADOR] Erro ao fazer parse do JSON:', jsonError);
+      throw new Error('Request body inválido - não é JSON válido');
+    }
+
+    console.log('📨 [COORDENADOR] Request body recebido:', JSON.stringify(requestBody, null, 2));
+
+    const { file_path, arquivo_fonte, periodo_referencia, periodo_processamento } = requestBody;
     
-    console.log('🎯 [COORDENADOR] Iniciando orquestração do processamento:', {
+    // VALIDAÇÕES OBRIGATÓRIAS
+    if (!file_path) {
+      throw new Error('ERRO: file_path é obrigatório');
+    }
+    if (!arquivo_fonte) {
+      throw new Error('ERRO: arquivo_fonte é obrigatório');  
+    }
+    
+    console.log('🎯 [COORDENADOR] Iniciando orquestração validada:', {
       file_path,
       arquivo_fonte,
       periodo_referencia
@@ -29,13 +48,17 @@ serve(async (req) => {
     // 1. ETAPA STAGING - Processar Excel para staging
     console.log('📋 [COORDENADOR] Etapa 1: Processando para staging...');
     
+    const stagingPayload = { 
+      file_path,
+      arquivo_fonte,
+      periodo_referencia: periodo_referencia || 'jun/25', // Fallback
+      periodo_processamento
+    };
+    
+    console.log('📤 [COORDENADOR] Payload para staging:', JSON.stringify(stagingPayload, null, 2));
+    
     const { data: stagingResult, error: stagingError } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
-      body: { 
-        file_path,
-        arquivo_fonte,
-        periodo_referencia,
-        periodo_processamento
-      }
+      body: stagingPayload
     });
 
     if (stagingError) {

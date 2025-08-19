@@ -30,6 +30,41 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
   const { toast } = useToast();
   const { refreshData } = useVolumetria();
 
+  // 🧪 FUNÇÃO DEBUG PARA TESTAR O FLUXO COMPLETO
+  const debugUploadFlow = async () => {
+    console.log('🧪 [DEBUG] Testando fluxo de upload...');
+    
+    try {
+      // 1. Testar função debug
+      const { data: debugResult } = await supabase.functions.invoke('debug-upload-flow');
+      console.log('✅ [DEBUG] Sistema:', debugResult);
+      
+      // 2. Testar função coordenador com dados mock
+      const { data: coordResult, error: coordError } = await supabase.functions.invoke('processar-volumetria-coordenador', {
+        body: {
+          file_path: 'teste_debug.xlsx',
+          arquivo_fonte: 'volumetria_padrao', 
+          periodo_referencia: 'jun/25'
+        }
+      });
+      
+      console.log('📋 [DEBUG] Resultado coordenador:', { coordResult, coordError });
+      
+      toast({
+        title: "Debug realizado",
+        description: "Verificar console para detalhes do sistema",
+      });
+      
+    } catch (error) {
+      console.error('❌ [DEBUG] Erro no teste:', error);
+      toast({
+        title: "Erro no debug",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -235,6 +270,26 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
           <span>Concluído: {stats.inserted} registros inseridos</span>
         </div>
       )}
+
+      {/* Botão de Debug do Sistema */}
+      <div className="border-t pt-4 mt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-medium text-sm">Debug do Sistema</h4>
+            <p className="text-xs text-muted-foreground">
+              Testar conectividade das funções e status do sistema
+            </p>
+          </div>
+          <Button
+            onClick={debugUploadFlow}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            🧪 Debug Sistema
+          </Button>
+        </div>
+      </div>
 
       {/* Botão de Processamento Completo */}
       {lastUploadedFile && isLimitedProcessing && (

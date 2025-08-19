@@ -14,9 +14,31 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte, periodo_referencia } = await req.json();
+    // VALIDAR REQUEST BODY PRIMEIRO
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (jsonError) {
+      console.error('❌ [STAGING] Erro ao fazer parse do JSON:', jsonError);
+      throw new Error('Request body inválido - não é JSON válido');
+    }
+
+    console.log('📨 [STAGING] Request body recebido:', JSON.stringify(requestBody, null, 2));
+
+    const { file_path, arquivo_fonte, periodo_referencia } = requestBody;
     
-    console.log('🔄 [STAGING] Iniciando processamento simplificado:', {
+    // VALIDAÇÕES OBRIGATÓRIAS
+    if (!file_path) {
+      throw new Error('ERRO: file_path é obrigatório');
+    }
+    if (!arquivo_fonte) {
+      throw new Error('ERRO: arquivo_fonte é obrigatório');
+    }
+    if (!periodo_referencia) {
+      throw new Error('ERRO: periodo_referencia é obrigatório');
+    }
+    
+    console.log('🔄 [STAGING] Iniciando processamento validado:', {
       file_path,
       arquivo_fonte,
       periodo_referencia
@@ -56,21 +78,47 @@ serve(async (req) => {
 
     // 2. Baixar arquivo do storage
     console.log('📥 [STAGING] Baixando arquivo do storage:', file_path);
+    
+    // Verificar se o bucket existe e o arquivo está acessível
+    const { data: buckets, error: bucketsError } = await supabaseClient.storage.listBuckets();
+    console.log('🪣 [STAGING] Buckets disponíveis:', buckets?.map(b => b.name));
+    
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
 
     if (downloadError || !fileData) {
-      console.error('❌ [STAGING] Erro ao baixar arquivo:', downloadError);
+      console.error('❌ [STAGING] Erro ao baixar arquivo:', {
+        error: downloadError,
+        file_path: file_path,
+        hasFileData: !!fileData
+      });
+      
+      // Listar arquivos no bucket para debug
+      try {
+        const { data: files } = await supabaseClient.storage
+          .from('uploads')
+          .list('volumetria_uploads', { limit: 10 });
+        console.log('📁 [STAGING] Arquivos no bucket:', files?.map(f => f.name).slice(0, 5));
+      } catch (listError) {
+        console.error('❌ [STAGING] Erro ao listar arquivos:', listError);
+      }
+      
       await supabaseClient
         .from('processamento_uploads')
         .update({
           status: 'erro',
-          detalhes_erro: { etapa: 'staging', erro: 'Erro ao baixar arquivo', erro_detalhes: downloadError },
+          detalhes_erro: { 
+            etapa: 'staging', 
+            erro: 'Erro ao baixar arquivo do storage', 
+            erro_detalhes: downloadError,
+            file_path: file_path,
+            timestamp: new Date().toISOString()
+          },
           completed_at: new Date().toISOString()
         })
         .eq('id', uploadRecord.id);
-      throw downloadError;
+      throw new Error(`Arquivo não encontrado no storage: ${file_path}`);
     }
 
     console.log('✅ [STAGING] Arquivo baixado com sucesso');
