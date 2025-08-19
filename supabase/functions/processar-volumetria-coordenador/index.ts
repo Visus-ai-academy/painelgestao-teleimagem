@@ -79,76 +79,94 @@ serve(async (req) => {
     
     console.log('📤 [COORDENADOR] Payload para staging streaming:', JSON.stringify(stagingPayload, null, 2));
     
-    // Tentar primeiro com zero-memory (para arquivos grandes)
+    // Tentar primeiro com processamento INSTANTÂNEO (evita todos os problemas)
     let stagingResult, stagingError;
     
     try {
-      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-zero-memory', {
+      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-instantaneo', {
         body: stagingPayload
       });
       stagingResult = data;
       stagingError = error;
       
       if (error) {
-        console.error('❌ [COORDENADOR] Zero-memory retornou erro:', error);
+        console.error('❌ [COORDENADOR] Instantâneo retornou erro:', error);
         throw error;
       }
       
-      console.log('✅ [COORDENADOR] Zero-memory usado com sucesso');
-    } catch (zeroMemoryError) {
-      console.log('⚠️ [COORDENADOR] Zero-memory falhou, tentando streaming:', zeroMemoryError.message);
+      console.log('✅ [COORDENADOR] Processamento instantâneo usado com sucesso');
+    } catch (instantaneoError) {
+      console.log('⚠️ [COORDENADOR] Instantâneo falhou, tentando zero-memory:', instantaneoError.message);
       
-      // Fallback 1: Streaming
+      // Fallback 1: Zero-memory
       try {
-        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
+        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-zero-memory', {
           body: stagingPayload
         });
         stagingResult = data;
         stagingError = error;
         
         if (error) {
-          console.error('❌ [COORDENADOR] Streaming retornou erro:', error);
+          console.error('❌ [COORDENADOR] Zero-memory retornou erro:', error);
           throw error;
         }
         
-        console.log('✅ [COORDENADOR] Streaming usado como fallback 1');
-      } catch (streamingError) {
-        console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
+        console.log('✅ [COORDENADOR] Zero-memory usado como fallback 1');
+      } catch (zeroMemoryError) {
+        console.log('⚠️ [COORDENADOR] Zero-memory falhou, tentando streaming:', zeroMemoryError.message);
         
-        // Fallback 2: Staging light
+        // Fallback 2: Streaming
         try {
-          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
+          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
             body: stagingPayload
           });
           stagingResult = data;
           stagingError = error;
           
           if (error) {
-            console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
+            console.error('❌ [COORDENADOR] Streaming retornou erro:', error);
             throw error;
           }
           
-          console.log('✅ [COORDENADOR] Staging light usado como fallback 2');
-        } catch (lightError) {
-          console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
+          console.log('✅ [COORDENADOR] Streaming usado como fallback 2');
+        } catch (streamingError) {
+          console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
           
-          // Fallback 3: Staging padrão
+          // Fallback 3: Staging light
           try {
-            const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+            const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
               body: stagingPayload
             });
             stagingResult = data;
             stagingError = error;
             
             if (error) {
-              console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+              console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
               throw error;
             }
             
-            console.log('✅ [COORDENADOR] Staging padrão usado como fallback 3');
-          } catch (standardError) {
-            console.error('❌ [COORDENADOR] Todos os stagings falharam:', standardError);
-            stagingError = standardError;
+            console.log('✅ [COORDENADOR] Staging light usado como fallback 3');
+          } catch (lightError) {
+            console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
+            
+            // Fallback 4: Staging padrão
+            try {
+              const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+                body: stagingPayload
+              });
+              stagingResult = data;
+              stagingError = error;
+              
+              if (error) {
+                console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+                throw error;
+              }
+              
+              console.log('✅ [COORDENADOR] Staging padrão usado como fallback 4');
+            } catch (standardError) {
+              console.error('❌ [COORDENADOR] Todos os métodos falharam:', standardError);
+              stagingError = standardError;
+            }
           }
         }
       }
