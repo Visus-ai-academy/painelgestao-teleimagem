@@ -42,12 +42,12 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'processar-volumetria-staging',
+      'processar-volumetria-mobilemed',
       {
         body: {
           file_path,
           arquivo_fonte,
-          periodo_referencia: periodoAtivo
+          periodo: periodoAtivo
         }
       }
     );
