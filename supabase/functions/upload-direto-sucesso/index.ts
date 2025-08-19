@@ -55,7 +55,16 @@ serve(async (req) => {
       "ESTUDO_DESCRICAO": ['RX TORAX', 'CT CRANIO', 'RM JOELHO', 'US ABDOME'][i % 4],
       "MODALIDADE": ['RX', 'CT', 'MR', 'US'][i % 4],
       "PRIORIDADE": i % 3 === 0 ? 'urgencia' : 'normal',
-      "VALORES": 1, // Cada registro = 1 exame
+      "VALORES": (() => {
+        const tipo = ['RX TORAX', 'CT CRANIO', 'RM JOELHO', 'US ABDOME'][i % 4];
+        switch(tipo) {
+          case 'RX TORAX': return Math.floor(Math.random() * 3) + 1; // 1-3 exames
+          case 'CT CRANIO': return Math.floor(Math.random() * 2) + 1; // 1-2 exames  
+          case 'RM JOELHO': return Math.floor(Math.random() * 2) + 1; // 1-2 exames
+          case 'US ABDOME': return Math.floor(Math.random() * 4) + 1; // 1-4 exames
+          default: return 1;
+        }
+      })(),
       "ESPECIALIDADE": ['RADIOLOGIA', 'CARDIOLOGIA'][i % 2],
       "MEDICO": `DR. MEDICO ${i + 1}`,
       "DATA_REALIZACAO": '2025-06-15',
