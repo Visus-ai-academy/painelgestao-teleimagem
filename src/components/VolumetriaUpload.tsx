@@ -7,7 +7,7 @@ import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { processVolumetriaComStaging, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
-import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Lock, Zap, AlertCircle } from 'lucide-react';
 
 interface VolumetriaUploadProps {
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
@@ -163,12 +163,12 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       return;
     }
 
-    // Validar tamanho do arquivo (máximo 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Validar tamanho do arquivo (máximo 2MB para evitar memory limit)
+    const maxSize = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSize) {
       toast({
         title: "Erro",
-        description: "Arquivo muito grande. Tamanho máximo: 50MB",
+        description: "Arquivo muito grande. Tamanho máximo: 2MB. Divida o arquivo em partes menores.",
         variant: "destructive"
       });
       return;
@@ -234,11 +234,21 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         onSuccess?.();
       } else {
         console.error('❌ Falha no upload:', result);
-        toast({
-          title: "Erro no processamento",
-          description: result.message || "Erro desconhecido",
-          variant: "destructive"
-        });
+        
+        // Verificar se foi erro de arquivo muito grande
+        if ((result as any).arquivo_muito_grande) {
+          toast({
+            title: "Arquivo Muito Grande",
+            description: `Arquivo de ${Math.round(((result as any).tamanho_kb || 0))}KB excede o limite de ${(result as any).tamanho_limite_kb || 2048}KB. Divida em partes menores.`,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Erro no processamento",
+            description: result.message || "Erro desconhecido",
+            variant: "destructive"
+          });
+        }
       }
 
     } catch (error) {

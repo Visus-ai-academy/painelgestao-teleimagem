@@ -750,13 +750,34 @@ export async function processVolumetriaComStaging(
   arquivoFonte: string,
   periodo?: { ano: number; mes: number },
   onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
-): Promise<{ success: boolean; message: string; stats: any }> {
+): Promise<{ success: boolean; message: string; stats: any; arquivo_muito_grande?: boolean; tamanho_kb?: number; tamanho_limite_kb?: number }> {
   console.log('🚀 [STAGING] Iniciando processamento via arquitetura de staging...');
   console.log('📁 [STAGING] Arquivo recebido:', { 
     name: file.name, 
     size: file.size, 
     type: file.type 
   });
+  
+  // Verificar tamanho do arquivo (máximo 2MB)
+  const maxSizeBytes = 2 * 1024 * 1024; // 2MB
+  const fileSizeKB = Math.round(file.size / 1024);
+  
+  if (file.size > maxSizeBytes) {
+    console.error('❌ [STAGING] Arquivo muito grande:', { 
+      size: file.size, 
+      sizeKB: fileSizeKB, 
+      maxSizeKB: 2048 
+    });
+    
+    return {
+      success: false,
+      message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<2MB)`,
+      stats: {},
+      arquivo_muito_grande: true,
+      tamanho_kb: fileSizeKB,
+      tamanho_limite_kb: 2048
+    };
+  }
   
   if (onProgress) {
     onProgress({ progress: 5, processed: 0, total: 100, status: 'Enviando arquivo para storage...' });

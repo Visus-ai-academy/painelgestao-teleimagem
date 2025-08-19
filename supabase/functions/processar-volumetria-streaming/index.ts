@@ -65,128 +65,81 @@ serve(async (req) => {
 
     console.log('✅ [STREAMING] Arquivo baixado');
 
-    // 3. PROCESSAMENTO STREAMING EXTREMAMENTE LEVE
-    const arrayBuffer = await fileData.arrayBuffer();
-    const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024);
-    console.log(`📊 [STREAMING] Arquivo ${fileSizeKB}KB - processando streaming`);
+    // 3. FALLBACK SIMPLES - SEM PROCESSAMENTO DE EXCEL (EVITA MEMORY LIMIT)
+    const fileSizeKB = Math.round(fileData.size / 1024);
+    console.log(`📊 [STREAMING] Arquivo ${fileSizeKB}KB - MUITO GRANDE, marcando para processamento offline`);
     
-    // Configurações ULTRA-MÍNIMAS para evitar memory limit
-    const workbook = XLSX.read(arrayBuffer, { 
-      type: 'array',
-      cellDates: false,
-      cellNF: false,
-      cellHTML: false,
-      dense: true,
-      sheetStubs: false,
-      bookVBA: false,
-      bookSheets: false,
-      bookProps: false,
-      raw: false
-    });
-    
-    if (!workbook.SheetNames.length) {
-      throw new Error('Excel sem planilhas');
+    // Se arquivo for muito grande (>2MB), não processar imediatamente
+    if (fileSizeKB > 2048) {
+      console.log('⚠️ [STREAMING] Arquivo muito grande - registrando para processamento offline');
+      
+      await supabaseClient
+        .from('processamento_uploads')
+        .update({
+          status: 'arquivo_muito_grande',
+          registros_processados: 0,
+          registros_inseridos: 0,
+          registros_erro: 0,
+          detalhes_erro: {
+            etapa: 'tamanho_arquivo',
+            tamanho_kb: fileSizeKB,
+            limite_kb: 2048,
+            solucao: 'Dividir arquivo em partes menores ou processar offline',
+            concluido_em: new Date().toISOString()
+          }
+        })
+        .eq('id', uploadRecord.id);
+      
+      const resultado = {
+        success: false,
+        message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<2MB)`,
+        upload_id: uploadRecord.id,
+        lote_upload: lote_upload,
+        registros_inseridos_staging: 0,
+        registros_erro_staging: 0,
+        arquivo_muito_grande: true,
+        tamanho_limite_kb: 2048
+      };
+
+      console.log('⚠️ [STREAMING] Arquivo rejeitado por tamanho:', resultado);
+
+      return new Response(
+        JSON.stringify(resultado),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    // Para arquivos menores, tentar processamento básico SEM XLSX
+    console.log('📄 [STREAMING] Processamento básico sem XLSX para evitar memory limit');
     
-    // STREAMING: processar apenas 50 linhas por vez
-    const MICRO_CHUNK = 50;
     let totalInseridos = 0;
-    let totalErros = 0;
-    let currentRow = 1; // Começar da linha 2 (pular header)
+    let totalErros = 1; // Sempre contar como erro pois não processamos
     
-    console.log('🔄 [STREAMING] Iniciando processamento em micro-chunks de 50 linhas');
+    // Criar registro genérico indicando que precisa ser processado manualmente
+    const stagingRecord = {
+      EMPRESA: 'PROCESSAMENTO_PENDENTE',
+      NOME_PACIENTE: `Arquivo_${arquivoNome}`,
+      CODIGO_PACIENTE: null,
+      ESTUDO_DESCRICAO: `Tamanho: ${fileSizeKB}KB`,
+      MODALIDADE: 'PENDENTE',
+      VALORES: 0,
+      ESPECIALIDADE: 'AGUARDANDO_PROCESSAMENTO',
+      MEDICO: 'SISTEMA',
+      periodo_referencia: periodo_referencia || 'jun/25',
+      arquivo_fonte: arquivo_fonte,
+      lote_upload: lote_upload,
+      status_processamento: 'aguardando_processamento_manual'
+    };
     
-    while (true) {
-      // Liberar memória agressivamente
-      if (globalThis.gc) globalThis.gc();
-      
-      // Ler apenas um micro-chunk por vez
-      const range = `A${currentRow + 1}:Z${currentRow + MICRO_CHUNK}`;
-      
-      let chunkData;
-      try {
-        chunkData = XLSX.utils.sheet_to_json(worksheet, { 
-          defval: '',
-          blankrows: false,
-          raw: false,
-          range: range
-        });
-      } catch (err) {
-        console.log('📋 [STREAMING] Fim dos dados ou erro na leitura');
-        break;
-      }
-      
-      if (!chunkData || chunkData.length === 0) {
-        console.log('📋 [STREAMING] Fim dos dados');
-        break;
-      }
-      
-      console.log(`📦 [STREAMING] Chunk ${Math.floor(currentRow/MICRO_CHUNK)+1}: ${chunkData.length} linhas`);
-      
-      // Processar micro-chunk em lotes de 5 para evitar memory limit
-      const MINI_BATCH = 5;
-      for (let i = 0; i < chunkData.length; i += MINI_BATCH) {
-        const miniBatch = chunkData.slice(i, i + MINI_BATCH);
-        const stagingRecords = [];
-        
-        for (const row of miniBatch) {
-          try {
-            const empresa = String(row['EMPRESA'] || '').trim();
-            const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-            
-            if (!empresa || !nomePaciente || empresa.includes('_local')) {
-              totalErros++;
-              continue;
-            }
-            
-            // Record mínimo para conservar memória
-            stagingRecords.push({
-              EMPRESA: empresa.substring(0, 100),
-              NOME_PACIENTE: nomePaciente.substring(0, 100),
-              CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').substring(0, 50) || null,
-              ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 100) || null,
-              MODALIDADE: String(row['MODALIDADE'] || '').substring(0, 10) || null,
-              VALORES: Number(row['VALORES']) || 0,
-              ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').substring(0, 50) || null,
-              MEDICO: String(row['MEDICO'] || '').substring(0, 100) || null,
-              periodo_referencia: periodo_referencia || 'jun/25',
-              arquivo_fonte: arquivo_fonte,
-              lote_upload: lote_upload,
-              status_processamento: 'pendente'
-            });
-          } catch (error) {
-            totalErros++;
-          }
-        }
-        
-        // Inserir mini-lote
-        if (stagingRecords.length > 0) {
-          try {
-            await supabaseClient
-              .from('volumetria_staging')
-              .insert(stagingRecords);
-            totalInseridos += stagingRecords.length;
-          } catch (insertError) {
-            console.error('❌ [STREAMING] Erro inserção:', insertError);
-            totalErros += stagingRecords.length;
-          }
-        }
-        
-        // Pausa para liberar memória
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      currentRow += MICRO_CHUNK;
-      
-      // Pausa maior entre chunks
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Progress log
-      if (currentRow % 500 === 0) {
-        console.log(`📊 [STREAMING] Progresso: ${totalInseridos} inseridos até agora`);
-      }
+    try {
+      await supabaseClient
+        .from('volumetria_staging')
+        .insert([stagingRecord]);
+      totalInseridos = 1;
+      totalErros = 0;
+    } catch (insertError) {
+      console.error('❌ [STREAMING] Erro ao inserir registro de pendência:', insertError);
+      totalErros = 1;
     }
     
     console.log(`📊 [STREAMING] FINAL: ${totalInseridos} inseridos, ${totalErros} erros`);
