@@ -9,6 +9,8 @@ const corsHeaders = {
 
 // 🚀 PROCESSAMENTO COMPLETO COM REGRAS - OTIMIZADO PARA EVITAR MEMORY LIMIT
 serve(async (req) => {
+  console.log('📊 [EXCEL+REGRAS] Função iniciada - método:', req.method);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -39,7 +41,10 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('❌ [EXCEL+REGRAS] Erro ao registrar upload:', uploadError);
+      throw uploadError;
+    }
     console.log('✅ [EXCEL+REGRAS] Upload registrado:', uploadRecord.id);
 
     // 2. Download e processamento do arquivo Excel
@@ -48,10 +53,11 @@ serve(async (req) => {
       .download(file_path);
 
     if (downloadError || !fileData) {
+      console.error('❌ [EXCEL+REGRAS] Erro no download:', downloadError);
       throw new Error(`Arquivo não encontrado: ${file_path}`);
     }
 
-    console.log('✅ [EXCEL+REGRAS] Arquivo baixado');
+    console.log('✅ [EXCEL+REGRAS] Arquivo baixado com sucesso');
 
     // 3. PROCESSAMENTO EXCEL OTIMIZADO
     const arrayBuffer = await fileData.arrayBuffer();
@@ -75,14 +81,14 @@ serve(async (req) => {
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
     // Converter para JSON em chunks pequenos
-    const CHUNK_SIZE = 100; // Procesar 100 linhas por vez
+    const CHUNK_SIZE = 50; // Reduzido para 50 linhas por vez
     let totalProcessados = 0;
     let totalInseridos = 0;
     let totalExcluidos = 0;
     let regrasAplicadas = 0;
     let currentRow = 1; // Pular header
     
-    console.log('🔄 [EXCEL+REGRAS] Iniciando processamento em chunks de 100 linhas');
+    console.log('🔄 [EXCEL+REGRAS] Iniciando processamento em chunks de 50 linhas');
     
     while (true) {
       // Forçar garbage collection
@@ -100,11 +106,12 @@ serve(async (req) => {
           range: range
         });
       } catch (err) {
-        console.log('📋 [EXCEL+REGRAS] Fim dos dados');
+        console.log('📋 [EXCEL+REGRAS] Fim dos dados ou erro na leitura:', err.message);
         break;
       }
       
       if (!chunkData || chunkData.length === 0) {
+        console.log('📋 [EXCEL+REGRAS] Chunk vazio, finalizando processamento');
         break;
       }
       
@@ -220,9 +227,9 @@ serve(async (req) => {
         }
       }
       
-      // 5. Inserir registros processados em lotes de 20
-      for (let i = 0; i < registrosProcessados.length; i += 20) {
-        const lote = registrosProcessados.slice(i, i + 20);
+      // 5. Inserir registros processados em lotes de 10
+      for (let i = 0; i < registrosProcessados.length; i += 10) {
+        const lote = registrosProcessados.slice(i, i + 10);
         
         try {
           await supabaseClient
@@ -236,18 +243,18 @@ serve(async (req) => {
         }
         
         // Pausa entre inserções
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
       
       currentRow += CHUNK_SIZE;
       
       // Log de progresso
-      if (currentRow % 500 === 0) {
+      if (currentRow % 200 === 0) {
         console.log(`📊 [EXCEL+REGRAS] Progresso: ${totalInseridos} inseridos, ${regrasAplicadas} regras aplicadas`);
       }
       
       // Pausa entre chunks
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     console.log(`📊 [EXCEL+REGRAS] FINAL: ${totalInseridos} inseridos, ${totalExcluidos} excluídos, ${regrasAplicadas} regras aplicadas`);
@@ -284,7 +291,7 @@ serve(async (req) => {
       processamento_completo_com_regras: true
     };
 
-    console.log('✅ [EXCEL+REGRAS] Concluído:', resultado);
+    console.log('✅ [EXCEL+REGRAS] Concluído com sucesso:', resultado);
 
     return new Response(
       JSON.stringify(resultado),
@@ -292,7 +299,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('💥 [EXCEL+REGRAS] Erro:', error);
+    console.error('💥 [EXCEL+REGRAS] Erro crítico:', error);
     
     return new Response(
       JSON.stringify({ 
