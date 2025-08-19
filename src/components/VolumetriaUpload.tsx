@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
-import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
+import { processVolumetriaFile, processVolumetriaComStaging, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
 import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
@@ -98,19 +98,19 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         console.warn('⚠️ Aviso na limpeza de uploads:', cleanError);
       }
 
-      console.log(`🚀 Iniciando processamento para ${arquivoFonte}...`);
+      console.log(`🚀 Iniciando processamento via STAGING para ${arquivoFonte}...`);
       
-      // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
-      const result = await processVolumetriaOtimizado(
+      // NOVA ARQUITETURA: Upload para Storage + Edge Function Staging
+      const result = await processVolumetriaComStaging(
         file,
         arquivoFonte,
         periodoFaturamento,
         (progressData) => {
-          console.log('📊 Progresso recebido:', progressData);
+          console.log('📊 Progresso recebido via staging:', progressData);
           setProgress(progressData.progress);
           setStats({ 
             processed: progressData.processed, 
-            total: progressData.total > 0 ? progressData.total : 100, // Garantir que total nunca seja 0
+            total: progressData.total > 0 ? progressData.total : 100,
             inserted: progressData.processed 
           });
         }

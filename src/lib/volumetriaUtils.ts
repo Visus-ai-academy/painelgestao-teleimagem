@@ -744,6 +744,196 @@ export async function processVolumetriaOtimizado(
   }
 }
 
+// NOVA ARQUITETURA: Função para processar através do sistema de staging
+export async function processVolumetriaComStaging(
+  file: File,
+  arquivoFonte: string,
+  periodo?: { ano: number; mes: number },
+  onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
+): Promise<{ success: boolean; message: string; stats: any }> {
+  console.log('🚀 [STAGING] Iniciando processamento via arquitetura de staging...');
+  
+  if (onProgress) {
+    onProgress({ progress: 5, processed: 0, total: 100, status: 'Enviando arquivo para storage...' });
+  }
+  
+  // 1. Upload do arquivo para o storage
+  const fileName = `volumetria_uploads/${arquivoFonte}_${Date.now()}_${Math.random().toString(36).substring(7)}.xlsx`;
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('uploads')
+    .upload(fileName, file, { 
+      cacheControl: '3600',
+      upsert: false 
+    });
+
+  if (uploadError) {
+    throw new Error(`Erro no upload: ${uploadError.message}`);
+  }
+
+  console.log('✅ [STAGING] Arquivo enviado para storage:', fileName);
+
+  if (onProgress) {
+    onProgress({ progress: 20, processed: 0, total: 100, status: 'Iniciando processamento em staging...' });
+  }
+  
+  try {
+    // 2. Chamar Edge Function de staging
+    console.log('📞 [STAGING] Chamando processar-volumetria-staging...');
+    
+    const { data: stagingResult, error: stagingError } = await supabase.functions.invoke('processar-volumetria-staging', {
+      body: {
+        file_path: uploadData.path,
+        arquivo_fonte: arquivoFonte,
+        periodo_referencia: periodo ? `${getMonthName(periodo.mes)}/${periodo.ano.toString().slice(-2)}` : undefined,
+        periodo_processamento: periodo
+      }
+    });
+
+    if (stagingError) {
+      console.error('❌ [STAGING] Erro na função de staging:', stagingError);
+      throw new Error(`Erro no processamento: ${stagingError.message}`);
+    }
+
+    console.log('✅ [STAGING] Staging iniciado com sucesso:', stagingResult);
+
+    if (onProgress) {
+      onProgress({ progress: 40, processed: 0, total: 100, status: 'Processamento em background iniciado...' });
+    }
+
+    // 3. Monitorar progresso via processamento_uploads
+    const uploadId = stagingResult.upload_id;
+    if (uploadId) {
+      await monitorarProgressoProcessamento(uploadId, onProgress);
+    }
+
+    // 4. Verificar resultado final
+    const { data: finalResult } = await supabase
+      .from('processamento_uploads')
+      .select('*')
+      .eq('id', uploadId)
+      .single();
+
+    console.log('🎯 [STAGING] Resultado final do processamento:', finalResult);
+
+    return {
+      success: finalResult?.status === 'completed',
+      message: finalResult?.status === 'completed' 
+        ? `Processamento concluído via staging`
+        : `Erro: ${(finalResult?.detalhes_erro as any)?.message || 'Erro desconhecido'}`,
+      stats: {
+        total_rows: finalResult?.registros_processados || 0,
+        inserted_count: finalResult?.registros_inseridos || 0,
+        error_count: finalResult?.registros_erro || 0
+      }
+    };
+
+  } catch (error) {
+    console.error('💥 [STAGING] Erro crítico:', error);
+    throw error;
+  } finally {
+    // 5. Limpar arquivo temporário
+    try {
+      await supabase.storage.from('uploads').remove([fileName]);
+      console.log('🧹 [STAGING] Arquivo temporário removido');
+    } catch (cleanupError) {
+      console.warn('⚠️ [STAGING] Erro ao limpar arquivo temporário:', cleanupError);
+    }
+  }
+}
+
+// Função auxiliar para monitorar progresso do processamento
+async function monitorarProgressoProcessamento(
+  uploadId: string,
+  onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
+): Promise<void> {
+  console.log('👀 [STAGING] Iniciando monitoramento do upload:', uploadId);
+  
+  return new Promise((resolve, reject) => {
+    const maxTentativas = 120; // 10 minutos máximo (5s * 120)
+    let tentativas = 0;
+
+    const verificarProgresso = async () => {
+      try {
+        const { data: upload, error } = await supabase
+          .from('processamento_uploads')
+          .select('*')
+          .eq('id', uploadId)
+          .single();
+
+        if (error) {
+          console.error('❌ [STAGING] Erro ao verificar progresso:', error);
+          reject(error);
+          return;
+        }
+
+        console.log(`🔍 [STAGING] Status atual: ${upload.status} (${tentativas}/${maxTentativas})`);
+
+        // Calcular progresso baseado no status
+        let progress = 40; // Já chegamos até aqui
+        if (upload.registros_processados && upload.registros_processados > 0) {
+          // Estimar total baseado no progresso atual
+          const estimatedTotal = upload.registros_processados * 2; // Estimativa simples
+          progress = Math.min(95, 40 + (upload.registros_processados / estimatedTotal) * 50);
+        }
+
+        if (onProgress) {
+          onProgress({
+            progress,
+            processed: upload.registros_processados || 0,
+            total: upload.registros_processados * 2 || 100, // Estimativa
+            status: `Processando: ${upload.registros_processados || 0} registros...`
+          });
+        }
+
+        // Verificar se completou
+        if (upload.status === 'completed') {
+          console.log('✅ [STAGING] Processamento completado!');
+          if (onProgress) {
+            onProgress({
+              progress: 100,
+              processed: upload.registros_inseridos || 0,
+              total: upload.registros_inseridos || 0,
+              status: 'Processamento concluído!'
+            });
+          }
+          resolve();
+          return;
+        }
+
+        // Verificar se deu erro
+        if (upload.status === 'error') {
+          console.error('❌ [STAGING] Processamento falhou:', upload.detalhes_erro);
+          reject(new Error((upload.detalhes_erro as any)?.message || 'Erro no processamento'));
+          return;
+        }
+
+        // Continuar monitorando se ainda está processando
+        if (upload.status === 'processando' && tentativas < maxTentativas) {
+          tentativas++;
+          setTimeout(verificarProgresso, 5000); // Verificar a cada 5 segundos
+        } else if (tentativas >= maxTentativas) {
+          console.warn('⏰ [STAGING] Timeout no monitoramento');
+          reject(new Error('Timeout no processamento'));
+        }
+
+      } catch (error) {
+        console.error('💥 [STAGING] Erro no monitoramento:', error);
+        reject(error);
+      }
+    };
+
+    // Iniciar monitoramento
+    verificarProgresso();
+  });
+}
+
+// Função auxiliar para obter nome do mês
+function getMonthName(mes: number): string {
+  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 
+                 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  return meses[mes - 1] || 'jan';
+}
+
 // Função para processar através do edge function otimizado (aplica exclusões por período)
 async function processVolumetriaComEdgeFunction(
   file: File,
