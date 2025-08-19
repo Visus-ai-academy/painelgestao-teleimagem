@@ -23,13 +23,13 @@ const ArquiteturaProjeto = () => {
 
   // 1. SISTEMA COMPLETO - FLUXO DE PROCESSAMENTO
   const sistemaNodes: Node[] = useMemo(() => [
-    // ENTRADA DE DADOS
+    // ENTRADA DE DADOS - NOVA ARQUITETURA DE STAGING
     {
       id: 'upload-volumetria',
       type: 'default',
       position: { x: 50, y: 100 },
-      data: { label: '📤 UPLOAD VOLUMETRIA\n(Arquivos 1,2,3,4)' },
-      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 160, height: 70 }
+      data: { label: '⚡ UPLOAD VOLUMETRIA\n(Nova Arquitetura Staging)\nArquivos 1,2,3,4' },
+      style: { backgroundColor: '#10b981', borderColor: '#059669', color: 'white', width: 180, height: 80, fontWeight: 'bold' }
     },
     {
       id: 'mobilemed-futuro',
@@ -535,9 +535,158 @@ const ArquiteturaProjeto = () => {
     { id: 'a16', source: 'external', target: 'mysuite-ext', type: 'smoothstep', style: { stroke: '#6b7280', strokeDasharray: '5,5' } },
   ], []);
 
+  // 4. NOVA ARQUITETURA DE STAGING - FLUXO DETALHADO
+  const stagingNodes: Node[] = useMemo(() => [
+    // USUÁRIO
+    {
+      id: 'user-upload',
+      type: 'default',
+      position: { x: 50, y: 200 },
+      data: { label: '👤 USUÁRIO\nSeleciona Arquivo' },
+      style: { backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', width: 150, height: 70 }
+    },
+
+    // ETAPA 1: UPLOAD
+    {
+      id: 'file-upload',
+      type: 'default',
+      position: { x: 250, y: 200 },
+      data: { label: '📁 UPLOAD FILE\nArquivos 1,2,3,4\n(.xlsx)' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 150, height: 80, fontWeight: 'bold' }
+    },
+
+    // ETAPA 2: STORAGE
+    {
+      id: 'supabase-storage',
+      type: 'default',
+      position: { x: 450, y: 200 },
+      data: { label: '💾 STORAGE\nSupabase Storage\n(5 segundos)' },
+      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 150, height: 80, fontWeight: 'bold' }
+    },
+
+    // ETAPA 3: STAGING
+    {
+      id: 'staging-process',
+      type: 'default',
+      position: { x: 650, y: 200 },
+      data: { label: '🔄 STAGING\nEdge Function\nProcessa Excel\n(30 segundos)' },
+      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 150, height: 90, fontWeight: 'bold' }
+    },
+
+    // ETAPA 4: BACKGROUND
+    {
+      id: 'background-rules',
+      type: 'default',
+      position: { x: 850, y: 200 },
+      data: { label: '🏗️ BACKGROUND\nAplica Regras\nTriggers DB\n(2 minutos)' },
+      style: { backgroundColor: '#dc2626', color: 'white', borderColor: '#b91c1c', width: 150, height: 90, fontWeight: 'bold' }
+    },
+
+    // ETAPA 5: DASHBOARD
+    {
+      id: 'realtime-dashboard',
+      type: 'default',
+      position: { x: 1050, y: 200 },
+      data: { label: '📊 DASHBOARD\nAtualização\nReal-time\n(Automática)' },
+      style: { backgroundColor: '#a855f7', color: 'white', borderColor: '#9333ea', width: 150, height: 90, fontWeight: 'bold' }
+    },
+
+    // DETALHES TÉCNICOS - STAGING
+    {
+      id: 'staging-details',
+      type: 'default',
+      position: { x: 650, y: 350 },
+      data: { label: '📋 STAGING DETALHES\n• Lê Excel XLSX\n• Valida estrutura\n• Insere em lotes\n• Monitora progresso' },
+      style: { backgroundColor: '#fef3c7', borderColor: '#f59e0b', width: 180, height: 90 }
+    },
+
+    // DETALHES TÉCNICOS - BACKGROUND  
+    {
+      id: 'background-details',
+      type: 'default',
+      position: { x: 850, y: 350 },
+      data: { label: '🔧 REGRAS APLICADAS\n• Limpeza de dados\n• De-Para valores\n• Categorização\n• Quebras de exames\n• Tipificação' },
+      style: { backgroundColor: '#fee2e2', borderColor: '#dc2626', width: 180, height: 110 }
+    },
+
+    // DETALHES TÉCNICOS - REAL-TIME
+    {
+      id: 'realtime-details',
+      type: 'default',
+      position: { x: 1050, y: 350 },
+      data: { label: '🔔 REAL-TIME\n• PostgreSQL Changes\n• Supabase Realtime\n• Context Updates\n• Dashboard Refresh' },
+      style: { backgroundColor: '#f3e8ff', borderColor: '#a855f7', width: 180, height: 100 }
+    },
+
+    // MONITORAMENTO
+    {
+      id: 'monitoring',
+      type: 'default',
+      position: { x: 450, y: 50 },
+      data: { label: '👀 MONITORAMENTO\nTabela: processamento_uploads\nStatus em tempo real' },
+      style: { backgroundColor: '#1e40af', color: 'white', borderColor: '#1d4ed8', width: 200, height: 80 }
+    },
+
+    // VANTAGENS
+    {
+      id: 'advantages',
+      type: 'default',
+      position: { x: 250, y: 500 },
+      data: { label: '✅ VANTAGENS NOVA ARQUITETURA\n• Sem travamentos\n• Upload ultrarrápido\n• Tolerante a falhas\n• Monitoramento real-time\n• Processamento robusto' },
+      style: { backgroundColor: '#dcfce7', borderColor: '#16a34a', width: 250, height: 120 }
+    },
+
+    // COMPATIBILIDADE  
+    {
+      id: 'compatibility',
+      type: 'default',
+      position: { x: 550, y: 500 },
+      data: { label: '🔄 COMPATIBILIDADE\n• Mesmos arquivos (1,2,3,4)\n• Mesmas regras de negócio\n• Mesmos dashboards\n• Zero downtime na migração' },
+      style: { backgroundColor: '#dbeafe', borderColor: '#3b82f6', width: 250, height: 120 }
+    },
+
+    // EDGE FUNCTIONS
+    {
+      id: 'edge-functions-detail',
+      type: 'default',
+      position: { x: 850, y: 50 },
+      data: { label: '⚡ EDGE FUNCTIONS\n• processar-volumetria-staging\n• processar-staging-background\n• Escalabilidade automática' },
+      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 200, height: 90 }
+    }
+  ], []);
+
+  const stagingEdges: Edge[] = useMemo(() => [
+    // Fluxo principal da nova arquitetura
+    { id: 's1', source: 'user-upload', target: 'file-upload', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#10b981' }, label: '1. Seleciona' },
+    { id: 's2', source: 'file-upload', target: 'supabase-storage', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#059669' }, label: '2. Upload' },
+    { id: 's3', source: 'supabase-storage', target: 'staging-process', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#f59e0b' }, label: '3. Processa' },
+    { id: 's4', source: 'staging-process', target: 'background-rules', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#dc2626' }, label: '4. Aplica Regras' },
+    { id: 's5', source: 'background-rules', target: 'realtime-dashboard', type: 'smoothstep', style: { strokeWidth: 4, stroke: '#a855f7' }, label: '5. Atualiza UI' },
+
+    // Conexões com detalhes técnicos
+    { id: 's6', source: 'staging-process', target: 'staging-details', type: 'smoothstep', style: { stroke: '#f59e0b', strokeDasharray: '5,5' } },
+    { id: 's7', source: 'background-rules', target: 'background-details', type: 'smoothstep', style: { stroke: '#dc2626', strokeDasharray: '5,5' } },
+    { id: 's8', source: 'realtime-dashboard', target: 'realtime-details', type: 'smoothstep', style: { stroke: '#a855f7', strokeDasharray: '5,5' } },
+
+    // Monitoramento
+    { id: 's9', source: 'monitoring', target: 'staging-process', type: 'smoothstep', style: { stroke: '#1e40af', strokeDasharray: '3,3' } },
+    { id: 's10', source: 'monitoring', target: 'background-rules', type: 'smoothstep', style: { stroke: '#1e40af', strokeDasharray: '3,3' } },
+
+    // Edge Functions
+    { id: 's11', source: 'edge-functions-detail', target: 'staging-process', type: 'smoothstep', style: { stroke: '#059669', strokeDasharray: '3,3' } },
+    { id: 's12', source: 'edge-functions-detail', target: 'background-rules', type: 'smoothstep', style: { stroke: '#059669', strokeDasharray: '3,3' } },
+
+    // Vantagens e compatibilidade (apenas visuais)
+    { id: 's13', source: 'file-upload', target: 'advantages', type: 'smoothstep', style: { stroke: '#16a34a', strokeDasharray: '8,8' } },
+    { id: 's14', source: 'staging-process', target: 'compatibility', type: 'smoothstep', style: { stroke: '#3b82f6', strokeDasharray: '8,8' } }
+  ], []);
+
   // Estados para os flows
   const [sistemaNodesState, setSistemaNodes, onSistemaNodesChange] = useNodesState(sistemaNodes);
   const [sistemaEdgesState, setSistemaEdges, onSistemaEdgesChange] = useEdgesState(sistemaEdges);
+
+  const [stagingNodesState, setStagingNodes, onStagingNodesChange] = useNodesState(stagingNodes);
+  const [stagingEdgesState, setStagingEdges, onStagingEdgesChange] = useEdgesState(stagingEdges);
 
   const [integracoesNodesState, setIntegracoesNodes, onIntegracoesNodesChange] = useNodesState(integracoesNodes);
   const [integracoesEdgesState, setIntegracoesEdges, onIntegracoesEdgesChange] = useEdgesState(integracoesEdges);
@@ -549,6 +698,11 @@ const ArquiteturaProjeto = () => {
   const onSistemaConnect = useCallback(
     (params: any) => setSistemaEdges((eds) => addEdge(params, eds)),
     [setSistemaEdges]
+  );
+
+  const onStagingConnect = useCallback(
+    (params: any) => setStagingEdges((eds) => addEdge(params, eds)),
+    [setStagingEdges]
   );
 
   const onIntegracoesConnect = useCallback(
@@ -575,8 +729,9 @@ const ArquiteturaProjeto = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="sistema">🔄 Fluxo do Sistema</TabsTrigger>
+                <TabsTrigger value="staging">⚡ Nova Arquitetura</TabsTrigger>
                 <TabsTrigger value="integracoes">🔗 Integrações</TabsTrigger>
                 <TabsTrigger value="arquitetura">🏗️ Arquitetura Técnica</TabsTrigger>
               </TabsList>
@@ -600,7 +755,31 @@ const ArquiteturaProjeto = () => {
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground">
                   <p><strong>Fluxo Principal:</strong> Upload → Processamento → Aplicação Tipos → Volumetria → Faturamento → Saídas</p>
-                  <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+                  <p><strong>Legenda:</strong> ⚡ Verde = Nova Arquitetura Implementada | Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="staging" className="mt-6">
+                <div className="h-[700px] w-full border rounded-lg bg-gradient-to-br from-blue-50 to-green-50">
+                  <ReactFlow
+                    nodes={stagingNodesState}
+                    edges={stagingEdgesState}
+                    onNodesChange={onStagingNodesChange}
+                    onEdgesChange={onStagingEdgesChange}
+                    onConnect={onStagingConnect}
+                    nodeTypes={nodeTypes}
+                    fitView
+                    attributionPosition="top-right"
+                  >
+                    <MiniMap />
+                    <Controls />
+                    <Background gap={12} size={1} />
+                  </ReactFlow>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p><strong>🎯 Fluxo Nova Arquitetura:</strong> 📁 Upload → 💾 Storage → 🔄 Staging → 🏗️ Background → 📊 Dashboard</p>
+                  <p><strong>⏱️ Tempos:</strong> Upload (5s) → Storage (instantâneo) → Staging (30s) → Background (2min) → Dashboard (real-time)</p>
+                  <p><strong>✅ Vantagens:</strong> Sem travamentos, Ultrarrápido, Monitoramento real-time, Tolerante a falhas</p>
                 </div>
               </TabsContent>
 
