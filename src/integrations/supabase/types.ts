@@ -3787,10 +3787,14 @@ export type Database = {
       get_clientes_stats_completos: {
         Args: Record<PropertyKey, never>
         Returns: {
+          arquivo_fonte: string
           empresa: string
-          laudos_atrasados: number
+          especialidades: string[]
+          medicos: string[]
+          modalidades: string[]
           percentual_atraso: number
-          total_laudos: number
+          total_atrasados: number
+          total_exames: number
           total_registros: number
         }[]
       }
