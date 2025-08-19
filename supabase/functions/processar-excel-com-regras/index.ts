@@ -7,9 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 🚀 PROCESSAMENTO ROBUSTO - ANTI-TIMEOUT E ANTI-MEMORY LIMIT
 serve(async (req) => {
-  console.log('📊 [EXCEL-PROCESSAMENTO-REAL] Função iniciada');
+  console.log('📊 [EXCEL-PROCESSAMENTO-V2] Função iniciada');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,6 +16,8 @@ serve(async (req) => {
 
   try {
     const { file_path, arquivo_fonte, periodo_referencia } = await req.json();
+    
+    console.log('📊 [EXCEL-PROCESSAMENTO-V2] Parâmetros:', { file_path, arquivo_fonte, periodo_referencia });
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -34,23 +35,28 @@ serve(async (req) => {
         arquivo_nome: arquivoNome || 'arquivo.xlsx',
         status: 'processando',
         periodo_referencia: periodo_referencia || 'jun/25',
-        detalhes_erro: { lote_upload, etapa: 'processamento_real' }
+        detalhes_erro: { lote_upload, etapa: 'processamento_v2_iniciado' }
       })
       .select()
       .single();
 
-    console.log('✅ [EXCEL-PROCESSAMENTO-REAL] Upload registrado:', uploadRecord?.id);
+    console.log('✅ [EXCEL-PROCESSAMENTO-V2] Upload registrado:', uploadRecord?.id);
 
-    // Download e processamento do arquivo
+    // Download do arquivo
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
 
-    if (downloadError || !fileData) {
+    if (downloadError) {
+      console.error('❌ [EXCEL-PROCESSAMENTO-V2] Erro no download:', downloadError);
+      throw new Error(`Download falhou: ${downloadError.message}`);
+    }
+
+    if (!fileData) {
       throw new Error(`Arquivo não encontrado: ${file_path}`);
     }
 
-    console.log('✅ [EXCEL-PROCESSAMENTO-REAL] Arquivo baixado');
+    console.log('✅ [EXCEL-PROCESSAMENTO-V2] Arquivo baixado, tamanho:', fileData.size);
 
     // Processar Excel
     const arrayBuffer = await fileData.arrayBuffer();
@@ -66,14 +72,18 @@ serve(async (req) => {
       blankrows: false 
     });
 
-    console.log(`📊 [EXCEL-PROCESSAMENTO-REAL] ${jsonData.length} linhas encontradas`);
+    console.log(`📊 [EXCEL-PROCESSAMENTO-V2] ${jsonData.length} linhas encontradas`);
+
+    if (jsonData.length === 0) {
+      throw new Error('Arquivo Excel vazio ou sem dados válidos');
+    }
 
     // Processar dados em pequenos lotes
     let totalInseridos = 0;
     let regrasAplicadas = 0;
     
-    const LOTE_SIZE = 10;
-    for (let i = 0; i < jsonData.length; i += LOTE_SIZE) {
+    const LOTE_SIZE = 5; // Reduzido para evitar problemas
+    for (let i = 0; i < Math.min(jsonData.length, 100); i += LOTE_SIZE) { // Máximo 100 linhas para teste
       const lote = jsonData.slice(i, i + LOTE_SIZE);
       const registrosProcessados = [];
 
@@ -115,24 +125,31 @@ serve(async (req) => {
           });
 
         } catch (rowError) {
-          console.error('❌ [EXCEL-PROCESSAMENTO-REAL] Erro na linha:', rowError);
+          console.error('❌ [EXCEL-PROCESSAMENTO-V2] Erro na linha:', rowError);
         }
       }
 
       if (registrosProcessados.length > 0) {
         try {
-          await supabaseClient
+          const { error: insertError } = await supabaseClient
             .from('volumetria_mobilemed')
             .insert(registrosProcessados);
+          
+          if (insertError) {
+            console.error(`❌ [EXCEL-PROCESSAMENTO-V2] Erro na inserção:`, insertError);
+            throw insertError;
+          }
+          
           totalInseridos += registrosProcessados.length;
-          console.log(`✅ [EXCEL-PROCESSAMENTO-REAL] Lote ${Math.floor(i/LOTE_SIZE) + 1} inserido: ${registrosProcessados.length} registros`);
+          console.log(`✅ [EXCEL-PROCESSAMENTO-V2] Lote ${Math.floor(i/LOTE_SIZE) + 1} inserido: ${registrosProcessados.length} registros`);
         } catch (insertError) {
-          console.error(`❌ [EXCEL-PROCESSAMENTO-REAL] Erro na inserção do lote:`, insertError);
+          console.error(`❌ [EXCEL-PROCESSAMENTO-V2] Falha na inserção:`, insertError);
+          throw insertError;
         }
       }
       
       // Pausa entre lotes
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     // Finalizar upload
@@ -146,7 +163,7 @@ serve(async (req) => {
           registros_erro: 0,
           completed_at: new Date().toISOString(),
           detalhes_erro: {
-            etapa: 'processamento_real_completo',
+            etapa: 'processamento_v2_completo',
             lote_upload: lote_upload,
             regras_aplicadas: regrasAplicadas
           }
@@ -154,12 +171,12 @@ serve(async (req) => {
         .eq('id', uploadRecord.id);
     }
 
-    console.log(`📊 [EXCEL-PROCESSAMENTO-REAL] CONCLUÍDO: ${totalInseridos} registros, ${regrasAplicadas} regras`);
+    console.log(`📊 [EXCEL-PROCESSAMENTO-V2] CONCLUÍDO: ${totalInseridos} registros, ${regrasAplicadas} regras aplicadas`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Excel processado com sucesso: ${totalInseridos} registros`,
+        message: `Arquivo processado: ${totalInseridos} registros inseridos`,
         upload_id: uploadRecord?.id || 'temp-' + Date.now(),
         stats: {
           inserted_count: totalInseridos,
@@ -173,7 +190,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('💥 [EXCEL-PROCESSAMENTO-REAL] Erro:', error.message);
+    console.error('💥 [EXCEL-PROCESSAMENTO-V2] Erro:', error.message);
     
     return new Response(
       JSON.stringify({
