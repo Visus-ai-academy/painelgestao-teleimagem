@@ -79,27 +79,49 @@ serve(async (req) => {
         const processedRecords: any[] = [];
         const stagingIdsToUpdate: string[] = [];
 
-        // Aplicar regras de negócio
+        // Aplicar transformações e validações
         for (const record of batch) {
           try {
             // Aplicar transformações e validações
             const processedRecord = {
-              EMPRESA: await applyClientNameCleaning(record.empresa),
-              ESTUDO_DESCRICAO: record.estudo_descricao,
+              EMPRESA: await applyClientNameCleaning(record.EMPRESA),
+              NOME_PACIENTE: record.NOME_PACIENTE,
+              CODIGO_PACIENTE: record.CODIGO_PACIENTE,
+              ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
+              ACCESSION_NUMBER: record.ACCESSION_NUMBER,
               MODALIDADE: await applyModalityCorrections(record),
-              ESPECIALIDADE: record.especialidade,
-              MEDICO: await applyMedicoNormalization(record.medico),
-              DATA_EXAME: record.data_exame,
-              DATA_LAUDO: record.data_laudo,
-              PRIORIDADE: await applyPriorityMapping(record.prioridade),
-              VALORES: record.valores,
-              CATEGORIA: await applyCategoryMapping(record.estudo_descricao),
-              TIPO_FATURAMENTO: await applyBillingType(record),
-              PREPARO: record.preparo,
+              PRIORIDADE: await applyPriorityMapping(record.PRIORIDADE),
+              VALORES: record.VALORES,
+              ESPECIALIDADE: record.ESPECIALIDADE,
+              MEDICO: await applyMedicoNormalization(record.MEDICO),
+              DUPLICADO: record.DUPLICADO,
+              DATA_REALIZACAO: record.DATA_REALIZACAO,
+              HORA_REALIZACAO: record.HORA_REALIZACAO,
+              DATA_TRANSFERENCIA: record.DATA_TRANSFERENCIA,
+              HORA_TRANSFERENCIA: record.HORA_TRANSFERENCIA,
+              DATA_LAUDO: record.DATA_LAUDO,
+              HORA_LAUDO: record.HORA_LAUDO,
+              DATA_PRAZO: record.DATA_PRAZO,
+              HORA_PRAZO: record.HORA_PRAZO,
+              STATUS: record.STATUS,
+              DATA_REASSINATURA: record.DATA_REASSINATURA,
+              HORA_REASSINATURA: record.HORA_REASSINATURA,
+              MEDICO_REASSINATURA: record.MEDICO_REASSINATURA,
+              SEGUNDA_ASSINATURA: record.SEGUNDA_ASSINATURA,
+              POSSUI_IMAGENS_CHAVE: record.POSSUI_IMAGENS_CHAVE,
+              IMAGENS_CHAVES: record.IMAGENS_CHAVES,
+              IMAGENS_CAPTURADAS: record.IMAGENS_CAPTURADAS,
+              CODIGO_INTERNO: record.CODIGO_INTERNO,
+              DIGITADOR: record.DIGITADOR,
+              COMPLEMENTAR: record.COMPLEMENTAR,
+              CATEGORIA: await applyCategoryMapping(record.ESTUDO_DESCRICAO),
+              tipo_faturamento: await applyBillingType(record),
+              data_referencia: record.data_referencia,
               periodo_referencia: record.periodo_referencia,
               arquivo_fonte: record.arquivo_fonte,
               lote_upload: record.lote_upload,
-              processed_at: new Date().toISOString()
+              processamento_pendente: false,
+              processado_em: new Date().toISOString()
             };
 
             // Verificar se deve ser excluído
@@ -259,11 +281,36 @@ async function applyMedicoNormalization(medico: string): Promise<string> {
 }
 
 async function applyModalityCorrections(record: any): Promise<string> {
-  return record.modalidade || '';
+  let modalidade = record.MODALIDADE || '';
+  
+  // REGRA: Correção CR/DX para RX ou MG baseado no ESTUDO_DESCRICAO
+  if (modalidade === 'CR' || modalidade === 'DX') {
+    if (record.ESTUDO_DESCRICAO === 'MAMOGRAFIA') {
+      modalidade = 'MG';
+    } else {
+      modalidade = 'RX';
+    }
+  }
+  
+  // REGRA: Correção OT para DO
+  if (modalidade === 'OT') {
+    modalidade = 'DO';
+  }
+  
+  return modalidade;
 }
 
 async function applyCategoryMapping(estudo: string): Promise<string> {
-  return estudo.includes('ONCO') ? 'Onco' : 'Geral';
+  if (!estudo) return 'SC';
+  
+  const estudoUpper = estudo.toUpperCase();
+  
+  // Mapear categoria baseado no estudo
+  if (estudoUpper.includes('ONCO') || estudoUpper.includes('ONCOLOGIA')) {
+    return 'Onco';
+  }
+  
+  return 'Geral';
 }
 
 async function applyPriorityMapping(prioridade: string): Promise<string> {
@@ -271,7 +318,19 @@ async function applyPriorityMapping(prioridade: string): Promise<string> {
 }
 
 async function applyBillingType(record: any): Promise<string> {
-  return record.tipo_faturamento || 'PADRAO';
+  const categoria = record.CATEGORIA || '';
+  const prioridade = record.PRIORIDADE || '';
+  const modalidade = record.MODALIDADE || '';
+  
+  if (categoria.toLowerCase().includes('onco')) {
+    return 'oncologia';
+  } else if (prioridade.toLowerCase().includes('urgencia')) {
+    return 'urgencia';
+  } else if (['CT', 'MR'].includes(modalidade)) {
+    return 'alta_complexidade';
+  } else {
+    return 'padrao';
+  }
 }
 
 async function shouldExcludeRecord(record: any, arquivoFonte: string): Promise<boolean> {
