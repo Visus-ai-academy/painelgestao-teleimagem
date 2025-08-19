@@ -45,10 +45,15 @@ serve(async (req) => {
     if (downloadError) throw downloadError;
 
     // 3. Processar Excel
+    console.log('📥 [BÁSICO] Convertendo para arrayBuffer...');
     const arrayBuffer = await fileData.arrayBuffer();
+    
+    console.log('📖 [BÁSICO] Lendo workbook...');
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
+    
+    console.log('🔄 [BÁSICO] Convertendo para JSON...');
     const rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
     console.log(`📊 [BÁSICO] Dados extraídos: ${rawData.length} registros`);
@@ -60,28 +65,37 @@ serve(async (req) => {
     for (let i = 0; i < rawData.length; i += BATCH_SIZE) {
       const batch = rawData.slice(i, i + BATCH_SIZE);
       
-      const records = batch.map((row: any) => ({
-        id: crypto.randomUUID(),
-        "EMPRESA": row["EMPRESA"] || row["A"] || null,
-        "NOME_PACIENTE": row["NOME_PACIENTE"] || row["B"] || null,
-        "CODIGO_PACIENTE": row["CODIGO_PACIENTE"] || row["C"] || null,
-        "ESTUDO_DESCRICAO": row["ESTUDO_DESCRICAO"] || row["D"] || null,
-        "ACCESSION_NUMBER": row["ACCESSION_NUMBER"] || row["E"] || null,
-        "MODALIDADE": row["MODALIDADE"] || row["F"] || null,
-        "PRIORIDADE": row["PRIORIDADE"] || row["G"] || null,
-        "VALORES": parseFloat(row["VALORES"] || row["H"] || 0),
-        "ESPECIALIDADE": row["ESPECIALIDADE"] || row["I"] || null,
-        "MEDICO": row["MEDICO"] || row["J"] || null,
-        "DATA_REALIZACAO": row["DATA_REALIZACAO"] || row["K"] || null,
-        "HORA_REALIZACAO": row["HORA_REALIZACAO"] || row["L"] || null,
-        "DATA_LAUDO": row["DATA_LAUDO"] || row["M"] || null,
-        "HORA_LAUDO": row["HORA_LAUDO"] || row["N"] || null,
-        "DATA_PRAZO": row["DATA_PRAZO"] || row["O"] || null,
-        "HORA_PRAZO": row["HORA_PRAZO"] || row["P"] || null,
-        arquivo_fonte,
-        periodo_referencia: periodo || 'jun/25',
-        data_referencia: new Date().toISOString().split('T')[0]
-      }));
+      console.log(`🔄 [BÁSICO] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}...`);
+      
+      const records = batch.map((row: any, index: number) => {
+        try {
+          return {
+            id: crypto.randomUUID(),
+            "EMPRESA": row["EMPRESA"] || row["A"] || null,
+            "NOME_PACIENTE": row["NOME_PACIENTE"] || row["B"] || null,
+            "CODIGO_PACIENTE": row["CODIGO_PACIENTE"] || row["C"] || null,
+            "ESTUDO_DESCRICAO": row["ESTUDO_DESCRICAO"] || row["D"] || null,
+            "ACCESSION_NUMBER": row["ACCESSION_NUMBER"] || row["E"] || null,
+            "MODALIDADE": row["MODALIDADE"] || row["F"] || null,
+            "PRIORIDADE": row["PRIORIDADE"] || row["G"] || null,
+            "VALORES": isNaN(parseFloat(row["VALORES"] || row["H"] || 0)) ? 0 : parseFloat(row["VALORES"] || row["H"] || 0),
+            "ESPECIALIDADE": row["ESPECIALIDADE"] || row["I"] || null,
+            "MEDICO": row["MEDICO"] || row["J"] || null,
+            "DATA_REALIZACAO": row["DATA_REALIZACAO"] || row["K"] || null,
+            "HORA_REALIZACAO": row["HORA_REALIZACAO"] || row["L"] || null,
+            "DATA_LAUDO": row["DATA_LAUDO"] || row["M"] || null,
+            "HORA_LAUDO": row["HORA_LAUDO"] || row["N"] || null,
+            "DATA_PRAZO": row["DATA_PRAZO"] || row["O"] || null,
+            "HORA_PRAZO": row["HORA_PRAZO"] || row["P"] || null,
+            arquivo_fonte,
+            periodo_referencia: periodo || 'jun/25',
+            data_referencia: new Date().toISOString().split('T')[0]
+          };
+        } catch (recordError) {
+          console.error(`❌ [BÁSICO] Erro no registro ${index}:`, recordError);
+          throw recordError;
+        }
+      });
 
       const { error: insertError } = await supabase
         .from('volumetria_mobilemed')
@@ -115,10 +129,14 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('❌ [BÁSICO] Erro:', error.message);
+    console.error('❌ [BÁSICO] Erro completo:', error);
+    console.error('❌ [BÁSICO] Stack trace:', error.stack);
+    console.error('❌ [BÁSICO] Message:', error.message);
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message || 'Erro desconhecido',
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
