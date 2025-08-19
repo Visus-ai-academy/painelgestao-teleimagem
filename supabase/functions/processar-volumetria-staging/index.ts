@@ -74,7 +74,7 @@ serve(async (req) => {
     // 2. Baixar arquivo do storage
     console.log('📥 [STAGING] Baixando arquivo do storage...');
     const { data: fileData, error: downloadError } = await supabaseClient.storage
-      .from('volumetria')
+      .from('uploads')
       .download(file_path);
 
     if (downloadError || !fileData) {

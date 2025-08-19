@@ -777,10 +777,10 @@ export async function processVolumetriaComStaging(
   }
   
   try {
-    // 2. Chamar Edge Function de staging
-    console.log('📞 [STAGING] Chamando processar-volumetria-staging...');
+    // 2. Chamar Edge Function COORDENADOR
+    console.log('📞 [STAGING] Chamando processar-volumetria-coordenador...');
     
-    const { data: stagingResult, error: stagingError } = await supabase.functions.invoke('processar-volumetria-staging', {
+    const { data: stagingResult, error: stagingError } = await supabase.functions.invoke('processar-volumetria-coordenador', {
       body: {
         file_path: uploadData.path,
         arquivo_fonte: arquivoFonte,
@@ -816,8 +816,8 @@ export async function processVolumetriaComStaging(
     console.log('🎯 [STAGING] Resultado final do processamento:', finalResult);
 
     return {
-      success: finalResult?.status === 'completed',
-      message: finalResult?.status === 'completed' 
+      success: finalResult?.status === 'concluido',
+      message: finalResult?.status === 'concluido' 
         ? `Processamento concluído via staging`
         : `Erro: ${(finalResult?.detalhes_erro as any)?.message || 'Erro desconhecido'}`,
       stats: {
@@ -886,7 +886,7 @@ async function monitorarProgressoProcessamento(
         }
 
         // Verificar se completou
-        if (upload.status === 'completed') {
+        if (upload.status === 'concluido') {
           console.log('✅ [STAGING] Processamento completado!');
           if (onProgress) {
             onProgress({
@@ -901,14 +901,14 @@ async function monitorarProgressoProcessamento(
         }
 
         // Verificar se deu erro
-        if (upload.status === 'error') {
+        if (upload.status === 'erro') {
           console.error('❌ [STAGING] Processamento falhou:', upload.detalhes_erro);
           reject(new Error((upload.detalhes_erro as any)?.message || 'Erro no processamento'));
           return;
         }
 
         // Continuar monitorando se ainda está processando
-        if (upload.status === 'processando' && tentativas < maxTentativas) {
+        if ((upload.status === 'processando' || upload.status === 'processando_regras' || upload.status === 'staging_concluido') && tentativas < maxTentativas) {
           tentativas++;
           setTimeout(verificarProgresso, 5000); // Verificar a cada 5 segundos
         } else if (tentativas >= maxTentativas) {
