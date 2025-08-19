@@ -89,13 +89,18 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      // Limpar uploads travados antes de iniciar novo processamento
-      console.log('🧹 Verificando uploads travados...');
+      // Limpar uploads travados e testar sistema antes do processamento
+      console.log('🧹 Limpando sistema e verificando saúde...');
       try {
+        // Limpar uploads travados
         const { data: cleanResult } = await supabase.functions.invoke('limpar-uploads-travados');
-        console.log('✅ Resultado limpeza uploads:', cleanResult);
+        console.log('✅ Limpeza de uploads:', cleanResult);
+        
+        // Testar sistema (função de debug)
+        const { data: systemTest } = await supabase.functions.invoke('test-staging-pipeline');
+        console.log('🧪 Teste do sistema:', systemTest);
       } catch (cleanError) {
-        console.warn('⚠️ Aviso na limpeza de uploads:', cleanError);
+        console.warn('⚠️ Aviso no teste do sistema:', cleanError);
       }
 
       console.log(`🚀 Iniciando processamento via STAGING para ${arquivoFonte}...`);
@@ -118,6 +123,12 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
       if (result.success) {
         const insertedCount = result.stats?.inserted_count || 0;
+        console.log('🎯 Upload finalizado com sucesso:', {
+          insertedCount,
+          totalProcessed: result.stats?.total_rows,
+          errors: result.stats?.error_count
+        });
+        
         toast({
           title: "Upload concluído!",
           description: `${insertedCount} registros inseridos com sucesso.`,
@@ -128,6 +139,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         
         onSuccess?.();
       } else {
+        console.error('❌ Falha no upload:', result);
         toast({
           title: "Erro no processamento",
           description: result.message || "Erro desconhecido",

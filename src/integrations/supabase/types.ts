@@ -4211,6 +4211,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      testar_sistema_upload: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       update_custom_metrics: {
         Args: Record<PropertyKey, never>
         Returns: number
