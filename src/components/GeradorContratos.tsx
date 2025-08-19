@@ -101,84 +101,29 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
       setProgresso({ atual: 0, total: clientes.length });
       setResultados({ sucesso: 0, erro: 0, detalhes: [] });
 
-      // Filtrar apenas clientes que não têm contrato
-      const { data: contratosExistentes } = await supabase
-        .from('contratos_clientes')
-        .select('cliente_id');
+      // Chamar edge function para processar contratos
+      const { data, error } = await supabase.functions.invoke('processar-contratos');
 
-      const clientesComContrato = new Set(contratosExistentes?.map(c => c.cliente_id) || []);
-      const clientesSemContrato = clientes.filter(cliente => !clientesComContrato.has(cliente.id));
+      if (error) throw error;
 
-      if (clientesSemContrato.length === 0) {
+      if (data.success) {
+        setResultados({
+          sucesso: data.contratos_criados,
+          erro: data.erros,
+          detalhes: data.detalhes || []
+        });
+
         toast({
-          title: "Aviso",
-          description: "Todos os clientes já possuem contratos cadastrados",
+          title: "Contratos gerados com sucesso!",
+          description: data.message,
           variant: "default"
         });
-        setGerandoContratos(false);
-        return;
-      }
 
-      setProgresso({ atual: 0, total: clientesSemContrato.length });
-      let sucessos = 0;
-      let erros = 0;
-      const detalhes: string[] = [];
-
-      for (let i = 0; i < clientesSemContrato.length; i++) {
-        const cliente = clientesSemContrato[i];
-        
-        try {
-          setProgresso({ atual: i + 1, total: clientesSemContrato.length });
-
-          const contratoData = {
-            cliente_id: cliente.id,
-            numero_contrato: `CT-${cliente.nome.substring(0, 3).toUpperCase()}-${Date.now()}-${i}`,
-            data_inicio: configuracao.data_inicio,
-            data_fim: configuracao.data_fim,
-            considera_plantao: configuracao.considera_plantao,
-            dia_vencimento: configuracao.dia_vencimento,
-            desconto_percentual: configuracao.desconto_percentual,
-            acrescimo_percentual: configuracao.acrescimo_percentual,
-            status: 'ativo',
-            servicos_contratados: configuracao.servicos_inclusos.filter(s => s.trim() !== ''),
-            configuracoes_franquia: {
-              tem_franquia: configuracao.valor_franquia > 0,
-              valor_franquia: configuracao.valor_franquia
-            },
-            configuracoes_integracao: {
-              cobra_integracao: configuracao.valor_integracao > 0,
-              valor_integracao: configuracao.valor_integracao
-            },
-            observacoes_contratuais: configuracao.observacoes,
-            clausulas_especiais: configuracao.clausulas_especiais
-          };
-
-          const { error: contratoError } = await supabase
-            .from('contratos_clientes')
-            .insert([contratoData]);
-
-          if (contratoError) throw contratoError;
-
-          sucessos++;
-          detalhes.push(`✅ ${cliente.nome} - Contrato criado`);
-
-        } catch (error: any) {
-          erros++;
-          detalhes.push(`❌ ${cliente.nome} - Erro: ${error.message}`);
-          console.error(`Erro ao criar contrato para ${cliente.nome}:`, error);
+        if (data.contratos_criados > 0) {
+          onSuccess?.();
         }
-      }
-
-      setResultados({ sucesso: sucessos, erro: erros, detalhes });
-      
-      toast({
-        title: "Geração de contratos concluída",
-        description: `${sucessos} contratos criados com sucesso. ${erros} erros encontrados.`,
-        variant: sucessos > 0 ? "default" : "destructive"
-      });
-
-      if (sucessos > 0) {
-        onSuccess?.();
+      } else {
+        throw new Error(data.error || 'Erro desconhecido');
       }
 
     } catch (error: any) {
@@ -188,6 +133,11 @@ export function GeradorContratos({ clientes, onSuccess }: GeradorContratosProps)
         description: error.message || "Ocorreu um erro inesperado",
         variant: "destructive"
       });
+      setResultados(prev => ({
+        ...prev,
+        erro: prev.erro + 1,
+        detalhes: [...prev.detalhes, `❌ Erro: ${error.message}`]
+      }));
     } finally {
       setGerandoContratos(false);
     }
