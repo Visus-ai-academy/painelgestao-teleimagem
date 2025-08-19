@@ -86,9 +86,10 @@ serve(async (req) => {
         background: backgroundResponse.data,
         upload_id: stagingData?.upload_id || upload_id,
         stats: {
-          staging_inseridos: stagingData?.registros_inseridos || 0,
-          staging_processados: stagingData?.registros_processados || 0,
-          background_processados: backgroundResponse.data?.registros_processados || 0
+          inserted_count: stagingData?.registros_inseridos || stagingData?.stats?.inserted_count || 0,
+          total_rows: stagingData?.registros_processados || stagingData?.stats?.total_rows || 0,
+          error_count: stagingData?.stats?.error_count || 0,
+          regras_aplicadas: 0 // Será implementado posteriormente
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
