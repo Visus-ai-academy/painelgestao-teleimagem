@@ -12,13 +12,13 @@ serve(async (req) => {
   }
 
   try {
-    const { file_path, arquivo_fonte, periodo_referencia, upload_id, force_staging } = await req.json();
+    const { file_path, arquivo_fonte, periodo_referencia, upload_id } = await req.json();
     
-    console.log('🎯 [COORDENADOR] Iniciando orquestração:', {
+    console.log('🎯 [COORDENADOR] Iniciando orquestração V2:', {
       file_path,
       arquivo_fonte,
       upload_id,
-      force_staging
+      periodo_referencia
     });
 
     const supabase = createClient(
@@ -26,10 +26,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. ESTRATÉGIA: Usar staging-light para processar o arquivo
-    console.log('🚀 [COORDENADOR] Delegando para staging-light...');
+    // 1. Chamar staging-light diretamente
+    console.log('🚀 [COORDENADOR] Chamando staging-light...');
     
-    const { data: stagingResult, error: stagingError } = await supabase.functions.invoke(
+    const stagingResponse = await supabase.functions.invoke(
       'processar-volumetria-staging-light',
       {
         body: {
@@ -40,79 +40,56 @@ serve(async (req) => {
       }
     );
 
-    if (stagingError) {
-      console.error('❌ [COORDENADOR] Erro no staging:', stagingError);
-      throw stagingError;
+    console.log('📊 [COORDENADOR] Resposta staging raw:', stagingResponse);
+
+    if (stagingResponse.error) {
+      console.error('❌ [COORDENADOR] Erro no staging:', stagingResponse.error);
+      throw new Error(`Staging falhou: ${stagingResponse.error.message}`);
     }
 
-    console.log('✅ [COORDENADOR] Staging concluído:', stagingResult);
+    const stagingData = stagingResponse.data;
+    console.log('✅ [COORDENADOR] Staging dados:', stagingData);
 
-    // 2. Se staging foi bem-sucedido, processar background
-    if (stagingResult?.success && stagingResult?.lote_upload) {
-      console.log('🏗️ [COORDENADOR] Iniciando background processing...');
-      
-      // Usar EdgeRuntime.waitUntil para processar em background
-      const processBackground = async () => {
-        try {
-          const { data: backgroundResult, error: backgroundError } = await supabase.functions.invoke(
-            'processar-staging-background',
-            {
-              body: {
-                upload_id: stagingResult.upload_id || upload_id,
-                arquivo_fonte,
-                periodo_referencia: periodo_referencia || 'jun/25'
-              }
-            }
-          );
+    if (!stagingData?.success) {
+      throw new Error('Staging não retornou sucesso');
+    }
 
-          if (backgroundError) {
-            console.error('❌ [COORDENADOR] Erro no background:', backgroundError);
-            // Atualizar status para erro
-            await supabase
-              .from('processamento_uploads')
-              .update({
-                status: 'erro',
-                detalhes_erro: {
-                  etapa: 'background_erro',
-                  erro: backgroundError.message
-                }
-              })
-              .eq('id', stagingResult.upload_id || upload_id);
-          } else {
-            console.log('✅ [COORDENADOR] Background concluído:', backgroundResult);
-          }
-        } catch (error) {
-          console.error('💥 [COORDENADOR] Erro crítico no background:', error);
+    // 2. Chamar background processing imediatamente (sem waitUntil por enquanto)
+    console.log('🏗️ [COORDENADOR] Chamando background...');
+    
+    const backgroundResponse = await supabase.functions.invoke(
+      'processar-staging-background',
+      {
+        body: {
+          upload_id: stagingData.upload_id || upload_id,
+          arquivo_fonte,
+          periodo_referencia: periodo_referencia || 'jun/25'
         }
-      };
-
-      // Executar background sem bloquear resposta
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-        EdgeRuntime.waitUntil(processBackground());
-      } else {
-        // Fallback para ambientes que não suportam EdgeRuntime
-        processBackground();
       }
+    );
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Coordenação iniciada com sucesso',
-          staging_result: stagingResult,
-          background: 'iniciado',
-          upload_id: stagingResult.upload_id || upload_id,
-          stats: {
-            inseridos: stagingResult.registros_inseridos_staging || 0,
-            erros: stagingResult.registros_erro_staging || 0,
-            processados: stagingResult.registros_inseridos_staging || 0
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    console.log('📊 [COORDENADOR] Resposta background raw:', backgroundResponse);
+
+    if (backgroundResponse.error) {
+      console.error('❌ [COORDENADOR] Erro no background:', backgroundResponse.error);
+      // Não falhar por erro no background, apenas logar
     }
 
-    // Se staging falhou
-    throw new Error('Staging não foi concluído com sucesso');
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Processamento coordenado concluído',
+        staging: stagingData,
+        background: backgroundResponse.data,
+        upload_id: stagingData?.upload_id || upload_id,
+        stats: {
+          staging_inseridos: stagingData?.registros_inseridos || 0,
+          staging_processados: stagingData?.registros_processados || 0,
+          background_processados: backgroundResponse.data?.registros_processados || 0
+        }
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('💥 [COORDENADOR] Erro crítico:', error);
@@ -121,7 +98,8 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
-        message: `Erro no coordenador: ${error.message}`
+        message: `Erro no coordenador: ${error.message}`,
+        timestamp: new Date().toISOString()
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
