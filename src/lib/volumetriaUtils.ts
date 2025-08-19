@@ -758,24 +758,24 @@ export async function processVolumetriaComStaging(
     type: file.type 
   });
   
-  // Verificar tamanho do arquivo (máximo 2MB)
-  const maxSizeBytes = 2 * 1024 * 1024; // 2MB
+  // Verificar tamanho do arquivo (máximo 8MB com processamento streaming)
+  const maxSizeBytes = 8 * 1024 * 1024; // 8MB
   const fileSizeKB = Math.round(file.size / 1024);
   
   if (file.size > maxSizeBytes) {
     console.error('❌ [STAGING] Arquivo muito grande:', { 
       size: file.size, 
       sizeKB: fileSizeKB, 
-      maxSizeKB: 2048 
+      maxSizeKB: 8192 
     });
     
     return {
       success: false,
-      message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<2MB)`,
+      message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<8MB)`,
       stats: {},
       arquivo_muito_grande: true,
       tamanho_kb: fileSizeKB,
-      tamanho_limite_kb: 2048
+      tamanho_limite_kb: 8192
     };
   }
   

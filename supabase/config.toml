@@ -118,3 +118,6 @@ verify_jwt = true
 
 [functions.processar-volumetria-streaming]
 verify_jwt = true
+
+[functions.processar-volumetria-zero-memory]
+verify_jwt = true

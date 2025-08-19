@@ -79,59 +79,77 @@ serve(async (req) => {
     
     console.log('📤 [COORDENADOR] Payload para staging streaming:', JSON.stringify(stagingPayload, null, 2));
     
-    // Tentar primeiro com staging streaming (para arquivos grandes)
+    // Tentar primeiro com zero-memory (para arquivos grandes)
     let stagingResult, stagingError;
     
     try {
-      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
+      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-zero-memory', {
         body: stagingPayload
       });
       stagingResult = data;
       stagingError = error;
       
       if (error) {
-        console.error('❌ [COORDENADOR] Staging streaming retornou erro:', error);
+        console.error('❌ [COORDENADOR] Zero-memory retornou erro:', error);
         throw error;
       }
       
-      console.log('✅ [COORDENADOR] Staging streaming usado com sucesso');
-    } catch (streamingError) {
-      console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
+      console.log('✅ [COORDENADOR] Zero-memory usado com sucesso');
+    } catch (zeroMemoryError) {
+      console.log('⚠️ [COORDENADOR] Zero-memory falhou, tentando streaming:', zeroMemoryError.message);
       
-      // Fallback 1: Staging light
+      // Fallback 1: Streaming
       try {
-        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
+        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
           body: stagingPayload
         });
         stagingResult = data;
         stagingError = error;
         
         if (error) {
-          console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
+          console.error('❌ [COORDENADOR] Streaming retornou erro:', error);
           throw error;
         }
         
-        console.log('✅ [COORDENADOR] Staging light usado como fallback 1');
-      } catch (lightError) {
-        console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
+        console.log('✅ [COORDENADOR] Streaming usado como fallback 1');
+      } catch (streamingError) {
+        console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
         
-        // Fallback 2: Staging padrão
+        // Fallback 2: Staging light
         try {
-          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
             body: stagingPayload
           });
           stagingResult = data;
           stagingError = error;
           
           if (error) {
-            console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+            console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
             throw error;
           }
           
-          console.log('✅ [COORDENADOR] Staging padrão usado como fallback 2');
-        } catch (standardError) {
-          console.error('❌ [COORDENADOR] Todos os stagings falharam:', standardError);
-          stagingError = standardError;
+          console.log('✅ [COORDENADOR] Staging light usado como fallback 2');
+        } catch (lightError) {
+          console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
+          
+          // Fallback 3: Staging padrão
+          try {
+            const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+              body: stagingPayload
+            });
+            stagingResult = data;
+            stagingError = error;
+            
+            if (error) {
+              console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+              throw error;
+            }
+            
+            console.log('✅ [COORDENADOR] Staging padrão usado como fallback 3');
+          } catch (standardError) {
+            console.error('❌ [COORDENADOR] Todos os stagings falharam:', standardError);
+            stagingError = standardError;
+          }
         }
       }
     }
@@ -149,6 +167,30 @@ serve(async (req) => {
     }
 
     console.log('✅ [COORDENADOR] Staging completado:', stagingResult);
+
+    // Verificar se precisa de processamento offline
+    if (stagingResult.requer_processamento_offline) {
+      console.log('📋 [COORDENADOR] Arquivo marcado para processamento offline');
+      
+      const resultado = {
+        success: true,
+        message: `Arquivo aceito (${stagingResult.registros_inseridos_staging} placeholders criados). Processamento offline necessário devido ao tamanho.`,
+        upload_id: stagingResult.upload_id,
+        staging_stats: {
+          registros_staging: stagingResult.registros_inseridos_staging,
+          registros_erro_staging: stagingResult.registros_erro_staging
+        },
+        requer_processamento_offline: true,
+        arquivo_storage_path: stagingResult.arquivo_storage_path
+      };
+
+      console.log('🎯 [COORDENADOR] Processamento offline agendado:', resultado);
+
+      return new Response(
+        JSON.stringify(resultado),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // 2. ETAPA BACKGROUND - Aplicar regras e mover para tabela final
     console.log('🔄 [COORDENADOR] Etapa 2: Processamento em background...');

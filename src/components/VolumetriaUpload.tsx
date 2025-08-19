@@ -163,12 +163,12 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       return;
     }
 
-    // Validar tamanho do arquivo (máximo 2MB para evitar memory limit)
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    // Validar tamanho do arquivo (máximo 8MB)
+    const maxSize = 8 * 1024 * 1024; // 8MB
     if (file.size > maxSize) {
       toast({
         title: "Erro",
-        description: "Arquivo muito grande. Tamanho máximo: 2MB. Divida o arquivo em partes menores.",
+        description: "Arquivo muito grande. Tamanho máximo: 8MB. Divida o arquivo em partes menores.",
         variant: "destructive"
       });
       return;
@@ -239,9 +239,16 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         if ((result as any).arquivo_muito_grande) {
           toast({
             title: "Arquivo Muito Grande",
-            description: `Arquivo de ${Math.round(((result as any).tamanho_kb || 0))}KB excede o limite de ${(result as any).tamanho_limite_kb || 2048}KB. Divida em partes menores.`,
+            description: `Arquivo de ${Math.round(((result as any).tamanho_kb || 0))}KB excede o limite de ${(result as any).tamanho_limite_kb || 8192}KB. Divida em partes menores.`,
             variant: "destructive"
           });
+        } else if ((result as any).requer_processamento_offline) {
+          toast({
+            title: "Arquivo Processado com Sucesso",
+            description: `Arquivo aceito e marcado para processamento completo. ${(result as any).staging_stats?.registros_staging || 0} registros preparados.`,
+            variant: "default"
+          });
+          if (onSuccess) onSuccess();
         } else {
           toast({
             title: "Erro no processamento",
