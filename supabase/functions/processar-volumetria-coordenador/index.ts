@@ -26,8 +26,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Chamar staging-light diretamente
-    console.log('🚀 [COORDENADOR] Chamando staging-light...');
+    // 1. Chamar zero-memory diretamente (função otimizada)
+    console.log('🚀 [COORDENADOR] Chamando zero-memory...');
     
     // Buscar período de referência ativo do sistema se não fornecido
     let periodoAtivo = periodo_referencia;
@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'processar-volumetria-staging-light',
+      'processar-volumetria-zero-memory',
       {
         body: {
           file_path,
@@ -52,18 +52,18 @@ serve(async (req) => {
       }
     );
 
-    console.log('📊 [COORDENADOR] Resposta staging raw:', stagingResponse);
+    console.log('📊 [COORDENADOR] Resposta zero-memory raw:', stagingResponse);
 
     if (stagingResponse.error) {
-      console.error('❌ [COORDENADOR] Erro no staging:', stagingResponse.error);
-      throw new Error(`Staging falhou: ${stagingResponse.error.message}`);
+      console.error('❌ [COORDENADOR] Erro no zero-memory:', stagingResponse.error);
+      throw new Error(`Zero-memory falhou: ${stagingResponse.error.message}`);
     }
 
     const stagingData = stagingResponse.data;
-    console.log('✅ [COORDENADOR] Staging dados:', stagingData);
+    console.log('✅ [COORDENADOR] Zero-memory dados:', stagingData);
 
     if (!stagingData?.success) {
-      throw new Error('Staging não retornou sucesso');
+      throw new Error('Zero-memory não retornou sucesso');
     }
 
     // 2. Chamar background processing imediatamente (sem waitUntil por enquanto)
