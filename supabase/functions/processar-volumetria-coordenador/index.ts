@@ -49,20 +49,29 @@ serve(async (req) => {
       cellDates: true
     });
 
+    // Verificar se existem planilhas
+    if (!workbook?.Sheets || !workbook?.SheetNames?.length) {
+      throw new Error('Arquivo Excel não contém planilhas válidas');
+    }
+
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!worksheet) {
+      throw new Error('Primeira planilha não encontrada');
+    }
+
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
       header: 1,
-      defval: null,
+      defval: '',
       raw: false
     });
 
-    if (!jsonData || jsonData.length <= 1) {
+    if (!Array.isArray(jsonData) || jsonData.length <= 1) {
       throw new Error('Arquivo vazio ou sem dados válidos');
     }
 
-    // Headers na primeira linha
-    const headers = jsonData[0] as string[];
-    const dataRows = jsonData.slice(1);
+    // Headers na primeira linha - garantir que não seja null
+    const headers = (jsonData[0] as any[]) || [];
+    const dataRows = jsonData.slice(1).filter(row => Array.isArray(row) && row.length > 0);
     
     console.log(`📊 [COORDENADOR-V2] Processando ${dataRows.length} registros`);
 
@@ -87,40 +96,45 @@ serve(async (req) => {
         const recordsToInsert = [];
 
         for (const row of batch) {
-          if (!row || (row as any[]).every(cell => !cell)) continue;
+          // Verificar se a linha existe e tem conteúdo
+          if (!Array.isArray(row) || row.length === 0) continue;
+          if (row.every(cell => !cell || cell === '')) continue;
 
           const rowData = row as any[];
           const record: any = {
-            arquivo_fonte: arquivo_fonte,
+            arquivo_fonte: arquivo_fonte || 'volumetria_padrao',
             periodo_referencia: periodo_referencia || 'jun/25',
             lote_upload: upload_id || crypto.randomUUID()
           };
 
           // Mapear apenas campos essenciais para reduzir processamento
-          if (rowData.length >= 8) {
-            record["EMPRESA"] = rowData[0] || null;
-            record["NOME_PACIENTE"] = rowData[1] || null;
-            record["CODIGO_PACIENTE"] = rowData[2] || null;
-            record["ESTUDO_DESCRICAO"] = rowData[3] || null;
-            record["ACCESSION_NUMBER"] = rowData[4] || null;
-            record["MODALIDADE"] = rowData[5] || null;
-            record["PRIORIDADE"] = rowData[6] || null;
-            record["VALORES"] = parseFloat(rowData[7]) || 0;
+          if (rowData && rowData.length >= 8) {
+            record["EMPRESA"] = (rowData[0] || '').toString().trim() || null;
+            record["NOME_PACIENTE"] = (rowData[1] || '').toString().trim() || null;
+            record["CODIGO_PACIENTE"] = (rowData[2] || '').toString().trim() || null;
+            record["ESTUDO_DESCRICAO"] = (rowData[3] || '').toString().trim() || null;
+            record["ACCESSION_NUMBER"] = (rowData[4] || '').toString().trim() || null;
+            record["MODALIDADE"] = (rowData[5] || '').toString().trim() || null;
+            record["PRIORIDADE"] = (rowData[6] || '').toString().trim() || null;
+            
+            // Conversão segura para número
+            const valorStr = (rowData[7] || '0').toString().replace(',', '.');
+            record["VALORES"] = isNaN(parseFloat(valorStr)) ? 0 : parseFloat(valorStr);
             
             // Campos opcionais só se existirem
             if (rowData.length >= 16) {
-              record["ESPECIALIDADE"] = rowData[8] || null;
-              record["MEDICO"] = rowData[9] || null;
-              record["DATA_REALIZACAO"] = rowData[10] || null;
-              record["HORA_REALIZACAO"] = rowData[11] || null;
-              record["DATA_LAUDO"] = rowData[12] || null;
-              record["HORA_LAUDO"] = rowData[13] || null;
-              record["DATA_PRAZO"] = rowData[14] || null;
-              record["HORA_PRAZO"] = rowData[15] || null;
+              record["ESPECIALIDADE"] = (rowData[8] || '').toString().trim() || null;
+              record["MEDICO"] = (rowData[9] || '').toString().trim() || null;
+              record["DATA_REALIZACAO"] = (rowData[10] || '').toString().trim() || null;
+              record["HORA_REALIZACAO"] = (rowData[11] || '').toString().trim() || null;
+              record["DATA_LAUDO"] = (rowData[12] || '').toString().trim() || null;
+              record["HORA_LAUDO"] = (rowData[13] || '').toString().trim() || null;
+              record["DATA_PRAZO"] = (rowData[14] || '').toString().trim() || null;
+              record["HORA_PRAZO"] = (rowData[15] || '').toString().trim() || null;
             }
           }
 
-          // Validação mínima
+          // Validação mínima com verificação de null/undefined
           if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
             recordsToInsert.push(record);
           }
