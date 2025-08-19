@@ -3056,6 +3056,48 @@ export type Database = {
         }
         Relationships: []
       }
+      validacao_integridade: {
+        Row: {
+          arquivo_fonte: string
+          created_at: string | null
+          executado_em: string | null
+          id: string
+          pontuacao_integridade: number | null
+          requer_rollback: boolean | null
+          status_geral: string
+          upload_id: string
+          validacoes_aprovadas: Json | null
+          validacoes_executadas: Json | null
+          validacoes_falhadas: Json | null
+        }
+        Insert: {
+          arquivo_fonte: string
+          created_at?: string | null
+          executado_em?: string | null
+          id?: string
+          pontuacao_integridade?: number | null
+          requer_rollback?: boolean | null
+          status_geral?: string
+          upload_id: string
+          validacoes_aprovadas?: Json | null
+          validacoes_executadas?: Json | null
+          validacoes_falhadas?: Json | null
+        }
+        Update: {
+          arquivo_fonte?: string
+          created_at?: string | null
+          executado_em?: string | null
+          id?: string
+          pontuacao_integridade?: number | null
+          requer_rollback?: boolean | null
+          status_geral?: string
+          upload_id?: string
+          validacoes_aprovadas?: Json | null
+          validacoes_executadas?: Json | null
+          validacoes_falhadas?: Json | null
+        }
+        Relationships: []
+      }
       valores_prioridade_de_para: {
         Row: {
           ativo: boolean
@@ -3774,6 +3816,10 @@ export type Database = {
       enviar_escala_mensal: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      executar_rollback_upload: {
+        Args: { p_motivo: string; p_upload_id: string }
+        Returns: Json
       }
       expirar_coberturas_automaticamente: {
         Args: Record<PropertyKey, never>
