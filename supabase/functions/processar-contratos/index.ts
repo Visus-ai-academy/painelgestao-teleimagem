@@ -53,7 +53,7 @@ interface PrecoServico {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('', { headers: corsHeaders });
   }
 
   try {
@@ -263,10 +263,13 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('❌ Erro na edge function:', error);
+    console.error('❌ Stack trace:', error.stack);
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || 'Erro desconhecido',
+        stack: error.stack || 'Stack não disponível'
       }),
       { 
         status: 500,
