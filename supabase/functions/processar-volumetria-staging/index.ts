@@ -7,34 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface VolumetriaRecord {
-  EMPRESA: string;
-  ESTUDO_DESCRICAO: string;
-  MODALIDADE: string;
-  ESPECIALIDADE: string;
-  MEDICO: string;
-  DATA_EXAME: string;
-  DATA_LAUDO: string;
-  PRIORIDADE: string;
-  VALORES: number;
-  CATEGORIA: string;
-  TIPO_FATURAMENTO: string;
-  PREPARO: string;
-  periodo_referencia: string;
-  arquivo_fonte: string;
-  lote_upload?: string;
-}
-
-// 🔄 PROCESSAMENTO DE STAGING OTIMIZADO - Primeira etapa da nova arquitetura
+// 🔄 PROCESSAMENTO DE STAGING SIMPLIFICADO E ROBUSTO
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { file_path, arquivo_fonte, periodo_referencia, periodo_processamento } = await req.json();
+    const { file_path, arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log('🔄 [STAGING] Iniciando processamento otimizado:', {
+    console.log('🔄 [STAGING] Iniciando processamento simplificado:', {
       file_path,
       arquivo_fonte,
       periodo_referencia
@@ -47,6 +29,7 @@ serve(async (req) => {
 
     // 1. Registrar início do upload
     const lote_upload = crypto.randomUUID();
+    console.log('🆔 [STAGING] Lote gerado:', lote_upload);
     
     const { data: uploadRecord, error: uploadError } = await supabaseClient
       .from('processamento_uploads')
@@ -72,7 +55,7 @@ serve(async (req) => {
     console.log('📝 [STAGING] Upload registrado:', uploadRecord.id);
 
     // 2. Baixar arquivo do storage
-    console.log('📥 [STAGING] Baixando arquivo do storage...');
+    console.log('📥 [STAGING] Baixando arquivo do storage:', file_path);
     const { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
@@ -83,170 +66,265 @@ serve(async (req) => {
         .from('processamento_uploads')
         .update({
           status: 'erro',
-          detalhes_erro: { etapa: 'staging', erro: 'Erro ao baixar arquivo' },
+          detalhes_erro: { etapa: 'staging', erro: 'Erro ao baixar arquivo', erro_detalhes: downloadError },
           completed_at: new Date().toISOString()
         })
         .eq('id', uploadRecord.id);
       throw downloadError;
     }
 
-    // 3. Processamento otimizado por tamanho de arquivo
-    console.log('📊 [STAGING] Processando arquivo Excel otimizado...');
+    console.log('✅ [STAGING] Arquivo baixado com sucesso');
+
+    // 3. Processar Excel de forma robusta
+    console.log('📊 [STAGING] Processando arquivo Excel...');
     
     let totalLinhas = 0;
     let totalInseridos = 0;
+    let totalErros = 0;
     
     try {
       const arrayBuffer = await fileData.arrayBuffer();
       const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024);
-      console.log(`📏 [STAGING] Arquivo: ${fileSizeKB} KB`);
+      console.log(`📏 [STAGING] Tamanho do arquivo: ${fileSizeKB} KB`);
       
-      // Para arquivos grandes (>4MB), usar processamento streaming
-      if (fileSizeKB > 4096) {
-        console.log('🚀 [STAGING] Arquivo grande detectado - usando processamento streaming');
+      // Ler Excel com configurações básicas
+      console.log('📖 [STAGING] Lendo workbook...');
+      const workbook = XLSX.read(arrayBuffer, { 
+        type: 'array',
+        cellDates: false, // Evitar conversão automática de datas
+        cellNF: false,
+        cellHTML: false,
+        dense: false
+      });
+      
+      if (!workbook.SheetNames.length) {
+        throw new Error('Arquivo Excel sem planilhas');
+      }
+      
+      console.log('📋 [STAGING] Planilhas encontradas:', workbook.SheetNames);
+      
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!worksheet) {
+        throw new Error('Primeira planilha não encontrada');
+      }
+      
+      // Converter para JSON
+      console.log('🔄 [STAGING] Convertendo planilha para JSON...');
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        defval: '', // Usar string vazia para valores indefinidos
+        blankrows: false,
+        skipHidden: false,
+        raw: false // Não usar valores raw para evitar problemas de formato
+      });
+      
+      totalLinhas = jsonData.length;
+      console.log(`📋 [STAGING] ${totalLinhas} registros encontrados no Excel`);
+      
+      if (totalLinhas === 0) {
+        throw new Error('Planilha não contém dados');
+      }
+      
+      // Verificar colunas essenciais
+      const firstRow = jsonData[0] as any;
+      const colunas = Object.keys(firstRow);
+      console.log('📄 [STAGING] Colunas detectadas:', colunas.slice(0, 5), '... total:', colunas.length);
+      
+      const colunasEssenciais = ['EMPRESA', 'NOME_PACIENTE'];
+      const colunasPresentes = colunasEssenciais.filter(col => colunas.includes(col));
+      
+      if (colunasPresentes.length !== colunasEssenciais.length) {
+        throw new Error(`Colunas essenciais faltando: ${colunasEssenciais.filter(c => !colunas.includes(c))}`);
+      }
+      
+      console.log('✅ [STAGING] Colunas essenciais verificadas');
+      
+      // 4. Processar em lotes pequenos
+      const BATCH_SIZE = 50;
+      let loteAtual = 1;
+      const totalLotes = Math.ceil(totalLinhas / BATCH_SIZE);
+      
+      console.log(`📦 [STAGING] Processando em ${totalLotes} lotes de ${BATCH_SIZE} registros cada`);
+
+      for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+        const batch = jsonData.slice(i, i + BATCH_SIZE);
         
-        const workbook = XLSX.read(arrayBuffer, { 
-          type: 'array',
-          cellNF: false,
-          cellHTML: false,
-          cellFormula: false,
-          cellStyles: false,
-          cellDates: false,
-          dense: true,
-          sheetRows: 0 // Ler apenas metadados primeiro
-        });
+        console.log(`📦 [STAGING] Lote ${loteAtual}/${totalLotes} - ${batch.length} registros`);
         
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        if (!worksheet) {
-          throw new Error('Planilha não encontrada no arquivo');
-        }
-        
-        // Obter total de linhas
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-        totalLinhas = Math.max(1, range.e.r);
-        
-        console.log(`📋 [STAGING] ${totalLinhas} linhas detectadas - processamento por chunks`);
-        
-        // Processar em chunks de 300 linhas para arquivos grandes
-        const CHUNK_SIZE = 300;
-        let processedRows = 0;
-        
-        for (let startRow = 1; startRow < totalLinhas; startRow += CHUNK_SIZE) {
-          const endRow = Math.min(startRow + CHUNK_SIZE - 1, totalLinhas - 1);
+        const stagingRecords: any[] = [];
+
+        // Mapear dados do lote
+        for (let j = 0; j < batch.length; j++) {
+          const row = batch[j] as any;
           
-          console.log(`📦 [STAGING] Chunk ${Math.floor(startRow/CHUNK_SIZE) + 1} (linhas ${startRow}-${endRow})`);
-          
-          // Recriar workbook apenas com o range necessário
-          const rangeString = `A1:Z${endRow + 1}`;
-          const chunkWorkbook = XLSX.read(arrayBuffer, {
-            type: 'array',
-            cellNF: false,
-            cellHTML: false,
-            cellFormula: false,
-            cellStyles: false,
-            cellDates: false,
-            dense: true,
-            sheetRows: endRow + 1
-          });
-          
-          const chunkWorksheet = chunkWorkbook.Sheets[chunkWorkbook.SheetNames[0]];
-          
-          // Extrair apenas as linhas do chunk atual
-          const chunkData = XLSX.utils.sheet_to_json(chunkWorksheet, {
-            defval: null,
-            blankrows: false,
-            skipHidden: true,
-            range: { s: { r: startRow, c: 0 }, e: { r: endRow, c: 100 } }
-          });
-          
-          const chunkInserted = await processarChunk(
-            chunkData, 
-            supabaseClient, 
-            lote_upload, 
-            arquivo_fonte, 
-            periodo_referencia
-          );
-          
-          totalInseridos += chunkInserted;
-          processedRows += chunkData.length;
-          
-          // Limpar objetos do chunk para liberar memória
-          delete chunkWorkbook.Sheets;
-          
-          // Pausa para evitar sobrecarga de memória
-          if (startRow % (CHUNK_SIZE * 3) === 0) {
-            console.log(`⏸️ [STAGING] Pausa para limpeza de memória (processadas ${processedRows} linhas)`);
-            await new Promise(resolve => setTimeout(resolve, 200));
+          try {
+            const empresa = String(row['EMPRESA'] || '').trim();
+            const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
+
+            // Log detalhado para debug
+            if (j === 0) {
+              console.log(`🔍 [STAGING] Exemplo primeiro registro do lote ${loteAtual}:`, {
+                EMPRESA: empresa,
+                NOME_PACIENTE: nomePaciente,
+                ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 20) + '...',
+                VALORES: row['VALORES']
+              });
+            }
+
+            // Validações básicas
+            if (!empresa || !nomePaciente) {
+              console.log(`⚠️ [STAGING] Registro ${i+j+1} inválido: empresa="${empresa}" paciente="${nomePaciente}"`);
+              totalErros++;
+              continue;
+            }
+
+            // Excluir clientes com "_local"
+            if (empresa.toLowerCase().includes('_local')) {
+              totalErros++;
+              continue;
+            }
+
+            const record = {
+              EMPRESA: empresa,
+              NOME_PACIENTE: nomePaciente,
+              CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').trim() || null,
+              ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').trim() || null,
+              ACCESSION_NUMBER: String(row['ACCESSION_NUMBER'] || '').trim() || null,
+              MODALIDADE: String(row['MODALIDADE'] || '').trim() || null,
+              PRIORIDADE: String(row['PRIORIDADE'] || '').trim() || null,
+              VALORES: Number(row['VALORES']) || 0,
+              ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').trim() || null,
+              MEDICO: String(row['MEDICO'] || '').trim() || null,
+              DUPLICADO: String(row['DUPLICADO'] || '').trim() || null,
+              DATA_REALIZACAO: row['DATA_REALIZACAO'] || null,
+              HORA_REALIZACAO: row['HORA_REALIZACAO'] || null,
+              DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] || null,
+              HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] || null,
+              DATA_LAUDO: row['DATA_LAUDO'] || null,
+              HORA_LAUDO: row['HORA_LAUDO'] || null,
+              DATA_PRAZO: row['DATA_PRAZO'] || null,
+              HORA_PRAZO: row['HORA_PRAZO'] || null,
+              STATUS: String(row['STATUS'] || '').trim() || null,
+              DATA_REASSINATURA: row['DATA_REASSINATURA'] || null,
+              HORA_REASSINATURA: row['HORA_REASSINATURA'] || null,
+              MEDICO_REASSINATURA: String(row['MEDICO_REASSINATURA'] || '').trim() || null,
+              SEGUNDA_ASSINATURA: String(row['SEGUNDA_ASSINATURA'] || '').trim() || null,
+              POSSUI_IMAGENS_CHAVE: String(row['POSSUI_IMAGENS_CHAVE'] || '').trim() || null,
+              IMAGENS_CHAVES: row['IMAGENS_CHAVES'] || null,
+              IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] || null,
+              CODIGO_INTERNO: row['CODIGO_INTERNO'] || null,
+              DIGITADOR: String(row['DIGITADOR'] || '').trim() || null,
+              COMPLEMENTAR: String(row['COMPLEMENTAR'] || '').trim() || null,
+              CATEGORIA: String(row['CATEGORIA'] || '').trim() || null,
+              tipo_faturamento: String(row['TIPO_FATURAMENTO'] || '').trim() || null,
+              periodo_referencia: periodo_referencia,
+              arquivo_fonte: arquivo_fonte,
+              lote_upload: lote_upload,
+              status_processamento: 'pendente'
+            };
+
+            stagingRecords.push(record);
+          } catch (error) {
+            console.error(`⚠️ [STAGING] Erro ao mapear registro ${i+j+1}:`, error);
+            totalErros++;
           }
         }
+
+        // Inserir lote na tabela staging
+        console.log(`💾 [STAGING] Inserindo lote ${loteAtual} com ${stagingRecords.length} registros...`);
         
-      } else {
-        // Arquivos pequenos - processamento normal otimizado
-        console.log('📊 [STAGING] Processamento otimizado para arquivo pequeno');
-        
-        const workbook = XLSX.read(arrayBuffer, { 
-          type: 'array',
-          cellNF: false,
-          cellHTML: false,
-          cellFormula: false,
-          cellStyles: false,
-          cellDates: false,
-          dense: false
-        });
-        
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        if (!worksheet) {
-          throw new Error('Planilha não encontrada no arquivo');
+        if (stagingRecords.length > 0) {
+          const { error: insertError, count } = await supabaseClient
+            .from('volumetria_staging')
+            .insert(stagingRecords);
+
+          if (insertError) {
+            console.error('❌ [STAGING] Erro ao inserir lote:', insertError);
+            console.error('❌ [STAGING] Detalhes do erro:', JSON.stringify(insertError));
+            
+            // Tentar inserir registros individuais para identificar problema
+            let sucessosIndividuais = 0;
+            for (let k = 0; k < stagingRecords.length; k++) {
+              try {
+                await supabaseClient
+                  .from('volumetria_staging')
+                  .insert([stagingRecords[k]]);
+                sucessosIndividuais++;
+              } catch (individualError) {
+                if (k < 3) { // Log apenas os 3 primeiros erros
+                  console.error(`❌ [STAGING] Erro individual registro ${k+1}:`, individualError);
+                }
+                totalErros++;
+              }
+            }
+            
+            totalInseridos += sucessosIndividuais;
+            console.log(`⚠️ [STAGING] Inserção individual: ${sucessosIndividuais}/${stagingRecords.length} sucessos`);
+            
+          } else {
+            totalInseridos += stagingRecords.length;
+            console.log(`✅ [STAGING] Lote ${loteAtual} inserido: ${stagingRecords.length} registros`);
+          }
+        } else {
+          console.log(`⚠️ [STAGING] Lote ${loteAtual} vazio após validações`);
         }
         
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          defval: null,
-          blankrows: false,
-          skipHidden: true 
-        });
+        loteAtual++;
         
-        totalLinhas = jsonData.length;
-        console.log(`📋 [STAGING] ${totalLinhas} registros encontrados - processamento único`);
-        
-        totalInseridos = await processarChunk(
-          jsonData, 
-          supabaseClient, 
-          lote_upload, 
-          arquivo_fonte, 
-          periodo_referencia
-        );
-        
-        // Limpar workbook da memória
-        delete workbook.Sheets;
+        // Pausa entre lotes para não sobrecarregar
+        if (loteAtual % 3 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
       
     } catch (error) {
       console.error('❌ [STAGING] Erro ao processar Excel:', error);
+      console.error('❌ [STAGING] Stack:', error.stack);
+      
       await supabaseClient
         .from('processamento_uploads')
         .update({
           status: 'erro',
-          detalhes_erro: { etapa: 'staging', erro: `Erro ao processar Excel: ${error.message}` },
+          detalhes_erro: { 
+            etapa: 'staging', 
+            erro: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          },
           completed_at: new Date().toISOString()
         })
         .eq('id', uploadRecord.id);
       throw error;
     }
 
-    // 4. Atualizar status final do upload
+    console.log(`📊 [STAGING] RESUMO: ${totalLinhas} linhas → ${totalInseridos} inseridos, ${totalErros} erros`);
+
+    // 5. Verificar se realmente inseriu dados no staging
+    const { data: stagingCheck, count: stagingCount } = await supabaseClient
+      .from('volumetria_staging')
+      .select('*', { count: 'exact' })
+      .eq('lote_upload', lote_upload);
+
+    console.log(`🔍 [STAGING] Verificação final: ${stagingCount || 0} registros no staging`);
+    
+    if (!stagingCount || stagingCount === 0) {
+      throw new Error(`CRÍTICO: Nenhum registro foi inserido no staging! Esperado: ${totalInseridos}`);
+    }
+
+    // 6. Atualizar status final
     await supabaseClient
       .from('processamento_uploads')
       .update({
         status: 'staging_concluido',
         registros_processados: totalLinhas,
         registros_inseridos: totalInseridos,
-        registros_erro: Math.max(0, totalLinhas - totalInseridos),
+        registros_erro: totalErros,
         detalhes_erro: {
           etapa: 'staging_completo',
           registros_excel: totalLinhas,
-          registros_staging: totalInseridos,
-          registros_erro: Math.max(0, totalLinhas - totalInseridos),
+          registros_staging: stagingCount,
+          registros_erro: totalErros,
           lote_upload: lote_upload,
+          verificacao_final: 'ok',
           concluido_em: new Date().toISOString()
         }
       })
@@ -254,15 +332,15 @@ serve(async (req) => {
 
     const resultado = {
       success: true,
-      message: 'Staging processado com sucesso',
+      message: `Staging processado: ${totalInseridos} registros`,
       upload_id: uploadRecord.id,
       lote_upload: lote_upload,
       registros_excel: totalLinhas,
-      registros_inseridos: totalInseridos,
-      registros_erro: Math.max(0, totalLinhas - totalInseridos)
+      registros_inseridos_staging: stagingCount,
+      registros_erro_staging: totalErros
     };
 
-    console.log('✅ [STAGING] Processamento concluído:', resultado);
+    console.log('✅ [STAGING] Processamento concluído com sucesso:', resultado);
 
     return new Response(
       JSON.stringify(resultado),
@@ -270,122 +348,19 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('💥 [STAGING] Erro crítico:', error);
+    console.error('💥 [STAGING] Erro crítico final:', error);
+    console.error('💥 [STAGING] Tipo do erro:', typeof error);
+    console.error('💥 [STAGING] Message:', error.message);
+    console.error('💥 [STAGING] Stack:', error.stack);
+    
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        error_type: typeof error,
+        timestamp: new Date().toISOString()
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 })
-
-// Função auxiliar otimizada para processar chunks de dados
-async function processarChunk(
-  jsonData: any[],
-  supabaseClient: any,
-  lote_upload: string,
-  arquivo_fonte: string,
-  periodo_referencia: string
-): Promise<number> {
-  const BATCH_SIZE = 25; // Lotes muito pequenos para evitar timeout
-  let totalInseridos = 0;
-
-  console.log(`📦 [CHUNK] Processando ${jsonData.length} registros em lotes de ${BATCH_SIZE}...`);
-
-  for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-    const batch = jsonData.slice(i, i + BATCH_SIZE);
-    const stagingRecords: any[] = [];
-
-    // Mapear dados do Excel para formato staging
-    for (const row of batch) {
-      try {
-        if (!row || typeof row !== 'object') continue;
-
-        const empresa = String(row['EMPRESA'] || '').trim();
-        const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-
-        // Validações básicas
-        if (!empresa || !nomePaciente) continue;
-
-        // Excluir clientes com "_local"
-        if (empresa.toLowerCase().includes('_local')) continue;
-
-        const record = {
-          EMPRESA: empresa,
-          NOME_PACIENTE: nomePaciente,
-          CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').trim() || null,
-          ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').trim() || null,
-          ACCESSION_NUMBER: String(row['ACCESSION_NUMBER'] || '').trim() || null,
-          MODALIDADE: String(row['MODALIDADE'] || '').trim() || null,
-          PRIORIDADE: String(row['PRIORIDADE'] || '').trim() || null,
-          VALORES: Number(row['VALORES']) || 0,
-          ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').trim() || null,
-          MEDICO: String(row['MEDICO'] || '').trim() || null,
-          DUPLICADO: String(row['DUPLICADO'] || '').trim() || null,
-          DATA_REALIZACAO: row['DATA_REALIZACAO'] || row['DATA_EXAME'] || null,
-          HORA_REALIZACAO: row['HORA_REALIZACAO'] || null,
-          DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] || null,
-          HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] || null,
-          DATA_LAUDO: row['DATA_LAUDO'] || null,
-          HORA_LAUDO: row['HORA_LAUDO'] || null,
-          DATA_PRAZO: row['DATA_PRAZO'] || null,
-          HORA_PRAZO: row['HORA_PRAZO'] || null,
-          STATUS: String(row['STATUS'] || '').trim() || null,
-          DATA_REASSINATURA: row['DATA_REASSINATURA'] || null,
-          HORA_REASSINATURA: row['HORA_REASSINATURA'] || null,
-          MEDICO_REASSINATURA: String(row['MEDICO_REASSINATURA'] || '').trim() || null,
-          SEGUNDA_ASSINATURA: String(row['SEGUNDA_ASSINATURA'] || '').trim() || null,
-          POSSUI_IMAGENS_CHAVE: String(row['POSSUI_IMAGENS_CHAVE'] || '').trim() || null,
-          IMAGENS_CHAVES: row['IMAGENS_CHAVES'] || null,
-          IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] || null,
-          CODIGO_INTERNO: row['CODIGO_INTERNO'] || null,
-          DIGITADOR: String(row['DIGITADOR'] || '').trim() || null,
-          COMPLEMENTAR: String(row['COMPLEMENTAR'] || '').trim() || null,
-          CATEGORIA: String(row['CATEGORIA'] || '').trim() || null,
-          tipo_faturamento: String(row['TIPO_FATURAMENTO'] || '').trim() || null,
-          periodo_referencia: periodo_referencia,
-          arquivo_fonte: arquivo_fonte,
-          lote_upload: lote_upload,
-          status_processamento: 'pendente'
-        };
-
-        stagingRecords.push(record);
-      } catch (error) {
-        console.error('⚠️ [CHUNK] Erro ao mapear registro:', error);
-        // Continuar processamento mesmo com erro em registro individual
-      }
-    }
-
-    // Inserir lote na tabela staging
-    if (stagingRecords.length > 0) {
-      const { error: insertError } = await supabaseClient
-        .from('volumetria_staging')
-        .insert(stagingRecords);
-
-      if (insertError) {
-        console.error('❌ [CHUNK] Erro ao inserir lote:', insertError);
-        // Tentar inserir registros individualmente se falhar em lote
-        for (const record of stagingRecords) {
-          try {
-            await supabaseClient
-              .from('volumetria_staging')
-              .insert([record]);
-            totalInseridos++;
-          } catch (individualError) {
-            console.error('⚠️ [CHUNK] Erro em registro individual:', individualError);
-          }
-        }
-      } else {
-        totalInseridos += stagingRecords.length;
-        console.log(`✅ [CHUNK] Lote inserido: ${stagingRecords.length} registros`);
-      }
-    }
-
-    // Pausa micro para não sobrecarregar o sistema
-    if (i % (BATCH_SIZE * 4) === 0) {
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-  }
-
-  console.log(`✅ [CHUNK] Processamento concluído: ${totalInseridos} registros inseridos`);
-  return totalInseridos;
-}
