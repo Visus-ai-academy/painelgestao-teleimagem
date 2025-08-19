@@ -900,7 +900,7 @@ const ArquiteturaProjeto = () => {
                             <li>• <strong>trigger_normalizar_medico</strong> (v017)</li>
                             <li>• <strong>aplicar_correcao_modalidades</strong> (v030)</li>
                             <li>• <strong>aplicar_categorias_trigger</strong> (v028)</li>
-                            <li>• <strong>aplicar_prioridades_de_para</strong> (v029)</li>
+                            <li>• <strong>aplicar_prioridades_de_para</strong> (v018)</li>
                             <li>• <strong>aplicar_de_para_trigger</strong> (v026)</li>
                             <li>• <strong>aplicar_tipificacao_faturamento</strong> (f005/f006)</li>
                           </ul>

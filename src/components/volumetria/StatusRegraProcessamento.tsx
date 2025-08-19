@@ -92,10 +92,10 @@ const REGRAS_MONITORADAS = [
     id: 'v028'
   },
   {
-    nome: 'v029 De-Para Prioridades',
+    nome: 'v018 De-Para Prioridades',
     descricao: 'Aplica mapeamento de prioridades conforme tabela de-para',
     funcao: 'aplicar_prioridades_de_para',
-    id: 'v029'
+    id: 'v018'
   },
   {
     nome: 'v030 Correção Modalidade Específica',
@@ -289,7 +289,7 @@ export function StatusRegraProcessamento() {
               const regrasValidacao = ['v013', 'extra_006'];
               
               // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
-              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033', 'v034'];
+              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v018', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033', 'v034'];
               
               if (regrasExclusao.includes(regra.id)) {
                 // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
@@ -312,7 +312,7 @@ export function StatusRegraProcessamento() {
                 foiAplicada = uploadInfo.status === 'concluido';
                 
                 // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
-                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'v033', 'v034'].includes(regra.id)) {
+                if (['v028', 'v018', 'f005', 'f006', 'extra_007', 'extra_008', 'v033', 'v034'].includes(regra.id)) {
                   if (uploadInfo.registros_erro > 0) {
                     informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
                   } else {
