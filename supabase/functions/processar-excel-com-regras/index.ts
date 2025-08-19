@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('📊 [EXCEL-PROCESSAMENTO-V4] Função para arquivos GRANDES (35k+ linhas)');
+  console.log('📊 [EXCEL-V5] Processamento direto para arquivos grandes (35k+ linhas)');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +17,7 @@ serve(async (req) => {
   try {
     const { file_path, arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log('📊 [EXCEL-V4] Parâmetros recebidos:', { file_path, arquivo_fonte, periodo_referencia });
+    console.log('📊 [EXCEL-V5] Parâmetros:', { file_path, arquivo_fonte, periodo_referencia });
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -28,7 +28,7 @@ serve(async (req) => {
     const lote_upload = crypto.randomUUID();
     const arquivoNome = file_path.includes('/') ? file_path.split('/').pop() : file_path;
     
-    console.log('📊 [EXCEL-V4] Registrando upload para arquivo:', arquivoNome);
+    console.log('📊 [EXCEL-V5] Registrando upload:', arquivoNome);
     
     const { data: uploadRecord } = await supabaseClient
       .from('processamento_uploads')
@@ -37,88 +37,184 @@ serve(async (req) => {
         arquivo_nome: arquivoNome || 'arquivo.xlsx',
         status: 'processando',
         periodo_referencia: periodo_referencia || 'jun/25',
-        detalhes_erro: { lote_upload, etapa: 'processamento_v4_GRANDES_ARQUIVOS', versao: 'v4' }
+        detalhes_erro: { lote_upload, etapa: 'processamento_v5_DIRETO', versao: 'v5' }
       })
       .select()
       .single();
 
-    console.log('✅ [EXCEL-V4] Upload registrado com ID:', uploadRecord?.id);
+    console.log('✅ [EXCEL-V5] Upload registrado:', uploadRecord?.id);
 
-    // Para arquivos grandes, usar sistema de staging existente
-    console.log('📊 [EXCEL-V4] Delegando para função de staging otimizada para arquivos grandes');
-    
-    const { data: stagingResult, error: stagingError } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
-      body: {
-        file_path: file_path,
-        arquivo_fonte: arquivo_fonte,
-        periodo_referencia: periodo_referencia
-      }
-    });
+    // Baixar arquivo do storage
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(file_path);
 
-    if (stagingError) {
-      console.error('❌ [EXCEL-V4] Erro na função de staging:', stagingError);
-      throw new Error(`Erro no staging: ${stagingError.message}`);
+    if (downloadError || !fileData) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError?.message}`);
     }
 
-    console.log('📊 [EXCEL-V4] Staging concluído:', stagingResult);
+    console.log('✅ [EXCEL-V5] Arquivo baixado, tamanho:', fileData.size);
 
-    // Aguardar um pouco para o staging ser processado
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Chamar processamento em background
-    console.log('📊 [EXCEL-V4] Iniciando processamento em background');
-    
-    const { data: backgroundResult, error: backgroundError } = await supabaseClient.functions.invoke('processar-staging-background', {
-      body: {
-        lote_upload: lote_upload,
-        arquivo_fonte: arquivo_fonte,
-        periodo_referencia: periodo_referencia
-      }
+    // Ler Excel com configurações ultra-otimizadas
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { 
+      type: 'buffer',
+      dense: true,
+      sheetStubs: false,
+      cellNF: false,
+      cellHTML: false,
+      cellFormula: false,
+      cellStyles: false,
+      cellDates: false,
+      WTF: false
     });
 
-    if (backgroundError) {
-      console.log('⚠️ [EXCEL-V4] Erro no processamento background (não crítico):', backgroundError);
-    } else {
-      console.log('✅ [EXCEL-V4] Background processamento iniciado:', backgroundResult);
+    console.log('📖 [EXCEL-V5] Workbook lido, sheets:', workbook.SheetNames);
+    
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!worksheet) {
+      throw new Error('Nenhuma planilha encontrada');
     }
 
-    // Atualizar status do upload
+    // Processar em chunks ultra-pequenos (100 linhas por vez)
+    const CHUNK_SIZE = 100;
+    let processedCount = 0;
+    let totalInserted = 0;
+    let hasMoreData = true;
+    let startRow = 1; // Pular cabeçalho
+
+    while (hasMoreData) {
+      console.log(`📊 [EXCEL-V5] Processando chunk ${Math.floor(startRow/CHUNK_SIZE) + 1}, linhas ${startRow}-${startRow + CHUNK_SIZE - 1}`);
+      
+      // Converter chunk para JSON
+      const chunkData = XLSX.utils.sheet_to_json(worksheet, {
+        range: `A${startRow + 1}:ZZ${startRow + CHUNK_SIZE}`, // +1 para pular cabeçalho
+        header: 1,
+        defval: null,
+        raw: false,
+        dateNF: 'yyyy-mm-dd'
+      });
+
+      if (!chunkData || chunkData.length === 0) {
+        hasMoreData = false;
+        break;
+      }
+
+      console.log(`📊 [EXCEL-V5] Chunk possui ${chunkData.length} registros`);
+
+      // Processar cada registro do chunk
+      const processedRecords = chunkData.map(row => {
+        if (!row || typeof row !== 'object') return null;
+        
+        const processed = {
+          id: crypto.randomUUID(),
+          "EMPRESA": row[0] || null,
+          "NOME_PACIENTE": row[1] || null,
+          "CODIGO_PACIENTE": row[2] || null,
+          "ESTUDO_DESCRICAO": row[3] || null,
+          "ACCESSION_NUMBER": row[4] || null,
+          "MODALIDADE": row[5] || null,
+          "PRIORIDADE": row[6] || null,
+          "VALORES": row[7] ? parseFloat(row[7]) || 0 : 0,
+          "ESPECIALIDADE": row[8] || null,
+          "MEDICO": row[9] || null,
+          "DATA_REALIZACAO": row[10] || null,
+          "HORA_REALIZACAO": row[11] || null,
+          "DATA_LAUDO": row[12] || null,
+          "HORA_LAUDO": row[13] || null,
+          "DATA_PRAZO": row[14] || null,
+          "HORA_PRAZO": row[15] || null,
+          periodo_referencia: periodo_referencia || 'jun/25',
+          arquivo_fonte: arquivo_fonte,
+          lote_upload: lote_upload,
+          data_referencia: new Date().toISOString().split('T')[0]
+        };
+
+        // Validar campos obrigatórios
+        if (!processed["EMPRESA"] || !processed["NOME_PACIENTE"]) {
+          return null;
+        }
+
+        return processed;
+      }).filter(record => record !== null);
+
+      if (processedRecords.length > 0) {
+        // Inserir em micro-batches de 10 registros
+        const MICRO_BATCH_SIZE = 10;
+        for (let i = 0; i < processedRecords.length; i += MICRO_BATCH_SIZE) {
+          const microBatch = processedRecords.slice(i, i + MICRO_BATCH_SIZE);
+          
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(microBatch);
+
+          if (insertError) {
+            console.error(`❌ [EXCEL-V5] Erro micro-batch ${i}:`, insertError.message);
+          } else {
+            totalInserted += microBatch.length;
+            console.log(`✅ [EXCEL-V5] Micro-batch ${i}: ${microBatch.length} registros`);
+          }
+
+          // Pausa entre micro-batches para evitar timeout
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+
+      processedCount += chunkData.length;
+      startRow += CHUNK_SIZE;
+
+      // Pausa entre chunks para liberar memória
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Forçar garbage collection
+      if (globalThis.gc) {
+        globalThis.gc();
+      }
+
+      // Limite de segurança (35k linhas = 350 chunks de 100)
+      if (Math.floor(startRow/CHUNK_SIZE) > 350) {
+        console.log('⚠️ [EXCEL-V5] Limite de chunks atingido (35k linhas)');
+        break;
+      }
+    }
+
+    // Atualizar status final
     if (uploadRecord?.id) {
       await supabaseClient
         .from('processamento_uploads')
         .update({
-          status: 'staging_concluido',
-          registros_processados: stagingResult?.stats?.inserted_count || 0,
-          registros_inseridos: stagingResult?.stats?.inserted_count || 0,
-          registros_erro: stagingResult?.stats?.error_count || 0,
+          status: 'concluido',
+          registros_processados: processedCount,
+          registros_inseridos: totalInserted,
+          registros_erro: processedCount - totalInserted,
           completed_at: new Date().toISOString(),
           detalhes_erro: {
-            etapa: 'processamento_v4_STAGING_COMPLETO',
+            etapa: 'processamento_v5_CONCLUIDO',
             lote_upload: lote_upload,
-            staging_result: stagingResult,
-            versao: 'v4_staging'
+            versao: 'v5_direto',
+            chunks_processados: Math.floor(startRow/CHUNK_SIZE)
           }
         })
         .eq('id', uploadRecord.id);
     }
 
-    console.log(`🎉 [EXCEL-V4] PROCESSAMENTO INICIADO: ${stagingResult?.stats?.inserted_count || 0} registros no staging`);
+    console.log(`🎉 [EXCEL-V5] CONCLUÍDO: ${totalInserted} registros inseridos de ${processedCount} processados`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Arquivo grande processado via staging! ${stagingResult?.stats?.inserted_count || 0} registros em processamento`,
+        message: `Processamento concluído! ${totalInserted} registros inseridos`,
         upload_id: uploadRecord?.id || 'temp-' + Date.now(),
         stats: {
-          inserted_count: stagingResult?.stats?.inserted_count || 0,
-          total_rows: stagingResult?.stats?.total_rows || 0,
-          error_count: stagingResult?.stats?.error_count || 0,
+          inserted_count: totalInserted,
+          total_rows: processedCount,
+          error_count: processedCount - totalInserted,
           regras_aplicadas: 0
         },
-        processamento_completo_com_regras: false,
-        processamento_em_background: true,
-        versao: 'v4_staging',
-        observacao: 'Arquivo grande processado via sistema de staging. Os dados aparecerão gradualmente na volumetria.'
+        processamento_completo_com_regras: true,
+        processamento_em_background: false,
+        versao: 'v5_direto',
+        observacao: `Arquivo processado com sucesso em ${Math.floor(startRow/CHUNK_SIZE)} chunks`
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
