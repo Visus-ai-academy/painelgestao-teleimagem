@@ -32,7 +32,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       let query = supabase
         .from('processamento_uploads')
         .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at, detalhes_erro')
-        .in('status', ['processando', 'staging_concluido', 'concluido', 'erro']) // Incluir mais status
+        .in('status', ['processando', 'staging_concluido', 'concluido', 'erro', 'pendente']) // Corrigir status
         .gte('created_at', cutoffTime); // Últimos 5 minutos
       
       // Aplicar filtro de tipo(s)

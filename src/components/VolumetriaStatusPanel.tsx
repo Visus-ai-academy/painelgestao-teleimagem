@@ -129,7 +129,7 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
       toast.loading("Processando dados pendentes...", { id: "processar-pendentes" });
 
       const { data, error } = await supabase.functions.invoke('processar-dados-pendentes', {
-        body: {}
+        body: { force_reset: true }
       });
 
       if (error) {
