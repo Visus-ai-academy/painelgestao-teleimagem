@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'processar-volumetria-basico',
+      'test-upload',
       {
         body: {
           file_path,
