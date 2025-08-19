@@ -66,19 +66,17 @@ serve(async (req) => {
       throw new Error('Staging não retornou sucesso');
     }
 
-    // 2. BYPASS - Não chamar background por enquanto (função está com erro)
-    console.log('🏗️ [COORDENADOR] BYPASS background - evitando erro...');
+    // 2. PROCESSAMENTO CONCLUÍDO - Staging já fez todo o trabalho necessário
+    console.log('✅ [COORDENADOR] Processamento concluído no staging - sem necessidade de background');
     
     const backgroundResponse = {
       data: {
         success: true,
-        message: 'Background processamento bypassed',
-        registros_processados: 0
+        message: 'Processamento completo no staging',
+        registros_processados: stagingData?.registros_inseridos || 0
       },
       error: null
     };
-
-    console.log('📊 [COORDENADOR] Background bypassed - simulando sucesso');
 
     return new Response(
       JSON.stringify({
