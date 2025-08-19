@@ -4199,6 +4199,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      resetar_sistema_upload: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       security_health_check: {
         Args: Record<PropertyKey, never>
         Returns: {
