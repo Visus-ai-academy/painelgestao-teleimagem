@@ -136,3 +136,9 @@ verify_jwt = true
 
 [functions.aplicar-todas-regras-volumetria]
 verify_jwt = true
+
+[functions.validar-integridade-processamento]
+verify_jwt = true
+
+[functions.executar-rollback-processamento]
+verify_jwt = true

@@ -6,7 +6,7 @@ import {
   BarChart3,
   Settings
 } from "lucide-react";
-import { VolumetriaUpload } from "@/components/VolumetriaUpload";
+import { VolumetriaUpload } from "@/components/volumetria/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
 import { PeriodoReferenciaManager } from "@/components/volumetria/PeriodoReferenciaManager";
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
