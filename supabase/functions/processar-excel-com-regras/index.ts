@@ -86,12 +86,12 @@ serve(async (req) => {
       throw new Error('Arquivo Excel vazio ou sem dados válidos');
     }
 
-    // Processar dados em pequenos lotes
+    // Processar dados em pequenos lotes - OTIMIZADO PARA MEMÓRIA
     let totalInseridos = 0;
     let regrasAplicadas = 0;
     
-    const LOTE_SIZE = 10;
-    const maxLinhas = Math.min(jsonData.length, 200); // Processar no máximo 200 linhas por vez
+    const LOTE_SIZE = 3; // Reduzido para 3 para economizar memória
+    const maxLinhas = Math.min(jsonData.length, 50); // Máximo 50 linhas para evitar estouro de memória
     
     console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Processando ${maxLinhas} linhas em lotes de ${LOTE_SIZE}`);
     
