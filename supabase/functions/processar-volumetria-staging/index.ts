@@ -25,9 +25,18 @@ serve(async (req) => {
 
     console.log('📨 [STAGING] Request body recebido:', JSON.stringify(requestBody, null, 2));
 
-    const { file_path, arquivo_fonte, periodo_referencia } = requestBody;
+    const { file_path, arquivo_fonte, periodo_referencia, test } = requestBody;
     
-    // VALIDAÇÕES CRÍTICAS
+    // Se for teste, retornar resposta de teste
+    if (test === true) {
+      console.log('🧪 [STAGING] Chamada de teste recebida - retornando sucesso');
+      return new Response(
+        JSON.stringify({ success: true, test: true, message: 'Função staging operacional' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // VALIDAÇÕES CRÍTICAS para processamento real
     if (!file_path || typeof file_path !== 'string' || file_path.trim() === '') {
       console.error('❌ [STAGING] file_path inválido:', { file_path, type: typeof file_path });
       throw new Error('ERRO CRÍTICO: file_path obrigatório, deve ser string não-vazia');

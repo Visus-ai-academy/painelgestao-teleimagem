@@ -115,18 +115,13 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      // Limpar uploads travados e testar sistema antes do processamento
-      console.log('🧹 Limpando sistema e verificando saúde...');
+      // Limpar uploads travados antes do processamento
+      console.log('🧹 Limpando uploads travados...');
       try {
-        // Limpar uploads travados
         const { data: cleanResult } = await supabase.functions.invoke('limpar-uploads-travados');
         console.log('✅ Limpeza de uploads:', cleanResult);
-        
-        // Testar sistema (função de debug)
-        const { data: systemTest } = await supabase.functions.invoke('test-staging-pipeline');
-        console.log('🧪 Teste do sistema:', systemTest);
       } catch (cleanError) {
-        console.warn('⚠️ Aviso no teste do sistema:', cleanError);
+        console.warn('⚠️ Aviso na limpeza:', cleanError);
       }
 
       console.log(`🚀 Iniciando processamento via STAGING para ${arquivoFonte}...`);
