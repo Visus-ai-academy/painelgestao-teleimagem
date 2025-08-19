@@ -67,10 +67,10 @@ serve(async (req) => {
 
     // 3. FALLBACK SIMPLES - SEM PROCESSAMENTO DE EXCEL (EVITA MEMORY LIMIT)
     const fileSizeKB = Math.round(fileData.size / 1024);
-    console.log(`📊 [STREAMING] Arquivo ${fileSizeKB}KB - MUITO GRANDE, marcando para processamento offline`);
+    console.log(`📊 [STREAMING] Arquivo ${fileSizeKB}KB - LIMITE AUMENTADO PARA 8MB`);
     
-    // Se arquivo for muito grande (>2MB), não processar imediatamente
-    if (fileSizeKB > 2048) {
+    // Se arquivo for muito grande (>8MB), não processar imediatamente
+    if (fileSizeKB > 8192) {
       console.log('⚠️ [STREAMING] Arquivo muito grande - registrando para processamento offline');
       
       await supabaseClient
@@ -83,7 +83,7 @@ serve(async (req) => {
           detalhes_erro: {
             etapa: 'tamanho_arquivo',
             tamanho_kb: fileSizeKB,
-            limite_kb: 2048,
+            limite_kb: 8192,
             solucao: 'Dividir arquivo em partes menores ou processar offline',
             concluido_em: new Date().toISOString()
           }
@@ -92,13 +92,13 @@ serve(async (req) => {
       
       const resultado = {
         success: false,
-        message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<2MB)`,
+        message: `Arquivo muito grande (${fileSizeKB}KB). Divida em arquivos menores (<8MB)`,
         upload_id: uploadRecord.id,
         lote_upload: lote_upload,
         registros_inseridos_staging: 0,
         registros_erro_staging: 0,
         arquivo_muito_grande: true,
-        tamanho_limite_kb: 2048
+        tamanho_limite_kb: 8192
       };
 
       console.log('⚠️ [STREAMING] Arquivo rejeitado por tamanho:', resultado);
@@ -109,7 +109,7 @@ serve(async (req) => {
       );
     }
     
-    // Para arquivos menores, tentar processamento básico SEM XLSX
+    // Para arquivos menores que 8MB, tentar processamento básico SEM XLSX
     console.log('📄 [STREAMING] Processamento básico sem XLSX para evitar memory limit');
     
     let totalInseridos = 0;
