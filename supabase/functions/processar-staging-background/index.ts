@@ -30,7 +30,7 @@ serve(async (req) => {
     await supabaseClient
       .from('processamento_uploads')
       .update({
-        status: 'processando_regras',
+        status: 'processando',
         detalhes_erro: {
           etapa: 'background',
           inicio: new Date().toISOString()

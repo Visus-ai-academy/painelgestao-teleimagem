@@ -53,7 +53,7 @@ serve(async (req) => {
       .insert({
         tipo_arquivo: arquivo_fonte,
         arquivo_nome: file_path.split('/').pop(),
-        status: 'processando_staging',
+        status: 'processando',
         periodo_referencia: periodo_referencia,
         detalhes_erro: {
           lote_upload: lote_upload,
@@ -182,7 +182,7 @@ serve(async (req) => {
     await supabaseClient
       .from('processamento_uploads')
       .update({
-        status: 'staging_concluido',
+        status: 'processando',
         registros_processados: totalProcessados,
         registros_inseridos: totalInseridos,
         registros_erro: totalErros,
