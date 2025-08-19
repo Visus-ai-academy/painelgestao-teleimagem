@@ -27,6 +27,14 @@ serve(async (req) => {
 
     const { file_path, arquivo_fonte, periodo_referencia, test } = requestBody;
     
+    console.log('🔍 [STAGING] Valores extraídos do request:', {
+      file_path: file_path,
+      file_path_type: typeof file_path,
+      arquivo_fonte: arquivo_fonte,
+      periodo_referencia: periodo_referencia,
+      test: test
+    });
+    
     // Se for teste, retornar resposta de teste
     if (test === true) {
       console.log('🧪 [STAGING] Chamada de teste recebida - retornando sucesso');
@@ -38,7 +46,7 @@ serve(async (req) => {
     
     // VALIDAÇÕES CRÍTICAS para processamento real
     if (!file_path || typeof file_path !== 'string' || file_path.trim() === '') {
-      console.error('❌ [STAGING] file_path inválido:', { file_path, type: typeof file_path });
+      console.error('❌ [STAGING] file_path inválido:', { file_path, type: typeof file_path, requestBody });
       throw new Error('ERRO CRÍTICO: file_path obrigatório, deve ser string não-vazia');
     }
     if (!arquivo_fonte || arquivo_fonte.trim() === '') {

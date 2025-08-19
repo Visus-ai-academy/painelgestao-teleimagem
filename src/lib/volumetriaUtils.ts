@@ -752,6 +752,11 @@ export async function processVolumetriaComStaging(
   onProgress?: (progress: { progress: number; processed: number; total: number; status: string }) => void
 ): Promise<{ success: boolean; message: string; stats: any }> {
   console.log('🚀 [STAGING] Iniciando processamento via arquitetura de staging...');
+  console.log('📁 [STAGING] Arquivo recebido:', { 
+    name: file.name, 
+    size: file.size, 
+    type: file.type 
+  });
   
   if (onProgress) {
     onProgress({ progress: 5, processed: 0, total: 100, status: 'Enviando arquivo para storage...' });
@@ -759,6 +764,8 @@ export async function processVolumetriaComStaging(
   
   // 1. Upload do arquivo para o storage
   const fileName = `volumetria_uploads/${arquivoFonte}_${Date.now()}_${Math.random().toString(36).substring(7)}.xlsx`;
+  console.log('📁 [STAGING] Caminho do arquivo que será usado:', fileName);
+  
   const { data: uploadData, error: uploadError } = await supabase.storage
     .from('uploads')
     .upload(fileName, file, { 
@@ -767,10 +774,15 @@ export async function processVolumetriaComStaging(
     });
 
   if (uploadError) {
+    console.error('❌ [STAGING] Erro no upload:', uploadError);
     throw new Error(`Erro no upload: ${uploadError.message}`);
   }
 
-  console.log('✅ [STAGING] Arquivo enviado para storage:', fileName);
+  console.log('✅ [STAGING] Arquivo enviado para storage:', {
+    fileName: fileName,
+    uploadPath: uploadData.path,
+    uploadData: uploadData
+  });
 
   if (onProgress) {
     onProgress({ progress: 20, processed: 0, total: 100, status: 'Iniciando processamento em staging...' });
@@ -780,13 +792,17 @@ export async function processVolumetriaComStaging(
     // 2. Chamar Edge Function COORDENADOR
     console.log('📞 [STAGING] Chamando processar-volumetria-coordenador...');
     
+    const payloadCompleto = {
+      file_path: fileName,
+      arquivo_fonte: arquivoFonte,
+      periodo_referencia: periodo ? `${getMonthName(periodo.mes)}/${periodo.ano.toString().slice(-2)}` : undefined,
+      periodo_processamento: periodo
+    };
+    
+    console.log('📤 [STAGING] Payload completo enviado ao coordenador:', JSON.stringify(payloadCompleto, null, 2));
+    
     const { data: stagingResult, error: stagingError } = await supabase.functions.invoke('processar-volumetria-coordenador', {
-      body: {
-        file_path: fileName,
-        arquivo_fonte: arquivoFonte,
-        periodo_referencia: periodo ? `${getMonthName(periodo.mes)}/${periodo.ano.toString().slice(-2)}` : undefined,
-        periodo_processamento: periodo
-      }
+      body: payloadCompleto
     });
 
     if (stagingError) {

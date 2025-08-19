@@ -26,11 +26,20 @@ serve(async (req) => {
 
     const { file_path, arquivo_fonte, periodo_referencia, periodo_processamento } = requestBody;
     
+    console.log('🔍 [COORDENADOR] Valores extraídos:', {
+      file_path: file_path,
+      file_path_type: typeof file_path,
+      arquivo_fonte: arquivo_fonte,
+      periodo_referencia: periodo_referencia
+    });
+    
     // VALIDAÇÕES OBRIGATÓRIAS
     if (!file_path) {
+      console.error('❌ [COORDENADOR] file_path está vazio ou undefined');
       throw new Error('ERRO: file_path é obrigatório');
     }
     if (!arquivo_fonte) {
+      console.error('❌ [COORDENADOR] arquivo_fonte está vazio ou undefined');
       throw new Error('ERRO: arquivo_fonte é obrigatório');  
     }
     
