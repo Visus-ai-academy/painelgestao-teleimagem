@@ -45,21 +45,43 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. ETAPA STAGING - Processar Excel para staging
-    console.log('📋 [COORDENADOR] Etapa 1: Processando para staging...');
+    // 1. ETAPA STAGING OTIMIZADA - Para arquivos grandes
+    console.log('📋 [COORDENADOR] Etapa 1: Processando com staging otimizado...');
     
     const stagingPayload = { 
       file_path,
       arquivo_fonte,
-      periodo_referencia: periodo_referencia || 'jun/25', // Fallback
-      periodo_processamento
+      periodo_referencia: periodo_referencia || 'jun/25'
     };
     
-    console.log('📤 [COORDENADOR] Payload para staging:', JSON.stringify(stagingPayload, null, 2));
+    console.log('📤 [COORDENADOR] Payload para staging otimizado:', JSON.stringify(stagingPayload, null, 2));
     
-    const { data: stagingResult, error: stagingError } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
-      body: stagingPayload
-    });
+    // Tentar primeiro com staging otimizado (para arquivos grandes)
+    let stagingResult, stagingError;
+    
+    try {
+      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
+        body: stagingPayload
+      });
+      stagingResult = data;
+      stagingError = error;
+      console.log('✅ [COORDENADOR] Staging otimizado usado com sucesso');
+    } catch (lightError) {
+      console.log('⚠️ [COORDENADOR] Staging otimizado falhou, tentando staging padrão:', lightError.message);
+      
+      // Fallback para staging padrão
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
+          body: stagingPayload
+        });
+        stagingResult = data;
+        stagingError = error;
+        console.log('✅ [COORDENADOR] Staging padrão usado como fallback');
+      } catch (standardError) {
+        console.error('❌ [COORDENADOR] Ambos stagings falharam:', standardError);
+        stagingError = standardError;
+      }
+    }
 
     if (stagingError) {
       console.error('❌ [COORDENADOR] Erro na etapa de staging:', stagingError);

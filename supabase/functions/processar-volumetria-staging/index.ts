@@ -38,6 +38,11 @@ serve(async (req) => {
       throw new Error('ERRO: periodo_referencia é obrigatório');
     }
     
+    // Validar se file_path tem formato correto
+    if (typeof file_path !== 'string' || file_path.length === 0) {
+      throw new Error('ERRO: file_path deve ser uma string válida');
+    }
+    
     console.log('🔄 [STAGING] Iniciando processamento validado:', {
       file_path,
       arquivo_fonte,
@@ -49,15 +54,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Registrar início do upload
+    // 1. Registrar início do upload 
     const lote_upload = crypto.randomUUID();
     console.log('🆔 [STAGING] Lote gerado:', lote_upload);
+    
+    // Extrair nome do arquivo de forma segura
+    const arquivoNome = file_path.includes('/') ? file_path.split('/').pop() : file_path;
+    console.log('📁 [STAGING] Nome do arquivo extraído:', arquivoNome);
     
     const { data: uploadRecord, error: uploadError } = await supabaseClient
       .from('processamento_uploads')
       .insert({
         tipo_arquivo: arquivo_fonte,
-        arquivo_nome: file_path.split('/').pop(),
+        arquivo_nome: arquivoNome || 'arquivo_desconhecido.xlsx',
         status: 'processando',
         periodo_referencia: periodo_referencia,
         detalhes_erro: {
