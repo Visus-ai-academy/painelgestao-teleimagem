@@ -4160,6 +4160,10 @@ export type Database = {
         Args: { p_periodo_referencia: string }
         Returns: boolean
       }
+      popular_categorias_faltantes: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       prepare_partition_structure: {
         Args: { partition_date: string; table_name: string }
         Returns: Json
