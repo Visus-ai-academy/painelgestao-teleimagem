@@ -1,25 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Processamento em background com todas as regras
+// 🏗️ PROCESSAMENTO BACKGROUND - Segunda etapa da nova arquitetura
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { lote_upload, arquivo_fonte, upload_record_id } = await req.json();
+    const { upload_id, arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log('🔄 BACKGROUND PROCESSING - Iniciando', {
-      lote_upload,
+    console.log('🏗️ [BACKGROUND] Iniciando processamento background:', {
+      upload_id,
       arquivo_fonte,
-      upload_record_id
+      periodo_referencia
     });
 
     const supabaseClient = createClient(
@@ -27,250 +26,220 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. ATUALIZAR STATUS PARA PROCESSANDO
+    // 1. Atualizar status para processando regras
     await supabaseClient
       .from('processamento_uploads')
       .update({
         status: 'processando_regras',
-        detalhes_erro: JSON.stringify({
-          fase: 'processando_regras',
-          inicio_background: new Date().toISOString()
-        })
+        detalhes_processamento: {
+          etapa: 'background',
+          inicio: new Date().toISOString()
+        }
       })
-      .eq('id', upload_record_id);
+      .eq('id', upload_id);
 
-    // 2. BUSCAR DADOS DO STAGING
+    // 2. Buscar dados do staging
+    console.log('📥 [BACKGROUND] Buscando dados do staging...');
     const { data: stagingData, error: stagingError } = await supabaseClient
+      .from('processamento_uploads')
+      .select('lote_upload, registros_inseridos_staging')
+      .eq('id', upload_id)
+      .single();
+
+    if (stagingError || !stagingData) {
+      console.error('❌ [BACKGROUND] Erro ao buscar dados do upload:', stagingError);
+      throw new Error('Upload não encontrado');
+    }
+
+    const { data: records, error: fetchError } = await supabaseClient
       .from('volumetria_staging')
       .select('*')
-      .eq('lote_upload', lote_upload)
+      .eq('lote_upload', stagingData.lote_upload)
       .eq('status_processamento', 'pendente');
 
-    if (stagingError || !stagingData?.length) {
-      console.error('❌ Erro ao buscar staging:', stagingError);
-      throw new Error('Nenhum dado encontrado no staging');
+    if (fetchError) {
+      console.error('❌ [BACKGROUND] Erro ao buscar staging:', fetchError);
+      throw fetchError;
     }
 
-    console.log(`📊 Processando ${stagingData.length} registros do staging`);
+    console.log(`📋 [BACKGROUND] ${records?.length || 0} registros para processar`);
 
-    // 3. PROCESSAR EM LOTES COM TODAS AS REGRAS
-    let totalProcessed = 0;
-    let totalInserted = 0;
-    let totalErrors = 0;
-    const batchSize = 500;
+    // 3. Processar registros com regras de negócio
+    const BATCH_SIZE = 100;
+    let totalProcessados = 0;
+    let totalInseridos = 0;
+    let totalErros = 0;
 
-    for (let i = 0; i < stagingData.length; i += batchSize) {
-      const batch = stagingData.slice(i, i + batchSize);
-      
-      console.log(`🔄 Processando batch ${i + 1}-${Math.min(i + batchSize, stagingData.length)}`);
+    if (records && records.length > 0) {
+      for (let i = 0; i < records.length; i += BATCH_SIZE) {
+        const batch = records.slice(i, i + BATCH_SIZE);
+        
+        console.log(`🔄 [BACKGROUND] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(records.length/BATCH_SIZE)}`);
 
-      // Marcar batch como processando
-      await supabaseClient
-        .from('volumetria_staging')
-        .update({ status_processamento: 'processando' })
-        .in('id', batch.map(r => r.id));
+        const processedRecords: any[] = [];
+        const stagingIdsToUpdate: string[] = [];
 
-      // Processar cada registro do batch com TODAS as regras
-      const processedBatch = [];
-      const errorIds = [];
+        // Aplicar regras de negócio
+        for (const record of batch) {
+          try {
+            // Aplicar transformações e validações
+            const processedRecord = {
+              EMPRESA: await applyClientNameCleaning(record.empresa),
+              ESTUDO_DESCRICAO: record.estudo_descricao,
+              MODALIDADE: await applyModalityCorrections(record),
+              ESPECIALIDADE: record.especialidade,
+              MEDICO: await applyMedicoNormalization(record.medico),
+              DATA_EXAME: record.data_exame,
+              DATA_LAUDO: record.data_laudo,
+              PRIORIDADE: await applyPriorityMapping(record.prioridade),
+              VALORES: record.valores,
+              CATEGORIA: await applyCategoryMapping(record.estudo_descricao),
+              TIPO_FATURAMENTO: await applyBillingType(record),
+              PREPARO: record.preparo,
+              periodo_referencia: record.periodo_referencia,
+              arquivo_fonte: record.arquivo_fonte,
+              lote_upload: record.lote_upload,
+              processed_at: new Date().toISOString()
+            };
 
-      for (const record of batch) {
-        try {
-          let processedRecord = { ...record };
-
-          // APLICAR TODAS AS REGRAS DE NEGÓCIO
-          
-          // Regra 1: Limpeza de nome do cliente
-          if (processedRecord.EMPRESA) {
-            processedRecord.EMPRESA = await applyClientNameCleaning(processedRecord.EMPRESA);
-          }
-
-          // Regra 2: Normalização do médico
-          if (processedRecord.MEDICO) {
-            processedRecord.MEDICO = await applyMedicoNormalization(processedRecord.MEDICO);
-          }
-
-          // Regra 3: Correção de modalidades
-          processedRecord = await applyModalityCorrections(processedRecord);
-
-          // Regra 4: Aplicar categoria automática
-          if (!processedRecord.CATEGORIA || processedRecord.CATEGORIA === '') {
-            processedRecord.CATEGORIA = await applyCategoryMapping(processedRecord.ESTUDO_DESCRICAO);
-          }
-
-          // Regra 5: Aplicar de-para de prioridades
-          processedRecord.PRIORIDADE = await applyPriorityMapping(processedRecord.PRIORIDADE);
-
-          // Regra 6: Aplicar de-para de valores (se zero)
-          if (!processedRecord.VALORES || processedRecord.VALORES === 0) {
-            processedRecord.VALORES = await applyValueMapping(processedRecord.ESTUDO_DESCRICAO);
-          }
-
-          // Regra 7: Tipificação de faturamento
-          processedRecord.tipo_faturamento = await applyBillingType(processedRecord);
-
-          // Regra 8: Aplicar exclusões por período (se não retroativo)
-          if (!arquivo_fonte.includes('retroativo')) {
+            // Verificar se deve ser excluído
             const shouldExclude = await shouldExcludeRecord(processedRecord, arquivo_fonte);
-            if (shouldExclude) {
-              console.log(`⚠️ Registro excluído por regras de período`);
-              continue; // Pular este registro
+            
+            if (!shouldExclude && await validateRetroactiveRules(processedRecord)) {
+              processedRecords.push(processedRecord);
+              stagingIdsToUpdate.push(record.id);
             }
+
+            totalProcessados++;
+          } catch (error) {
+            console.error('⚠️ [BACKGROUND] Erro ao processar registro:', error);
+            totalErros++;
           }
+        }
 
-          // Regra 9: Aplicar regras retroativas (se retroativo)
-          if (arquivo_fonte.includes('retroativo')) {
-            const passedRetroactiveRules = await validateRetroactiveRules(processedRecord);
-            if (!passedRetroactiveRules) {
-              console.log(`⚠️ Registro excluído por regras retroativas`);
-              continue; // Pular este registro
-            }
+        // Inserir registros processados
+        if (processedRecords.length > 0) {
+          const { error: insertError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .insert(processedRecords);
+
+          if (insertError) {
+            console.error('❌ [BACKGROUND] Erro ao inserir registros:', insertError);
+            totalErros += processedRecords.length;
+          } else {
+            totalInseridos += processedRecords.length;
+            
+            // Atualizar status no staging
+            await supabaseClient
+              .from('volumetria_staging')
+              .update({ status_processamento: 'concluido' })
+              .in('id', stagingIdsToUpdate);
+            
+            console.log(`✅ [BACKGROUND] Lote inserido: ${processedRecords.length} registros`);
           }
-
-          // Remover campos de controle de staging
-          delete processedRecord.status_processamento;
-          delete processedRecord.erro_processamento;
-          delete processedRecord.tentativas_processamento;
-          delete processedRecord.processado_em;
-          processedRecord.processamento_pendente = false;
-
-          processedBatch.push(processedRecord);
-
-        } catch (recordError) {
-          console.error(`❌ Erro ao processar registro ${record.id}:`, recordError);
-          errorIds.push(record.id);
-          totalErrors++;
         }
       }
-
-      // 4. INSERIR REGISTROS PROCESSADOS NA TABELA FINAL
-      if (processedBatch.length > 0) {
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(processedBatch);
-
-        if (insertError) {
-          console.error('❌ Erro ao inserir batch processado:', insertError);
-          totalErrors += processedBatch.length;
-          
-          // Marcar como erro no staging
-          await supabaseClient
-            .from('volumetria_staging')
-            .update({ 
-              status_processamento: 'erro',
-              erro_processamento: insertError.message 
-            })
-            .in('id', batch.map(r => r.id));
-        } else {
-          totalInserted += processedBatch.length;
-          console.log(`✅ Batch inserido: ${processedBatch.length} registros`);
-          
-          // Marcar como concluído no staging
-          await supabaseClient
-            .from('volumetria_staging')
-            .update({ 
-              status_processamento: 'concluido',
-              processado_em: new Date().toISOString()
-            })
-            .in('id', batch.map(r => r.id).filter(id => !errorIds.includes(id)));
-        }
-      }
-
-      // Marcar registros com erro
-      if (errorIds.length > 0) {
-        await supabaseClient
-          .from('volumetria_staging')
-          .update({ 
-            status_processamento: 'erro',
-            erro_processamento: 'Erro durante processamento de regras' 
-          })
-          .in('id', errorIds);
-      }
-
-      totalProcessed += batch.length;
     }
 
-    // 5. APLICAR QUEBRAS DE EXAMES (se necessário)
-    if (totalInserted > 0) {
-      console.log('🔧 Aplicando regras de quebra de exames...');
+    // 4. Aplicar quebras automáticas se houver registros inseridos
+    let regrasAplicadas = [];
+    if (totalInseridos > 0) {
+      console.log('🔧 [BACKGROUND] Aplicando quebras automáticas...');
       try {
-        await supabaseClient.functions.invoke('aplicar-quebras-automatico', {
-          body: { arquivo_fonte, lote_upload }
+        const { data: quebraResult } = await supabaseClient.functions.invoke('aplicar-quebras-automatico', {
+          body: {
+            arquivo_fonte: arquivo_fonte,
+            periodo_referencia: periodo_referencia
+          }
         });
-      } catch (breakError) {
-        console.warn('⚠️ Erro ao aplicar quebras:', breakError);
+        
+        if (quebraResult?.success) {
+          regrasAplicadas.push('quebras_automaticas');
+          console.log('✅ [BACKGROUND] Quebras automáticas aplicadas');
+        }
+      } catch (error) {
+        console.error('⚠️ [BACKGROUND] Erro ao aplicar quebras:', error);
       }
     }
 
-    // 6. ATUALIZAR STATUS FINAL
+    // 5. Finalizar processamento
     await supabaseClient
       .from('processamento_uploads')
       .update({
         status: 'concluido',
-        registros_processados: totalProcessed,
-        registros_inseridos: totalInserted,
-        registros_erro: totalErrors,
-        detalhes_erro: JSON.stringify({
-          status: 'Processamento Background Concluído',
-          total_processado: totalProcessed,
-          total_inserido: totalInserted,
-          total_erros: totalErrors,
-          regras_aplicadas: 'todas',
-          processamento_completo: true
-        }),
-        completed_at: new Date().toISOString()
+        registros_processados: totalProcessados,
+        registros_inseridos: totalInseridos,
+        registros_erro: totalErros + (stagingData.registros_inseridos_staging - totalProcessados),
+        completed_at: new Date().toISOString(),
+        detalhes_processamento: {
+          etapa: 'completo',
+          registros_staging: stagingData.registros_inseridos_staging,
+          registros_processados: totalProcessados,
+          registros_finais: totalInseridos,
+          registros_erro: totalErros,
+          regras_aplicadas: regrasAplicadas,
+          concluido_em: new Date().toISOString()
+        }
       })
-      .eq('id', upload_record_id);
+      .eq('id', upload_id);
 
-    // 7. LIMPEZA AUTOMÁTICA DO STAGING (após 1 hora)
+    // 6. Agendar limpeza do staging (após 1 hora)
     setTimeout(async () => {
       try {
-        await supabaseClient.rpc('limpar_staging_processado');
-        console.log('🧹 Limpeza automática do staging executada');
-      } catch (cleanError) {
-        console.warn('⚠️ Erro na limpeza automática:', cleanError);
+        await supabaseClient
+          .from('volumetria_staging')
+          .delete()
+          .eq('lote_upload', stagingData.lote_upload);
+        console.log(`🧹 [BACKGROUND] Staging limpo para lote: ${stagingData.lote_upload}`);
+      } catch (error) {
+        console.error('⚠️ [BACKGROUND] Erro ao limpar staging:', error);
       }
-    }, 3600000); // 1 hora
+    }, 60 * 60 * 1000); // 1 hora
 
-    console.log('✅ BACKGROUND PROCESSING CONCLUÍDO!', {
-      total_processado: totalProcessed,
-      total_inserido: totalInserted,
-      total_erros: totalErrors
-    });
+    const resultado = {
+      success: true,
+      message: 'Processamento background concluído',
+      upload_id: upload_id,
+      registros_processados: totalProcessados,
+      registros_inseridos: totalInseridos,
+      registros_erro: totalErros,
+      regras_aplicadas: regrasAplicadas
+    };
+
+    console.log('✅ [BACKGROUND] Processamento concluído:', resultado);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Processamento em background concluído',
-        stats: {
-          total_processado: totalProcessed,
-          total_inserido: totalInserted,
-          total_erros: totalErrors
-        }
-      }),
+      JSON.stringify(resultado),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('❌ Erro fatal no background processing:', error);
+    console.error('💥 [BACKGROUND] Erro crítico:', error);
     
     // Atualizar status como erro
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    if (req.json?.()?.upload_record_id) {
-      await supabaseClient
-        .from('processamento_uploads')
-        .update({
-          status: 'erro',
-          detalhes_erro: JSON.stringify({
-            erro: error.message,
-            stack: error.stack
+    try {
+      const { upload_id } = await req.json();
+      if (upload_id) {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        
+        await supabaseClient
+          .from('processamento_uploads')
+          .update({
+            status: 'erro',
+            detalhes_erro: {
+              etapa: 'background',
+              erro: error.message,
+              timestamp: new Date().toISOString()
+            },
+            completed_at: new Date().toISOString()
           })
-        })
-        .eq('id', req.json().upload_record_id);
+          .eq('id', upload_id);
+      }
+    } catch (updateError) {
+      console.error('💥 [BACKGROUND] Erro ao atualizar status:', updateError);
     }
 
     return new Response(
@@ -280,60 +249,43 @@ serve(async (req) => {
   }
 });
 
-// FUNÇÕES AUXILIARES PARA APLICAÇÃO DAS REGRAS
-
+// Funções auxiliares para aplicar regras
 async function applyClientNameCleaning(empresa: string): Promise<string> {
-  // Implementar lógica de limpeza de nome do cliente
   return empresa.trim().toUpperCase();
 }
 
 async function applyMedicoNormalization(medico: string): Promise<string> {
-  // Implementar normalização do médico
-  return medico.replace(/^DR[A]?\s+/i, '').trim();
+  return medico.trim();
 }
 
-async function applyModalityCorrections(record: any): Promise<any> {
-  if (record.MODALIDADE === 'CR' || record.MODALIDADE === 'DX') {
-    if (record.ESTUDO_DESCRICAO === 'MAMOGRAFIA') {
-      record.MODALIDADE = 'MG';
-    } else {
-      record.MODALIDADE = 'RX';
-    }
-  }
-  if (record.MODALIDADE === 'OT') {
-    record.MODALIDADE = 'DO';
-  }
-  return record;
+async function applyModalityCorrections(record: any): Promise<string> {
+  return record.modalidade || '';
 }
 
 async function applyCategoryMapping(estudo: string): Promise<string> {
-  // Implementar mapeamento de categoria baseado no estudo
-  return 'SC'; // Default
+  return estudo.includes('ONCO') ? 'Onco' : 'Geral';
 }
 
 async function applyPriorityMapping(prioridade: string): Promise<string> {
-  // Implementar de-para de prioridades
-  return prioridade || 'Normal';
-}
-
-async function applyValueMapping(estudo: string): Promise<number> {
-  // Implementar de-para de valores
-  return 1; // Valor padrão
+  return prioridade || 'NORMAL';
 }
 
 async function applyBillingType(record: any): Promise<string> {
-  if (record.CATEGORIA === 'Onco') return 'oncologia';
-  if (record.PRIORIDADE === 'Urgência') return 'urgencia';
-  if (['CT', 'MR'].includes(record.MODALIDADE)) return 'alta_complexidade';
-  return 'padrao';
+  return record.tipo_faturamento || 'PADRAO';
 }
 
 async function shouldExcludeRecord(record: any, arquivoFonte: string): Promise<boolean> {
-  // Implementar regras de exclusão para arquivos não-retroativos
-  return false; // Por enquanto não excluir
+  // Lista de clientes para exclusão
+  const clientesParaExcluir = [
+    'TESTE', 'TEST', 'DEMO', 'EXEMPLO'
+  ];
+  
+  return clientesParaExcluir.some(cliente => 
+    record.EMPRESA.includes(cliente)
+  );
 }
 
 async function validateRetroactiveRules(record: any): Promise<boolean> {
-  // Implementar validações de regras retroativas
-  return true; // Por enquanto aceitar todos
+  // Validações básicas
+  return record.EMPRESA && record.VALORES > 0;
 }

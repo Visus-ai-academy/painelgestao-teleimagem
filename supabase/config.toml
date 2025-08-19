@@ -97,3 +97,12 @@ verify_jwt = true
 
 [functions.security-monitor]
 verify_jwt = true
+
+[functions.processar-volumetria-coordenador]
+verify_jwt = true
+
+[functions.processar-volumetria-staging]
+verify_jwt = true
+
+[functions.processar-staging-background]
+verify_jwt = true
