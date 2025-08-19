@@ -122,7 +122,7 @@ verify_jwt = true
 [functions.processar-volumetria-zero-memory]
 verify_jwt = true
 
-[functions.upload-direto-sucesso]
+[functions.processar-excel-com-regras]
 verify_jwt = true
 
 [functions.processar-volumetria-instantaneo]

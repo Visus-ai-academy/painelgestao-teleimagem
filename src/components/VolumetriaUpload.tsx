@@ -54,11 +54,12 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       setTimeout(() => setProgress(75), 1000);
       setTimeout(() => setProgress(90), 1500);
       
-      // UPLOAD DIRETO - Bypassa todos os problemas de staging/streaming/memory
-      const result = await supabase.functions.invoke('upload-direto-sucesso', {
+      // PROCESSAMENTO COMPLETO COM REGRAS
+      const result = await supabase.functions.invoke('processar-excel-com-regras', {
         body: {
           file_path: `uploads/${file.name}`,
-          arquivo_fonte: arquivoFonte
+          arquivo_fonte: arquivoFonte,
+          periodo_referencia: 'jun/25'
         }
       });
 
@@ -76,17 +77,18 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       
       if (data?.success) {
         const insertedCount = data.stats?.inserted_count || 0;
-        console.log('🎯 Upload direto finalizado:', {
+        console.log('🎯 Upload completo finalizado:', {
           insertedCount,
           totalProcessed: data.stats?.total_rows,
-          errors: data.stats?.error_count
+          errors: data.stats?.error_count,
+          regrasAplicadas: data.stats?.regras_aplicadas
         });
         
         setProgress(100);
         
         toast({
-          title: "Upload concluído!",
-          description: `${insertedCount} registros inseridos com sucesso.`,
+          title: "Upload concluído com regras aplicadas!",
+          description: `${insertedCount} registros inseridos. ${data.stats?.regras_aplicadas || 0} regras aplicadas automaticamente.`,
         });
         
         // Atualizar dados
@@ -150,7 +152,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
                   <span className="font-semibold">Clique para fazer upload</span> ou arraste o arquivo
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Arquivos Excel (.xlsx, .xls) - PROCESSAMENTO INSTANTÂNEO
+                  Arquivos Excel (.xlsx, .xls) - COM REGRAS APLICADAS
                 </p>
               </>
             )}
