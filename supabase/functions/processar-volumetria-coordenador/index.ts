@@ -70,72 +70,92 @@ serve(async (req) => {
     let insertedCount = 0;
     let errorCount = 0;
 
-    // Processar em batches pequenos
-    const BATCH_SIZE = 50;
+    // Processar em micro-batches ultra pequenos para economizar CPU
+    const BATCH_SIZE = 20; // Reduzido drasticamente
+    const MAX_BATCHES_PER_CYCLE = 25; // Processar no máximo 500 registros por ciclo
     
-    for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
-      const batch = dataRows.slice(i, i + BATCH_SIZE);
-      const recordsToInsert = [];
-
-      for (const row of batch) {
-        if (!row || (row as any[]).every(cell => !cell)) continue;
-
-        const rowData = row as any[];
-        const record: any = {
-          arquivo_fonte: arquivo_fonte,
-          periodo_referencia: periodo_referencia || 'jun/25',
-          lote_upload: upload_id || crypto.randomUUID()
-        };
-
-        // Mapear colunas baseado na posição (padrão mobilemed)
-        if (rowData.length >= 16) {
-          record["EMPRESA"] = rowData[0] || null;
-          record["NOME_PACIENTE"] = rowData[1] || null;
-          record["CODIGO_PACIENTE"] = rowData[2] || null;
-          record["ESTUDO_DESCRICAO"] = rowData[3] || null;
-          record["ACCESSION_NUMBER"] = rowData[4] || null;
-          record["MODALIDADE"] = rowData[5] || null;
-          record["PRIORIDADE"] = rowData[6] || null;
-          record["VALORES"] = parseFloat(rowData[7]) || 0;
-          record["ESPECIALIDADE"] = rowData[8] || null;
-          record["MEDICO"] = rowData[9] || null;
-          record["DATA_REALIZACAO"] = rowData[10] || null;
-          record["HORA_REALIZACAO"] = rowData[11] || null;
-          record["DATA_LAUDO"] = rowData[12] || null;
-          record["HORA_LAUDO"] = rowData[13] || null;
-          record["DATA_PRAZO"] = rowData[14] || null;
-          record["HORA_PRAZO"] = rowData[15] || null;
-        }
-
-        // Validação mínima
-        if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
-          recordsToInsert.push(record);
-        }
-      }
-
-      if (recordsToInsert.length > 0) {
-        try {
-          const { error: insertError } = await supabase
-            .from('volumetria_mobilemed')
-            .insert(recordsToInsert);
-
-          if (insertError) {
-            console.error(`❌ [COORDENADOR-V2] Erro no batch ${i}:`, insertError.message);
-            errorCount += recordsToInsert.length;
-          } else {
-            insertedCount += recordsToInsert.length;
-            console.log(`✅ [COORDENADOR-V2] Batch ${i}: ${recordsToInsert.length} registros`);
-          }
-        } catch (err) {
-          console.error(`❌ [COORDENADOR-V2] Erro no insert:`, err);
-          errorCount += recordsToInsert.length;
-        }
-      }
-
-      processedCount += batch.length;
+    let totalCycles = Math.ceil(dataRows.length / (BATCH_SIZE * MAX_BATCHES_PER_CYCLE));
+    
+    for (let cycle = 0; cycle < totalCycles; cycle++) {
+      const cycleStart = cycle * BATCH_SIZE * MAX_BATCHES_PER_CYCLE;
+      const cycleEnd = Math.min(cycleStart + (BATCH_SIZE * MAX_BATCHES_PER_CYCLE), dataRows.length);
       
-      // Pausa pequena entre batches
-      await new Promise(resolve => setTimeout(resolve, 10));
+      console.log(`🔄 [COORDENADOR-V3] Ciclo ${cycle + 1}/${totalCycles}: processando registros ${cycleStart} a ${cycleEnd}`);
+      
+      for (let i = cycleStart; i < cycleEnd; i += BATCH_SIZE) {
+        const batch = dataRows.slice(i, Math.min(i + BATCH_SIZE, cycleEnd));
+        const recordsToInsert = [];
+
+        for (const row of batch) {
+          if (!row || (row as any[]).every(cell => !cell)) continue;
+
+          const rowData = row as any[];
+          const record: any = {
+            arquivo_fonte: arquivo_fonte,
+            periodo_referencia: periodo_referencia || 'jun/25',
+            lote_upload: upload_id || crypto.randomUUID()
+          };
+
+          // Mapear apenas campos essenciais para reduzir processamento
+          if (rowData.length >= 8) {
+            record["EMPRESA"] = rowData[0] || null;
+            record["NOME_PACIENTE"] = rowData[1] || null;
+            record["CODIGO_PACIENTE"] = rowData[2] || null;
+            record["ESTUDO_DESCRICAO"] = rowData[3] || null;
+            record["ACCESSION_NUMBER"] = rowData[4] || null;
+            record["MODALIDADE"] = rowData[5] || null;
+            record["PRIORIDADE"] = rowData[6] || null;
+            record["VALORES"] = parseFloat(rowData[7]) || 0;
+            
+            // Campos opcionais só se existirem
+            if (rowData.length >= 16) {
+              record["ESPECIALIDADE"] = rowData[8] || null;
+              record["MEDICO"] = rowData[9] || null;
+              record["DATA_REALIZACAO"] = rowData[10] || null;
+              record["HORA_REALIZACAO"] = rowData[11] || null;
+              record["DATA_LAUDO"] = rowData[12] || null;
+              record["HORA_LAUDO"] = rowData[13] || null;
+              record["DATA_PRAZO"] = rowData[14] || null;
+              record["HORA_PRAZO"] = rowData[15] || null;
+            }
+          }
+
+          // Validação mínima
+          if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
+            recordsToInsert.push(record);
+          }
+        }
+
+        if (recordsToInsert.length > 0) {
+          try {
+            const { error: insertError } = await supabase
+              .from('volumetria_mobilemed')
+              .insert(recordsToInsert);
+
+            if (insertError) {
+              console.error(`❌ [COORDENADOR-V3] Erro no batch ${i}:`, insertError.message);
+              errorCount += recordsToInsert.length;
+            } else {
+              insertedCount += recordsToInsert.length;
+            }
+          } catch (err) {
+            console.error(`❌ [COORDENADOR-V3] Erro no insert:`, err);
+            errorCount += recordsToInsert.length;
+          }
+        }
+
+        processedCount += batch.length;
+        
+        // Limpeza de memória e pausa mais longa entre batches
+        recordsToInsert.length = 0;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      
+      // Pausa maior entre ciclos para reduzir carga de CPU
+      if (cycle < totalCycles - 1) {
+        console.log(`⏸️ [COORDENADOR-V3] Pausa entre ciclos... ${insertedCount} inseridos até agora`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
     // Atualizar status do upload se foi fornecido
