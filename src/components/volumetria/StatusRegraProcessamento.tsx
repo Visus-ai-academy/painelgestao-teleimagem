@@ -180,6 +180,12 @@ const REGRAS_MONITORADAS = [
     descricao: 'Substitui especialidade e categoria por valores do cadastro de exames para especialidades específicas',
     funcao: 'aplicar_substituicao_especialidade_categoria',
     id: 'v033'
+  },
+  {
+    nome: 'v034 Especialidade Colunas por Médico',
+    descricao: 'Processa especialidade "Colunas": altera para "Neuro" (médicos especialistas) ou "Músculo Esquelético" e aplica categorias do cadastro',
+    funcao: 'aplicar_substituicao_especialidade_categoria',
+    id: 'v034'
   }
 ];
 
@@ -283,7 +289,7 @@ export function StatusRegraProcessamento() {
               const regrasValidacao = ['v013', 'extra_006'];
               
               // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
-              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004'];
+              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033', 'v034'];
               
               if (regrasExclusao.includes(regra.id)) {
                 // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
@@ -306,7 +312,7 @@ export function StatusRegraProcessamento() {
                 foiAplicada = uploadInfo.status === 'concluido';
                 
                 // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
-                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008'].includes(regra.id)) {
+                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'v033', 'v034'].includes(regra.id)) {
                   if (uploadInfo.registros_erro > 0) {
                     informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
                   } else {

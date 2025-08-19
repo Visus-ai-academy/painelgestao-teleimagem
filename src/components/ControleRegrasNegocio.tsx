@@ -315,15 +315,15 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'exclusao'
     },
     {
-      id: 'v033',
-      nome: 'Substituição de Especialidade/Categoria por Cadastro de Exames',
+      id: 'v034',
+      nome: 'Substituição Especialidade Colunas por Médico',
       modulo: 'volumetria',
       categoria: 'dados',
-      criterio: 'Para exames com especialidades "Cardio com Score", "Corpo" ou "Onco Medicina Interna", substitui a especialidade e categoria pelos valores cadastrados na tabela cadastro_exames baseado no nome do exame.',
+      criterio: 'Para exames com especialidade "Colunas" nos arquivos 1,2,3,4: altera para "Neuro" se o médico estiver na lista de especialistas em Neuro (44 médicos cadastrados), caso contrário altera para "Músculo Esquelético". Também aplica categoria conforme cadastro de exames para todos os registros.',
       status: 'ativa',
-      implementadaEm: '2025-01-18',
-      observacoes: 'Aplica-se aos arquivos 1,2,3,4 durante o processamento - Edge function: aplicar-substituicao-especialidade-categoria',
-      ordem_execucao: 23,
+      implementadaEm: '2025-08-19',
+      observacoes: 'Edge function: aplicar-substituicao-especialidade-categoria - Extensão da regra v033 com processamento específico para especialidade Colunas e aplicação global de categorias',
+      ordem_execucao: 24,
       tipo_regra: 'negocio'
     },
 
