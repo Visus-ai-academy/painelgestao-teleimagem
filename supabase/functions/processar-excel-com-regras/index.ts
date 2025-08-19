@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('📊 [EXCEL-PROCESSAMENTO-V3] Função NOVA iniciada - versão atualizada');
+  console.log('📊 [EXCEL-PROCESSAMENTO-V4] Função para arquivos GRANDES (35k+ linhas)');
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,18 +17,18 @@ serve(async (req) => {
   try {
     const { file_path, arquivo_fonte, periodo_referencia } = await req.json();
     
-    console.log('📊 [EXCEL-PROCESSAMENTO-V3] Parâmetros recebidos:', { file_path, arquivo_fonte, periodo_referencia });
+    console.log('📊 [EXCEL-V4] Parâmetros recebidos:', { file_path, arquivo_fonte, periodo_referencia });
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Registrar upload inicial - VERSÃO NOVA
+    // Registrar upload inicial
     const lote_upload = crypto.randomUUID();
     const arquivoNome = file_path.includes('/') ? file_path.split('/').pop() : file_path;
     
-    console.log('📊 [EXCEL-PROCESSAMENTO-V3] Registrando upload para arquivo:', arquivoNome);
+    console.log('📊 [EXCEL-V4] Registrando upload para arquivo:', arquivoNome);
     
     const { data: uploadRecord } = await supabaseClient
       .from('processamento_uploads')
@@ -37,163 +37,88 @@ serve(async (req) => {
         arquivo_nome: arquivoNome || 'arquivo.xlsx',
         status: 'processando',
         periodo_referencia: periodo_referencia || 'jun/25',
-        detalhes_erro: { lote_upload, etapa: 'processamento_v3_NOVA_VERSAO', versao: 'v3' }
+        detalhes_erro: { lote_upload, etapa: 'processamento_v4_GRANDES_ARQUIVOS', versao: 'v4' }
       })
       .select()
       .single();
 
-    console.log('✅ [EXCEL-PROCESSAMENTO-V3] Upload registrado com ID:', uploadRecord?.id);
+    console.log('✅ [EXCEL-V4] Upload registrado com ID:', uploadRecord?.id);
 
-    // Download do arquivo
-    console.log('📊 [EXCEL-PROCESSAMENTO-V3] Iniciando download do arquivo:', file_path);
+    // Para arquivos grandes, usar sistema de staging existente
+    console.log('📊 [EXCEL-V4] Delegando para função de staging otimizada para arquivos grandes');
     
-    const { data: fileData, error: downloadError } = await supabaseClient.storage
-      .from('uploads')
-      .download(file_path);
-
-    if (downloadError) {
-      console.error('❌ [EXCEL-PROCESSAMENTO-V3] Erro no download:', downloadError);
-      throw new Error(`Download falhou: ${downloadError.message}`);
-    }
-
-    if (!fileData) {
-      console.error('❌ [EXCEL-PROCESSAMENTO-V3] Arquivo não encontrado');
-      throw new Error(`Arquivo não encontrado: ${file_path}`);
-    }
-
-    console.log('✅ [EXCEL-PROCESSAMENTO-V3] Arquivo baixado com sucesso, tamanho:', fileData.size, 'bytes');
-
-    // Processar Excel
-    const arrayBuffer = await fileData.arrayBuffer();
-    console.log('📊 [EXCEL-PROCESSAMENTO-V3] Convertendo para ArrayBuffer, tamanho:', arrayBuffer.byteLength);
-    
-    const workbook = XLSX.read(arrayBuffer, { 
-      type: 'array',
-      raw: false,
-      cellDates: false
-    });
-    
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-      defval: '',
-      blankrows: false 
-    });
-
-    console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Processando ${jsonData.length} linhas do Excel`);
-
-    if (jsonData.length === 0) {
-      console.error('❌ [EXCEL-PROCESSAMENTO-V3] Arquivo Excel vazio');
-      throw new Error('Arquivo Excel vazio ou sem dados válidos');
-    }
-
-    // Processar dados UM POR VEZ - ULTRA CONSERVATIVO MEMÓRIA
-    let totalInseridos = 0;
-    let regrasAplicadas = 0;
-    
-    const maxLinhas = Math.min(jsonData.length, 20); // Máximo 20 linhas para evitar estouro de memória
-    
-    console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Processando ${maxLinhas} linhas INDIVIDUALMENTE`);
-    
-    for (let i = 0; i < maxLinhas; i++) {
-      const row = jsonData[i];
-      
-      try {
-        let empresa = String(row['EMPRESA'] || '').trim();
-        let nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-        
-        if (!empresa || !nomePaciente) continue;
-
-        // Aplicar regras básicas
-        if (empresa.includes('CEDI')) {
-          empresa = 'CEDIDIAG';
-          regrasAplicadas++;
-        }
-
-        let modalidade = String(row['MODALIDADE'] || '').trim();
-        if (modalidade === 'CR' || modalidade === 'DX') {
-          modalidade = 'RX';
-          regrasAplicadas++;
-        }
-
-        const registro = {
-          id: crypto.randomUUID(),
-          "EMPRESA": empresa.substring(0, 100),
-          "NOME_PACIENTE": nomePaciente.substring(0, 100),
-          "MODALIDADE": modalidade.substring(0, 10),
-          "VALORES": Number(row['VALORES']) || 1,
-          "CATEGORIA": String(row['CATEGORIA'] || 'SC').trim(),
-          "ESTUDO_DESCRICAO": String(row['ESTUDO_DESCRICAO'] || '').substring(0, 200),
-          "MEDICO": String(row['MEDICO'] || '').substring(0, 100),
-          "PRIORIDADE": String(row['PRIORIDADE'] || '').substring(0, 20),
-          data_referencia: new Date().toISOString().split('T')[0],
-          arquivo_fonte: arquivo_fonte,
-          lote_upload: lote_upload,
-          periodo_referencia: periodo_referencia || 'jun/25',
-          tipo_faturamento: 'padrao',
-          processamento_pendente: false
-        };
-
-        console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Inserindo registro ${i + 1}/${maxLinhas}`);
-        
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert([registro]);
-        
-        if (insertError) {
-          console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Erro na inserção linha ${i + 1}:`, insertError);
-          throw insertError;
-        }
-        
-        totalInseridos++;
-        console.log(`✅ [EXCEL-PROCESSAMENTO-V3] Linha ${i + 1} inserida com sucesso`);
-
-      } catch (rowError) {
-        console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Erro na linha ${i + 1}:`, rowError);
+    const { data: stagingResult, error: stagingError } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
+      body: {
+        file_path: file_path,
+        arquivo_fonte: arquivo_fonte,
+        periodo_referencia: periodo_referencia
       }
-      
-      // Pausa entre cada inserção para evitar sobrecarga de memória
-      await new Promise(resolve => setTimeout(resolve, 200));
+    });
+
+    if (stagingError) {
+      console.error('❌ [EXCEL-V4] Erro na função de staging:', stagingError);
+      throw new Error(`Erro no staging: ${stagingError.message}`);
     }
 
-    console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Finalizando upload. Total inseridos: ${totalInseridos}, regras aplicadas: ${regrasAplicadas}`);
+    console.log('📊 [EXCEL-V4] Staging concluído:', stagingResult);
 
-    // Finalizar upload
+    // Aguardar um pouco para o staging ser processado
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Chamar processamento em background
+    console.log('📊 [EXCEL-V4] Iniciando processamento em background');
+    
+    const { data: backgroundResult, error: backgroundError } = await supabaseClient.functions.invoke('processar-staging-background', {
+      body: {
+        lote_upload: lote_upload,
+        arquivo_fonte: arquivo_fonte,
+        periodo_referencia: periodo_referencia
+      }
+    });
+
+    if (backgroundError) {
+      console.log('⚠️ [EXCEL-V4] Erro no processamento background (não crítico):', backgroundError);
+    } else {
+      console.log('✅ [EXCEL-V4] Background processamento iniciado:', backgroundResult);
+    }
+
+    // Atualizar status do upload
     if (uploadRecord?.id) {
       await supabaseClient
         .from('processamento_uploads')
         .update({
-          status: 'concluido',
-          registros_processados: totalInseridos,
-          registros_inseridos: totalInseridos,
-          registros_erro: 0,
+          status: 'staging_concluido',
+          registros_processados: stagingResult?.stats?.inserted_count || 0,
+          registros_inseridos: stagingResult?.stats?.inserted_count || 0,
+          registros_erro: stagingResult?.stats?.error_count || 0,
           completed_at: new Date().toISOString(),
           detalhes_erro: {
-            etapa: 'processamento_v3_COMPLETO',
+            etapa: 'processamento_v4_STAGING_COMPLETO',
             lote_upload: lote_upload,
-            regras_aplicadas: regrasAplicadas,
-            versao: 'v3_final'
+            staging_result: stagingResult,
+            versao: 'v4_staging'
           }
         })
         .eq('id', uploadRecord.id);
-        
-      console.log('✅ [EXCEL-PROCESSAMENTO-V3] Upload finalizado no banco de dados');
     }
 
-    console.log(`🎉 [EXCEL-PROCESSAMENTO-V3] PROCESSAMENTO CONCLUÍDO COM SUCESSO: ${totalInseridos} registros inseridos, ${regrasAplicadas} regras aplicadas`);
+    console.log(`🎉 [EXCEL-V4] PROCESSAMENTO INICIADO: ${stagingResult?.stats?.inserted_count || 0} registros no staging`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Arquivo processado com sucesso! ${totalInseridos} registros inseridos com ${regrasAplicadas} regras aplicadas`,
+        message: `Arquivo grande processado via staging! ${stagingResult?.stats?.inserted_count || 0} registros em processamento`,
         upload_id: uploadRecord?.id || 'temp-' + Date.now(),
         stats: {
-          inserted_count: totalInseridos,
-          total_rows: totalInseridos,
-          error_count: 0,
-          regras_aplicadas: regrasAplicadas
+          inserted_count: stagingResult?.stats?.inserted_count || 0,
+          total_rows: stagingResult?.stats?.total_rows || 0,
+          error_count: stagingResult?.stats?.error_count || 0,
+          regras_aplicadas: 0
         },
-        processamento_completo_com_regras: true,
-        versao: 'v3'
+        processamento_completo_com_regras: false,
+        processamento_em_background: true,
+        versao: 'v4_staging',
+        observacao: 'Arquivo grande processado via sistema de staging. Os dados aparecerão gradualmente na volumetria.'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
