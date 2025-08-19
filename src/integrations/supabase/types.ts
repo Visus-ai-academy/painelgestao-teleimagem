@@ -4111,6 +4111,10 @@ export type Database = {
         Args: { access_pattern: string; metadata?: Json; resource_type: string }
         Returns: undefined
       }
+      monitorar_upload_status: {
+        Args: { upload_id_param: string }
+        Returns: Json
+      }
       normalizar_clientes_cedi: {
         Args: Record<PropertyKey, never>
         Returns: Json
