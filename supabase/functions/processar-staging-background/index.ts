@@ -59,10 +59,10 @@ serve(async (req) => {
     let totalInseridos = 0;
     let totalErros = 0;
 
-    // Buscar dados do staging em lotes para economizar memória
+    // Buscar dados do staging em lotes MUITO menores para economizar memória
     let hasMoreRecords = true;
     let offset = 0;
-    const FETCH_SIZE = 200;
+    const FETCH_SIZE = 100; // Reduzido de 200 para 100
 
     while (hasMoreRecords) {
       const { data: records, error: fetchError } = await supabaseClient
@@ -92,8 +92,6 @@ serve(async (req) => {
 
         const processedRecords: any[] = [];
         const stagingIdsToUpdate: string[] = [];
-
-        // ... keep existing code (processing loop)
 
         // Aplicar transformações e validações
         for (const record of batch) {

@@ -90,43 +90,130 @@ serve(async (req) => {
       throw downloadError;
     }
 
-    // 3. Ler Excel com otimização de memória
-    console.log('📊 [STAGING] Lendo arquivo Excel...');
+    // 3. Ler Excel com STREAMING para arquivos grandes
+    console.log('📊 [STAGING] Processando arquivo Excel em streaming...');
     
-    let workbook, worksheet, jsonData;
+    let totalLinhas = 0;
+    let processedBatches = 0;
     
     try {
-      // Ler arquivo em chunks menores para evitar excesso de memória
       const arrayBuffer = await fileData.arrayBuffer();
-      console.log(`📏 [STAGING] Arquivo: ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
+      const fileSizeKB = Math.round(arrayBuffer.byteLength / 1024);
+      console.log(`📏 [STAGING] Arquivo: ${fileSizeKB} KB`);
       
-      // Configurar XLSX para usar menos memória
-      workbook = XLSX.read(arrayBuffer, { 
-        type: 'array',
-        cellNF: false,
-        cellHTML: false,
-        cellFormula: false,
-        cellStyles: false,
-        cellDates: true,
-        dense: false
-      });
-      
-      worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!worksheet) {
-        throw new Error('Planilha não encontrada no arquivo');
+      // Para arquivos grandes (>3MB), processar em chunks
+      if (fileSizeKB > 3072) { // 3MB
+        console.log('🔄 [STAGING] Arquivo grande detectado - usando processamento streaming');
+        
+        // Ler Excel otimizado para arquivos grandes
+        const workbook = XLSX.read(arrayBuffer, { 
+          type: 'array',
+          cellNF: false,
+          cellHTML: false,
+          cellFormula: false,
+          cellStyles: false,
+          cellDates: false, // Desabilitar parsing de datas para economizar memória
+          dense: true, // Usar formato denso
+          sheetRows: 1000 // Limitar linhas por vez
+        });
+        
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        if (!worksheet) {
+          throw new Error('Planilha não encontrada no arquivo');
+        }
+        
+        // Obter range da planilha
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+        totalLinhas = range.e.r + 1;
+        console.log(`📋 [STAGING] ${totalLinhas} linhas detectadas no Excel`);
+        
+        // Processar em chunks de 500 linhas
+        const CHUNK_SIZE = 500;
+        for (let startRow = 1; startRow < totalLinhas; startRow += CHUNK_SIZE) {
+          const endRow = Math.min(startRow + CHUNK_SIZE - 1, totalLinhas - 1);
+          
+          console.log(`📦 [STAGING] Processando chunk ${Math.floor(startRow/CHUNK_SIZE) + 1} (linhas ${startRow}-${endRow})`);
+          
+          // Criar nova planilha apenas com o chunk atual
+          const chunkWorksheet = {};
+          const chunkRange = `A1:Z${endRow - startRow + 2}`; // +2 para incluir cabeçalho
+          
+          // Copiar cabeçalho
+          for (let col = range.s.c; col <= range.e.c; col++) {
+            const headerAddr = XLSX.utils.encode_cell({ r: 0, c: col });
+            const headerCell = worksheet[headerAddr];
+            if (headerCell) {
+              const newHeaderAddr = XLSX.utils.encode_cell({ r: 0, c: col });
+              chunkWorksheet[newHeaderAddr] = headerCell;
+            }
+          }
+          
+          // Copiar dados do chunk
+          for (let row = startRow; row <= endRow; row++) {
+            for (let col = range.s.c; col <= range.e.c; col++) {
+              const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
+              const cell = worksheet[cellAddr];
+              if (cell) {
+                const newRowIndex = row - startRow + 1; // +1 para pular cabeçalho
+                const newCellAddr = XLSX.utils.encode_cell({ r: newRowIndex, c: col });
+                chunkWorksheet[newCellAddr] = cell;
+              }
+            }
+          }
+          
+          chunkWorksheet['!ref'] = chunkRange;
+          
+          // Converter chunk para JSON
+          const chunkData = XLSX.utils.sheet_to_json(chunkWorksheet, { 
+            defval: null,
+            blankrows: false,
+            skipHidden: true 
+          });
+          
+          // Processar chunk
+          await processarChunk(chunkData, supabaseClient, lote_upload, arquivo_fonte, periodo_referencia);
+          processedBatches++;
+          
+          // Limpar chunk da memória
+          Object.keys(chunkWorksheet).forEach(key => delete chunkWorksheet[key]);
+          
+          // Pausa para evitar sobrecarga
+          if (processedBatches % 5 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+        
+        console.log(`✅ [STAGING] ${processedBatches} chunks processados`);
+        
+      } else {
+        // Arquivos pequenos - processamento normal
+        console.log('📊 [STAGING] Processamento normal para arquivo pequeno');
+        const workbook = XLSX.read(arrayBuffer, { 
+          type: 'array',
+          cellNF: false,
+          cellHTML: false,
+          cellFormula: false,
+          cellStyles: false,
+          cellDates: true,
+          dense: false
+        });
+        
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        if (!worksheet) {
+          throw new Error('Planilha não encontrada no arquivo');
+        }
+        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+          defval: null,
+          blankrows: false,
+          skipHidden: true 
+        });
+        
+        totalLinhas = jsonData.length;
+        console.log(`📋 [STAGING] ${totalLinhas} registros encontrados no Excel`);
+        
+        await processarChunk(jsonData, supabaseClient, lote_upload, arquivo_fonte, periodo_referencia);
       }
-      
-      jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        defval: null,
-        blankrows: false,
-        skipHidden: true 
-      });
-      
-      console.log(`📋 [STAGING] ${jsonData.length} registros encontrados no Excel`);
-      
-      // Limpar objetos grandes da memória
-      workbook = null;
-      worksheet = null;
       
     } catch (error) {
       console.error('❌ [STAGING] Erro ao processar Excel:', error);
@@ -141,98 +228,27 @@ serve(async (req) => {
       throw error;
     }
 
-    // 4. Processar em lotes menores para staging
-    const BATCH_SIZE = 100;
-    let totalProcessados = 0;
-    let totalInseridos = 0;
-    let totalErros = 0;
+    // 5. Atualizar estatísticas finais
+    const { data: stagingStats } = await supabaseClient
+      .from('volumetria_staging')
+      .select('id', { count: 'exact' })
+      .eq('lote_upload', lote_upload);
 
-    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-      const batch = jsonData.slice(i, i + BATCH_SIZE);
-      
-      console.log(`📦 [STAGING] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(jsonData.length/BATCH_SIZE)} (${batch.length} registros)`);
+    const totalInseridos = stagingStats?.length || 0;
 
-      const stagingRecords: any[] = [];
-
-      // Mapear dados do Excel para formato staging
-      for (const row of batch) {
-        try {
-          const record = {
-            EMPRESA: row['EMPRESA'] || '',
-            NOME_PACIENTE: row['NOME_PACIENTE'] || '',
-            CODIGO_PACIENTE: row['CODIGO_PACIENTE'] || '',
-            ESTUDO_DESCRICAO: row['ESTUDO_DESCRICAO'] || '',
-            ACCESSION_NUMBER: row['ACCESSION_NUMBER'] || '',
-            MODALIDADE: row['MODALIDADE'] || '',
-            PRIORIDADE: row['PRIORIDADE'] || '',
-            VALORES: Number(row['VALORES']) || 0,
-            ESPECIALIDADE: row['ESPECIALIDADE'] || '',
-            MEDICO: row['MEDICO'] || '',
-            DUPLICADO: row['DUPLICADO'] || '',
-            DATA_REALIZACAO: row['DATA_REALIZACAO'] || row['DATA_EXAME'] || null,
-            HORA_REALIZACAO: row['HORA_REALIZACAO'] || null,
-            DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] || null,
-            HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] || null,
-            DATA_LAUDO: row['DATA_LAUDO'] || null,
-            HORA_LAUDO: row['HORA_LAUDO'] || null,
-            DATA_PRAZO: row['DATA_PRAZO'] || null,
-            HORA_PRAZO: row['HORA_PRAZO'] || null,
-            STATUS: row['STATUS'] || '',
-            DATA_REASSINATURA: row['DATA_REASSINATURA'] || null,
-            HORA_REASSINATURA: row['HORA_REASSINATURA'] || null,
-            MEDICO_REASSINATURA: row['MEDICO_REASSINATURA'] || '',
-            SEGUNDA_ASSINATURA: row['SEGUNDA_ASSINATURA'] || '',
-            POSSUI_IMAGENS_CHAVE: row['POSSUI_IMAGENS_CHAVE'] || '',
-            IMAGENS_CHAVES: row['IMAGENS_CHAVES'] || '',
-            IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] || '',
-            CODIGO_INTERNO: row['CODIGO_INTERNO'] || '',
-            DIGITADOR: row['DIGITADOR'] || '',
-            COMPLEMENTAR: row['COMPLEMENTAR'] || '',
-            CATEGORIA: row['CATEGORIA'] || '',
-            tipo_faturamento: row['TIPO_FATURAMENTO'] || '',
-            periodo_referencia: periodo_referencia,
-            arquivo_fonte: arquivo_fonte,
-            lote_upload: lote_upload,
-            status_processamento: 'pendente'
-          };
-
-          stagingRecords.push(record);
-          totalProcessados++;
-        } catch (error) {
-          console.error('⚠️ [STAGING] Erro ao mapear registro:', error);
-          totalErros++;
-        }
-      }
-
-      // Inserir lote na tabela staging
-      if (stagingRecords.length > 0) {
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_staging')
-          .insert(stagingRecords);
-
-        if (insertError) {
-          console.error('❌ [STAGING] Erro ao inserir lote:', insertError);
-          totalErros += stagingRecords.length;
-        } else {
-          totalInseridos += stagingRecords.length;
-          console.log(`✅ [STAGING] Lote inserido: ${stagingRecords.length} registros`);
-        }
-      }
-    }
-
-    // 5. Atualizar status do upload
+    // 6. Atualizar status do upload
     await supabaseClient
       .from('processamento_uploads')
       .update({
         status: 'processando',
-        registros_processados: totalProcessados,
+        registros_processados: totalLinhas,
         registros_inseridos: totalInseridos,
-        registros_erro: totalErros,
+        registros_erro: totalLinhas - totalInseridos,
         detalhes_erro: {
           etapa: 'staging_completo',
-          registros_excel: jsonData.length,
+          registros_excel: totalLinhas,
           registros_staging: totalInseridos,
-          registros_erro: totalErros,
+          registros_erro: totalLinhas - totalInseridos,
           lote_upload: lote_upload,
           concluido_em: new Date().toISOString()
         }
@@ -244,9 +260,9 @@ serve(async (req) => {
       message: 'Staging processado com sucesso',
       upload_id: uploadRecord.id,
       lote_upload: lote_upload,
-      registros_excel: jsonData.length,
+      registros_excel: totalLinhas,
       registros_inseridos: totalInseridos,
-      registros_erro: totalErros
+      registros_erro: totalLinhas - totalInseridos
     };
 
     console.log('✅ [STAGING] Processamento concluído:', resultado);
