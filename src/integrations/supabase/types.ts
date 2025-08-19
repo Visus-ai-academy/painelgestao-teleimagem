@@ -3406,6 +3406,7 @@ export type Database = {
           DATA_REASSINATURA: string | null
           data_referencia: string | null
           DATA_TRANSFERENCIA: string | null
+          detalhes_processamento: Json | null
           DIGITADOR: string | null
           DUPLICADO: string | null
           EMPRESA: string | null
@@ -3452,6 +3453,7 @@ export type Database = {
           DATA_REASSINATURA?: string | null
           data_referencia?: string | null
           DATA_TRANSFERENCIA?: string | null
+          detalhes_processamento?: Json | null
           DIGITADOR?: string | null
           DUPLICADO?: string | null
           EMPRESA?: string | null
@@ -3498,6 +3500,7 @@ export type Database = {
           DATA_REASSINATURA?: string | null
           data_referencia?: string | null
           DATA_TRANSFERENCIA?: string | null
+          detalhes_processamento?: Json | null
           DIGITADOR?: string | null
           DUPLICADO?: string | null
           EMPRESA?: string | null
