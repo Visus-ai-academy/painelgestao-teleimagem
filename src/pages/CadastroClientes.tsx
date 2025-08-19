@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useClienteStats } from "@/hooks/useClienteStats";
 import { CadastroDataTable } from "@/components/CadastroDataTable";
+import { GeradorContratos } from "@/components/GeradorContratos";
 
 interface Cliente {
   id: string;
@@ -394,6 +395,18 @@ export default function CadastroClientes() {
           }}
           icon={<Upload className="h-5 w-5" />}
           variant="button"
+        />
+        
+        <GeradorContratos 
+          clientes={clientes}
+          onSuccess={() => {
+            carregarClientes();
+            refreshStats();
+            toast({
+              title: "Sucesso!",
+              description: "Contrato gerado e registrado com sucesso",
+            });
+          }}
         />
       </div>
 
