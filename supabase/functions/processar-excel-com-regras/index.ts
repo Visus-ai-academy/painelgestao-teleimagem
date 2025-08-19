@@ -86,84 +86,73 @@ serve(async (req) => {
       throw new Error('Arquivo Excel vazio ou sem dados válidos');
     }
 
-    // Processar dados em pequenos lotes - OTIMIZADO PARA MEMÓRIA
+    // Processar dados UM POR VEZ - ULTRA CONSERVATIVO MEMÓRIA
     let totalInseridos = 0;
     let regrasAplicadas = 0;
     
-    const LOTE_SIZE = 3; // Reduzido para 3 para economizar memória
-    const maxLinhas = Math.min(jsonData.length, 50); // Máximo 50 linhas para evitar estouro de memória
+    const maxLinhas = Math.min(jsonData.length, 20); // Máximo 20 linhas para evitar estouro de memória
     
-    console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Processando ${maxLinhas} linhas em lotes de ${LOTE_SIZE}`);
+    console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Processando ${maxLinhas} linhas INDIVIDUALMENTE`);
     
-    for (let i = 0; i < maxLinhas; i += LOTE_SIZE) {
-      const lote = jsonData.slice(i, i + LOTE_SIZE);
-      const registrosProcessados = [];
-
-      for (const row of lote) {
-        try {
-          let empresa = String(row['EMPRESA'] || '').trim();
-          let nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-          
-          if (!empresa || !nomePaciente) continue;
-
-          // Aplicar regras básicas
-          if (empresa.includes('CEDI')) {
-            empresa = 'CEDIDIAG';
-            regrasAplicadas++;
-          }
-
-          let modalidade = String(row['MODALIDADE'] || '').trim();
-          if (modalidade === 'CR' || modalidade === 'DX') {
-            modalidade = 'RX';
-            regrasAplicadas++;
-          }
-
-          registrosProcessados.push({
-            id: crypto.randomUUID(),
-            "EMPRESA": empresa.substring(0, 100),
-            "NOME_PACIENTE": nomePaciente.substring(0, 100),
-            "MODALIDADE": modalidade.substring(0, 10),
-            "VALORES": Number(row['VALORES']) || 1,
-            "CATEGORIA": String(row['CATEGORIA'] || 'SC').trim(),
-            "ESTUDO_DESCRICAO": String(row['ESTUDO_DESCRICAO'] || '').substring(0, 200),
-            "MEDICO": String(row['MEDICO'] || '').substring(0, 100),
-            "PRIORIDADE": String(row['PRIORIDADE'] || '').substring(0, 20),
-            data_referencia: new Date().toISOString().split('T')[0],
-            arquivo_fonte: arquivo_fonte,
-            lote_upload: lote_upload,
-            periodo_referencia: periodo_referencia || 'jun/25',
-            tipo_faturamento: 'padrao',
-            processamento_pendente: false
-          });
-
-        } catch (rowError) {
-          console.error('❌ [EXCEL-PROCESSAMENTO-V3] Erro na linha:', rowError);
-        }
-      }
-
-      if (registrosProcessados.length > 0) {
-        console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Inserindo lote ${Math.floor(i/LOTE_SIZE) + 1} com ${registrosProcessados.length} registros`);
+    for (let i = 0; i < maxLinhas; i++) {
+      const row = jsonData[i];
+      
+      try {
+        let empresa = String(row['EMPRESA'] || '').trim();
+        let nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
         
-        try {
-          const { error: insertError } = await supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(registrosProcessados);
-          
-          if (insertError) {
-            console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Erro na inserção:`, insertError);
-            throw insertError;
-          }
-          
-          totalInseridos += registrosProcessados.length;
-          console.log(`✅ [EXCEL-PROCESSAMENTO-V3] Lote ${Math.floor(i/LOTE_SIZE) + 1} inserido com sucesso`);
-        } catch (insertError) {
-          console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Falha na inserção:`, insertError);
+        if (!empresa || !nomePaciente) continue;
+
+        // Aplicar regras básicas
+        if (empresa.includes('CEDI')) {
+          empresa = 'CEDIDIAG';
+          regrasAplicadas++;
+        }
+
+        let modalidade = String(row['MODALIDADE'] || '').trim();
+        if (modalidade === 'CR' || modalidade === 'DX') {
+          modalidade = 'RX';
+          regrasAplicadas++;
+        }
+
+        const registro = {
+          id: crypto.randomUUID(),
+          "EMPRESA": empresa.substring(0, 100),
+          "NOME_PACIENTE": nomePaciente.substring(0, 100),
+          "MODALIDADE": modalidade.substring(0, 10),
+          "VALORES": Number(row['VALORES']) || 1,
+          "CATEGORIA": String(row['CATEGORIA'] || 'SC').trim(),
+          "ESTUDO_DESCRICAO": String(row['ESTUDO_DESCRICAO'] || '').substring(0, 200),
+          "MEDICO": String(row['MEDICO'] || '').substring(0, 100),
+          "PRIORIDADE": String(row['PRIORIDADE'] || '').substring(0, 20),
+          data_referencia: new Date().toISOString().split('T')[0],
+          arquivo_fonte: arquivo_fonte,
+          lote_upload: lote_upload,
+          periodo_referencia: periodo_referencia || 'jun/25',
+          tipo_faturamento: 'padrao',
+          processamento_pendente: false
+        };
+
+        console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Inserindo registro ${i + 1}/${maxLinhas}`);
+        
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert([registro]);
+        
+        if (insertError) {
+          console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Erro na inserção linha ${i + 1}:`, insertError);
           throw insertError;
         }
+        
+        totalInseridos++;
+        console.log(`✅ [EXCEL-PROCESSAMENTO-V3] Linha ${i + 1} inserida com sucesso`);
+
+      } catch (rowError) {
+        console.error(`❌ [EXCEL-PROCESSAMENTO-V3] Erro na linha ${i + 1}:`, rowError);
       }
       
-      // Pausa entre lotes
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Pausa entre cada inserção para evitar sobrecarga de memória
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     console.log(`📊 [EXCEL-PROCESSAMENTO-V3] Finalizando upload. Total inseridos: ${totalInseridos}, regras aplicadas: ${regrasAplicadas}`);
