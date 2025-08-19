@@ -185,6 +185,28 @@ serve(async (req) => {
       }
     }
 
+    // 4.5. Aplicar regras de substituição de especialidade/categoria (v033 e v034)
+    if (totalInseridos > 0) {
+      console.log('🔧 [BACKGROUND] Aplicando regras v033 e v034...');
+      try {
+        const { data: especialidadeResult } = await supabaseClient.functions.invoke('aplicar-substituicao-especialidade-categoria', {
+          body: {
+            arquivo_fonte: arquivo_fonte
+          }
+        });
+        
+        if (especialidadeResult?.sucesso) {
+          regrasAplicadas.push('v033_v034_especialidade_categoria');
+          console.log('✅ [BACKGROUND] Regras v033 e v034 aplicadas com sucesso');
+          console.log(`   - v033: ${especialidadeResult.total_substituidos_v033} registros processados`);
+          console.log(`   - v034: ${especialidadeResult.total_substituidos_v034} registros Colunas processados`);
+          console.log(`   - Categorias: ${especialidadeResult.total_categorias_aplicadas} atualizadas`);
+        }
+      } catch (error) {
+        console.error('⚠️ [BACKGROUND] Erro ao aplicar regras v033/v034:', error);
+      }
+    }
+
     // 5. Finalizar processamento
     await supabaseClient
       .from('processamento_uploads')
