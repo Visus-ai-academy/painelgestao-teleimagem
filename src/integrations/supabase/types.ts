@@ -4067,6 +4067,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      limpar_uploads_travados: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       listar_coberturas_disponiveis: {
         Args: { p_medico_id: string }
         Returns: {

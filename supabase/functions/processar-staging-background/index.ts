@@ -38,7 +38,7 @@ serve(async (req) => {
       })
       .eq('id', upload_id);
 
-    // 2. Buscar dados do staging
+    // 2. Buscar dados do staging - usando lotes menores para economizar memória
     console.log('📥 [BACKGROUND] Buscando dados do staging...');
     const { data: stagingData, error: stagingError } = await supabaseClient
       .from('processamento_uploads')
@@ -52,33 +52,48 @@ serve(async (req) => {
     }
 
     const lote_upload = stagingData.detalhes_erro?.lote_upload;
-    const { data: records, error: fetchError } = await supabaseClient
-      .from('volumetria_staging')
-      .select('*')
-      .eq('lote_upload', lote_upload)
-      .eq('status_processamento', 'pendente');
-
-    if (fetchError) {
-      console.error('❌ [BACKGROUND] Erro ao buscar staging:', fetchError);
-      throw fetchError;
-    }
-
-    console.log(`📋 [BACKGROUND] ${records?.length || 0} registros para processar`);
-
-    // 3. Processar registros com regras de negócio
-    const BATCH_SIZE = 100;
+    
+    // Processar em lotes ainda menores para economizar memória
+    const BATCH_SIZE = 50;
     let totalProcessados = 0;
     let totalInseridos = 0;
     let totalErros = 0;
+
+    // Buscar dados do staging em lotes para economizar memória
+    let hasMoreRecords = true;
+    let offset = 0;
+    const FETCH_SIZE = 200;
+
+    while (hasMoreRecords) {
+      const { data: records, error: fetchError } = await supabaseClient
+        .from('volumetria_staging')
+        .select('*')
+        .eq('lote_upload', lote_upload)
+        .eq('status_processamento', 'pendente')
+        .range(offset, offset + FETCH_SIZE - 1);
+
+      if (fetchError) {
+        console.error('❌ [BACKGROUND] Erro ao buscar staging:', fetchError);
+        throw fetchError;
+      }
+
+      if (!records || records.length === 0) {
+        hasMoreRecords = false;
+        break;
+      }
+
+      console.log(`📋 [BACKGROUND] Processando ${records.length} registros (offset: ${offset})`);
 
     if (records && records.length > 0) {
       for (let i = 0; i < records.length; i += BATCH_SIZE) {
         const batch = records.slice(i, i + BATCH_SIZE);
         
-        console.log(`🔄 [BACKGROUND] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(records.length/BATCH_SIZE)}`);
+        console.log(`🔄 [BACKGROUND] Processando lote ${Math.floor((offset + i)/BATCH_SIZE) + 1}`);
 
         const processedRecords: any[] = [];
         const stagingIdsToUpdate: string[] = [];
+
+        // ... keep existing code (processing loop)
 
         // Aplicar transformações e validações
         for (const record of batch) {
@@ -162,6 +177,10 @@ serve(async (req) => {
           }
         }
       }
+      
+      // Atualizar offset para próxima busca
+      offset += FETCH_SIZE;
+    }
     }
 
     // 4. Aplicar quebras automáticas se houver registros inseridos
