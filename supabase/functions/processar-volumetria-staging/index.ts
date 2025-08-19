@@ -215,12 +215,12 @@ serve(async (req) => {
       
       console.log('✅ [STAGING] Colunas essenciais verificadas');
       
-      // 4. Processar em lotes pequenos
-      const BATCH_SIZE = 50;
+      // 4. Processar em MICRO-LOTES para economizar memória
+      const BATCH_SIZE = fileSizeKB > 10000 ? 15 : (fileSizeKB > 5000 ? 30 : 50);
       let loteAtual = 1;
       const totalLotes = Math.ceil(totalLinhas / BATCH_SIZE);
       
-      console.log(`📦 [STAGING] Processando em ${totalLotes} lotes de ${BATCH_SIZE} registros cada`);
+      console.log(`📦 [STAGING] Processando em ${totalLotes} micro-lotes de ${BATCH_SIZE} registros cada`);
 
       for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
         const batch = jsonData.slice(i, i + BATCH_SIZE);
@@ -229,27 +229,16 @@ serve(async (req) => {
         
         const stagingRecords: any[] = [];
 
-        // Mapear dados do lote
+        // Mapear dados do lote com campos reduzidos
         for (let j = 0; j < batch.length; j++) {
           const row = batch[j] as any;
           
           try {
-            const empresa = String(row['EMPRESA'] || '').trim();
-            const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-
-            // Log detalhado para debug
-            if (j === 0) {
-              console.log(`🔍 [STAGING] Exemplo primeiro registro do lote ${loteAtual}:`, {
-                EMPRESA: empresa,
-                NOME_PACIENTE: nomePaciente,
-                ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 20) + '...',
-                VALORES: row['VALORES']
-              });
-            }
+            const empresa = String(row['EMPRESA'] || '').trim().substring(0, 100);
+            const nomePaciente = String(row['NOME_PACIENTE'] || '').trim().substring(0, 100);
 
             // Validações básicas
             if (!empresa || !nomePaciente) {
-              console.log(`⚠️ [STAGING] Registro ${i+j+1} inválido: empresa="${empresa}" paciente="${nomePaciente}"`);
               totalErros++;
               continue;
             }
@@ -263,36 +252,12 @@ serve(async (req) => {
             const record = {
               EMPRESA: empresa,
               NOME_PACIENTE: nomePaciente,
-              CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').trim() || null,
-              ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').trim() || null,
-              ACCESSION_NUMBER: String(row['ACCESSION_NUMBER'] || '').trim() || null,
-              MODALIDADE: String(row['MODALIDADE'] || '').trim() || null,
-              PRIORIDADE: String(row['PRIORIDADE'] || '').trim() || null,
+              CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').substring(0, 50) || null,
+              ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 100) || null,
+              MODALIDADE: String(row['MODALIDADE'] || '').substring(0, 10) || null,
               VALORES: Number(row['VALORES']) || 0,
-              ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').trim() || null,
-              MEDICO: String(row['MEDICO'] || '').trim() || null,
-              DUPLICADO: String(row['DUPLICADO'] || '').trim() || null,
-              DATA_REALIZACAO: row['DATA_REALIZACAO'] || null,
-              HORA_REALIZACAO: row['HORA_REALIZACAO'] || null,
-              DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] || null,
-              HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] || null,
-              DATA_LAUDO: row['DATA_LAUDO'] || null,
-              HORA_LAUDO: row['HORA_LAUDO'] || null,
-              DATA_PRAZO: row['DATA_PRAZO'] || null,
-              HORA_PRAZO: row['HORA_PRAZO'] || null,
-              STATUS: String(row['STATUS'] || '').trim() || null,
-              DATA_REASSINATURA: row['DATA_REASSINATURA'] || null,
-              HORA_REASSINATURA: row['HORA_REASSINATURA'] || null,
-              MEDICO_REASSINATURA: String(row['MEDICO_REASSINATURA'] || '').trim() || null,
-              SEGUNDA_ASSINATURA: String(row['SEGUNDA_ASSINATURA'] || '').trim() || null,
-              POSSUI_IMAGENS_CHAVE: String(row['POSSUI_IMAGENS_CHAVE'] || '').trim() || null,
-              IMAGENS_CHAVES: row['IMAGENS_CHAVES'] || null,
-              IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] || null,
-              CODIGO_INTERNO: row['CODIGO_INTERNO'] || null,
-              DIGITADOR: String(row['DIGITADOR'] || '').trim() || null,
-              COMPLEMENTAR: String(row['COMPLEMENTAR'] || '').trim() || null,
-              CATEGORIA: String(row['CATEGORIA'] || '').trim() || null,
-              tipo_faturamento: String(row['TIPO_FATURAMENTO'] || '').trim() || null,
+              ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').substring(0, 50) || null,
+              MEDICO: String(row['MEDICO'] || '').substring(0, 100) || null,
               periodo_referencia: periodo_referencia,
               arquivo_fonte: arquivo_fonte,
               lote_upload: lote_upload,
@@ -301,55 +266,30 @@ serve(async (req) => {
 
             stagingRecords.push(record);
           } catch (error) {
-            console.error(`⚠️ [STAGING] Erro ao mapear registro ${i+j+1}:`, error);
             totalErros++;
           }
         }
 
-        // Inserir lote na tabela staging
-        console.log(`💾 [STAGING] Inserindo lote ${loteAtual} com ${stagingRecords.length} registros...`);
-        
+        // Inserir micro-lote na tabela staging
         if (stagingRecords.length > 0) {
-          const { error: insertError, count } = await supabaseClient
-            .from('volumetria_staging')
-            .insert(stagingRecords);
-
-          if (insertError) {
-            console.error('❌ [STAGING] Erro ao inserir lote:', insertError);
-            console.error('❌ [STAGING] Detalhes do erro:', JSON.stringify(insertError));
+          try {
+            await supabaseClient
+              .from('volumetria_staging')
+              .insert(stagingRecords);
             
-            // Tentar inserir registros individuais para identificar problema
-            let sucessosIndividuais = 0;
-            for (let k = 0; k < stagingRecords.length; k++) {
-              try {
-                await supabaseClient
-                  .from('volumetria_staging')
-                  .insert([stagingRecords[k]]);
-                sucessosIndividuais++;
-              } catch (individualError) {
-                if (k < 3) { // Log apenas os 3 primeiros erros
-                  console.error(`❌ [STAGING] Erro individual registro ${k+1}:`, individualError);
-                }
-                totalErros++;
-              }
-            }
-            
-            totalInseridos += sucessosIndividuais;
-            console.log(`⚠️ [STAGING] Inserção individual: ${sucessosIndividuais}/${stagingRecords.length} sucessos`);
-            
-          } else {
             totalInseridos += stagingRecords.length;
-            console.log(`✅ [STAGING] Lote ${loteAtual} inserido: ${stagingRecords.length} registros`);
+          } catch (insertError) {
+            console.error('❌ [STAGING] Erro ao inserir lote:', insertError);
+            totalErros += stagingRecords.length;
           }
-        } else {
-          console.log(`⚠️ [STAGING] Lote ${loteAtual} vazio após validações`);
         }
         
         loteAtual++;
         
-        // Pausa entre lotes para não sobrecarregar
-        if (loteAtual % 3 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Pausa para liberação de memória
+        if (loteAtual % 5 === 0) {
+          if (globalThis.gc) globalThis.gc(); // Forçar garbage collection
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
       }
       

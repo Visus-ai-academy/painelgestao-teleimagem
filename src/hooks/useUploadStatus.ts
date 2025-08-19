@@ -26,14 +26,14 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
 
   const fetchStatus = async () => {
     try {
-      // Buscar uploads ativos (processando) E recém-concluídos (últimos 3 minutos)
-      const cutoffTime = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      // Buscar uploads ativos (processando) E recém-concluídos (últimos 5 minutos)
+      const cutoffTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       
       let query = supabase
         .from('processamento_uploads')
-        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at')
-        .in('status', ['processando', 'concluido']) // Incluir concluídos também
-        .gte('created_at', cutoffTime); // Últimos 3 minutos
+        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at, detalhes_erro')
+        .in('status', ['processando', 'staging_concluido', 'concluido', 'erro']) // Incluir mais status
+        .gte('created_at', cutoffTime); // Últimos 5 minutos
       
       // Aplicar filtro de tipo(s)
       if (Array.isArray(fileType)) {
@@ -42,7 +42,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
         query = query.eq('tipo_arquivo', fileType);
       }
       
-      const { data: uploads, error } = await query;
+      const { data: uploads, error } = await query.order('created_at', { ascending: false }).limit(10);
 
       if (error) {
         console.error('Erro ao buscar status dos uploads:', error);
@@ -52,43 +52,46 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       const activeUploads = uploads || [];
       const totalUploads = activeUploads.length;
       const completedUploads = activeUploads.filter(u => u.status === 'concluido').length;
-      const processingUploads = activeUploads.filter(u => u.status === 'processando').length;
+      const processingUploads = activeUploads.filter(u => u.status === 'processando' || u.status === 'staging_concluido').length;
       const errorUploads = activeUploads.filter(u => u.status === 'erro').length;
       const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.registros_processados || 0), 0);
       
       const isProcessing = processingUploads > 0;
       
-      // Cálculo de progresso
+      // Cálculo de progresso melhorado
       let progressPercentage = 0;
       if (processingUploads > 0) {
         // Há processamento ativo
-        const uploadAtual = activeUploads.find(u => u.status === 'processando');
-        if (uploadAtual && uploadAtual.registros_processados > 0) {
-          // Usar o total real baseado no progresso atual, não limitado a 1000
-          const estimatedTotal = Math.max(uploadAtual.registros_processados, uploadAtual.registros_inseridos);
-          progressPercentage = Math.min(Math.round((uploadAtual.registros_inseridos / estimatedTotal) * 100), 99);
-        } else {
-          progressPercentage = 5; // Iniciando
+        const uploadAtual = activeUploads.find(u => u.status === 'processando' || u.status === 'staging_concluido');
+        if (uploadAtual) {
+          if (uploadAtual.status === 'staging_concluido') {
+            progressPercentage = 75; // Staging concluído, aguardando background
+          } else if (uploadAtual.registros_processados > 0) {
+            // Progresso baseado nos registros processados
+            const estimatedTotal = Math.max(uploadAtual.registros_processados, uploadAtual.registros_inseridos);
+            progressPercentage = Math.min(Math.round((uploadAtual.registros_inseridos / estimatedTotal) * 70), 70);
+          } else {
+            progressPercentage = 10; // Iniciando
+          }
         }
       } else if (completedUploads > 0) {
         // Há uploads recém-concluídos - mostrar 100%
         progressPercentage = 100;
-      } else {
-        // Nenhum upload ativo ou recente
-        progressPercentage = 0;
       }
       
       const lastUpdate = activeUploads.length > 0 
-        ? activeUploads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+        ? activeUploads[0].created_at
         : null;
 
       console.log('Upload Status Debug:', {
         totalUploads,
         processingUploads,
         completedUploads,
+        errorUploads,
         progressPercentage,
         isProcessing,
-        activeUploads: activeUploads.length
+        activeUploads: activeUploads.length,
+        lastStatuses: activeUploads.map(u => u.status)
       });
 
       setStatus({

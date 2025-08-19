@@ -123,13 +123,14 @@ serve(async (req) => {
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     console.log('📋 [STAGING-LIGHT] Convertendo planilha...');
     
-    // Conversão otimizada com limite de memória
+    // Conversão ultra-otimizada para arquivos grandes
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
       blankrows: false,
       skipHidden: true,
       raw: false,
-      range: 0 // Processar apenas o necessário
+      dateNF: 'yyyy-mm-dd', // Formato de data simples
+      header: 1 // Usar primeira linha como header
     });
     
     const totalLinhas = jsonData.length;
@@ -152,67 +153,77 @@ serve(async (req) => {
     
     console.log('✅ [STAGING-LIGHT] Estrutura validada');
 
-    // 4. Inserção em LOTES OTIMIZADOS para balance performance/memória  
-    const BATCH_SIZE = fileSizeKB > 5000 ? 100 : 250; // Ajusta dinamicamente baseado no tamanho
+    // 4. PROCESSAMENTO ULTRA-OTIMIZADO para arquivos muito grandes
+    const BATCH_SIZE = fileSizeKB > 10000 ? 25 : (fileSizeKB > 5000 ? 50 : 100);
     let totalInseridos = 0;
     let totalErros = 0;
     
-    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-      const batch = jsonData.slice(i, i + BATCH_SIZE);
-      const batchNum = Math.floor(i/BATCH_SIZE)+1;
-      const totalBatches = Math.ceil(jsonData.length/BATCH_SIZE);
-      console.log(`🔄 [STAGING-LIGHT] Lote ${batchNum}/${totalBatches} (${batch.length} registros)`);
+    // Processar em chunks menores para economizar memória
+    const CHUNK_SIZE = Math.min(1000, Math.floor(jsonData.length / 10)); // Máximo 1000 registros por chunk
+    
+    for (let chunkStart = 0; chunkStart < jsonData.length; chunkStart += CHUNK_SIZE) {
+      const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, jsonData.length);
+      const chunk = jsonData.slice(chunkStart, chunkEnd);
       
-      const stagingRecords = [];
+      console.log(`📦 [STAGING-LIGHT] Chunk ${Math.floor(chunkStart/CHUNK_SIZE)+1}/${Math.ceil(jsonData.length/CHUNK_SIZE)} (${chunk.length} registros)`);
       
-      for (const row of batch) {
-        try {
-          const empresa = String(row['EMPRESA'] || '').trim();
-          const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
-          
-          if (!empresa || !nomePaciente || empresa.includes('_local')) {
+      // Processar chunk em micro-lotes
+      for (let i = 0; i < chunk.length; i += BATCH_SIZE) {
+        const batch = chunk.slice(i, i + BATCH_SIZE);
+        const stagingRecords = [];
+        
+        for (const row of batch) {
+          try {
+            const empresa = String(row['EMPRESA'] || '').trim();
+            const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
+            
+            if (!empresa || !nomePaciente || empresa.includes('_local')) {
+              totalErros++;
+              continue;
+            }
+            
+            // Registro ultra-mínimo para economizar memória
+            stagingRecords.push({
+              EMPRESA: empresa,
+              NOME_PACIENTE: nomePaciente,
+              CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').substring(0, 50) || null,
+              ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').substring(0, 100) || null,
+              MODALIDADE: String(row['MODALIDADE'] || '').substring(0, 10) || null,
+              VALORES: Number(row['VALORES']) || 0,
+              ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').substring(0, 50) || null,
+              MEDICO: String(row['MEDICO'] || '').substring(0, 100) || null,
+              periodo_referencia: periodo_referencia || 'jun/25',
+              arquivo_fonte: arquivo_fonte,
+              lote_upload: lote_upload,
+              status_processamento: 'pendente'
+            });
+          } catch (error) {
             totalErros++;
-            continue;
           }
-          
-          // Registro mínimo para economizar memória
-          stagingRecords.push({
-            EMPRESA: empresa,
-            NOME_PACIENTE: nomePaciente,
-            CODIGO_PACIENTE: String(row['CODIGO_PACIENTE'] || '').trim() || null,
-            ESTUDO_DESCRICAO: String(row['ESTUDO_DESCRICAO'] || '').trim() || null,
-            MODALIDADE: String(row['MODALIDADE'] || '').trim() || null,
-            VALORES: Number(row['VALORES']) || 0,
-            ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').trim() || null,
-            MEDICO: String(row['MEDICO'] || '').trim() || null,
-            periodo_referencia: periodo_referencia || 'jun/25',
-            arquivo_fonte: arquivo_fonte,
-            lote_upload: lote_upload,
-            status_processamento: 'pendente'
-          });
-        } catch (error) {
-          console.error('⚠️ [STAGING-LIGHT] Erro no registro:', error);
-          totalErros++;
+        }
+        
+        // Inserir micro-lote com retry
+        if (stagingRecords.length > 0) {
+          try {
+            await supabaseClient
+              .from('volumetria_staging')
+              .insert(stagingRecords);
+            totalInseridos += stagingRecords.length;
+          } catch (insertError) {
+            console.error('❌ [STAGING-LIGHT] Erro na inserção batch:', insertError);
+            totalErros += stagingRecords.length;
+          }
+        }
+        
+        // Liberação de memória mais agressiva
+        if (totalInseridos % 200 === 0) {
+          if (globalThis.gc) globalThis.gc(); // Forçar garbage collection se disponível
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
       
-      // Inserir micro-lote
-      if (stagingRecords.length > 0) {
-        try {
-          await supabaseClient
-            .from('volumetria_staging')
-            .insert(stagingRecords);
-          totalInseridos += stagingRecords.length;
-        } catch (insertError) {
-          console.error('❌ [STAGING-LIGHT] Erro na inserção:', insertError);
-          totalErros += stagingRecords.length;
-        }
-      }
-      
-      // Pausa estratégica para liberar memória (a cada 1000 registros)
-      if (i % 1000 === 0 && i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Pausa entre chunks para liberar memória
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     console.log(`📊 [STAGING-LIGHT] RESULTADO: ${totalInseridos} inseridos, ${totalErros} erros`);

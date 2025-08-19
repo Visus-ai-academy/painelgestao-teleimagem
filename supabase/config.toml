@@ -106,3 +106,9 @@ verify_jwt = true
 
 [functions.processar-staging-background]
 verify_jwt = true
+
+[functions.processar-volumetria-staging-light]
+verify_jwt = true
+
+[functions.limpar-staging-antigo]
+verify_jwt = true
