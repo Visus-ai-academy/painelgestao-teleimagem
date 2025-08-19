@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
-import { processVolumetriaFile, processVolumetriaComStaging, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
+import { processVolumetriaComStaging, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
 import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
