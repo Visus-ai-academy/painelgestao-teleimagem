@@ -46,22 +46,40 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      console.log(`🚀 Iniciando UPLOAD DIRETO para ${arquivoFonte} - SEM PROCESSAMENTO COMPLEXO`);
+      console.log(`🚀 Iniciando UPLOAD para ${arquivoFonte} - COM REGRAS APLICADAS`);
       
-      // Simular progresso para UX
-      setProgress(25);
-      setTimeout(() => setProgress(50), 500);
-      setTimeout(() => setProgress(75), 1000);
-      setTimeout(() => setProgress(90), 1500);
+      // 1. UPLOAD DO ARQUIVO PARA STORAGE
+      setProgress(10);
+      const fileName = `${arquivoFonte}_${Date.now()}.xlsx`;
       
-      // PROCESSAMENTO COMPLETO COM REGRAS
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Erro no upload:', uploadError);
+        throw new Error(`Erro ao fazer upload: ${uploadError.message}`);
+      }
+
+      console.log('✅ Arquivo enviado para storage:', fileName);
+      setProgress(30);
+      
+      // 2. PROCESSAMENTO COMPLETO COM REGRAS
+      console.log('🔧 Iniciando processamento com regras...');
+      setProgress(50);
+      
       const result = await supabase.functions.invoke('processar-excel-com-regras', {
         body: {
-          file_path: `uploads/${file.name}`,
+          file_path: fileName,
           arquivo_fonte: arquivoFonte,
           periodo_referencia: 'jun/25'
         }
       });
+
+      setProgress(80);
 
       if (result.error) {
         console.error('❌ Erro na função:', result.error);
@@ -96,10 +114,10 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
         onSuccess?.();
         
       } else {
-        console.error('❌ Falha no upload direto:', data);
+        console.error('❌ Falha no processamento:', data);
         toast({
           title: "Erro no processamento",
-          description: data?.message || "Erro desconhecido", 
+          description: data?.error || data?.message || "Erro desconhecido no processamento", 
           variant: "destructive"
         });
       }
