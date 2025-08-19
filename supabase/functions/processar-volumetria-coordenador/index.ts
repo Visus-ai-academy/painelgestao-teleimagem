@@ -26,8 +26,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Chamar staging-light (função confiável)
-    console.log('🚀 [COORDENADOR] Chamando staging-light...');
+    // 1. Chamar staging (função confiável)
+    console.log('🚀 [COORDENADOR] Chamando staging...');
     
     // Buscar período de referência ativo do sistema se não fornecido
     let periodoAtivo = periodo_referencia;
@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const stagingResponse = await supabase.functions.invoke(
-      'processar-volumetria-staging-light',
+      'processar-volumetria-staging',
       {
         body: {
           file_path,
@@ -52,18 +52,18 @@ serve(async (req) => {
       }
     );
 
-    console.log('📊 [COORDENADOR] Resposta staging-light raw:', stagingResponse);
+    console.log('📊 [COORDENADOR] Resposta staging raw:', stagingResponse);
 
     if (stagingResponse.error) {
-      console.error('❌ [COORDENADOR] Erro no staging-light:', stagingResponse.error);
-      throw new Error(`Staging-light falhou: ${stagingResponse.error.message}`);
+      console.error('❌ [COORDENADOR] Erro no staging:', stagingResponse.error);
+      throw new Error(`Staging falhou: ${stagingResponse.error.message}`);
     }
 
     const stagingData = stagingResponse.data;
-    console.log('✅ [COORDENADOR] Staging-light dados:', stagingData);
+    console.log('✅ [COORDENADOR] Staging dados:', stagingData);
 
     if (!stagingData?.success) {
-      throw new Error('Staging-light não retornou sucesso');
+      throw new Error('Staging não retornou sucesso');
     }
 
     // 2. Chamar background processing imediatamente (sem waitUntil por enquanto)
