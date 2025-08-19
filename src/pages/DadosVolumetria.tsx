@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
+import { PeriodoReferenciaManager } from "@/components/volumetria/PeriodoReferenciaManager";
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
@@ -44,6 +45,9 @@ export default function DadosVolumetria() {
           </TabsList>
 
           <TabsContent value="upload" className="space-y-6">
+            {/* Configuração do Período do Sistema */}
+            <PeriodoReferenciaManager />
+
             {/* Seletor de Período */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-800 mb-2">Período de Processamento</h3>

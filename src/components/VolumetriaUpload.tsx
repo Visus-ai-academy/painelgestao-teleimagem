@@ -71,11 +71,16 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       console.log('🔧 Iniciando processamento com regras...');
       setProgress(50);
       
+      // Converter período selecionado para formato brasileiro  
+      const periodoReferencia = periodoFaturamento ? 
+        `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][periodoFaturamento.mes-1]}/${periodoFaturamento.ano.toString().slice(-2)}` :
+        'jun/25'; // fallback
+      
       const result = await supabase.functions.invoke('processar-excel-com-regras', {
         body: {
           file_path: fileName,
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: 'jun/25'
+          periodo_referencia: periodoReferencia
         }
       });
 

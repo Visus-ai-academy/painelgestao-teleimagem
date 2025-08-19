@@ -162,6 +162,10 @@ serve(async (req) => {
     
     console.log('✅ [STAGING-LIGHT] Estrutura validada');
 
+    // Obter período de referência formatado corretamente
+    const periodoRef = periodo_referencia || 'jun/25';
+    console.log(`📅 [STAGING-LIGHT] Usando período de referência: ${periodoRef}`);
+    
     // 4. PROCESSAMENTO ULTRA-CONSERVADOR para arquivos gigantes
     const BATCH_SIZE = fileSizeKB > 8000 ? 10 : (fileSizeKB > 5000 ? 20 : 50);
     let totalInseridos = 0;
@@ -203,7 +207,7 @@ serve(async (req) => {
               VALORES: Number(row['VALORES']) || 0,
               ESPECIALIDADE: String(row['ESPECIALIDADE'] || '').substring(0, 50) || null,
               MEDICO: String(row['MEDICO'] || '').substring(0, 100) || null,
-              periodo_referencia: periodo_referencia || 'jun/25',
+              periodo_referencia: periodoRef,
               arquivo_fonte: arquivo_fonte,
               lote_upload: lote_upload,
               status_processamento: 'pendente'

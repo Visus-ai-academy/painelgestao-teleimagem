@@ -92,8 +92,25 @@ serve(async (req) => {
     let totalInseridos = 0;
     let totalErros = 0;
 
-    // 5. Processar em lotes otimizados para inserção final  
-    const BATCH_SIZE = 100; // Aumentado de 25 para 100
+    // 5. Processar TUDO de uma vez - os triggers aplicarão as regras automaticamente
+    console.log('🔄 [BACKGROUND] Aplicando regras via RPC para aplicar todas de uma vez...');
+    
+    // Aplicar regras automaticamente via funções RPC
+    const { error: aplicarRegrasError } = await supabaseClient.functions.invoke('aplicar-regras-lote', {
+      body: {
+        arquivo_fonte: arquivo_fonte,
+        periodo_referencia: periodo_referencia
+      }
+    });
+
+    if (aplicarRegrasError) {
+      console.error('❌ [BACKGROUND] Erro ao aplicar regras:', aplicarRegrasError);
+    } else {
+      console.log('✅ [BACKGROUND] Regras aplicadas com sucesso via RPC');
+    }
+
+    // 6. Inserir em lotes diretamente na tabela final (triggers aplicam regras automaticamente)
+    const BATCH_SIZE = 50; // Reduzido para evitar timeouts
     
     for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
       const batch = allRecords.slice(i, i + BATCH_SIZE);
@@ -103,33 +120,17 @@ serve(async (req) => {
       const finalRecords: any[] = [];
       const stagingIdsToUpdate: string[] = [];
 
-      // Aplicar regras simples (sem muita complexidade)
+      // Preparar registros para inserção (triggers aplicarão regras automaticamente)
       for (const record of batch) {
         try {
-          // Aplicar apenas regras básicas
-          let empresa = record.EMPRESA;
-          let modalidade = record.MODALIDADE;
-          
-          // Normalizar cliente CEDI-* para CEDIDIAG
-          if (empresa && (empresa.includes('CEDI-') || empresa.includes('CEDI_'))) {
-            empresa = 'CEDIDIAG';
-          }
-          
-          // Correção simples de modalidade
-          if (modalidade === 'CR' || modalidade === 'DX') {
-            modalidade = record.ESTUDO_DESCRICAO === 'MAMOGRAFIA' ? 'MG' : 'RX';
-          }
-          if (modalidade === 'OT') {
-            modalidade = 'DO';
-          }
-
+          // NÃO aplicar regras aqui - os triggers farão automaticamente
           const finalRecord = {
-            EMPRESA: empresa,
+            EMPRESA: record.EMPRESA,
             NOME_PACIENTE: record.NOME_PACIENTE,
             CODIGO_PACIENTE: record.CODIGO_PACIENTE,
             ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
             ACCESSION_NUMBER: record.ACCESSION_NUMBER,
-            MODALIDADE: modalidade,
+            MODALIDADE: record.MODALIDADE,
             PRIORIDADE: record.PRIORIDADE || 'normal',
             VALORES: Number(record.VALORES) || 0,
             ESPECIALIDADE: record.ESPECIALIDADE,
@@ -154,13 +155,13 @@ serve(async (req) => {
             CODIGO_INTERNO: record.CODIGO_INTERNO,
             DIGITADOR: record.DIGITADOR,
             COMPLEMENTAR: record.COMPLEMENTAR,
-            CATEGORIA: record.CATEGORIA || 'SC',
-            tipo_faturamento: record.tipo_faturamento || 'padrao',
-            data_referencia: new Date().toISOString().split('T')[0],
+            CATEGORIA: record.CATEGORIA, // Trigger aplicará automaticamente
+            tipo_faturamento: record.tipo_faturamento, // Trigger aplicará automaticamente  
+            data_referencia: record.data_referencia || new Date().toISOString().split('T')[0],
             periodo_referencia: record.periodo_referencia,
             arquivo_fonte: record.arquivo_fonte,
             lote_upload: record.lote_upload,
-            processamento_pendente: false
+            processamento_pendente: true // Marcar para processamento de quebras
           };
 
           finalRecords.push(finalRecord);
@@ -228,14 +229,34 @@ serve(async (req) => {
       })
       .eq('id', upload_id);
 
+    // 8. Processar quebras pendentes após inserção
+    console.log('🔧 [BACKGROUND] Processando quebras pendentes...');
+    
+    try {
+      const { error: quebrasError } = await supabaseClient.functions.invoke('processar-quebras-pendentes', {
+        body: {
+          arquivo_fonte: arquivo_fonte,
+          periodo_referencia: periodo_referencia
+        }
+      });
+
+      if (quebrasError) {
+        console.error('⚠️ [BACKGROUND] Erro nas quebras (não crítico):', quebrasError);
+      } else {
+        console.log('✅ [BACKGROUND] Quebras processadas com sucesso');
+      }
+    } catch (error) {
+      console.error('⚠️ [BACKGROUND] Erro ao processar quebras (continuando):', error);
+    }
+
     const resultado = {
       success: true,
-      message: `Background processado: ${finalCount || totalInseridos} registros inseridos`,
+      message: `Background processado: ${finalCount || totalInseridos} registros inseridos com regras aplicadas`,
       upload_id: upload_id,
       registros_processados: totalProcessados,
       registros_inseridos: finalCount || totalInseridos,
       registros_erro: totalErros,
-      regras_aplicadas: ['limpeza_cliente', 'correcao_modalidade']
+      regras_aplicadas: ['trigger_regras_completas', 'quebras_automaticas', 'de_para', 'tipificacao']
     };
 
     console.log('✅ [BACKGROUND] Processamento concluído:', resultado);
