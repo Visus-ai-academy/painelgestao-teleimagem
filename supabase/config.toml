@@ -130,3 +130,9 @@ verify_jwt = true
 
 [functions.processar-volumetria-instantaneo]
 verify_jwt = true
+
+[functions.processar-quebras-pendentes]
+verify_jwt = true
+
+[functions.aplicar-todas-regras-volumetria]
+verify_jwt = true

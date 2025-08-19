@@ -29,13 +29,25 @@ serve(async (req) => {
     // 1. Chamar staging-light diretamente
     console.log('🚀 [COORDENADOR] Chamando staging-light...');
     
+    // Buscar período de referência ativo do sistema se não fornecido
+    let periodoAtivo = periodo_referencia;
+    if (!periodoAtivo) {
+      const { data: periodoConfig } = await supabase
+        .from('configuracoes_sistema')
+        .select('valor')
+        .eq('chave', 'periodo_referencia_ativo')
+        .single();
+      
+      periodoAtivo = periodoConfig?.valor || 'jul/25'; // fallback mais recente
+    }
+
     const stagingResponse = await supabase.functions.invoke(
       'processar-volumetria-staging-light',
       {
         body: {
           file_path,
           arquivo_fonte,
-          periodo_referencia: periodo_referencia || 'jun/25'
+          periodo_referencia: periodoAtivo
         }
       }
     );
@@ -63,7 +75,7 @@ serve(async (req) => {
         body: {
           upload_id: stagingData.upload_id || upload_id,
           arquivo_fonte,
-          periodo_referencia: periodo_referencia || 'jun/25'
+          periodo_referencia: periodoAtivo
         }
       }
     );
