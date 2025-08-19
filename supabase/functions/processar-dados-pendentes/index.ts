@@ -12,90 +12,72 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 [PENDENTES] Iniciando processamento de dados pendentes...');
+    console.log('🔄 [PENDENTES] Iniciando processamento simplificado...');
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar uploads travados (processando com contadores zerados)
-    const { data: uploadsTravados, error } = await supabaseClient
+    // Buscar uploads que estão travados
+    const { data: uploads, error } = await supabaseClient
       .from('processamento_uploads')
-      .select('id, arquivo_fonte, periodo_referencia, lote_upload')
-      .eq('status_processamento', 'processando')
-      .eq('registros_inseridos', 0)
-      .eq('registros_processados', 0);
+      .select('*')
+      .eq('status', 'processando')
+      .eq('registros_inseridos', 0);
 
     if (error) {
       console.error('❌ [PENDENTES] Erro ao buscar uploads:', error);
       throw error;
     }
 
-    console.log(`📋 [PENDENTES] ${uploadsTravados?.length || 0} uploads travados encontrados`);
+    console.log(`📋 [PENDENTES] ${uploads?.length || 0} uploads encontrados`);
 
-    if (!uploadsTravados || uploadsTravados.length === 0) {
+    if (!uploads || uploads.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'Nenhum upload travado encontrado',
+          message: 'Nenhum upload pendente encontrado',
           totalProcessados: 0
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    let totalProcessados = 0;
-    const resultados = [];
-
-    // Processar cada upload travado
-    for (const upload of uploadsTravados) {
-      console.log(`🔄 [PENDENTES] Processando upload ${upload.id}`);
-      
+    // Para uploads simples que estão travados, vamos resetá-los para permitir novo processamento
+    let processados = 0;
+    
+    for (const upload of uploads) {
       try {
-        // Chamar a função de staging-background
-        const { data: resultado, error: processError } = await supabaseClient.functions.invoke(
-          'processar-staging-background',
-          {
-            body: {
-              upload_id: upload.id,
-              arquivo_fonte: upload.arquivo_fonte,
-              periodo_referencia: upload.periodo_referencia
+        // Resetar status para permitir reprocessamento
+        const { error: updateError } = await supabaseClient
+          .from('processamento_uploads')
+          .update({ 
+            status: 'pendente',
+            detalhes_erro: {
+              ...upload.detalhes_erro,
+              reset_em: new Date().toISOString(),
+              motivo: 'Resetado por processamento pendentes'
             }
-          }
-        );
+          })
+          .eq('id', upload.id);
 
-        if (processError) {
-          console.error(`❌ [PENDENTES] Erro no upload ${upload.id}:`, processError);
-          resultados.push({
-            upload_id: upload.id,
-            status: 'erro',
-            erro: processError.message
-          });
+        if (updateError) {
+          console.error(`❌ [PENDENTES] Erro ao resetar upload ${upload.id}:`, updateError);
         } else {
-          console.log(`✅ [PENDENTES] Upload ${upload.id} processado`);
-          totalProcessados++;
-          resultados.push({
-            upload_id: upload.id,
-            status: 'sucesso'
-          });
+          console.log(`✅ [PENDENTES] Upload ${upload.id} resetado`);
+          processados++;
         }
       } catch (error) {
-        console.error(`❌ [PENDENTES] Erro inesperado no upload ${upload.id}:`, error);
-        resultados.push({
-          upload_id: upload.id,
-          status: 'erro',
-          erro: error.message
-        });
+        console.error(`❌ [PENDENTES] Erro no upload ${upload.id}:`, error);
       }
     }
 
     const resultado = {
       success: true,
-      message: `${totalProcessados} de ${uploadsTravados.length} uploads processados`,
-      totalProcessados,
-      totalTravados: uploadsTravados.length,
-      resultados
+      message: `${processados} uploads resetados para reprocessamento`,
+      totalProcessados: processados,
+      totalEncontrados: uploads.length
     };
 
     console.log('✅ [PENDENTES] Processamento concluído:', resultado);
