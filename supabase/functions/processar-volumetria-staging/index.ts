@@ -52,11 +52,11 @@ serve(async (req) => {
       .from('processamento_uploads')
       .insert({
         tipo_arquivo: arquivo_fonte,
-        nome_arquivo: file_path.split('/').pop(),
+        arquivo_nome: file_path.split('/').pop(),
         status: 'processando_staging',
         periodo_referencia: periodo_referencia,
-        lote_upload: lote_upload,
-        detalhes_processamento: {
+        detalhes_erro: {
+          lote_upload: lote_upload,
           etapa: 'staging',
           inicio: new Date().toISOString()
         }
@@ -184,13 +184,14 @@ serve(async (req) => {
       .update({
         status: 'staging_concluido',
         registros_processados: totalProcessados,
-        registros_inseridos_staging: totalInseridos,
-        registros_erro_staging: totalErros,
-        detalhes_processamento: {
+        registros_inseridos: totalInseridos,
+        registros_erro: totalErros,
+        detalhes_erro: {
           etapa: 'staging_completo',
           registros_excel: jsonData.length,
           registros_staging: totalInseridos,
           registros_erro: totalErros,
+          lote_upload: lote_upload,
           concluido_em: new Date().toISOString()
         }
       })
@@ -202,8 +203,8 @@ serve(async (req) => {
       upload_id: uploadRecord.id,
       lote_upload: lote_upload,
       registros_excel: jsonData.length,
-      registros_inseridos_staging: totalInseridos,
-      registros_erro_staging: totalErros
+      registros_inseridos: totalInseridos,
+      registros_erro: totalErros
     };
 
     console.log('✅ [STAGING] Processamento concluído:', resultado);

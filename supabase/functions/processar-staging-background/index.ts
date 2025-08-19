@@ -31,7 +31,7 @@ serve(async (req) => {
       .from('processamento_uploads')
       .update({
         status: 'processando_regras',
-        detalhes_processamento: {
+        detalhes_erro: {
           etapa: 'background',
           inicio: new Date().toISOString()
         }
@@ -42,7 +42,7 @@ serve(async (req) => {
     console.log('📥 [BACKGROUND] Buscando dados do staging...');
     const { data: stagingData, error: stagingError } = await supabaseClient
       .from('processamento_uploads')
-      .select('lote_upload, registros_inseridos_staging')
+      .select('detalhes_erro, registros_inseridos')
       .eq('id', upload_id)
       .single();
 
@@ -51,10 +51,11 @@ serve(async (req) => {
       throw new Error('Upload não encontrado');
     }
 
+    const lote_upload = stagingData.detalhes_erro?.lote_upload;
     const { data: records, error: fetchError } = await supabaseClient
       .from('volumetria_staging')
       .select('*')
-      .eq('lote_upload', stagingData.lote_upload)
+      .eq('lote_upload', lote_upload)
       .eq('status_processamento', 'pendente');
 
     if (fetchError) {
@@ -191,15 +192,16 @@ serve(async (req) => {
         status: 'concluido',
         registros_processados: totalProcessados,
         registros_inseridos: totalInseridos,
-        registros_erro: totalErros + (stagingData.registros_inseridos_staging - totalProcessados),
+        registros_erro: totalErros + (stagingData.registros_inseridos - totalProcessados),
         completed_at: new Date().toISOString(),
-        detalhes_processamento: {
+        detalhes_erro: {
           etapa: 'completo',
-          registros_staging: stagingData.registros_inseridos_staging,
+          registros_staging: stagingData.registros_inseridos,
           registros_processados: totalProcessados,
           registros_finais: totalInseridos,
           registros_erro: totalErros,
           regras_aplicadas: regrasAplicadas,
+          lote_upload: lote_upload,
           concluido_em: new Date().toISOString()
         }
       })
@@ -211,7 +213,7 @@ serve(async (req) => {
         await supabaseClient
           .from('volumetria_staging')
           .delete()
-          .eq('lote_upload', stagingData.lote_upload);
+          .eq('lote_upload', lote_upload);
         console.log(`🧹 [BACKGROUND] Staging limpo para lote: ${stagingData.lote_upload}`);
       } catch (error) {
         console.error('⚠️ [BACKGROUND] Erro ao limpar staging:', error);
