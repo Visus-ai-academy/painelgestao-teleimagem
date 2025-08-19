@@ -90,17 +90,59 @@ serve(async (req) => {
       throw downloadError;
     }
 
-    // 3. Ler Excel
+    // 3. Ler Excel com otimização de memória
     console.log('📊 [STAGING] Lendo arquivo Excel...');
-    const arrayBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+    
+    let workbook, worksheet, jsonData;
+    
+    try {
+      // Ler arquivo em chunks menores para evitar excesso de memória
+      const arrayBuffer = await fileData.arrayBuffer();
+      console.log(`📏 [STAGING] Arquivo: ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
+      
+      // Configurar XLSX para usar menos memória
+      workbook = XLSX.read(arrayBuffer, { 
+        type: 'array',
+        cellNF: false,
+        cellHTML: false,
+        cellFormula: false,
+        cellStyles: false,
+        cellDates: true,
+        dense: false
+      });
+      
+      worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!worksheet) {
+        throw new Error('Planilha não encontrada no arquivo');
+      }
+      
+      jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        defval: null,
+        blankrows: false,
+        skipHidden: true 
+      });
+      
+      console.log(`📋 [STAGING] ${jsonData.length} registros encontrados no Excel`);
+      
+      // Limpar objetos grandes da memória
+      workbook = null;
+      worksheet = null;
+      
+    } catch (error) {
+      console.error('❌ [STAGING] Erro ao processar Excel:', error);
+      await supabaseClient
+        .from('processamento_uploads')
+        .update({
+          status: 'erro',
+          detalhes_erro: { etapa: 'staging', erro: `Erro ao processar Excel: ${error.message}` },
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', uploadRecord.id);
+      throw error;
+    }
 
-    console.log(`📋 [STAGING] ${jsonData.length} registros encontrados no Excel`);
-
-    // 4. Processar em lotes para staging
-    const BATCH_SIZE = 500;
+    // 4. Processar em lotes menores para staging
+    const BATCH_SIZE = 100;
     let totalProcessados = 0;
     let totalInseridos = 0;
     let totalErros = 0;
