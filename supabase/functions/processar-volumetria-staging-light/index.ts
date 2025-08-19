@@ -138,18 +138,20 @@ serve(async (req) => {
     
     console.log('✅ [STAGING-LIGHT] Estrutura validada');
 
-    // 4. Inserção em MICRO-LOTES para economizar memória
-    const MICRO_BATCH = 10; // Lotes ultra pequenos
+    // 4. Inserção em LOTES OTIMIZADOS para balance performance/memória  
+    const BATCH_SIZE = fileSizeKB > 5000 ? 100 : 250; // Ajusta dinamicamente baseado no tamanho
     let totalInseridos = 0;
     let totalErros = 0;
     
-    for (let i = 0; i < jsonData.length; i += MICRO_BATCH) {
-      const microBatch = jsonData.slice(i, i + MICRO_BATCH);
-      console.log(`🔄 [STAGING-LIGHT] Processando micro-lote ${Math.floor(i/MICRO_BATCH)+1}`);
+    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+      const batch = jsonData.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i/BATCH_SIZE)+1;
+      const totalBatches = Math.ceil(jsonData.length/BATCH_SIZE);
+      console.log(`🔄 [STAGING-LIGHT] Lote ${batchNum}/${totalBatches} (${batch.length} registros)`);
       
       const stagingRecords = [];
       
-      for (const row of microBatch) {
+      for (const row of batch) {
         try {
           const empresa = String(row['EMPRESA'] || '').trim();
           const nomePaciente = String(row['NOME_PACIENTE'] || '').trim();
@@ -193,9 +195,9 @@ serve(async (req) => {
         }
       }
       
-      // Pausa entre micro-lotes para liberar memória
-      if (i % 50 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+      // Pausa estratégica para liberar memória (a cada 1000 registros)
+      if (i % 1000 === 0 && i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
     
