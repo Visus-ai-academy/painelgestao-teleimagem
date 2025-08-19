@@ -57,11 +57,13 @@ serve(async (req) => {
       "PRIORIDADE": i % 3 === 0 ? 'urgencia' : 'normal',
       "VALORES": (() => {
         const tipo = ['RX TORAX', 'CT CRANIO', 'RM JOELHO', 'US ABDOME'][i % 4];
+        // Alguns registros zerados para testar regras de-para, outros com valores reais
+        if (i % 5 === 0) return 0; // 20% zerados para testar de-para
         switch(tipo) {
-          case 'RX TORAX': return Math.floor(Math.random() * 3) + 1; // 1-3 exames
-          case 'CT CRANIO': return Math.floor(Math.random() * 2) + 1; // 1-2 exames  
-          case 'RM JOELHO': return Math.floor(Math.random() * 2) + 1; // 1-2 exames
-          case 'US ABDOME': return Math.floor(Math.random() * 4) + 1; // 1-4 exames
+          case 'RX TORAX': return 1;
+          case 'CT CRANIO': return 2; 
+          case 'RM JOELHO': return 1;
+          case 'US ABDOME': return 3;
           default: return 1;
         }
       })(),
