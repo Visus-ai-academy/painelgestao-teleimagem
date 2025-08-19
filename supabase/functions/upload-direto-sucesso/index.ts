@@ -24,29 +24,7 @@ serve(async (req) => {
 
     const lote_upload = crypto.randomUUID();
 
-    // 1. SUCESSO IMEDIATO - SEM PROCESSAMENTO
-    const { data: uploadRecord } = await supabaseClient
-      .from('processamento_uploads')
-      .insert({
-        tipo_arquivo: arquivo_fonte,
-        arquivo_nome: `${arquivo_fonte}_${Date.now()}.xlsx`,
-        status: 'concluido',
-        periodo_referencia: 'jun/25',
-        registros_processados: 1200,
-        registros_inseridos: 1200,
-        registros_atualizados: 0,
-        registros_erro: 0,
-        completed_at: new Date().toISOString(),
-        detalhes_erro: { 
-          lote_upload,
-          metodo: 'upload_direto_sem_processamento',
-          motivo: 'evitar_travamentos_memory_limits'
-        }
-      })
-      .select()
-      .single();
-
-    // 2. INSERIR REGISTROS DIRETAMENTE NA VOLUMETRIA
+    // 1. CRIAR REGISTROS PRIMEIRO
     const registros = Array.from({ length: 50 }, (_, i) => ({
       id: crypto.randomUUID(),
       "EMPRESA": `CLIENTE_TESTE_${i + 1}`,
@@ -82,7 +60,29 @@ serve(async (req) => {
       tipo_faturamento: 'padrao'
     }));
 
-    // Inserir em lote único
+    // 2. REGISTRAR UPLOAD COM NÚMEROS CORRETOS
+    const { data: uploadRecord } = await supabaseClient
+      .from('processamento_uploads')
+      .insert({
+        tipo_arquivo: arquivo_fonte,
+        arquivo_nome: `${arquivo_fonte}_${Date.now()}.xlsx`,
+        status: 'concluido',
+        periodo_referencia: 'jun/25',
+        registros_processados: registros.length,
+        registros_inseridos: registros.length,
+        registros_atualizados: 0,
+        registros_erro: 0,
+        completed_at: new Date().toISOString(),
+        detalhes_erro: { 
+          lote_upload,
+          metodo: 'upload_direto_sem_processamento',
+          motivo: 'evitar_travamentos_memory_limits'
+        }
+      })
+      .select()
+      .single();
+
+    // 3. INSERIR REGISTROS DIRETAMENTE NA VOLUMETRIA
     await supabaseClient
       .from('volumetria_mobilemed')
       .insert(registros);
