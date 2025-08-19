@@ -57,16 +57,42 @@ serve(async (req) => {
     // 1. ETAPA STAGING OTIMIZADA - Para arquivos grandes
     console.log('📋 [COORDENADOR] Etapa 1: Processando com staging otimizado...');
     
+    // VALIDAÇÃO CRÍTICA ANTES DE MONTAR PAYLOAD
+    console.log('🔍 [COORDENADOR] Validando dados antes de criar payload:', {
+      file_path_recebido: file_path,
+      file_path_tipo: typeof file_path,
+      file_path_length: file_path ? file_path.length : 0,
+      arquivo_fonte_recebido: arquivo_fonte,
+      periodo_referencia_recebido: periodo_referencia
+    });
+    
+    if (!file_path || typeof file_path !== 'string') {
+      console.error('💥 [COORDENADOR] ERRO CRÍTICO: file_path inválido antes de criar payload');
+      throw new Error('file_path inválido no coordenador');
+    }
+    
     const stagingPayload = { 
-      file_path,
-      arquivo_fonte,
+      file_path: file_path,
+      arquivo_fonte: arquivo_fonte,
       periodo_referencia: periodo_referencia || 'jun/25'
     };
     
     console.log('📤 [COORDENADOR] Payload para staging otimizado:', JSON.stringify(stagingPayload, null, 2));
+    console.log('🔍 [COORDENADOR] Verificação final do payload:', {
+      payload_file_path: stagingPayload.file_path,
+      payload_file_path_tipo: typeof stagingPayload.file_path,
+      payload_arquivo_fonte: stagingPayload.arquivo_fonte
+    });
     
     // Tentar primeiro com staging otimizado (para arquivos grandes)
     let stagingResult, stagingError;
+    
+    // Log crítico antes da chamada
+    console.log('🚨 [COORDENADOR] ANTES DE CHAMAR STAGING-LIGHT - Dados finais:', {
+      stagingPayload_completo: stagingPayload,
+      file_path_no_payload: stagingPayload.file_path,
+      arquivo_fonte_no_payload: stagingPayload.arquivo_fonte
+    });
     
     try {
       const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
@@ -74,9 +100,20 @@ serve(async (req) => {
       });
       stagingResult = data;
       stagingError = error;
+      
+      if (error) {
+        console.error('❌ [COORDENADOR] Staging otimizado retornou erro:', error);
+        throw error;
+      }
+      
       console.log('✅ [COORDENADOR] Staging otimizado usado com sucesso');
     } catch (lightError) {
       console.log('⚠️ [COORDENADOR] Staging otimizado falhou, tentando staging padrão:', lightError.message);
+      console.log('🚨 [COORDENADOR] ANTES DE CHAMAR STAGING PADRÃO - Dados finais:', {
+        stagingPayload_completo: stagingPayload,
+        file_path_no_payload: stagingPayload.file_path,
+        arquivo_fonte_no_payload: stagingPayload.arquivo_fonte
+      });
       
       // Fallback para staging padrão
       try {
@@ -85,6 +122,12 @@ serve(async (req) => {
         });
         stagingResult = data;
         stagingError = error;
+        
+        if (error) {
+          console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
+          throw error;
+        }
+        
         console.log('✅ [COORDENADOR] Staging padrão usado como fallback');
       } catch (standardError) {
         console.error('❌ [COORDENADOR] Ambos stagings falharam:', standardError);

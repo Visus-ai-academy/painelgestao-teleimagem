@@ -18,6 +18,9 @@ serve(async (req) => {
     let requestBody;
     try {
       requestBody = await req.json();
+      console.log('📨 [STAGING-LIGHT] Request body recebido completo:', JSON.stringify(requestBody, null, 2));
+      console.log('📨 [STAGING-LIGHT] Tipo do requestBody:', typeof requestBody);
+      console.log('📨 [STAGING-LIGHT] Keys do requestBody:', Object.keys(requestBody || {}));
     } catch (jsonError) {
       console.error('❌ [STAGING-LIGHT] Erro ao fazer parse do JSON:', jsonError);
       throw new Error('Request body inválido');
@@ -25,9 +28,18 @@ serve(async (req) => {
 
     const { file_path, arquivo_fonte, periodo_referencia } = requestBody;
     
+    console.log('🔍 [STAGING-LIGHT] Valores extraídos do destructuring:', {
+      file_path_extraido: file_path,
+      file_path_tipo: typeof file_path,
+      arquivo_fonte_extraido: arquivo_fonte,
+      arquivo_fonte_tipo: typeof arquivo_fonte,
+      periodo_referencia_extraido: periodo_referencia
+    });
+    
     // VALIDAÇÕES CRÍTICAS
     if (!file_path || typeof file_path !== 'string' || file_path.trim() === '') {
       console.error('❌ [STAGING-LIGHT] file_path inválido:', { file_path, type: typeof file_path });
+      console.error('💥 [STAGING-LIGHT] RequestBody completo quando file_path inválido:', requestBody);
       throw new Error('ERRO CRÍTICO: file_path obrigatório, deve ser string não-vazia');
     }
     if (!arquivo_fonte || arquivo_fonte.trim() === '') {
