@@ -1,290 +1,186 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 🎯 COORDENADOR DE PROCESSAMENTO - Orquestra todo o fluxo de staging
+// 🚀 COORDENADOR SIMPLIFICADO - Processa diretamente sem fallbacks complexos
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // VALIDAR REQUEST BODY
-    let requestBody;
-    try {
-      requestBody = await req.json();
-    } catch (jsonError) {
-      console.error('❌ [COORDENADOR] Erro ao fazer parse do JSON:', jsonError);
-      throw new Error('Request body inválido - não é JSON válido');
-    }
-
-    console.log('📨 [COORDENADOR] Request body recebido:', JSON.stringify(requestBody, null, 2));
-
-    const { file_path, arquivo_fonte, periodo_referencia, periodo_processamento } = requestBody;
+    const { file_path, arquivo_fonte, periodo_referencia, upload_id } = await req.json();
     
-    console.log('🔍 [COORDENADOR] Valores extraídos:', {
-      file_path: file_path,
-      file_path_type: typeof file_path,
-      arquivo_fonte: arquivo_fonte,
-      periodo_referencia: periodo_referencia
-    });
-    
-    // VALIDAÇÕES OBRIGATÓRIAS
-    if (!file_path) {
-      console.error('❌ [COORDENADOR] file_path está vazio ou undefined');
-      throw new Error('ERRO: file_path é obrigatório');
-    }
-    if (!arquivo_fonte) {
-      console.error('❌ [COORDENADOR] arquivo_fonte está vazio ou undefined');
-      throw new Error('ERRO: arquivo_fonte é obrigatório');  
-    }
-    
-    console.log('🎯 [COORDENADOR] Iniciando orquestração validada:', {
+    console.log('🎯 [COORDENADOR-V2] Iniciando processamento direto:', {
       file_path,
       arquivo_fonte,
-      periodo_referencia
+      periodo_referencia,
+      upload_id
     });
 
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. ETAPA STAGING STREAMING - Para arquivos grandes
-    console.log('📋 [COORDENADOR] Etapa 1: Processando com staging streaming...');
-    
-    // VALIDAÇÃO CRÍTICA ANTES DE MONTAR PAYLOAD
-    console.log('🔍 [COORDENADOR] Validando dados antes de criar payload:', {
-      file_path_recebido: file_path,
-      file_path_tipo: typeof file_path,
-      file_path_length: file_path ? file_path.length : 0,
-      arquivo_fonte_recebido: arquivo_fonte,
-      periodo_referencia_recebido: periodo_referencia
-    });
-    
-    if (!file_path || typeof file_path !== 'string') {
-      console.error('💥 [COORDENADOR] ERRO CRÍTICO: file_path inválido antes de criar payload');
-      throw new Error('file_path inválido no coordenador');
+    // Baixar arquivo diretamente
+    console.log('📥 [COORDENADOR-V2] Baixando arquivo:', file_path);
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('uploads')
+      .download(file_path);
+
+    if (downloadError || !fileData) {
+      throw new Error(`Erro ao baixar arquivo: ${downloadError?.message}`);
     }
+
+    console.log('✅ [COORDENADOR-V2] Arquivo baixado, tamanho:', fileData.size);
+
+    // Processar Excel diretamente (versão ultra-simplificada)
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { 
+      type: 'array',
+      dense: true,
+      cellText: false,
+      cellDates: true
+    });
+
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: null,
+      raw: false
+    });
+
+    if (!jsonData || jsonData.length <= 1) {
+      throw new Error('Arquivo vazio ou sem dados válidos');
+    }
+
+    // Headers na primeira linha
+    const headers = jsonData[0] as string[];
+    const dataRows = jsonData.slice(1);
     
-    const stagingPayload = { 
-      file_path: file_path,
-      arquivo_fonte: arquivo_fonte,
-      periodo_referencia: periodo_referencia || 'jun/25'
-    };
+    console.log(`📊 [COORDENADOR-V2] Processando ${dataRows.length} registros`);
+
+    let processedCount = 0;
+    let insertedCount = 0;
+    let errorCount = 0;
+
+    // Processar em batches pequenos
+    const BATCH_SIZE = 50;
     
-    console.log('📤 [COORDENADOR] Payload para staging streaming:', JSON.stringify(stagingPayload, null, 2));
-    
-    // Tentar primeiro com processamento INSTANTÂNEO (evita todos os problemas)
-    let stagingResult, stagingError;
-    
-    try {
-      const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-instantaneo', {
-        body: stagingPayload
-      });
-      stagingResult = data;
-      stagingError = error;
-      
-      if (error) {
-        console.error('❌ [COORDENADOR] Instantâneo retornou erro:', error);
-        throw error;
-      }
-      
-      console.log('✅ [COORDENADOR] Processamento instantâneo usado com sucesso');
-    } catch (instantaneoError) {
-      console.log('⚠️ [COORDENADOR] Instantâneo falhou, tentando zero-memory:', instantaneoError.message);
-      
-      // Fallback 1: Zero-memory
-      try {
-        const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-zero-memory', {
-          body: stagingPayload
-        });
-        stagingResult = data;
-        stagingError = error;
-        
-        if (error) {
-          console.error('❌ [COORDENADOR] Zero-memory retornou erro:', error);
-          throw error;
+    for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
+      const batch = dataRows.slice(i, i + BATCH_SIZE);
+      const recordsToInsert = [];
+
+      for (const row of batch) {
+        if (!row || (row as any[]).every(cell => !cell)) continue;
+
+        const rowData = row as any[];
+        const record: any = {
+          arquivo_fonte: arquivo_fonte,
+          periodo_referencia: periodo_referencia || 'jun/25',
+          lote_upload: upload_id || crypto.randomUUID()
+        };
+
+        // Mapear colunas baseado na posição (padrão mobilemed)
+        if (rowData.length >= 16) {
+          record["EMPRESA"] = rowData[0] || null;
+          record["NOME_PACIENTE"] = rowData[1] || null;
+          record["CODIGO_PACIENTE"] = rowData[2] || null;
+          record["ESTUDO_DESCRICAO"] = rowData[3] || null;
+          record["ACCESSION_NUMBER"] = rowData[4] || null;
+          record["MODALIDADE"] = rowData[5] || null;
+          record["PRIORIDADE"] = rowData[6] || null;
+          record["VALORES"] = parseFloat(rowData[7]) || 0;
+          record["ESPECIALIDADE"] = rowData[8] || null;
+          record["MEDICO"] = rowData[9] || null;
+          record["DATA_REALIZACAO"] = rowData[10] || null;
+          record["HORA_REALIZACAO"] = rowData[11] || null;
+          record["DATA_LAUDO"] = rowData[12] || null;
+          record["HORA_LAUDO"] = rowData[13] || null;
+          record["DATA_PRAZO"] = rowData[14] || null;
+          record["HORA_PRAZO"] = rowData[15] || null;
         }
-        
-        console.log('✅ [COORDENADOR] Zero-memory usado como fallback 1');
-      } catch (zeroMemoryError) {
-        console.log('⚠️ [COORDENADOR] Zero-memory falhou, tentando streaming:', zeroMemoryError.message);
-        
-        // Fallback 2: Streaming
+
+        // Validação mínima
+        if (record["EMPRESA"] && record["NOME_PACIENTE"]) {
+          recordsToInsert.push(record);
+        }
+      }
+
+      if (recordsToInsert.length > 0) {
         try {
-          const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-streaming', {
-            body: stagingPayload
-          });
-          stagingResult = data;
-          stagingError = error;
-          
-          if (error) {
-            console.error('❌ [COORDENADOR] Streaming retornou erro:', error);
-            throw error;
+          const { error: insertError } = await supabase
+            .from('volumetria_mobilemed')
+            .insert(recordsToInsert);
+
+          if (insertError) {
+            console.error(`❌ [COORDENADOR-V2] Erro no batch ${i}:`, insertError.message);
+            errorCount += recordsToInsert.length;
+          } else {
+            insertedCount += recordsToInsert.length;
+            console.log(`✅ [COORDENADOR-V2] Batch ${i}: ${recordsToInsert.length} registros`);
           }
-          
-          console.log('✅ [COORDENADOR] Streaming usado como fallback 2');
-        } catch (streamingError) {
-          console.log('⚠️ [COORDENADOR] Streaming falhou, tentando staging light:', streamingError.message);
-          
-          // Fallback 3: Staging light
-          try {
-            const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging-light', {
-              body: stagingPayload
-            });
-            stagingResult = data;
-            stagingError = error;
-            
-            if (error) {
-              console.error('❌ [COORDENADOR] Staging light retornou erro:', error);
-              throw error;
-            }
-            
-            console.log('✅ [COORDENADOR] Staging light usado como fallback 3');
-          } catch (lightError) {
-            console.log('⚠️ [COORDENADOR] Light falhou, tentando staging padrão:', lightError.message);
-            
-            // Fallback 4: Staging padrão
-            try {
-              const { data, error } = await supabaseClient.functions.invoke('processar-volumetria-staging', {
-                body: stagingPayload
-              });
-              stagingResult = data;
-              stagingError = error;
-              
-              if (error) {
-                console.error('❌ [COORDENADOR] Staging padrão retornou erro:', error);
-                throw error;
-              }
-              
-              console.log('✅ [COORDENADOR] Staging padrão usado como fallback 4');
-            } catch (standardError) {
-              console.error('❌ [COORDENADOR] Todos os métodos falharam:', standardError);
-              stagingError = standardError;
-            }
-          }
+        } catch (err) {
+          console.error(`❌ [COORDENADOR-V2] Erro no insert:`, err);
+          errorCount += recordsToInsert.length;
         }
       }
-    }
 
-    if (stagingError) {
-      console.error('❌ [COORDENADOR] Erro na etapa de staging:', stagingError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Erro no processamento de staging',
-          details: stagingError 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('✅ [COORDENADOR] Staging completado:', stagingResult);
-
-    // Verificar se precisa de processamento offline
-    if (stagingResult.requer_processamento_offline) {
-      console.log('📋 [COORDENADOR] Arquivo marcado para processamento offline');
+      processedCount += batch.length;
       
-      const resultado = {
-        success: true,
-        message: `Arquivo aceito (${stagingResult.registros_inseridos_staging} placeholders criados). Processamento offline necessário devido ao tamanho.`,
-        upload_id: stagingResult.upload_id,
-        staging_stats: {
-          registros_staging: stagingResult.registros_inseridos_staging,
-          registros_erro_staging: stagingResult.registros_erro_staging
-        },
-        requer_processamento_offline: true,
-        arquivo_storage_path: stagingResult.arquivo_storage_path
-      };
-
-      console.log('🎯 [COORDENADOR] Processamento offline agendado:', resultado);
-
-      return new Response(
-        JSON.stringify(resultado),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Pausa pequena entre batches
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
-    // 2. ETAPA BACKGROUND - Aplicar regras e mover para tabela final
-    console.log('🔄 [COORDENADOR] Etapa 2: Processamento em background...');
-    
-    const { data: backgroundResult, error: backgroundError } = await supabaseClient.functions.invoke('processar-staging-background', {
-      body: {
-        upload_id: stagingResult.upload_id,
-        arquivo_fonte,
-        periodo_referencia
-      }
-    });
-
-    if (backgroundError) {
-      console.error('❌ [COORDENADOR] Erro no processamento background:', backgroundError);
-      
-      // Atualizar status do upload como erro
-      await supabaseClient
+    // Atualizar status do upload se foi fornecido
+    if (upload_id) {
+      await supabase
         .from('processamento_uploads')
         .update({
-          status: 'error',
-          detalhes_erro: {
-            etapa: 'background',
-            erro: backgroundError.message,
-            timestamp: new Date().toISOString()
-          },
+          status: errorCount > 0 ? 'erro_parcial' : 'sucesso',
+          registros_processados: processedCount,
+          registros_inseridos: insertedCount,
+          registros_erro: errorCount,
           completed_at: new Date().toISOString()
         })
-        .eq('id', stagingResult.upload_id);
-
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Erro no processamento background',
-          upload_id: stagingResult.upload_id,
-          details: backgroundError 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        .eq('id', upload_id);
     }
 
-    console.log('✅ [COORDENADOR] Background completado:', backgroundResult);
-
-    // 3. RESULTADO FINAL
-    const resultado = {
+    const result = {
       success: true,
-      message: 'Processamento completo via arquitetura de staging',
-      upload_id: stagingResult.upload_id,
-      staging_stats: {
-        registros_staging: stagingResult.registros_inseridos_staging,
-        registros_erro_staging: stagingResult.registros_erro_staging
-      },
-      background_stats: {
-        registros_processados: backgroundResult.registros_processados,
-        registros_inseridos: backgroundResult.registros_inseridos,
-        registros_erro: backgroundResult.registros_erro,
-        regras_aplicadas: backgroundResult.regras_aplicadas
-      },
-      total_stats: {
-        total_registros: stagingResult.registros_inseridos_staging,
-        registros_finais: backgroundResult.registros_inseridos,
-        taxa_sucesso: backgroundResult.registros_inseridos / stagingResult.registros_inseridos_staging * 100
+      message: `Processamento completo: ${insertedCount} inseridos, ${errorCount} erros`,
+      stats: {
+        processados: processedCount,
+        inseridos: insertedCount,
+        erros: errorCount
       }
     };
 
-    console.log('🎯 [COORDENADOR] Processamento completo:', resultado);
+    console.log('🎉 [COORDENADOR-V2] Concluído:', result);
 
     return new Response(
-      JSON.stringify(resultado),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('💥 [COORDENADOR] Erro crítico:', error);
+    console.error('💥 [COORDENADOR-V2] Erro:', error.message);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        message: 'Erro no processamento coordenador simplificado'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
   }
 });
