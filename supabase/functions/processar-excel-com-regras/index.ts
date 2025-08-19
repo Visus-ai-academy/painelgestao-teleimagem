@@ -48,40 +48,77 @@ serve(async (req) => {
     if (uploadError) throw uploadError;
     console.log('✅ [EXCEL-V6] Upload registrado:', uploadRecord?.id);
 
-    // BYPASS COMPLETO - Retornar sucesso direto para testar
-    console.log('🚀 [EXCEL-V6] BYPASS TOTAL - Simulando sucesso...');
+    // Delegar para o coordenador
+    console.log('🚀 [EXCEL-V6] Delegando para coordenador (sem background)...');
     
-    // Atualizar status como sucesso
+    const { data: coordenadorResult, error: coordenadorError } = await supabase.functions.invoke(
+      'processar-volumetria-coordenador',
+      {
+        body: {
+          file_path,
+          arquivo_fonte,
+          periodo_referencia,
+          upload_id: uploadRecord.id
+        }
+      }
+    );
+
+    if (coordenadorError) {
+      console.error('❌ [EXCEL-V6] Erro no coordenador:', coordenadorError);
+      
+      await supabase
+        .from('processamento_uploads')
+        .update({
+          status: 'erro',
+          completed_at: new Date().toISOString(),
+          detalhes_erro: {
+            lote_upload,
+            etapa: 'erro_coordenador',
+            versao: 'v6_coordenador_fixed',
+            erro: coordenadorError.message
+          }
+        })
+        .eq('id', uploadRecord.id);
+      
+      throw coordenadorError;
+    }
+
+    console.log('✅ [EXCEL-V6] Coordenador executado:', coordenadorResult);
+
+    // Atualizar status baseado no resultado do coordenador
+    const finalStatus = coordenadorResult?.success ? 'sucesso' : 'erro';
+    const stats = coordenadorResult?.stats || {};
+    
     await supabase
       .from('processamento_uploads')
       .update({
-        status: 'sucesso',
-        registros_processados: 1000,
-        registros_inseridos: 1000,
+        status: finalStatus,
+        registros_processados: stats.staging_processados || 0,
+        registros_inseridos: stats.staging_inseridos || 0,
         registros_erro: 0,
         completed_at: new Date().toISOString(),
         detalhes_erro: {
           lote_upload,
-          etapa: 'bypass_completo',
-          versao: 'v6_bypass_teste'
+          etapa: 'sucesso_coordenador_fixed',
+          versao: 'v6_coordenador_fixed'
         }
       })
       .eq('id', uploadRecord.id);
 
-    console.log(`🎉 [EXCEL-V6] BYPASS CONCLUÍDO: Sucesso simulado`);
+    console.log(`🎉 [EXCEL-V6] PROCESSAMENTO CONCLUÍDO: Status ${finalStatus}`);
 
     return new Response(
       JSON.stringify({
-        success: true,
-        message: 'Upload processado com sucesso (BYPASS MODE)',
+        success: coordenadorResult?.success || false,
+        message: coordenadorResult?.message || 'Upload processado com sucesso',
         upload_id: uploadRecord?.id,
         stats: {
-          processados: 1000,
-          inseridos: 1000,
+          processados: stats.staging_processados || 0,
+          inseridos: stats.staging_inseridos || 0,
           erros: 0
         },
         processamento_completo_com_regras: true,
-        versao: 'v6_bypass_teste'
+        versao: 'v6_coordenador_fixed'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
