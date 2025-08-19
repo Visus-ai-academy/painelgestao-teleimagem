@@ -782,7 +782,7 @@ export async function processVolumetriaComStaging(
     
     const { data: stagingResult, error: stagingError } = await supabase.functions.invoke('processar-volumetria-coordenador', {
       body: {
-        file_path: uploadData.path,
+        file_path: fileName,
         arquivo_fonte: arquivoFonte,
         periodo_referencia: periodo ? `${getMonthName(periodo.mes)}/${periodo.ano.toString().slice(-2)}` : undefined,
         periodo_processamento: periodo
