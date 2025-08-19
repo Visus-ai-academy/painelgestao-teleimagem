@@ -781,6 +781,309 @@ const ArquiteturaProjeto = () => {
                   <p><strong>⏱️ Tempos:</strong> Upload (5s) → Storage (instantâneo) → Staging (30s) → Background (2min) → Dashboard (real-time)</p>
                   <p><strong>✅ Vantagens:</strong> Sem travamentos, Ultrarrápido, Monitoramento real-time, Tolerante a falhas</p>
                 </div>
+
+                {/* Detalhamento das Funções por Etapa */}
+                <div className="mt-8 space-y-6">
+                  <h3 className="text-2xl font-bold text-center mb-6">🔧 Funções Executadas em Cada Etapa</h3>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {/* ETAPA 1: UPLOAD */}
+                    <Card className="border-green-200 bg-green-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-green-700">
+                          <span className="text-lg">📁</span>
+                          ETAPA 1: UPLOAD (5 segundos)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-green-800 mb-2">Interface (React):</h4>
+                          <ul className="text-xs space-y-1 text-green-700">
+                            <li>• FileUpload.tsx</li>
+                            <li>• VolumetriaUpload.tsx</li>
+                            <li>• SimpleFileUpload.tsx</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-green-800 mb-2">Validações Frontend:</h4>
+                          <ul className="text-xs space-y-1 text-green-700">
+                            <li>• Validação formato .xlsx</li>
+                            <li>• Verificação tamanho arquivo</li>
+                            <li>• Seleção período referência</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 2: STORAGE */}
+                    <Card className="border-cyan-200 bg-cyan-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-cyan-700">
+                          <span className="text-lg">💾</span>
+                          ETAPA 2: STORAGE (Instantâneo)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-cyan-800 mb-2">Supabase Storage:</h4>
+                          <ul className="text-xs space-y-1 text-cyan-700">
+                            <li>• Upload bucket 'uploads'</li>
+                            <li>• Geração URL temporária</li>
+                            <li>• Controle acesso RLS</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-cyan-800 mb-2">Trigger Automático:</h4>
+                          <ul className="text-xs space-y-1 text-cyan-700">
+                            <li>• Disparo edge function</li>
+                            <li>• Criação lote_upload ID</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 3: STAGING */}
+                    <Card className="border-orange-200 bg-orange-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-orange-700">
+                          <span className="text-lg">🔄</span>
+                          ETAPA 3: STAGING (30 segundos)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-orange-800 mb-2">Edge Function Principal:</h4>
+                          <ul className="text-xs space-y-1 text-orange-700">
+                            <li>• <strong>processar-volumetria-staging</strong></li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-orange-800 mb-2">Operações Executadas:</h4>
+                          <ul className="text-xs space-y-1 text-orange-700">
+                            <li>• Leitura arquivo Excel (XLSX.readFile)</li>
+                            <li>• Validação estrutura colunas</li>
+                            <li>• Processamento em lotes (1000 registros)</li>
+                            <li>• Inserção tabela volumetria_staging</li>
+                            <li>• Atualização status processamento_uploads</li>
+                            <li>• Trigger background processing</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-orange-800 mb-2">Tabelas Atualizadas:</h4>
+                          <ul className="text-xs space-y-1 text-orange-700">
+                            <li>• processamento_uploads</li>
+                            <li>• volumetria_staging</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 4: BACKGROUND - PARTE 1 */}
+                    <Card className="border-red-200 bg-red-50 lg:col-span-2 xl:col-span-1">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-red-700">
+                          <span className="text-lg">🏗️</span>
+                          ETAPA 4A: BACKGROUND - REGRAS (1 minuto)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Edge Function Principal:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• <strong>processar-staging-background</strong></li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Regras de Transformação:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• <strong>trigger_limpar_nome_cliente</strong> (v015)</li>
+                            <li>• <strong>trigger_normalizar_medico</strong> (v017)</li>
+                            <li>• <strong>aplicar_correcao_modalidades</strong> (v030)</li>
+                            <li>• <strong>aplicar_categorias_trigger</strong> (v028)</li>
+                            <li>• <strong>aplicar_prioridades_de_para</strong> (v029)</li>
+                            <li>• <strong>aplicar_de_para_trigger</strong> (v026)</li>
+                            <li>• <strong>aplicar_tipificacao_faturamento</strong> (f005/f006)</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Regras de Exclusão:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• <strong>aplicar_regras_periodo_atual</strong> (v031)</li>
+                            <li>• <strong>aplicar_regras_retroativas</strong> (v002/v003)</li>
+                            <li>• <strong>aplicar_regras_exclusao_dinamicas</strong> (v020)</li>
+                            <li>• <strong>aplicar_exclusao_clientes_especificos</strong> (v032)</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 4: BACKGROUND - PARTE 2 */}
+                    <Card className="border-red-200 bg-red-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-red-700">
+                          <span className="text-lg">⚡</span>
+                          ETAPA 4B: EDGE FUNCTIONS ESPECÍFICAS (30 segundos)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Edge Functions Chamadas:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• <strong>aplicar-quebras-automatico</strong></li>
+                            <li>• <strong>aplicar-substituicao-especialidade-categoria</strong> (v033/v034)</li>
+                            <li>• <strong>aplicar-especialidade-automatica</strong> (v023)</li>
+                            <li>• <strong>aplicar-validacao-cliente</strong> (v021)</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Operações Específicas:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• Quebra de exames compostos</li>
+                            <li>• Substituição especialidades Colunas</li>
+                            <li>• Aplicação categorias cadastro</li>
+                            <li>• Validação clientes ativos</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Tabelas Consultadas:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• cadastro_exames</li>
+                            <li>• regras_quebra_exames</li>
+                            <li>• clientes</li>
+                            <li>• medicos</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 4: BACKGROUND - PARTE 3 */}
+                    <Card className="border-red-200 bg-red-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-red-700">
+                          <span className="text-lg">🔧</span>
+                          ETAPA 4C: FINALIZAÇÃO (30 segundos)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Operações Finais:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• Atualização status 'concluido'</li>
+                            <li>• Cálculo estatísticas finais</li>
+                            <li>• Log audit_logs</li>
+                            <li>• Limpeza volumetria_staging</li>
+                            <li>• Trigger dashboard refresh</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-800 mb-2">Tabelas Finais:</h4>
+                          <ul className="text-xs space-y-1 text-red-700">
+                            <li>• volumetria_mobilemed (destino)</li>
+                            <li>• processamento_uploads (status)</li>
+                            <li>• audit_logs (rastreabilidade)</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ETAPA 5: DASHBOARD */}
+                    <Card className="border-purple-200 bg-purple-50 lg:col-span-2 xl:col-span-1">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-purple-700">
+                          <span className="text-lg">📊</span>
+                          ETAPA 5: DASHBOARD REAL-TIME (Automático)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm text-purple-800 mb-2">Hooks React Atualizados:</h4>
+                          <ul className="text-xs space-y-1 text-purple-700">
+                            <li>• <strong>useVolumetriaData</strong></li>
+                            <li>• <strong>useUploadStatus</strong></li>
+                            <li>• <strong>useClienteStats</strong></li>
+                            <li>• <strong>useVolumetriaProcessedData</strong></li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-purple-800 mb-2">Componentes Atualizados:</h4>
+                          <ul className="text-xs space-y-1 text-purple-700">
+                            <li>• Dashboard principal</li>
+                            <li>• VolumetriaStats</li>
+                            <li>• StatusRegraProcessamento</li>
+                            <li>• UploadStatusPanel</li>
+                            <li>• CompactUploadStatus</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-purple-800 mb-2">Tecnologia Real-time:</h4>
+                          <ul className="text-xs space-y-1 text-purple-700">
+                            <li>• PostgreSQL LISTEN/NOTIFY</li>
+                            <li>• Supabase Realtime</li>
+                            <li>• React Context Updates</li>
+                            <li>• Automatic Re-renders</li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* MONITORAMENTO E AUDITORIA */}
+                    <Card className="border-blue-200 bg-blue-50 lg:col-span-2 xl:col-span-3">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-blue-700">
+                          <span className="text-lg">👀</span>
+                          MONITORAMENTO E AUDITORIA (Contínuo)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <h4 className="font-semibold text-sm text-blue-800 mb-2">Tabelas de Controle:</h4>
+                            <ul className="text-xs space-y-1 text-blue-700">
+                              <li>• <strong>processamento_uploads</strong> - Status em tempo real</li>
+                              <li>• <strong>audit_logs</strong> - Log completo de operações</li>
+                              <li>• <strong>performance_logs</strong> - Métricas de performance</li>
+                              <li>• <strong>data_access_logs</strong> - Controle de acesso</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm text-blue-800 mb-2">RLS Policies Aplicadas:</h4>
+                            <ul className="text-xs space-y-1 text-blue-700">
+                              <li>• Proteção temporal can_edit_data()</li>
+                              <li>• Controle período fechamento</li>
+                              <li>• Validação permissões usuário</li>
+                              <li>• Auditoria automática mudanças</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm text-blue-800 mb-2">Triggers Database:</h4>
+                            <ul className="text-xs space-y-1 text-blue-700">
+                              <li>• <strong>audit_trigger</strong> - Auditoria automática</li>
+                              <li>• <strong>monitor_sensitive_access</strong> - Acesso dados sensíveis</li>
+                              <li>• <strong>audit_sensitive_changes</strong> - Mudanças críticas</li>
+                              <li>• <strong>round_precos_servicos</strong> - Arredondamento valores</li>
+                            </ul>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                          <h4 className="font-semibold text-sm text-blue-800 mb-2">⚡ Performance e Escalabilidade:</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <ul className="text-xs space-y-1 text-blue-700">
+                              <li>• <strong>Processamento em lotes:</strong> 1000 registros por vez</li>
+                              <li>• <strong>Cache otimizado:</strong> Refresh a cada 5 minutos</li>
+                              <li>• <strong>Edge Functions:</strong> Escalabilidade automática</li>
+                            </ul>
+                            <ul className="text-xs space-y-1 text-blue-700">
+                              <li>• <strong>Background tasks:</strong> Não bloqueiam UI</li>
+                              <li>• <strong>Cleanup automático:</strong> Limpeza staging após 1h</li>
+                              <li>• <strong>Real-time updates:</strong> Zero polling</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="integracoes" className="mt-6">
