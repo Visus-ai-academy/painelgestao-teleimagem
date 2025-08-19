@@ -164,13 +164,25 @@ serve(async (req) => {
             categoria: p.categoria
           }));
 
+        // Calcular dia de vencimento
+        let diaVencimento = 10; // Padrão
+        if (cliente.dia_faturamento) {
+          diaVencimento = cliente.dia_faturamento;
+        } else if (parametroCliente?.data_aniversario_contrato) {
+          try {
+            diaVencimento = new Date(parametroCliente.data_aniversario_contrato).getDate();
+          } catch (e) {
+            diaVencimento = 10;
+          }
+        }
+
         // Criar contrato
         const contratoData = {
           cliente_id: cliente.id,
           numero_contrato: `CT-${cliente.nome.substring(0, 3).toUpperCase()}-${Date.now()}-${contratosCreados}`,
           data_inicio: dataInicio,
           data_fim: dataFim,
-          dia_vencimento: cliente.dia_faturamento || parametroCliente?.data_aniversario_contrato ? new Date(parametroCliente.data_aniversario_contrato).getDate() : 10,
+          dia_vencimento: diaVencimento,
           status: 'ativo',
           forma_pagamento: 'mensal',
           modalidades: modalidades,
@@ -213,12 +225,7 @@ serve(async (req) => {
           // Observações
           observacoes: `Contrato gerado automaticamente com base nos dados cadastrais, parâmetros e preços configurados.`,
           observacoes_contratuais: parametroCliente ? 
-            `Parâmetros aplicados: ${JSON.stringify({
-              tipo_cliente: parametroCliente.tipo_cliente,
-              franquia: parametroCliente.aplicar_franquia,
-              integração: parametroCliente.cobrar_integracao,
-              urgencia: parametroCliente.aplicar_adicional_urgencia
-            })}` : 'Contrato básico sem parâmetros específicos'
+            `Parâmetros aplicados: Tipo cliente: ${parametroCliente.tipo_cliente || 'N/A'}, Franquia: ${parametroCliente.aplicar_franquia ? 'Sim' : 'Não'}, Integração: ${parametroCliente.cobrar_integracao ? 'Sim' : 'Não'}, Urgência: ${parametroCliente.aplicar_adicional_urgencia ? 'Sim' : 'Não'}` : 'Contrato básico sem parâmetros específicos'
         };
 
         const { error: insertError } = await supabaseClient
