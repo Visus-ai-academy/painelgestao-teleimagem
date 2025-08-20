@@ -109,21 +109,53 @@ serve(async (req) => {
           throw new Error('Campo "Nome Empresa" não encontrado. Verifique se a coluna existe no arquivo.');
         }
 
-        // Preparar dados do parâmetro usando mapeamento flexível
+        // Preparar dados do parâmetro usando mapeamento flexível - TODAS as colunas do template
         const parametroData = {
           cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()),
+          
+          // Campos básicos
+          cliente_consolidado: findColumnValue(row, ['Cliente Consolidado', 'CLIENTE CONSOLIDADO']),
           tipo_cliente: findColumnValue(row, COLUMN_MAPPING.status)?.toString().trim() || 'CO',
+          
+          // Impostos e Simples
+          impostos_ab_min: findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN']) ? Number(findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN'])) : null,
+          simples: findColumnValue(row, ['Simples', 'SIMPLES'])?.toString().trim()?.toLowerCase() === 'sim',
+          percentual_iss: findColumnValue(row, COLUMN_MAPPING.percentualISS) ? Number(findColumnValue(row, COLUMN_MAPPING.percentualISS)) : null,
+          
+          // Métrica e Valor Convênio
+          tipo_metrica_convenio: findColumnValue(row, COLUMN_MAPPING.tipoMetricaConvenio)?.toString().trim(),
           valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorConvenio) ? Number(findColumnValue(row, COLUMN_MAPPING.valorConvenio)) : null,
           cobrar_integracao: findColumnValue(row, COLUMN_MAPPING.integracao)?.toString().trim()?.toLowerCase() === 'sim',
+          data_inicio_integracao: findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao)).toISOString().split('T')[0] : null,
+          
+          // Métrica e Valor Urgência
+          tipo_metrica_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim(),
           percentual_urgencia: findColumnValue(row, COLUMN_MAPPING.valorUrgencia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorUrgencia)) : null,
           aplicar_adicional_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim()?.toLowerCase() === 'percentual',
+          cobrar_urgencia_como_rotina: findColumnValue(row, COLUMN_MAPPING.cobrarUrgenciaRotina)?.toString().trim()?.toLowerCase() === 'sim',
+          
+          // Desconto/Acréscimo
+          tipo_desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.tipoDesconto)?.toString().trim(),
+          desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
+          
+          // Portal de Laudos
+          portal_laudos: findColumnValue(row, COLUMN_MAPPING.portalLaudos)?.toString().trim()?.toLowerCase() === 'sim',
+          
+          // Franquia
+          aplicar_franquia: findColumnValue(row, COLUMN_MAPPING.possuiFranquia)?.toString().trim()?.toLowerCase() === 'sim',
           valor_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquia)) : null,
           volume_franquia: findColumnValue(row, COLUMN_MAPPING.volume) ? Number(findColumnValue(row, COLUMN_MAPPING.volume)) : null,
           frequencia_continua: findColumnValue(row, COLUMN_MAPPING.frequenciaContinua)?.toString().trim()?.toLowerCase() === 'sim',
           frequencia_por_volume: findColumnValue(row, COLUMN_MAPPING.frequenciaPorVolume)?.toString().trim()?.toLowerCase() === 'sim',
           valor_acima_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume)) : null,
-          aplicar_franquia: findColumnValue(row, COLUMN_MAPPING.possuiFranquia)?.toString().trim()?.toLowerCase() === 'sim',
           data_aniversario_contrato: findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia)).toISOString().split('T')[0] : null,
+          
+          // Configurações de Faturamento
+          incluir_empresa_origem: findColumnValue(row, COLUMN_MAPPING.incluirEmpresaOrigem)?.toString().trim()?.toLowerCase() === 'sim',
+          incluir_access_number: findColumnValue(row, COLUMN_MAPPING.incluirAccessNumber)?.toString().trim()?.toLowerCase() === 'sim',
+          incluir_medico_solicitante: findColumnValue(row, COLUMN_MAPPING.incluirMedicoSolicitante)?.toString().trim()?.toLowerCase() === 'sim',
+          
+          // Campos de controle (mantidos dos originais)
           periodicidade_reajuste: 'anual',
           indice_reajuste: 'IGP-M',
           percentual_reajuste_fixo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,

@@ -2019,19 +2019,33 @@ export type Database = {
           aplicar_adicional_urgencia: boolean | null
           aplicar_franquia: boolean | null
           ativo: boolean
+          cliente_consolidado: string | null
           cliente_id: string | null
           cobrar_integracao: boolean | null
+          cobrar_urgencia_como_rotina: boolean | null
           created_at: string
           created_by: string | null
           data_aniversario_contrato: string | null
+          data_inicio_integracao: string | null
+          desconto_acrescimo: number | null
           frequencia_continua: boolean | null
           frequencia_por_volume: boolean | null
           id: string
+          impostos_ab_min: number | null
+          incluir_access_number: boolean | null
+          incluir_empresa_origem: boolean | null
+          incluir_medico_solicitante: boolean | null
           indice_reajuste: string | null
+          percentual_iss: number | null
           percentual_reajuste_fixo: number | null
           percentual_urgencia: number | null
           periodicidade_reajuste: string | null
+          portal_laudos: boolean | null
+          simples: boolean | null
           tipo_cliente: string | null
+          tipo_desconto_acrescimo: string | null
+          tipo_metrica_convenio: string | null
+          tipo_metrica_urgencia: string | null
           updated_at: string
           valor_acima_franquia: number | null
           valor_franquia: number | null
@@ -2042,19 +2056,33 @@ export type Database = {
           aplicar_adicional_urgencia?: boolean | null
           aplicar_franquia?: boolean | null
           ativo?: boolean
+          cliente_consolidado?: string | null
           cliente_id?: string | null
           cobrar_integracao?: boolean | null
+          cobrar_urgencia_como_rotina?: boolean | null
           created_at?: string
           created_by?: string | null
           data_aniversario_contrato?: string | null
+          data_inicio_integracao?: string | null
+          desconto_acrescimo?: number | null
           frequencia_continua?: boolean | null
           frequencia_por_volume?: boolean | null
           id?: string
+          impostos_ab_min?: number | null
+          incluir_access_number?: boolean | null
+          incluir_empresa_origem?: boolean | null
+          incluir_medico_solicitante?: boolean | null
           indice_reajuste?: string | null
+          percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           percentual_urgencia?: number | null
           periodicidade_reajuste?: string | null
+          portal_laudos?: boolean | null
+          simples?: boolean | null
           tipo_cliente?: string | null
+          tipo_desconto_acrescimo?: string | null
+          tipo_metrica_convenio?: string | null
+          tipo_metrica_urgencia?: string | null
           updated_at?: string
           valor_acima_franquia?: number | null
           valor_franquia?: number | null
@@ -2065,19 +2093,33 @@ export type Database = {
           aplicar_adicional_urgencia?: boolean | null
           aplicar_franquia?: boolean | null
           ativo?: boolean
+          cliente_consolidado?: string | null
           cliente_id?: string | null
           cobrar_integracao?: boolean | null
+          cobrar_urgencia_como_rotina?: boolean | null
           created_at?: string
           created_by?: string | null
           data_aniversario_contrato?: string | null
+          data_inicio_integracao?: string | null
+          desconto_acrescimo?: number | null
           frequencia_continua?: boolean | null
           frequencia_por_volume?: boolean | null
           id?: string
+          impostos_ab_min?: number | null
+          incluir_access_number?: boolean | null
+          incluir_empresa_origem?: boolean | null
+          incluir_medico_solicitante?: boolean | null
           indice_reajuste?: string | null
+          percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           percentual_urgencia?: number | null
           periodicidade_reajuste?: string | null
+          portal_laudos?: boolean | null
+          simples?: boolean | null
           tipo_cliente?: string | null
+          tipo_desconto_acrescimo?: string | null
+          tipo_metrica_convenio?: string | null
+          tipo_metrica_urgencia?: string | null
           updated_at?: string
           valor_acima_franquia?: number | null
           valor_franquia?: number | null
