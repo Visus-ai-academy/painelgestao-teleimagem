@@ -201,9 +201,8 @@ serve(async (req) => {
           }
         }
         
-        // Buscar categoria no cadastro de exames
+        // Buscar categoria no cadastro de exames - OBRIGATÓRIO
         const categoriaCadastro = mapaExames.get(nomeExame);
-        const novaCategoria = categoriaCadastro || categoriaAtual;
         
         // Preparar dados para atualização
         const dadosAtualizacao: any = {
@@ -211,8 +210,8 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         };
         
-        // Só atualizar categoria se encontrou no cadastro
-        if (categoriaCadastro && categoriaCadastro !== categoriaAtual) {
+        // OBRIGATÓRIO: Sempre aplicar categoria do cadastro se disponível
+        if (categoriaCadastro) {
           dadosAtualizacao['CATEGORIA'] = categoriaCadastro;
           totalCategoriasAplicadas++;
         }
