@@ -18,6 +18,7 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useValoresReferencia } from '@/hooks/useValoresReferencia';
 import { ClientValidationStatus } from '@/components/ClientValidationStatus';
 import { PrecosSemClienteAnalise } from '@/components/PrecosSemClienteAnalise';
+import { ParametrosFaturamentoList } from '@/components/ParametrosFaturamentoList';
 
 
 import { 
@@ -717,6 +718,12 @@ export default function GerenciarCadastros() {
                   tipos={['parametros_faturamento']}
                   title="Status dos Uploads de Parâmetros"
                 />
+              </div>
+
+              {/* Lista de Parâmetros Cadastrados */}
+              <div className="mt-8">
+                <h3 className="text-lg font-medium mb-4">Parâmetros de Faturamento Cadastrados</h3>
+                <ParametrosFaturamentoList />
               </div>
             </CardContent>
           </Card>
