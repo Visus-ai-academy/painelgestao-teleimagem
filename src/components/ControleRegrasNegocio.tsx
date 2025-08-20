@@ -328,13 +328,13 @@ export function ControleRegrasNegocio() {
     },
     {
       id: 'v034',
-      nome: 'ColunasxMusculoxNeuro',
+      nome: 'ColunasxMusculoxNeuro com Normalização Avançada',
       modulo: 'volumetria',
       categoria: 'dados',
-      criterio: 'Todos os exames com especialidade "Colunas" são alterados para "Músculo Esquelético", exceto para médicos específicos que são alterados para "Neuro". Aplica categoria conforme cadastro de exames.',
+      criterio: 'Todos os exames com especialidade "Colunas" são alterados para "Músculo Esquelético", exceto para médicos específicos (43 médicos) que são alterados para "Neuro". Aplica categoria conforme cadastro de exames. Inclui normalização avançada de nomes: remove "Dr." e "Dra.", considera nomes abreviados (ex: "Francisca R" identifica "Francisca Rocélia Silva de Freitas").',
       status: 'ativa',
       implementadaEm: '2024-08-20',
-      observacoes: 'Edge function: aplicar-regra-colunas-musculo-neuro. Lista de médicos para Neuro deve ser configurada ao executar.',
+      observacoes: 'Edge function: aplicar-regra-colunas-musculo-neuro. Normalização inteligente: compara nome completo vs abreviado, verifica iniciais e correspondência por posição. Lista de 43 médicos pré-configurada.',
       ordem_execucao: 24,
       tipo_regra: 'negocio'
     },

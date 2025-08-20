@@ -79,6 +79,45 @@ serve(async (req) => {
         .trim()
         .toUpperCase(); // Para comparação case-insensitive
     };
+
+    // Função para verificar se nomes coincidem (incluindo abreviações)
+    const nomesCoicidem = (nomeCompleto: string, nomeBusca: string): boolean => {
+      const nomeCompletoNorm = normalizarNomeMedico(nomeCompleto);
+      const nomeBuscaNorm = normalizarNomeMedico(nomeBusca);
+      
+      // Verificação exata
+      if (nomeCompletoNorm === nomeBuscaNorm) return true;
+      
+      // Verificação de nome abreviado
+      // Ex: "Francisca R" deve coincidir com "Francisca Rocélia Silva de Freitas"
+      const partesCompleto = nomeCompletoNorm.split(' ');
+      const partesBusca = nomeBuscaNorm.split(' ');
+      
+      if (partesBusca.length <= partesCompleto.length) {
+        let match = true;
+        for (let i = 0; i < partesBusca.length; i++) {
+          const parteBusca = partesBusca[i];
+          const parteCompleta = partesCompleto[i];
+          
+          // Se a parte da busca tem apenas 1 caractere, verifica se é inicial
+          if (parteBusca.length === 1) {
+            if (!parteCompleta.startsWith(parteBusca)) {
+              match = false;
+              break;
+            }
+          } else {
+            // Nome completo deve coincidir exatamente
+            if (parteBusca !== parteCompleta) {
+              match = false;
+              break;
+            }
+          }
+        }
+        if (match) return true;
+      }
+      
+      return false;
+    };
     
     console.log(`🔄 Iniciando aplicação da regra ColunasxMusculoxNeuro para arquivo: ${arquivo_fonte}`);
     console.log(`👨‍⚕️ Médicos para Neuro: ${medicosNeuroLista.length} médicos na lista`);
@@ -154,9 +193,12 @@ serve(async (req) => {
         // Determinar nova especialidade baseado no médico normalizado
         let novaEspecialidade = 'Músculo Esquelético'; // Padrão
         
-        const medicoNormalizado = normalizarNomeMedico(medico);
-        if (medicosNeuroNormalizados.includes(medicoNormalizado)) {
-          novaEspecialidade = 'Neuro';
+        // Verificar se o médico está na lista usando comparação inteligente
+        for (const medicoNeuro of medicosNeuroLista) {
+          if (nomesCoicidem(medicoNeuro, medico)) {
+            novaEspecialidade = 'Neuro';
+            break;
+          }
         }
         
         // Buscar categoria no cadastro de exames
