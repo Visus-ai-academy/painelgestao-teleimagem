@@ -111,10 +111,6 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
 
     // REMOVIDO: Não excluir registros por campos vazios - tratar como string vazia se necessário
 
-    // REGRA: Excluir clientes com "_local" no nome (maiúscula ou minúscula)
-    if (empresaOriginal.toLowerCase().includes('_local')) {
-      return null;
-    }
 
     // Não aplicar limpeza aqui pois processRow é síncrono - será aplicado via trigger SQL
     const empresa = empresaOriginal.trim();
