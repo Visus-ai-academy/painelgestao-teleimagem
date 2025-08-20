@@ -130,7 +130,7 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Converter período (YYYY-MM) para formato mon/YY (ex.: jun/25)
+      // Converter período (YYYY-MM) para formato mon/YY (ex.: jun/25) 
       const formatPeriodo = (yyyyMM: string) => {
         const [y, m] = yyyyMM.split('-');
         const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -140,8 +140,9 @@ export default function GerarFaturamento() {
       const periodoRef = formatPeriodo(periodoSelecionado);
       
       console.log('🔍 Buscando clientes com faturamento para período:', periodoRef);
+      console.log('💡 Período original selecionado:', periodoSelecionado);
 
-      // 1. PRIMEIRO: Buscar clientes que têm dados na tabela faturamento
+      // 1. PRIMEIRO: Buscar clientes que têm dados na tabela faturamento (formato mon/YY)
       const { data: clientesComFaturamento, error: errorFaturamento } = await supabase
         .from('faturamento')
         .select('cliente_nome, cliente_email')
@@ -159,11 +160,11 @@ export default function GerarFaturamento() {
       if (!clientesComFaturamento || clientesComFaturamento.length === 0) {
         console.log('⚠️ Nenhum dado no faturamento, buscando da volumetria...');
         
-        // Buscar da volumetria_mobilemed
+        // Buscar da volumetria_mobilemed (formato YYYY-MM)
         const { data: clientesVolumetria, error: errorVolumetria } = await supabase
           .from('volumetria_mobilemed')
           .select('EMPRESA')
-          .eq('periodo_referencia', periodoRef)
+          .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM para volumetria
           .not('EMPRESA', 'is', null); // Remover limite para capturar todos os registros
 
         if (errorVolumetria) {

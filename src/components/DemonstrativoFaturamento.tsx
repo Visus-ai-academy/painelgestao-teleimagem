@@ -107,6 +107,7 @@ export default function DemonstrativoFaturamento() {
         .order('cliente_nome'); // Remover limite para garantir TODOS os dados sejam carregados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
+      console.log('🔍 Período usado na busca:', periodo); // Log do período usado
       console.log('🔍 Amostra dos primeiros registros:', dadosFaturamento?.slice(0, 3).map(d => ({
         cliente: d.cliente_nome,
         valor: d.valor_bruto,
@@ -124,7 +125,7 @@ export default function DemonstrativoFaturamento() {
       }
 
       if (!dadosFaturamento || dadosFaturamento.length === 0) {
-        console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
+        console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodo}`);
         
         // Se não há dados de faturamento, verificar se há dados de volumetria
         if (clientesVolumetria && clientesVolumetria.length > 0) {
@@ -149,7 +150,7 @@ export default function DemonstrativoFaturamento() {
         return;
       }
 
-      console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodoRef}`);
+      console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodo}`);
 
       // Agrupar por cliente - CORRIGIDO para usar mesma lógica da aba Gerar
       const clientesMap = new Map<string, ClienteFaturamento>();

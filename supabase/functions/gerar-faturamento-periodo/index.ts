@@ -104,7 +104,7 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
-        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (não filtrar por tabela clientes)
+        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
         // Buscar dados completos dos clientes na tabela para ter UUID correto
         const { data: todosClientes } = await supabase
           .from('clientes')
@@ -114,9 +114,24 @@ serve(async (req) => {
         
         const clientesMap = new Map(todosClientes?.map(c => [c.nome, c]) || []);
         
-        const clientesParaProcessar = nomesClientesComVolumetria
-          .map(nomeEmpresa => clientesMap.get(nomeEmpresa))
-          .filter(cliente => cliente !== undefined); // Só processar clientes que existem na tabela
+        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (cadastrados ou não)
+        const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
+          const clienteExistente = clientesMap.get(nomeEmpresa);
+          
+          if (clienteExistente) {
+            return clienteExistente;
+          } else {
+            // Criar cliente temporário para processamento
+            console.log(`[gerar-faturamento-periodo] Cliente não cadastrado: ${nomeEmpresa} - criando registro temporário`);
+            return {
+              id: `temp-${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+              nome: nomeEmpresa,
+              email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.temporario.com`,
+              ativo: true,
+              status: 'Ativo'
+            };
+          }
+        });
         
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
         console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
