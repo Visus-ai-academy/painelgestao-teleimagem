@@ -475,20 +475,20 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="flex w-full overflow-x-auto text-xs">
-          <TabsTrigger value="exames" className="text-xs px-2 whitespace-nowrap">Exames</TabsTrigger>
-          <TabsTrigger value="quebra-exames" className="text-xs px-2 whitespace-nowrap">Quebra</TabsTrigger>
-          <TabsTrigger value="de-para" className="text-xs px-2 whitespace-nowrap">Fora Padrão</TabsTrigger>
-          <TabsTrigger value="precos" className="text-xs px-2 whitespace-nowrap">Preços</TabsTrigger>
-          <TabsTrigger value="parametros" className="text-xs px-2 whitespace-nowrap">Parâmetros</TabsTrigger>
-          <TabsTrigger value="regras" className="text-xs px-2 whitespace-nowrap">Regras</TabsTrigger>
-          <TabsTrigger value="repasse" className="text-xs px-2 whitespace-nowrap">Repasse</TabsTrigger>
-          <TabsTrigger value="legado" className="text-xs px-2 whitespace-nowrap">Legado</TabsTrigger>
-          <TabsTrigger value="modalidades" className="text-xs px-2 whitespace-nowrap">Modalidades</TabsTrigger>
-          <TabsTrigger value="especialidades" className="text-xs px-2 whitespace-nowrap">Especialidades</TabsTrigger>
-          <TabsTrigger value="categorias" className="text-xs px-2 whitespace-nowrap">Categorias</TabsTrigger>
-          <TabsTrigger value="prioridades" className="text-xs px-2 whitespace-nowrap">Prioridades</TabsTrigger>
-          <TabsTrigger value="de-para-prioridade" className="text-xs px-2 whitespace-nowrap">De-Para</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto text-sm">
+          <TabsTrigger value="exames" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Exames</TabsTrigger>
+          <TabsTrigger value="quebra-exames" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Quebra</TabsTrigger>
+          <TabsTrigger value="de-para" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Fora Padrão</TabsTrigger>
+          <TabsTrigger value="precos" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Preços</TabsTrigger>
+          <TabsTrigger value="parametros" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Parâmetros</TabsTrigger>
+          <TabsTrigger value="regras" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Regras</TabsTrigger>
+          <TabsTrigger value="repasse" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Repasse</TabsTrigger>
+          <TabsTrigger value="legado" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Legado</TabsTrigger>
+          <TabsTrigger value="modalidades" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Modalidades</TabsTrigger>
+          <TabsTrigger value="especialidades" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Especialidades</TabsTrigger>
+          <TabsTrigger value="categorias" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Categorias</TabsTrigger>
+          <TabsTrigger value="prioridades" className="text-sm px-3 py-2 whitespace-nowrap font-medium">Prioridades</TabsTrigger>
+          <TabsTrigger value="de-para-prioridade" className="text-sm px-3 py-2 whitespace-nowrap font-medium">De-Para</TabsTrigger>
         </TabsList>
 
         {/* Cadastro de Exames */}
