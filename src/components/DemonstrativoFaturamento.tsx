@@ -101,13 +101,13 @@ export default function DemonstrativoFaturamento() {
           data_vencimento,
           periodo_referencia
         `)
-        .eq('periodo_referencia', periodoRef)
+        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto (não periodoRef)
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
         .order('cliente_nome'); // Remover limite para garantir TODOS os dados sejam carregados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
-      console.log('🔍 Período usado na busca:', periodo); // Log do período usado
+      console.log('🔍 Período usado na busca (direto YYYY-MM):', periodo);
       console.log('🔍 Amostra dos primeiros registros:', dadosFaturamento?.slice(0, 3).map(d => ({
         cliente: d.cliente_nome,
         valor: d.valor_bruto,
@@ -124,31 +124,37 @@ export default function DemonstrativoFaturamento() {
         throw error;
       }
 
-      if (!dadosFaturamento || dadosFaturamento.length === 0) {
-        console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodo}`);
-        
-        // Se não há dados de faturamento, verificar se há dados de volumetria
-        if (clientesVolumetria && clientesVolumetria.length > 0) {
-          const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
-          console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
-          toast({
-            title: "Faturamento não gerado",
-            description: `Há dados de volumetria disponíveis para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
-            variant: "destructive",
-          });
-        } else {
-          console.log('💡 Não há dados de volumetria nem faturamento para este período');
-          toast({
-            title: "Dados não encontrados", 
-            description: `Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`,
-            variant: "destructive",
-          });
+        if (!dadosFaturamento || dadosFaturamento.length === 0) {
+          console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodo}`);
+          
+          // Se não há dados de faturamento, verificar se há dados de volumetria
+          const { data: clientesVolumetria } = await supabase
+            .from('volumetria_mobilemed')
+            .select('EMPRESA')
+            .eq('periodo_referencia', periodo)
+            .not('EMPRESA', 'is', null);
+            
+          if (clientesVolumetria && clientesVolumetria.length > 0) {
+            const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
+            console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
+            toast({
+              title: "Faturamento não gerado",
+              description: `Há dados de volumetria disponíveis para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
+              variant: "destructive",
+            });
+          } else {
+            console.log('💡 Não há dados de volumetria nem faturamento para este período');
+            toast({
+              title: "Dados não encontrados", 
+              description: `Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`,
+              variant: "destructive",
+            });
+          }
+          
+          setClientes([]);
+          setClientesFiltrados([]);
+          return;
         }
-        
-        setClientes([]);
-        setClientesFiltrados([]);
-        return;
-      }
 
       console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodo}`);
 
@@ -521,7 +527,7 @@ export default function DemonstrativoFaturamento() {
                 </thead>
                 <tbody>
                   {clientesFiltrados.map((cliente, index) => (
-                    <tr key={cliente.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                    <tr key={`${cliente.nome}-${index}`} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                       <td className="py-3 px-4 font-medium">{cliente.nome}</td>
                       <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
                       <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
