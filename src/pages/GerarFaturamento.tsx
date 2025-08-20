@@ -581,7 +581,9 @@ export default function GerarFaturamento() {
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-out"
-                      style={{ width: '100%' }}
+                      style={{ 
+                        width: clientesCarregados.length > 0 ? '100%' : '0%'
+                      }}
                     />
                   </div>
                 </div>
@@ -738,20 +740,6 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="gerar" className="space-y-6 mt-6">
-          {/* Alerta informativo sobre clientes */}
-          {clientesCarregados.length === 0 && (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 text-blue-800">
-                  <AlertTriangle className="h-5 w-5" />
-                  <div>
-                    <h3 className="font-semibold">Nenhum cliente carregado</h3>
-                    <p className="text-sm">Execute o "Gerar Demonstrativo" para carregar os clientes.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Seletor de Período */}
           <Card>
