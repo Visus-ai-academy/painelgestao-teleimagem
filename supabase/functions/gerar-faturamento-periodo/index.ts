@@ -244,9 +244,9 @@ serve(async (req) => {
                 const unit = Number(preco) || 0;
                 const valor = Number((unit * qtd).toFixed(2));
 
-                // Debug detalhado para identificar a origem do valor zero
+                // PULAR ITENS SEM PREÇO CONFIGURADO (não usar preço padrão)
                 if (valor <= 0) {
-                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO:`);
+                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO - PULANDO ITEM:`);
                   console.log(`  Cliente: ${cliente.nome}`);
                   console.log(`  Paciente: ${paciente}`);
                   console.log(`  Exame: ${chave.estudo}`);
@@ -254,43 +254,9 @@ serve(async (req) => {
                   console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
                   console.log(`  Quantidade (qtd): ${qtd}`);
                   console.log(`  Preço unitário (unit): ${unit}`);
-                  console.log(`  Preço retornado pela RPC: ${preco}`);
                   console.log(`  Volume total: ${volumeTotal}`);
-                  console.log(`  MOTIVO: Cliente pode não ter contrato ou tabela de preços configurada`);
-                  
-                  // Tentar com preço padrão de R$ 25,00 para não bloquear o faturamento
-                  const valorPadrao = 25.00;
-                  const valorComPadrao = Number((valorPadrao * qtd).toFixed(2));
-                  
-                  console.log(`  APLICANDO PREÇO PADRÃO: R$ ${valorPadrao} x ${qtd} = R$ ${valorComPadrao}`);
-                  
-                  const hoje = new Date();
-                  const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-                  const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-                  itensInserir.push({
-                  omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                  numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
-                  cliente_id: cliente.id,
-                  cliente_nome: cliente.nome, // Nome fantasia já está sendo usado
-                  cliente_email: cliente.email || null,
-                    paciente: paciente,
-                    modalidade: chave.modalidade,
-                    especialidade: chave.especialidade,
-                    categoria: chave.categoria,
-                    prioridade: chave.prioridade,
-                    nome_exame: chave.estudo,
-                    medico: medico,
-                    data_exame: dataExame || emissao,
-                    quantidade: qtd,
-                    valor_bruto: valorComPadrao,
-                    valor: valorComPadrao,
-                    data_emissao: emissao,
-                    data_vencimento: vencimento,
-                    periodo_referencia: periodoFormatado, // Usar formato YYYY-MM
-                    tipo_dados: 'incremental',
-                  });
-                  continue;
+                  console.log(`  MOTIVO: Cliente sem tabela de preços configurada para esta combinação`);
+                  continue; // Pular este item
                 }
 
                 const hoje = new Date();

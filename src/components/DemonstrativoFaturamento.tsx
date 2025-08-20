@@ -189,8 +189,8 @@ export default function DemonstrativoFaturamento() {
               // Buscar cliente cadastrado
               const clienteCadastrado = clientesMapPorNome.get(clienteNome);
               
-              // Calcular preço usando mesma lógica dos relatórios
-              let valorUnitario = 25.00; // Preço padrão
+              // Calcular preço usando mesma lógica dos relatórios - SEM PREÇO PADRÃO
+              let valorUnitario = 0; // SEM PREÇO PADRÃO
               
               if (clienteCadastrado?.id) {
                 try {
@@ -215,11 +215,17 @@ export default function DemonstrativoFaturamento() {
                   }
                 } catch (error) {
                   console.log(`Erro ao calcular preço para ${clienteNome}:`, error);
-                  // Manter preço padrão R$ 25,00
+                  // Não usar preço padrão - manter zero
                 }
               }
               
               const valorTotal = Number((valorUnitario * quantidade).toFixed(2));
+              
+              // Pular itens sem preço configurado
+              if (valorUnitario === 0) {
+                console.warn(`Cliente ${clienteNome} sem preço configurado - pulando item`);
+                continue;
+              }
               
               if (clientesMap.has(clienteNome)) {
                 const cliente = clientesMap.get(clienteNome)!;
@@ -237,7 +243,7 @@ export default function DemonstrativoFaturamento() {
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Dados baseados na volumetria com preços ${valorUnitario > 25 ? 'calculados' : 'padrão'}`
+                  observacoes: `Dados baseados na volumetria com preços calculados (R$ ${valorUnitario.toFixed(2)})`
                 });
               }
             }
