@@ -42,6 +42,7 @@ export default function DemonstrativoFaturamento() {
   const [filtroNome, setFiltroNome] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
+  const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
 
   // Carregar dados de faturamento
   const carregarDados = async () => {
@@ -353,7 +354,7 @@ export default function DemonstrativoFaturamento() {
     }
   };
 
-  // Aplicar filtros
+  // Aplicar filtros e ordenação
   useEffect(() => {
     let filtrados = [...clientes];
 
@@ -369,8 +370,14 @@ export default function DemonstrativoFaturamento() {
       );
     }
 
+    // Aplicar ordenação alfabética
+    filtrados.sort((a, b) => {
+      const comparison = a.nome.localeCompare(b.nome, 'pt-BR');
+      return ordemAlfabetica ? comparison : -comparison;
+    });
+
     setClientesFiltrados(filtrados);
-  }, [clientes, filtroNome, filtroStatus]);
+  }, [clientes, filtroNome, filtroStatus, ordemAlfabetica]);
 
   // Carregar dados ao montar o componente
   useEffect(() => {
@@ -629,15 +636,35 @@ export default function DemonstrativoFaturamento() {
       {/* Tabela de Clientes */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Faturamento por Cliente</span>
-            <span className="text-sm font-normal text-gray-500">
-              Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </CardTitle>
-          <CardDescription>
-            {clientesFiltrados.length} de {clientes.length} clientes
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center justify-between">
+                <span>Faturamento por Cliente</span>
+                <span className="text-sm font-normal text-gray-500 ml-4">
+                  Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </CardTitle>
+              <CardDescription>
+                {clientesFiltrados.length} de {clientes.length} clientes
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const novaOrdem = [...clientesFiltrados].sort((a, b) => {
+                    const comparison = a.nome.localeCompare(b.nome, 'pt-BR');
+                    return ordemAlfabetica ? -comparison : comparison;
+                  });
+                  setClientesFiltrados(novaOrdem);
+                  setOrdemAlfabetica(!ordemAlfabetica);
+                }}
+              >
+                {ordemAlfabetica ? 'Z-A' : 'A-Z'}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {carregando ? (

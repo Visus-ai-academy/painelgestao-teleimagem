@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,8 @@ import {
   Zap,
   Users,
   Upload,
-  Trash2
+  Trash2,
+  Search
 } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
@@ -144,6 +145,48 @@ export default function GerarFaturamento() {
     const saved = sessionStorage.getItem('resultadosFaturamento');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Estados para filtros e ordenação
+  const [filtroClienteRelatorios, setFiltroClienteRelatorios] = useState("");
+  const [ordemAlfabeticaRelatorios, setOrdemAlfabeticaRelatorios] = useState(true);
+  const [filtroClienteStatus, setFiltroClienteStatus] = useState("");
+  const [ordemAlfabeticaStatus, setOrdemAlfabeticaStatus] = useState(true);
+
+  // Resultados filtrados e ordenados para aba Relatórios
+  const resultadosFiltradosRelatorios = useMemo(() => {
+    let filtrados = [...resultados];
+    
+    if (filtroClienteRelatorios) {
+      filtrados = filtrados.filter(resultado => 
+        resultado.clienteNome.toLowerCase().includes(filtroClienteRelatorios.toLowerCase())
+      );
+    }
+    
+    filtrados.sort((a, b) => {
+      const comparison = a.clienteNome.localeCompare(b.clienteNome, 'pt-BR');
+      return ordemAlfabeticaRelatorios ? comparison : -comparison;
+    });
+    
+    return filtrados;
+  }, [resultados, filtroClienteRelatorios, ordemAlfabeticaRelatorios]);
+
+  // Resultados filtrados e ordenados para aba Gerar (Status por Cliente)
+  const resultadosFiltradosStatus = useMemo(() => {
+    let filtrados = [...resultados];
+    
+    if (filtroClienteStatus) {
+      filtrados = filtrados.filter(resultado => 
+        resultado.clienteNome.toLowerCase().includes(filtroClienteStatus.toLowerCase())
+      );
+    }
+    
+    filtrados.sort((a, b) => {
+      const comparison = a.clienteNome.localeCompare(b.clienteNome, 'pt-BR');
+      return ordemAlfabeticaStatus ? comparison : -comparison;
+    });
+    
+    return filtrados;
+  }, [resultados, filtroClienteStatus, ordemAlfabeticaStatus]);
 
   // Função para salvar resultados no banco de dados
   const salvarResultadosDB = useCallback(async (novosResultados: typeof resultados) => {
@@ -359,13 +402,38 @@ export default function GerarFaturamento() {
     setStatusProcessamento({
       processando: true,
       mensagem: 'Gerando demonstrativo de faturamento...',
-      progresso: 0
+      progresso: 10
     });
 
     try {
+      // Primeiro: Verificar quantos clientes únicos existem na volumetria
+      console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
+      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"Cliente_Nome_Fantasia"')
+        .eq('periodo_referencia', periodoSelecionado)
+        .not('"Cliente_Nome_Fantasia"', 'is', null);
+
+      if (errorVolumetria) {
+        throw new Error('Erro ao consultar volumetria: ' + errorVolumetria.message);
+      }
+
+      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.Cliente_Nome_Fantasia).filter(Boolean) || [])];
+      console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
+
+      if (clientesUnicosVolumetria.length === 0) {
+        throw new Error(`Nenhum cliente encontrado na volumetria para o período ${periodoSelecionado}`);
+      }
+
+      setStatusProcessamento({
+        processando: true,
+        mensagem: `Processando ${clientesUnicosVolumetria.length} clientes da volumetria...`,
+        progresso: 30
+      });
+
       console.log('📡 [EDGE_FUNCTION] Chamando gerar-faturamento-periodo com período:', periodoSelecionado);
       
-      // Primeiro gerar o faturamento do período
+      // Chamar edge function para gerar o faturamento
       const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
         body: {
           periodo: periodoSelecionado
@@ -381,8 +449,51 @@ export default function GerarFaturamento() {
         throw new Error(faturamentoError?.message || faturamentoData?.error || 'Erro ao gerar faturamento');
       }
 
-      console.log('✅ [SUCESSO] Demonstrativo gerado com sucesso');
-      console.log('📊 [DADOS] Dados retornados:', faturamentoData);
+      setStatusProcessamento({
+        processando: true,
+        mensagem: 'Verificando se todos os clientes foram processados...',
+        progresso: 70
+      });
+
+      // Aguardar um pouco para o processamento terminar
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Verificar quantos clientes foram realmente processados na tabela faturamento
+      console.log('🔍 [VERIFICACAO] Verificando clientes processados na tabela faturamento...');
+      const { data: clientesFaturamento, error: errorFaturamento } = await supabase
+        .from('faturamento')
+        .select('cliente_nome')
+        .eq('periodo_referencia', periodoSelecionado)
+        .not('cliente_nome', 'is', null);
+
+      if (errorFaturamento) {
+        console.warn('⚠️ [AVISO] Erro ao verificar faturamento:', errorFaturamento);
+      }
+
+      const clientesUnicosFaturamento = [...new Set(clientesFaturamento?.map(c => c.cliente_nome).filter(Boolean) || [])];
+      console.log('📊 [FATURAMENTO] Clientes processados no faturamento:', clientesUnicosFaturamento.length, clientesUnicosFaturamento);
+
+      setStatusProcessamento({
+        processando: true,
+        mensagem: `Processados ${clientesUnicosFaturamento.length} de ${clientesUnicosVolumetria.length} clientes`,
+        progresso: 90
+      });
+
+      // Verificar se todos os clientes foram processados
+      if (clientesUnicosFaturamento.length < clientesUnicosVolumetria.length) {
+        const clientesNaoProcessados = clientesUnicosVolumetria.filter(
+          cliente => !clientesUnicosFaturamento.includes(cliente)
+        );
+        console.warn('⚠️ [AVISO] Alguns clientes não foram processados:', clientesNaoProcessados);
+        
+        toast({
+          title: "Processamento parcial",
+          description: `${clientesUnicosFaturamento.length} de ${clientesUnicosVolumetria.length} clientes processados. Alguns clientes podem não ter preços configurados.`,
+          variant: "default",
+        });
+      } else {
+        console.log('✅ [SUCESSO] Todos os clientes foram processados');
+      }
 
       // Marcar demonstrativo como gerado
       setDemonstrativoGerado(true);
@@ -390,21 +501,21 @@ export default function GerarFaturamento() {
 
       setStatusProcessamento({
         processando: false,
-        mensagem: 'Demonstrativo gerado com sucesso',
+        mensagem: `Demonstrativo gerado com sucesso (${clientesUnicosFaturamento.length} clientes)`,
         progresso: 100
       });
 
       toast({
         title: "Demonstrativo gerado!",
-        description: `Faturamento do período ${periodoSelecionado} processado com sucesso`,
+        description: `Faturamento do período ${periodoSelecionado} processado com ${clientesUnicosFaturamento.length} clientes`,
         variant: "default",
       });
 
-      // Aguardar processamento e recarregar dados
+      // Recarregar dados
       setTimeout(() => {
         verificarDemonstrativoGerado();
         carregarClientes();
-      }, 3000);
+      }, 2000);
 
     } catch (error) {
       console.error('❌ [CATCH] Erro no processo de geração de faturamento:', error);
@@ -419,7 +530,7 @@ export default function GerarFaturamento() {
 
       toast({
         title: "Erro na geração",
-        description: "Ocorreu um erro durante a geração do demonstrativo",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração do demonstrativo",
         variant: "destructive",
       });
     } finally {
@@ -802,10 +913,30 @@ export default function GerarFaturamento() {
             </CardContent>
           </Card>
 
-          {/* Status dos Relatórios por Cliente - Simplificado */}
+          {/* Status dos Relatórios por Cliente - Com Filtros */}
           <Card>
             <CardHeader>
-              <CardTitle>Status dos Relatórios por Cliente</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle>Status dos Relatórios por Cliente</CardTitle>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Filtrar por cliente..."
+                      value={filtroClienteRelatorios}
+                      onChange={(e) => setFiltroClienteRelatorios(e.target.value)}
+                      className="pl-10 w-60"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOrdemAlfabeticaRelatorios(!ordemAlfabeticaRelatorios)}
+                  >
+                    {ordemAlfabeticaRelatorios ? 'Z-A' : 'A-Z'}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -818,7 +949,7 @@ export default function GerarFaturamento() {
                     </tr>
                   </thead>
                   <tbody>
-                    {resultados.map((resultado) => (
+                    {resultadosFiltradosRelatorios.map((resultado) => (
                       <tr key={resultado.clienteId} className="border-b">
                         <td className="p-3 font-medium">{resultado.clienteNome}</td>
                          <td className="p-3">
@@ -1043,11 +1174,31 @@ export default function GerarFaturamento() {
             </Card>
           )}
 
-          {/* Status por Cliente - Completo */}
+          {/* Status por Cliente - Com Filtros */}
           {resultados.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Status por Cliente</CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>Status por Cliente</CardTitle>
+                  <div className="flex gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Filtrar por cliente..."
+                        value={filtroClienteStatus}
+                        onChange={(e) => setFiltroClienteStatus(e.target.value)}
+                        className="pl-10 w-60"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOrdemAlfabeticaStatus(!ordemAlfabeticaStatus)}
+                    >
+                      {ordemAlfabeticaStatus ? 'Z-A' : 'A-Z'}
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -1062,7 +1213,7 @@ export default function GerarFaturamento() {
                       </tr>
                     </thead>
                     <tbody>
-                      {resultados.map((resultado) => (
+                      {resultadosFiltradosStatus.map((resultado) => (
                         <tr key={resultado.clienteId} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
                           <td className="p-3 text-center">
