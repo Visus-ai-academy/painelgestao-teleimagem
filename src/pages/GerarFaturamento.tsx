@@ -728,15 +728,15 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="gerar" className="space-y-6 mt-6">
-          {/* Alerta se não há clientes carregados */}
+          {/* Alerta informativo sobre clientes */}
           {clientesCarregados.length === 0 && (
-            <Card className="border-orange-200 bg-orange-50">
+            <Card className="border-blue-200 bg-blue-50">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-3 text-orange-800">
+                <div className="flex items-center gap-3 text-blue-800">
                   <AlertTriangle className="h-5 w-5" />
                   <div>
-                    <h3 className="font-semibold">Nenhum Cliente Encontrado</h3>
-                    <p className="text-sm">Certifique-se de que há dados de volumetria carregados para o período selecionado.</p>
+                    <h3 className="font-semibold">Execute primeiro o "Gerar Demonstrativo"</h3>
+                    <p className="text-sm">Os clientes aparecerão após gerar o demonstrativo do período selecionado.</p>
                   </div>
                 </div>
               </CardContent>
@@ -762,33 +762,6 @@ export default function GerarFaturamento() {
                 setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
                 onPeriodoChange={setPeriodoSelecionado}
               />
-            </CardContent>
-          </Card>
-
-          {/* Resumo Geral */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo do Processo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-3xl font-bold text-blue-900">{clientesCarregados.length}</div>
-                  <div className="text-sm text-blue-700">Clientes Ativos</div>
-                </div>
-                <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="text-3xl font-bold text-green-900">{relatoriosGerados}</div>
-                  <div className="text-sm text-green-700">Relatórios Gerados</div>
-                </div>
-                <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                  <div className="text-3xl font-bold text-orange-900">{emailsEnviados}</div>
-                  <div className="text-sm text-orange-700">E-mails Enviados</div>
-                </div>
-                <div className="text-center p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-900">{resultados.filter(r => r.erro).length}</div>
-                  <div className="text-sm text-gray-700">Erros</div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
