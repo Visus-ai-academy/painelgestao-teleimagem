@@ -261,212 +261,32 @@ export function ParametrosFaturamentoList() {
           <Table className="min-w-max">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[200px]">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('nome_mobilemed')}
-                  >
-                    NOME_MOBILEMED
-                    {getSortIcon('nome_mobilemed')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[200px]">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('nome_fantasia')}
-                  >
-                    Nome_Fantasia
-                    {getSortIcon('nome_fantasia')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('contrato')}
-                  >
-                    Contrato
-                    {getSortIcon('contrato')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('cnpj')}
-                  >
-                    CNPJ
-                    {getSortIcon('cnpj')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[250px]">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('razao_social')}
-                  >
-                    Razão Social
-                    {getSortIcon('razao_social')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('tipo_cliente')}
-                  >
-                    TIPO_CLIENTE
-                    {getSortIcon('tipo_cliente')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('dia_faturamento')}
-                  >
-                    DIA_FATURAMENTO
-                    {getSortIcon('dia_faturamento')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('data_inicio')}
-                  >
-                    DATA_INICIO
-                    {getSortIcon('data_inicio')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('data_termino')}
-                  >
-                    DATA_TERMINO
-                    {getSortIcon('data_termino')}
-                  </Button>
-                </TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[200px]">NOME_MOBILEMED</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[200px]">Nome_Fantasia</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Contrato</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">CNPJ</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[250px]">Razão Social</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">TIPO_CLIENTE</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">DIA_FATURAMENTO</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">DATA_INICIO</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">DATA_TERMINO</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">Criterio de Emissao de NF</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">Criterios de geração do relatório</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">Criterios de aplicação dos parâmetros</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">Criterios de aplicação das franquias</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">TIPO FATURAMENTO</TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('status')}
-                  >
-                    STATUS
-                    {getSortIcon('status')}
-                  </Button>
-                </TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">STATUS</TableHead>
                 <TableHead className="sticky top-0 bg-background whitespace-nowrap">Impostos abMin</TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('simples')}
-                  >
-                    Simples
-                    {getSortIcon('simples')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('integracao')}
-                  >
-                    Integração
-                    {getSortIcon('integracao')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('portal_laudos')}
-                  >
-                    Portal de Laudos
-                    {getSortIcon('portal_laudos')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('possui_franquia')}
-                  >
-                    Possui Franquia
-                    {getSortIcon('possui_franquia')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('valor_franquia')}
-                  >
-                    Valor Franquia
-                    {getSortIcon('valor_franquia')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('frequencia_continua')}
-                  >
-                    Frequencia Contínua
-                    {getSortIcon('frequencia_continua')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('frequencia_por_volume')}
-                  >
-                    Frequência por volume
-                    {getSortIcon('frequencia_por_volume')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('volume_franquia')}
-                  >
-                    Volume Franquia
-                    {getSortIcon('volume_franquia')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('valor_franquia_acima_volume')}
-                  >
-                    R$ Valor Franquia Acima Volume
-                    {getSortIcon('valor_franquia_acima_volume')}
-                  </Button>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background whitespace-nowrap">
-                  <Button 
-                    variant="ghost" 
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                    onClick={() => handleSort('incluir_medico_solicitante')}
-                  >
-                    INCLUIR MÉDICO SOLICITANTE
-                    {getSortIcon('incluir_medico_solicitante')}
-                  </Button>
-                </TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Simples</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Integração</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Portal de Laudos</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Possui Franquia</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Valor Franquia</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Frequencia Contínua</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Frequência por volume</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">Volume Franquia</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">R$ Valor Franquia Acima Volume</TableHead>
+                <TableHead className="sticky top-0 bg-background whitespace-nowrap">INCLUIR MÉDICO SOLICITANTE</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
