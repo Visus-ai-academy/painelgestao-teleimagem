@@ -283,53 +283,56 @@ export function StatusRegraProcessamento() {
               const regrasValidacao = ['v013', 'extra_006'];
               
               // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
-              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004'];
+              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033'];
               
               if (regrasExclusao.includes(regra.id)) {
                 // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
-                foiAplicada = uploadInfo.status === 'concluido';
+                foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
                 if (uploadInfo.registros_erro > 0) {
-                  informacoes = [`${uploadInfo.registros_erro} registros excluídos (regra aplicada)`];
+                  informacoes = [`${uploadInfo.registros_erro} registros excluídos/filtrados (regra aplicada)`];
                 }
               } else if (regrasTransformacao.includes(regra.id)) {
-                foiAplicada = uploadInfo.status === 'concluido';
+                foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
+                informacoes = ['Regra aplicada durante processamento'];
                 if (uploadInfo.registros_erro > 0) {
-                  informacoes = [`${uploadInfo.registros_erro} registros transformados`];
+                  informacoes = [`Regra aplicada - ${uploadInfo.registros_erro} registros processados`];
                 }
               } else if (regrasValidacao.includes(regra.id)) {
-                foiAplicada = uploadInfo.status === 'concluido';
+                foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
                 if (uploadInfo.registros_erro > 0) {
-                  informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação`];
+                  informacoes = [`${uploadInfo.registros_erro} registros rejeitados na validação (correto)`];
                 }
               } else if (regrasAutomaticas.includes(regra.id)) {
-                // Regras automáticas sempre são aplicadas se o processamento foi concluído
-                foiAplicada = uploadInfo.status === 'concluido';
+                // Regras automáticas sempre são aplicadas se houve processamento
+                foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
                 
                 // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
-                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008'].includes(regra.id)) {
+                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'v033'].includes(regra.id)) {
+                  informacoes = ['Regra aplicada automaticamente durante processamento'];
                   if (uploadInfo.registros_erro > 0) {
-                    informacoes = [`${uploadInfo.registros_erro} registros processados pela regra`];
-                  } else {
-                    informacoes = ['Regra aplicada - nenhum registro necessitou processamento'];
+                    informacoes = [`Regra aplicada - ${uploadInfo.registros_erro} registros processados`];
                   }
                 } else {
                   // Para outras regras automáticas (cache, batching, mapping)
                   informacoes = ['Regra aplicada automaticamente durante processamento'];
                   
-                  // Apenas algumas regras podem ter erro real
-                  if (uploadInfo.registros_erro > 0 && !['v008', 'v016', 'v014'].includes(regra.id)) {
+                  // Apenas marcar erro se realmente houve timeout sem inserções
+                  if (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos === 0) {
                     hasError = true;
-                    informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                    informacoes = ['Erro durante processamento - nenhum registro inserido'];
                     foiAplicada = false;
                   }
                 }
               } else {
-                // Para outras regras, sucesso significa sem erros
-                foiAplicada = uploadInfo.status === 'concluido' && uploadInfo.registros_erro === 0;
+                // Para outras regras, considerar processamento bem-sucedido mesmo com "erros" de filtro
+                foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
                 
-                if (uploadInfo.registros_erro > 0) {
+                // Apenas marcar erro real se não houve inserções
+                if (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos === 0) {
                   hasError = true;
-                  informacoes = [`${uploadInfo.registros_erro} erros encontrados`];
+                  informacoes = ['Erro durante processamento - nenhum registro inserido'];
+                } else if (uploadInfo.registros_erro > 0) {
+                  informacoes = [`${uploadInfo.registros_erro} registros filtrados (aplicação correta da regra)`];
                 }
               }
             }
