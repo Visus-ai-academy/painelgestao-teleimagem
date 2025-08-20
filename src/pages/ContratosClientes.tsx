@@ -369,6 +369,115 @@ export default function ContratosClientes() {
     }
   }, [contratoEditando]);
 
+  // Função para gerar contratos automaticamente
+  const gerarContratosAutomaticos = async () => {
+    try {
+      setIsCreatingContracts(true);
+      
+      // 1. Buscar clientes ativos que não têm contrato
+      const { data: clientesSemContrato, error: clientesError } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('ativo', true)
+        .not('id', 'in', `(${contratos.map(c => c.clienteId).join(',') || 'null'})`);
+      
+      if (clientesError) throw clientesError;
+      
+      if (!clientesSemContrato || clientesSemContrato.length === 0) {
+        toast({
+          title: "Nenhum cliente encontrado",
+          description: "Todos os clientes ativos já possuem contratos.",
+          variant: "default",
+        });
+        return;
+      }
+
+      let contratosGerados = 0;
+      
+      for (const cliente of clientesSemContrato) {
+        // 2. Buscar preços configurados para o cliente
+        const { data: precosCliente, error: precosError } = await supabase
+          .from('precos_servicos')
+          .select('*')
+          .eq('cliente_id', cliente.id);
+        
+        if (precosError) {
+          console.error(`Erro ao buscar preços para cliente ${cliente.nome}:`, precosError);
+          continue;
+        }
+        
+        // 3. Só gera contrato se cliente tem preços configurados
+        if (precosCliente && precosCliente.length > 0) {
+          // Calcular data de início e fim do contrato
+          const dataInicio = new Date().toISOString().split('T')[0];
+          const dataFim = new Date();
+          dataFim.setFullYear(dataFim.getFullYear() + 1); // 1 ano de contrato
+          
+          // Preparar serviços contratados baseados nos preços
+          const servicosContratados = precosCliente.map(preco => ({
+            modalidade: preco.modalidade,
+            especialidade: preco.especialidade,
+            categoria: preco.categoria,
+            prioridade: preco.prioridade || 'Rotina',
+            valor_base: preco.valor_base,
+            valor_urgencia: preco.valor_urgencia,
+            volume_inicial: preco.volume_inicial,
+            volume_final: preco.volume_final
+          }));
+          
+          // 4. Criar contrato no banco
+          const { error: contratoError } = await supabase
+            .from('contratos_clientes')
+            .insert({
+              cliente_id: cliente.id,
+              numero_contrato: `CT-${Date.now()}-${cliente.id.slice(-8)}`,
+              data_inicio: dataInicio,
+              data_fim: dataFim.toISOString().split('T')[0],
+              status: 'ativo',
+              servicos_contratados: servicosContratados,
+              modalidades: [...new Set(precosCliente.map(p => p.modalidade))],
+              especialidades: [...new Set(precosCliente.map(p => p.especialidade))],
+              tem_precos_configurados: true,
+              tem_parametros_configurados: false,
+              considera_plantao: false,
+              cond_volume: 'MOD/ESP/CAT',
+              dia_vencimento: 10,
+              desconto_percentual: 0,
+              acrescimo_percentual: 0,
+              faixas_volume: [],
+              configuracoes_franquia: {},
+              configuracoes_integracao: {}
+            });
+          
+          if (contratoError) {
+            console.error(`Erro ao criar contrato para cliente ${cliente.nome}:`, contratoError);
+            continue;
+          }
+          
+          contratosGerados++;
+        }
+      }
+      
+      toast({
+        title: "Contratos gerados com sucesso!",
+        description: `${contratosGerados} contratos foram criados automaticamente.`,
+      });
+      
+      // Recarregar lista de contratos
+      await carregarContratos();
+      
+    } catch (error: any) {
+      console.error('Erro ao gerar contratos:', error);
+      toast({
+        title: "Erro ao gerar contratos",
+        description: error.message || 'Erro desconhecido',
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingContracts(false);
+    }
+  };
+
   // Função para salvar contrato
   const salvarContrato = async () => {
     if (!contratoEditando) return;
@@ -534,6 +643,24 @@ export default function ContratosClientes() {
 
       {/* Ações Principais */}
       <div className="flex gap-4">
+        <Button 
+          onClick={gerarContratosAutomaticos}
+          disabled={isCreatingContracts}
+          className="bg-green-600 hover:bg-green-700 text-white"
+        >
+          {isCreatingContracts ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Gerando...
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-2" />
+              Gerar Contratos
+            </>
+          )}
+        </Button>
+
         <Button variant="outline">
           <Download className="h-4 w-4 mr-2" />
           Exportar Contratos
