@@ -141,9 +141,22 @@ export default function GerarFaturamento() {
       valor_total: number;
     };
   }>>(() => {
-    const saved = localStorage.getItem('resultadosFaturamento');
+    const saved = sessionStorage.getItem('resultadosFaturamento');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Função para salvar resultados no sessionStorage (excluindo dados pesados)
+  const salvarResultados = useCallback((novosResultados: typeof resultados) => {
+    try {
+      // Salvar apenas dados essenciais, excluindo relatorioData que é muito pesado
+      const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
+      sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
+    } catch (error) {
+      console.warn('Erro ao salvar no sessionStorage:', error);
+      // Se ainda der erro, limpar dados antigos
+      sessionStorage.removeItem('resultadosFaturamento');
+    }
+  }, []);
   
   const { toast } = useToast();
 
@@ -221,7 +234,7 @@ export default function GerarFaturamento() {
       }));
       
       setResultados(novosResultados);
-      localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+      salvarResultados(novosResultados);
       
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
@@ -365,8 +378,8 @@ export default function GerarFaturamento() {
                 : r
             );
             
-            // Salvar no localStorage
-            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            // Salvar no sessionStorage
+            salvarResultados(novosResultados);
             return novosResultados;
           });
 
@@ -383,8 +396,8 @@ export default function GerarFaturamento() {
                 : r
             );
             
-            // Salvar no localStorage
-            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            // Salvar no sessionStorage
+            salvarResultados(novosResultados);
             return novosResultados;
           });
         }
@@ -430,7 +443,7 @@ export default function GerarFaturamento() {
       setEmailsEnviados(0);
       localStorage.setItem('relatoriosGerados', '0');
       localStorage.setItem('emailsEnviados', '0');
-      localStorage.removeItem('resultadosFaturamento');
+      sessionStorage.removeItem('resultadosFaturamento');
       setResultados([]);
     }
     
@@ -501,8 +514,8 @@ export default function GerarFaturamento() {
                 : resultado
             );
             
-            // Salvar no localStorage
-            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            // Salvar no sessionStorage
+            salvarResultados(novosResultados);
             return novosResultados;
           });
 
@@ -525,8 +538,8 @@ export default function GerarFaturamento() {
                 : resultado
             );
             
-            // Salvar no localStorage
-            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            // Salvar no sessionStorage
+            salvarResultados(novosResultados);
             return novosResultados;
           });
         }
