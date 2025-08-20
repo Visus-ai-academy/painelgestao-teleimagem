@@ -83,6 +83,12 @@ export default function GerarFaturamento() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Estado para controlar se o demonstrativo foi gerado
+  const [demonstrativoGerado, setDemonstrativoGerado] = useState(() => {
+    const saved = localStorage.getItem('demonstrativoGerado');
+    return saved === 'true';
+  });
+
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
   const [enviarEmails, setEnviarEmails] = useState(false);
@@ -269,6 +275,10 @@ export default function GerarFaturamento() {
       console.log('✅ [SUCESSO] Demonstrativo gerado com sucesso');
       console.log('📊 [DADOS] Dados retornados:', faturamentoData);
 
+      // Marcar demonstrativo como gerado
+      setDemonstrativoGerado(true);
+      localStorage.setItem('demonstrativoGerado', 'true');
+
       setStatusProcessamento({
         processando: false,
         mensagem: 'Demonstrativo gerado com sucesso',
@@ -390,6 +400,9 @@ export default function GerarFaturamento() {
   // Carregar clientes quando o componente inicializa ou período muda
   useEffect(() => {
     console.log('🔄 Período selecionado mudou para:', periodoSelecionado);
+    // Resetar demonstrativo quando período mudar
+    setDemonstrativoGerado(false);
+    localStorage.setItem('demonstrativoGerada', 'false');
     carregarClientes();
   }, [periodoSelecionado]);
 
@@ -832,7 +845,7 @@ export default function GerarFaturamento() {
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
                   <Button 
                     onClick={gerarTodosRelatorios}
-                    disabled={processandoTodos || clientesCarregados.length === 0}
+                    disabled={processandoTodos || clientesCarregados.length === 0 || !demonstrativoGerado}
                     size="lg"
                     className="min-w-[280px] bg-green-600 hover:bg-green-700"
                   >
@@ -849,7 +862,10 @@ export default function GerarFaturamento() {
                     )}
                   </Button>
                   <p className="text-sm text-green-700">
-                    Gera relatórios individuais em PDF para cada cliente
+                    {!demonstrativoGerado 
+                      ? "Execute primeiro a Etapa 1 (Gerar Demonstrativo)" 
+                      : "Gera relatórios individuais em PDF para cada cliente"
+                    }
                   </p>
                 </div>
               </div>
