@@ -471,19 +471,49 @@ export default function GerarFaturamento() {
         progresso: 70
       });
 
-      // Aguardar um pouco para o processamento terminar
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Aguardar e verificar o processamento com polling
+      console.log('🔍 [VERIFICACAO] Aguardando processamento em background...');
+      
+      let tentativas = 0;
+      const maxTentativas = 20; // 20 tentativas = até 60 segundos
+      let clientesFaturamento: any[] = [];
+      
+      while (tentativas < maxTentativas) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3 segundos entre tentativas
+        tentativas++;
+        
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Verificando processamento... (${tentativas}/${maxTentativas})`,
+          progresso: 70 + ((tentativas / maxTentativas) * 20) // 70% a 90%
+        });
 
-      // Verificar quantos clientes foram realmente processados na tabela faturamento
-      console.log('🔍 [VERIFICACAO] Verificando clientes processados na tabela faturamento...');
-      const { data: clientesFaturamento, error: errorFaturamento } = await supabase
-        .from('faturamento')
-        .select('cliente_nome')
-        .eq('periodo_referencia', periodoSelecionado)
-        .not('cliente_nome', 'is', null);
+        console.log(`🔍 [VERIFICACAO] Tentativa ${tentativas}/${maxTentativas} - Verificando clientes processados...`);
+        const { data: dadosFaturamento, error: errorFaturamento } = await supabase
+          .from('faturamento')
+          .select('cliente_nome')
+          .eq('periodo_referencia', periodoSelecionado)
+          .not('cliente_nome', 'is', null);
 
-      if (errorFaturamento) {
-        console.warn('⚠️ [AVISO] Erro ao verificar faturamento:', errorFaturamento);
+        if (errorFaturamento) {
+          console.warn('⚠️ [AVISO] Erro ao verificar faturamento:', errorFaturamento);
+          continue;
+        }
+
+        clientesFaturamento = dadosFaturamento || [];
+        
+        // Se encontrou dados, sair do loop
+        if (clientesFaturamento.length > 0) {
+          console.log(`✅ [SUCESSO] Encontrados ${clientesFaturamento.length} registros processados na tentativa ${tentativas}`);
+          break;
+        }
+        
+        console.log(`⏳ [AGUARDANDO] Tentativa ${tentativas}: ainda sem dados processados, aguardando...`);
+      }
+
+      if (clientesFaturamento.length === 0) {
+        console.warn('⚠️ [TIMEOUT] Processamento não concluído dentro do tempo limite');
+        throw new Error('Timeout: O processamento está demorando mais que o esperado. Verifique se há dados de volumetria para o período.');
       }
 
       const clientesUnicosFaturamento = [...new Set(clientesFaturamento?.map(c => c.cliente_nome).filter(Boolean) || [])];
