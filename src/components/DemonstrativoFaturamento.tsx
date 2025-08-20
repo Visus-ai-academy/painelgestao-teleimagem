@@ -133,22 +133,74 @@ export default function DemonstrativoFaturamento() {
 
         if (!dadosFaturamento || dadosFaturamento.length === 0) {
           console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodo}`);
+          console.log('💡 Buscando dados da volumetria para criar demonstrativo...');
           
-          // Se não há dados de faturamento, verificar se há dados de volumetria
-          const { data: clientesVolumetria } = await supabase
+          // Se não há dados de faturamento, usar dados da volumetria para criar demonstrativo
+          const { data: dadosVolumetria, error: errorVolumetria } = await supabase
             .from('volumetria_mobilemed')
-            .select('EMPRESA')
+            .select(`
+              "EMPRESA",
+              "VALORES",
+              "DATA_REALIZACAO",
+              "MODALIDADE",
+              "ESPECIALIDADE",
+              "CATEGORIA",
+              "PRIORIDADE"
+            `)
             .eq('periodo_referencia', periodo)
-            .not('EMPRESA', 'is', null);
+            .not('EMPRESA', 'is', null)
+            .not('VALORES', 'is', null);
             
-          if (clientesVolumetria && clientesVolumetria.length > 0) {
-            const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
-            console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
+          if (errorVolumetria) {
+            console.error('❌ Erro ao carregar volumetria:', errorVolumetria);
+            throw errorVolumetria;
+          }
+            
+          if (dadosVolumetria && dadosVolumetria.length > 0) {
+            console.log('📊 Dados de volumetria encontrados:', dadosVolumetria.length);
+            
+            // Processar dados da volumetria para criar demonstrativo
+            const clientesMap = new Map<string, ClienteFaturamento>();
+            
+            dadosVolumetria.forEach(item => {
+              const clienteNome = item.EMPRESA;
+              const valor = Number(item.VALORES || 0);
+              
+              if (clientesMap.has(clienteNome)) {
+                const cliente = clientesMap.get(clienteNome)!;
+                cliente.total_exames += 1;
+                cliente.valor_bruto += valor;
+                cliente.valor_liquido += valor;
+              } else {
+                clientesMap.set(clienteNome, {
+                  id: clienteNome,
+                  nome: clienteNome,
+                  email: '', // Volumetria não tem email
+                  total_exames: 1,
+                  valor_bruto: valor,
+                  valor_liquido: valor,
+                  periodo: periodo,
+                  status_pagamento: 'pendente' as const,
+                  data_vencimento: new Date().toISOString().split('T')[0],
+                  observacoes: 'Dados baseados na volumetria'
+                });
+              }
+            });
+
+            const clientesArray = Array.from(clientesMap.values());
+            console.log('📊 Clientes processados da volumetria:', clientesArray.length);
+            console.log('📋 Primeiros 5 clientes:', clientesArray.slice(0, 5).map(c => ({ nome: c.nome, exames: c.total_exames, valor: c.valor_bruto })));
+            
+            setClientes(clientesArray);
+            setClientesFiltrados(clientesArray);
+            
             toast({
-              title: "Demonstrativo atualizado",
-              description: `Agora há ${clientesUnicos.length} clientes na volumetria para ${periodo}. Todos os clientes com dados válidos aparecem no demonstrativo após processamento na aba "Gerar".`,
+              title: "Demonstrativo carregado da volumetria",
+              description: `${clientesArray.length} clientes carregados diretamente dos dados de volumetria para ${periodo}.`,
               variant: "default",
             });
+            
+            return;
           } else {
             console.log('💡 Não há dados de volumetria nem faturamento para este período');
             toast({
