@@ -574,20 +574,6 @@ serve(async (req) => {
         console.warn('⚠️ Exceção na validação de cliente:', validacaoException);
       }
     }
-    try {
-      const { error: normError } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .update({ EMPRESA: 'CEDIDIAG', updated_at: new Date().toISOString() })
-        .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
-        .eq('lote_upload', loteUpload);
-      if (normError) {
-        console.warn('⚠️ Erro na normalização CEDIDIAG (ignorado):', normError);
-      } else {
-        console.log('✅ Normalização CEDIDIAG aplicada (última etapa)');
-      }
-    } catch (normEx) {
-      console.warn('⚠️ Exceção na normalização CEDIDIAG (ignorada):', normEx);
-    }
 
     // Finalizar log
     await supabaseClient
