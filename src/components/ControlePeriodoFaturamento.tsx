@@ -99,108 +99,56 @@ export function ControlePeriodoFaturamento({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileBarChart2 className="h-5 w-5" />
-          Período para Relatórios de Faturamento
+          Período do Faturamento
         </CardTitle>
         <CardDescription>
-          Selecione o período para geração de relatórios PDF e envio de emails
+          Selecione o período para processamento
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="periodo-faturamento">Período do Relatório</Label>
-              <Select value={periodoSelecionado} onValueChange={handlePeriodoChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o período" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodos.map(({ periodo, status, isDisponivel }) => (
-                    <SelectItem 
-                      key={periodo} 
-                      value={periodo}
-                      disabled={mostrarApenasDisponiveis && !isDisponivel}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{periodo}</span>
-                        <Badge 
-                          variant={
-                            status === 'concluido' ? 'default' :
-                            status === 'pronto' ? 'default' :
-                            status === 'futuro' ? 'secondary' : 'outline'
-                          }
-                          className="text-xs"
-                        >
-                          {
-                            status === 'concluido' ? 'Concluído' :
-                            status === 'pronto' ? 'Pronto' :
-                            status === 'futuro' ? 'Futuro' : 'Em Andamento'
-                          }
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={mostrarApenasDisponiveis}
-                onCheckedChange={setMostrarApenasDisponiveis}
-              />
-              <Label className="text-sm">Mostrar apenas períodos recomendados</Label>
-            </div>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="periodo-faturamento">Período</Label>
+            <Select value={periodoSelecionado} onValueChange={handlePeriodoChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o período" />
+              </SelectTrigger>
+              <SelectContent>
+                {periodos.map(({ periodo, status, isDisponivel }) => (
+                  <SelectItem 
+                    key={periodo} 
+                    value={periodo}
+                    disabled={mostrarApenasDisponiveis && !isDisponivel}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{periodo}</span>
+                      <Badge 
+                        variant={
+                          status === 'concluido' ? 'default' :
+                          status === 'pronto' ? 'default' :
+                          status === 'futuro' ? 'secondary' : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {
+                          status === 'concluido' ? 'Concluído' :
+                          status === 'pronto' ? 'Pronto' :
+                          status === 'futuro' ? 'Futuro' : 'Em Andamento'
+                        }
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="space-y-4">
-            <div className="p-4 border rounded-lg">
-              <h4 className="font-medium mb-3">Status do Período Selecionado</h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${
-                    statusPeriodoSelecionado === 'concluido' ? 'bg-green-500' :
-                    statusPeriodoSelecionado === 'pronto' ? 'bg-blue-500' :
-                    statusPeriodoSelecionado === 'futuro' ? 'bg-yellow-500' : 'bg-orange-500'
-                  }`}></div>
-                  <span className="font-medium">
-                    {periodoSelecionado} - {
-                      statusPeriodoSelecionado === 'concluido' ? 'Concluído' :
-                      statusPeriodoSelecionado === 'pronto' ? 'Pronto p/ Faturar' :
-                      statusPeriodoSelecionado === 'futuro' ? 'Futuro' : 'Em Andamento'
-                    }
-                  </span>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  {statusPeriodoSelecionado === 'concluido' && (
-                    <p className="text-green-700">✅ Dados históricos - Faturamento/Volumetria concluída</p>
-                  )}
-                  {statusPeriodoSelecionado === 'pronto' && (
-                    <p className="text-blue-700">💰 Período pronto para faturamento - dados completos</p>
-                  )}
-                  {statusPeriodoSelecionado === 'futuro' && (
-                    <p className="text-yellow-700">📅 Período futuro - dados podem não estar completos</p>
-                  )}
-                  {statusPeriodoSelecionado === 'pendente' && (
-                    <p className="text-orange-700">⏳ Período em andamento - aguardando fechamento</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2 flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Sobre Relatórios de Faturamento
-              </h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Relatórios são <strong>independentes</strong> das validações de upload</li>
-                <li>• Podem ser gerados para qualquer período com dados disponíveis</li>
-                <li>• Não modificam dados operacionais do sistema</li>
-                <li>• PDFs são protegidos com senha baseada no CNPJ do cliente</li>
-              </ul>
-            </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={mostrarApenasDisponiveis}
+              onCheckedChange={setMostrarApenasDisponiveis}
+            />
+            <Label className="text-sm">Mostrar apenas períodos recomendados</Label>
           </div>
         </div>
       </CardContent>
