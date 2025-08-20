@@ -109,27 +109,14 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento em vez de volumetria
-    console.log('Buscando dados de faturamento...');
+    // Buscar dados de faturamento usando APENAS o nome fantasia
+    console.log('Buscando dados de faturamento pelo nome fantasia...');
     
-    // Buscar primeiro com nome exato, depois com LIKE para ser mais flexível
-    let { data: dataFaturamento, error: errorFaturamento } = await supabase
+    const { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
       .select('*')
       .eq('cliente_nome', cliente.nome)
       .eq('periodo_referencia', periodo);
-
-    // Se não encontrou com nome exato, tentar busca com LIKE (case insensitive)
-    if (!dataFaturamento || dataFaturamento.length === 0) {
-      console.log('Tentando busca com LIKE para nome do cliente...');
-      const result = await supabase
-        .from('faturamento')
-        .select('*')
-        .ilike('cliente_nome', `%${cliente.nome}%`)
-        .eq('periodo_referencia', periodo);
-      dataFaturamento = result.data;
-      errorFaturamento = result.error;
-    }
 
     console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
     console.log('🔍 AMOSTRA DOS DADOS ENCONTRADOS:');
@@ -137,33 +124,27 @@ serve(async (req: Request) => {
       console.log('Primeiros 2 registros:', JSON.stringify(dataFaturamento.slice(0, 2), null, 2));
       console.log('Tem campo "valor"?', dataFaturamento[0].hasOwnProperty('valor'));
       console.log('Valor do primeiro registro:', dataFaturamento[0].valor);
+    } else {
+      console.log('⚠️ NENHUM DADO DE FATURAMENTO ENCONTRADO PARA O NOME FANTASIA:', cliente.nome);
     }
 
     let finalData = dataFaturamento || [];
     
-    // Se não encontrou dados no faturamento, tentar buscar na volumetria como fallback
+    // Se não encontrou dados no faturamento, retornar erro informativo
     if (finalData.length === 0) {
-      console.log('Nenhum dado de faturamento encontrado, tentando volumetria como fallback...');
+      console.log('❌ DADOS NÃO ENCONTRADOS - Cliente precisa de verificação no cadastro');
       
-      // Calcular período correto para volumetria (do dia 8 do mês anterior ao dia 7 do mês atual)
-      const mesInt = parseInt(mes);
-      const anoInt = parseInt(ano);
-      
-      // Para volumetria, o período é do dia 8 do mês anterior ao dia 7 do mês selecionado
-      const dataInicioVolumetria = `${anoInt}-${(mesInt - 1).toString().padStart(2, '0')}-08`;
-      const dataFimVolumetria = `${anoInt}-${mes.padStart(2, '0')}-07`;
-      
-      console.log(`Período volumetria: ${dataInicioVolumetria} a ${dataFimVolumetria}`);
-      
-      const { data: dataVolumetria, error: errorVolumetria } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('"EMPRESA"', cliente.nome)
-        .gte('data_referencia', dataInicioVolumetria)
-        .lte('data_referencia', dataFimVolumetria);
-
-      finalData = dataVolumetria || [];
-      console.log(`Dados de volumetria encontrados como fallback: ${finalData.length}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Dados de faturamento não encontrados para o cliente "${cliente.nome}" no período ${periodo}. Favor verificar o cadastro do cliente.`,
+        cliente: cliente.nome,
+        periodo: periodo,
+        motivo: 'cliente_nao_encontrado_no_faturamento',
+        acao_requerida: 'Verificar se o nome fantasia do cliente está correto no sistema e se há dados de faturamento processados para este período.'
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
