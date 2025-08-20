@@ -78,8 +78,7 @@ export default function DemonstrativoFaturamento() {
         .from('volumetria_mobilemed')
         .select('EMPRESA')
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM para volumetria
-        .not('EMPRESA', 'is', null)
-        .limit(50000); // Aumentar limite para capturar todos os registros
+        .not('EMPRESA', 'is', null); // Remover limite completamente para capturar TODOS os registros
       
       console.log('📊 Clientes encontrados na volumetria (formato YYYY-MM):', clientesVolumetria?.length || 0);
       
@@ -129,16 +128,17 @@ export default function DemonstrativoFaturamento() {
         
         // Se não há dados de faturamento, verificar se há dados de volumetria
         if (clientesVolumetria && clientesVolumetria.length > 0) {
+          const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
           console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
           toast({
             title: "Faturamento não gerado",
-            description: `Há ${clientesVolumetria.length} registros de volumetria para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
+            description: `Há dados de volumetria disponíveis para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
             variant: "destructive",
           });
         } else {
           console.log('💡 Não há dados de volumetria nem faturamento para este período');
           toast({
-            title: "Dados não encontrados",
+            title: "Dados não encontrados", 
             description: `Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`,
             variant: "destructive",
           });

@@ -164,8 +164,7 @@ export default function GerarFaturamento() {
           .from('volumetria_mobilemed')
           .select('EMPRESA')
           .eq('periodo_referencia', periodoRef)
-          .not('EMPRESA', 'is', null)
-          .limit(50000); // Aumentar limite para capturar todos os registros
+          .not('EMPRESA', 'is', null); // Remover limite para capturar todos os registros
 
         if (errorVolumetria) {
           console.error('❌ Erro na consulta volumetria:', errorVolumetria);
