@@ -51,15 +51,21 @@ serve(async (req) => {
       deParaMap.set(rule.estudo_descricao, rule.valores);
     });
 
-    // 4. PROCESSAR REGISTROS EM LOTES
-    const BATCH_SIZE = 1000;
+    // 4. PROCESSAR REGISTROS EM LOTES MENORES (OTIMIZADO)
+    const BATCH_SIZE = 50; // Reduzido para evitar timeout
     let totalInseridos = 0;
     let totalZeradosCorrigidos = 0;
 
+    console.log(`📊 [DIRETO] Iniciando processamento de ${jsonData.length} registros em lotes de ${BATCH_SIZE}`);
+
     for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
       const batch = jsonData.slice(i, i + BATCH_SIZE);
+      console.log(`🔄 [DIRETO] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(jsonData.length/BATCH_SIZE)} (registros ${i + 1}-${Math.min(i + BATCH_SIZE, jsonData.length)})`);
       
-      const registrosProcessados = batch.map((row: any) => {
+      // Processar batch de forma mais eficiente
+      const registrosProcessados = [];
+      
+      for (const row of batch) {
         // Aplicar de-para se valor for zero
         let valorFinal = parseFloat(row.VALORES) || 0;
         if (valorFinal === 0 && deParaMap.has(row.ESTUDO_DESCRICAO)) {
@@ -67,7 +73,7 @@ serve(async (req) => {
           totalZeradosCorrigidos++;
         }
 
-        return {
+        registrosProcessados.push({
           id: crypto.randomUUID(),
           "EMPRESA": row.EMPRESA,
           "NOME_PACIENTE": row.NOME_PACIENTE,
@@ -105,19 +111,30 @@ serve(async (req) => {
           periodo_referencia: 'jun/25',
           "CATEGORIA": row.CATEGORIA || 'SC',
           tipo_faturamento: 'padrao'
-        };
-      });
+        });
+      }
 
-      // Inserir lote
-      const { error: insertError } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .insert(registrosProcessados);
+      // Inserir lote com timeout reduzido
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(registrosProcessados);
 
-      if (insertError) {
-        console.error(`❌ [DIRETO] Erro no lote ${i}:`, insertError);
-      } else {
-        totalInseridos += registrosProcessados.length;
-        console.log(`✅ [DIRETO] Lote ${i}-${i + BATCH_SIZE}: ${registrosProcessados.length} registros`);
+        if (insertError) {
+          console.error(`❌ [DIRETO] Erro no lote ${i}:`, insertError);
+          throw insertError;
+        } else {
+          totalInseridos += registrosProcessados.length;
+          console.log(`✅ [DIRETO] Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${registrosProcessados.length} registros (Total: ${totalInseridos})`);
+        }
+      } catch (batchError) {
+        console.error(`❌ [DIRETO] Erro crítico no lote ${i}:`, batchError);
+        throw batchError;
+      }
+
+      // Pequena pausa para evitar sobrecarga
+      if (i + BATCH_SIZE < jsonData.length) {
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
 
