@@ -402,7 +402,16 @@ export default function GerarFaturamento() {
     console.log('🔄 Período selecionado mudou para:', periodoSelecionado);
     // Resetar demonstrativo quando período mudar
     setDemonstrativoGerado(false);
-    localStorage.setItem('demonstrativoGerada', 'false');
+    localStorage.setItem('demonstrativoGerado', 'false');
+    
+    // Resetar contadores de relatórios e emails quando período mudar
+    setRelatoriosGerados(0);
+    setEmailsEnviados(0);
+    localStorage.setItem('relatoriosGerados', '0');
+    localStorage.setItem('emailsEnviados', '0');
+    localStorage.removeItem('resultadosFaturamento');
+    setResultados([]);
+    
     carregarClientes();
   }, [periodoSelecionado]);
 
@@ -487,6 +496,7 @@ export default function GerarFaturamento() {
       }
 
       setRelatoriosGerados(gerados);
+      localStorage.setItem('relatoriosGerados', gerados.toString());
 
       setStatusProcessamento({
         processando: false,
