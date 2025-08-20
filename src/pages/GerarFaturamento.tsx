@@ -541,80 +541,90 @@ export default function GerarFaturamento() {
 
         {/* Tab: Relatórios - Simplificada */}
         <TabsContent value="relatorios" className="space-y-6">
-          {/* Progresso do Faturamento */}
+          {/* Progresso do Faturamento - Barras Laterais com Degradê */}
           <Card>
             <CardHeader>
-              <CardTitle>{processandoTodos ? "Processando..." : "Progresso do Faturamento"}</CardTitle>
+              <CardTitle>Progresso do Faturamento</CardTitle>
+              <CardDescription>Acompanhe o progresso da geração de relatórios</CardDescription>
             </CardHeader>
-            <CardContent>
-              {processandoTodos ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                  <div className="flex flex-col items-center space-y-4">
-                    <h3 className="text-lg font-semibold text-green-400">SISTEMA ATIVO</h3>
-                    <div className="w-[350px] h-[250px] bg-gray-900 rounded flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-green-400 text-2xl font-mono mb-2">⚡</div>
-                        <p className="text-green-400 font-mono">PROCESSANDO...</p>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-green-600 font-mono">GERANDO RELATÓRIOS...</p>
-                      <p className="text-xs text-muted-foreground mt-1">Processando dados dos clientes</p>
-                    </div>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                {/* Clientes Cadastrados */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Clientes Cadastrados</span>
+                    <span className="text-sm font-bold">{clientesCarregados.length}</span>
                   </div>
-                  <div className="flex flex-col items-center space-y-4">
-                    <h3 className="text-lg font-semibold text-green-400">STATUS: ONLINE</h3>
-                    <div className="w-[350px] h-[250px] bg-gray-900 rounded flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-green-400 text-2xl font-mono mb-2">🟢</div>
-                        <p className="text-green-400 font-mono">SISTEMA ONLINE</p>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-green-600 font-mono">SISTEMA OPERACIONAL</p>
-                      <p className="text-xs text-muted-foreground mt-1">Aguarde a conclusão do processo</p>
-                    </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-out"
+                      style={{ width: '100%' }}
+                    />
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
-                  <Speedometer
-                    value={clientesCarregados.length}
-                    max={clientesCarregados.length}
-                    label="Clientes Cadastrados"
-                    unit=""
-                    colorThresholds={{
-                      low: { threshold: 30, color: "#3b82f6" },
-                      medium: { threshold: 70, color: "#3b82f6" },
-                      high: { threshold: 100, color: "#3b82f6" }
-                    }}
-                  />
-                  
-                  <Speedometer
-                    value={relatoriosGerados}
-                    max={clientesCarregados.length}
-                    label="Relatórios Gerados"
-                    unit=""
-                    colorThresholds={{
-                      low: { threshold: 40, color: "#f59e0b" },
-                      medium: { threshold: 80, color: "#10b981" },
-                      high: { threshold: 100, color: "#10b981" }
-                    }}
-                  />
-                  
-                  <Speedometer
-                    value={emailsEnviados}
-                    max={clientesCarregados.length}
-                    label="E-mails Enviados"
-                    unit=""
-                    colorThresholds={{
-                      low: { threshold: 40, color: "#ef4444" },
-                      medium: { threshold: 80, color: "#f59e0b" },
-                      high: { threshold: 100, color: "#10b981" }
-                    }}
-                  />
+
+                {/* Relatórios Gerados */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Relatórios Gerados</span>
+                    <span className="text-sm font-bold">
+                      {relatoriosGerados} de {clientesCarregados.length}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
+                      style={{ 
+                        width: clientesCarregados.length > 0 
+                          ? `${Math.min(100, (relatoriosGerados / clientesCarregados.length) * 100)}%` 
+                          : '0%' 
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
+
+                {/* E-mails Enviados */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">E-mails Enviados</span>
+                    <span className="text-sm font-bold">
+                      {emailsEnviados} de {clientesCarregados.length}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-out"
+                      style={{ 
+                        width: clientesCarregados.length > 0 
+                          ? `${Math.min(100, (emailsEnviados / clientesCarregados.length) * 100)}%` 
+                          : '0%' 
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Erros */}
+                {resultados.filter(r => r.erro).length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-red-600">Erros</span>
+                      <span className="text-sm font-bold text-red-600">
+                        {resultados.filter(r => r.erro).length} de {clientesCarregados.length}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-red-400 to-red-600 transition-all duration-1000 ease-out"
+                        style={{ 
+                          width: clientesCarregados.length > 0 
+                            ? `${Math.min(100, (resultados.filter(r => r.erro).length / clientesCarregados.length) * 100)}%` 
+                            : '0%' 
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
