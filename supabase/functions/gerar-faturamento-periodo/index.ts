@@ -150,13 +150,17 @@ serve(async (req) => {
           
           if (clienteExistente) {
             console.log(`[gerar-faturamento-periodo] Cliente encontrado: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
-            return clienteExistente;
+            return {
+              ...clienteExistente,
+              nome_fantasia_volumetria: nomeEmpresa // Preservar o nome usado na volumetria
+            };
           } else {
             // Criar cliente temporário para processamento
             console.log(`[gerar-faturamento-periodo] Cliente não cadastrado: ${nomeEmpresa} - criando registro temporário`);
             return {
               id: `temp-${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
               nome: nomeEmpresa,
+              nome_fantasia_volumetria: nomeEmpresa,
               email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.temporario.com`,
               ativo: true,
               status: 'Ativo'
@@ -180,7 +184,7 @@ serve(async (req) => {
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
                 .select('"Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
+                .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia_volumetria) // CORRIGIDO: usar nome_fantasia_volumetria
                 .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {
@@ -190,9 +194,11 @@ serve(async (req) => {
 
               const rows = vm || [];
               if (rows.length === 0) {
-                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período ${periodoFormatado}`);
+                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} (${cliente.nome_fantasia_volumetria}) sem dados de volumetria no período ${periodoFormatado}`);
                 continue;
               }
+
+              console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} - encontrados ${rows.length} registros de volumetria`);
 
               // Volume total (usado na faixa de preço) - garantir valor mínimo 1 se zerado
               const volumeTotal = Math.max(1, rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0));
