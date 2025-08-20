@@ -172,6 +172,196 @@ export default function GerarFaturamento() {
   
   const { toast } = useToast();
 
+  // Função para gerar todos os relatórios (nova aba "Relatórios")
+  const gerarTodosRelatorios = async () => {
+    if (clientesCarregados.length === 0) {
+      toast({
+        title: "Nenhum cliente encontrado",
+        description: "Certifique-se de que há clientes com faturamento no período selecionado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessandoTodos(true);
+    setStatusProcessamento({
+      processando: true,
+      mensagem: 'Iniciando geração de relatórios...',
+      progresso: 0
+    });
+
+    try {
+      const total = clientesCarregados.length;
+      let gerados = 0;
+      let errors = 0;
+
+      for (let i = 0; i < clientesCarregados.length; i++) {
+        const cliente = clientesCarregados[i];
+        
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Gerando relatório para ${cliente.nome} (${i + 1}/${total})...`,
+          progresso: Math.round((i / total) * 100)
+        });
+
+        try {
+          // Gerar relatório para o cliente
+          const { data: relatorioData, error: relatorioError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
+            body: {
+              cliente_id: cliente.id,
+              periodo: periodoSelecionado
+            }
+          });
+
+          if (relatorioError || !relatorioData?.success) {
+            throw new Error(relatorioError?.message || relatorioData?.error || 'Erro ao gerar relatório');
+          }
+
+          // Atualizar resultado do cliente
+          setResultados(prev => prev.map(resultado => 
+            resultado.clienteId === cliente.id 
+              ? {
+                  ...resultado,
+                  relatorioGerado: true,
+                  linkRelatorio: relatorioData.arquivos?.[0]?.url,
+                  arquivos: relatorioData.arquivos,
+                  dataProcessamento: new Date().toLocaleString('pt-BR'),
+                  relatorioData: relatorioData,
+                  erro: undefined
+                }
+              : resultado
+          ));
+
+          gerados++;
+          
+        } catch (error) {
+          console.error(`Erro ao gerar relatório para ${cliente.nome}:`, error);
+          errors++;
+          
+          // Atualizar resultado com erro
+          setResultados(prev => prev.map(resultado => 
+            resultado.clienteId === cliente.id 
+              ? {
+                  ...resultado,
+                  relatorioGerado: false,
+                  erro: error instanceof Error ? error.message : 'Erro desconhecido',
+                  dataProcessamento: new Date().toLocaleString('pt-BR')
+                }
+              : resultado
+          ));
+        }
+      }
+
+      setRelatoriosGerados(gerados);
+
+      setStatusProcessamento({
+        processando: false,
+        mensagem: 'Processo concluído',
+        progresso: 100
+      });
+
+      toast({
+        title: "Relatórios gerados!",
+        description: `${gerados} relatórios gerados com sucesso${errors > 0 ? `, ${errors} com erro` : ''}`,
+        variant: gerados > 0 ? "default" : "destructive",
+      });
+
+    } catch (error) {
+      console.error('Erro no processo de geração de relatórios:', error);
+      
+      setStatusProcessamento({
+        processando: false,
+        mensagem: 'Erro no processamento',
+        progresso: 0
+      });
+
+      toast({
+        title: "Erro na geração",
+        description: "Ocorreu um erro durante a geração dos relatórios",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessandoTodos(false);
+    }
+  };
+
+  // Função para enviar todos os e-mails dos relatórios gerados
+  const enviarTodosEmails = async () => {
+    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado);
+    
+    if (relatóriosParaEnviar.length === 0) {
+      toast({
+        title: "Nenhum relatório para enviar",
+        description: "Todos os relatórios já foram enviados ou ainda não foram gerados",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessandoTodos(true);
+    let enviados = 0;
+    let errors = 0;
+
+    try {
+      for (const resultado of relatóriosParaEnviar) {
+        try {
+          // Enviar e-mail com o relatório
+          const { error: emailError } = await supabase.functions.invoke('enviar-relatorio-email', {
+            body: {
+              cliente_id: resultado.clienteId,
+              relatorio: resultado.relatorioData,
+              anexo_pdf: resultado.arquivos?.[0]?.url ? 
+                await fetch(resultado.arquivos[0].url).then(r => r.arrayBuffer()).then(ab => btoa(String.fromCharCode(...new Uint8Array(ab)))) :
+                undefined
+            }
+          });
+
+          if (emailError) {
+            throw new Error(emailError.message);
+          }
+
+          // Atualizar status do e-mail
+          setResultados(prev => prev.map(r => 
+            r.clienteId === resultado.clienteId 
+              ? { ...r, emailEnviado: true }
+              : r
+          ));
+
+          enviados++;
+          
+        } catch (error) {
+          console.error(`Erro ao enviar e-mail para ${resultado.clienteNome}:`, error);
+          errors++;
+          
+          setResultados(prev => prev.map(r => 
+            r.clienteId === resultado.clienteId 
+              ? { ...r, erroEmail: error instanceof Error ? error.message : 'Erro desconhecido' }
+              : r
+          ));
+        }
+      }
+
+      setEmailsEnviados(prev => prev + enviados);
+
+      toast({
+        title: "E-mails enviados!",
+        description: `${enviados} e-mails enviados com sucesso${errors > 0 ? `, ${errors} com erro` : ''}`,
+        variant: enviados > 0 ? "default" : "destructive",
+      });
+
+    } catch (error) {
+      console.error('Erro no envio de e-mails:', error);
+      
+      toast({
+        title: "Erro no envio",
+        description: "Ocorreu um erro durante o envio dos e-mails",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessandoTodos(false);
+    }
+  };
+
   // Função para limpar dados de volumetria
   const handleLimparDadosVolumetria = async () => {
     console.log('🗑️ [INICIO] Botão de limpeza COMPLETA clicado!');
@@ -1108,10 +1298,14 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
             <FileBarChart2 className="h-4 w-4" />
             Demonstrativo
+          </TabsTrigger>
+          <TabsTrigger value="relatorios" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Relatórios
           </TabsTrigger>
           <TabsTrigger value="fechamento" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -1249,6 +1443,230 @@ export default function GerarFaturamento() {
           <ListaExamesPeriodo />
         </TabsContent>
 
+        {/* Tab: Relatórios */}
+        <TabsContent value="relatorios" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Relatórios de Faturamento
+              </CardTitle>
+              <CardDescription>
+                Gere os relatórios PDF individuais para cada cliente com faturamento no período selecionado
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Seletor de Período */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-3">📅 Período para Geração de Relatórios</h4>
+                <ControlePeriodoFaturamento 
+                  periodoSelecionado={periodoSelecionado}
+                  setPeriodoSelecionado={setPeriodoSelecionado}
+                  mostrarApenasDisponiveis={mostrarApenasEditaveis}
+                  setMostrarApenasDisponiveis={setMostrarApenasEditaveis}
+                  onPeriodoChange={setPeriodoSelecionado}
+                />
+              </div>
+
+              {/* Botão para gerar todos os relatórios */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={gerarTodosRelatorios}
+                  disabled={processandoTodos || clientesCarregados.length === 0}
+                  size="lg"
+                  className="min-w-[400px] bg-blue-600 hover:bg-blue-700 h-14 text-lg"
+                >
+                  {processandoTodos ? (
+                    <>
+                      <RefreshCw className="h-6 w-6 mr-3 animate-spin" />
+                      Processando Relatórios...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-6 w-6 mr-3" />
+                      📄 Gerar Todos os Relatórios ({clientesCarregados.length} clientes)
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Resumo dos Relatórios */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="relative overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Clientes com Faturamento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{clientesCarregados.length}</div>
+                    <p className="text-xs text-muted-foreground">clientes encontrados</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="relative overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Relatórios Gerados</CardTitle>
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div 
+                      className="absolute inset-0 bg-gradient-to-r from-green-100 to-transparent transition-all duration-1000 ease-out"
+                      style={{ 
+                        width: clientesCarregados.length > 0 ? `${(relatoriosGerados / clientesCarregados.length) * 100}%` : '0%' 
+                      }}
+                    />
+                    <div className="relative z-10">
+                      <div className="text-2xl font-bold">{relatoriosGerados}</div>
+                      <p className="text-xs text-muted-foreground">relatórios processados</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">E-mails Enviados</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{emailsEnviados}</div>
+                    <p className="text-xs text-muted-foreground">relatórios enviados</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Lista de Status dos Relatórios */}
+              {resultados.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Status dos Relatórios por Cliente</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3">Cliente</th>
+                            <th className="text-center p-3">Relatório</th>
+                            <th className="text-left p-3">Link do PDF</th>
+                            <th className="text-left p-3">E-mail</th>
+                            <th className="text-left p-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {resultados.map((resultado) => (
+                            <tr key={resultado.clienteId} className="border-b">
+                              <td className="p-3 font-medium">{resultado.clienteNome}</td>
+                              <td className="p-3 text-center">
+                                {resultado.relatorioGerado ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
+                                ) : (
+                                  <div className="h-5 w-5 rounded-full border-2 border-gray-300 mx-auto"></div>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                {resultado.arquivos && resultado.arquivos.length > 0 ? (
+                                  <div className="flex flex-col space-y-1">
+                                    {resultado.arquivos.map((arquivo, index) => (
+                                      <a
+                                        key={index}
+                                        href={arquivo.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        {arquivo.nome}
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">-</span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{resultado.emailDestino}</span>
+                                  {resultado.emailEnviado && (
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                {resultado.erro ? (
+                                  <Badge variant="destructive">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Erro
+                                  </Badge>
+                                ) : resultado.emailEnviado ? (
+                                  <Badge variant="default" className="bg-green-600">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Enviado
+                                  </Badge>
+                                ) : resultado.relatorioGerado ? (
+                                  <Badge variant="secondary" className="bg-blue-100">
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Gerado
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    Pendente
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Ações em lote */}
+                    <div className="flex gap-3 mt-4 pt-4 border-t">
+                      <Button 
+                        onClick={enviarTodosEmails}
+                        disabled={processandoTodos || relatoriosGerados === 0}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Enviar Todos os E-mails
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        onClick={limparResultados}
+                        disabled={processandoTodos}
+                        size="sm"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Limpar Resultados
+                      </Button>
+                    </div>
+
+                    {/* Mostrar erros se houver */}
+                    {resultados.some(r => r.erro) && (
+                      <div className="mt-4 space-y-2">
+                        <h4 className="font-semibold text-red-600 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Erros Encontrados ({resultados.filter(r => r.erro).length}):
+                        </h4>
+                        {resultados.filter(r => r.erro).map(resultado => (
+                          <div key={resultado.clienteId} className="text-sm p-3 bg-red-50 border border-red-200 rounded">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <span className="font-medium text-red-800">{resultado.clienteNome}:</span>
+                                <p className="text-red-700 mt-1">{resultado.erro}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Tab: Fechamento de Período */}
         <TabsContent value="fechamento" className="space-y-6">
           <ControleFechamentoFaturamento />
@@ -1288,10 +1706,10 @@ export default function GerarFaturamento() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileBarChart2 className="h-5 w-5 text-green-600" />
-                  Gerar Relatórios
+                  Gerar Faturamento (Apenas Dados)
                 </CardTitle>
                 <CardDescription>
-                  Sistema irá processar automaticamente a volumetria do período selecionado, buscar contratos e preços de cada cliente, e gerar demonstrativos individuais.
+                  Sistema irá processar automaticamente a volumetria do período selecionado e gerar apenas os dados de faturamento (demonstrativo). Para gerar os PDFs, use a aba "Relatórios".
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1323,7 +1741,7 @@ export default function GerarFaturamento() {
                     ) : (
                       <>
                         <FileBarChart2 className="h-6 w-6 mr-3" />
-                        🚀 Gerar Faturamento {(() => {
+                        🚀 Gerar Dados de Faturamento {(() => {
                           const [ano, mes] = periodoSelecionado.split('-');
                           const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
                           return `${meses[Number(mes)-1]}/${ano.slice(2)}`;
