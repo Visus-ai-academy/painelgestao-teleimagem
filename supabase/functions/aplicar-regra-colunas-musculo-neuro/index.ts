@@ -20,8 +20,71 @@ serve(async (req) => {
 
     const { arquivo_fonte, medicos_neuro = [] } = await req.json();
     
+    // Lista padrão de médicos para Neuro se não fornecida via parâmetro
+    const medicosNeuroDefault = [
+      'Amauri Silva Sobrinho',
+      'Ana Carolina Ottaiano', 
+      'Arthur de Freitas Ferreira',
+      'Caio Batalha Pereira',
+      'Carlos Alexandre Martinelli',
+      'Daniela Cartolano',
+      'Eduardo Walter Rabelo Arruda',
+      'Efraim da Silva Ferreira',
+      'Elton Dias Lopes Barud',
+      'Eugenio Castro',
+      'Fábio Sânderson Fernandes',
+      'Fernanda Veloso Pereira',
+      'Francisca Rocélia Silva de Freitas',
+      'Giovanna Martins',
+      'Gustavo Andreis',
+      'Gustavo Coutinho Ferreira',
+      'Heliantho de Siqueira Lima Filho',
+      'Henrique Bortot Zuppani',
+      'Jainy Sousa Oliveira',
+      'James Henrique Yared',
+      'Jander Luiz Bucker Filho',
+      'Lara Macatrao Duarte Bacelar',
+      'Larissa Nara Costa Freitas',
+      'Luciane Lucas Lucio',
+      'Luis Filipe Nagata Gasparini',
+      'Luis Tercio Feitosa Coelho',
+      'Marcelo Bandeira Filho',
+      'Marcos Marins',
+      'Marcus Rogério Lola de Andrade',
+      'Mariana Helena do Carmo',
+      'Marilia Assunção Jorge',
+      'Marlyson Luiz Olivier de Oliveira',
+      'Otto Wolf Maciel',
+      'Paulo de Tarso Martins Ribeiro',
+      'Pericles Moraes Pereira',
+      'Rafaela Contesini Nivoloni',
+      'Raissa Nery de Luna Freire Leite',
+      'Ricardo Jorge Vital',
+      'Thiago Bezerra Matias',
+      'Tiago Oliveira Lordelo',
+      'Tomás Andrade Lourenção Freddi',
+      'Virgílio de Araújo Oliveira',
+      'Yuri Aarão Amaral Serruya'
+    ];
+    
+    // Usar lista fornecida ou padrão
+    const medicosNeuroLista = medicos_neuro.length > 0 ? medicos_neuro : medicosNeuroDefault;
+    
+    // Função para normalizar nome do médico (remover Dr./Dra., espaços extras, etc.)
+    const normalizarNomeMedico = (nome: string): string => {
+      if (!nome) return '';
+      return nome
+        .replace(/^DR[A]?\s+/i, '') // Remove DR/DRA no início
+        .replace(/\s+/g, ' ') // Remove espaços extras
+        .trim()
+        .toUpperCase(); // Para comparação case-insensitive
+    };
+    
     console.log(`🔄 Iniciando aplicação da regra ColunasxMusculoxNeuro para arquivo: ${arquivo_fonte}`);
-    console.log(`👨‍⚕️ Médicos para Neuro: ${medicos_neuro.length > 0 ? medicos_neuro.join(', ') : 'Nenhum especificado'}`);
+    console.log(`👨‍⚕️ Médicos para Neuro: ${medicosNeuroLista.length} médicos na lista`);
+    
+    // Normalizar lista de médicos para comparação
+    const medicosNeuroNormalizados = medicosNeuroLista.map(nome => normalizarNomeMedico(nome));
     
     let totalProcessados = 0;
     let totalAlteradosMusculo = 0;
@@ -88,10 +151,11 @@ serve(async (req) => {
         const medico = registro.MEDICO;
         const categoriaAtual = registro.CATEGORIA;
         
-        // Determinar nova especialidade baseado no médico
+        // Determinar nova especialidade baseado no médico normalizado
         let novaEspecialidade = 'Músculo Esquelético'; // Padrão
         
-        if (medicos_neuro.length > 0 && medicos_neuro.includes(medico)) {
+        const medicoNormalizado = normalizarNomeMedico(medico);
+        if (medicosNeuroNormalizados.includes(medicoNormalizado)) {
           novaEspecialidade = 'Neuro';
         }
         
@@ -150,7 +214,7 @@ serve(async (req) => {
           total_categorias_aplicadas: totalCategoriasAplicadas,
           total_erros: totalErros,
           arquivo_fonte,
-          medicos_neuro
+          medicos_neuro: medicosNeuroLista
         },
         user_email: 'system',
         severity: totalErros > 0 ? 'warning' : 'info'
