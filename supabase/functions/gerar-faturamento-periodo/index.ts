@@ -283,6 +283,7 @@ serve(async (req) => {
               totalItens += itensInserir.length;
               clientesComDados++;
               console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
+            }
             } catch (clienteError: any) {
               console.error(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}:`, clienteError.message);
               // Continuar com próximo cliente mesmo em caso de erro
