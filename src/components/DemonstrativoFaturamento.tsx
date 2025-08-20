@@ -138,9 +138,9 @@ export default function DemonstrativoFaturamento() {
             const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
             console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
             toast({
-              title: "Faturamento não gerado",
-              description: `Há dados de volumetria disponíveis para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
-              variant: "destructive",
+              title: "Demonstrativo vazio",
+              description: `Há ${clientesUnicos.length} clientes na volumetria para ${periodo}, mas apenas clientes com dados válidos (preços configurados, valores não zerados) aparecem no demonstrativo. Execute "Gerar Demonstrativo" na aba "Gerar" para processar.`,
+              variant: "default",
             });
           } else {
             console.log('💡 Não há dados de volumetria nem faturamento para este período');

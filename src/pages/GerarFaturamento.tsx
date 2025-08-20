@@ -232,6 +232,15 @@ export default function GerarFaturamento() {
 
       console.log(`✅ ${clientesFinais.length} clientes encontrados:`, clientesFinais.map(c => c.nome));
       
+      // Se vem da volumetria, avisar que nem todos podem gerar faturamento
+      if (clientesComFaturamento?.length === 0 && clientesFinais.length > 0) {
+        toast({
+          title: "Clientes carregados da volumetria",
+          description: `${clientesFinais.length} clientes encontrados. Nem todos podem gerar faturamento válido (dependem de preços configurados e valores válidos).`,
+          variant: "default",
+        });
+      }
+      
       setClientesCarregados(clientesFinais);
       localStorage.setItem('clientesCarregados', JSON.stringify(clientesFinais));
       
