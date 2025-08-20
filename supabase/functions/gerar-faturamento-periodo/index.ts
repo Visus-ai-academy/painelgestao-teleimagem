@@ -174,11 +174,11 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
-              // Buscar TODOS os dados de volumetria do cliente no período
+              // Buscar TODOS os dados de volumetria do cliente no período usando NOME FANTASIA
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
-                .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .eq('"EMPRESA"', cliente.nome)
+                .select('"EMPRESA","Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
+                .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Usar nome fantasia para busca
                 .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {
@@ -269,11 +269,11 @@ serve(async (req) => {
                   const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
                   itensInserir.push({
-                    omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                    numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
-                    cliente_id: cliente.id,
-                    cliente_nome: cliente.nome,
-                    cliente_email: cliente.email || null,
+                  omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                  numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
+                  cliente_id: cliente.id,
+                  cliente_nome: cliente.nome, // Nome fantasia já está sendo usado
+                  cliente_email: cliente.email || null,
                     paciente: paciente,
                     modalidade: chave.modalidade,
                     especialidade: chave.especialidade,
@@ -301,7 +301,7 @@ serve(async (req) => {
                   omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                   numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
                   cliente_id: cliente.id,
-                  cliente_nome: cliente.nome,
+                  cliente_nome: cliente.nome, // Nome fantasia já está sendo usado
                   cliente_email: cliente.email || null,
                   paciente: paciente,
                   modalidade: chave.modalidade,

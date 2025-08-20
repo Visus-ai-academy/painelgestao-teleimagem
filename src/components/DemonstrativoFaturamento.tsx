@@ -140,15 +140,18 @@ export default function DemonstrativoFaturamento() {
             .from('volumetria_mobilemed')
             .select(`
               "EMPRESA",
+              "Cliente_Nome_Fantasia",
               "VALORES",
               "DATA_REALIZACAO",
               "MODALIDADE",
               "ESPECIALIDADE",
               "CATEGORIA",
-              "PRIORIDADE"
+              "PRIORIDADE",
+              "ESTUDO_DESCRICAO",
+              "NOME_PACIENTE"
             `)
             .eq('periodo_referencia', periodo)
-            .not('EMPRESA', 'is', null)
+            .not('Cliente_Nome_Fantasia', 'is', null)
             .not('VALORES', 'is', null);
             
           if (errorVolumetria) {
@@ -159,33 +162,85 @@ export default function DemonstrativoFaturamento() {
           if (dadosVolumetria && dadosVolumetria.length > 0) {
             console.log('📊 Dados de volumetria encontrados:', dadosVolumetria.length);
             
-            // Processar dados da volumetria para criar demonstrativo
+            // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-            dadosVolumetria.forEach(item => {
-              const clienteNome = item.EMPRESA;
-              const valor = Number(item.VALORES || 0);
+            // Buscar clientes cadastrados para obter IDs para cálculo de preços
+            const { data: clientesCadastrados } = await supabase
+              .from('clientes')
+              .select('id, nome, nome_fantasia, nome_mobilemed, email')
+              .eq('ativo', true);
+            
+            // Criar mapa de clientes por nome fantasia
+            const clientesMapPorNome = new Map();
+            clientesCadastrados?.forEach(cliente => {
+              if (cliente.nome_fantasia) clientesMapPorNome.set(cliente.nome_fantasia, cliente);
+              if (cliente.nome) clientesMapPorNome.set(cliente.nome, cliente);
+              if (cliente.nome_mobilemed) clientesMapPorNome.set(cliente.nome_mobilemed, cliente);
+            });
+            
+            console.log('🔍 Processando volumetria com NOME FANTASIA e cálculo de preços...');
+            
+            for (const item of dadosVolumetria) {
+              // Usar NOME FANTASIA em vez de EMPRESA
+              const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA;
+              const quantidade = Number(item.VALORES || 1); // Usar VALORES como quantidade, não valor
+              
+              // Buscar cliente cadastrado
+              const clienteCadastrado = clientesMapPorNome.get(clienteNome);
+              
+              // Calcular preço usando mesma lógica dos relatórios
+              let valorUnitario = 25.00; // Preço padrão
+              
+              if (clienteCadastrado?.id) {
+                try {
+                  // Calcular volume total do cliente (soma de todos os VALORES)
+                  const volumeTotal = dadosVolumetria
+                    .filter(v => (v.Cliente_Nome_Fantasia || v.EMPRESA) === clienteNome)
+                    .reduce((acc, v) => acc + Number(v.VALORES || 0), 0);
+                  
+                  // Chamar RPC para calcular preço correto
+                  const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
+                    p_cliente_id: clienteCadastrado.id,
+                    p_modalidade: item.MODALIDADE || '',
+                    p_especialidade: item.ESPECIALIDADE || '',
+                    p_prioridade: item.PRIORIDADE || '',
+                    p_categoria: item.CATEGORIA || 'SC',
+                    p_volume_total: Math.max(1, volumeTotal),
+                    p_is_plantao: (item.PRIORIDADE || '').toUpperCase().includes('PLANT')
+                  });
+                  
+                  if (precoCalculado && precoCalculado > 0) {
+                    valorUnitario = Number(precoCalculado);
+                  }
+                } catch (error) {
+                  console.log(`Erro ao calcular preço para ${clienteNome}:`, error);
+                  // Manter preço padrão R$ 25,00
+                }
+              }
+              
+              const valorTotal = Number((valorUnitario * quantidade).toFixed(2));
               
               if (clientesMap.has(clienteNome)) {
                 const cliente = clientesMap.get(clienteNome)!;
-                cliente.total_exames += 1;
-                cliente.valor_bruto += valor;
-                cliente.valor_liquido += valor;
+                cliente.total_exames += quantidade; // Somar quantidade real
+                cliente.valor_bruto += valorTotal;  // Usar valor calculado
+                cliente.valor_liquido += valorTotal;
               } else {
                 clientesMap.set(clienteNome, {
-                  id: clienteNome,
+                  id: clienteCadastrado?.id || `temp-${clienteNome}`,
                   nome: clienteNome,
-                  email: '', // Volumetria não tem email
-                  total_exames: 1,
-                  valor_bruto: valor,
-                  valor_liquido: valor,
+                  email: clienteCadastrado?.email || '',
+                  total_exames: quantidade, // Usar quantidade real
+                  valor_bruto: valorTotal,  // Usar valor calculado
+                  valor_liquido: valorTotal,
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: 'Dados baseados na volumetria'
+                  observacoes: `Dados baseados na volumetria com preços ${valorUnitario > 25 ? 'calculados' : 'padrão'}`
                 });
               }
-            });
+            }
 
             const clientesArray = Array.from(clientesMap.values());
             console.log('📊 Clientes processados da volumetria:', clientesArray.length);

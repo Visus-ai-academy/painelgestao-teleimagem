@@ -109,13 +109,13 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento usando APENAS o nome fantasia
+    // Buscar dados de faturamento usando NOME FANTASIA (campo cliente_nome já contém o nome fantasia após processamento)
     console.log('Buscando dados de faturamento pelo nome fantasia...');
     
-    const { data: dataFaturamento, error: errorFaturamento } = await supabase
+    let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
       .select('*')
-      .eq('cliente_nome', cliente.nome)
+      .eq('cliente_nome', cliente.nome) // O campo cliente_nome já contém o nome fantasia após o processamento
       .eq('periodo_referencia', periodo);
 
     console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
@@ -126,6 +126,21 @@ serve(async (req: Request) => {
       console.log('Valor do primeiro registro:', dataFaturamento[0].valor);
     } else {
       console.log('⚠️ NENHUM DADO DE FATURAMENTO ENCONTRADO PARA O NOME FANTASIA:', cliente.nome);
+      
+      // Se não encontrar, tentar buscar usando nome_fantasia nos dados de volumetria
+      console.log('🔄 Tentando buscar dados da volumetria usando Cliente_Nome_Fantasia...');
+      
+      const { data: dataVolumetria, error: errorVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('"Cliente_Nome_Fantasia"', cliente.nome)
+        .eq('periodo_referencia', periodo);
+        
+      if (dataVolumetria && dataVolumetria.length > 0) {
+        console.log(`📊 Dados de volumetria encontrados: ${dataVolumetria.length}`);
+        // Usar dados de volumetria como fallback
+        dataFaturamento = dataVolumetria;
+      }
     }
 
     let finalData = dataFaturamento || [];
