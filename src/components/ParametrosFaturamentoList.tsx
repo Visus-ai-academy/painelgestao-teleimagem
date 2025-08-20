@@ -238,8 +238,7 @@ export function ParametrosFaturamentoList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Parâmetros de Faturamento Cadastrados</h3>
+      <div className="flex items-center justify-end">
         <Badge variant="outline">
           {parametrosFiltrados.length} itens
         </Badge>
