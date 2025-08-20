@@ -207,14 +207,14 @@ export function ControleRegrasNegocio() {
       tipo_regra: 'negocio'
     },
     {
-      id: 'v015',
-      nome: 'Normalização Nome Cliente',
+      id: 'v035',
+      nome: 'Mapeamento Nome Cliente - Mobilemed para Nome Fantasia',
       modulo: 'volumetria',
       categoria: 'dados',
-      criterio: 'Aplica limpeza e normalização de nomes de clientes: remove sufixos como "- TELE", "-CT", "-MR", "_PLANTÃO", "_RMX" e mapeia variações como CEDI-* para CEDIDIAG.',
+      criterio: 'Substitui o campo EMPRESA (nome_mobilemed que vem dos arquivos 1,2,3,4) pelo nome_fantasia cadastrado na tabela clientes. O nome original torna-se "Unidade_Origem" e o nome_fantasia é usado na volumetria, dashboards e faturamento.',
       status: 'ativa',
-      implementadaEm: '2024-02-15',
-      observacoes: 'Trigger: trigger_limpar_nome_cliente, Função: limpar_nome_cliente()',
+      implementadaEm: '2025-01-20',
+      observacoes: 'Edge function: aplicar-mapeamento-nome-cliente. Mapeia nome_mobilemed → nome_fantasia usando tabela clientes.',
       ordem_execucao: 14,
       tipo_regra: 'negocio'
     },
@@ -437,23 +437,23 @@ export function ControleRegrasNegocio() {
     // PREÇOS - Ordem de execução
     {
       id: 'p001',
-      nome: 'Aplicação de Tabela Padrão',
+      nome: 'Validação de Tabela de Preços',
       modulo: 'precos',
-      categoria: 'calculo',
-      criterio: 'Aplica tabela de preços padrão quando não há configuração específica.',
+      categoria: 'validacao',
+      criterio: 'Valida consistência e completude da tabela de preços antes da aplicação.',
       status: 'ativa',
-      implementadaEm: '2024-01-20',
+      implementadaEm: '2024-01-30',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
     {
       id: 'p002',
-      nome: 'Aplicação de Descontos/Acréscimos',
+      nome: 'Aplicação de Desconto por Volume',
       modulo: 'precos',
       categoria: 'calculo',
-      criterio: 'Aplica percentuais de desconto ou acréscimo conforme contrato.',
+      criterio: 'Aplica descontos progressivos baseados no volume de exames contratados.',
       status: 'ativa',
-      implementadaEm: '2024-01-22',
+      implementadaEm: '2024-02-01',
       ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
@@ -464,33 +464,44 @@ export function ControleRegrasNegocio() {
       nome: 'Cálculo de Repasse Médico',
       modulo: 'repasses',
       categoria: 'calculo',
-      criterio: 'Calcula valores de repasse baseado na tabela de percentuais por médico.',
+      criterio: 'Calcula valores de repasse para médicos baseado em contratos e produtividade.',
       status: 'ativa',
-      implementadaEm: '2024-01-25',
+      implementadaEm: '2024-02-05',
       ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'r002',
+      nome: 'Validação de Produtividade Médica',
+      modulo: 'repasses',
+      categoria: 'validacao',
+      criterio: 'Valida métricas de produtividade antes do cálculo de repasses.',
+      status: 'ativa',
+      implementadaEm: '2024-02-08',
+      ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
 
     // EXAMES - Ordem de execução
     {
-      id: 'ex001',
-      nome: 'Validação de Modalidade',
+      id: 'e001',
+      nome: 'Validação de Código de Exame',
       modulo: 'exames',
       categoria: 'validacao',
-      criterio: 'Valida se a modalidade do exame existe no cadastro.',
+      criterio: 'Valida códigos de exames contra tabela TUSS e padrões internos.',
       status: 'ativa',
-      implementadaEm: '2024-01-20',
+      implementadaEm: '2024-02-10',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
     {
-      id: 'ex002',
-      nome: 'Validação de Especialidade',
+      id: 'e002',
+      nome: 'Categorização Automática de Exames',
       modulo: 'exames',
-      categoria: 'validacao',
-      criterio: 'Valida se a especialidade do exame existe no cadastro.',
+      categoria: 'dados',
+      criterio: 'Categoriza automaticamente exames baseado em descrição e modalidade.',
       status: 'ativa',
-      implementadaEm: '2024-01-20',
+      implementadaEm: '2024-02-12',
       ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
@@ -501,65 +512,102 @@ export function ControleRegrasNegocio() {
       nome: 'Validação de CRM',
       modulo: 'medicos',
       categoria: 'validacao',
-      criterio: 'Valida formato do CRM e especialidade médica cadastrada.',
+      criterio: 'Valida número de CRM e situação no Conselho Federal de Medicina.',
       status: 'ativa',
-      implementadaEm: '2024-01-15',
+      implementadaEm: '2024-02-15',
       ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'm002',
+      nome: 'Controle de Especialidades',
+      modulo: 'medicos',
+      categoria: 'validacao',
+      criterio: 'Valida especialidades médicas contra base de especialidades reconhecidas.',
+      status: 'ativa',
+      implementadaEm: '2024-02-18',
+      ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
 
     // ESCALAS - Ordem de execução
     {
-      id: 'e001',
-      nome: 'Proteção Temporal Escalas',
-      modulo: 'escalas',
-      categoria: 'temporal',
-      criterio: 'Aplicação das mesmas regras temporais de volumetria para escalas médicas.',
-      status: 'ativa',
-      implementadaEm: '2024-01-15',
-      ordem_execucao: 1,
-      tipo_regra: 'negocio'
-    },
-
-    // SEGURANÇA - Ordem de execução
-    {
       id: 's001',
-      nome: 'Controle de Acesso por Perfil',
-      modulo: 'seguranca',
-      categoria: 'acesso',
-      criterio: 'Define permissões específicas baseadas no perfil do usuário.',
+      nome: 'Validação de Conflitos de Escala',
+      modulo: 'escalas',
+      categoria: 'validacao',
+      criterio: 'Impede sobreposição de escalas para o mesmo médico.',
       status: 'ativa',
-      implementadaEm: '2024-01-10',
+      implementadaEm: '2024-02-20',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
     {
       id: 's002',
-      nome: 'Auditoria de Operações',
-      modulo: 'seguranca',
-      categoria: 'acesso',
-      criterio: 'Registra todas as operações críticas com identificação do usuário.',
+      nome: 'Notificação de Mudanças de Escala',
+      modulo: 'escalas',
+      categoria: 'automacao',
+      criterio: 'Envia notificações automáticas para mudanças de escala com antecedência mínima.',
       status: 'ativa',
-      implementadaEm: '2024-01-08',
+      implementadaEm: '2024-02-22',
       ordem_execucao: 2,
       tipo_regra: 'negocio'
     },
 
-    // SISTEMA - Regras básicas do sistema
+    // SISTEMA - Ordem de execução
     {
       id: 'sys001',
-      nome: 'Controle de Acesso e Permissões',
+      nome: 'Backup Automático de Dados',
       modulo: 'sistema',
-      categoria: 'acesso',
-      criterio: 'Sistema de roles e permissões para controlar acesso às funcionalidades.',
+      categoria: 'automacao',
+      criterio: 'Executa backup automático diário dos dados críticos do sistema.',
       status: 'ativa',
       implementadaEm: '2024-01-10',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
+    },
+    {
+      id: 'sys002',
+      nome: 'Monitoramento de Performance',
+      modulo: 'sistema',
+      categoria: 'dados',
+      criterio: 'Monitora performance do sistema e gera alertas para degradação.',
+      status: 'ativa',
+      implementadaEm: '2024-01-12',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
+    },
+
+    // SEGURANÇA - Ordem de execução
+    {
+      id: 'sec001',
+      nome: 'Controle de Acesso por Perfil',
+      modulo: 'seguranca',
+      categoria: 'acesso',
+      criterio: 'Implementa controle de acesso baseado em perfis e permissões granulares.',
+      status: 'ativa',
+      implementadaEm: '2024-01-08',
+      ordem_execucao: 1,
+      tipo_regra: 'negocio'
+    },
+    {
+      id: 'sec002',
+      nome: 'Auditoria de Ações Sensíveis',
+      modulo: 'seguranca',
+      categoria: 'dados',
+      criterio: 'Registra todas as ações sensíveis para auditoria e compliance.',
+      status: 'ativa',
+      implementadaEm: '2024-01-10',
+      ordem_execucao: 2,
+      tipo_regra: 'negocio'
     }
   ];
 
-  const buscarRegrasExclusao = async () => {
+  useEffect(() => {
+    carregarRegrasExclusao();
+  }, []);
+
+  const carregarRegrasExclusao = async () => {
     try {
       const { data, error } = await supabase
         .from('regras_exclusao_faturamento')
@@ -567,35 +615,29 @@ export function ControleRegrasNegocio() {
         .order('prioridade', { ascending: true });
 
       if (error) {
-        console.error('Erro ao buscar regras de exclusão:', error);
+        console.error('Erro ao carregar regras de exclusão:', error);
         return;
       }
 
       setRegrasExclusao(data || []);
     } catch (error) {
-      console.error('Erro ao conectar com o banco:', error);
+      console.error('Erro ao carregar regras de exclusão:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    buscarRegrasExclusao();
-  }, []);
-
   // Converter regras de exclusão do banco para o formato padrão
   const regrasExclusaoFormatadas: Regra[] = regrasExclusao.map((regra, index) => ({
-    id: `exc_${regra.id}`,
-    nome: regra.nome_regra || 'Regra sem nome',
-    modulo: determinarModulo(regra.nome_regra || ''),
+    id: regra.id,
+    nome: regra.nome_regra || `Regra de Exclusão ${index + 1}`,
+    modulo: determinarModulo(regra.nome_regra || regra.descricao || '') || 'sistema',
     categoria: 'exclusao' as const,
-    criterio: regra.descricao || 'Sem descrição',
-    status: (regra.ativo !== false) ? 'ativa' as const : 'inativa' as const,
-    implementadaEm: regra.created_at || new Date().toISOString(),
-    observacoes: regra.prioridade || regra.acao || regra.motivo_exclusao 
-      ? `${regra.prioridade ? `Prioridade: ${regra.prioridade}` : ''} ${regra.acao ? `| Ação: ${regra.acao}` : ''} ${regra.motivo_exclusao ? `| ${regra.motivo_exclusao}` : ''}`.replace(/^\s*\|\s*/, '') 
-      : undefined,
-    ordem_execucao: regra.prioridade || index + 1,
+    criterio: regra.descricao || 'Regra de exclusão dinâmica',
+    status: regra.ativo ? 'ativa' as const : 'inativa' as const,
+    implementadaEm: regra.created_at || '2024-01-01',
+    observacoes: `Prioridade: ${regra.prioridade || 0}. Ação: ${regra.acao || 'exclusao'}. Motivo: ${regra.motivo_exclusao || 'N/A'}`,
+    ordem_execucao: (regra.prioridade || 0) + 1000, // Offset para manter regras de exclusão no final
     tipo_regra: 'exclusao' as const
   }));
 
@@ -635,6 +677,7 @@ export function ControleRegrasNegocio() {
     if (nome.includes('escala')) return 'escalas';
     if (nome.includes('segurança') || nome.includes('seguranca')) return 'seguranca';
     if (nome.includes('sistema') || nome.includes('proteção') || nome.includes('temporal') || nome.includes('exclusão') || nome.includes('alerta')) return 'sistema';
+    return 'sistema';
   }
 
   const getModuleIcon = (modulo: Regra['modulo']) => {
