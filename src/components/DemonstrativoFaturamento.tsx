@@ -88,6 +88,9 @@ export default function DemonstrativoFaturamento() {
       }
       
       // Buscar dados de faturamento do período - GARANTIR TODOS OS CLIENTES
+      console.log('🔍 Iniciando busca na tabela faturamento...');
+      console.log('🔍 Período de busca:', periodo);
+      
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
@@ -104,8 +107,7 @@ export default function DemonstrativoFaturamento() {
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
-        .order('cliente_nome') // Sem limite - processar TODOS os clientes disponíveis
-        .limit(1000); // Limite alto para garantir que todos os clientes sejam carregados
+        .order('cliente_nome'); // REMOVIDO O LIMIT COMPLETAMENTE - sem limitação
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
       console.log('🔍 Período usado na busca (direto YYYY-MM):', periodo);
@@ -118,6 +120,10 @@ export default function DemonstrativoFaturamento() {
       if (dadosFaturamento && dadosFaturamento.length > 0) {
         const clientesUnicos = [...new Set(dadosFaturamento.map(d => d.cliente_nome))];
         console.log('👥 Clientes únicos encontrados:', clientesUnicos.length, clientesUnicos);
+        console.log('📋 Lista completa de clientes únicos:', clientesUnicos);
+      } else {
+        console.warn('⚠️ Nenhum dado de faturamento retornado pela consulta');
+        console.log('🔍 Detalhes do erro:', error);
       }
 
       if (error) {
@@ -162,8 +168,18 @@ export default function DemonstrativoFaturamento() {
       // Agrupar por cliente - CORRIGIDO para usar mesma lógica da aba Gerar
       const clientesMap = new Map<string, ClienteFaturamento>();
       
-      dadosFaturamento?.forEach(item => {
+      console.log('🔄 Processando', dadosFaturamento?.length || 0, 'registros de faturamento...');
+      
+      dadosFaturamento?.forEach((item, index) => {
         const clienteNome = item.cliente_nome;
+        
+        if (index < 5) { // Log dos primeiros 5 registros para debug
+          console.log(`📋 Registro ${index + 1}:`, {
+            cliente: clienteNome,
+            valor_bruto: item.valor_bruto,
+            quantidade: item.quantidade
+          });
+        }
         
         if (clientesMap.has(clienteNome)) {
           const cliente = clientesMap.get(clienteNome)!;
@@ -172,6 +188,8 @@ export default function DemonstrativoFaturamento() {
           cliente.valor_bruto += Number(item.valor_bruto || 0);
           cliente.valor_liquido += Number(item.valor || 0);
         } else {
+          console.log(`🆕 Novo cliente encontrado: ${clienteNome}`);
+          
           // Determinar status de pagamento baseado na data de vencimento
           const dataVencimento = new Date(item.data_vencimento);
           const hoje = new Date();
@@ -196,6 +214,9 @@ export default function DemonstrativoFaturamento() {
       });
 
       const clientesArray = Array.from(clientesMap.values());
+      console.log('📊 Clientes processados finais:', clientesArray.length);
+      console.log('📋 Nomes dos clientes processados:', clientesArray.map(c => c.nome));
+      
       setClientes(clientesArray);
       setClientesFiltrados(clientesArray);
 
