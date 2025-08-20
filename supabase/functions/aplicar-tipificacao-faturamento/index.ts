@@ -85,23 +85,17 @@ serve(async (req) => {
       throw contratosError;
     }
 
-    // 3. Criar mapa de configurações por cliente
+    // 3. Criar mapa de configurações por cliente (apenas nome_fantasia)
     const configClientes = new Map<string, { tipo_cliente: string, tipo_faturamento: string }>();
     
     contratos?.forEach(contrato => {
-      // Mapear pelos diferentes nomes possíveis do cliente
-      const nomes = [
-        contrato.clientes?.nome,
-        contrato.clientes?.nome_mobilemed, 
-        contrato.clientes?.nome_fantasia
-      ].filter(Boolean);
-      
-      nomes.forEach(nome => {
-        configClientes.set(nome, {
+      // Mapear apenas pelo nome_fantasia pois na volumetria já foi aplicado o nome_fantasia
+      if (contrato.clientes?.nome_fantasia) {
+        configClientes.set(contrato.clientes.nome_fantasia, {
           tipo_cliente: contrato.tipo_cliente || 'CO',
           tipo_faturamento: contrato.tipo_faturamento || 'CO-FT'
         });
-      });
+      }
     });
 
     console.log(`📋 Carregados ${configClientes.size} configurações de clientes dos contratos`);
@@ -114,9 +108,9 @@ serve(async (req) => {
         // Usar configuração do contrato
         return config.tipo_faturamento as TipoFaturamento;
       } else {
-        // Fallback: Cliente sem contrato = CO-FT (padrão)
-        console.log(`⚠️ Cliente sem contrato encontrado: ${nomeCliente} - Aplicando CO-FT (padrão)`);
-        return "CO-FT";
+        // Fallback: Cliente sem contrato = "Sem informação"
+        console.log(`⚠️ Cliente sem contrato encontrado: ${nomeCliente} - Aplicando "Sem informação"`);
+        return "Sem informação";
       }
     }
 
@@ -199,7 +193,7 @@ serve(async (req) => {
         'Tipificação baseada nos CONTRATOS dos clientes',
         'tipo_cliente: CO (cliente do tipo CO) / NC (Cliente do tipo NC)',
         'tipo_faturamento: CO-FT (CO com faturamento) / NC-FT (NC faturado) / NC-NF (NC não faturado)',
-        'Fallback: Clientes sem contrato = CO-FT (padrão)'
+        'Fallback: Clientes sem contrato = "Sem informação"'
       ],
       data_processamento: new Date().toISOString()
     };
