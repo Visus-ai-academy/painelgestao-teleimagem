@@ -14,6 +14,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log(`[limpar-clientes] Requisição recebida: ${req.method} ${req.url}`);
+    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -21,111 +23,147 @@ serve(async (req) => {
 
     console.log('Iniciando limpeza da tabela clientes...')
 
-    // Limpeza em lotes para evitar timeout
+    // Limpeza em lotes pequenos para evitar timeout e URL muito longa
     let totalPrecos = 0;
     let totalContratos = 0;
     let totalClientes = 0;
 
-    // 1. Limpar preços em lotes de 1000
-    console.log('Limpando preços...')
+    // 1. Limpar preços em lotes de 100 (reduzido para evitar URL longa)
+    console.log('[limpar-clientes] Iniciando limpeza de preços...')
     let hasMorePrecos = true;
-    while (hasMorePrecos) {
+    let loteAtual = 1;
+    
+    while (hasMorePrecos && loteAtual <= 50) { // Limite de segurança
+      console.log(`[limpar-clientes] Processando lote ${loteAtual} de preços...`);
+      
       const { data: precosLote, error: selectError } = await supabase
         .from('precos_servicos')
         .select('id')
-        .limit(1000);
+        .limit(100); // Reduzido para 100
 
-      if (selectError) throw selectError;
+      if (selectError) {
+        console.error('[limpar-clientes] Erro ao buscar preços:', selectError);
+        throw selectError;
+      }
       
       if (!precosLote || precosLote.length === 0) {
+        console.log('[limpar-clientes] Não há mais preços para remover');
         hasMorePrecos = false;
         break;
       }
 
-      const ids = precosLote.map(p => p.id);
+      // Usar DELETE com filtro simples em vez de IN com muitos IDs
       const { error: deleteError } = await supabase
         .from('precos_servicos')
         .delete()
-        .in('id', ids);
+        .limit(100);
 
       if (deleteError) {
-        console.error('Erro ao limpar preços:', deleteError)
+        console.error('[limpar-clientes] Erro ao deletar preços:', deleteError)
         return new Response(
-          JSON.stringify({ success: false, error: deleteError.message }),
+          JSON.stringify({ success: false, error: `Erro ao limpar preços: ${deleteError.message}` }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       totalPrecos += precosLote.length;
-      console.log(`Removidos ${precosLote.length} preços (total: ${totalPrecos})`);
+      loteAtual++;
+      console.log(`[limpar-clientes] Removidos ${precosLote.length} preços (total: ${totalPrecos})`);
+      
+      // Pequena pausa para evitar sobrecarga
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // 2. Limpar contratos em lotes de 1000  
-    console.log('Limpando contratos...')
+    // 2. Limpar contratos em lotes de 100
+    console.log('[limpar-clientes] Iniciando limpeza de contratos...')
     let hasMoreContratos = true;
-    while (hasMoreContratos) {
+    loteAtual = 1;
+    
+    while (hasMoreContratos && loteAtual <= 50) { // Limite de segurança
+      console.log(`[limpar-clientes] Processando lote ${loteAtual} de contratos...`);
+      
       const { data: contratosLote, error: selectError } = await supabase
         .from('contratos_clientes')
         .select('id')
-        .limit(1000);
+        .limit(100);
 
-      if (selectError) throw selectError;
+      if (selectError) {
+        console.error('[limpar-clientes] Erro ao buscar contratos:', selectError);
+        throw selectError;
+      }
       
       if (!contratosLote || contratosLote.length === 0) {
+        console.log('[limpar-clientes] Não há mais contratos para remover');
         hasMoreContratos = false;
         break;
       }
 
-      const ids = contratosLote.map(c => c.id);
+      // Usar DELETE com LIMIT em vez de IN com muitos IDs
       const { error: deleteError } = await supabase
         .from('contratos_clientes')
         .delete()
-        .in('id', ids);
+        .limit(100);
 
       if (deleteError) {
-        console.error('Erro ao limpar contratos:', deleteError)
+        console.error('[limpar-clientes] Erro ao deletar contratos:', deleteError)
         return new Response(
-          JSON.stringify({ success: false, error: deleteError.message }),
+          JSON.stringify({ success: false, error: `Erro ao limpar contratos: ${deleteError.message}` }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       totalContratos += contratosLote.length;
-      console.log(`Removidos ${contratosLote.length} contratos (total: ${totalContratos})`);
+      loteAtual++;
+      console.log(`[limpar-clientes] Removidos ${contratosLote.length} contratos (total: ${totalContratos})`);
+      
+      // Pequena pausa para evitar sobrecarga
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // 3. Limpar clientes em lotes de 1000
-    console.log('Limpando clientes...')
+    // 3. Limpar clientes em lotes de 100
+    console.log('[limpar-clientes] Iniciando limpeza de clientes...')
     let hasMoreClientes = true;
-    while (hasMoreClientes) {
+    loteAtual = 1;
+    
+    while (hasMoreClientes && loteAtual <= 50) { // Limite de segurança
+      console.log(`[limpar-clientes] Processando lote ${loteAtual} de clientes...`);
+      
       const { data: clientesLote, error: selectError } = await supabase
         .from('clientes')
         .select('id')
-        .limit(1000);
+        .limit(100);
 
-      if (selectError) throw selectError;
+      if (selectError) {
+        console.error('[limpar-clientes] Erro ao buscar clientes:', selectError);
+        throw selectError;
+      }
       
       if (!clientesLote || clientesLote.length === 0) {
+        console.log('[limpar-clientes] Não há mais clientes para remover');
         hasMoreClientes = false;
         break;
       }
 
-      const ids = clientesLote.map(c => c.id);
+      // Usar DELETE com LIMIT em vez de IN com muitos IDs
       const { error: deleteError } = await supabase
         .from('clientes')
         .delete()
-        .in('id', ids);
+        .limit(100);
 
       if (deleteError) {
-        console.error('Erro ao limpar clientes:', deleteError)
+        console.error('[limpar-clientes] Erro ao deletar clientes:', deleteError)
         return new Response(
-          JSON.stringify({ success: false, error: deleteError.message }),
+          JSON.stringify({ success: false, error: `Erro ao limpar clientes: ${deleteError.message}` }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       totalClientes += clientesLote.length;
-      console.log(`Removidos ${clientesLote.length} clientes (total: ${totalClientes})`);
+      loteAtual++;
+      console.log(`[limpar-clientes] Removidos ${clientesLote.length} clientes (total: ${totalClientes})`);
+      
+      // Pequena pausa para evitar sobrecarga
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Verify cleanup
@@ -133,7 +171,7 @@ serve(async (req) => {
       .from('clientes')
       .select('*', { count: 'exact', head: true })
 
-    console.log(`Limpeza concluída. Removidos: ${totalPrecos} preços, ${totalContratos} contratos, ${totalClientes} clientes`)
+    console.log(`[limpar-clientes] Limpeza concluída. Removidos: ${totalPrecos} preços, ${totalContratos} contratos, ${totalClientes} clientes`)
 
     return new Response(
       JSON.stringify({
@@ -149,9 +187,13 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro geral:', error)
+    console.error('[limpar-clientes] Erro geral:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: `Erro na limpeza: ${error.message}`,
+        details: error.stack || 'Stack trace não disponível'
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
