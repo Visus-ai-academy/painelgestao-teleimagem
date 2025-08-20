@@ -913,10 +913,10 @@ export default function GerarFaturamento() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-3">Cliente</th>
-                        <th className="text-center p-3">Relatório</th>
-                        <th className="text-left p-3">E-mail</th>
+                        <th className="text-center p-3">Status Demonstrativo</th>
+                        <th className="text-center p-3">Status Relatório</th>
+                        <th className="text-center p-3">Status E-mail</th>
                         <th className="text-left p-3">Link PDF</th>
-                        <th className="text-left p-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -924,19 +924,37 @@ export default function GerarFaturamento() {
                         <tr key={resultado.clienteId} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
                           <td className="p-3 text-center">
-                            {resultado.relatorioGerado ? (
-                              <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
+                            {demonstrativoGerado ? (
+                              <Badge variant="default" className="bg-green-600">
+                                Concluído
+                              </Badge>
                             ) : (
-                              <div className="h-5 w-5 rounded-full border-2 border-gray-300 mx-auto"></div>
+                              <Badge variant="outline">
+                                Pendente
+                              </Badge>
                             )}
                           </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">{resultado.emailDestino}</span>
-                              {resultado.emailEnviado && (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              )}
-                            </div>
+                          <td className="p-3 text-center">
+                            {resultado.relatorioGerado ? (
+                              <Badge variant="default" className="bg-green-600">
+                                Concluído
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                Pendente
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {resultado.emailEnviado ? (
+                              <Badge variant="default" className="bg-green-600">
+                                Concluído
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                Pendente
+                              </Badge>
+                            )}
                           </td>
                           <td className="p-3">
                             {resultado.arquivos && resultado.arquivos.length > 0 ? (
@@ -966,27 +984,6 @@ export default function GerarFaturamento() {
                               </a>
                             ) : (
                               <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {resultado.erro ? (
-                              <Badge variant="destructive">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Erro
-                              </Badge>
-                            ) : resultado.emailEnviado ? (
-                              <Badge variant="default">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Concluído
-                              </Badge>
-                            ) : resultado.relatorioGerado ? (
-                              <Badge variant="secondary">
-                                Relatório Gerado
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">
-                                Pendente
-                              </Badge>
                             )}
                           </td>
                         </tr>
