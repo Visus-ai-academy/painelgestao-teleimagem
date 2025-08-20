@@ -297,6 +297,9 @@ export default function GerarFaturamento() {
       setTimeout(() => {
         console.log('🔄 [RECARREGAR] Executando carregarClientes()...');
         carregarClientes();
+        // Garantir que o demonstrativo continue marcado como gerado após recarregar
+        setDemonstrativoGerado(true);
+        localStorage.setItem('demonstrativoGerado', 'true');
       }, 1000);
 
     } catch (error) {
