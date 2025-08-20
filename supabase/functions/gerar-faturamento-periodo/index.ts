@@ -105,14 +105,14 @@ serve(async (req) => {
         const loteSize = 10; // Reduzir para evitar timeout
         console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
         
-        // Buscar clientes que realmente têm dados de volumetria no período
+        // Buscar clientes que realmente têm dados de volumetria no período - USANDO NOME FANTASIA
         const { data: clientesComVolumetria } = await supabase
           .from('volumetria_mobilemed')
-          .select('"EMPRESA"')
+          .select('"Cliente_Nome_Fantasia"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
-          .not('"EMPRESA"', 'is', null);
+          .not('"Cliente_Nome_Fantasia"', 'is', null);
         
-        const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.EMPRESA) || [])];
+        const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.Cliente_Nome_Fantasia) || [])];
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
