@@ -145,18 +145,111 @@ export default function GerarFaturamento() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Função para salvar resultados no sessionStorage (excluindo dados pesados)
-  const salvarResultados = useCallback((novosResultados: typeof resultados) => {
+  // Função para salvar resultados no banco de dados
+  const salvarResultadosDB = useCallback(async (novosResultados: typeof resultados) => {
     try {
-      // Salvar apenas dados essenciais, excluindo relatorioData que é muito pesado
+      // Preparar dados para inserção/atualização no banco
+      const dadosParaDB = novosResultados.map(resultado => ({
+        cliente_id: resultado.clienteId,
+        cliente_nome: resultado.clienteNome,
+        periodo: periodoSelecionado,
+        relatorio_gerado: resultado.relatorioGerado,
+        email_enviado: resultado.emailEnviado,
+        email_destino: resultado.emailDestino,
+        link_relatorio: resultado.linkRelatorio || null,
+        erro: resultado.erro || null,
+        erro_email: resultado.erroEmail || null,
+        data_processamento: resultado.dataProcessamento ? new Date(resultado.dataProcessamento).toISOString() : null,
+        data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
+        data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
+        detalhes_relatorio: resultado.detalhesRelatorio ? JSON.stringify(resultado.detalhesRelatorio) : null
+      }));
+
+      // Usar upsert para inserir ou atualizar registros
+      for (const dados of dadosParaDB) {
+        await supabase
+          .from('relatorios_faturamento_status')
+          .upsert(dados, { 
+            onConflict: 'cliente_id,periodo',
+            ignoreDuplicates: false 
+          });
+      }
+
+      // Também salvar no sessionStorage como backup
       const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
       sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
     } catch (error) {
-      console.warn('Erro ao salvar no sessionStorage:', error);
-      // Se ainda der erro, limpar dados antigos
-      sessionStorage.removeItem('resultadosFaturamento');
+      console.error('Erro ao salvar resultados no banco:', error);
+      // Fallback para sessionStorage apenas
+      try {
+        const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
+        sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
+      } catch (sessionError) {
+        console.warn('Erro ao salvar no sessionStorage:', sessionError);
+        sessionStorage.removeItem('resultadosFaturamento');
+      }
     }
-  }, []);
+  }, [periodoSelecionado]);
+
+  // Função para carregar resultados do banco de dados
+  const carregarResultadosDB = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('relatorios_faturamento_status')
+        .select('*')
+        .eq('periodo', periodoSelecionado)
+        .order('cliente_nome');
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const resultadosCarregados = data.map(item => ({
+          clienteId: item.cliente_id,
+          clienteNome: item.cliente_nome,
+          relatorioGerado: item.relatorio_gerado,
+          emailEnviado: item.email_enviado,
+          emailDestino: item.email_destino,
+          linkRelatorio: item.link_relatorio || undefined,
+          erro: item.erro || undefined,
+          erroEmail: item.erro_email || undefined,
+          dataProcessamento: item.data_processamento ? new Date(item.data_processamento).toLocaleString('pt-BR') : undefined,
+          detalhesRelatorio: item.detalhes_relatorio ? (typeof item.detalhes_relatorio === 'string' ? JSON.parse(item.detalhes_relatorio) : item.detalhes_relatorio) : undefined
+        }));
+
+        setResultados(resultadosCarregados);
+        
+        // Atualizar contadores baseados nos dados carregados
+        const relatoriosGerados = resultadosCarregados.filter(r => r.relatorioGerado).length;
+        const emailsEnviados = resultadosCarregados.filter(r => r.emailEnviado).length;
+        setRelatoriosGerados(relatoriosGerados);
+        setEmailsEnviados(emailsEnviados);
+        
+        return true; // Indica que dados foram carregados do DB
+      }
+    } catch (error) {
+      console.error('Erro ao carregar resultados do banco:', error);
+    }
+    
+    // Fallback para sessionStorage
+    try {
+      const saved = sessionStorage.getItem('resultadosFaturamento');
+      if (saved) {
+        const resultadosCarregados = JSON.parse(saved);
+        setResultados(resultadosCarregados);
+        
+        const relatoriosGerados = resultadosCarregados.filter((r: any) => r.relatorioGerado).length;
+        const emailsEnviados = resultadosCarregados.filter((r: any) => r.emailEnviado).length;
+        setRelatoriosGerados(relatoriosGerados);
+        setEmailsEnviados(emailsEnviados);
+        
+        return true;
+      }
+    } catch (sessionError) {
+      console.warn('Erro ao carregar do sessionStorage:', sessionError);
+    }
+    
+    return false; // Nenhum dado foi carregado
+  }, [periodoSelecionado]);
   
   const { toast } = useToast();
 
@@ -234,7 +327,7 @@ export default function GerarFaturamento() {
       }));
       
       setResultados(novosResultados);
-      salvarResultados(novosResultados);
+      salvarResultadosDB(novosResultados);
       
     } catch (error) {
       console.error('❌ Erro ao carregar clientes:', error);
@@ -378,8 +471,8 @@ export default function GerarFaturamento() {
                 : r
             );
             
-            // Salvar no sessionStorage
-            salvarResultados(novosResultados);
+            // Salvar no banco de dados
+            salvarResultadosDB(novosResultados);
             return novosResultados;
           });
 
@@ -396,8 +489,8 @@ export default function GerarFaturamento() {
                 : r
             );
             
-            // Salvar no sessionStorage
-            salvarResultados(novosResultados);
+            // Salvar no banco de dados
+            salvarResultadosDB(novosResultados);
             return novosResultados;
           });
         }
@@ -450,8 +543,14 @@ export default function GerarFaturamento() {
     // Atualizar período anterior
     setPeriodoAnterior(periodoSelecionado);
     
-    carregarClientes();
-  }, [periodoSelecionado]);
+    // Primeira tentativa: carregar dados do banco de dados
+    carregarResultadosDB().then(dadosCarregados => {
+      if (!dadosCarregados) {
+        // Se não conseguiu carregar do banco, carregar clientes normalmente
+        carregarClientes();
+      }
+    });
+  }, [periodoSelecionado, carregarResultadosDB]);
 
   // Função para gerar todos os relatórios (nova aba "Relatórios")
   const gerarTodosRelatorios = async () => {
@@ -514,8 +613,8 @@ export default function GerarFaturamento() {
                 : resultado
             );
             
-            // Salvar no sessionStorage
-            salvarResultados(novosResultados);
+            // Salvar no banco de dados
+            salvarResultadosDB(novosResultados);
             return novosResultados;
           });
 
@@ -538,8 +637,8 @@ export default function GerarFaturamento() {
                 : resultado
             );
             
-            // Salvar no sessionStorage
-            salvarResultados(novosResultados);
+            // Salvar no banco de dados
+            salvarResultadosDB(novosResultados);
             return novosResultados;
           });
         }

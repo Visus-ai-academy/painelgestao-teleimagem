@@ -2461,6 +2461,54 @@ export type Database = {
         }
         Relationships: []
       }
+      processamento_streaming: {
+        Row: {
+          arquivo_fonte: string
+          chunk_atual: number | null
+          created_at: string | null
+          erro_detalhes: string | null
+          id: string
+          progresso_percentage: number | null
+          registros_por_chunk: number | null
+          status: string
+          tempo_fim: string | null
+          tempo_inicio: string | null
+          total_chunks: number | null
+          updated_at: string | null
+          upload_id: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          chunk_atual?: number | null
+          created_at?: string | null
+          erro_detalhes?: string | null
+          id?: string
+          progresso_percentage?: number | null
+          registros_por_chunk?: number | null
+          status?: string
+          tempo_fim?: string | null
+          tempo_inicio?: string | null
+          total_chunks?: number | null
+          updated_at?: string | null
+          upload_id: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          chunk_atual?: number | null
+          created_at?: string | null
+          erro_detalhes?: string | null
+          id?: string
+          progresso_percentage?: number | null
+          registros_por_chunk?: number | null
+          status?: string
+          tempo_fim?: string | null
+          tempo_inicio?: string | null
+          total_chunks?: number | null
+          updated_at?: string | null
+          upload_id?: string
+        }
+        Relationships: []
+      }
       processamento_uploads: {
         Row: {
           arquivo_nome: string
@@ -2771,6 +2819,63 @@ export type Database = {
           },
         ]
       }
+      relatorios_faturamento_status: {
+        Row: {
+          cliente_id: string
+          cliente_nome: string
+          created_at: string
+          data_envio_email: string | null
+          data_geracao_relatorio: string | null
+          data_processamento: string | null
+          detalhes_relatorio: Json | null
+          email_destino: string | null
+          email_enviado: boolean | null
+          erro: string | null
+          erro_email: string | null
+          id: string
+          link_relatorio: string | null
+          periodo: string
+          relatorio_gerado: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          cliente_nome: string
+          created_at?: string
+          data_envio_email?: string | null
+          data_geracao_relatorio?: string | null
+          data_processamento?: string | null
+          detalhes_relatorio?: Json | null
+          email_destino?: string | null
+          email_enviado?: boolean | null
+          erro?: string | null
+          erro_email?: string | null
+          id?: string
+          link_relatorio?: string | null
+          periodo: string
+          relatorio_gerado?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          cliente_nome?: string
+          created_at?: string
+          data_envio_email?: string | null
+          data_geracao_relatorio?: string | null
+          data_processamento?: string | null
+          detalhes_relatorio?: Json | null
+          email_destino?: string | null
+          email_enviado?: boolean | null
+          erro?: string | null
+          erro_email?: string | null
+          id?: string
+          link_relatorio?: string | null
+          periodo?: string
+          relatorio_gerado?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_alerts: {
         Row: {
           alert_type: string
@@ -3005,6 +3110,48 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      validacao_integridade: {
+        Row: {
+          arquivo_fonte: string
+          created_at: string | null
+          executado_em: string | null
+          id: string
+          pontuacao_integridade: number | null
+          requer_rollback: boolean | null
+          status_geral: string
+          upload_id: string
+          validacoes_aprovadas: Json | null
+          validacoes_executadas: Json | null
+          validacoes_falhadas: Json | null
+        }
+        Insert: {
+          arquivo_fonte: string
+          created_at?: string | null
+          executado_em?: string | null
+          id?: string
+          pontuacao_integridade?: number | null
+          requer_rollback?: boolean | null
+          status_geral?: string
+          upload_id: string
+          validacoes_aprovadas?: Json | null
+          validacoes_executadas?: Json | null
+          validacoes_falhadas?: Json | null
+        }
+        Update: {
+          arquivo_fonte?: string
+          created_at?: string | null
+          executado_em?: string | null
+          id?: string
+          pontuacao_integridade?: number | null
+          requer_rollback?: boolean | null
+          status_geral?: string
+          upload_id?: string
+          validacoes_aprovadas?: Json | null
+          validacoes_executadas?: Json | null
+          validacoes_falhadas?: Json | null
         }
         Relationships: []
       }
@@ -3391,6 +3538,150 @@ export type Database = {
         }
         Relationships: []
       }
+      volumetria_staging: {
+        Row: {
+          ACCESSION_NUMBER: string | null
+          arquivo_fonte: string | null
+          CATEGORIA: string | null
+          CODIGO_INTERNO: string | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
+          created_at: string
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
+          data_referencia: string | null
+          DATA_TRANSFERENCIA: string | null
+          detalhes_processamento: Json | null
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string | null
+          erro_processamento: string | null
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
+          id: string
+          IMAGENS_CAPTURADAS: string | null
+          IMAGENS_CHAVES: string | null
+          lote_upload: string | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string | null
+          periodo_referencia: string | null
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          processado_em: string | null
+          processamento_pendente: boolean | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
+          status_processamento: string | null
+          tentativas_processamento: number | null
+          tipo_faturamento: string | null
+          updated_at: string
+          VALORES: number | null
+        }
+        Insert: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte?: string | null
+          CATEGORIA?: string | null
+          CODIGO_INTERNO?: string | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          detalhes_processamento?: Json | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string | null
+          erro_processamento?: string | null
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: string | null
+          IMAGENS_CHAVES?: string | null
+          lote_upload?: string | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string | null
+          periodo_referencia?: string | null
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          processado_em?: string | null
+          processamento_pendente?: boolean | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          status_processamento?: string | null
+          tentativas_processamento?: number | null
+          tipo_faturamento?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Update: {
+          ACCESSION_NUMBER?: string | null
+          arquivo_fonte?: string | null
+          CATEGORIA?: string | null
+          CODIGO_INTERNO?: string | null
+          CODIGO_PACIENTE?: string | null
+          COMPLEMENTAR?: string | null
+          created_at?: string
+          DATA_LAUDO?: string | null
+          DATA_PRAZO?: string | null
+          DATA_REALIZACAO?: string | null
+          DATA_REASSINATURA?: string | null
+          data_referencia?: string | null
+          DATA_TRANSFERENCIA?: string | null
+          detalhes_processamento?: Json | null
+          DIGITADOR?: string | null
+          DUPLICADO?: string | null
+          EMPRESA?: string | null
+          erro_processamento?: string | null
+          ESPECIALIDADE?: string | null
+          ESTUDO_DESCRICAO?: string | null
+          HORA_LAUDO?: string | null
+          HORA_PRAZO?: string | null
+          HORA_REALIZACAO?: string | null
+          HORA_REASSINATURA?: string | null
+          HORA_TRANSFERENCIA?: string | null
+          id?: string
+          IMAGENS_CAPTURADAS?: string | null
+          IMAGENS_CHAVES?: string | null
+          lote_upload?: string | null
+          MEDICO?: string | null
+          MEDICO_REASSINATURA?: string | null
+          MODALIDADE?: string | null
+          NOME_PACIENTE?: string | null
+          periodo_referencia?: string | null
+          POSSUI_IMAGENS_CHAVE?: string | null
+          PRIORIDADE?: string | null
+          processado_em?: string | null
+          processamento_pendente?: boolean | null
+          SEGUNDA_ASSINATURA?: string | null
+          STATUS?: string | null
+          status_processamento?: string | null
+          tentativas_processamento?: number | null
+          tipo_faturamento?: string | null
+          updated_at?: string
+          VALORES?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       mv_dashboard_summary: {
@@ -3463,7 +3754,7 @@ export type Database = {
         Returns: Json
       }
       aplicar_de_para_automatico: {
-        Args: { arquivo_fonte_param: string }
+        Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
       aplicar_de_para_prioridade: {
@@ -3583,6 +3874,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      executar_rollback_upload: {
+        Args: { p_motivo: string; p_upload_id: string }
+        Returns: Json
+      }
       expirar_coberturas_automaticamente: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -3644,10 +3939,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           empresa: string
-          laudos_atrasados: number
+          especialidades_unicas: string[]
+          medicos_unicos: string[]
+          modalidades_unicas: string[]
           percentual_atraso: number
-          total_laudos: number
+          periodo_referencia: string
+          total_atrasados: number
+          total_exames: number
           total_registros: number
+          valor_medio_exame: number
         }[]
       }
       get_laudos_atrasados_completos: {
@@ -3918,9 +4218,17 @@ export type Database = {
         Args: { nome_cliente: string }
         Returns: string
       }
+      limpar_staging_processado: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       limpar_todos_precos: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      limpar_uploads_travados: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       listar_coberturas_disponiveis: {
         Args: { p_medico_id: string }
@@ -3961,6 +4269,10 @@ export type Database = {
       log_suspicious_access: {
         Args: { access_pattern: string; metadata?: Json; resource_type: string }
         Returns: undefined
+      }
+      monitorar_upload_status: {
+        Args: { upload_id_param: string }
+        Returns: Json
       }
       normalizar_clientes_cedi: {
         Args: Record<PropertyKey, never>
@@ -4004,6 +4316,10 @@ export type Database = {
         Args: { p_periodo_referencia: string }
         Returns: boolean
       }
+      popular_categorias_faltantes: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       prepare_partition_structure: {
         Args: { partition_date: string; table_name: string }
         Returns: Json
@@ -4046,6 +4362,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      resetar_sistema_upload: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       security_health_check: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -4055,6 +4375,10 @@ export type Database = {
         }[]
       }
       sincronizar_precos_servicos_contratos: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      testar_sistema_upload: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
