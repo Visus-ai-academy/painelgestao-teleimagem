@@ -180,6 +180,12 @@ const REGRAS_MONITORADAS = [
     descricao: 'Substitui especialidade e categoria por valores do cadastro de exames para especialidades específicas',
     funcao: 'aplicar_substituicao_especialidade_categoria',
     id: 'v033'
+  },
+  {
+    nome: 'v035 Mapeamento Nome Cliente',
+    descricao: 'Mapeia nome_mobilemed para nome_fantasia usando tabela clientes',
+    funcao: 'aplicar_mapeamento_nome_cliente',
+    id: 'v035'
   }
 ];
 
@@ -283,7 +289,7 @@ export function StatusRegraProcessamento() {
               const regrasValidacao = ['v013', 'extra_006'];
               
               // Regras AUTOMÁTICAS/SISTÊMICAS que sempre são aplicadas no processamento
-              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033'];
+              const regrasAutomaticas = ['v014', 'v016', 'v008', 'v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'extra_004', 'v033', 'v035'];
               
               if (regrasExclusao.includes(regra.id)) {
                 // Para regras de exclusão, se há registros "erro" significa que a regra foi aplicada
@@ -307,7 +313,7 @@ export function StatusRegraProcessamento() {
                 foiAplicada = uploadInfo.status === 'concluido' || (uploadInfo.status === 'erro' && uploadInfo.registros_inseridos > 0);
                 
                 // Para regras que tratam de categorização e tipificação, "registros_erro" são registros processados
-                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'v033'].includes(regra.id)) {
+                if (['v028', 'v029', 'f005', 'f006', 'extra_007', 'extra_008', 'v033', 'v035'].includes(regra.id)) {
                   informacoes = ['Regra aplicada automaticamente durante processamento'];
                   if (uploadInfo.registros_erro > 0) {
                     informacoes = [`Regra aplicada - ${uploadInfo.registros_erro} registros processados`];
