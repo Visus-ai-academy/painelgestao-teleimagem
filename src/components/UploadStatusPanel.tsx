@@ -18,7 +18,13 @@ interface UploadStats {
   created_at: string;
 }
 
-export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number }) {
+interface UploadStatusPanelProps {
+  refreshTrigger?: number;
+  tipos?: string[];
+  title?: string;
+}
+
+export function UploadStatusPanel({ refreshTrigger, tipos, title = "Status dos Uploads Recentes" }: UploadStatusPanelProps) {
   const [uploadStats, setUploadStats] = useState<UploadStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -34,27 +40,41 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
       const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      // Buscar uploads de cadastros (excluir tipos específicos de volumetria e limpeza)
-      const { data, error } = await supabase
+      // Buscar uploads de cadastros
+      let query = supabase
         .from('processamento_uploads')
         .select('*')
-        .not('tipo_arquivo', 'in', '(data_laudo,data_exame,volumetria_padrao,volumetria_fora_padrao,volumetria_padrao_retroativo,volumetria_fora_padrao_retroativo,limpeza)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
 
+      // Aplicar filtro de tipos se fornecido
+      if (tipos && tipos.length > 0) {
+        query = query.in('tipo_arquivo', tipos);
+      } else {
+        // Filtro padrão: excluir tipos específicos de volumetria e limpeza
+        query = query.not('tipo_arquivo', 'in', '(data_laudo,data_exame,volumetria_padrao,volumetria_fora_padrao,volumetria_padrao_retroativo,volumetria_fora_padrao_retroativo,limpeza)');
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
 
-      // Filtrar apenas uploads de cadastros válidos
-      const validCadastroTypes = [
-        'cadastro_exames', 'quebra_exames', 'precos_servicos', 
-        'regras_exclusao', 'repasse_medico', 'modalidades', 
-        'especialidades', 'categorias_exame', 'prioridades'
-      ];
+      let filteredData = data || [];
 
-      const filteredData = (data || []).filter(upload => 
-        validCadastroTypes.includes(upload.tipo_arquivo)
-      );
+      // Se não há filtro específico, aplicar filtro de cadastros válidos
+      if (!tipos || tipos.length === 0) {
+        const validCadastroTypes = [
+          'cadastro_exames', 'quebra_exames', 'precos_servicos', 
+          'regras_exclusao', 'repasse_medico', 'modalidades', 
+          'especialidades', 'categorias_exame', 'prioridades',
+          'parametros_faturamento'
+        ];
+
+        filteredData = filteredData.filter(upload => 
+          validCadastroTypes.includes(upload.tipo_arquivo)
+        );
+      }
 
       // Filtrar apenas o upload mais recente de cada tipo de arquivo
       const latestUploads = new Map<string, UploadStats>();
@@ -126,7 +146,8 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
       'especialidades': 'Especialidades',
       'categorias_exame': 'Categorias de Exame',
       'categorias': 'Categorias de Exame', // Alternativa
-      'prioridades': 'Prioridades'
+      'prioridades': 'Prioridades',
+      'parametros_faturamento': 'Parâmetros de Faturamento'
     };
     return labels[tipo as keyof typeof labels] || tipo;
   };
@@ -147,7 +168,7 @@ export function UploadStatusPanel({ refreshTrigger }: { refreshTrigger?: number 
   return (
     <Card>
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <CardTitle>Status dos Uploads Recentes</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="justify-start min-w-[220px]">

@@ -454,9 +454,6 @@ export default function GerenciarCadastros() {
 
   return (
     <div className="space-y-8">
-      {/* Status dos Uploads */}
-      <UploadStatusPanel refreshTrigger={refreshStatusPanel} />
-      
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gerenciar Cadastros</h1>
@@ -517,6 +514,15 @@ export default function GerenciarCadastros() {
                 </div>
               </div>
               
+              {/* Status do Upload de Exames */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['cadastro_exames']}
+                  title="Status dos Uploads de Exames"
+                />
+              </div>
+              
               <div className="mt-8">
                 <CadastroDataTable
                   data={examesData.data}
@@ -553,6 +559,15 @@ export default function GerenciarCadastros() {
                 </div>
               </div>
               
+              {/* Status do Upload de Quebra */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['quebra_exames']}
+                  title="Status dos Uploads de Quebra"
+                />
+              </div>
+              
               <div className="mt-8">
                 <CadastroDataTable
                   data={quebraData.data}
@@ -587,6 +602,15 @@ export default function GerenciarCadastros() {
                     onUpload={handleUploadValoresReferencia}
                   />
                 </div>
+              </div>
+              
+              {/* Status do Upload De-Para */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['valores_de_para']}
+                  title="Status dos Uploads De-Para"
+                />
               </div>
               
               <div className="mt-8">
@@ -635,6 +659,12 @@ export default function GerenciarCadastros() {
               </CardContent>
             </Card>
 
+            {/* Status do Upload de Preços */}
+            <UploadStatusPanel 
+              refreshTrigger={refreshStatusPanel} 
+              tipos={['precos_servicos']}
+              title="Status dos Uploads de Preços"
+            />
 
             {/* Tabela de Preços Cadastrados */}
             <Card>
@@ -679,6 +709,15 @@ export default function GerenciarCadastros() {
                   <p><strong>Nota:</strong> Arquivo Excel com parâmetros de faturamento específicos por cliente</p>
                 </div>
               </div>
+              
+              {/* Status do Upload de Parâmetros */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['parametros_faturamento']}
+                  title="Status dos Uploads de Parâmetros"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -704,6 +743,15 @@ export default function GerenciarCadastros() {
                     onUpload={handleUploadRegras}
                   />
                 </div>
+              </div>
+              
+              {/* Status do Upload de Regras */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['regras_exclusao']}
+                  title="Status dos Uploads de Regras"
+                />
               </div>
               
               <div className="mt-8">
@@ -740,6 +788,15 @@ export default function GerenciarCadastros() {
                     onUpload={handleUploadRepasse}
                   />
                 </div>
+              </div>
+              
+              {/* Status do Upload de Repasse */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['repasse_medico']}
+                  title="Status dos Uploads de Repasse"
+                />
               </div>
               
               <div className="mt-8">
@@ -821,6 +878,15 @@ export default function GerenciarCadastros() {
                 </div>
               </div>
               
+              {/* Status do Upload de Modalidades */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['modalidades']}
+                  title="Status dos Uploads de Modalidades"
+                />
+              </div>
+              
               <div className="mt-8">
                 <CadastroDataTable
                   data={modalidadesData.data}
@@ -855,6 +921,15 @@ export default function GerenciarCadastros() {
                     onUpload={handleUploadEspecialidades}
                   />
                 </div>
+              </div>
+              
+              {/* Status do Upload de Especialidades */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['especialidades']}
+                  title="Status dos Uploads de Especialidades"
+                />
               </div>
               
               <div className="mt-8">
@@ -893,6 +968,15 @@ export default function GerenciarCadastros() {
                 </div>
               </div>
               
+              {/* Status do Upload de Categorias */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['categorias_exame']}
+                  title="Status dos Uploads de Categorias"
+                />
+              </div>
+              
               <div className="mt-8">
                 <CadastroDataTable
                   data={categoriasData.data}
@@ -927,6 +1011,15 @@ export default function GerenciarCadastros() {
                     onUpload={handleUploadPrioridades}
                   />
                 </div>
+              </div>
+              
+              {/* Status do Upload de Prioridades */}
+              <div className="mt-6">
+                <UploadStatusPanel 
+                  refreshTrigger={refreshStatusPanel} 
+                  tipos={['prioridades']}
+                  title="Status dos Uploads de Prioridades"
+                />
               </div>
               
               <div className="mt-8">
