@@ -1,52 +1,43 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ParametroFaturamento {
   id: string;
   cliente_id: string;
   tipo_cliente: string;
-  valor_integracao: number | null;
-  cobrar_integracao: boolean;
-  percentual_urgencia: number | null;
-  aplicar_adicional_urgencia: boolean;
-  valor_franquia: number | null;
-  volume_franquia: number | null;
-  frequencia_continua: boolean;
-  frequencia_por_volume: boolean;
-  valor_acima_franquia: number | null;
   aplicar_franquia: boolean;
-  data_aniversario_contrato: string | null;
+  volume_franquia: number | null;
+  valor_franquia: number | null;
+  valor_acima_franquia: number | null;
+  aplicar_adicional_urgencia: boolean;
+  percentual_urgencia: number | null;
+  cobrar_integracao: boolean;
+  valor_integracao: number | null;
   periodicidade_reajuste: string;
-  indice_reajuste: string;
-  percentual_reajuste_fixo: number | null;
+  data_aniversario_contrato: string | null;
   ativo: boolean;
-  portal_laudos: boolean;
-  incluir_medico_solicitante: boolean;
-  incluir_access_number: boolean;
-  incluir_empresa_origem: boolean;
-  tipo_desconto_acrescimo: string | null;
-  desconto_acrescimo: number | null;
-  impostos_ab_min: string | null;
-  simples: boolean;
-  percentual_iss: number | null;
-  data_inicio_integracao: string | null;
-  tipo_metrica_convenio: string | null;
-  tipo_metrica_urgencia: string | null;
-  cobrar_urgencia_como_rotina: boolean;
-  cliente_consolidado: string | null;
   clientes?: {
     nome: string;
     nome_fantasia?: string;
   };
 }
 
+type SortField = 'cliente_nome' | 'tipo_cliente' | 'aplicar_franquia' | 'valor_franquia' | 'valor_acima_franquia' | 'aplicar_adicional_urgencia' | 'percentual_urgencia' | 'cobrar_integracao' | 'valor_integracao' | 'periodicidade_reajuste';
+type SortDirection = 'asc' | 'desc';
+
 export function ParametrosFaturamentoList() {
-  const [parametros, setParametros] = useState<any[]>([]);
+  const [parametros, setParametros] = useState<ParametroFaturamento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<SortField>('cliente_nome');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   useEffect(() => {
     const fetchParametros = async () => {
@@ -74,19 +65,96 @@ export function ParametrosFaturamentoList() {
     fetchParametros();
   }, []);
 
-  if (loading) {
-    return <div className="text-center py-4">Carregando parâmetros...</div>;
-  }
+  // Filtrar e ordenar parâmetros
+  const parametrosFiltrados = useMemo(() => {
+    let filtered = parametros.filter(parametro => {
+      const clienteNome = parametro.clientes?.nome_fantasia || parametro.clientes?.nome || '';
+      return clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             parametro.tipo_cliente.toLowerCase().includes(searchTerm.toLowerCase());
+    });
 
-  if (parametros.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">Nenhum parâmetro de faturamento encontrado.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+    // Ordenação
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'cliente_nome':
+          aValue = a.clientes?.nome_fantasia || a.clientes?.nome || '';
+          bValue = b.clientes?.nome_fantasia || b.clientes?.nome || '';
+          break;
+        case 'tipo_cliente':
+          aValue = a.tipo_cliente;
+          bValue = b.tipo_cliente;
+          break;
+        case 'aplicar_franquia':
+          aValue = a.aplicar_franquia ? 1 : 0;
+          bValue = b.aplicar_franquia ? 1 : 0;
+          break;
+        case 'valor_franquia':
+          aValue = a.valor_franquia || 0;
+          bValue = b.valor_franquia || 0;
+          break;
+        case 'valor_acima_franquia':
+          aValue = a.valor_acima_franquia || 0;
+          bValue = b.valor_acima_franquia || 0;
+          break;
+        case 'aplicar_adicional_urgencia':
+          aValue = a.aplicar_adicional_urgencia ? 1 : 0;
+          bValue = b.aplicar_adicional_urgencia ? 1 : 0;
+          break;
+        case 'percentual_urgencia':
+          aValue = a.percentual_urgencia || 0;
+          bValue = b.percentual_urgencia || 0;
+          break;
+        case 'cobrar_integracao':
+          aValue = a.cobrar_integracao ? 1 : 0;
+          bValue = b.cobrar_integracao ? 1 : 0;
+          break;
+        case 'valor_integracao':
+          aValue = a.valor_integracao || 0;
+          bValue = b.valor_integracao || 0;
+          break;
+        case 'periodicidade_reajuste':
+          aValue = a.periodicidade_reajuste;
+          bValue = b.periodicidade_reajuste;
+          break;
+        default:
+          return 0;
+      }
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    return filtered;
+  }, [parametros, searchTerm, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 opacity-50" />;
+    }
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="h-4 w-4" /> : 
+      <ArrowDown className="h-4 w-4" />;
+  };
 
   const formatCurrency = (value: number | null) => {
     return value ? `R$ ${value.toFixed(2)}` : '-';
@@ -101,88 +169,179 @@ export function ParametrosFaturamentoList() {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
+  if (loading) {
+    return <div className="text-center py-4">Carregando parâmetros...</div>;
+  }
+
+  if (parametros.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Nenhum parâmetro de faturamento encontrado.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Parâmetros de Faturamento Cadastrados ({parametros.length})</CardTitle>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <CardTitle>Parâmetros de Faturamento Cadastrados ({parametrosFiltrados.length})</CardTitle>
+          </div>
+          
+          {/* Campo de busca */}
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar por cliente ou tipo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[600px]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">Cliente</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Franquia</TableHead>
-                <TableHead>Valor Franquia</TableHead>
-                <TableHead>Volume Franquia</TableHead>
-                <TableHead>Valor Acima</TableHead>
-                <TableHead>Integração</TableHead>
-                <TableHead>Valor Integração</TableHead>
-                <TableHead>Urgência</TableHead>
-                <TableHead>% Urgência</TableHead>
-                <TableHead>Reajuste</TableHead>
-                <TableHead>Periodicidade</TableHead>
-                <TableHead>Portal Laudos</TableHead>
-                <TableHead>Médico Solicitante</TableHead>
-                <TableHead>Access Number</TableHead>
-                <TableHead>Empresa Origem</TableHead>
-                <TableHead>Tipo Desconto</TableHead>
-                <TableHead>Desconto/Acréscimo</TableHead>
-                <TableHead>Impostos AbMin</TableHead>
-                <TableHead>Simples</TableHead>
-                <TableHead>% ISS</TableHead>
-                <TableHead>Data Início Integração</TableHead>
-                <TableHead>Métrica Convênio</TableHead>
-                <TableHead>Métrica Urgência</TableHead>
-                <TableHead>Urgência como Rotina</TableHead>
-                <TableHead>Cliente Consolidado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {parametros.map((parametro) => (
-                <TableRow key={parametro.id}>
-                  <TableCell className="font-medium">
-                    {parametro.clientes?.nome_fantasia || parametro.clientes?.nome || 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{parametro.tipo_cliente}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={parametro.ativo ? "default" : "secondary"}>
-                      {parametro.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatBoolean(parametro.aplicar_franquia)}</TableCell>
-                  <TableCell>{formatCurrency(parametro.valor_franquia)}</TableCell>
-                  <TableCell>{parametro.volume_franquia || '-'}</TableCell>
-                  <TableCell>{formatCurrency(parametro.valor_acima_franquia)}</TableCell>
-                  <TableCell>{formatBoolean(parametro.cobrar_integracao)}</TableCell>
-                  <TableCell>{formatCurrency(parametro.valor_integracao)}</TableCell>
-                  <TableCell>{formatBoolean(parametro.aplicar_adicional_urgencia)}</TableCell>
-                  <TableCell>{parametro.percentual_urgencia ? `${parametro.percentual_urgencia}%` : '-'}</TableCell>
-                  <TableCell>{parametro.indice_reajuste}</TableCell>
-                  <TableCell>{parametro.periodicidade_reajuste}</TableCell>
-                  <TableCell>{formatBoolean(parametro.portal_laudos)}</TableCell>
-                  <TableCell>{formatBoolean(parametro.incluir_medico_solicitante)}</TableCell>
-                  <TableCell>{formatBoolean(parametro.incluir_access_number)}</TableCell>
-                  <TableCell>{formatBoolean(parametro.incluir_empresa_origem)}</TableCell>
-                  <TableCell>{parametro.tipo_desconto_acrescimo || '-'}</TableCell>
-                  <TableCell>{parametro.desconto_acrescimo ? `${parametro.desconto_acrescimo}%` : '-'}</TableCell>
-                  <TableCell>{parametro.impostos_ab_min || '-'}</TableCell>
-                  <TableCell>{formatBoolean(parametro.simples)}</TableCell>
-                  <TableCell>{parametro.percentual_iss ? `${parametro.percentual_iss}%` : '-'}</TableCell>
-                  <TableCell>{formatDate(parametro.data_inicio_integracao)}</TableCell>
-                  <TableCell>{parametro.tipo_metrica_convenio || '-'}</TableCell>
-                  <TableCell>{parametro.tipo_metrica_urgencia || '-'}</TableCell>
-                  <TableCell>{formatBoolean(parametro.cobrar_urgencia_como_rotina)}</TableCell>
-                  <TableCell>{parametro.cliente_consolidado || '-'}</TableCell>
+        <div className="border rounded-lg">
+          <ScrollArea className="h-[600px] w-full">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10 border-b">
+                <TableRow>
+                  <TableHead className="min-w-[200px]">
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('cliente_nome')}
+                    >
+                      Cliente Nome
+                      {getSortIcon('cliente_nome')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('tipo_cliente')}
+                    >
+                      Tipo Cliente
+                      {getSortIcon('tipo_cliente')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('aplicar_franquia')}
+                    >
+                      Aplicar Franquia
+                      {getSortIcon('aplicar_franquia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Volume Franquia</TableHead>
+                  <TableHead className="min-w-[120px]">
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('valor_franquia')}
+                    >
+                      Valor Franquia
+                      {getSortIcon('valor_franquia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="min-w-[140px]">
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('valor_acima_franquia')}
+                    >
+                      Valor Acima Franquia
+                      {getSortIcon('valor_acima_franquia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('aplicar_adicional_urgencia')}
+                    >
+                      Aplicar Adicional Urgência
+                      {getSortIcon('aplicar_adicional_urgencia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('percentual_urgencia')}
+                    >
+                      % Adicional Urgência
+                      {getSortIcon('percentual_urgencia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('cobrar_integracao')}
+                    >
+                      Cobrar Integração
+                      {getSortIcon('cobrar_integracao')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="min-w-[120px]">
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('valor_integracao')}
+                    >
+                      Valor Integração
+                      {getSortIcon('valor_integracao')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Dia Fechamento</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('periodicidade_reajuste')}
+                    >
+                      Forma Cobrança
+                      {getSortIcon('periodicidade_reajuste')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Data Aniversário</TableHead>
+                  <TableHead>Observações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+              </TableHeader>
+              <TableBody>
+                {parametrosFiltrados.map((parametro) => (
+                  <TableRow key={parametro.id}>
+                    <TableCell className="font-medium">
+                      {parametro.clientes?.nome_fantasia || parametro.clientes?.nome || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{parametro.tipo_cliente}</Badge>
+                    </TableCell>
+                    <TableCell>{formatBoolean(parametro.aplicar_franquia)}</TableCell>
+                    <TableCell>{parametro.volume_franquia || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_franquia)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_acima_franquia)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.aplicar_adicional_urgencia)}</TableCell>
+                    <TableCell>{parametro.percentual_urgencia ? `${parametro.percentual_urgencia}%` : '-'}</TableCell>
+                    <TableCell>{formatBoolean(parametro.cobrar_integracao)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_integracao)}</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>{parametro.periodicidade_reajuste}</TableCell>
+                    <TableCell>{formatDate(parametro.data_aniversario_contrato)}</TableCell>
+                    <TableCell>-</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
