@@ -15,6 +15,8 @@ interface ParametroFaturamento {
   aplicar_franquia: boolean;
   volume_franquia: number | null;
   valor_franquia: number | null;
+  frequencia_continua: boolean;
+  frequencia_por_volume: boolean;
   valor_acima_franquia: number | null;
   aplicar_adicional_urgencia: boolean;
   percentual_urgencia: number | null;
@@ -22,6 +24,22 @@ interface ParametroFaturamento {
   valor_integracao: number | null;
   periodicidade_reajuste: string;
   data_aniversario_contrato: string | null;
+  indice_reajuste: string;
+  percentual_reajuste_fixo: number | null;
+  cliente_consolidado: string;
+  impostos_ab_min: number | null;
+  simples: boolean;
+  tipo_metrica_convenio: string;
+  tipo_metrica_urgencia: string;
+  tipo_desconto_acrescimo: string;
+  desconto_acrescimo: number | null;
+  data_inicio_integracao: string | null;
+  portal_laudos: boolean;
+  percentual_iss: number | null;
+  cobrar_urgencia_como_rotina: boolean;
+  incluir_empresa_origem: boolean;
+  incluir_access_number: boolean;
+  incluir_medico_solicitante: boolean;
   ativo: boolean;
   clientes?: {
     nome: string;
@@ -29,7 +47,7 @@ interface ParametroFaturamento {
   };
 }
 
-type SortField = 'cliente_nome' | 'tipo_cliente' | 'aplicar_franquia' | 'valor_franquia' | 'valor_acima_franquia' | 'aplicar_adicional_urgencia' | 'percentual_urgencia' | 'cobrar_integracao' | 'valor_integracao' | 'periodicidade_reajuste';
+type SortField = 'cliente_nome' | 'tipo_cliente' | 'aplicar_franquia' | 'valor_franquia' | 'frequencia_continua' | 'frequencia_por_volume' | 'valor_acima_franquia' | 'aplicar_adicional_urgencia' | 'percentual_urgencia' | 'cobrar_integracao' | 'valor_integracao' | 'periodicidade_reajuste' | 'indice_reajuste' | 'percentual_reajuste_fixo' | 'cliente_consolidado' | 'impostos_ab_min' | 'simples' | 'tipo_metrica_convenio' | 'tipo_metrica_urgencia' | 'tipo_desconto_acrescimo' | 'desconto_acrescimo' | 'data_inicio_integracao' | 'portal_laudos' | 'percentual_iss' | 'cobrar_urgencia_como_rotina' | 'incluir_empresa_origem' | 'incluir_access_number' | 'incluir_medico_solicitante';
 type SortDirection = 'asc' | 'desc';
 
 export function ParametrosFaturamentoList() {
@@ -95,6 +113,14 @@ export function ParametrosFaturamentoList() {
           aValue = a.valor_franquia || 0;
           bValue = b.valor_franquia || 0;
           break;
+        case 'frequencia_continua':
+          aValue = a.frequencia_continua ? 1 : 0;
+          bValue = b.frequencia_continua ? 1 : 0;
+          break;
+        case 'frequencia_por_volume':
+          aValue = a.frequencia_por_volume ? 1 : 0;
+          bValue = b.frequencia_por_volume ? 1 : 0;
+          break;
         case 'valor_acima_franquia':
           aValue = a.valor_acima_franquia || 0;
           bValue = b.valor_acima_franquia || 0;
@@ -118,6 +144,70 @@ export function ParametrosFaturamentoList() {
         case 'periodicidade_reajuste':
           aValue = a.periodicidade_reajuste;
           bValue = b.periodicidade_reajuste;
+          break;
+        case 'indice_reajuste':
+          aValue = a.indice_reajuste;
+          bValue = b.indice_reajuste;
+          break;
+        case 'percentual_reajuste_fixo':
+          aValue = a.percentual_reajuste_fixo || 0;
+          bValue = b.percentual_reajuste_fixo || 0;
+          break;
+        case 'cliente_consolidado':
+          aValue = a.cliente_consolidado;
+          bValue = b.cliente_consolidado;
+          break;
+        case 'impostos_ab_min':
+          aValue = a.impostos_ab_min || 0;
+          bValue = b.impostos_ab_min || 0;
+          break;
+        case 'simples':
+          aValue = a.simples ? 1 : 0;
+          bValue = b.simples ? 1 : 0;
+          break;
+        case 'tipo_metrica_convenio':
+          aValue = a.tipo_metrica_convenio;
+          bValue = b.tipo_metrica_convenio;
+          break;
+        case 'tipo_metrica_urgencia':
+          aValue = a.tipo_metrica_urgencia;
+          bValue = b.tipo_metrica_urgencia;
+          break;
+        case 'tipo_desconto_acrescimo':
+          aValue = a.tipo_desconto_acrescimo;
+          bValue = b.tipo_desconto_acrescimo;
+          break;
+        case 'desconto_acrescimo':
+          aValue = a.desconto_acrescimo || 0;
+          bValue = b.desconto_acrescimo || 0;
+          break;
+        case 'data_inicio_integracao':
+          aValue = a.data_inicio_integracao || '';
+          bValue = b.data_inicio_integracao || '';
+          break;
+        case 'portal_laudos':
+          aValue = a.portal_laudos ? 1 : 0;
+          bValue = b.portal_laudos ? 1 : 0;
+          break;
+        case 'percentual_iss':
+          aValue = a.percentual_iss || 0;
+          bValue = b.percentual_iss || 0;
+          break;
+        case 'cobrar_urgencia_como_rotina':
+          aValue = a.cobrar_urgencia_como_rotina ? 1 : 0;
+          bValue = b.cobrar_urgencia_como_rotina ? 1 : 0;
+          break;
+        case 'incluir_empresa_origem':
+          aValue = a.incluir_empresa_origem ? 1 : 0;
+          bValue = b.incluir_empresa_origem ? 1 : 0;
+          break;
+        case 'incluir_access_number':
+          aValue = a.incluir_access_number ? 1 : 0;
+          bValue = b.incluir_access_number ? 1 : 0;
+          break;
+        case 'incluir_medico_solicitante':
+          aValue = a.incluir_medico_solicitante ? 1 : 0;
+          bValue = b.incluir_medico_solicitante ? 1 : 0;
           break;
         default:
           return 0;
@@ -157,7 +247,7 @@ export function ParametrosFaturamentoList() {
   };
 
   const formatCurrency = (value: number | null) => {
-    return value ? `R$ ${value.toFixed(2)}` : '-';
+    return value ? `R$ ${value.toFixed(2).replace('.', ',')}` : '-';
   };
 
   const formatBoolean = (value: boolean) => {
@@ -215,7 +305,7 @@ export function ParametrosFaturamentoList() {
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                       onClick={() => handleSort('cliente_nome')}
                     >
-                      Cliente Nome
+                      Cliente
                       {getSortIcon('cliente_nome')}
                     </Button>
                   </TableHead>
@@ -248,6 +338,26 @@ export function ParametrosFaturamentoList() {
                     >
                       Valor Franquia
                       {getSortIcon('valor_franquia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('frequencia_continua')}
+                    >
+                      Frequência Contínua
+                      {getSortIcon('frequencia_continua')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('frequencia_por_volume')}
+                    >
+                      Frequência Por Volume
+                      {getSortIcon('frequencia_por_volume')}
                     </Button>
                   </TableHead>
                   <TableHead className="min-w-[140px]">
@@ -300,19 +410,168 @@ export function ParametrosFaturamentoList() {
                       {getSortIcon('valor_integracao')}
                     </Button>
                   </TableHead>
-                  <TableHead>Dia Fechamento</TableHead>
                   <TableHead>
                     <Button 
                       variant="ghost" 
                       className="h-auto p-0 font-semibold hover:bg-transparent"
                       onClick={() => handleSort('periodicidade_reajuste')}
                     >
-                      Forma Cobrança
+                      Periodicidade Reajuste
                       {getSortIcon('periodicidade_reajuste')}
                     </Button>
                   </TableHead>
                   <TableHead>Data Aniversário</TableHead>
-                  <TableHead>Observações</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('indice_reajuste')}
+                    >
+                      Índice Reajuste
+                      {getSortIcon('indice_reajuste')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('percentual_reajuste_fixo')}
+                    >
+                      % Reajuste Fixo
+                      {getSortIcon('percentual_reajuste_fixo')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('cliente_consolidado')}
+                    >
+                      Cliente Consolidado
+                      {getSortIcon('cliente_consolidado')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('impostos_ab_min')}
+                    >
+                      Impostos AB Min
+                      {getSortIcon('impostos_ab_min')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('simples')}
+                    >
+                      Simples
+                      {getSortIcon('simples')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('tipo_metrica_convenio')}
+                    >
+                      Tipo Métrica Convênio
+                      {getSortIcon('tipo_metrica_convenio')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('tipo_metrica_urgencia')}
+                    >
+                      Tipo Métrica Urgência
+                      {getSortIcon('tipo_metrica_urgencia')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('tipo_desconto_acrescimo')}
+                    >
+                      Tipo Desconto/Acréscimo
+                      {getSortIcon('tipo_desconto_acrescimo')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('desconto_acrescimo')}
+                    >
+                      % Desconto/Acréscimo
+                      {getSortIcon('desconto_acrescimo')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Data Início Integração</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('portal_laudos')}
+                    >
+                      Portal Laudos
+                      {getSortIcon('portal_laudos')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('percentual_iss')}
+                    >
+                      % ISS
+                      {getSortIcon('percentual_iss')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('cobrar_urgencia_como_rotina')}
+                    >
+                      Urgência Como Rotina
+                      {getSortIcon('cobrar_urgencia_como_rotina')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('incluir_empresa_origem')}
+                    >
+                      Incluir Empresa Origem
+                      {getSortIcon('incluir_empresa_origem')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('incluir_access_number')}
+                    >
+                      Incluir Access Number
+                      {getSortIcon('incluir_access_number')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                      onClick={() => handleSort('incluir_medico_solicitante')}
+                    >
+                      Incluir Médico Solicitante
+                      {getSortIcon('incluir_medico_solicitante')}
+                    </Button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -327,15 +586,31 @@ export function ParametrosFaturamentoList() {
                     <TableCell>{formatBoolean(parametro.aplicar_franquia)}</TableCell>
                     <TableCell>{parametro.volume_franquia || '-'}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_franquia)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.frequencia_continua)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.frequencia_por_volume)}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_acima_franquia)}</TableCell>
                     <TableCell>{formatBoolean(parametro.aplicar_adicional_urgencia)}</TableCell>
                     <TableCell>{parametro.percentual_urgencia ? `${parametro.percentual_urgencia}%` : '-'}</TableCell>
                     <TableCell>{formatBoolean(parametro.cobrar_integracao)}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_integracao)}</TableCell>
-                    <TableCell>-</TableCell>
-                    <TableCell>{parametro.periodicidade_reajuste}</TableCell>
+                    <TableCell>{parametro.periodicidade_reajuste || '-'}</TableCell>
                     <TableCell>{formatDate(parametro.data_aniversario_contrato)}</TableCell>
-                    <TableCell>-</TableCell>
+                    <TableCell>{parametro.indice_reajuste || '-'}</TableCell>
+                    <TableCell>{parametro.percentual_reajuste_fixo ? `${parametro.percentual_reajuste_fixo}%` : '-'}</TableCell>
+                    <TableCell>{parametro.cliente_consolidado || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatCurrency(parametro.impostos_ab_min)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.simples)}</TableCell>
+                    <TableCell>{parametro.tipo_metrica_convenio || '-'}</TableCell>
+                    <TableCell>{parametro.tipo_metrica_urgencia || '-'}</TableCell>
+                    <TableCell>{parametro.tipo_desconto_acrescimo || '-'}</TableCell>
+                    <TableCell>{parametro.desconto_acrescimo ? `${parametro.desconto_acrescimo}%` : '-'}</TableCell>
+                    <TableCell>{formatDate(parametro.data_inicio_integracao)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.portal_laudos)}</TableCell>
+                    <TableCell>{parametro.percentual_iss ? `${parametro.percentual_iss}%` : '-'}</TableCell>
+                    <TableCell>{formatBoolean(parametro.cobrar_urgencia_como_rotina)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.incluir_empresa_origem)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.incluir_access_number)}</TableCell>
+                    <TableCell>{formatBoolean(parametro.incluir_medico_solicitante)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
