@@ -127,19 +127,50 @@ serve(async (req: Request) => {
     } else {
       console.log('⚠️ NENHUM DADO DE FATURAMENTO ENCONTRADO PARA O NOME FANTASIA:', cliente.nome);
       
-      // Se não encontrar, tentar buscar usando nome_fantasia nos dados de volumetria
-      console.log('🔄 Tentando buscar dados da volumetria usando Cliente_Nome_Fantasia...');
+      // Se não encontrar, tentar buscar usando MÚLTIPLOS CAMPOS nos dados de volumetria
+      console.log('🔄 Tentando buscar dados da volumetria usando EMPRESA e Cliente_Nome_Fantasia...');
       
       const { data: dataVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('"Cliente_Nome_Fantasia"', cliente.nome)
+        .or(`"EMPRESA".eq."${cliente.nome}","Cliente_Nome_Fantasia".eq."${cliente.nome}"`) // Buscar por QUALQUER campo
         .eq('periodo_referencia', periodo);
         
       if (dataVolumetria && dataVolumetria.length > 0) {
         console.log(`📊 Dados de volumetria encontrados: ${dataVolumetria.length}`);
         // Usar dados de volumetria como fallback
         dataFaturamento = dataVolumetria;
+      } else {
+        console.log('🔍 Tentando buscar por outros nomes do cliente...');
+        
+        // Buscar cliente pelos múltiplos campos de nome
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('nome, nome_fantasia, nome_mobilemed')
+          .eq('id', cliente_id);
+          
+        if (clienteData && clienteData[0]) {
+          const cli = clienteData[0];
+          const nomesParaBuscar = [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].filter(Boolean);
+          
+          for (const nomeAlternativo of nomesParaBuscar) {
+            if (nomeAlternativo !== cliente.nome) {
+              console.log(`🔍 Tentando buscar por nome alternativo: ${nomeAlternativo}`);
+              
+              const { data: dataAlt } = await supabase
+                .from('volumetria_mobilemed')
+                .select('*')
+                .or(`"EMPRESA".eq."${nomeAlternativo}","Cliente_Nome_Fantasia".eq."${nomeAlternativo}"`)
+                .eq('periodo_referencia', periodo);
+                
+              if (dataAlt && dataAlt.length > 0) {
+                console.log(`✅ Dados encontrados com nome alternativo: ${dataAlt.length} registros`);
+                dataFaturamento = dataAlt;
+                break;
+              }
+            }
+          }
+        }
       }
     }
 

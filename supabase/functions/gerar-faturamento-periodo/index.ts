@@ -105,14 +105,20 @@ serve(async (req) => {
         const loteSize = 10; // Reduzir para evitar timeout
         console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
         
-        // Buscar clientes que realmente têm dados de volumetria no período - USANDO NOME FANTASIA
+        // Buscar clientes que realmente têm dados de volumetria no período - USANDO AMBOS OS CAMPOS
         const { data: clientesComVolumetria } = await supabase
           .from('volumetria_mobilemed')
-          .select('"Cliente_Nome_Fantasia"')
-          .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
-          .not('"Cliente_Nome_Fantasia"', 'is', null);
+          .select('"EMPRESA", "Cliente_Nome_Fantasia"')
+          .eq('periodo_referencia', periodoFormatado); // Usar período normalizado YYYY-MM
         
-        const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.Cliente_Nome_Fantasia) || [])];
+        // Coletar TODOS os nomes únicos (EMPRESA e Cliente_Nome_Fantasia)
+        const nomesClientesSet = new Set();
+        clientesComVolumetria?.forEach(v => {
+          if (v.EMPRESA) nomesClientesSet.add(v.EMPRESA);
+          if (v.Cliente_Nome_Fantasia) nomesClientesSet.add(v.Cliente_Nome_Fantasia);
+        });
+        const nomesClientesComVolumetria = Array.from(nomesClientesSet);
+        
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
@@ -174,11 +180,11 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
-              // Buscar TODOS os dados de volumetria do cliente no período usando NOME FANTASIA
+              // Buscar TODOS os dados de volumetria do cliente no período usando MÚLTIPLOS CAMPOS
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
                 .select('"EMPRESA","Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Usar nome fantasia para busca
+                .or(`"EMPRESA".eq."${cliente.nome}","Cliente_Nome_Fantasia".eq."${cliente.nome}"`) // Buscar por QUALQUER campo
                 .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {
