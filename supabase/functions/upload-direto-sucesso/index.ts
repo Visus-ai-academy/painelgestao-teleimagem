@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,7 +16,7 @@ serve(async (req) => {
   try {
     const { file_path, arquivo_fonte } = await req.json();
     
-    console.log('⚡ [DIRETO] Upload direto iniciado - ZERO processamento');
+    console.log('📊 [DIRETO] Processando arquivo real:', file_path);
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -24,43 +25,103 @@ serve(async (req) => {
 
     const lote_upload = crypto.randomUUID();
 
-    // 1. CRIAR REGISTROS PRIMEIRO
-    const registros = Array.from({ length: 50 }, (_, i) => ({
-      id: crypto.randomUUID(),
-      "EMPRESA": `CLIENTE_TESTE_${i + 1}`,
-      "NOME_PACIENTE": `PACIENTE_${arquivo_fonte}_${i + 1}`,
-      "CODIGO_PACIENTE": `${i + 1000}`,
-      "ESTUDO_DESCRICAO": ['RX TORAX', 'CT CRANIO', 'RM JOELHO', 'US ABDOME'][i % 4],
-      "MODALIDADE": ['RX', 'CT', 'MR', 'US'][i % 4],
-      "PRIORIDADE": i % 3 === 0 ? 'urgencia' : 'normal',
-      "VALORES": (() => {
-        const tipo = ['RX TORAX', 'CT CRANIO', 'RM JOELHO', 'US ABDOME'][i % 4];
-        // Alguns registros zerados para testar regras de-para, outros com valores reais
-        if (i % 5 === 0) return 0; // 20% zerados para testar de-para
-        switch(tipo) {
-          case 'RX TORAX': return 1;
-          case 'CT CRANIO': return 2; 
-          case 'RM JOELHO': return 1;
-          case 'US ABDOME': return 3;
-          default: return 1;
-        }
-      })(),
-      "ESPECIALIDADE": ['RADIOLOGIA', 'CARDIOLOGIA'][i % 2],
-      "MEDICO": `DR. MEDICO ${i + 1}`,
-      "DATA_REALIZACAO": '2025-06-15',
-      "HORA_REALIZACAO": '10:00',
-      "DATA_LAUDO": '2025-06-15', 
-      "HORA_LAUDO": '14:00',
-      "STATUS": 'LAUDADO',
-      data_referencia: '2025-06-15',
-      arquivo_fonte: arquivo_fonte,
-      lote_upload: lote_upload,
-      periodo_referencia: 'jun/25',
-      "CATEGORIA": 'SC',
-      tipo_faturamento: 'padrao'
-    }));
+    // 1. BAIXAR ARQUIVO EXCEL DO STORAGE
+    const { data: fileData, error: downloadError } = await supabaseClient.storage
+      .from('uploads')
+      .download(file_path);
 
-    // 2. REGISTRAR UPLOAD COM NÚMEROS CORRETOS
+    if (downloadError) throw downloadError;
+    
+    // 2. LER DADOS DO EXCEL
+    const arrayBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+    console.log(`📊 [DIRETO] Arquivo lido: ${jsonData.length} registros encontrados`);
+
+    // 3. BUSCAR REGRAS DE DE-PARA PARA VALORES ZERADOS
+    const { data: deParaRules } = await supabaseClient
+      .from('valores_referencia_de_para')
+      .select('*')
+      .eq('ativo', true);
+
+    const deParaMap = new Map();
+    deParaRules?.forEach(rule => {
+      deParaMap.set(rule.estudo_descricao, rule.valores);
+    });
+
+    // 4. PROCESSAR REGISTROS EM LOTES
+    const BATCH_SIZE = 1000;
+    let totalInseridos = 0;
+    let totalZeradosCorrigidos = 0;
+
+    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
+      const batch = jsonData.slice(i, i + BATCH_SIZE);
+      
+      const registrosProcessados = batch.map((row: any) => {
+        // Aplicar de-para se valor for zero
+        let valorFinal = parseFloat(row.VALORES) || 0;
+        if (valorFinal === 0 && deParaMap.has(row.ESTUDO_DESCRICAO)) {
+          valorFinal = deParaMap.get(row.ESTUDO_DESCRICAO);
+          totalZeradosCorrigidos++;
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          "EMPRESA": row.EMPRESA,
+          "NOME_PACIENTE": row.NOME_PACIENTE,
+          "CODIGO_PACIENTE": row.CODIGO_PACIENTE,
+          "ESTUDO_DESCRICAO": row.ESTUDO_DESCRICAO,
+          "ACCESSION_NUMBER": row.ACCESSION_NUMBER,
+          "MODALIDADE": row.MODALIDADE,
+          "PRIORIDADE": row.PRIORIDADE,
+          "VALORES": valorFinal,
+          "ESPECIALIDADE": row.ESPECIALIDADE,
+          "MEDICO": row.MEDICO,
+          "DUPLICADO": row.DUPLICADO,
+          "DATA_REALIZACAO": row.DATA_REALIZACAO,
+          "HORA_REALIZACAO": row.HORA_REALIZACAO,
+          "DATA_TRANSFERENCIA": row.DATA_TRANSFERENCIA,
+          "HORA_TRANSFERENCIA": row.HORA_TRANSFERENCIA,
+          "DATA_LAUDO": row.DATA_LAUDO,
+          "HORA_LAUDO": row.HORA_LAUDO,
+          "DATA_PRAZO": row.DATA_PRAZO,
+          "HORA_PRAZO": row.HORA_PRAZO,
+          "STATUS": row.STATUS,
+          "DATA_REASSINATURA": row.DATA_REASSINATURA,
+          "HORA_REASSINATURA": row.HORA_REASSINATURA,
+          "MEDICO_REASSINATURA": row.MEDICO_REASSINATURA,
+          "SEGUNDA_ASSINATURA": row.SEGUNDA_ASSINATURA,
+          "POSSUI_IMAGENS_CHAVE": row.POSSUI_IMAGENS_CHAVE,
+          "IMAGENS_CHAVES": row.IMAGENS_CHAVES,
+          "IMAGENS_CAPTURADAS": row.IMAGENS_CAPTURADAS,
+          "CODIGO_INTERNO": row.CODIGO_INTERNO,
+          "DIGITADOR": row.DIGITADOR,
+          "COMPLEMENTAR": row.COMPLEMENTAR,
+          data_referencia: row.data_referencia || '2025-06-15',
+          arquivo_fonte: arquivo_fonte,
+          lote_upload: lote_upload,
+          periodo_referencia: 'jun/25',
+          "CATEGORIA": row.CATEGORIA || 'SC',
+          tipo_faturamento: 'padrao'
+        };
+      });
+
+      // Inserir lote
+      const { error: insertError } = await supabaseClient
+        .from('volumetria_mobilemed')
+        .insert(registrosProcessados);
+
+      if (insertError) {
+        console.error(`❌ [DIRETO] Erro no lote ${i}:`, insertError);
+      } else {
+        totalInseridos += registrosProcessados.length;
+        console.log(`✅ [DIRETO] Lote ${i}-${i + BATCH_SIZE}: ${registrosProcessados.length} registros`);
+      }
+    }
+
+    // 5. REGISTRAR UPLOAD COMPLETO
     const { data: uploadRecord } = await supabaseClient
       .from('processamento_uploads')
       .insert({
@@ -68,37 +129,34 @@ serve(async (req) => {
         arquivo_nome: `${arquivo_fonte}_${Date.now()}.xlsx`,
         status: 'concluido',
         periodo_referencia: 'jun/25',
-        registros_processados: registros.length,
-        registros_inseridos: registros.length,
+        registros_processados: totalInseridos,
+        registros_inseridos: totalInseridos,
         registros_atualizados: 0,
-        registros_erro: 0,
+        registros_erro: jsonData.length - totalInseridos,
         completed_at: new Date().toISOString(),
         detalhes_erro: { 
           lote_upload,
-          metodo: 'upload_direto_sem_processamento',
-          motivo: 'evitar_travamentos_memory_limits'
+          metodo: 'upload_direto_completo',
+          motivo: 'processamento_arquivo_real',
+          zerados_corrigidos: totalZeradosCorrigidos
         }
       })
       .select()
       .single();
 
-    // 3. INSERIR REGISTROS DIRETAMENTE NA VOLUMETRIA
-    await supabaseClient
-      .from('volumetria_mobilemed')
-      .insert(registros);
+    console.log(`✅ [DIRETO] ${totalInseridos} registros inseridos, ${totalZeradosCorrigidos} zerados corrigidos`);
 
-    console.log(`✅ [DIRETO] ${registros.length} registros inseridos com sucesso`);
-
-    // 3. RESPOSTA DE SUCESSO GARANTIDA
+    // 6. RESPOSTA DE SUCESSO
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Upload concluído: ${registros.length} registros processados`,
+        message: `Upload concluído: ${totalInseridos} registros processados`,
         upload_id: uploadRecord?.id || 'direto',
         stats: {
-          inserted_count: registros.length,
-          total_rows: registros.length,
-          error_count: 0
+          inserted_count: totalInseridos,
+          total_rows: jsonData.length,
+          error_count: jsonData.length - totalInseridos,
+          regras_aplicadas: totalZeradosCorrigidos
         },
         processamento_direto: true
       }),
