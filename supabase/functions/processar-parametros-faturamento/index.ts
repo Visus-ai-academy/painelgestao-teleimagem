@@ -18,7 +18,7 @@ const COLUMN_MAPPING = {
     'Nome Empresa', 'NOME EMPRESA', 'nome empresa', 'Nome_Empresa', 
     'NOME_EMPRESA', 'Cliente', 'CLIENTE', 'cliente', 'Empresa', 'EMPRESA', 'empresa',
     'NOME_MOBILEMED', 'Nome_Fantasia', 'Razão Social', 'RAZÃO SOCIAL',
-    'Nome Fantasia', 'NOME FANTASIA', 'razao social'
+    'Nome Fantasia', 'NOME FANTASIA', 'razao social', 'Nome_fantasia'
   ],
   status: ['Status', 'STATUS', 'status', 'Situação', 'SITUAÇÃO', 'situacao', 'STATUS (INATIVO OU ATIVO)'],
   tipoMetricaConvenio: ['Tipo métrica convênio', 'Tipo Métrica Convênio', 'TIPO MÉTRICA CONVÊNIO'],
