@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -265,41 +263,38 @@ export function ParametrosFaturamentoList() {
 
   if (parametros.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">Nenhum parâmetro de faturamento encontrado.</p>
-        </CardContent>
-      </Card>
+      <div className="text-center py-8 text-muted-foreground">
+        Nenhum parâmetro de faturamento encontrado.
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <CardTitle>Parâmetros de Faturamento Cadastrados ({parametrosFiltrados.length})</CardTitle>
-          </div>
-          
-          {/* Campo de busca */}
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar por cliente ou tipo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="border rounded-lg">
-          <ScrollArea className="h-[600px] w-full">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background z-10 border-b">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Parâmetros de Faturamento Cadastrados</h3>
+        <Badge variant="outline">
+          {parametrosFiltrados.length} itens
+        </Badge>
+      </div>
+      
+      {/* Campo de busca */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por cliente ou tipo..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      
+      <div className="border rounded-md max-h-[600px] overflow-auto">
+        <div className="overflow-x-auto">
+          <Table className="min-w-max">
+            <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[200px]">
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[200px]">
                     <Button 
                       variant="ghost" 
                       className="h-auto p-0 font-semibold hover:bg-transparent"
@@ -309,7 +304,7 @@ export function ParametrosFaturamentoList() {
                       {getSortIcon('cliente_nome')}
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">
                     <Button 
                       variant="ghost" 
                       className="h-auto p-0 font-semibold hover:bg-transparent"
@@ -319,305 +314,80 @@ export function ParametrosFaturamentoList() {
                       {getSortIcon('tipo_cliente')}
                     </Button>
                   </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('aplicar_franquia')}
-                    >
-                      Aplicar Franquia
-                      {getSortIcon('aplicar_franquia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Volume Franquia</TableHead>
-                  <TableHead className="min-w-[120px]">
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('valor_franquia')}
-                    >
-                      Valor Franquia
-                      {getSortIcon('valor_franquia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('frequencia_continua')}
-                    >
-                      Frequência Contínua
-                      {getSortIcon('frequencia_continua')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('frequencia_por_volume')}
-                    >
-                      Frequência Por Volume
-                      {getSortIcon('frequencia_por_volume')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="min-w-[140px]">
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('valor_acima_franquia')}
-                    >
-                      Valor Acima Franquia
-                      {getSortIcon('valor_acima_franquia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('aplicar_adicional_urgencia')}
-                    >
-                      Aplicar Adicional Urgência
-                      {getSortIcon('aplicar_adicional_urgencia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('percentual_urgencia')}
-                    >
-                      % Adicional Urgência
-                      {getSortIcon('percentual_urgencia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('cobrar_integracao')}
-                    >
-                      Cobrar Integração
-                      {getSortIcon('cobrar_integracao')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="min-w-[120px]">
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('valor_integracao')}
-                    >
-                      Valor Integração
-                      {getSortIcon('valor_integracao')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('periodicidade_reajuste')}
-                    >
-                      Periodicidade Reajuste
-                      {getSortIcon('periodicidade_reajuste')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Data Aniversário</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('indice_reajuste')}
-                    >
-                      Índice Reajuste
-                      {getSortIcon('indice_reajuste')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('percentual_reajuste_fixo')}
-                    >
-                      % Reajuste Fixo
-                      {getSortIcon('percentual_reajuste_fixo')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('cliente_consolidado')}
-                    >
-                      Cliente Consolidado
-                      {getSortIcon('cliente_consolidado')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('impostos_ab_min')}
-                    >
-                      Impostos AB Min
-                      {getSortIcon('impostos_ab_min')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('simples')}
-                    >
-                      Simples
-                      {getSortIcon('simples')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('tipo_metrica_convenio')}
-                    >
-                      Tipo Métrica Convênio
-                      {getSortIcon('tipo_metrica_convenio')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('tipo_metrica_urgencia')}
-                    >
-                      Tipo Métrica Urgência
-                      {getSortIcon('tipo_metrica_urgencia')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('tipo_desconto_acrescimo')}
-                    >
-                      Tipo Desconto/Acréscimo
-                      {getSortIcon('tipo_desconto_acrescimo')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('desconto_acrescimo')}
-                    >
-                      % Desconto/Acréscimo
-                      {getSortIcon('desconto_acrescimo')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Data Início Integração</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('portal_laudos')}
-                    >
-                      Portal Laudos
-                      {getSortIcon('portal_laudos')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('percentual_iss')}
-                    >
-                      % ISS
-                      {getSortIcon('percentual_iss')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('cobrar_urgencia_como_rotina')}
-                    >
-                      Urgência Como Rotina
-                      {getSortIcon('cobrar_urgencia_como_rotina')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('incluir_empresa_origem')}
-                    >
-                      Incluir Empresa Origem
-                      {getSortIcon('incluir_empresa_origem')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('incluir_access_number')}
-                    >
-                      Incluir Access Number
-                      {getSortIcon('incluir_access_number')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      className="h-auto p-0 font-semibold hover:bg-transparent"
-                      onClick={() => handleSort('incluir_medico_solicitante')}
-                    >
-                      Incluir Médico Solicitante
-                      {getSortIcon('incluir_medico_solicitante')}
-                    </Button>
-                  </TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Aplicar Franquia</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Volume Franquia</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[120px]">Valor Franquia</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Frequência Contínua</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Frequência Por Volume</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[140px]">Valor Acima Franquia</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Aplicar Adicional Urgência</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">% Adicional Urgência</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Cobrar Integração</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap min-w-[120px]">Valor Integração</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Periodicidade Reajuste</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Data Aniversário</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Índice Reajuste</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">% Reajuste Fixo</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Cliente Consolidado</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Impostos AB Min</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Simples</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Tipo Métrica Convênio</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Tipo Métrica Urgência</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Tipo Desconto/Acréscimo</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">% Desconto/Acréscimo</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Data Início Integração</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Portal Laudos</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">% ISS</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Urgência Como Rotina</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Incluir Empresa Origem</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Incluir Access Number</TableHead>
+                  <TableHead className="sticky top-0 bg-background whitespace-nowrap">Incluir Médico Solicitante</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {parametrosFiltrados.map((parametro) => (
                   <TableRow key={parametro.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium whitespace-nowrap">
                       {parametro.clientes?.nome_fantasia || parametro.clientes?.nome || 'N/A'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <Badge variant="outline">{parametro.tipo_cliente}</Badge>
                     </TableCell>
-                    <TableCell>{formatBoolean(parametro.aplicar_franquia)}</TableCell>
-                    <TableCell>{parametro.volume_franquia || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.aplicar_franquia)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.volume_franquia || '-'}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_franquia)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.frequencia_continua)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.frequencia_por_volume)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.frequencia_continua)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.frequencia_por_volume)}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_acima_franquia)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.aplicar_adicional_urgencia)}</TableCell>
-                    <TableCell>{parametro.percentual_urgencia ? `${parametro.percentual_urgencia}%` : '-'}</TableCell>
-                    <TableCell>{formatBoolean(parametro.cobrar_integracao)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.aplicar_adicional_urgencia)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.percentual_urgencia ? `${parametro.percentual_urgencia}%` : '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.cobrar_integracao)}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.valor_integracao)}</TableCell>
-                    <TableCell>{parametro.periodicidade_reajuste || '-'}</TableCell>
-                    <TableCell>{formatDate(parametro.data_aniversario_contrato)}</TableCell>
-                    <TableCell>{parametro.indice_reajuste || '-'}</TableCell>
-                    <TableCell>{parametro.percentual_reajuste_fixo ? `${parametro.percentual_reajuste_fixo}%` : '-'}</TableCell>
-                    <TableCell>{parametro.cliente_consolidado || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.periodicidade_reajuste || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDate(parametro.data_aniversario_contrato)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.indice_reajuste || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.percentual_reajuste_fixo ? `${parametro.percentual_reajuste_fixo}%` : '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.cliente_consolidado || '-'}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatCurrency(parametro.impostos_ab_min)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.simples)}</TableCell>
-                    <TableCell>{parametro.tipo_metrica_convenio || '-'}</TableCell>
-                    <TableCell>{parametro.tipo_metrica_urgencia || '-'}</TableCell>
-                    <TableCell>{parametro.tipo_desconto_acrescimo || '-'}</TableCell>
-                    <TableCell>{parametro.desconto_acrescimo ? `${parametro.desconto_acrescimo}%` : '-'}</TableCell>
-                    <TableCell>{formatDate(parametro.data_inicio_integracao)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.portal_laudos)}</TableCell>
-                    <TableCell>{parametro.percentual_iss ? `${parametro.percentual_iss}%` : '-'}</TableCell>
-                    <TableCell>{formatBoolean(parametro.cobrar_urgencia_como_rotina)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.incluir_empresa_origem)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.incluir_access_number)}</TableCell>
-                    <TableCell>{formatBoolean(parametro.incluir_medico_solicitante)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.simples)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.tipo_metrica_convenio || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.tipo_metrica_urgencia || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.tipo_desconto_acrescimo || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.desconto_acrescimo ? `${parametro.desconto_acrescimo}%` : '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDate(parametro.data_inicio_integracao)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.portal_laudos)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{parametro.percentual_iss ? `${parametro.percentual_iss}%` : '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.cobrar_urgencia_como_rotina)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.incluir_empresa_origem)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.incluir_access_number)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatBoolean(parametro.incluir_medico_solicitante)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
