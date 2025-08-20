@@ -431,6 +431,42 @@ export default function GerenciarCadastros() {
     setRefreshStatusPanel(prev => prev + 1);
   };
 
+  // Handler para limpar parâmetros de faturamento
+  const handleLimparParametros = async () => {
+    if (!isAdmin) {
+      toast({
+        title: "Acesso Negado",
+        description: "Apenas administradores podem limpar parâmetros",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('limpar-parametros-faturamento', {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Parâmetros Limpos!",
+        description: `${data.registros_removidos} parâmetros foram removidos com sucesso`,
+      });
+
+      // Recarregar dados
+      setRefreshStatusPanel(prev => prev + 1);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao Limpar Parâmetros",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Handler para dados legados
   const handleUploadLegado = async (file: File, tipoArquivo: string, periodoReferencia: string, descricao?: string) => {
     console.log('🔄 Iniciando upload de dados legados:', file.name);
@@ -722,7 +758,18 @@ export default function GerenciarCadastros() {
 
               {/* Lista de Parâmetros Cadastrados */}
               <div className="mt-8">
-                <h3 className="text-lg font-medium mb-4">Parâmetros de Faturamento Cadastrados</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium">Parâmetros de Faturamento Cadastrados</h3>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleLimparParametros}
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Limpar Parâmetros
+                  </Button>
+                </div>
                 <ParametrosFaturamentoList />
               </div>
             </CardContent>
