@@ -276,17 +276,15 @@ export default function DemonstrativoFaturamento() {
   };
 
   const exportarCSV = () => {
-    const headers = ['Cliente', 'Email', 'Total Exames', 'Valor Bruto', 'Valor Líquido', 'Status', 'Vencimento'];
+    const headers = ['Cliente', 'Total Exames', 'Valor Bruto', 'Valor Líquido', 'Status'];
     const csvContent = [
       headers.join(','),
       ...clientesFiltrados.map(cliente => [
         `"${cliente.nome}"`,
-        `"${cliente.email}"`,
         cliente.total_exames,
         cliente.valor_bruto.toFixed(2),
         cliente.valor_liquido.toFixed(2),
-        cliente.status_pagamento,
-        cliente.data_vencimento
+        cliente.status_pagamento
       ].join(','))
     ].join('\n');
 
@@ -489,7 +487,12 @@ export default function DemonstrativoFaturamento() {
       {/* Tabela de Clientes */}
       <Card>
         <CardHeader>
-          <CardTitle>Faturamento por Cliente</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Faturamento por Cliente</span>
+            <span className="text-sm font-normal text-gray-500">
+              Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </CardTitle>
           <CardDescription>
             {clientesFiltrados.length} de {clientes.length} clientes
           </CardDescription>
@@ -509,19 +512,16 @@ export default function DemonstrativoFaturamento() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4">Cliente</th>
-                    <th className="text-left py-3 px-4">Email</th>
                     <th className="text-right py-3 px-4">Exames</th>
                     <th className="text-right py-3 px-4">Valor Bruto</th>
                     <th className="text-right py-3 px-4">Valor Líquido</th>
                     <th className="text-center py-3 px-4">Status</th>
-                    <th className="text-center py-3 px-4">Vencimento</th>
                   </tr>
                 </thead>
                 <tbody>
                   {clientesFiltrados.map((cliente, index) => (
                     <tr key={cliente.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                       <td className="py-3 px-4 font-medium">{cliente.nome}</td>
-                      <td className="py-3 px-4 text-gray-600">{cliente.email}</td>
                       <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
                       <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                       <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
@@ -534,9 +534,6 @@ export default function DemonstrativoFaturamento() {
                         >
                           {cliente.status_pagamento}
                         </Badge>
-                      </td>
-                      <td className="py-3 px-4 text-center text-sm">
-                        {new Date(cliente.data_vencimento).toLocaleDateString('pt-BR')}
                       </td>
                     </tr>
                   ))}
