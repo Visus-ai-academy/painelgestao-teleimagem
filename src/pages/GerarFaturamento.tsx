@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,11 +83,33 @@ export default function GerarFaturamento() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Estado para controlar se o demonstrativo foi gerado
-  const [demonstrativoGerado, setDemonstrativoGerado] = useState(() => {
-    const saved = localStorage.getItem('demonstrativoGerado');
-    return saved === 'true';
-  });
+  // Estado para controlar se o demonstrativo foi gerado - AGORA VERIFICA AUTOMATICAMENTE
+  const [demonstrativoGerado, setDemonstrativoGerado] = useState(false);
+  
+  // Verificar se há dados de faturamento processados para este período
+  const verificarDemonstrativoGerado = useCallback(async () => {
+    if (!periodoSelecionado) return;
+    
+    try {
+      const { data: dadosFaturamento } = await supabase
+        .from('faturamento')
+        .select('cliente_nome')
+        .eq('periodo_referencia', periodoSelecionado)
+        .limit(1);
+      
+      const temDados = dadosFaturamento && dadosFaturamento.length > 0;
+      setDemonstrativoGerado(temDados);
+      console.log('🎯 Demonstrativo gerado:', temDados, 'para período:', periodoSelecionado);
+    } catch (error) {
+      console.error('Erro ao verificar demonstrativo:', error);
+      setDemonstrativoGerado(false);
+    }
+  }, [periodoSelecionado]);
+  
+  // Verificar status do demonstrativo quando período mudar
+  useEffect(() => {
+    verificarDemonstrativoGerado();
+  }, [verificarDemonstrativoGerado]);
 
   // Estado para arquivo de faturamento
   const [arquivoFaturamento, setArquivoFaturamento] = useState<File | null>(null);
@@ -292,15 +314,11 @@ export default function GerarFaturamento() {
         variant: "default",
       });
 
-      // Recarregar clientes após gerar o demonstrativo
-      console.log('🔄 [RECARREGAR] Recarregando clientes em 1 segundo...');
+      // Aguardar processamento e recarregar dados
       setTimeout(() => {
-        console.log('🔄 [RECARREGAR] Executando carregarClientes()...');
+        verificarDemonstrativoGerado();
         carregarClientes();
-        // Garantir que o demonstrativo continue marcado como gerado após recarregar
-        setDemonstrativoGerado(true);
-        localStorage.setItem('demonstrativoGerado', 'true');
-      }, 1000);
+      }, 3000);
 
     } catch (error) {
       console.error('❌ [CATCH] Erro no processo de geração de faturamento:', error);

@@ -14,6 +14,26 @@ type GrupoChave = {
   estudo: string;
 };
 
+// Função auxiliar para normalizar período
+const formatPeriodoParaYYYYMM = (periodo: string): string => {
+  if (periodo.includes('-')) return periodo; // Já está no formato YYYY-MM
+  
+  // Converter jun/25 -> 2025-06
+  const [mes, ano] = periodo.split('/');
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const mesNum = meses.indexOf(mes.toLowerCase()) + 1;
+  const anoCompleto = `20${ano}`;
+  return `${anoCompleto}-${mesNum.toString().padStart(2, '0')}`;
+};
+
+// Função para converter período YYYY-MM para jun/25
+const formatPeriodoParaMonYY = (periodo: string): string => {
+  const [ano, mes] = periodo.split('-');
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const mesNome = meses[parseInt(mes) - 1];
+  return `${mesNome}/${ano.slice(2)}`;
+};
+
 function periodoToDatas(periodo: string) {
   // período no formato YYYY-MM (ex: 2025-06 para jun/25)
   const [y, m] = periodo.split('-').map(Number);
@@ -24,13 +44,6 @@ function periodoToDatas(periodo: string) {
   
   const toISO = (d: Date) => d.toISOString().split('T')[0];
   return { inicio: toISO(inicio), fim: toISO(fim) };
-}
-
-function periodoReferencia(periodo: string) {
-  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-  const [y, m] = periodo.split('-');
-  const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
-  return `${mon}/${y.slice(2)}`;
 }
 
 serve(async (req) => {
@@ -55,9 +68,13 @@ serve(async (req) => {
     );
 
     const { inicio, fim } = periodoToDatas(periodo);
-    const periodoRef = periodoReferencia(periodo);
-
-    console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} Ref=${periodoRef}`);
+    
+    // Normalizar período para formato consistente
+    const periodoFormatado = formatPeriodoParaYYYYMM(periodo);
+    const periodoRefMonyy = formatPeriodoParaMonYY(periodoFormatado);
+    
+    console.log(`[gerar-faturamento-periodo] Período normalizado: ${periodo} -> ${periodoFormatado}`);
+    console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} RefMonYY=${periodoRefMonyy}`);
 
     // Buscar TODOS os clientes ativos
     const { data: clientes, error: clientesError } = await supabase
@@ -76,14 +93,10 @@ serve(async (req) => {
       try {
         console.log('[gerar-faturamento-periodo] Iniciando processamento em background...');
         
-        // Limpar faturamento do período antes de inserir
-        const { error: delErr } = await supabase
-          .from('faturamento')
-          .delete()
-          .eq('periodo_referencia', periodoRef);
-        if (delErr) {
-          console.log('[gerar-faturamento-periodo] Aviso ao limpar faturamento:', delErr.message);
-        }
+        // 1. LIMPAR DADOS ANTERIORES DO PERÍODO (ambos os formatos)
+        console.log(`[gerar-faturamento-periodo] Limpando dados anteriores do período ${periodoFormatado} e ${periodoRefMonyy}`);
+        await supabase.from('faturamento').delete().eq('periodo_referencia', periodoFormatado);
+        await supabase.from('faturamento').delete().eq('periodo_referencia', periodoRefMonyy);
 
         let totalItens = 0;
         let clientesComDados = 0;
@@ -96,9 +109,9 @@ serve(async (req) => {
         const { data: clientesComVolumetria } = await supabase
           .from('volumetria_mobilemed')
           .select('"EMPRESA"')
-          .eq('periodo_referencia', periodo)
+          .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
           .not('"VALORES"', 'is', null)
-          .neq('"VALORES"', 0); // Remover limite para capturar TODOS os registros
+          .neq('"VALORES"', 0);
         
         const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.EMPRESA) || [])];
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
@@ -136,6 +149,7 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
         console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
         console.log(`[gerar-faturamento-periodo] Clientes da volumetria vs cadastrados vs processados: ${nomesClientesComVolumetria.length} vs ${todosClientes?.length || 0} vs ${clientesParaProcessar.length}`);
+        
         for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
           const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
           console.log(`[gerar-faturamento-periodo] Processando lote ${Math.floor(i/loteSize) + 1}/${Math.ceil(clientesParaProcessar.length/loteSize)}`);
@@ -144,105 +158,134 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
-            // Buscar TODOS os dados de volumetria do cliente no período (incluindo modalidade RX)
-            const { data: vm, error: vmErr } = await supabase
-              .from('volumetria_mobilemed')
-              .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-              .eq('"EMPRESA"', cliente.nome)
-              .eq('periodo_referencia', periodo)
-              .not('"VALORES"', 'is', null)
-              .neq('"VALORES"', 0); // Remover limite para capturar TODOS os dados do cliente
+              // Buscar TODOS os dados de volumetria do cliente no período
+              const { data: vm, error: vmErr } = await supabase
+                .from('volumetria_mobilemed')
+                .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
+                .eq('"EMPRESA"', cliente.nome)
+                .eq('periodo_referencia', periodoFormatado) // Usar período normalizado
+                .not('"VALORES"', 'is', null)
+                .neq('"VALORES"', 0);
 
-            if (vmErr) {
-              console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
-              continue;
-            }
+              if (vmErr) {
+                console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
+                continue;
+              }
 
-            const rows = vm || [];
-            if (rows.length === 0) {
-              console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período ${periodo}`);
-              continue;
-            }
+              const rows = vm || [];
+              if (rows.length === 0) {
+                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período ${periodoFormatado}`);
+                continue;
+              }
 
-            // Volume total (usado na faixa de preço)
-            const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
+              // Volume total (usado na faixa de preço)
+              const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
 
-            // Agrupar por chave INCLUINDO paciente
-            const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
-            for (const r of rows) {
-              const chave: GrupoChave = {
-                modalidade: r.MODALIDADE || '',
-                especialidade: r.ESPECIALIDADE || '',
-                categoria: r.CATEGORIA || 'SC',
-                prioridade: r.PRIORIDADE || '',
-                estudo: r.ESTUDO_DESCRICAO || 'Exame',
-              };
-              // INCLUIR PACIENTE na chave para evitar agregação incorreta
-              const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}|${r.NOME_PACIENTE}|${r.ACCESSION_NUMBER}`;
-              const qtd = Number(r.VALORES) || 1;
-              const atual = grupos.get(key);
-              if (atual) {
-                atual.qtd += qtd;
-              } else {
-                grupos.set(key, { 
-                  chave, 
-                  qtd, 
-                  paciente: r.NOME_PACIENTE || 'N/A',
-                  medico: r.MEDICO || 'N/A',
-                  dataExame: r.DATA_REALIZACAO || '',
-                  accession: r.ACCESSION_NUMBER || ''
+              // Agrupar por chave INCLUINDO paciente
+              const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
+              for (const r of rows) {
+                const chave: GrupoChave = {
+                  modalidade: r.MODALIDADE || '',
+                  especialidade: r.ESPECIALIDADE || '',
+                  categoria: r.CATEGORIA || 'SC',
+                  prioridade: r.PRIORIDADE || '',
+                  estudo: r.ESTUDO_DESCRICAO || 'Exame',
+                };
+                // INCLUIR PACIENTE na chave para evitar agregação incorreta
+                const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}|${r.NOME_PACIENTE}|${r.ACCESSION_NUMBER}`;
+                const qtd = Number(r.VALORES) || 1;
+                const atual = grupos.get(key);
+                if (atual) {
+                  atual.qtd += qtd;
+                } else {
+                  grupos.set(key, { 
+                    chave, 
+                    qtd, 
+                    paciente: r.NOME_PACIENTE || 'N/A',
+                    medico: r.MEDICO || 'N/A',
+                    dataExame: r.DATA_REALIZACAO || '',
+                    accession: r.ACCESSION_NUMBER || ''
+                  });
+                }
+              }
+
+              const itensInserir: any[] = [];
+
+              for (const { chave, qtd, paciente, medico, dataExame } of grupos.values()) {
+                // Calcular preço unitário via RPC
+                const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: chave.modalidade,
+                  p_especialidade: chave.especialidade,
+                  p_prioridade: chave.prioridade,
+                  p_categoria: chave.categoria,
+                  p_volume_total: volumeTotal,
+                  p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
                 });
-              }
-            }
 
-            const itensInserir: any[] = [];
+                if (precoErr) {
+                  console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
+                }
 
-            for (const { chave, qtd, paciente, medico, dataExame } of grupos.values()) {
-              // Calcular preço unitário via RPC
-              const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente.id,
-                p_modalidade: chave.modalidade,
-                p_especialidade: chave.especialidade,
-                p_prioridade: chave.prioridade,
-                p_categoria: chave.categoria,
-                p_volume_total: volumeTotal,
-                p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
-              });
+                const unit = Number(preco) || 0;
+                const valor = Number((unit * qtd).toFixed(2));
 
-              if (precoErr) {
-                console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
-              }
+                // Debug detalhado para identificar a origem do valor zero
+                if (valor <= 0) {
+                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO:`);
+                  console.log(`  Cliente: ${cliente.nome}`);
+                  console.log(`  Paciente: ${paciente}`);
+                  console.log(`  Exame: ${chave.estudo}`);
+                  console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
+                  console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
+                  console.log(`  Quantidade (qtd): ${qtd}`);
+                  console.log(`  Preço unitário (unit): ${unit}`);
+                  console.log(`  Preço retornado pela RPC: ${preco}`);
+                  console.log(`  Volume total: ${volumeTotal}`);
+                  console.log(`  MOTIVO: Cliente pode não ter contrato ou tabela de preços configurada`);
+                  
+                  // Tentar com preço padrão de R$ 25,00 para não bloquear o faturamento
+                  const valorPadrao = 25.00;
+                  const valorComPadrao = Number((valorPadrao * qtd).toFixed(2));
+                  
+                  console.log(`  APLICANDO PREÇO PADRÃO: R$ ${valorPadrao} x ${qtd} = R$ ${valorComPadrao}`);
+                  
+                  const hoje = new Date();
+                  const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+                  const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-              const unit = Number(preco) || 0;
-              const valor = Number((unit * qtd).toFixed(2));
+                  itensInserir.push({
+                    omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                    numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
+                    cliente_id: cliente.id,
+                    cliente_nome: cliente.nome,
+                    cliente_email: cliente.email || null,
+                    paciente: paciente,
+                    modalidade: chave.modalidade,
+                    especialidade: chave.especialidade,
+                    categoria: chave.categoria,
+                    prioridade: chave.prioridade,
+                    nome_exame: chave.estudo,
+                    medico: medico,
+                    data_exame: dataExame || emissao,
+                    quantidade: qtd,
+                    valor_bruto: valorComPadrao,
+                    valor: valorComPadrao,
+                    data_emissao: emissao,
+                    data_vencimento: vencimento,
+                    periodo_referencia: periodoFormatado, // Usar formato YYYY-MM
+                    tipo_dados: 'incremental',
+                  });
+                  continue;
+                }
 
-              // Debug detalhado para identificar a origem do valor zero
-              if (valor <= 0) {
-                console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO:`);
-                console.log(`  Cliente: ${cliente.nome}`);
-                console.log(`  Paciente: ${paciente}`);
-                console.log(`  Exame: ${chave.estudo}`);
-                console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
-                console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
-                console.log(`  Quantidade (qtd): ${qtd}`);
-                console.log(`  Preço unitário (unit): ${unit}`);
-                console.log(`  Preço retornado pela RPC: ${preco}`);
-                console.log(`  Volume total: ${volumeTotal}`);
-                console.log(`  MOTIVO: Cliente pode não ter contrato ou tabela de preços configurada`);
-                
-                // Tentar com preço padrão de R$ 25,00 para não bloquear o faturamento
-                const valorPadrao = 25.00;
-                const valorComPadrao = Number((valorPadrao * qtd).toFixed(2));
-                
-                console.log(`  APLICANDO PREÇO PADRÃO: R$ ${valorPadrao} x ${qtd} = R$ ${valorComPadrao}`);
-                
                 const hoje = new Date();
                 const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
                 const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
                 itensInserir.push({
                   omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                  numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                  numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
                   cliente_id: cliente.id,
                   cliente_nome: cliente.nome,
                   cliente_email: cliente.email || null,
@@ -255,57 +298,28 @@ serve(async (req) => {
                   medico: medico,
                   data_exame: dataExame || emissao,
                   quantidade: qtd,
-                  valor_bruto: valorComPadrao,
-                  valor: valorComPadrao,
+                  valor_bruto: valor,
+                  valor: valor,
                   data_emissao: emissao,
                   data_vencimento: vencimento,
-                  periodo_referencia: periodoRef,
+                  periodo_referencia: periodoFormatado, // Usar formato YYYY-MM
                   tipo_dados: 'incremental',
                 });
-                continue;
               }
 
-              const hoje = new Date();
-              const emissao = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-              const vencimento = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-              itensInserir.push({
-                omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
-                numero_fatura: `SIM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-                cliente_id: cliente.id,
-                cliente_nome: cliente.nome,
-                cliente_email: cliente.email || null,
-                paciente: paciente,
-                modalidade: chave.modalidade,
-                especialidade: chave.especialidade,
-                categoria: chave.categoria,
-                prioridade: chave.prioridade,
-                nome_exame: chave.estudo,
-                medico: medico,
-                data_exame: dataExame || emissao,
-                quantidade: qtd,
-                valor_bruto: valor,
-                valor: valor,
-                data_emissao: emissao,
-                data_vencimento: vencimento,
-                periodo_referencia: periodoRef,
-                tipo_dados: 'incremental',
-              });
-            }
-
-            if (itensInserir.length > 0) {
-              const batchSize = 50; // Reduzir tamanho do lote
-              for (let j = 0; j < itensInserir.length; j += batchSize) {
-                const lote = itensInserir.slice(j, j + batchSize);
-                const { error: insErr } = await supabase.from('faturamento').insert(lote);
-                if (insErr) {
-                  console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
+              if (itensInserir.length > 0) {
+                const batchSize = 50; // Reduzir tamanho do lote
+                for (let j = 0; j < itensInserir.length; j += batchSize) {
+                  const lote = itensInserir.slice(j, j + batchSize);
+                  const { error: insErr } = await supabase.from('faturamento').insert(lote);
+                  if (insErr) {
+                    console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
+                  }
                 }
+                totalItens += itensInserir.length;
+                clientesComDados++;
+                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
               }
-              totalItens += itensInserir.length;
-              clientesComDados++;
-              console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
-            }
             } catch (clienteError: any) {
               console.error(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}:`, clienteError.message);
               // Continuar com próximo cliente mesmo em caso de erro
@@ -320,7 +334,7 @@ serve(async (req) => {
         console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {
           totalItens,
           clientesComDados,
-          clientesProcessados: clientesAtivos.length
+          clientesProcessados: clientesParaProcessar.length
         });
 
       } catch (error: any) {
@@ -334,10 +348,10 @@ serve(async (req) => {
     // Retornar resposta imediata
     return new Response(JSON.stringify({
       success: true,
-      periodo,
-      periodo_referencia: periodoRef,
+      periodo: periodoFormatado,
+      periodo_referencia: periodoRefMonyy,
       clientes_processados: clientesAtivos.length,
-      message: 'Processamento iniciado em background',
+      message: 'Processamento iniciado em background - agora usa formato normalizado YYYY-MM',
       status: 'processing'
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
