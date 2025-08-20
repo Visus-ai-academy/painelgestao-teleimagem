@@ -72,7 +72,7 @@ export default function DemonstrativoFaturamento() {
       
       console.log('🔍 Buscando dados para período de referência:', periodoRef);
       
-      // Buscar dados de faturamento do período
+      // Buscar dados de faturamento do período - SEM LIMITE para garantir todos os dados
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
@@ -88,9 +88,21 @@ export default function DemonstrativoFaturamento() {
         `)
         .eq('periodo_referencia', periodoRef)
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
-        .order('cliente_nome');
+        .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
+        .order('cliente_nome')
+        .limit(10000); // Limite alto para garantir que todos os dados sejam carregados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
+      console.log('🔍 Amostra dos primeiros registros:', dadosFaturamento?.slice(0, 3).map(d => ({
+        cliente: d.cliente_nome,
+        valor: d.valor_bruto,
+        quantidade: d.quantidade
+      })));
+      
+      if (dadosFaturamento && dadosFaturamento.length > 0) {
+        const clientesUnicos = [...new Set(dadosFaturamento.map(d => d.cliente_nome))];
+        console.log('👥 Clientes únicos encontrados:', clientesUnicos.length, clientesUnicos);
+      }
 
       if (error) {
         console.error('❌ Erro ao carregar faturamento:', error);
