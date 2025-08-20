@@ -105,8 +105,7 @@ export default function DemonstrativoFaturamento() {
         .eq('periodo_referencia', periodoRef)
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
-        .order('cliente_nome')
-        .limit(10000); // Limite alto para garantir que todos os dados sejam carregados
+        .order('cliente_nome'); // Remover limite para garantir TODOS os dados sejam carregados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
       console.log('🔍 Amostra dos primeiros registros:', dadosFaturamento?.slice(0, 3).map(d => ({

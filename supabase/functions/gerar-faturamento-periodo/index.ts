@@ -90,7 +90,7 @@ serve(async (req) => {
 
         // Processar TODOS os clientes que têm dados de volumetria
         const loteSize = 10; // Reduzir para evitar timeout
-        console.log(`[gerar-faturamento-periodo] Processando ${clientesAtivos.length} clientes em lotes de ${loteSize}`);
+        console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
         
         // Buscar clientes que realmente têm dados de volumetria no período
         const { data: clientesComVolumetria } = await supabase
@@ -105,14 +105,29 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
-        // Filtrar apenas clientes que têm dados de volumetria
-        const clientesParaProcessar = clientesAtivos.filter(cliente => 
-          nomesClientesComVolumetria.includes(cliente.nome)
-        );
+        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (não filtrar por tabela clientes)
+        // Criar objetos cliente temporários para clientes da volumetria
+        const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
+          // Tentar encontrar o cliente na tabela clientes
+          const clienteExistente = clientesAtivos.find(c => c.nome === nomeEmpresa);
+          
+          if (clienteExistente) {
+            return clienteExistente;
+          } else {
+            // Criar cliente temporário para processamento
+            return {
+              id: nomeEmpresa.toLowerCase().replace(/\s+/g, '-'),
+              nome: nomeEmpresa,
+              email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+              ativo: true,
+              status: 'Ativo'
+            };
+          }
+        });
         
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
         console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
-        
+        console.log(`[gerar-faturamento-periodo] Clientes cadastrados vs volumetria: ${clientesAtivos.length} vs ${nomesClientesComVolumetria.length}`);
         for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
           const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
           console.log(`[gerar-faturamento-periodo] Processando lote ${Math.floor(i/loteSize) + 1}/${Math.ceil(clientesParaProcessar.length/loteSize)}`);
