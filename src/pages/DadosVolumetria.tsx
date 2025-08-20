@@ -6,8 +6,8 @@ import {
   BarChart3,
   Settings
 } from "lucide-react";
-import { VolumetriaUpload } from "@/components/volumetria/VolumetriaUpload";
-import { PeriodoUnificado } from "@/components/volumetria/PeriodoUnificado";
+import { VolumetriaUpload } from "@/components/VolumetriaUpload";
+import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
@@ -44,11 +44,15 @@ export default function DadosVolumetria() {
           </TabsList>
 
           <TabsContent value="upload" className="space-y-6">
-            {/* Configuração Unificada de Período */}
-            <PeriodoUnificado
-              periodoSelecionado={periodoFaturamentoVolumetria}
-              onPeriodoSelected={setPeriodoFaturamentoVolumetria}
-            />
+            {/* Seletor de Período */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-800 mb-2">Período de Processamento</h3>
+              <VolumetriaPeriodoSelector
+                periodoSelecionado={periodoFaturamentoVolumetria}
+                onPeriodoSelected={setPeriodoFaturamentoVolumetria}
+                onClearPeriodo={() => setPeriodoFaturamentoVolumetria(null)}
+              />
+            </div>
 
             {/* Upload de Dados */}
             <div className="grid md:grid-cols-2 gap-6">

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useVolumetria } from '@/contexts/VolumetriaContext';
-import { VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
+import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, FileText, CheckCircle, Lock } from 'lucide-react';
+import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
+import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
 
 interface VolumetriaUploadProps {
   arquivoFonte: 'volumetria_padrao' | 'volumetria_fora_padrao' | 'volumetria_padrao_retroativo' | 'volumetria_fora_padrao_retroativo' | 'volumetria_onco_padrao';
@@ -22,7 +24,9 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     total: number;
     inserted: number;
   } | null>(null);
-
+  const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
+  const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
+  const [isLimitedProcessing, setIsLimitedProcessing] = useState(false);
   const { toast } = useToast();
   const { refreshData } = useVolumetria();
 
@@ -30,12 +34,51 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validação básica
+    // Validação rigorosa do arquivo
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel' // .xls
+    ];
+    
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    if (!['.xlsx', '.xls'].includes(fileExtension)) {
+    const isValidExtension = ['.xlsx', '.xls'].includes(fileExtension);
+    const isValidMimeType = allowedMimeTypes.includes(file.type);
+    
+    if (!isValidExtension || !isValidMimeType) {
       toast({
         title: "Erro",
-        description: "Apenas arquivos Excel (.xlsx, .xls) são aceitos",
+        description: `Arquivo inválido. Tipos aceitos: .xlsx, .xls. Detectado: ${file.type}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar nome do arquivo
+    const dangerousChars = /[<>:"/\\|?*\x00-\x1f]/;
+    if (dangerousChars.test(file.name)) {
+      toast({
+        title: "Erro",
+        description: "Nome do arquivo contém caracteres não permitidos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar tamanho do arquivo (máximo 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Erro",
+        description: "Arquivo muito grande. Tamanho máximo: 50MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (file.size < 100) {
+      toast({
+        title: "Erro",
+        description: "Arquivo muito pequeno ou corrompido",
         variant: "destructive"
       });
       return;
@@ -46,89 +89,53 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     setStats(null);
 
     try {
-      console.log(`🚀 Iniciando UPLOAD para ${arquivoFonte} - COM REGRAS APLICADAS`);
-      
-      // 1. UPLOAD DO ARQUIVO PARA STORAGE
-      setProgress(10);
-      const fileName = `${arquivoFonte}_${Date.now()}.xlsx`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('❌ Erro no upload:', uploadError);
-        throw new Error(`Erro ao fazer upload: ${uploadError.message}`);
+      // Limpar uploads travados antes de iniciar novo processamento
+      console.log('🧹 Verificando uploads travados...');
+      try {
+        const { data: cleanResult } = await supabase.functions.invoke('limpar-uploads-travados');
+        console.log('✅ Resultado limpeza uploads:', cleanResult);
+      } catch (cleanError) {
+        console.warn('⚠️ Aviso na limpeza de uploads:', cleanError);
       }
 
-      console.log('✅ Arquivo enviado para storage:', fileName);
-      setProgress(30);
+      console.log(`🚀 Iniciando processamento para ${arquivoFonte}...`);
       
-      // 2. PROCESSAMENTO COMPLETO COM REGRAS
-      console.log('🔧 Iniciando processamento com regras...');
-      setProgress(50);
-      
-      // Converter período selecionado para formato brasileiro  
-      const periodoReferencia = periodoFaturamento ? 
-        `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][periodoFaturamento.mes-1]}/${periodoFaturamento.ano.toString().slice(-2)}` :
-        'jun/25'; // fallback
-      
-      const result = await supabase.functions.invoke('processar-excel-com-regras', {
-        body: {
-          file_path: fileName,
-          arquivo_fonte: arquivoFonte,
-          periodo_referencia: periodoReferencia
+      // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
+      const result = await processVolumetriaOtimizado(
+        file,
+        arquivoFonte,
+        periodoFaturamento,
+        (progressData) => {
+          console.log('📊 Progresso recebido:', progressData);
+          setProgress(progressData.progress);
+          setStats({ 
+            processed: progressData.processed, 
+            total: progressData.total > 0 ? progressData.total : 100, // Garantir que total nunca seja 0
+            inserted: progressData.processed 
+          });
         }
-      });
+      );
 
-      setProgress(80);
-
-      if (result.error) {
-        console.error('❌ Erro na função:', result.error);
+      if (result.success) {
+        const insertedCount = result.stats?.inserted_count || 0;
         toast({
-          title: "Erro no processamento",
-          description: result.error.message || "Erro desconhecido",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const data = result.data;
-      
-      if (data?.success) {
-        const insertedCount = data.stats?.inserted_count || 0;
-        console.log('🎯 Upload completo finalizado:', {
-          insertedCount,
-          totalProcessed: data.stats?.total_rows,
-          errors: data.stats?.error_count,
-          regrasAplicadas: data.stats?.regras_aplicadas
+          title: "Upload concluído!",
+          description: `${insertedCount} registros inseridos com sucesso.`,
         });
         
-        setProgress(100);
-        
-        toast({
-          title: "Upload concluído com regras aplicadas!",
-          description: `${insertedCount} registros inseridos. ${data.stats?.regras_aplicadas || 0} regras aplicadas automaticamente.`,
-        });
-        
-        // Atualizar dados
+        // Atualizar automaticamente a "Análise dos Uploads Realizados" e "Exames Não Identificados"
         await refreshData();
-        onSuccess?.();
         
+        onSuccess?.();
       } else {
-        console.error('❌ Falha no processamento:', data);
         toast({
           title: "Erro no processamento",
-          description: data?.error || data?.message || "Erro desconhecido no processamento", 
+          description: result.message || "Erro desconhecido",
           variant: "destructive"
         });
       }
 
     } catch (error) {
-      console.error('💥 Erro crítico:', error);
       toast({
         title: "Erro",
         description: "Erro ao processar arquivo",
@@ -136,6 +143,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       });
     } finally {
       setIsProcessing(false);
+      // Reset input
       event.target.value = '';
     }
   };
@@ -175,7 +183,7 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
                   <span className="font-semibold">Clique para fazer upload</span> ou arraste o arquivo
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Arquivos Excel (.xlsx, .xls) - COM REGRAS APLICADAS
+                  Arquivos Excel (.xlsx, .xls)
                 </p>
               </>
             )}
@@ -199,6 +207,13 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
             <span>{progress}%</span>
           </div>
           <Progress value={progress} className="w-full" />
+          
+          {stats && (
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Processadas: {stats.processed}/{stats.total}</span>
+              <span>Inseridas: {stats.inserted}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -208,6 +223,48 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
           <span>Concluído: {stats.inserted} registros inseridos</span>
         </div>
       )}
+
+      {/* Botão de Processamento Completo */}
+      {lastUploadedFile && isLimitedProcessing && (
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-sm">Processamento Completo Disponível</h4>
+              <p className="text-xs text-muted-foreground">
+                Seu último arquivo foi limitado. Use o processamento completo para processar todos os registros.
+              </p>
+            </div>
+            <Dialog open={showProcessarCompleto} onOpenChange={setShowProcessarCompleto}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="flex items-center gap-2">
+                  <Zap className="h-3 w-3" />
+                  Processamento Completo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Processamento Completo do Arquivo</DialogTitle>
+                  <DialogDescription>
+                    Processa o arquivo inteiro em batches pequenos para evitar timeouts.
+                    Este processo pode levar alguns minutos dependendo do tamanho do arquivo.
+                  </DialogDescription>
+                </DialogHeader>
+                <ProcessarArquivoCompleto
+                  filePath={lastUploadedFile}
+                  arquivoFonte={arquivoFonte}
+                  totalEstimado={34000}
+                  onComplete={() => {
+                    setShowProcessarCompleto(false);
+                    setLastUploadedFile(null);
+                    setIsLimitedProcessing(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

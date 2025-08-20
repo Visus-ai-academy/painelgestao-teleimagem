@@ -487,12 +487,12 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     console.log('🌍 Contexto disponibilizado globalmente');
   }, [loadStats, refreshData]);
 
-  // Real-time subscription OTIMIZADA para STAGING - monitora todas as etapas
+  // Real-time subscription otimizada - com debounce
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
     const channel = supabase
-      .channel('volumetria-staging-updates')
+      .channel('volumetria-updates')
       .on(
         'postgres_changes',
         {
@@ -501,49 +501,32 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           table: 'volumetria_mobilemed'
         },
         () => {
-          console.log('📊 [STAGING] Dados FINAIS de volumetria alterados - atualizando dashboards...');
+          console.log('🔄 Dados de volumetria alterados FISICAMENTE no banco - atualizando imediatamente...');
           // Invalidar cache e recarregar imediatamente
           lastLoadTime.current = 0;
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             loadStats();
-          }, 1000);
+          }, 1000); // Reduzido para 1 segundo
         }
       )
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'processamento_uploads'
         },
         (payload) => {
-          console.log('📤 [STAGING] Status do processamento atualizado:', payload);
-          const uploadData = payload.new as any;
-          
-          // Atualizar dashboards quando processamento completar
-          if (uploadData.status === 'completed') {
-            console.log('✅ [STAGING] Processamento completado - atualizando dados finais...');
+          console.log('🔄 Status de upload alterado - dados DEFINITIVOS sendo atualizados...', payload);
+          // Invalidar cache e recarregar quando upload finaliza
+          if (payload.new && (payload.new as any).status === 'concluido') {
             lastLoadTime.current = 0;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-              loadStats(); // Carrega dados FINAIS após aplicação de todas as regras
-            }, 2000);
-          } else if (uploadData.status === 'error') {
-            console.error('❌ [STAGING] Erro no processamento:', uploadData.detalhes_erro);
+              loadStats(); // Carregará dados DEFINITIVOS do banco após todas as regras
+            }, 3000); // Aumentar delay para garantir que regras foram aplicadas
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'volumetria_staging'
-        },
-        () => {
-          console.log('📥 [STAGING] Novos dados inseridos no staging (processamento em andamento...)');
-          // Não atualizar dashboard ainda - apenas log do progresso
         }
       )
       .subscribe();
