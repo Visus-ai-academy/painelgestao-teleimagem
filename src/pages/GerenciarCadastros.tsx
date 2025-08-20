@@ -478,20 +478,20 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-13">
-          <TabsTrigger value="exames">Exames</TabsTrigger>
-          <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
-          <TabsTrigger value="de-para">Exames Fora Padrão</TabsTrigger>
-          <TabsTrigger value="precos">Preços</TabsTrigger>
-          <TabsTrigger value="parametros">Parâmetros</TabsTrigger>
-          <TabsTrigger value="regras">Regras</TabsTrigger>
-          <TabsTrigger value="repasse">Repasse</TabsTrigger>
-          <TabsTrigger value="legado">Legado</TabsTrigger>
-          <TabsTrigger value="modalidades">Modalidades</TabsTrigger>
-          <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
-          <TabsTrigger value="categorias">Categorias</TabsTrigger>
-          <TabsTrigger value="prioridades">Prioridades</TabsTrigger>
-          <TabsTrigger value="de-para-prioridade">De-Para Prioridade</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-13 text-xs">
+          <TabsTrigger value="exames" className="text-xs px-2">Exames</TabsTrigger>
+          <TabsTrigger value="quebra-exames" className="text-xs px-2">Quebra</TabsTrigger>
+          <TabsTrigger value="de-para" className="text-xs px-2">Fora Padrão</TabsTrigger>
+          <TabsTrigger value="precos" className="text-xs px-2">Preços</TabsTrigger>
+          <TabsTrigger value="parametros" className="text-xs px-2">Parâmetros</TabsTrigger>
+          <TabsTrigger value="regras" className="text-xs px-2">Regras</TabsTrigger>
+          <TabsTrigger value="repasse" className="text-xs px-2">Repasse</TabsTrigger>
+          <TabsTrigger value="legado" className="text-xs px-2">Legado</TabsTrigger>
+          <TabsTrigger value="modalidades" className="text-xs px-2">Modalidades</TabsTrigger>
+          <TabsTrigger value="especialidades" className="text-xs px-2">Especialidades</TabsTrigger>
+          <TabsTrigger value="categorias" className="text-xs px-2">Categorias</TabsTrigger>
+          <TabsTrigger value="prioridades" className="text-xs px-2">Prioridades</TabsTrigger>
+          <TabsTrigger value="de-para-prioridade" className="text-xs px-2">De-Para</TabsTrigger>
         </TabsList>
 
         {/* Cadastro de Exames */}
