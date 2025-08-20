@@ -109,77 +109,60 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de volumetria - por nome da empresa
-    console.log('Buscando dados por nome da empresa...');
+    // Buscar dados de faturamento em vez de volumetria
+    console.log('Buscando dados de faturamento...');
     
-    // Calcular período correto para volumetria (do dia 8 do mês anterior ao dia 7 do mês atual)
-    const mesInt = parseInt(mes);
-    const anoInt = parseInt(ano);
-    
-    // Para volumetria, o período é do dia 8 do mês anterior ao dia 7 do mês selecionado
-    const dataInicioVolumetria = `${anoInt}-${(mesInt - 1).toString().padStart(2, '0')}-08`;
-    const dataFimVolumetria = `${anoInt}-${mes.padStart(2, '0')}-07`;
-    
-    console.log(`Período volumetria: ${dataInicioVolumetria} a ${dataFimVolumetria}`);
-    
-    let { data: dataVolumetria, error: errorVolumetria } = await supabase
-      .from('volumetria_mobilemed')
+    const { data: dataFaturamento, error: errorFaturamento } = await supabase
+      .from('faturamento')
       .select('*')
-      .eq('"EMPRESA"', cliente.nome)
-      .gte('data_referencia', dataInicioVolumetria)
-      .lte('data_referencia', dataFimVolumetria);
+      .eq('cliente_nome', cliente.nome)
+      .eq('periodo_referencia', periodo);
 
-    console.log(`Dados encontrados por nome da empresa: ${dataVolumetria?.length || 0}`);
+    console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
 
-    let finalData = dataVolumetria || [];
+    let finalData = dataFaturamento || [];
     
-    // Se não encontrou dados exatos, tentar buscar com variações do nome
+    // Se não encontrou dados no faturamento, tentar buscar na volumetria como fallback
     if (finalData.length === 0) {
-      console.log('Tentando buscar com variações do nome...');
+      console.log('Nenhum dado de faturamento encontrado, tentando volumetria como fallback...');
       
-      const { data: dataVariacao, error: errorVariacao } = await supabase
+      // Calcular período correto para volumetria (do dia 8 do mês anterior ao dia 7 do mês atual)
+      const mesInt = parseInt(mes);
+      const anoInt = parseInt(ano);
+      
+      // Para volumetria, o período é do dia 8 do mês anterior ao dia 7 do mês selecionado
+      const dataInicioVolumetria = `${anoInt}-${(mesInt - 1).toString().padStart(2, '0')}-08`;
+      const dataFimVolumetria = `${anoInt}-${mes.padStart(2, '0')}-07`;
+      
+      console.log(`Período volumetria: ${dataInicioVolumetria} a ${dataFimVolumetria}`);
+      
+      const { data: dataVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .ilike('"EMPRESA"', `%${cliente.nome}%`)
+        .eq('"EMPRESA"', cliente.nome)
         .gte('data_referencia', dataInicioVolumetria)
         .lte('data_referencia', dataFimVolumetria);
 
-      if (errorVariacao) {
-        console.error('Erro ao buscar por variação do nome:', errorVariacao);
-      } else {
-        finalData = dataVariacao || [];
-        console.log(`Dados encontrados por variação do nome: ${finalData.length}`);
-      }
-      
-      // Se ainda não encontrou, tentar buscar todos os dados do período para debug
-      if (finalData.length === 0) {
-        console.log('Tentando buscar todos os dados do período para debug...');
-        const { data: allData, error: allError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"EMPRESA", data_referencia')
-          .gte('data_referencia', dataInicioVolumetria)
-          .lte('data_referencia', dataFimVolumetria)
-          .limit(10);
-        
-        console.log('Dados do período encontrados:', JSON.stringify(allData));
-        
-        // Mostrar empresas únicas para debug
-        if (allData && allData.length > 0) {
-          const empresasUnicas = [...new Set(allData.map(item => item.EMPRESA))];
-          console.log('Empresas únicas no período:', JSON.stringify(empresasUnicas));
-        }
-      }
-    }
-
-    if (errorVolumetria && finalData.length === 0) {
-      console.error('Erro ao buscar dados de volumetria:', errorVolumetria);
+      finalData = dataVolumetria || [];
+      console.log(`Dados de volumetria encontrados como fallback: ${finalData.length}`);
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
 
-    // Calcular resumo usando VALORES da volumetria
-    const valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
-    const totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0); // VALORES já representa a quantidade
+    // Calcular resumo usando dados de faturamento ou volumetria
+    const isFaturamentoData = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
+    
+    let valorBrutoTotal, totalLaudos;
+    
+    if (isFaturamentoData) {
+      // Dados de faturamento - usar campos corretos
+      valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
+      totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
+    } else {
+      // Dados de volumetria - usar VALORES como quantidade
+      valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
+      totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
+    }
     
     // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
     const franquia = 0;
@@ -361,16 +344,31 @@ serve(async (req: Request) => {
         doc.setFillColor(0, 124, 186);
         doc.rect(20, yPosition, 257, 8, 'F');
         
-        doc.text('Data', 22, yPosition + 5);
-        doc.text('Paciente', 40, yPosition + 5);
-        doc.text('Médico', 80, yPosition + 5);
-        doc.text('Exame', 120, yPosition + 5);
-        doc.text('Modal.', 160, yPosition + 5);
-        doc.text('Espec.', 180, yPosition + 5);
-        doc.text('Categ.', 205, yPosition + 5);
-        doc.text('Prior.', 230, yPosition + 5);
-        doc.text('Qtd', 250, yPosition + 5);
-        doc.text('Valor', 260, yPosition + 5);
+        if (isFaturamentoData) {
+          // Headers para dados de faturamento
+          doc.text('Data', 22, yPosition + 5);
+          doc.text('Paciente', 40, yPosition + 5);
+          doc.text('Médico', 80, yPosition + 5);
+          doc.text('Exame', 120, yPosition + 5);
+          doc.text('Modal.', 160, yPosition + 5);
+          doc.text('Espec.', 180, yPosition + 5);
+          doc.text('Categ.', 205, yPosition + 5);
+          doc.text('Prior.', 230, yPosition + 5);
+          doc.text('Qtd', 250, yPosition + 5);
+          doc.text('Valor', 260, yPosition + 5);
+        } else {
+          // Headers para dados de volumetria
+          doc.text('Data', 22, yPosition + 5);
+          doc.text('Paciente', 40, yPosition + 5);
+          doc.text('Médico', 80, yPosition + 5);
+          doc.text('Exame', 120, yPosition + 5);
+          doc.text('Modal.', 160, yPosition + 5);
+          doc.text('Espec.', 180, yPosition + 5);
+          doc.text('Categ.', 205, yPosition + 5);
+          doc.text('Prior.', 230, yPosition + 5);
+          doc.text('Qtd', 250, yPosition + 5);
+          doc.text('Val.Ref', 260, yPosition + 5);
+        }
         
         yPosition += 12;
         doc.setTextColor(0, 0, 0);
@@ -389,16 +387,31 @@ serve(async (req: Request) => {
             doc.setFillColor(0, 124, 186);
             doc.rect(20, yPosition, 257, 8, 'F');
             
-            doc.text('Data', 22, yPosition + 5);
-            doc.text('Paciente', 40, yPosition + 5);
-            doc.text('Médico', 80, yPosition + 5);
-            doc.text('Exame', 120, yPosition + 5);
-            doc.text('Modal.', 160, yPosition + 5);
-            doc.text('Espec.', 180, yPosition + 5);
-            doc.text('Categ.', 205, yPosition + 5);
-            doc.text('Prior.', 230, yPosition + 5);
-            doc.text('Qtd', 250, yPosition + 5);
-            doc.text('Valor', 260, yPosition + 5);
+            if (isFaturamentoData) {
+              // Headers para dados de faturamento
+              doc.text('Data', 22, yPosition + 5);
+              doc.text('Paciente', 40, yPosition + 5);
+              doc.text('Médico', 80, yPosition + 5);
+              doc.text('Exame', 120, yPosition + 5);
+              doc.text('Modal.', 160, yPosition + 5);
+              doc.text('Espec.', 180, yPosition + 5);
+              doc.text('Categ.', 205, yPosition + 5);
+              doc.text('Prior.', 230, yPosition + 5);
+              doc.text('Qtd', 250, yPosition + 5);
+              doc.text('Valor', 260, yPosition + 5);
+            } else {
+              // Headers para dados de volumetria
+              doc.text('Data', 22, yPosition + 5);
+              doc.text('Paciente', 40, yPosition + 5);
+              doc.text('Médico', 80, yPosition + 5);
+              doc.text('Exame', 120, yPosition + 5);
+              doc.text('Modal.', 160, yPosition + 5);
+              doc.text('Espec.', 180, yPosition + 5);
+              doc.text('Categ.', 205, yPosition + 5);
+              doc.text('Prior.', 230, yPosition + 5);
+              doc.text('Qtd', 250, yPosition + 5);
+              doc.text('Val.Ref', 260, yPosition + 5);
+            }
             
             yPosition += 12;
             doc.setTextColor(0, 0, 0);
@@ -411,18 +424,36 @@ serve(async (req: Request) => {
           }
           
           doc.setFontSize(7);
-          const dataFormatada = item.DATA_REALIZACAO ? 
-            item.DATA_REALIZACAO.split('T')[0].split('-').reverse().join('/') : '-';
-          doc.text(dataFormatada, 22, yPosition + 2);
-          doc.text((item.NOME_PACIENTE || '-').substring(0, 20), 40, yPosition + 2);
-          doc.text((item.MEDICO || '-').substring(0, 20), 80, yPosition + 2);
-          doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 20), 120, yPosition + 2);
-          doc.text((item.MODALIDADE || '-').substring(0, 12), 160, yPosition + 2);
-          doc.text((item.ESPECIALIDADE || '-').substring(0, 12), 180, yPosition + 2);
-          doc.text((item.CATEGORIA || '-').substring(0, 12), 205, yPosition + 2);
-          doc.text((item.PRIORIDADE || '-').substring(0, 12), 230, yPosition + 2);
-          doc.text((item.VALORES || '0').toString(), 250, yPosition + 2);
-          doc.text(`R$ ${parseFloat(item.VALORES || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
+          
+          if (isFaturamentoData) {
+            // Dados de faturamento - usar campos corretos
+            const dataFormatada = item.data_exame ? 
+              item.data_exame.split('T')[0].split('-').reverse().join('/') : '-';
+            doc.text(dataFormatada, 22, yPosition + 2);
+            doc.text((item.paciente || '-').substring(0, 20), 40, yPosition + 2);
+            doc.text((item.medico || '-').substring(0, 20), 80, yPosition + 2);
+            doc.text((item.nome_exame || '-').substring(0, 20), 120, yPosition + 2);
+            doc.text((item.modalidade || '-').substring(0, 12), 160, yPosition + 2);
+            doc.text((item.especialidade || '-').substring(0, 12), 180, yPosition + 2);
+            doc.text((item.categoria || '-').substring(0, 12), 205, yPosition + 2);
+            doc.text((item.prioridade || '-').substring(0, 12), 230, yPosition + 2);
+            doc.text((item.quantidade || '0').toString(), 250, yPosition + 2);
+            doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
+          } else {
+            // Dados de volumetria - usar campos da volumetria
+            const dataFormatada = item.DATA_REALIZACAO ? 
+              item.DATA_REALIZACAO.split('T')[0].split('-').reverse().join('/') : '-';
+            doc.text(dataFormatada, 22, yPosition + 2);
+            doc.text((item.NOME_PACIENTE || '-').substring(0, 20), 40, yPosition + 2);
+            doc.text((item.MEDICO || '-').substring(0, 20), 80, yPosition + 2);
+            doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 20), 120, yPosition + 2);
+            doc.text((item.MODALIDADE || '-').substring(0, 12), 160, yPosition + 2);
+            doc.text((item.ESPECIALIDADE || '-').substring(0, 12), 180, yPosition + 2);
+            doc.text((item.CATEGORIA || '-').substring(0, 12), 205, yPosition + 2);
+            doc.text((item.PRIORIDADE || '-').substring(0, 12), 230, yPosition + 2);
+            doc.text((item.VALORES || '0').toString(), 250, yPosition + 2);
+            doc.text(`R$ ${parseFloat(item.VALORES || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
+          }
           
           yPosition += 6;
         }
