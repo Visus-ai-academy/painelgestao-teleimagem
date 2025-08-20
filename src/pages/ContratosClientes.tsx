@@ -374,16 +374,21 @@ export default function ContratosClientes() {
     try {
       setIsCreatingContracts(true);
       
-      // 1. Buscar clientes ativos que não têm contrato
-      const { data: clientesSemContrato, error: clientesError } = await supabase
+      // 1. Buscar todos os clientes ativos primeiro
+      const { data: todosClientes, error: clientesError } = await supabase
         .from('clientes')
         .select('*')
-        .eq('ativo', true)
-        .not('id', 'in', `(${contratos.map(c => c.clienteId).join(',') || 'null'})`);
+        .eq('ativo', true);
       
       if (clientesError) throw clientesError;
       
-      if (!clientesSemContrato || clientesSemContrato.length === 0) {
+      // 2. Filtrar clientes que já têm contrato
+      const clienteIdsComContrato = contratos.map(c => c.clienteId);
+      const clientesSemContrato = todosClientes?.filter(cliente => 
+        !clienteIdsComContrato.includes(cliente.id)
+      ) || [];
+      
+      if (clientesSemContrato.length === 0) {
         toast({
           title: "Nenhum cliente encontrado",
           description: "Todos os clientes ativos já possuem contratos.",
@@ -391,6 +396,8 @@ export default function ContratosClientes() {
         });
         return;
       }
+
+      console.log(`🔍 Encontrados ${clientesSemContrato.length} clientes sem contrato`);
 
       let contratosGerados = 0;
       
