@@ -391,11 +391,17 @@ export default function GerarFaturamento() {
           }
 
           // Atualizar status do e-mail
-          setResultados(prev => prev.map(r => 
-            r.clienteId === resultado.clienteId 
-              ? { ...r, emailEnviado: true }
-              : r
-          ));
+          setResultados(prev => {
+            const novosResultados = prev.map(r => 
+              r.clienteId === resultado.clienteId 
+                ? { ...r, emailEnviado: true }
+                : r
+            );
+            
+            // Salvar no localStorage
+            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            return novosResultados;
+          });
 
           enviados++;
           
@@ -403,11 +409,17 @@ export default function GerarFaturamento() {
           console.error(`Erro ao enviar e-mail para ${resultado.clienteNome}:`, error);
           errors++;
           
-          setResultados(prev => prev.map(r => 
-            r.clienteId === resultado.clienteId 
-              ? { ...r, erroEmail: error instanceof Error ? error.message : 'Erro desconhecido' }
-              : r
-          ));
+          setResultados(prev => {
+            const novosResultados = prev.map(r => 
+              r.clienteId === resultado.clienteId 
+                ? { ...r, erroEmail: error instanceof Error ? error.message : 'Erro desconhecido' }
+                : r
+            );
+            
+            // Salvar no localStorage
+            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            return novosResultados;
+          });
         }
       }
 
@@ -432,20 +444,31 @@ export default function GerarFaturamento() {
     }
   };
 
+  // Estado para controlar o período anterior (para detectar mudanças reais)
+  const [periodoAnterior, setPeriodoAnterior] = useState<string | null>(null);
+
   // Carregar clientes quando o componente inicializa ou período muda
   useEffect(() => {
-    console.log('🔄 Período selecionado mudou para:', periodoSelecionado);
-    // Resetar demonstrativo quando período mudar
-    setDemonstrativoGerado(false);
-    localStorage.setItem('demonstrativoGerado', 'false');
+    console.log('🔄 Período selecionado:', periodoSelecionado, 'Período anterior:', periodoAnterior);
     
-    // Resetar contadores de relatórios e emails quando período mudar
-    setRelatoriosGerados(0);
-    setEmailsEnviados(0);
-    localStorage.setItem('relatoriosGerados', '0');
-    localStorage.setItem('emailsEnviados', '0');
-    localStorage.removeItem('resultadosFaturamento');
-    setResultados([]);
+    // Só resetar dados se o período realmente mudou (não na primeira carga)
+    if (periodoAnterior !== null && periodoAnterior !== periodoSelecionado) {
+      console.log('🔄 Período mudou, resetando dados...');
+      // Resetar demonstrativo quando período mudar
+      setDemonstrativoGerado(false);
+      localStorage.setItem('demonstrativoGerado', 'false');
+      
+      // Resetar contadores de relatórios e emails quando período mudar
+      setRelatoriosGerados(0);
+      setEmailsEnviados(0);
+      localStorage.setItem('relatoriosGerados', '0');
+      localStorage.setItem('emailsEnviados', '0');
+      localStorage.removeItem('resultadosFaturamento');
+      setResultados([]);
+    }
+    
+    // Atualizar período anterior
+    setPeriodoAnterior(periodoSelecionado);
     
     carregarClientes();
   }, [periodoSelecionado]);
@@ -496,19 +519,25 @@ export default function GerarFaturamento() {
           }
 
           // Atualizar resultado do cliente
-          setResultados(prev => prev.map(resultado => 
-            resultado.clienteId === cliente.id 
-              ? {
-                  ...resultado,
-                  relatorioGerado: true,
-                  linkRelatorio: relatorioData.arquivos?.[0]?.url,
-                  arquivos: relatorioData.arquivos,
-                  dataProcessamento: new Date().toLocaleString('pt-BR'),
-                  relatorioData: relatorioData,
-                  erro: undefined
-                }
-              : resultado
-          ));
+          setResultados(prev => {
+            const novosResultados = prev.map(resultado => 
+              resultado.clienteId === cliente.id 
+                ? {
+                    ...resultado,
+                    relatorioGerado: true,
+                    linkRelatorio: relatorioData.arquivos?.[0]?.url,
+                    arquivos: relatorioData.arquivos,
+                    dataProcessamento: new Date().toLocaleString('pt-BR'),
+                    relatorioData: relatorioData,
+                    erro: undefined
+                  }
+                : resultado
+            );
+            
+            // Salvar no localStorage
+            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            return novosResultados;
+          });
 
           gerados++;
           
@@ -517,16 +546,22 @@ export default function GerarFaturamento() {
           errors++;
           
           // Atualizar resultado com erro
-          setResultados(prev => prev.map(resultado => 
-            resultado.clienteId === cliente.id 
-              ? {
-                  ...resultado,
-                  relatorioGerado: false,
-                  erro: error instanceof Error ? error.message : 'Erro desconhecido',
-                  dataProcessamento: new Date().toLocaleString('pt-BR')
-                }
-              : resultado
-          ));
+          setResultados(prev => {
+            const novosResultados = prev.map(resultado => 
+              resultado.clienteId === cliente.id 
+                ? {
+                    ...resultado,
+                    relatorioGerado: false,
+                    erro: error instanceof Error ? error.message : 'Erro desconhecido',
+                    dataProcessamento: new Date().toLocaleString('pt-BR')
+                  }
+                : resultado
+            );
+            
+            // Salvar no localStorage
+            localStorage.setItem('resultadosFaturamento', JSON.stringify(novosResultados));
+            return novosResultados;
+          });
         }
       }
 
