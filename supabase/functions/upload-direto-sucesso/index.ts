@@ -102,14 +102,35 @@ serve(async (req) => {
       };
     });
 
-    console.log(`📊 [ULTRA-SIMPLES] Inserindo ${registrosProcessados.length} registros`);
+    // 5. INSERIR EM LOTES MICRO (ANTI-TIMEOUT)
+    const MICRO_BATCH_SIZE = 10; // MUITO pequeno para garantir que funcione
+    let totalInseridos = 0;
+    
+    console.log(`📊 [ULTRA-SIMPLES] Inserindo em ${Math.ceil(registrosProcessados.length / MICRO_BATCH_SIZE)} micro-lotes de ${MICRO_BATCH_SIZE}`);
 
-    // 5. INSERIR TUDO DE UMA VEZ (SEM LOOPS)
-    const { error: insertError } = await supabaseClient
-      .from('volumetria_mobilemed')
-      .insert(registrosProcessados);
+    for (let i = 0; i < registrosProcessados.length; i += MICRO_BATCH_SIZE) {
+      const microBatch = registrosProcessados.slice(i, i + MICRO_BATCH_SIZE);
+      
+      try {
+        const { error: insertError } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .insert(microBatch);
 
-    if (insertError) throw insertError;
+        if (insertError) throw insertError;
+        
+        totalInseridos += microBatch.length;
+        console.log(`✅ [MICRO-LOTE] ${Math.floor(i/MICRO_BATCH_SIZE) + 1}/${Math.ceil(registrosProcessados.length/MICRO_BATCH_SIZE)}: ${microBatch.length} registros (Total: ${totalInseridos})`);
+        
+        // Pausa obrigatória entre lotes para evitar timeout
+        if (i + MICRO_BATCH_SIZE < registrosProcessados.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+      } catch (batchError) {
+        console.error(`❌ [MICRO-LOTE] Erro no lote ${i}:`, batchError);
+        throw batchError;
+      }
+    }
 
     // 6. REGISTRAR UPLOAD
     const { data: uploadRecord } = await supabaseClient
