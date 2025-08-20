@@ -97,6 +97,9 @@ interface ContratoCliente {
   // Histórico de alterações
   termosAditivos?: TermoAditivo[];
   documentos?: DocumentoCliente[];
+  // Campos adicionais para exibição
+  numeroContrato?: string;
+  razaoSocial?: string;
 }
 
 interface DocumentoCliente {
@@ -206,6 +209,8 @@ export default function ContratosClientes() {
           clientes (
             id,
             nome,
+            nome_fantasia,
+            razao_social,
             cnpj,
             endereco,
             telefone,
@@ -260,7 +265,7 @@ export default function ContratosClientes() {
         return {
           id: contrato.id,
           clienteId: cliente?.id || '',
-          cliente: cliente?.nome || 'Cliente não encontrado',
+          cliente: cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
           cnpj: cliente?.cnpj || '',
           dataInicio: contrato.data_inicio || '',
           dataFim: contrato.data_fim || contrato.data_inicio || '',
@@ -294,7 +299,10 @@ export default function ContratosClientes() {
           configuracoesFranquia: configuracoesFranquia,
           configuracoesIntegracao: configuracoesIntegracao,
           termosAditivos: [],
-          documentos: []
+          documentos: [],
+          // Novos campos para exibição na tabela
+          numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
+          razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado'
         };
       });
 
@@ -412,8 +420,20 @@ export default function ContratosClientes() {
           console.error(`Erro ao buscar preços para cliente ${cliente.nome}:`, precosError);
           continue;
         }
+
+        // 3. Buscar parâmetros de faturamento para o cliente
+        const { data: parametrosCliente, error: parametrosError } = await supabase
+          .from('parametros_faturamento')
+          .select('*')
+          .eq('cliente_id', cliente.id)
+          .eq('ativo', true)
+          .single();
+
+        if (parametrosError && parametrosError.code !== 'PGRST116') {
+          console.error(`Erro ao buscar parâmetros para cliente ${cliente.nome}:`, parametrosError);
+        }
         
-        // 3. Só gera contrato se cliente tem preços configurados
+        // 4. Só gera contrato se cliente tem preços configurados
         if (precosCliente && precosCliente.length > 0) {
           // Calcular data de início e fim do contrato
           const dataInicio = new Date().toISOString().split('T')[0];
@@ -431,8 +451,27 @@ export default function ContratosClientes() {
             volume_inicial: preco.volume_inicial,
             volume_final: preco.volume_final
           }));
+
+          // Preparar configurações baseadas nos parâmetros de faturamento
+          const configuracoesFranquia = parametrosCliente ? {
+            tem_franquia: parametrosCliente.aplicar_franquia,
+            valor_franquia: parametrosCliente.valor_franquia,
+            volume_franquia: parametrosCliente.volume_franquia,
+            valor_acima_franquia: parametrosCliente.valor_acima_franquia,
+            frequencia_continua: parametrosCliente.frequencia_continua,
+            frequencia_por_volume: parametrosCliente.frequencia_por_volume
+          } : {};
+
+          const configuracoesIntegracao = parametrosCliente ? {
+            cobra_integracao: parametrosCliente.cobrar_integracao,
+            valor_integracao: parametrosCliente.valor_integracao,
+            portal_laudos: parametrosCliente.portal_laudos,
+            incluir_medico_solicitante: parametrosCliente.incluir_medico_solicitante,
+            incluir_access_number: parametrosCliente.incluir_access_number,
+            incluir_empresa_origem: parametrosCliente.incluir_empresa_origem
+          } : {};
           
-          // 4. Criar contrato no banco
+          // 5. Criar contrato no banco
           const { error: contratoError } = await supabase
             .from('contratos_clientes')
             .insert({
@@ -445,15 +484,19 @@ export default function ContratosClientes() {
               modalidades: [...new Set(precosCliente.map(p => p.modalidade))],
               especialidades: [...new Set(precosCliente.map(p => p.especialidade))],
               tem_precos_configurados: true,
-              tem_parametros_configurados: false,
+              tem_parametros_configurados: parametrosCliente ? true : false,
               considera_plantao: false,
               cond_volume: 'MOD/ESP/CAT',
-              dia_vencimento: 10,
+              dia_vencimento: parametrosCliente?.periodicidade_reajuste === 'mensal' ? 10 : 30,
               desconto_percentual: 0,
               acrescimo_percentual: 0,
               faixas_volume: [],
-              configuracoes_franquia: {},
-              configuracoes_integracao: {}
+              configuracoes_franquia: configuracoesFranquia,
+              configuracoes_integracao: configuracoesIntegracao,
+              // Campos adicionais dos parâmetros
+              tipo_faturamento: parametrosCliente?.tipo_cliente === 'CO' ? 'CO-FT' : 'NC-FT',
+              forma_pagamento: parametrosCliente?.periodicidade_reajuste || 'mensal',
+              observacoes_contratuais: parametrosCliente ? `Parâmetros configurados: ${parametrosCliente.indice_reajuste} - ${parametrosCliente.periodicidade_reajuste}` : null
             });
           
           if (contratoError) {
@@ -467,7 +510,7 @@ export default function ContratosClientes() {
       
       toast({
         title: "Contratos gerados com sucesso!",
-        description: `${contratosGerados} contratos foram criados automaticamente.`,
+        description: `${contratosGerados} contratos foram criados automaticamente com seus respectivos parâmetros.`,
       });
       
       // Recarregar lista de contratos
@@ -758,12 +801,12 @@ export default function ContratosClientes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>CNPJ</TableHead>
+                  <TableHead>Contrato</TableHead>
+                  <TableHead>Razão Social</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data Início</TableHead>
                   <TableHead>Data Fim</TableHead>
                   <TableHead>Dias p/ Vencer</TableHead>
-                  <TableHead>Valor Total</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -771,7 +814,8 @@ export default function ContratosClientes() {
                 {contratos.map((contrato) => (
                   <TableRow key={contrato.id}>
                     <TableCell className="font-medium">{contrato.cliente}</TableCell>
-                    <TableCell>{contrato.cnpj || 'Não informado'}</TableCell>
+                    <TableCell>{contrato.numeroContrato || 'Não informado'}</TableCell>
+                    <TableCell>{contrato.razaoSocial}</TableCell>
                     <TableCell>
                       <Badge variant={contrato.status === 'Ativo' ? 'default' : contrato.status === 'A Vencer' ? 'secondary' : 'destructive'}>
                         {contrato.status}
@@ -784,7 +828,6 @@ export default function ContratosClientes() {
                         {contrato.diasParaVencer} dias
                       </span>
                     </TableCell>
-                    <TableCell>R$ {contrato.valorTotal.toLocaleString('pt-BR')}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
