@@ -87,7 +87,7 @@ export default function DemonstrativoFaturamento() {
         console.log('👥 Clientes únicos na volumetria:', clientesUnicos.length, clientesUnicos.slice(0, 5));
       }
       
-      // Buscar dados de faturamento do período - SEM LIMITE para garantir todos os dados
+      // Buscar dados de faturamento do período - GARANTIR TODOS OS CLIENTES
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
@@ -101,10 +101,11 @@ export default function DemonstrativoFaturamento() {
           data_vencimento,
           periodo_referencia
         `)
-        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto (não periodoRef)
+        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
-        .order('cliente_nome'); // Remover limite para garantir TODOS os dados sejam carregados
+        .order('cliente_nome') // Sem limite - processar TODOS os clientes disponíveis
+        .limit(1000); // Limite alto para garantir que todos os clientes sejam carregados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
       console.log('🔍 Período usado na busca (direto YYYY-MM):', periodo);

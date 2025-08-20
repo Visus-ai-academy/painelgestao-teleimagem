@@ -714,8 +714,6 @@ export default function GerarFaturamento() {
                                  <a
                                    key={index}
                                    href={arquivo.url}
-                                   target="_blank"
-                                   rel="noopener noreferrer"
                                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
                                  >
                                    <ExternalLink className="h-3 w-3" />
@@ -726,8 +724,6 @@ export default function GerarFaturamento() {
                            ) : resultado.linkRelatorio ? (
                              <a 
                                href={resultado.linkRelatorio} 
-                               target="_blank" 
-                               rel="noopener noreferrer"
                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
                              >
                                <ExternalLink className="h-3 w-3" />
@@ -995,8 +991,6 @@ export default function GerarFaturamento() {
                                   <a
                                     key={index}
                                     href={arquivo.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
                                   >
                                     <ExternalLink className="h-3 w-3" />
@@ -1007,8 +1001,6 @@ export default function GerarFaturamento() {
                             ) : resultado.linkRelatorio ? (
                               <a 
                                 href={resultado.linkRelatorio} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
                               >
                                 <ExternalLink className="h-3 w-3" />

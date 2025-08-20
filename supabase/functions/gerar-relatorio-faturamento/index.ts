@@ -355,7 +355,7 @@ serve(async (req: Request) => {
           doc.text('Categ.', 205, yPosition + 5);
           doc.text('Prior.', 230, yPosition + 5);
           doc.text('Qtd', 250, yPosition + 5);
-          doc.text('Valor', 260, yPosition + 5);
+          doc.text('Valor Total', 260, yPosition + 5);
         } else {
           // Headers para dados de volumetria
           doc.text('Data', 22, yPosition + 5);
@@ -398,7 +398,7 @@ serve(async (req: Request) => {
               doc.text('Categ.', 205, yPosition + 5);
               doc.text('Prior.', 230, yPosition + 5);
               doc.text('Qtd', 250, yPosition + 5);
-              doc.text('Valor', 260, yPosition + 5);
+              doc.text('Valor Total', 260, yPosition + 5);
             } else {
               // Headers para dados de volumetria
               doc.text('Data', 22, yPosition + 5);
