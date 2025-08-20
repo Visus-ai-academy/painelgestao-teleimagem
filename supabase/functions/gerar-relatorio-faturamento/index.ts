@@ -109,13 +109,13 @@ serve(async (req: Request) => {
     
     console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
     
-    // Buscar dados de faturamento usando NOME FANTASIA (campo cliente_nome já contém o nome fantasia após processamento)
+    // Buscar dados de faturamento usando NOME FANTASIA do cliente
     console.log('Buscando dados de faturamento pelo nome fantasia...');
     
     let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
       .select('*')
-      .eq('cliente_nome', cliente.nome) // O campo cliente_nome já contém o nome fantasia após o processamento
+      .eq('cliente_nome', cliente.nome_fantasia || cliente.nome) // Usar nome_fantasia prioritariamente
       .eq('periodo_referencia', periodo);
 
     console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
