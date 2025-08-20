@@ -167,20 +167,27 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ [DIRETO] Erro:', error);
+    console.error('❌ [DIRETO] Erro crítico:', error.message);
+    console.error('❌ [DIRETO] Stack trace:', error.stack);
+    console.error('❌ [DIRETO] Tipo do erro:', error.constructor.name);
     
-    // SEMPRE retornar sucesso para evitar travamentos
+    // Por enquanto, ainda retornar sucesso para evitar travamentos
+    // mas com mais informações para debug
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Upload aceito (modo de segurança)',
-        upload_id: 'seguranca',
+        message: `Upload com erro capturado: ${error.message}`,
+        upload_id: 'erro_capturado',
         stats: {
-          inserted_count: 100,
-          total_rows: 100, 
-          error_count: 0
+          inserted_count: 0,
+          total_rows: 0,
+          error_count: 1
         },
-        modo_seguranca: true
+        erro_detalhado: {
+          message: error.message,
+          type: error.constructor.name,
+          stack: error.stack?.substring(0, 500) // primeiros 500 chars
+        }
       }),
       { 
         status: 200, 
