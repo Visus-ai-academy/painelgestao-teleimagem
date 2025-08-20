@@ -52,10 +52,11 @@ serve(async (req) => {
         break;
       }
 
-      // Usar DELETE com filtro simples em vez de IN com muitos IDs
+      // Usar DELETE com ORDER e LIMIT
       const { error: deleteError } = await supabase
         .from('precos_servicos')
         .delete()
+        .order('created_at', { ascending: true })
         .limit(100);
 
       if (deleteError) {
@@ -98,10 +99,11 @@ serve(async (req) => {
         break;
       }
 
-      // Usar DELETE com LIMIT em vez de IN com muitos IDs
+      // Usar DELETE com ORDER e LIMIT
       const { error: deleteError } = await supabase
         .from('contratos_clientes')
         .delete()
+        .order('created_at', { ascending: true })
         .limit(100);
 
       if (deleteError) {
@@ -144,10 +146,11 @@ serve(async (req) => {
         break;
       }
 
-      // Usar DELETE com LIMIT em vez de IN com muitos IDs
+      // Usar DELETE com ORDER e LIMIT
       const { error: deleteError } = await supabase
         .from('clientes')
         .delete()
+        .order('created_at', { ascending: true })
         .limit(100);
 
       if (deleteError) {
