@@ -127,13 +127,13 @@ serve(async (req: Request) => {
     } else {
       console.log('⚠️ NENHUM DADO DE FATURAMENTO ENCONTRADO PARA O NOME FANTASIA:', cliente.nome);
       
-      // Se não encontrar, tentar buscar usando MÚLTIPLOS CAMPOS nos dados de volumetria
-      console.log('🔄 Tentando buscar dados da volumetria usando EMPRESA e Cliente_Nome_Fantasia...');
+      // Se não encontrar, tentar buscar usando APENAS Cliente_Nome_Fantasia nos dados de volumetria
+      console.log('🔄 Tentando buscar dados da volumetria usando APENAS Cliente_Nome_Fantasia...');
       
       const { data: dataVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .or(`"EMPRESA".eq."${cliente.nome}","Cliente_Nome_Fantasia".eq."${cliente.nome}"`) // Buscar por QUALQUER campo
+        .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
         .eq('periodo_referencia', periodo);
         
       if (dataVolumetria && dataVolumetria.length > 0) {
@@ -141,34 +141,27 @@ serve(async (req: Request) => {
         // Usar dados de volumetria como fallback
         dataFaturamento = dataVolumetria;
       } else {
-        console.log('🔍 Tentando buscar por outros nomes do cliente...');
+        console.log('🔍 Tentando buscar pelo nome fantasia do cliente...');
         
-        // Buscar cliente pelos múltiplos campos de nome
+        // Buscar cliente pelo nome fantasia
         const { data: clienteData } = await supabase
           .from('clientes')
-          .select('nome, nome_fantasia, nome_mobilemed')
+          .select('nome, nome_fantasia')
           .eq('id', cliente_id);
           
-        if (clienteData && clienteData[0]) {
-          const cli = clienteData[0];
-          const nomesParaBuscar = [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].filter(Boolean);
+        if (clienteData && clienteData[0] && clienteData[0].nome_fantasia) {
+          const nomeFantasia = clienteData[0].nome_fantasia;
+          console.log(`🔍 Tentando buscar por nome fantasia: ${nomeFantasia}`);
           
-          for (const nomeAlternativo of nomesParaBuscar) {
-            if (nomeAlternativo !== cliente.nome) {
-              console.log(`🔍 Tentando buscar por nome alternativo: ${nomeAlternativo}`);
-              
-              const { data: dataAlt } = await supabase
-                .from('volumetria_mobilemed')
-                .select('*')
-                .or(`"EMPRESA".eq."${nomeAlternativo}","Cliente_Nome_Fantasia".eq."${nomeAlternativo}"`)
-                .eq('periodo_referencia', periodo);
-                
-              if (dataAlt && dataAlt.length > 0) {
-                console.log(`✅ Dados encontrados com nome alternativo: ${dataAlt.length} registros`);
-                dataFaturamento = dataAlt;
-                break;
-              }
-            }
+          const { data: dataAlt } = await supabase
+            .from('volumetria_mobilemed')
+            .select('*')
+            .eq('"Cliente_Nome_Fantasia"', nomeFantasia) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
+            .eq('periodo_referencia', periodo);
+            
+          if (dataAlt && dataAlt.length > 0) {
+            console.log(`✅ Dados encontrados com nome fantasia: ${dataAlt.length} registros`);
+            dataFaturamento = dataAlt;
           }
         }
       }

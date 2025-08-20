@@ -105,16 +105,16 @@ serve(async (req) => {
         const loteSize = 10; // Reduzir para evitar timeout
         console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
         
-        // Buscar clientes que realmente têm dados de volumetria no período - USANDO AMBOS OS CAMPOS
+        // Buscar clientes que realmente têm dados de volumetria no período - USANDO APENAS Cliente_Nome_Fantasia
         const { data: clientesComVolumetria } = await supabase
           .from('volumetria_mobilemed')
-          .select('"EMPRESA", "Cliente_Nome_Fantasia"')
-          .eq('periodo_referencia', periodoFormatado); // Usar período normalizado YYYY-MM
+          .select('"Cliente_Nome_Fantasia"')
+          .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
+          .not('"Cliente_Nome_Fantasia"', 'is', null);
         
-        // Coletar TODOS os nomes únicos (EMPRESA e Cliente_Nome_Fantasia)
+        // Coletar APENAS nomes de Cliente_Nome_Fantasia
         const nomesClientesSet = new Set();
         clientesComVolumetria?.forEach(v => {
-          if (v.EMPRESA) nomesClientesSet.add(v.EMPRESA);
           if (v.Cliente_Nome_Fantasia) nomesClientesSet.add(v.Cliente_Nome_Fantasia);
         });
         const nomesClientesComVolumetria = Array.from(nomesClientesSet);
@@ -123,27 +123,23 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
-        // Buscar dados completos dos clientes na tabela usando MÚLTIPLOS CAMPOS para mapeamento
+        // Buscar dados completos dos clientes na tabela usando APENAS Cliente_Nome_Fantasia
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status')
+          .select('id, nome, nome_fantasia, email, ativo, status')
           .eq('ativo', true)
           .eq('status', 'Ativo');
         
-        // Criar mapa usando MÚLTIPLOS campos de identificação (nome, nome_fantasia, nome_mobilemed)
+        // Criar mapa usando APENAS Cliente_Nome_Fantasia para identificação
         const clientesMap = new Map();
         todosClientes?.forEach(cliente => {
-          // Mapear por nome principal
-          if (cliente.nome) {
-            clientesMap.set(cliente.nome, cliente);
-          }
-          // Mapear por nome fantasia (regra v035)
-          if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
+          // Mapear APENAS por nome fantasia (regra exclusiva Cliente_Nome_Fantasia)
+          if (cliente.nome_fantasia) {
             clientesMap.set(cliente.nome_fantasia, cliente);
           }
-          // Mapear por nome mobilemed
-          if (cliente.nome_mobilemed && cliente.nome_mobilemed !== cliente.nome) {
-            clientesMap.set(cliente.nome_mobilemed, cliente);
+          // Fallback para nome principal se não tiver nome_fantasia
+          else if (cliente.nome) {
+            clientesMap.set(cliente.nome, cliente);
           }
         });
         
@@ -180,11 +176,11 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
-              // Buscar TODOS os dados de volumetria do cliente no período usando MÚLTIPLOS CAMPOS
+              // Buscar TODOS os dados de volumetria do cliente no período usando APENAS Cliente_Nome_Fantasia
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
-                .select('"EMPRESA","Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .or(`"EMPRESA".eq."${cliente.nome}","Cliente_Nome_Fantasia".eq."${cliente.nome}"`) // Buscar por QUALQUER campo
+                .select('"Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
+                .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
                 .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {

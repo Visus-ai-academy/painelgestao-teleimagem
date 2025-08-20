@@ -221,6 +221,14 @@ export default function GerarFaturamento() {
       // Também salvar no sessionStorage como backup
       const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
       sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
+      
+      // Atualizar contadores e persistir no localStorage
+      const relatoriosGerados = novosResultados.filter(r => r.relatorioGerado).length;
+      const emailsEnviados = novosResultados.filter(r => r.emailEnviado).length;
+      setRelatoriosGerados(relatoriosGerados);
+      setEmailsEnviados(emailsEnviados);
+      localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+      localStorage.setItem('emailsEnviados', emailsEnviados.toString());
     } catch (error) {
       console.error('Erro ao salvar resultados no banco:', error);
       // Fallback para sessionStorage apenas
@@ -267,6 +275,10 @@ export default function GerarFaturamento() {
         setRelatoriosGerados(relatoriosGerados);
         setEmailsEnviados(emailsEnviados);
         
+        // Persistir contadores no localStorage
+        localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+        localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+        
         return true; // Indica que dados foram carregados do DB
       }
     } catch (error) {
@@ -284,6 +296,10 @@ export default function GerarFaturamento() {
         const emailsEnviados = resultadosCarregados.filter((r: any) => r.emailEnviado).length;
         setRelatoriosGerados(relatoriosGerados);
         setEmailsEnviados(emailsEnviados);
+        
+        // Persistir contadores no localStorage
+        localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+        localStorage.setItem('emailsEnviados', emailsEnviados.toString());
         
         return true;
       }
@@ -635,32 +651,42 @@ export default function GerarFaturamento() {
   useEffect(() => {
     console.log('🔄 Período selecionado:', periodoSelecionado, 'Período anterior:', periodoAnterior);
     
-    // Só resetar dados se o período realmente mudou (não na primeira carga)
-    if (periodoAnterior !== null && periodoAnterior !== periodoSelecionado) {
-      console.log('🔄 Período mudou, resetando dados...');
-      // Resetar demonstrativo quando período mudar
-      setDemonstrativoGerado(false);
-      localStorage.setItem('demonstrativoGerado', 'false');
+    const carregarDados = async () => {
+      // Primeira tentativa: sempre carregar dados persistidos do banco primeiro
+      const dadosCarregados = await carregarResultadosDB();
       
-      // Resetar contadores de relatórios e emails quando período mudar
-      setRelatoriosGerados(0);
-      setEmailsEnviados(0);
-      localStorage.setItem('relatoriosGerados', '0');
-      localStorage.setItem('emailsEnviados', '0');
-      sessionStorage.removeItem('resultadosFaturamento');
-      setResultados([]);
-    }
+      if (dadosCarregados) {
+        console.log('✅ Dados carregados do banco de dados');
+        // Se há dados persistidos, não precisa fazer mais nada
+        return;
+      }
+      
+      // Só resetar dados se o período realmente mudou (não na primeira carga ou troca de aba)
+      if (periodoAnterior !== null && periodoAnterior !== periodoSelecionado) {
+        console.log('🔄 Período mudou, resetando dados...');
+        // Resetar demonstrativo quando período mudar
+        setDemonstrativoGerado(false);
+        localStorage.setItem('demonstrativoGerado', 'false');
+        
+        // Resetar contadores de relatórios e emails quando período mudar
+        setRelatoriosGerados(0);
+        setEmailsEnviados(0);
+        localStorage.setItem('relatoriosGerados', '0');
+        localStorage.setItem('emailsEnviados', '0');
+        sessionStorage.removeItem('resultadosFaturamento');
+        setResultados([]);
+      }
+      
+      // Se não conseguiu carregar do banco, carregar clientes normalmente
+      console.log('⚠️ Sem dados persistidos, carregando clientes da volumetria...');
+      carregarClientes();
+    };
     
     // Atualizar período anterior
     setPeriodoAnterior(periodoSelecionado);
     
-    // Primeira tentativa: carregar dados do banco de dados
-    carregarResultadosDB().then(dadosCarregados => {
-      if (!dadosCarregados) {
-        // Se não conseguiu carregar do banco, carregar clientes normalmente
-        carregarClientes();
-      }
-    });
+    // Executar carregamento
+    carregarDados();
   }, [periodoSelecionado, carregarResultadosDB]);
 
   // Função para gerar todos os relatórios (nova aba "Relatórios")
