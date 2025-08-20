@@ -478,11 +478,12 @@ export default function GerenciarCadastros() {
       </div>
 
       <Tabs defaultValue="exames" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-12">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-13">
           <TabsTrigger value="exames">Exames</TabsTrigger>
           <TabsTrigger value="quebra-exames">Quebra Exames</TabsTrigger>
           <TabsTrigger value="de-para">Exames Fora Padrão</TabsTrigger>
           <TabsTrigger value="precos">Preços</TabsTrigger>
+          <TabsTrigger value="parametros">Parâmetros</TabsTrigger>
           <TabsTrigger value="regras">Regras</TabsTrigger>
           <TabsTrigger value="repasse">Repasse</TabsTrigger>
           <TabsTrigger value="legado">Legado</TabsTrigger>
@@ -634,32 +635,6 @@ export default function GerenciarCadastros() {
               </CardContent>
             </Card>
 
-            {/* Upload Parâmetros Clientes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Parâmetros de Clientes (Parametros_Clientes)
-                </CardTitle>
-                <CardDescription>
-                  Upload do arquivo Excel "Parametros_Clientes" com parâmetros específicos de faturamento por cliente.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <SimpleFileUpload
-                      title="Upload Parametros_Clientes (Excel)"
-                      acceptedTypes={['.xlsx', '.xls']}
-                      onUpload={handleUploadParametros}
-                    />
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p><strong>Nota:</strong> Arquivo Excel com parâmetros de faturamento específicos por cliente</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Tabela de Preços Cadastrados */}
             <Card>
@@ -677,6 +652,35 @@ export default function GerenciarCadastros() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Parâmetros de Clientes */}
+        <TabsContent value="parametros">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Parâmetros de Clientes (Parametros_Clientes)
+              </CardTitle>
+              <CardDescription>
+                Upload do arquivo Excel "Parametros_Clientes" com parâmetros específicos de faturamento por cliente.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <SimpleFileUpload
+                    title="Upload Parametros_Clientes (Excel)"
+                    acceptedTypes={['.xlsx', '.xls']}
+                    onUpload={handleUploadParametros}
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <p><strong>Nota:</strong> Arquivo Excel com parâmetros de faturamento específicos por cliente</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Regras de Exclusão */}
