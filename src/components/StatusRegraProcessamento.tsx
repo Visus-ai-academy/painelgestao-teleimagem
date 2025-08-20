@@ -70,6 +70,12 @@ export function StatusRegraProcessamento() {
       nome: 'Mapeamento Nome Cliente (v035)',
       status: 'disponivel',
       descricao: 'Mapeia nome_mobilemed para nome_fantasia usando tabela clientes'
+    },
+    {
+      id: 'aplicar-regra-colunas-musculo-neuro',
+      nome: 'ColunasxMusculoxNeuro (v034)',
+      status: 'disponivel',
+      descricao: 'Converte especialidade "Colunas" para "Músculo Esquelético" ou "Neuro" baseado no médico'
     }
   ]);
 

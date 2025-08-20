@@ -42,7 +42,8 @@ export function useQuebrasStatus() {
 
         const registrosOriginais = originaisCount || 0;
         const registrosQuebrados = quebradosCount || 0;
-        const foiAplicada = registrosOriginais === 0 && registrosQuebrados > 0;
+        // Regra aplicada = OK se não há dados originais (independente se gerou quebras ou não)
+        const foiAplicada = registrosOriginais === 0;
 
         status.push({
           arquivo_fonte: arquivo,
