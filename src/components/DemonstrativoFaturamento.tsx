@@ -182,70 +182,102 @@ export default function DemonstrativoFaturamento() {
             
             console.log('🔍 Processando volumetria com NOME FANTASIA e cálculo de preços...');
             
-            for (const item of dadosVolumetria) {
-              // Usar NOME FANTASIA em vez de EMPRESA
+            // OTIMIZAÇÃO: Agrupar dados primeiro para evitar múltiplas chamadas RPC
+            const dadosAgrupados = new Map<string, {
+              cliente: any,
+              total_exames: number,
+              combinacoes: Map<string, { quantidade: number, config: any }>
+            }>();
+            
+            // Primeira passada: agrupar por cliente
+            dadosVolumetria.forEach(item => {
               const clienteNome = item.Cliente_Nome_Fantasia || item.EMPRESA;
-              const quantidade = Number(item.VALORES || 1); // Usar VALORES como quantidade, não valor
-              
-              // Buscar cliente cadastrado
               const clienteCadastrado = clientesMapPorNome.get(clienteNome);
+              const quantidade = Number(item.VALORES || 1);
               
-              // Calcular preço usando mesma lógica dos relatórios - SEM PREÇO PADRÃO
-              let valorUnitario = 0; // SEM PREÇO PADRÃO
-              
-              if (clienteCadastrado?.id) {
-                try {
-                  // Calcular volume total do cliente (soma de todos os VALORES)
-                  const volumeTotal = dadosVolumetria
-                    .filter(v => (v.Cliente_Nome_Fantasia || v.EMPRESA) === clienteNome)
-                    .reduce((acc, v) => acc + Number(v.VALORES || 0), 0);
-                  
-                  // Chamar RPC para calcular preço correto
-                  const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
-                    p_cliente_id: clienteCadastrado.id,
-                    p_modalidade: item.MODALIDADE || '',
-                    p_especialidade: item.ESPECIALIDADE || '',
-                    p_prioridade: item.PRIORIDADE || '',
-                    p_categoria: item.CATEGORIA || 'SC',
-                    p_volume_total: Math.max(1, volumeTotal),
-                    p_is_plantao: (item.PRIORIDADE || '').toUpperCase().includes('PLANT')
-                  });
-                  
-                  if (precoCalculado && precoCalculado > 0) {
-                    valorUnitario = Number(precoCalculado);
-                  }
-                } catch (error) {
-                  console.log(`Erro ao calcular preço para ${clienteNome}:`, error);
-                  // Não usar preço padrão - manter zero
-                }
+              if (!dadosAgrupados.has(clienteNome)) {
+                dadosAgrupados.set(clienteNome, {
+                  cliente: clienteCadastrado,
+                  total_exames: 0,
+                  combinacoes: new Map()
+                });
               }
               
-              const valorTotal = Number((valorUnitario * quantidade).toFixed(2));
+              const clienteData = dadosAgrupados.get(clienteNome)!;
+              clienteData.total_exames += quantidade;
               
-              // Pular itens sem preço configurado
-              if (valorUnitario === 0) {
-                console.warn(`Cliente ${clienteNome} sem preço configurado - pulando item`);
+              // Agrupar por combinação de modalidade/especialidade/categoria/prioridade
+              const chave = `${item.MODALIDADE || ''}-${item.ESPECIALIDADE || ''}-${item.CATEGORIA || 'SC'}-${item.PRIORIDADE || ''}`;
+              
+              if (clienteData.combinacoes.has(chave)) {
+                clienteData.combinacoes.get(chave)!.quantidade += quantidade;
+              } else {
+                clienteData.combinacoes.set(chave, {
+                  quantidade: quantidade,
+                  config: {
+                    modalidade: item.MODALIDADE || '',
+                    especialidade: item.ESPECIALIDADE || '',
+                    categoria: item.CATEGORIA || 'SC',
+                    prioridade: item.PRIORIDADE || '',
+                    is_plantao: (item.PRIORIDADE || '').toUpperCase().includes('PLANT')
+                  }
+                });
+              }
+            });
+            
+            console.log(`📊 Processamento otimizado: ${dadosAgrupados.size} clientes únicos`);
+            
+            // Segunda passada: calcular preços por cliente (muito menos chamadas RPC)
+            for (const [clienteNome, dadosCliente] of dadosAgrupados) {
+              if (!dadosCliente.cliente?.id) {
+                console.warn(`Cliente ${clienteNome} não encontrado no cadastro - pulando`);
                 continue;
               }
               
-              if (clientesMap.has(clienteNome)) {
-                const cliente = clientesMap.get(clienteNome)!;
-                cliente.total_exames += quantidade; // Somar quantidade real
-                cliente.valor_bruto += valorTotal;  // Usar valor calculado
-                cliente.valor_liquido += valorTotal;
-              } else {
+              let valorTotalCliente = 0;
+              let temPrecoConfigurado = false;
+              
+              // Processar cada combinação única do cliente
+              for (const [chave, combinacao] of dadosCliente.combinacoes) {
+                try {
+                  const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
+                    p_cliente_id: dadosCliente.cliente.id,
+                    p_modalidade: combinacao.config.modalidade,
+                    p_especialidade: combinacao.config.especialidade,
+                    p_prioridade: combinacao.config.prioridade,
+                    p_categoria: combinacao.config.categoria,
+                    p_volume_total: dadosCliente.total_exames,
+                    p_is_plantao: combinacao.config.is_plantao
+                  });
+                  
+                  if (precoCalculado && precoCalculado > 0) {
+                    const valorCombinacao = Number(precoCalculado) * combinacao.quantidade;
+                    valorTotalCliente += valorCombinacao;
+                    temPrecoConfigurado = true;
+                    
+                    console.log(`💰 ${clienteNome} - ${chave}: ${combinacao.quantidade} exames x R$ ${precoCalculado} = R$ ${valorCombinacao.toFixed(2)}`);
+                  }
+                } catch (error) {
+                  console.log(`Erro ao calcular preço para ${clienteNome} (${chave}):`, error);
+                }
+              }
+              
+              // Só incluir cliente se tem preço configurado
+              if (temPrecoConfigurado && valorTotalCliente > 0) {
                 clientesMap.set(clienteNome, {
-                  id: clienteCadastrado?.id || `temp-${clienteNome}`,
+                  id: dadosCliente.cliente.id,
                   nome: clienteNome,
-                  email: clienteCadastrado?.email || '',
-                  total_exames: quantidade, // Usar quantidade real
-                  valor_bruto: valorTotal,  // Usar valor calculado
-                  valor_liquido: valorTotal,
+                  email: dadosCliente.cliente.email || '',
+                  total_exames: dadosCliente.total_exames,
+                  valor_bruto: Number(valorTotalCliente.toFixed(2)),
+                  valor_liquido: Number(valorTotalCliente.toFixed(2)),
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Dados baseados na volumetria com preços calculados (R$ ${valorUnitario.toFixed(2)})`
+                  observacoes: `Dados baseados na volumetria com preços calculados`
                 });
+              } else {
+                console.warn(`Cliente ${clienteNome} sem preço configurado - pulando`);
               }
             }
 
