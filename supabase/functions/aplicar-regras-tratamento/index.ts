@@ -138,19 +138,15 @@ export default async function handler(req: Request): Promise<Response> {
         break;
 
       case 'volumetria_fora_padrao_retroativo':
-        // Arquivo 4: Aplicar De-Para otimizado especificamente para este arquivo
+        // Arquivo 4: Aplicar De-Para obrigatório específico para este arquivo
         const { data: deParaResult4, error: deParaError4 } = await supabase
           .rpc('aplicar_de_para_automatico', { 
             arquivo_fonte_param: arquivo_fonte 
           });
         
-        if (deParaError4) {
-          console.log(`⚠️ De-Para falhou: ${deParaError4.message}`);
-          mensagens.push(`Arquivo 4: De-Para não aplicado - ${deParaError4.message}`);
-        } else {
-          registrosAtualizados += deParaResult4?.registros_atualizados || 0;
-          mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
-        }
+        if (deParaError4) throw deParaError4;
+        registrosAtualizados += deParaResult4?.registros_atualizados || 0;
+        mensagens.push(`Arquivo 4: Aplicado De-Para específico em ${deParaResult4?.registros_atualizados || 0} registros`);
         break;
 
       case 'volumetria_onco_padrao':
