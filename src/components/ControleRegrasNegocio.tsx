@@ -326,6 +326,18 @@ export function ControleRegrasNegocio() {
       ordem_execucao: 23,
       tipo_regra: 'negocio'
     },
+    {
+      id: 'v034',
+      nome: 'ColunasxMusculoxNeuro',
+      modulo: 'volumetria',
+      categoria: 'dados',
+      criterio: 'Todos os exames com especialidade "Colunas" são alterados para "Músculo Esquelético", exceto para médicos específicos que são alterados para "Neuro". Aplica categoria conforme cadastro de exames.',
+      status: 'ativa',
+      implementadaEm: '2024-08-20',
+      observacoes: 'Edge function: aplicar-regra-colunas-musculo-neuro. Lista de médicos para Neuro deve ser configurada ao executar.',
+      ordem_execucao: 24,
+      tipo_regra: 'negocio'
+    },
 
     // FATURAMENTO - Ordem de execução
     {

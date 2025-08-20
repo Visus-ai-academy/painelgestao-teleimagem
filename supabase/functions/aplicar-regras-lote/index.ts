@@ -32,6 +32,7 @@ serve(async (req) => {
       'aplicar-correcao-modalidade-rx',
       'aplicar-correcao-modalidade-ot',
       'aplicar-substituicao-especialidade-categoria',
+      'aplicar-regra-colunas-musculo-neuro',
       'aplicar-tipificacao-faturamento',
       'aplicar-validacao-cliente',
       'aplicar-regras-quebra-exames'
