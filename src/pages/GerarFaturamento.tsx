@@ -152,94 +152,61 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Converter período (YYYY-MM) para formato mon/YY (ex.: jun/25) 
-      const formatPeriodo = (yyyyMM: string) => {
-        const [y, m] = yyyyMM.split('-');
-        const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-        const mon = meses[Math.max(0, Math.min(11, Number(m) - 1))];
-        return `${mon}/${y.slice(2)}`;
-      };
-      const periodoRef = formatPeriodo(periodoSelecionado);
-      
-      console.log('🔍 Buscando clientes com faturamento para período:', periodoRef);
-      console.log('💡 Período original selecionado:', periodoSelecionado);
+      // CORRIGIDO: Buscar APENAS clientes únicos da volumetria do período usando Cliente_Nome_Fantasia
+      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"Cliente_Nome_Fantasia"')
+        .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM direto
+        .not('"Cliente_Nome_Fantasia"', 'is', null);
 
-      // 1. PRIMEIRO: Buscar clientes que têm dados na tabela faturamento (formato mon/YY)
-      const { data: clientesComFaturamento, error: errorFaturamento } = await supabase
-        .from('faturamento')
-        .select('cliente_nome, cliente_email')
-        .eq('periodo_referencia', periodoRef)
-        .not('cliente_nome', 'is', null);
-
-      if (errorFaturamento) {
-        console.error('❌ Erro na consulta faturamento:', errorFaturamento);
-        throw errorFaturamento;
+      if (errorVolumetria) {
+        console.error('❌ Erro na consulta volumetria:', errorVolumetria);
+        throw errorVolumetria;
       }
 
-      // 2. SEGUNDO: Se não há dados na tabela faturamento, buscar da volumetria
       let clientesFinais: any[] = [];
       
-      if (!clientesComFaturamento || clientesComFaturamento.length === 0) {
-        console.log('⚠️ Nenhum dado no faturamento, buscando da volumetria...');
-        
-        // Buscar da volumetria_mobilemed (formato YYYY-MM)
-        const { data: clientesVolumetria, error: errorVolumetria } = await supabase
-          .from('volumetria_mobilemed')
-          .select('EMPRESA')
-          .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM para volumetria
-          .not('EMPRESA', 'is', null);
-
-        if (errorVolumetria) {
-          console.error('❌ Erro na consulta volumetria:', errorVolumetria);
-          throw errorVolumetria;
-        }
-
-        if (clientesVolumetria && clientesVolumetria.length > 0) {
-          // Buscar emails dos clientes na tabela clientes usando MÚLTIPLOS CAMPOS
-          const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
-          
-          for (const nomeCliente of nomesUnicos) {
-            // Buscar cliente por nome, nome_fantasia ou nome_mobilemed  
-            const { data: emailCliente } = await supabase
-              .from('clientes')
-              .select('id, nome, email, nome_fantasia, nome_mobilemed')
-              .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
-              .eq('ativo', true)
-              .eq('status', 'Ativo')
-              .limit(1);
-
-            clientesFinais.push({
-              id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
-              nome: nomeCliente,
-              // Usar email do cliente cadastrado se encontrado
-              email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
-            });
-          }
-        }
-      } else {
-        // Usar dados da tabela faturamento
-        const nomesUnicos = [...new Set(clientesComFaturamento.map(c => c.cliente_nome).filter(Boolean))];
+      if (clientesVolumetria && clientesVolumetria.length > 0) {
+        // Buscar apenas clientes únicos da volumetria por Cliente_Nome_Fantasia
+        const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia).filter(Boolean))];
+        console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
         
         for (const nomeCliente of nomesUnicos) {
-          const clienteData = clientesComFaturamento.find(c => c.cliente_nome === nomeCliente);
+          // Buscar cliente cadastrado para obter email
+          const { data: emailCliente } = await supabase
+            .from('clientes')
+            .select('id, nome, email, nome_fantasia, nome_mobilemed')
+            .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
+            .eq('ativo', true)
+            .eq('status', 'Ativo')
+            .limit(1);
+
           clientesFinais.push({
-            id: nomeCliente.toLowerCase().replace(/\s+/g, '-'),
+            id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
             nome: nomeCliente,
-            email: clienteData?.cliente_email || `${nomeCliente.toLowerCase().replace(/\s+/g, '.')}@email.com`
+            // Usar email do cliente cadastrado se encontrado
+            email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
           });
         }
+      } else {
+        console.log('⚠️ Nenhum cliente encontrado na volumetria para o período:', periodoSelecionado);
+        toast({
+          title: "Nenhum cliente encontrado",
+          description: `Não há dados de volumetria para o período ${periodoSelecionado}`,
+          variant: "destructive",
+        });
+        setClientesCarregados([]);
+        localStorage.setItem('clientesCarregados', JSON.stringify([]));
+        return;
       }
 
-      console.log(`✅ ${clientesFinais.length} clientes encontrados:`, clientesFinais.map(c => c.nome));
+      console.log(`✅ ${clientesFinais.length} clientes únicos da volumetria encontrados:`, clientesFinais.map(c => c.nome));
       
-      // Se vem da volumetria, avisar que nem todos podem gerar faturamento
-      if (clientesComFaturamento?.length === 0 && clientesFinais.length > 0) {
-        toast({
-          title: "Clientes carregados da volumetria",
-          description: `${clientesFinais.length} clientes encontrados. Agora todos os clientes com dados na volumetria geram faturamento (usando preços configurados ou padrão R$ 25).`,
-          variant: "default",
-        });
-      }
+      toast({
+        title: "Clientes carregados da volumetria",
+        description: `${clientesFinais.length} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+        variant: "default",
+      });
       
       setClientesCarregados(clientesFinais);
       localStorage.setItem('clientesCarregados', JSON.stringify(clientesFinais));
