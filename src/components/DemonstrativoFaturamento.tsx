@@ -78,7 +78,8 @@ export default function DemonstrativoFaturamento() {
         .from('volumetria_mobilemed')
         .select('EMPRESA')
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM para volumetria
-        .not('EMPRESA', 'is', null);
+        .not('EMPRESA', 'is', null)
+        .limit(50000); // Aumentar limite para capturar todos os registros
       
       console.log('📊 Clientes encontrados na volumetria (formato YYYY-MM):', clientesVolumetria?.length || 0);
       

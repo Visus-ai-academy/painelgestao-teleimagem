@@ -98,7 +98,8 @@ serve(async (req) => {
           .select('"EMPRESA"')
           .eq('periodo_referencia', periodo)
           .not('"VALORES"', 'is', null)
-          .neq('"VALORES"', 0);
+          .neq('"VALORES"', 0)
+          .limit(50000); // Aumentar limite para capturar todos os registros
         
         const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.EMPRESA) || [])];
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
@@ -128,7 +129,7 @@ serve(async (req) => {
               .eq('periodo_referencia', periodo)
               .not('"VALORES"', 'is', null)
               .neq('"VALORES"', 0)
-              .limit(10000); // Aumentar limite para capturar todos os dados
+              .limit(50000); // Aumentar limite para capturar todos os dados do cliente
 
             if (vmErr) {
               console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
