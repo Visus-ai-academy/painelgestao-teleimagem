@@ -112,13 +112,32 @@ serve(async (req: Request) => {
     // Buscar dados de faturamento em vez de volumetria
     console.log('Buscando dados de faturamento...');
     
-    const { data: dataFaturamento, error: errorFaturamento } = await supabase
+    // Buscar primeiro com nome exato, depois com LIKE para ser mais flexível
+    let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
       .select('*')
       .eq('cliente_nome', cliente.nome)
       .eq('periodo_referencia', periodo);
 
+    // Se não encontrou com nome exato, tentar busca com LIKE (case insensitive)
+    if (!dataFaturamento || dataFaturamento.length === 0) {
+      console.log('Tentando busca com LIKE para nome do cliente...');
+      const result = await supabase
+        .from('faturamento')
+        .select('*')
+        .ilike('cliente_nome', `%${cliente.nome}%`)
+        .eq('periodo_referencia', periodo);
+      dataFaturamento = result.data;
+      errorFaturamento = result.error;
+    }
+
     console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
+    console.log('🔍 AMOSTRA DOS DADOS ENCONTRADOS:');
+    if (dataFaturamento && dataFaturamento.length > 0) {
+      console.log('Primeiros 2 registros:', JSON.stringify(dataFaturamento.slice(0, 2), null, 2));
+      console.log('Tem campo "valor"?', dataFaturamento[0].hasOwnProperty('valor'));
+      console.log('Valor do primeiro registro:', dataFaturamento[0].valor);
+    }
 
     let finalData = dataFaturamento || [];
     
@@ -151,6 +170,13 @@ serve(async (req: Request) => {
 
     // Calcular resumo usando dados de faturamento ou volumetria
     const isFaturamentoData = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
+    console.log('🔍 ANÁLISE DOS DADOS FINAIS:');
+    console.log('Total de registros finalData:', finalData.length);
+    console.log('É dados de faturamento?', isFaturamentoData);
+    if (finalData.length > 0) {
+      console.log('Primeiro registro completo:', JSON.stringify(finalData[0], null, 2));
+      console.log('Propriedades disponíveis:', Object.keys(finalData[0]));
+    }
     
     let valorBrutoTotal, totalLaudos;
     
