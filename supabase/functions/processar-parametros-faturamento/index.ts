@@ -8,32 +8,47 @@ const corsHeaders = {
 };
 
 interface ParametroRow {
-  "Nome Empresa"?: string;
-  "Cliente Consolidado"?: string;
-  "Status"?: string;
-  "Impostos abMin"?: string;
-  "Simples"?: string;
-  "Tipo métrica convênio"?: string;
-  "Valor convênio"?: number;
-  "Tipo métrica URGÊNCIA"?: string;
-  "Valor URGÊNCIA"?: number;
-  "Tipo Desconto / Acréscimo"?: string;
-  "Desconto / Acréscimo"?: number;
-  "Integração"?: string;
-  "Data Início Integração"?: string;
-  "Portal de Laudos"?: string;
-  "% ISS"?: number;
-  "Possui Franquia"?: string;
-  "Valor Franquia"?: number;
-  "Frequencia Contínua"?: string;
-  "Frequência por volume"?: string;
-  "Volume"?: number;
-  "R$ Valor Franquia Acima Volume"?: number;
-  "Data Início Franquia"?: string;
-  "Cobrar URGÊNCIA como ROTINA"?: string;
-  "Incluir Empresa Origem"?: string;
-  "Incluir Acces Number"?: string;
-  "Incluir Médico Solicitante"?: string;
+  [key: string]: any; // Permite qualquer nome de coluna
+}
+
+// Mapeamento flexível de colunas
+const COLUMN_MAPPING = {
+  // Nomes possíveis para o nome da empresa
+  nomeEmpresa: [
+    'Nome Empresa', 'NOME EMPRESA', 'nome empresa', 'Nome_Empresa', 
+    'NOME_EMPRESA', 'Cliente', 'CLIENTE', 'cliente', 'Empresa', 'EMPRESA', 'empresa'
+  ],
+  status: ['Status', 'STATUS', 'status', 'Situação', 'SITUAÇÃO', 'situacao'],
+  tipoMetricaConvenio: ['Tipo métrica convênio', 'Tipo Métrica Convênio', 'TIPO MÉTRICA CONVÊNIO'],
+  valorConvenio: ['Valor convênio', 'Valor Convênio', 'VALOR CONVÊNIO'],
+  tipoMetricaUrgencia: ['Tipo métrica URGÊNCIA', 'Tipo Métrica URGÊNCIA', 'TIPO MÉTRICA URGÊNCIA'],
+  valorUrgencia: ['Valor URGÊNCIA', 'VALOR URGÊNCIA', 'Valor Urgência'],
+  tipoDesconto: ['Tipo Desconto / Acréscimo', 'TIPO DESCONTO / ACRÉSCIMO'],
+  descontoAcrescimo: ['Desconto / Acréscimo', 'DESCONTO / ACRÉSCIMO'],
+  integracao: ['Integração', 'INTEGRAÇÃO', 'integracao'],
+  dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO'],
+  portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS'],
+  percentualISS: ['% ISS', '%ISS', 'ISS'],
+  possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA'],
+  valorFranquia: ['Valor Franquia', 'VALOR FRANQUIA'],
+  frequenciaContinua: ['Frequencia Contínua', 'FREQUENCIA CONTÍNUA', 'Frequência Contínua'],
+  frequenciaPorVolume: ['Frequência por volume', 'FREQUÊNCIA POR VOLUME'],
+  volume: ['Volume', 'VOLUME'],
+  valorFranquiaAcimaVolume: ['R$ Valor Franquia Acima Volume', 'VALOR FRANQUIA ACIMA VOLUME'],
+  dataInicioFranquia: ['Data Início Franquia', 'DATA INÍCIO FRANQUIA'],
+  cobrarUrgenciaRotina: ['Cobrar URGÊNCIA como ROTINA', 'COBRAR URGÊNCIA COMO ROTINA'],
+  incluirEmpresaOrigem: ['Incluir Empresa Origem', 'INCLUIR EMPRESA ORIGEM'],
+  incluirAccessNumber: ['Incluir Acces Number', 'INCLUIR ACCES NUMBER', 'Incluir Access Number'],
+  incluirMedicoSolicitante: ['Incluir Médico Solicitante', 'INCLUIR MÉDICO SOLICITANTE']
+};
+
+function findColumnValue(row: ParametroRow, possibleNames: string[]): any {
+  for (const name of possibleNames) {
+    if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+      return row[name];
+    }
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -74,38 +89,47 @@ serve(async (req) => {
     const { data: clientes } = await supabase.from('clientes').select('id, nome');
     const clienteMap = new Map(clientes?.map(c => [c.nome.toLowerCase(), c.id]) || []);
 
+    // Imprimir colunas disponíveis para debug
+    if (jsonData.length > 0) {
+      console.log('Colunas disponíveis no arquivo:', Object.keys(jsonData[0]));
+    }
+
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
       processados++;
 
       try {
-        if (!row["Nome Empresa"]) {
-          throw new Error('Campo "Nome Empresa" é obrigatório');
+        // Usar mapeamento flexível para encontrar o nome da empresa
+        const nomeEmpresa = findColumnValue(row, COLUMN_MAPPING.nomeEmpresa);
+        
+        if (!nomeEmpresa) {
+          console.log(`Linha ${i + 1} - Colunas disponíveis:`, Object.keys(row));
+          throw new Error('Campo "Nome Empresa" não encontrado. Verifique se a coluna existe no arquivo.');
         }
 
-        // Preparar dados do parâmetro
+        // Preparar dados do parâmetro usando mapeamento flexível
         const parametroData = {
-          cliente_id: clienteMap.get(row["Nome Empresa"].toLowerCase().trim()),
-          tipo_cliente: row["Status"]?.trim() || 'CO',
-          valor_integracao: row["Valor convênio"] ? Number(row["Valor convênio"]) : null,
-          cobrar_integracao: row["Integração"]?.trim()?.toLowerCase() === 'sim',
-          percentual_urgencia: row["Valor URGÊNCIA"] ? Number(row["Valor URGÊNCIA"]) : null,
-          aplicar_adicional_urgencia: row["Tipo métrica URGÊNCIA"]?.trim()?.toLowerCase() === 'percentual',
-          valor_franquia: row["Valor Franquia"] ? Number(row["Valor Franquia"]) : null,
-          volume_franquia: row["Volume"] ? Number(row["Volume"]) : null,
-          frequencia_continua: row["Frequencia Contínua"]?.trim()?.toLowerCase() === 'sim',
-          frequencia_por_volume: row["Frequência por volume"]?.trim()?.toLowerCase() === 'sim',
-          valor_acima_franquia: row["R$ Valor Franquia Acima Volume"] ? Number(row["R$ Valor Franquia Acima Volume"]) : null,
-          aplicar_franquia: row["Possui Franquia"]?.trim()?.toLowerCase() === 'sim',
-          data_aniversario_contrato: row["Data Início Franquia"] ? new Date(row["Data Início Franquia"]).toISOString().split('T')[0] : null,
+          cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()),
+          tipo_cliente: findColumnValue(row, COLUMN_MAPPING.status)?.toString().trim() || 'CO',
+          valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorConvenio) ? Number(findColumnValue(row, COLUMN_MAPPING.valorConvenio)) : null,
+          cobrar_integracao: findColumnValue(row, COLUMN_MAPPING.integracao)?.toString().trim()?.toLowerCase() === 'sim',
+          percentual_urgencia: findColumnValue(row, COLUMN_MAPPING.valorUrgencia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorUrgencia)) : null,
+          aplicar_adicional_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim()?.toLowerCase() === 'percentual',
+          valor_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquia)) : null,
+          volume_franquia: findColumnValue(row, COLUMN_MAPPING.volume) ? Number(findColumnValue(row, COLUMN_MAPPING.volume)) : null,
+          frequencia_continua: findColumnValue(row, COLUMN_MAPPING.frequenciaContinua)?.toString().trim()?.toLowerCase() === 'sim',
+          frequencia_por_volume: findColumnValue(row, COLUMN_MAPPING.frequenciaPorVolume)?.toString().trim()?.toLowerCase() === 'sim',
+          valor_acima_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume)) : null,
+          aplicar_franquia: findColumnValue(row, COLUMN_MAPPING.possuiFranquia)?.toString().trim()?.toLowerCase() === 'sim',
+          data_aniversario_contrato: findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia)).toISOString().split('T')[0] : null,
           periodicidade_reajuste: 'anual',
           indice_reajuste: 'IGP-M',
-          percentual_reajuste_fixo: row["Desconto / Acréscimo"] ? Number(row["Desconto / Acréscimo"]) : null,
+          percentual_reajuste_fixo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
           ativo: true
         };
 
         if (!parametroData.cliente_id) {
-          throw new Error(`Cliente não encontrado: ${row["Nome Empresa"]}`);
+          throw new Error(`Cliente não encontrado: ${nomeEmpresa}`);
         }
 
         // Verificar se já existe
@@ -113,7 +137,7 @@ serve(async (req) => {
           .from('parametros_faturamento')
           .select('id')
           .eq('cliente_id', parametroData.cliente_id)
-          .single();
+          .maybeSingle();
 
         if (existente) {
           // Atualizar existente
@@ -134,7 +158,7 @@ serve(async (req) => {
           inseridos++;
         }
 
-        console.log(`Linha ${i + 1}: Processada com sucesso - ${row["Nome Empresa"]}`);
+        console.log(`Linha ${i + 1}: Processada com sucesso - ${nomeEmpresa}`);
 
       } catch (error: any) {
         erros++;
