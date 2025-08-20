@@ -26,19 +26,25 @@ serve(async (req) => {
     const lote_upload = crypto.randomUUID();
 
     // 1. BAIXAR ARQUIVO EXCEL DO STORAGE
-    const { data: fileData, error: downloadError } = await supabaseClient.storage
+    let { data: fileData, error: downloadError } = await supabaseClient.storage
       .from('uploads')
       .download(file_path);
 
     if (downloadError) throw downloadError;
     
-    // 2. LER DADOS DO EXCEL
+    // 2. LER DADOS DO EXCEL (OTIMIZADO PARA MEMÓRIA)
     const arrayBuffer = await fileData.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-    console.log(`📊 [DIRETO] Arquivo lido: ${jsonData.length} registros encontrados`);
+    
+    // Liberar recursos do arquivo
+    fileData = null;
+    
+    // Contar total de linhas primeiro
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    const totalRows = range.e.r;
+    
+    console.log(`📊 [DIRETO] Arquivo detectado: ${totalRows} registros`);
 
     // 3. BUSCAR REGRAS DE DE-PARA PARA VALORES ZERADOS
     const { data: deParaRules } = await supabaseClient
@@ -51,90 +57,107 @@ serve(async (req) => {
       deParaMap.set(rule.estudo_descricao, rule.valores);
     });
 
-    // 4. PROCESSAR REGISTROS EM LOTES MENORES (OTIMIZADO)
-    const BATCH_SIZE = 50; // Reduzido para evitar timeout
+     // 4. PROCESSAR LINHAS EM LOTES PEQUENOS (STREAMING)
+    const BATCH_SIZE = 20; // Muito pequeno para economizar memória
     let totalInseridos = 0;
     let totalZeradosCorrigidos = 0;
+    let linhaAtual = 1; // Começar da linha 1 (header é linha 0)
 
-    console.log(`📊 [DIRETO] Iniciando processamento de ${jsonData.length} registros em lotes de ${BATCH_SIZE}`);
+    console.log(`📊 [DIRETO] Iniciando processamento streaming de ${totalRows} linhas em lotes de ${BATCH_SIZE}`);
 
-    for (let i = 0; i < jsonData.length; i += BATCH_SIZE) {
-      const batch = jsonData.slice(i, i + BATCH_SIZE);
-      console.log(`🔄 [DIRETO] Processando lote ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(jsonData.length/BATCH_SIZE)} (registros ${i + 1}-${Math.min(i + BATCH_SIZE, jsonData.length)})`);
-      
-      // Processar batch de forma mais eficiente
+    while (linhaAtual <= totalRows) {
       const registrosProcessados = [];
+      const fimLote = Math.min(linhaAtual + BATCH_SIZE - 1, totalRows);
       
-      for (const row of batch) {
+      console.log(`🔄 [DIRETO] Processando lote ${Math.floor(linhaAtual/BATCH_SIZE) + 1}/${Math.ceil(totalRows/BATCH_SIZE)} (linhas ${linhaAtual}-${fimLote})`);
+      
+      // Processar cada linha do lote
+      for (let linha = linhaAtual; linha <= fimLote; linha++) {
+        const rowData = {};
+        
+        // Ler dados da linha atual do worksheet
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const headerCell = worksheet[XLSX.utils.encode_cell({r: 0, c: col})];
+          const dataCell = worksheet[XLSX.utils.encode_cell({r: linha, c: col})];
+          
+          if (headerCell && headerCell.v) {
+            rowData[headerCell.v] = dataCell ? dataCell.v : null;
+          }
+        }
+        
         // Aplicar de-para se valor for zero
-        let valorFinal = parseFloat(row.VALORES) || 0;
-        if (valorFinal === 0 && deParaMap.has(row.ESTUDO_DESCRICAO)) {
-          valorFinal = deParaMap.get(row.ESTUDO_DESCRICAO);
+        let valorFinal = parseFloat(rowData.VALORES) || 0;
+        if (valorFinal === 0 && deParaMap.has(rowData.ESTUDO_DESCRICAO)) {
+          valorFinal = deParaMap.get(rowData.ESTUDO_DESCRICAO);
           totalZeradosCorrigidos++;
         }
 
         registrosProcessados.push({
           id: crypto.randomUUID(),
-          "EMPRESA": row.EMPRESA,
-          "NOME_PACIENTE": row.NOME_PACIENTE,
-          "CODIGO_PACIENTE": row.CODIGO_PACIENTE,
-          "ESTUDO_DESCRICAO": row.ESTUDO_DESCRICAO,
-          "ACCESSION_NUMBER": row.ACCESSION_NUMBER,
-          "MODALIDADE": row.MODALIDADE,
-          "PRIORIDADE": row.PRIORIDADE,
+          "EMPRESA": rowData.EMPRESA,
+          "NOME_PACIENTE": rowData.NOME_PACIENTE,
+          "CODIGO_PACIENTE": rowData.CODIGO_PACIENTE,
+          "ESTUDO_DESCRICAO": rowData.ESTUDO_DESCRICAO,
+          "ACCESSION_NUMBER": rowData.ACCESSION_NUMBER,
+          "MODALIDADE": rowData.MODALIDADE,
+          "PRIORIDADE": rowData.PRIORIDADE,
           "VALORES": valorFinal,
-          "ESPECIALIDADE": row.ESPECIALIDADE,
-          "MEDICO": row.MEDICO,
-          "DUPLICADO": row.DUPLICADO,
-          "DATA_REALIZACAO": row.DATA_REALIZACAO,
-          "HORA_REALIZACAO": row.HORA_REALIZACAO,
-          "DATA_TRANSFERENCIA": row.DATA_TRANSFERENCIA,
-          "HORA_TRANSFERENCIA": row.HORA_TRANSFERENCIA,
-          "DATA_LAUDO": row.DATA_LAUDO,
-          "HORA_LAUDO": row.HORA_LAUDO,
-          "DATA_PRAZO": row.DATA_PRAZO,
-          "HORA_PRAZO": row.HORA_PRAZO,
-          "STATUS": row.STATUS,
-          "DATA_REASSINATURA": row.DATA_REASSINATURA,
-          "HORA_REASSINATURA": row.HORA_REASSINATURA,
-          "MEDICO_REASSINATURA": row.MEDICO_REASSINATURA,
-          "SEGUNDA_ASSINATURA": row.SEGUNDA_ASSINATURA,
-          "POSSUI_IMAGENS_CHAVE": row.POSSUI_IMAGENS_CHAVE,
-          "IMAGENS_CHAVES": row.IMAGENS_CHAVES,
-          "IMAGENS_CAPTURADAS": row.IMAGENS_CAPTURADAS,
-          "CODIGO_INTERNO": row.CODIGO_INTERNO,
-          "DIGITADOR": row.DIGITADOR,
-          "COMPLEMENTAR": row.COMPLEMENTAR,
-          data_referencia: row.data_referencia || '2025-06-15',
+          "ESPECIALIDADE": rowData.ESPECIALIDADE,
+          "MEDICO": rowData.MEDICO,
+          "DUPLICADO": rowData.DUPLICADO,
+          "DATA_REALIZACAO": rowData.DATA_REALIZACAO,
+          "HORA_REALIZACAO": rowData.HORA_REALIZACAO,
+          "DATA_TRANSFERENCIA": rowData.DATA_TRANSFERENCIA,
+          "HORA_TRANSFERENCIA": rowData.HORA_TRANSFERENCIA,
+          "DATA_LAUDO": rowData.DATA_LAUDO,
+          "HORA_LAUDO": rowData.HORA_LAUDO,
+          "DATA_PRAZO": rowData.DATA_PRAZO,
+          "HORA_PRAZO": rowData.HORA_PRAZO,
+          "STATUS": rowData.STATUS,
+          "DATA_REASSINATURA": rowData.DATA_REASSINATURA,
+          "HORA_REASSINATURA": rowData.HORA_REASSINATURA,
+          "MEDICO_REASSINATURA": rowData.MEDICO_REASSINATURA,
+          "SEGUNDA_ASSINATURA": rowData.SEGUNDA_ASSINATURA,
+          "POSSUI_IMAGENS_CHAVE": rowData.POSSUI_IMAGENS_CHAVE,
+          "IMAGENS_CHAVES": rowData.IMAGENS_CHAVES,
+          "IMAGENS_CAPTURADAS": rowData.IMAGENS_CAPTURADAS,
+          "CODIGO_INTERNO": rowData.CODIGO_INTERNO,
+          "DIGITADOR": rowData.DIGITADOR,
+          "COMPLEMENTAR": rowData.COMPLEMENTAR,
+          data_referencia: rowData.data_referencia || '2025-06-15',
           arquivo_fonte: arquivo_fonte,
           lote_upload: lote_upload,
           periodo_referencia: 'jun/25',
-          "CATEGORIA": row.CATEGORIA || 'SC',
+          "CATEGORIA": rowData.CATEGORIA || 'SC',
           tipo_faturamento: 'padrao'
         });
       }
 
-      // Inserir lote com timeout reduzido
+      // Inserir lote
       try {
         const { error: insertError } = await supabaseClient
           .from('volumetria_mobilemed')
           .insert(registrosProcessados);
 
         if (insertError) {
-          console.error(`❌ [DIRETO] Erro no lote ${i}:`, insertError);
+          console.error(`❌ [DIRETO] Erro no lote ${linhaAtual}:`, insertError);
           throw insertError;
         } else {
           totalInseridos += registrosProcessados.length;
-          console.log(`✅ [DIRETO] Lote ${Math.floor(i/BATCH_SIZE) + 1} inserido: ${registrosProcessados.length} registros (Total: ${totalInseridos})`);
+          console.log(`✅ [DIRETO] Lote inserido: ${registrosProcessados.length} registros (Total: ${totalInseridos})`);
         }
       } catch (batchError) {
-        console.error(`❌ [DIRETO] Erro crítico no lote ${i}:`, batchError);
+        console.error(`❌ [DIRETO] Erro crítico no lote ${linhaAtual}:`, batchError);
         throw batchError;
       }
 
-      // Pequena pausa para evitar sobrecarga
-      if (i + BATCH_SIZE < jsonData.length) {
-        await new Promise(resolve => setTimeout(resolve, 10));
+      // Próximo lote
+      linhaAtual = fimLote + 1;
+      
+      // Pequena pausa e forçar garbage collection
+      if (linhaAtual <= totalRows) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (globalThis.gc) globalThis.gc();
       }
     }
 
@@ -149,7 +172,7 @@ serve(async (req) => {
         registros_processados: totalInseridos,
         registros_inseridos: totalInseridos,
         registros_atualizados: 0,
-        registros_erro: jsonData.length - totalInseridos,
+        registros_erro: totalRows - totalInseridos,
         completed_at: new Date().toISOString(),
         detalhes_erro: { 
           lote_upload,
@@ -171,8 +194,8 @@ serve(async (req) => {
         upload_id: uploadRecord?.id || 'direto',
         stats: {
           inserted_count: totalInseridos,
-          total_rows: jsonData.length,
-          error_count: jsonData.length - totalInseridos,
+          total_rows: totalRows,
+          error_count: totalRows - totalInseridos,
           regras_aplicadas: totalZeradosCorrigidos
         },
         processamento_direto: true
