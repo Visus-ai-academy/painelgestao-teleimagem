@@ -110,8 +110,7 @@ serve(async (req) => {
           .from('volumetria_mobilemed')
           .select('"EMPRESA"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
-          .not('"VALORES"', 'is', null)
-          .neq('"VALORES"', 0);
+          .not('"EMPRESA"', 'is', null);
         
         const nomesClientesComVolumetria = [...new Set(clientesComVolumetria?.map(v => v.EMPRESA) || [])];
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
@@ -180,9 +179,7 @@ serve(async (req) => {
                 .from('volumetria_mobilemed')
                 .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
                 .eq('"EMPRESA"', cliente.nome)
-                .eq('periodo_referencia', periodoFormatado) // Usar período normalizado
-                .not('"VALORES"', 'is', null)
-                .neq('"VALORES"', 0);
+                .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {
                 console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
@@ -195,8 +192,8 @@ serve(async (req) => {
                 continue;
               }
 
-              // Volume total (usado na faixa de preço)
-              const volumeTotal = rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0);
+              // Volume total (usado na faixa de preço) - garantir valor mínimo 1 se zerado
+              const volumeTotal = Math.max(1, rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0));
 
               // Agrupar por chave INCLUINDO paciente
               const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
@@ -210,7 +207,7 @@ serve(async (req) => {
                 };
                 // INCLUIR PACIENTE na chave para evitar agregação incorreta
                 const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}|${r.NOME_PACIENTE}|${r.ACCESSION_NUMBER}`;
-                const qtd = Number(r.VALORES) || 1;
+                const qtd = Math.max(1, Number(r.VALORES) || 1); // Garantir quantidade mínima 1
                 const atual = grupos.get(key);
                 if (atual) {
                   atual.qtd += qtd;

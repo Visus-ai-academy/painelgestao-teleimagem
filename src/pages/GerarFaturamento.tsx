@@ -236,7 +236,7 @@ export default function GerarFaturamento() {
       if (clientesComFaturamento?.length === 0 && clientesFinais.length > 0) {
         toast({
           title: "Clientes carregados da volumetria",
-          description: `${clientesFinais.length} clientes encontrados. Nem todos podem gerar faturamento válido (dependem de preços configurados e valores válidos).`,
+          description: `${clientesFinais.length} clientes encontrados. Agora todos os clientes com dados na volumetria geram faturamento (usando preços configurados ou padrão R$ 25).`,
           variant: "default",
         });
       }
