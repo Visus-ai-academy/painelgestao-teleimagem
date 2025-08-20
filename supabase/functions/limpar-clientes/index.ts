@@ -21,46 +21,111 @@ serve(async (req) => {
 
     console.log('Iniciando limpeza da tabela clientes...')
 
-    // Clear prices first (foreign key constraint)
-    const { error: precosError } = await supabase
-      .from('precos_servicos')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+    // Limpeza em lotes para evitar timeout
+    let totalPrecos = 0;
+    let totalContratos = 0;
+    let totalClientes = 0;
 
-    if (precosError) {
-      console.error('Erro ao limpar preços:', precosError)
-      return new Response(
-        JSON.stringify({ success: false, error: precosError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // 1. Limpar preços em lotes de 1000
+    console.log('Limpando preços...')
+    let hasMorePrecos = true;
+    while (hasMorePrecos) {
+      const { data: precosLote, error: selectError } = await supabase
+        .from('precos_servicos')
+        .select('id')
+        .limit(1000);
+
+      if (selectError) throw selectError;
+      
+      if (!precosLote || precosLote.length === 0) {
+        hasMorePrecos = false;
+        break;
+      }
+
+      const ids = precosLote.map(p => p.id);
+      const { error: deleteError } = await supabase
+        .from('precos_servicos')
+        .delete()
+        .in('id', ids);
+
+      if (deleteError) {
+        console.error('Erro ao limpar preços:', deleteError)
+        return new Response(
+          JSON.stringify({ success: false, error: deleteError.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      totalPrecos += precosLote.length;
+      console.log(`Removidos ${precosLote.length} preços (total: ${totalPrecos})`);
     }
 
-    // Clear contracts second (foreign key constraint)
-    const { error: contractsError } = await supabase
-      .from('contratos_clientes')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+    // 2. Limpar contratos em lotes de 1000  
+    console.log('Limpando contratos...')
+    let hasMoreContratos = true;
+    while (hasMoreContratos) {
+      const { data: contratosLote, error: selectError } = await supabase
+        .from('contratos_clientes')
+        .select('id')
+        .limit(1000);
 
-    if (contractsError) {
-      console.error('Erro ao limpar contratos:', contractsError)
-      return new Response(
-        JSON.stringify({ success: false, error: contractsError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      if (selectError) throw selectError;
+      
+      if (!contratosLote || contratosLote.length === 0) {
+        hasMoreContratos = false;
+        break;
+      }
+
+      const ids = contratosLote.map(c => c.id);
+      const { error: deleteError } = await supabase
+        .from('contratos_clientes')
+        .delete()
+        .in('id', ids);
+
+      if (deleteError) {
+        console.error('Erro ao limpar contratos:', deleteError)
+        return new Response(
+          JSON.stringify({ success: false, error: deleteError.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      totalContratos += contratosLote.length;
+      console.log(`Removidos ${contratosLote.length} contratos (total: ${totalContratos})`);
     }
 
-    // Then clear all clients
-    const { error: clearError } = await supabase
-      .from('clientes')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all
+    // 3. Limpar clientes em lotes de 1000
+    console.log('Limpando clientes...')
+    let hasMoreClientes = true;
+    while (hasMoreClientes) {
+      const { data: clientesLote, error: selectError } = await supabase
+        .from('clientes')
+        .select('id')
+        .limit(1000);
 
-    if (clearError) {
-      console.error('Erro ao limpar clientes:', clearError)
-      return new Response(
-        JSON.stringify({ success: false, error: clearError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      if (selectError) throw selectError;
+      
+      if (!clientesLote || clientesLote.length === 0) {
+        hasMoreClientes = false;
+        break;
+      }
+
+      const ids = clientesLote.map(c => c.id);
+      const { error: deleteError } = await supabase
+        .from('clientes')
+        .delete()
+        .in('id', ids);
+
+      if (deleteError) {
+        console.error('Erro ao limpar clientes:', deleteError)
+        return new Response(
+          JSON.stringify({ success: false, error: deleteError.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      totalClientes += clientesLote.length;
+      console.log(`Removidos ${clientesLote.length} clientes (total: ${totalClientes})`);
     }
 
     // Verify cleanup
@@ -68,13 +133,17 @@ serve(async (req) => {
       .from('clientes')
       .select('*', { count: 'exact', head: true })
 
-    console.log('Limpeza concluída. Registros restantes:', count)
+    console.log(`Limpeza concluída. Removidos: ${totalPrecos} preços, ${totalContratos} contratos, ${totalClientes} clientes`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Base de clientes limpa com sucesso. ${count || 0} registros restantes.`,
-        registros_restantes: count || 0
+        message: `Base limpa com sucesso! ${totalClientes} clientes, ${totalContratos} contratos e ${totalPrecos} preços removidos.`,
+        registros_removidos: {
+          clientes: totalClientes,
+          contratos: totalContratos,
+          precos: totalPrecos
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
