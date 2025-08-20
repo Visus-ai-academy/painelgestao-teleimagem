@@ -71,6 +71,21 @@ export default function DemonstrativoFaturamento() {
       const periodoRef = formatPeriodo(periodo);
       
       console.log('🔍 Buscando dados para período de referência:', periodoRef);
+      console.log('💡 Período original selecionado:', periodo);
+      
+      // PRIMEIRO: Verificar se há clientes com volumetria para este período no formato YYYY-MM
+      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA')
+        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM para volumetria
+        .not('EMPRESA', 'is', null);
+      
+      console.log('📊 Clientes encontrados na volumetria (formato YYYY-MM):', clientesVolumetria?.length || 0);
+      
+      if (clientesVolumetria && clientesVolumetria.length > 0) {
+        const clientesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA))];
+        console.log('👥 Clientes únicos na volumetria:', clientesUnicos.length, clientesUnicos.slice(0, 5));
+      }
       
       // Buscar dados de faturamento do período - SEM LIMITE para garantir todos os dados
       const { data: dadosFaturamento, error } = await supabase
@@ -111,14 +126,23 @@ export default function DemonstrativoFaturamento() {
 
       if (!dadosFaturamento || dadosFaturamento.length === 0) {
         console.warn(`⚠️ Nenhum dado de faturamento encontrado para o período ${periodoRef}`);
-        console.log('💡 Será necessário executar a geração de faturamento para este período');
         
-        // Se não há dados de faturamento, mostrar mensagem explicativa
-        toast({
-          title: "Dados não encontrados",
-          description: `Nenhum dado de faturamento encontrado para ${periodoRef}. Execute a geração de faturamento primeiro na aba "Gerar".`,
-          variant: "destructive",
-        });
+        // Se não há dados de faturamento, verificar se há dados de volumetria
+        if (clientesVolumetria && clientesVolumetria.length > 0) {
+          console.log('💡 Há dados de volumetria disponíveis, mas faturamento não foi gerado ainda');
+          toast({
+            title: "Faturamento não gerado",
+            description: `Há ${clientesVolumetria.length} registros de volumetria para ${periodo}, mas o faturamento ainda não foi processado. Execute "Gerar Demonstrativo" na aba "Gerar".`,
+            variant: "destructive",
+          });
+        } else {
+          console.log('💡 Não há dados de volumetria nem faturamento para este período');
+          toast({
+            title: "Dados não encontrados",
+            description: `Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`,
+            variant: "destructive",
+          });
+        }
         
         setClientes([]);
         setClientesFiltrados([]);

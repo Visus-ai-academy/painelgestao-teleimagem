@@ -110,12 +110,15 @@ serve(async (req) => {
         );
         
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
+        console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
         
         for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
           const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
+          console.log(`[gerar-faturamento-periodo] Processando lote ${Math.floor(i/loteSize) + 1}/${Math.ceil(clientesParaProcessar.length/loteSize)}`);
           
           for (const cliente of loteClientes) {
-            console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome}`);
+            try {
+              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
             // Buscar TODOS os dados de volumetria do cliente no período (incluindo modalidade RX)
             const { data: vm, error: vmErr } = await supabase
@@ -279,6 +282,10 @@ serve(async (req) => {
               totalItens += itensInserir.length;
               clientesComDados++;
               console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
+            } catch (clienteError: any) {
+              console.error(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}:`, clienteError.message);
+              // Continuar com próximo cliente mesmo em caso de erro
+              continue;
             }
           }
           
