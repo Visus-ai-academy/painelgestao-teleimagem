@@ -113,7 +113,6 @@ serve(async (req: Request) => {
     console.log('Buscando dados por nome da empresa...');
     
     // Calcular período correto para volumetria (do dia 8 do mês anterior ao dia 7 do mês atual)
-    const [ano, mes] = periodo.split('-');
     const mesInt = parseInt(mes);
     const anoInt = parseInt(ano);
     
