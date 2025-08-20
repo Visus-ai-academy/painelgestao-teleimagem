@@ -171,13 +171,13 @@ serve(async (req) => {
     console.error('❌ [DIRETO] Stack trace:', error.stack);
     console.error('❌ [DIRETO] Tipo do erro:', error.constructor.name);
     
-    // Por enquanto, ainda retornar sucesso para evitar travamentos
-    // mas com mais informações para debug
+    // FALHAR COMPLETAMENTE - NÃO GERAR DADOS FICTÍCIOS
     return new Response(
       JSON.stringify({
-        success: true,
-        message: `Upload com erro capturado: ${error.message}`,
-        upload_id: 'erro_capturado',
+        success: false,
+        error: error.message,
+        message: `Erro no processamento do arquivo: ${error.message}`,
+        upload_id: null,
         stats: {
           inserted_count: 0,
           total_rows: 0,
@@ -186,11 +186,11 @@ serve(async (req) => {
         erro_detalhado: {
           message: error.message,
           type: error.constructor.name,
-          stack: error.stack?.substring(0, 500) // primeiros 500 chars
+          stack: error.stack?.substring(0, 500)
         }
       }),
       { 
-        status: 200, 
+        status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
