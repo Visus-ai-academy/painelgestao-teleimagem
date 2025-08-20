@@ -187,7 +187,7 @@ export default function GerarFaturamento() {
           .from('volumetria_mobilemed')
           .select('EMPRESA')
           .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM para volumetria
-          .not('EMPRESA', 'is', null); // Remover limite para capturar todos os registros
+          .not('EMPRESA', 'is', null);
 
         if (errorVolumetria) {
           console.error('❌ Erro na consulta volumetria:', errorVolumetria);
@@ -195,20 +195,24 @@ export default function GerarFaturamento() {
         }
 
         if (clientesVolumetria && clientesVolumetria.length > 0) {
-          // Buscar emails dos clientes na tabela clientes
+          // Buscar emails dos clientes na tabela clientes usando MÚLTIPLOS CAMPOS
           const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
           
           for (const nomeCliente of nomesUnicos) {
+            // Buscar cliente por nome, nome_fantasia ou nome_mobilemed  
             const { data: emailCliente } = await supabase
               .from('clientes')
-              .select('email')
-              .eq('nome', nomeCliente)
-              .single();
-            
+              .select('id, nome, email, nome_fantasia, nome_mobilemed')
+              .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
+              .eq('ativo', true)
+              .eq('status', 'Ativo')
+              .limit(1);
+
             clientesFinais.push({
-              id: nomeCliente.toLowerCase().replace(/\s+/g, '-'),
+              id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
               nome: nomeCliente,
-              email: emailCliente?.email || `${nomeCliente.toLowerCase().replace(/\s+/g, '.')}@email.com`
+              // Usar email do cliente cadastrado se encontrado
+              email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
             });
           }
         }

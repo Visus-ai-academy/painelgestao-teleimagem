@@ -118,20 +118,37 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
-        // Buscar dados completos dos clientes na tabela para ter UUID correto
+        // Buscar dados completos dos clientes na tabela usando MÚLTIPLOS CAMPOS para mapeamento
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select('id, nome, email, ativo, status')
+          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status')
           .eq('ativo', true)
           .eq('status', 'Ativo');
         
-        const clientesMap = new Map(todosClientes?.map(c => [c.nome, c]) || []);
+        // Criar mapa usando MÚLTIPLOS campos de identificação (nome, nome_fantasia, nome_mobilemed)
+        const clientesMap = new Map();
+        todosClientes?.forEach(cliente => {
+          // Mapear por nome principal
+          if (cliente.nome) {
+            clientesMap.set(cliente.nome, cliente);
+          }
+          // Mapear por nome fantasia (regra v035)
+          if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
+            clientesMap.set(cliente.nome_fantasia, cliente);
+          }
+          // Mapear por nome mobilemed
+          if (cliente.nome_mobilemed && cliente.nome_mobilemed !== cliente.nome) {
+            clientesMap.set(cliente.nome_mobilemed, cliente);
+          }
+        });
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (cadastrados ou não)
         const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
+          // Buscar cliente usando qualquer um dos campos de nome
           const clienteExistente = clientesMap.get(nomeEmpresa);
           
           if (clienteExistente) {
+            console.log(`[gerar-faturamento-periodo] Cliente encontrado: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
             return clienteExistente;
           } else {
             // Criar cliente temporário para processamento
