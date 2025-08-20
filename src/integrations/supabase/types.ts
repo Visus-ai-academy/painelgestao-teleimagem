@@ -715,6 +715,7 @@ export type Database = {
           tem_parametros_configurados: boolean | null
           tem_precos_configurados: boolean | null
           tipo_cliente: string | null
+          tipo_faturamento: string
           updated_at: string
         }
         Insert: {
@@ -744,6 +745,7 @@ export type Database = {
           tem_parametros_configurados?: boolean | null
           tem_precos_configurados?: boolean | null
           tipo_cliente?: string | null
+          tipo_faturamento?: string
           updated_at?: string
         }
         Update: {
@@ -773,6 +775,7 @@ export type Database = {
           tem_parametros_configurados?: boolean | null
           tem_precos_configurados?: boolean | null
           tipo_cliente?: string | null
+          tipo_faturamento?: string
           updated_at?: string
         }
         Relationships: [

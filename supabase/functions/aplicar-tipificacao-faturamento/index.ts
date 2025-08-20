@@ -12,41 +12,6 @@ const corsHeaders = {
 // NC-NF: NC não faturado
 type TipoFaturamento = "CO-FT" | "NC-FT" | "NC-NF";
 
-// Lista de clientes NC (Cliente do tipo NC)
-const CLIENTES_NC = [
-  "CDICARDIO",
-  "CDIGOIAS", 
-  "CISP",
-  "CLIRAM",
-  "CRWANDERLEY",
-  "DIAGMAX-PR",
-  "GOLD",
-  "PRODIMAGEM",
-  "TRANSDUSON",
-  "ZANELLO",
-  "CEMVALENCA",
-  "RMPADUA",
-  "RADI-IMAGEM"
-];
-
-// Função para determinar o tipo de cliente
-function determinarTipoCliente(cliente: string): "CO" | "NC" {
-  return CLIENTES_NC.includes(cliente) ? "NC" : "CO";
-}
-
-// Função para determinar o tipo de faturamento
-function determinarTipoFaturamento(cliente: string): TipoFaturamento {
-  const tipoCliente = determinarTipoCliente(cliente);
-  
-  if (tipoCliente === "CO") {
-    return "CO-FT"; // CO com faturamento
-  } else {
-    // Para clientes NC, determinar se é faturado ou não faturado
-    // Por enquanto, todos os NC são não faturados por padrão
-    return "NC-NF"; // NC não faturado
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -62,7 +27,6 @@ serve(async (req) => {
     const { arquivo_fonte, lote_upload } = await req.json();
 
     console.log(`🔄 Aplicando tipificação de faturamento - Arquivo: ${arquivo_fonte}, Lote: ${lote_upload}`);
-
 
     // 1. Buscar registros que precisam de tipificação
     let query = supabaseClient
@@ -102,10 +66,65 @@ serve(async (req) => {
 
     console.log(`📊 Processando ${registros.length} registros para tipificação`);
 
-    // 2. Processar registros em lotes de 500
+    // 2. Buscar configurações de contratos dos clientes
+    const { data: contratos, error: contratosError } = await supabaseClient
+      .from('contratos_clientes')
+      .select(`
+        tipo_cliente,
+        tipo_faturamento,
+        clientes (
+          nome,
+          nome_mobilemed,
+          nome_fantasia
+        )
+      `)
+      .eq('status', 'ativo');
+
+    if (contratosError) {
+      console.error('❌ Erro ao buscar contratos:', contratosError);
+      throw contratosError;
+    }
+
+    // 3. Criar mapa de configurações por cliente
+    const configClientes = new Map<string, { tipo_cliente: string, tipo_faturamento: string }>();
+    
+    contratos?.forEach(contrato => {
+      // Mapear pelos diferentes nomes possíveis do cliente
+      const nomes = [
+        contrato.clientes?.nome,
+        contrato.clientes?.nome_mobilemed, 
+        contrato.clientes?.nome_fantasia
+      ].filter(Boolean);
+      
+      nomes.forEach(nome => {
+        configClientes.set(nome, {
+          tipo_cliente: contrato.tipo_cliente || 'CO',
+          tipo_faturamento: contrato.tipo_faturamento || 'CO-FT'
+        });
+      });
+    });
+
+    console.log(`📋 Carregados ${configClientes.size} configurações de clientes dos contratos`);
+
+    // 4. Função para determinar tipo de faturamento baseado no contrato
+    function determinarTipoFaturamento(nomeCliente: string): TipoFaturamento {
+      const config = configClientes.get(nomeCliente);
+      
+      if (config) {
+        // Usar configuração do contrato
+        return config.tipo_faturamento as TipoFaturamento;
+      } else {
+        // Fallback: Cliente sem contrato = CO-FT (padrão)
+        console.log(`⚠️ Cliente sem contrato encontrado: ${nomeCliente} - Aplicando CO-FT (padrão)`);
+        return "CO-FT";
+      }
+    }
+
+    // 5. Processar registros em lotes de 500
     const BATCH_SIZE = 500;
     let registrosProcessados = 0;
     let registrosAtualizados = 0;
+    let clientesSemContrato = new Set<string>();
 
     for (let i = 0; i < registros.length; i += BATCH_SIZE) {
       const lote = registros.slice(i, i + BATCH_SIZE);
@@ -115,6 +134,11 @@ serve(async (req) => {
       // Preparar atualizações em massa
       const updates = lote.map(registro => {
         const tipoFaturamento = determinarTipoFaturamento(registro.EMPRESA);
+        
+        // Rastrear clientes sem contrato
+        if (!configClientes.has(registro.EMPRESA)) {
+          clientesSemContrato.add(registro.EMPRESA);
+        }
 
         registrosProcessados++;
 
@@ -147,7 +171,7 @@ serve(async (req) => {
       }
     }
 
-    // 3. Estatísticas finais
+    // 6. Estatísticas finais
     const { data: stats, error: statsError } = await supabaseClient
       .from('volumetria_mobilemed')
       .select('tipo_faturamento')
@@ -167,8 +191,16 @@ serve(async (req) => {
       registros_encontrados: registros.length,
       registros_processados: registrosProcessados,
       registros_atualizados: registrosAtualizados,
+      clientes_sem_contrato: Array.from(clientesSemContrato),
+      total_clientes_sem_contrato: clientesSemContrato.size,
+      configuracoes_carregadas: configClientes.size,
       estatisticas_tipos: estatisticas,
-      regras_aplicadas: ['Determinação do Tipo de Cliente: CO (cliente do tipo CO) / NC (Cliente do tipo NC)', 'Tipos de Faturamento: CO-FT (CO com faturamento) / NC-FT (NC faturado) / NC-NF (NC não faturado)'],
+      regras_aplicadas: [
+        'Tipificação baseada nos CONTRATOS dos clientes',
+        'tipo_cliente: CO (cliente do tipo CO) / NC (Cliente do tipo NC)',
+        'tipo_faturamento: CO-FT (CO com faturamento) / NC-FT (NC faturado) / NC-NF (NC não faturado)',
+        'Fallback: Clientes sem contrato = CO-FT (padrão)'
+      ],
       data_processamento: new Date().toISOString()
     };
 
@@ -185,7 +217,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       sucesso: false,
       erro: error.message,
-      detalhes: 'Erro ao aplicar tipificação de faturamento'
+      detalhes: 'Erro ao aplicar tipificação de faturamento baseada em contratos'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
