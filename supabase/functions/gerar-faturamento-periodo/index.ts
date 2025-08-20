@@ -105,28 +105,22 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (não filtrar por tabela clientes)
-        // Criar objetos cliente temporários para clientes da volumetria
-        const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
-          // Tentar encontrar o cliente na tabela clientes
-          const clienteExistente = clientesAtivos.find(c => c.nome === nomeEmpresa);
-          
-          if (clienteExistente) {
-            return clienteExistente;
-          } else {
-            // Criar cliente temporário para processamento
-            return {
-              id: nomeEmpresa.toLowerCase().replace(/\s+/g, '-'),
-              nome: nomeEmpresa,
-              email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
-              ativo: true,
-              status: 'Ativo'
-            };
-          }
-        });
+        // Buscar dados completos dos clientes na tabela para ter UUID correto
+        const { data: todosClientes } = await supabase
+          .from('clientes')
+          .select('id, nome, email, ativo, status')
+          .eq('ativo', true)
+          .eq('status', 'Ativo');
+        
+        const clientesMap = new Map(todosClientes?.map(c => [c.nome, c]) || []);
+        
+        const clientesParaProcessar = nomesClientesComVolumetria
+          .map(nomeEmpresa => clientesMap.get(nomeEmpresa))
+          .filter(cliente => cliente !== undefined); // Só processar clientes que existem na tabela
         
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
         console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
-        console.log(`[gerar-faturamento-periodo] Clientes cadastrados vs volumetria: ${clientesAtivos.length} vs ${nomesClientesComVolumetria.length}`);
+        console.log(`[gerar-faturamento-periodo] Clientes da volumetria vs cadastrados vs processados: ${nomesClientesComVolumetria.length} vs ${todosClientes?.length || 0} vs ${clientesParaProcessar.length}`);
         for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
           const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
           console.log(`[gerar-faturamento-periodo] Processando lote ${Math.floor(i/loteSize) + 1}/${Math.ceil(clientesParaProcessar.length/loteSize)}`);
