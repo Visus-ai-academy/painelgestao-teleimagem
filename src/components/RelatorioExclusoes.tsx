@@ -94,107 +94,80 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      // Para demonstração, vamos simular os registros excluídos com base nas regras conhecidas
-      // Na prática, estes dados viriam de logs de processamento ou tabelas de auditoria
-      const registrosDetalhados: RegistroExcluido[] = [
-        // Registros excluídos por clientes específicos
-        {
-          cliente: 'RADIOCOR_LOCAL',
-          paciente: 'João Silva Santos',
-          data_exame: '2025-06-15',
-          data_laudo: '2025-06-16',
-          especialidade: 'Radiologia',
-          modalidade: 'RX',
-          categoria: 'Tórax',
-          motivo_exclusao: 'Cliente específico excluído (regra v032)'
-        },
-        {
-          cliente: 'CLINICADIA_TC',
-          paciente: 'Maria Santos Costa',
-          data_exame: '2025-06-20',
-          data_laudo: '2025-06-21',
-          especialidade: 'Radiologia',
-          modalidade: 'TC',
-          categoria: 'Abdome',
-          motivo_exclusao: 'Cliente específico excluído (regra v032)'
-        },
-        {
-          cliente: 'CLINICA RADIOCOR',
-          paciente: 'Pedro Oliveira Lima',
-          data_exame: '2025-06-18',
-          data_laudo: '2025-06-19',
-          especialidade: 'Radiologia',
-          modalidade: 'US',
-          categoria: 'Pélvica',
-          motivo_exclusao: 'Cliente específico excluído (regra v032)'
-        },
-        // Registros fora do período
-        {
-          cliente: 'HOSPITAL ABC',
-          paciente: 'Ana Costa Silva',
-          data_exame: '2025-06-25',
-          data_laudo: '2025-07-10',
-          especialidade: 'Radiologia',
-          modalidade: 'RM',
-          categoria: 'Crânio',
-          motivo_exclusao: 'DATA_LAUDO fora do período (regra v031) - após 07/07/2025'
-        },
-        {
-          cliente: 'CLINICA XYZ',
-          paciente: 'Carlos Santos Lima',
-          data_exame: '2025-05-28',
-          data_laudo: '2025-05-30',
-          especialidade: 'Radiologia',
-          modalidade: 'RX',
-          categoria: 'Tórax',
-          motivo_exclusao: 'DATA_LAUDO fora do período (regra v031) - antes de 01/06/2025'
-        }
-      ];
-
-      // Simular maior quantidade de registros para demonstração
-      const registrosExpandidos: RegistroExcluido[] = [];
+      // Buscar dados reais da tabela volumetria_mobilemed que foram processados
+      console.log('Iniciando busca de registros excluídos reais...');
       
-      // Gerar 6966 registros para atingir o total de 6971 (6966 + 5 detalhados)
-      for (let i = 0; i < 6966; i++) {
-        const nomes = ['João Silva', 'Maria Santos', 'Pedro Costa', 'Ana Lima', 'Carlos Oliveira'];
-        const sobrenomes = ['Santos', 'Costa', 'Lima', 'Silva', 'Pereira'];
-        const especialidades = ['Radiologia', 'Cardiologia', 'Neurologia'];
-        const modalidades = ['RX', 'TC', 'RM', 'US'];
-        const categorias = ['Tórax', 'Abdome', 'Crânio', 'Pelve'];
-        const clientes = ['HOSPITAL ABC', 'CLINICA XYZ', 'CENTRO MÉDICO', 'RADIOCOR_LOCAL'];
-        
-        const isClienteExcluido = Math.random() < 0.3;
-        const isDataForaPeriodo = Math.random() < 0.4;
-        
-        let motivo = 'Validação de campos obrigatórios';
-        let cliente = clientes[Math.floor(Math.random() * clientes.length)];
-        
-        if (isClienteExcluido) {
-          cliente = ['RADIOCOR_LOCAL', 'CLINICADIA_TC', 'CLINICA RADIOCOR', 'CLIRAM_LOCAL'][Math.floor(Math.random() * 4)];
-          motivo = 'Cliente específico excluído (regra v032)';
-        } else if (isDataForaPeriodo) {
-          motivo = 'DATA_LAUDO fora do período (regra v031)';
-        }
-        
-        registrosExpandidos.push({
-          cliente: cliente,
-          paciente: `${nomes[Math.floor(Math.random() * nomes.length)]} ${sobrenomes[Math.floor(Math.random() * sobrenomes.length)]}`,
-          data_exame: `2025-06-${String(Math.floor(Math.random() * 30) + 1).padStart(2, '0')}`,
-          data_laudo: isDataForaPeriodo 
-            ? (Math.random() < 0.5 ? `2025-05-${String(Math.floor(Math.random() * 30) + 1).padStart(2, '0')}` : `2025-07-${String(Math.floor(Math.random() * 20) + 8).padStart(2, '0')}`)
-            : `2025-06-${String(Math.floor(Math.random() * 30) + 1).padStart(2, '0')}`,
-          especialidade: especialidades[Math.floor(Math.random() * especialidades.length)],
-          modalidade: modalidades[Math.floor(Math.random() * modalidades.length)],
-          categoria: categorias[Math.floor(Math.random() * categorias.length)],
-          motivo_exclusao: motivo
-        });
+      // 1. Buscar todos os registros que foram originalmente carregados (dados brutos)
+      const { data: todosRegistros, error: errorTodos } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (errorTodos) {
+        console.error('Erro ao buscar todos registros:', errorTodos);
+        throw errorTodos;
       }
 
-      setRegistrosExcluidos([...registrosDetalhados, ...registrosExpandidos]);
+      console.log(`Total de registros encontrados no banco: ${todosRegistros?.length || 0}`);
+
+      if (!todosRegistros || todosRegistros.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Nenhum registro encontrado na tabela volumetria_mobilemed. Verifique se os dados foram carregados corretamente.",
+          variant: "destructive"
+        });
+        setRegistrosExcluidos([]);
+        return;
+      }
+
+      // 2. Aplicar as regras de exclusão para identificar quais deveriam ser excluídos
+      const registrosComMotivos: RegistroExcluido[] = [];
+      const clientesExcluidos = ['RADIOCOR_LOCAL', 'CLINICADIA_TC', 'CLINICA RADIOCOR', 'CLIRAM_LOCAL'];
+      
+      // Calcular período válido para DATA_LAUDO (Jun/25: entre 01/06/2025 e 07/07/2025)
+      const dataInicioValida = new Date('2025-06-01');
+      const dataFimValida = new Date('2025-07-07');
+
+      for (const registro of todosRegistros) {
+        let motivoExclusao = null;
+        
+        // Verificar exclusão por cliente específico
+        if (clientesExcluidos.includes(registro.EMPRESA)) {
+          motivoExclusao = `Cliente específico excluído (regra v032) - ${registro.EMPRESA}`;
+        }
+        // Verificar DATA_LAUDO fora do período
+        else if (registro.DATA_LAUDO) {
+          const dataLaudo = new Date(registro.DATA_LAUDO);
+          if (dataLaudo < dataInicioValida) {
+            motivoExclusao = `DATA_LAUDO fora do período (regra v031) - antes de 01/06/2025 (${registro.DATA_LAUDO})`;
+          } else if (dataLaudo > dataFimValida) {
+            motivoExclusao = `DATA_LAUDO fora do período (regra v031) - após 07/07/2025 (${registro.DATA_LAUDO})`;
+          }
+        }
+        
+        // Se há motivo de exclusão, adicionar à lista
+        if (motivoExclusao) {
+          registrosComMotivos.push({
+            cliente: registro.EMPRESA || 'N/A',
+            paciente: registro.NOME_PACIENTE || 'N/A',
+            data_exame: registro.DATA_REALIZACAO || 'N/A',
+            data_laudo: registro.DATA_LAUDO || 'N/A',
+            especialidade: registro.ESPECIALIDADE || 'N/A',
+            modalidade: registro.MODALIDADE || 'N/A',
+            categoria: registro.CATEGORIA || 'N/A',
+            motivo_exclusao: motivoExclusao
+          });
+        }
+      }
+
+      console.log(`Registros que deveriam ser excluídos: ${registrosComMotivos.length}`);
+      console.log('Motivos de exclusão encontrados:', registrosComMotivos.map(r => r.motivo_exclusao));
+
+      setRegistrosExcluidos(registrosComMotivos);
 
       toast({
         title: "Sucesso",
-        description: `${registrosDetalhados.length + registrosExpandidos.length} registros excluídos carregados`,
+        description: `${registrosComMotivos.length} registros excluídos carregados`,
       });
 
     } catch (error) {
