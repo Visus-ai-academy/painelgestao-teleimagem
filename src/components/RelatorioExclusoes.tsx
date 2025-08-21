@@ -159,23 +159,12 @@ export function RelatorioExclusoes() {
         });
       } else if (totalRejeicoes > 0) {
         // Caso 2: Há rejeições mas sem detalhes salvos (função antiga)
-        const registrosPlaceholder = [{
-          cliente: 'DADOS NÃO DETALHADOS',
-          paciente: 'FUNÇÃO DE PROCESSAMENTO ANTIGA',
-          data_exame: 'N/A',
-          data_laudo: 'N/A', 
-          especialidade: 'N/A',
-          modalidade: 'N/A',
-          categoria: 'N/A',
-          motivo_exclusao: `${totalRejeicoes} registros rejeitados - detalhes não capturados pela versão anterior do processador`
-        }];
-        
-        setRegistrosExcluidos(registrosPlaceholder);
+        setRegistrosExcluidos([]);
         
         toast({
-          title: "⚠️ Exclusões Detectadas",
-          description: `${totalRejeicoes} rejeições encontradas, mas sem detalhes individuais. Use a função processar-volumetria-mobilemed no próximo upload.`,
-          variant: "destructive"
+          title: "📊 Exclusões Detectadas - Função Anterior",
+          description: `${totalRejeicoes.toLocaleString()} registros foram rejeitados no processamento, mas os detalhes individuais não foram capturados pela versão anterior da função.`,
+          variant: "default"
         });
       } else {
         // Caso 3: Nenhuma rejeição
@@ -566,7 +555,7 @@ export function RelatorioExclusoes() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="text-sm">
-                  {registrosExcluidos.length.toLocaleString()} registros carregados
+                  {registrosExcluidos.length.toLocaleString()} registros detalhados carregados
                 </Badge>
                 <p className="text-sm text-muted-foreground">
                   Use o botão "Exportar Excel" acima para obter a lista completa
@@ -622,10 +611,72 @@ export function RelatorioExclusoes() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Clique no botão acima para carregar os registros excluídos detalhados</p>
-            </div>
+            // Verificar se há exclusões mas sem detalhes (função antiga)
+            analiseVolumetria.some(item => item.registros_excluidos > 0) ? (
+              <div className="space-y-4">
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-amber-800 dark:text-amber-200">
+                          Exclusões Detectadas - Dados Processados por Função Anterior
+                        </span>
+                        <Badge variant="outline" className="text-amber-700 border-amber-300">
+                          {analiseVolumetria[0]?.registros_excluidos.toLocaleString()} exclusões
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
+                        <p>
+                          <strong>📊 Status:</strong> O sistema detectou {analiseVolumetria[0]?.registros_excluidos.toLocaleString()} registros que foram rejeitados durante o processamento, 
+                          mas os detalhes individuais não foram capturados porque o upload foi processado por uma versão anterior da função.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-white/50 dark:bg-black/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <div>
+                            <h4 className="font-semibold mb-2">📋 Principais Causas de Rejeição:</h4>
+                            <ul className="text-xs space-y-1 list-disc list-inside">
+                              <li>Campos obrigatórios ausentes (EMPRESA, NOME_PACIENTE, ESTUDO_DESCRICAO)</li>
+                              <li>Datas inválidas ou em formato incorreto</li>
+                              <li>Registros fora do período permitido (v031)</li>
+                              <li>Clientes específicos excluídos (v032)</li>
+                            </ul>
+                          </div>
+                          
+                          <div>
+                            <h4 className="font-semibold mb-2">🔧 Para Próximos Uploads:</h4>
+                            <ul className="text-xs space-y-1 list-disc list-inside">
+                              <li>Use a função <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">processar-volumetria-mobilemed</code></li>
+                              <li>Novos uploads capturarão detalhes completos</li>
+                              <li>Relatórios futuros mostrarão linha e motivo específico</li>
+                              <li>Export Excel incluirá análise detalhada</li>
+                            </ul>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-sm">
+                            <Info className="h-4 w-4" />
+                            <strong>Análise Disponível no Excel:</strong>
+                          </div>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            O botão "Exportar Excel" acima gerará um relatório com estatísticas completas, 
+                            regras aplicadas e análise detalhada das {analiseVolumetria[0]?.registros_excluidos.toLocaleString()} exclusões.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500 opacity-50" />
+                <p className="font-medium">✅ Nenhum registro foi excluído</p>
+                <p className="text-sm mt-2">Todos os registros foram processados com sucesso!</p>
+              </div>
+            )
           )}
         </CardContent>
       </Card>
