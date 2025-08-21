@@ -116,14 +116,26 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      // Buscar registros rejeitados do último upload
+      // 1. Buscar o upload mais recente para identificar o lote atual
+      const { data: ultimoUpload } = await supabase
+        .from('processamento_uploads')
+        .select('id, created_at, detalhes_erro')
+        .eq('tipo_arquivo', 'volumetria_padrao')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const loteAtual = (ultimoUpload?.[0]?.detalhes_erro as any)?.lote_upload;
+      
+      // 2. Buscar APENAS os registros rejeitados do lote mais recente
       const { data: rejeitados } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
         .eq('arquivo_fonte', 'volumetria_padrao')
-        .order('created_at', { ascending: false })
-        .limit(1000);
+        .eq('lote_upload', loteAtual || 'sem_lote')
+        .order('linha_original', { ascending: true })
+        .limit(10000);
 
+      console.log(`🔍 Buscando exclusões do lote: ${loteAtual || 'sem_lote'}`);
       console.log('🔍 Registros rejeitados encontrados:', rejeitados?.length || 0);
 
       if (rejeitados && rejeitados.length > 0) {
@@ -146,13 +158,13 @@ export function RelatorioExclusoes() {
         
         toast({
           title: "✅ Exclusões Carregadas",
-          description: `${registrosFormatados.length} registros rejeitados encontrados`,
+          description: `${registrosFormatados.length} registros rejeitados do lote mais recente`,
         });
       } else {
         setRegistrosExcluidos([]);
         toast({
           title: "ℹ️ Nenhuma Exclusão",
-          description: "Nenhum registro rejeitado encontrado. Faça um novo upload para ver as exclusões detalhadas.",
+          description: `Nenhum registro rejeitado no lote atual (${loteAtual || 'sem_lote'}). O sistema capturará exclusões no próximo upload.`,
         });
       }
 
@@ -171,15 +183,26 @@ export function RelatorioExclusoes() {
 
   const exportarParaExcel = async () => {
     try {
-      // Buscar TODAS as exclusões detalhadas do último lote
+      // Buscar o lote mais recente para Excel
+      const { data: ultimoUpload } = await supabase
+        .from('processamento_uploads')
+        .select('id, created_at, detalhes_erro')
+        .eq('tipo_arquivo', 'volumetria_padrao')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const loteAtual = (ultimoUpload?.[0]?.detalhes_erro as any)?.lote_upload;
+      
+      // Buscar TODAS as exclusões detalhadas do lote mais recente
       const { data: todasExclusoes } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
         .eq('arquivo_fonte', 'volumetria_padrao')
+        .eq('lote_upload', loteAtual || 'sem_lote')
         .order('linha_original', { ascending: true })
         .limit(10000); // Buscar todas as exclusões até 10k
 
-      console.log(`🔍 Buscando exclusões detalhadas para Excel... Encontradas: ${todasExclusoes?.length || 0}`);
+      console.log(`🔍 Buscando exclusões detalhadas do lote ${loteAtual} para Excel... Encontradas: ${todasExclusoes?.length || 0}`);
       
       const wb = XLSX.utils.book_new();
 
