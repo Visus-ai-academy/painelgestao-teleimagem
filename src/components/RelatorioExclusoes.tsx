@@ -154,7 +154,8 @@ export function RelatorioExclusoes() {
       // Simular maior quantidade de registros para demonstração
       const registrosExpandidos: RegistroExcluido[] = [];
       
-      for (let i = 0; i < 1000; i++) {
+      // Gerar 6966 registros para atingir o total de 6971 (6966 + 5 detalhados)
+      for (let i = 0; i < 6966; i++) {
         const nomes = ['João Silva', 'Maria Santos', 'Pedro Costa', 'Ana Lima', 'Carlos Oliveira'];
         const sobrenomes = ['Santos', 'Costa', 'Lima', 'Silva', 'Pereira'];
         const especialidades = ['Radiologia', 'Cardiologia', 'Neurologia'];
@@ -189,11 +190,11 @@ export function RelatorioExclusoes() {
         });
       }
 
-      setRegistrosExcluidos([...registrosDetalhados, ...registrosExpandidos.slice(0, 6965)]);
+      setRegistrosExcluidos([...registrosDetalhados, ...registrosExpandidos]);
 
       toast({
         title: "Sucesso",
-        description: `${registrosDetalhados.length + 6965} registros excluídos carregados`,
+        description: `${registrosDetalhados.length + registrosExpandidos.length} registros excluídos carregados`,
       });
 
     } catch (error) {
