@@ -109,8 +109,15 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
 
-    // REMOVIDO: Não excluir registros por campos vazios - tratar como string vazia se necessário
-
+    // DEBUG: Log detalhado dos campos principais para identificar o problema
+    if (!empresaOriginal || !nomePaciente) {
+      console.log('🔍 DEBUG CAMPOS VAZIOS:');
+      console.log('- Linha original:', JSON.stringify(row).substring(0, 300));
+      console.log('- EMPRESA original:', JSON.stringify(empresaOriginal), 'Tipo:', typeof empresaOriginal);
+      console.log('- NOME_PACIENTE original:', JSON.stringify(nomePaciente), 'Tipo:', typeof nomePaciente);
+      console.log('- Chaves disponíveis:', Object.keys(row));
+      console.log('- Valores das primeiras 5 chaves:', Object.keys(row).slice(0, 5).map(k => `${k}: ${JSON.stringify(row[k])}`));
+    }
 
     // Não aplicar limpeza aqui pois processRow é síncrono - será aplicado via trigger SQL
     const empresa = empresaOriginal.trim();
@@ -533,12 +540,35 @@ serve(async (req) => {
     
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
-      raw: true,
+      raw: false, // CORREÇÃO: Usar false para preservar formatação de texto
       dateNF: 'dd/mm/yyyy',
-      blankrows: false
+      blankrows: false,
+      header: 1 // CORREÇÃO: Usar primeira linha como cabeçalho para garantir nomes corretos
     });
     
     console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
+    
+    // DEBUG: Verificar estrutura dos primeiros registros
+    if (jsonData.length > 0) {
+      console.log('🔍 DEBUG ESTRUTURA DOS DADOS:');
+      console.log('- Primeira linha (cabeçalhos?):', JSON.stringify(jsonData[0]).substring(0, 500));
+      if (jsonData.length > 1) {
+        console.log('- Segunda linha (dados?):', JSON.stringify(jsonData[1]).substring(0, 500));
+      }
+      console.log('- Chaves do primeiro objeto:', Object.keys(jsonData[0]));
+      
+      // Verificar se EMPRESA e NOME_PACIENTE existem como chaves
+      const firstRow = jsonData[0];
+      const hasEmpresa = 'EMPRESA' in firstRow;
+      const hasNomePaciente = 'NOME_PACIENTE' in firstRow;
+      console.log(`- Tem coluna EMPRESA: ${hasEmpresa}`);
+      console.log(`- Tem coluna NOME_PACIENTE: ${hasNomePaciente}`);
+      
+      if (!hasEmpresa || !hasNomePaciente) {
+        console.log('⚠️ PROBLEMA: Colunas EMPRESA ou NOME_PACIENTE não encontradas!');
+        console.log('- Todas as chaves:', JSON.stringify(Object.keys(firstRow)));
+      }
+    }
     
     // Se arquivo muito grande, processar apenas parte e agendar continuação
     const MAX_RECORDS_PER_EXECUTION = 100000; // Aumentado para volumes altos
