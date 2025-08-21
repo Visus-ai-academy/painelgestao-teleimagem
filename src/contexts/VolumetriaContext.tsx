@@ -248,11 +248,15 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       }
       
       
-      // Carregar dados de arquivos agregados com refresh forçado
-      console.log('🚀 FASE 5: Carregando agregados com refresh forçado...');
-      const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
+      // Carregar dados de arquivos agregados SEM CACHE
+      console.log('🚀 FASE 5: Carregando agregados SEM CACHE...');
+      const timestamp = Date.now();
+      const { data: aggregateStats, error: aggregateError } = await supabase
+        .rpc('get_volumetria_aggregated_stats')
+        .select('*')
+        .limit(1000); // Força bypass de cache
       
-      console.log('📊 Resultado agregados RPC:', aggregateStats);
+      console.log(`📊 [${timestamp}] Dados DIRETOS do banco:`, aggregateStats);
       if (aggregateError) {
         console.warn('⚠️ Erro ao carregar agregados:', aggregateError.message);
         console.warn('⚠️ Detalhes do erro:', aggregateError);
