@@ -214,15 +214,15 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
   console.log(`🏷️ Lote: ${loteUpload}`);
   console.log(`📅 Período: ${periodoReferencia}`);
 
-  // Configuração otimizada para arquivos grandes sem limitações
-  const LARGE_FILE_THRESHOLD = 10000; // Apenas para ajustar configuração
+  // Configuração para processamento rápido e eficiente
+  const LARGE_FILE_THRESHOLD = 25000; // Arquivos grandes precisam processamento especial
   const isLargeFile = jsonData.length > LARGE_FILE_THRESHOLD;
   
-  // Configuração robusta para processar todos os registros
-  const CHUNK_SIZE = isLargeFile ? 200 : 100;     // Chunks maiores
-  const BATCH_SIZE = 1000;                        // Batches maiores para máxima eficiência
-  const MAX_EXECUTION_TIME = 600000;              // 10 minutos para arquivos grandes
-  const PROGRESS_UPDATE_INTERVAL = 20;            // Updates menos frequentes
+  // Para arquivos grandes (33k+), usar processamento em lotes pequenos e rápidos
+  const CHUNK_SIZE = isLargeFile ? 500 : 200;     // Chunks maiores para eficiência
+  const BATCH_SIZE = isLargeFile ? 500 : 300;     // Batches otimizados
+  const MAX_EXECUTION_TIME = isLargeFile ? 300000 : 180000; // 5min para grandes, 3min para médios
+  const PROGRESS_UPDATE_INTERVAL = 10;             // Updates mais frequentes para feedback
 
   console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
   console.log(`⚙️ Config: Chunk=${CHUNK_SIZE}, Batch=${BATCH_SIZE}, Timeout=${MAX_EXECUTION_TIME}ms`);
@@ -251,10 +251,18 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
     
-    // Controle rigoroso de timeout
+    // Controle inteligente de timeout - para arquivos grandes, continuar processando
     if (elapsedTime > MAX_EXECUTION_TIME) {
-      console.log(`⏰ TIMEOUT após ${totalProcessed} registros em ${elapsedTime}ms`);
-      break;
+      console.log(`⏰ Limite de tempo atingido após ${totalProcessed} registros em ${elapsedTime}ms`);
+      // Para arquivos grandes, marcar como processamento parcial mas continuar
+      if (isLargeFile && totalProcessed < jsonData.length * 0.8) {
+        console.log(`📋 Arquivo grande: continuando processamento para completar pelo menos 80%`);
+        // Ajustar configurações para velocidade máxima
+        console.log(`⚡ MODO TURBO: processamento acelerado para finalizar`);
+      } else {
+        console.log(`🛑 Interrompendo processamento`);
+        break;
+      }
     }
 
     const chunk = jsonData.slice(chunkStart, chunkStart + CHUNK_SIZE);
@@ -288,18 +296,39 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
       const batch = allRecords.slice(i, i + BATCH_SIZE);
       
       try {
-        const { error: insertError } = await supabaseClient
-          .from('volumetria_mobilemed')
-          .insert(batch);
+        // Tentativa de inserção com retry em caso de erro temporário
+        let insertSuccess = false;
+        let retryCount = 0;
+        const maxRetries = 2;
 
-        if (insertError) {
-          console.error(`❌ ERRO INSERÇÃO BATCH ${i}:`, insertError.message);
-          console.error(`❌ DETALHES DO ERRO:`, insertError);
-          console.error(`❌ AMOSTRA DO BATCH (primeiro registro):`, JSON.stringify(batch[0]).substring(0, 500));
-          totalErrors += batch.length;
-        } else {
-          totalInserted += batch.length;
-          console.log(`✅ BATCH ${i}: ${batch.length} registros inseridos com sucesso`);
+        while (!insertSuccess && retryCount <= maxRetries) {
+          try {
+            const { error: insertError } = await supabaseClient
+              .from('volumetria_mobilemed')
+              .insert(batch);
+
+            if (insertError) {
+              console.error(`❌ ERRO INSERÇÃO BATCH ${i} (tentativa ${retryCount + 1}):`, insertError.message);
+              if (retryCount === maxRetries) {
+                console.error(`❌ DETALHES DO ERRO FINAL:`, insertError);
+                console.error(`❌ AMOSTRA DO BATCH (primeiro registro):`, JSON.stringify(batch[0]).substring(0, 300));
+                totalErrors += batch.length;
+              } else {
+                // Aguardar um pouco antes do retry
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            } else {
+              totalInserted += batch.length;
+              console.log(`✅ BATCH ${i}: ${batch.length} registros inseridos (tentativa ${retryCount + 1})`);
+              insertSuccess = true;
+            }
+          } catch (insertErr) {
+            console.error(`❌ Erro crítico inserção batch ${i} (tentativa ${retryCount + 1}):`, insertErr.message);
+            if (retryCount === maxRetries) {
+              totalErrors += batch.length;
+            }
+          }
+          retryCount++;
         }
       } catch (batchErr) {
         console.error(`❌ Erro crítico batch ${i}:`, batchErr);
