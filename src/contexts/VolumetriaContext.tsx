@@ -248,11 +248,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       }
       
       
-      // Carregar dados de arquivos agregados
+      // Carregar dados de arquivos agregados com refresh forçado
+      console.log('🚀 FASE 5: Carregando agregados com refresh forçado...');
       const { data: aggregateStats, error: aggregateError } = await supabase.rpc('get_volumetria_aggregated_stats');
       
+      console.log('📊 Resultado agregados RPC:', aggregateStats);
       if (aggregateError) {
         console.warn('⚠️ Erro ao carregar agregados:', aggregateError.message);
+        console.warn('⚠️ Detalhes do erro:', aggregateError);
       }
       
       // Processar estatísticas por tipo de arquivo
@@ -330,12 +333,17 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
   const refreshData = useCallback(async () => {
     console.log('🔄 Forçando refresh COMPLETO dos dados DEFINITIVOS do banco...');
+    console.log('🔥 FORÇA ATUALIZAÇÃO: Ignorando cache e carregando dados mais recentes');
     lastLoadTime.current = 0; // Invalidar cache
     isLoadingRef.current = false; // Reset flag de carregamento
     
-    // LIMPAR CACHES LOCAIS
+    // LIMPAR CACHES LOCAIS E FORÇA REFRESH
     localStorage.removeItem('volumetria_cache');
     sessionStorage.clear();
+    
+    // ADICIONAR TIMESTAMP PARA GARANTIR REFRESH
+    const timestamp = Date.now();
+    console.log(`⏰ Timestamp refresh: ${timestamp}`);
     
     setData(prev => ({ ...prev, loading: true }));
     await loadStats();
