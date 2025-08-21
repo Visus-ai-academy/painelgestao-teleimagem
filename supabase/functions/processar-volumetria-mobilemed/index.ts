@@ -256,12 +256,16 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     for (const row of chunk) {
       try {
         const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
-        if (record && record.EMPRESA && record.NOME_PACIENTE) {
+        if (record) {
+          // CORREÇÃO: Aceitar todos os registros válidos, mesmo com campos substituídos
+          // Os campos obrigatórios já são tratados com valores padrão (SEM_EMPRESA, SEM_NOME)
           allRecords.push(record);
         } else {
+          console.log(`❌ Registro rejeitado na linha ${totalProcessed + 1}:`, JSON.stringify(row).substring(0, 200));
           totalErrors++;
         }
       } catch (error) {
+        console.error(`❌ Erro processamento linha ${totalProcessed + 1}:`, error.message);
         totalErrors++;
       }
       totalProcessed++;
