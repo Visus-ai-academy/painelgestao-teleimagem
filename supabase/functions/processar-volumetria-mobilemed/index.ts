@@ -120,6 +120,12 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     const estudoVazio = !estudoDescricao || estudoDescricao.toString().trim() === '';
     
     if (empresaVazia || nomeVazio || estudoVazio) {
+      // Registrar TODAS as rejeições para análise posterior
+      const motivosEspecificos = [];
+      if (empresaVazia) motivosEspecificos.push('EMPRESA vazio');
+      if (nomeVazio) motivosEspecificos.push('NOME_PACIENTE vazio');
+      if (estudoVazio) motivosEspecificos.push('ESTUDO_DESCRICAO vazio');
+      
       console.log(`❌ REJEIÇÃO [${rowIndex}] - CAMPOS OBRIGATÓRIOS VAZIOS:`);
       console.log(`  - EMPRESA: "${empresaOriginal}" (vazia: ${empresaVazia})`);
       console.log(`  - NOME_PACIENTE: "${nomePaciente}" (vazio: ${nomeVazio})`);
@@ -127,7 +133,24 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       console.log(`  - DATA_LAUDO: "${row['DATA_LAUDO']}"`);
       console.log(`  - DATA_REALIZACAO: "${row['DATA_REALIZACAO']}"`);
       console.log(`  - Linha do Excel: ${rowIndex}`);
-      return null; // REJEITAR registro com campos obrigatórios vazios
+      
+      // Retornar dados para registro de auditoria
+      return {
+        rejected: true,
+        motivo: 'campos_obrigatorios_vazios',
+        detalhes: motivosEspecificos.join(', '),
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: row['DATA_LAUDO'],
+          DATA_REALIZACAO: row['DATA_REALIZACAO'],
+          MODALIDADE: row['MODALIDADE'],
+          ESPECIALIDADE: row['ESPECIALIDADE'],
+          VALORES: row['VALORES']
+        }
+      };
     }
 
     const empresa = empresaOriginal.toString().trim();
@@ -152,50 +175,83 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       return cleanName || undefined;
     };
 
-    const record: VolumetriaRecord = {
-      EMPRESA: empresa, // Campo já validado como não-vazio
-      NOME_PACIENTE: nomePaciente.toString().trim(), // Campo já validado como não-vazio
-      arquivo_fonte: arquivoFonte as any,
-      lote_upload: loteUpload,
-      periodo_referencia: periodoReferencia,
-      
-      CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
-      ESTUDO_DESCRICAO: cleanExameName(row['ESTUDO_DESCRICAO']),
-      ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
-      MODALIDADE: safeString(row['MODALIDADE']),
-      PRIORIDADE: safeString(row['PRIORIDADE']),
-      ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
-      MEDICO: safeString(row['MEDICO']),
-      DUPLICADO: safeString(row['DUPLICADO']),
-      STATUS: safeString(row['STATUS']),
-      MEDICO_REASSINATURA: safeString(row['MEDICO_REASSINATURA']),
-      SEGUNDA_ASSINATURA: safeString(row['SEGUNDA_ASSINATURA']),
-      POSSUI_IMAGENS_CHAVE: safeString(row['POSSUI_IMAGENS_CHAVE']),
-      DIGITADOR: safeString(row['DIGITADOR']),
-      COMPLEMENTAR: safeString(row['COMPLEMENTAR']),
-      
-      VALORES: row['VALORES'] ? convertValues(row['VALORES']) : undefined,
-      IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : undefined,
-      IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
-      CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
-      
-      DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : undefined,
-      DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : undefined,
-      DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : undefined,
-      DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : undefined,
-      DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : undefined,
-      
-      HORA_REALIZACAO: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : undefined,
-      HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : undefined,
-      HORA_LAUDO: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : undefined,
-      HORA_PRAZO: row['HORA_PRAZO'] ? convertTime(String(row['HORA_PRAZO'])) : undefined,
-      HORA_REASSINATURA: row['HORA_REASSINATURA'] ? convertTime(String(row['HORA_REASSINATURA'])) : undefined,
-    };
+    // Verificar se houve erro de conversão de dados
+    try {
+      const record: VolumetriaRecord = {
+        EMPRESA: empresa, // Campo já validado como não-vazio
+        NOME_PACIENTE: nomePaciente.toString().trim(), // Campo já validado como não-vazio
+        arquivo_fonte: arquivoFonte as any,
+        lote_upload: loteUpload,
+        periodo_referencia: periodoReferencia,
+        
+        CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
+        ESTUDO_DESCRICAO: cleanExameName(row['ESTUDO_DESCRICAO']),
+        ACCESSION_NUMBER: safeString(row['ACCESSION_NUMBER']),
+        MODALIDADE: safeString(row['MODALIDADE']),
+        PRIORIDADE: safeString(row['PRIORIDADE']),
+        ESPECIALIDADE: safeString(row['ESPECIALIDADE']),
+        MEDICO: safeString(row['MEDICO']),
+        DUPLICADO: safeString(row['DUPLICADO']),
+        STATUS: safeString(row['STATUS']),
+        MEDICO_REASSINATURA: safeString(row['MEDICO_REASSINATURA']),
+        SEGUNDA_ASSINATURA: safeString(row['SEGUNDA_ASSINATURA']),
+        POSSUI_IMAGENS_CHAVE: safeString(row['POSSUI_IMAGENS_CHAVE']),
+        DIGITADOR: safeString(row['DIGITADOR']),
+        COMPLEMENTAR: safeString(row['COMPLEMENTAR']),
+        
+        VALORES: row['VALORES'] ? convertValues(row['VALORES']) : undefined,
+        IMAGENS_CHAVES: row['IMAGENS_CHAVES'] ? convertValues(row['IMAGENS_CHAVES']) : undefined,
+        IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
+        CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
+        
+        DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : undefined,
+        DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : undefined,
+        DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : undefined,
+        DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : undefined,
+        DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : undefined,
+        
+        HORA_REALIZACAO: row['HORA_REALIZACAO'] ? convertTime(String(row['HORA_REALIZACAO'])) : undefined,
+        HORA_TRANSFERENCIA: row['HORA_TRANSFERENCIA'] ? convertTime(String(row['HORA_TRANSFERENCIA'])) : undefined,
+        HORA_LAUDO: row['HORA_LAUDO'] ? convertTime(String(row['HORA_LAUDO'])) : undefined,
+        HORA_PRAZO: row['HORA_PRAZO'] ? convertTime(String(row['HORA_PRAZO'])) : undefined,
+        HORA_REASSINATURA: row['HORA_REASSINATURA'] ? convertTime(String(row['HORA_REASSINATURA'])) : undefined,
+      };
 
-    return record;
+      return record;
+    } catch (conversionError) {
+      // Registrar erro de conversão
+      return {
+        rejected: true,
+        motivo: 'erro_conversao_dados',
+        detalhes: `Erro na conversão: ${conversionError.message}`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: row['DATA_LAUDO'],
+          DATA_REALIZACAO: row['DATA_REALIZACAO'],
+          MODALIDADE: row['MODALIDADE'],
+          ESPECIALIDADE: row['ESPECIALIDADE'],
+          VALORES: row['VALORES'],
+          erro: conversionError.message
+        }
+      };
+    }
   } catch (error) {
     console.error('Erro ao processar linha:', error);
-    return null;
+    return {
+      rejected: true,
+      motivo: 'erro_processamento_geral',
+      detalhes: `Erro geral: ${error.message}`,
+      dados: {
+        linha: rowIndex,
+        EMPRESA: row['EMPRESA'] || 'N/A',
+        NOME_PACIENTE: row['NOME_PACIENTE'] || 'N/A',
+        ESTUDO_DESCRICAO: row['ESTUDO_DESCRICAO'] || 'N/A',
+        erro: error.message
+      }
+    };
   }
 }
 
@@ -280,44 +336,35 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     
     for (const row of chunk) {
       try {
-        const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, totalProcessed + 1);
-        if (record) {
-          allRecords.push(record);
-        } else {
-          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Análise dos campos:`);
-          console.log(`  - EMPRESA: "${row['EMPRESA']}" (tipo: ${typeof row['EMPRESA']})`);
-          console.log(`  - NOME_PACIENTE: "${row['NOME_PACIENTE']}" (tipo: ${typeof row['NOME_PACIENTE']})`);
-          console.log(`  - ESTUDO_DESCRICAO: "${row['ESTUDO_DESCRICAO']}" (tipo: ${typeof row['ESTUDO_DESCRICAO']})`);
-          console.log(`  - DATA_LAUDO: "${row['DATA_LAUDO']}" (tipo: ${typeof row['DATA_LAUDO']})`);
+        const result = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, totalProcessed + 1);
+        
+        if (result && typeof result === 'object' && result.rejected) {
+          // Registro rejeitado - salvar para auditoria
+          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - ${result.motivo}: ${result.detalhes}`);
           
-          // INVESTIGAÇÃO: Verificar se realmente está vazio
-          const empresaVazia = !row['EMPRESA'] || row['EMPRESA'].toString().trim() === '';
-          const nomeVazio = !row['NOME_PACIENTE'] || row['NOME_PACIENTE'].toString().trim() === '';
-          const estudoVazio = !row['ESTUDO_DESCRICAO'] || row['ESTUDO_DESCRICAO'].toString().trim() === '';
-          
-          console.log(`  - EMPRESA vazia: ${empresaVazia}`);
-          console.log(`  - NOME_PACIENTE vazio: ${nomeVazio}`);
-          console.log(`  - ESTUDO_DESCRICAO vazio: ${estudoVazio}`);
-          
-          // Se não há campos vazios, investigar outra causa
-          if (!empresaVazia && !nomeVazio && !estudoVazio) {
-            console.log(`  - ⚠️ POSSÍVEL FALSO POSITIVO: registro rejeitado mas campos não estão vazios!`);
-          }
-          
-          // Registrar motivo da rejeição para auditoria
           try {
-            let motivoDetalhado = 'campos_obrigatorios_vazios';
-            let detalhesEspecificos = [];
-            
-            if (empresaVazia) detalhesEspecificos.push('EMPRESA vazio');
-            if (nomeVazio) detalhesEspecificos.push('NOME_PACIENTE vazio');
-            if (estudoVazio) detalhesEspecificos.push('ESTUDO_DESCRICAO vazio');
-            
-            if (detalhesEspecificos.length === 0) {
-              motivoDetalhado = 'erro_processamento_desconhecido';
-              detalhesEspecificos.push('Registro rejeitado mas campos obrigatórios não estão vazios');
-            }
-            
+            await supabaseClient
+              .from('registros_rejeitados_processamento')
+              .insert({
+                arquivo_fonte: arquivo_fonte,
+                lote_upload: loteUpload,
+                linha_original: totalProcessed + 1,
+                dados_originais: result.dados,
+                motivo_rejeicao: result.motivo,
+                detalhes_erro: result.detalhes
+              });
+          } catch (auditError) {
+            console.warn(`⚠️ Falha ao registrar rejeição linha ${totalProcessed + 1}:`, auditError);
+          }
+          totalErrors++;
+        } else if (result && !result.rejected) {
+          // Registro válido - adicionar para inserção
+          allRecords.push(result as VolumetriaRecord);
+        } else {
+          // Null ou undefined - erro não específico
+          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Erro não identificado`);
+          
+          try {
             await supabaseClient
               .from('registros_rejeitados_processamento')
               .insert({
@@ -325,19 +372,16 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
                 lote_upload: loteUpload,
                 linha_original: totalProcessed + 1,
                 dados_originais: row,
-                motivo_rejeicao: motivoDetalhado,
-                detalhes_erro: detalhesEspecificos.join(', ')
+                motivo_rejeicao: 'erro_nao_identificado',
+                detalhes_erro: 'Registro retornou null sem motivo específico'
               });
-              
-            console.log(`📝 Auditoria registrada: Linha ${totalProcessed + 1} - ${detalhesEspecificos.join(', ')}`);
           } catch (auditError) {
-            console.warn(`⚠️ Falha ao registrar auditoria linha ${totalProcessed + 1}:`, auditError);
+            console.warn(`⚠️ Falha ao registrar erro linha ${totalProcessed + 1}:`, auditError);
           }
           totalErrors++;
         }
       } catch (error) {
         console.error(`❌ ERRO PROCESSAMENTO LINHA ${totalProcessed + 1}:`, error.message);
-        console.error(`❌ DADOS DA LINHA:`, JSON.stringify(row).substring(0, 300));
         
         // Registrar erro de processamento para auditoria
         try {
@@ -351,8 +395,6 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
               motivo_rejeicao: 'erro_conversao_dados',
               detalhes_erro: `Erro na conversão de dados: ${error.message}`
             });
-            
-          console.log(`📝 Auditoria erro registrada: Linha ${totalProcessed + 1} - ${error.message}`);
         } catch (auditError) {
           console.warn(`⚠️ Falha ao registrar erro linha ${totalProcessed + 1}:`, auditError);
         }

@@ -116,7 +116,7 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      // Buscar registros rejeitados durante processamento
+      // Buscar registros rejeitados do último upload
       const { data: rejeitados } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
@@ -124,36 +124,36 @@ export function RelatorioExclusoes() {
         .order('created_at', { ascending: false })
         .limit(1000);
 
+      console.log('🔍 Registros rejeitados encontrados:', rejeitados?.length || 0);
+
       if (rejeitados && rejeitados.length > 0) {
-        const registrosFormatados = rejeitados.map(r => {
-          // Type-safe access para JSON data
+        const registrosFormatados = rejeitados.map((r, index) => {
           const dados = r.dados_originais as Record<string, any> || {};
           
           return {
             cliente: dados.EMPRESA || 'N/A',
-            paciente: dados.NOME_PACIENTE || 'N/A',
+            paciente: dados.NOME_PACIENTE || 'N/A', 
             data_exame: dados.DATA_REALIZACAO || 'N/A',
             data_laudo: dados.DATA_LAUDO || 'N/A',
             especialidade: dados.ESPECIALIDADE || 'N/A',
             modalidade: dados.MODALIDADE || 'N/A',
             categoria: dados.CATEGORIA || 'N/A',
-            motivo_exclusao: r.motivo_rejeicao || 'N/A'
+            motivo_exclusao: `[Linha ${r.linha_original}] ${r.motivo_rejeicao}: ${r.detalhes_erro}`
           };
         });
         
         setRegistrosExcluidos(registrosFormatados);
         
         toast({
-          title: "Registros Carregados",
+          title: "✅ Exclusões Carregadas",
           description: `${registrosFormatados.length} registros rejeitados encontrados`,
         });
       } else {
-        // Se não há dados na nova tabela, mostrar explicação
-        toast({
-          title: "Informação",
-          description: "Os registros detalhados das exclusões estarão disponíveis a partir dos próximos uploads. As exclusões atuais são aplicadas pelas regras de negócio.",
-        });
         setRegistrosExcluidos([]);
+        toast({
+          title: "ℹ️ Nenhuma Exclusão",
+          description: "Nenhum registro rejeitado encontrado. Faça um novo upload para ver as exclusões detalhadas.",
+        });
       }
 
     } catch (error) {
@@ -163,6 +163,7 @@ export function RelatorioExclusoes() {
         description: "Erro ao carregar registros rejeitados",
         variant: "destructive"
       });
+      setRegistrosExcluidos([]);
     } finally {
       setLoadingDetalhes(false);
     }
@@ -471,7 +472,8 @@ export function RelatorioExclusoes() {
             </Button>
           </div>
           <CardDescription>
-            ⚠️ IMPORTANTE: Os registros excluídos não são armazenados no sistema. As exclusões acontecem durante o processamento e não podem ser listados individualmente.
+            📊 <strong>Sistema Atualizado:</strong> Agora capturamos e exibimos TODAS as exclusões detalhadamente. 
+            As exclusões dos uploads futuros serão listadas aqui com o motivo específico de cada rejeição.
           </CardDescription>
         </CardHeader>
         <CardContent>
