@@ -10,9 +10,8 @@ import { VolumetriaDelayAnalysis } from "@/components/volumetria/VolumetriaDelay
 import { VolumetriaExecutiveSummary } from "@/components/volumetria/VolumetriaExecutiveSummary";
 import { VolumetriaMedicosAnalysis } from "@/components/volumetria/VolumetriaMedicosAnalysis";
 import { VolumetriaNoData } from "@/components/volumetria/VolumetriaNoData";
-import { RelatorioExclusoes } from "@/components/RelatorioExclusoes";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
-import { BarChart3, Users, Clock, TrendingUp, FileText, Settings } from "lucide-react";
+import { BarChart3, Users, Clock, TrendingUp, FileText } from "lucide-react";
 import { useVolumetriaDataFiltered } from "@/hooks/useVolumetriaDataFiltered";
 
 
@@ -101,8 +100,8 @@ export default function Volumetria() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : hasData ? (
-          <Tabs defaultValue="resumo" className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <Tabs defaultValue="resumo" className="w-full">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="resumo" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Resumo Executivo
@@ -122,10 +121,6 @@ export default function Volumetria() {
               <TabsTrigger value="clientes" className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Clientes Atrasados
-              </TabsTrigger>
-              <TabsTrigger value="exclusoes" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Relatório Exclusões
               </TabsTrigger>
             </TabsList>
 
@@ -185,10 +180,6 @@ export default function Volumetria() {
 
             <TabsContent value="clientes" className="space-y-6">
               <VolumetriaClientesAtrasados />
-            </TabsContent>
-
-            <TabsContent value="exclusoes" className="space-y-6">
-              <RelatorioExclusoes />
             </TabsContent>
 
             

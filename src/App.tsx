@@ -54,7 +54,7 @@ import GerenciarCadastros from "./pages/GerenciarCadastros";
 import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
 import NotFound from "./pages/NotFound";
 import LimparDados from "./pages/LimparDados";
-import LimparDadosCompleto from "./components/LimparDadosCompleto";
+import RelatorioExclusoes from "./pages/RelatorioExclusoes";
 
 const queryClient = new QueryClient();
 
@@ -152,6 +152,15 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
                     <DadosVolumetria />
+                  </RoleProtectedRoute>
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/operacional/relatorio-exclusoes" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RoleProtectedRoute requiredRoles={['manager', 'admin']}>
+                    <RelatorioExclusoes />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
@@ -421,15 +430,6 @@ const App = () => {
                 <Layout>
                   <RoleProtectedRoute requiredRoles={['admin']}>
                     <LimparDados />
-                  </RoleProtectedRoute>
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/limpar-dados-completo" element={
-              <ProtectedRoute>
-                <Layout>
-                  <RoleProtectedRoute requiredRoles={['admin']}>
-                    <LimparDadosCompleto />
                   </RoleProtectedRoute>
                 </Layout>
               </ProtectedRoute>
