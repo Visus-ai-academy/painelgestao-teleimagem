@@ -169,8 +169,18 @@ export function RelatorioExclusoes() {
     }
   };
 
-  const exportarParaExcel = () => {
+  const exportarParaExcel = async () => {
     try {
+      // Buscar TODAS as exclusões detalhadas do último lote
+      const { data: todasExclusoes } = await supabase
+        .from('registros_rejeitados_processamento')
+        .select('*')
+        .eq('arquivo_fonte', 'volumetria_padrao')
+        .order('linha_original', { ascending: true })
+        .limit(10000); // Buscar todas as exclusões até 10k
+
+      console.log(`🔍 Buscando exclusões detalhadas para Excel... Encontradas: ${todasExclusoes?.length || 0}`);
+      
       const wb = XLSX.utils.book_new();
 
       // Aba 1: Análise Geral
@@ -186,27 +196,42 @@ export function RelatorioExclusoes() {
       const wsAnalise = XLSX.utils.json_to_sheet(analiseData);
       XLSX.utils.book_append_sheet(wb, wsAnalise, 'Análise Exclusões');
 
-      // Aba 2: Registros Excluídos Detalhados (sempre incluir, mesmo vazia)
-      const registrosData = registrosExcluidos.length > 0 
-        ? registrosExcluidos.map(registro => ({
-            'Cliente': registro.cliente,
-            'Paciente': registro.paciente,
-            'Data Exame': registro.data_exame,
-            'Data Laudo': registro.data_laudo,
-            'Especialidade': registro.especialidade,
-            'Modalidade': registro.modalidade,
-            'Categoria': registro.categoria,
-            'Motivo Exclusão': registro.motivo_exclusao
-          }))
+      // Aba 2: TODAS as Exclusões Detalhadas (6.831 registros)
+      const registrosData = todasExclusoes && todasExclusoes.length > 0 
+        ? todasExclusoes.map((exclusao, index) => {
+            const dados = exclusao.dados_originais as Record<string, any> || {};
+            return {
+              'Linha': exclusao.linha_original,
+              'Cliente': dados.EMPRESA || 'N/A',
+              'Paciente': dados.NOME_PACIENTE || 'N/A',
+              'Exame': dados.ESTUDO_DESCRICAO || 'N/A',
+              'Data Realização': dados.DATA_REALIZACAO || 'N/A',
+              'Data Laudo': dados.DATA_LAUDO || 'N/A',
+              'Modalidade': dados.MODALIDADE || 'N/A',
+              'Especialidade': dados.ESPECIALIDADE || 'N/A',
+              'Valores': dados.VALORES || 'N/A',
+              'Prioridade': dados.PRIORIDADE || 'N/A',
+              'Código Motivo': exclusao.motivo_rejeicao,
+              'Motivo Detalhado': exclusao.detalhes_erro,
+              'Lote Upload': exclusao.lote_upload,
+              'Data Processamento': exclusao.created_at ? new Date(exclusao.created_at).toLocaleString('pt-BR') : 'N/A'
+            };
+          })
         : [{ 
-            'Cliente': 'Nenhum registro rejeitado encontrado',
-            'Paciente': 'Os registros podem ter sido excluídos por regras de trigger',
-            'Data Exame': 'Consulte a aba "Regras Aplicadas"',
+            'Linha': 'Nenhum',
+            'Cliente': 'Nenhum registro rejeitado encontrado no banco',
+            'Paciente': 'Faça um novo upload para capturar exclusões',
+            'Exame': 'Sistema atualizado para capturar todos os detalhes',
+            'Data Realização': '',
             'Data Laudo': '',
-            'Especialidade': '',
             'Modalidade': '',
-            'Categoria': '',
-            'Motivo Exclusão': 'Exclusões por triggers não são rastreadas individualmente'
+            'Especialidade': '',
+            'Valores': '',
+            'Prioridade': '',
+            'Código Motivo': 'SEM_DADOS',
+            'Motivo Detalhado': 'Sistema não capturou exclusões anteriores',
+            'Lote Upload': '',
+            'Data Processamento': ''
           }];
 
       const wsRegistros = XLSX.utils.json_to_sheet(registrosData);
@@ -275,8 +300,8 @@ export function RelatorioExclusoes() {
       XLSX.writeFile(wb, fileName);
 
       toast({
-        title: "Sucesso",
-        description: `Relatório exportado como ${fileName}`,
+        title: "✅ Excel Gerado",
+        description: `Relatório completo exportado com ${todasExclusoes?.length || 0} exclusões detalhadas`,
       });
 
     } catch (error) {
