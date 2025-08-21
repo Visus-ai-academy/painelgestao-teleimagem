@@ -102,25 +102,31 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, rowIndex: number): VolumetriaRecord | null {
   try {
-    if (!row || typeof row !== 'object') return null;
-
-    const empresaOriginal = row['EMPRESA'] || '';
-    const nomePaciente = row['NOME_PACIENTE'] || '';
-
-    // DEBUG: Log detalhado dos campos principais para identificar o problema
-    if (!empresaOriginal || !nomePaciente) {
-      console.log('🔍 DEBUG CAMPOS VAZIOS:');
-      console.log('- Linha original:', JSON.stringify(row).substring(0, 300));
-      console.log('- EMPRESA original:', JSON.stringify(empresaOriginal), 'Tipo:', typeof empresaOriginal);
-      console.log('- NOME_PACIENTE original:', JSON.stringify(nomePaciente), 'Tipo:', typeof nomePaciente);
-      console.log('- Chaves disponíveis:', Object.keys(row));
-      console.log('- Valores das primeiras 5 chaves:', Object.keys(row).slice(0, 5).map(k => `${k}: ${JSON.stringify(row[k])}`));
+    if (!row || typeof row !== 'object') {
+      console.log(`❌ REJEIÇÃO [${rowIndex}]: Linha não é objeto válido:`, typeof row);
+      return null;
     }
 
-    // Não aplicar limpeza aqui pois processRow é síncrono - será aplicado via trigger SQL
-    const empresa = empresaOriginal.trim();
+    // ANÁLISE DETALHADA DOS CAMPOS OBRIGATÓRIOS
+    const empresaOriginal = row['EMPRESA'] || '';
+    const nomePaciente = row['NOME_PACIENTE'] || '';
+    
+    // Log detalhado para TODOS os casos problemáticos
+    const empresaVazia = !empresaOriginal || empresaOriginal.toString().trim() === '';
+    const nomeVazio = !nomePaciente || nomePaciente.toString().trim() === '';
+    
+    if (empresaVazia || nomeVazio) {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - CAMPOS OBRIGATÓRIOS VAZIOS:`);
+      console.log(`  - EMPRESA: "${empresaOriginal}" (vazia: ${empresaVazia})`);
+      console.log(`  - NOME_PACIENTE: "${nomePaciente}" (vazia: ${nomeVazio})`);
+      console.log(`  - Todas as chaves: [${Object.keys(row).join(', ')}]`);
+      console.log(`  - Valores das 10 primeiras: ${Object.keys(row).slice(0, 10).map(k => `${k}:"${row[k]}"`).join(', ')}`);
+      return null; // REJEITAR registro com campos obrigatórios vazios
+    }
+
+    const empresa = empresaOriginal.toString().trim();
 
     const safeString = (value: any): string | undefined => {
       if (value === null || value === undefined || value === '') return undefined;
@@ -143,8 +149,8 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     };
 
     const record: VolumetriaRecord = {
-      EMPRESA: String(empresa || 'SEM_EMPRESA').trim(), // CORREÇÃO: Não deixar vazio
-      NOME_PACIENTE: String(nomePaciente || 'SEM_NOME').trim(), // CORREÇÃO: Não deixar vazio
+      EMPRESA: empresa, // Campo já validado como não-vazio
+      NOME_PACIENTE: nomePaciente.toString().trim(), // Campo já validado como não-vazio
       arquivo_fonte: arquivoFonte as any,
       lote_upload: loteUpload,
       periodo_referencia: periodoReferencia,
@@ -262,17 +268,16 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     
     for (const row of chunk) {
       try {
-        const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia);
+        const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, totalProcessed + 1);
         if (record) {
-          // CORREÇÃO: Aceitar todos os registros válidos, mesmo com campos substituídos
-          // Os campos obrigatórios já são tratados com valores padrão (SEM_EMPRESA, SEM_NOME)
           allRecords.push(record);
         } else {
-          console.log(`❌ Registro rejeitado na linha ${totalProcessed + 1}:`, JSON.stringify(row).substring(0, 200));
+          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Ver logs detalhados acima`);
           totalErrors++;
         }
       } catch (error) {
-        console.error(`❌ Erro processamento linha ${totalProcessed + 1}:`, error.message);
+        console.error(`❌ ERRO PROCESSAMENTO LINHA ${totalProcessed + 1}:`, error.message);
+        console.error(`❌ DADOS DA LINHA:`, JSON.stringify(row).substring(0, 300));
         totalErrors++;
       }
       totalProcessed++;
@@ -288,11 +293,13 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
           .insert(batch);
 
         if (insertError) {
-          console.error(`❌ Erro batch ${i}:`, insertError.message);
+          console.error(`❌ ERRO INSERÇÃO BATCH ${i}:`, insertError.message);
+          console.error(`❌ DETALHES DO ERRO:`, insertError);
+          console.error(`❌ AMOSTRA DO BATCH (primeiro registro):`, JSON.stringify(batch[0]).substring(0, 500));
           totalErrors += batch.length;
         } else {
           totalInserted += batch.length;
-          console.log(`✅ Batch ${i}: ${batch.length} inseridos`);
+          console.log(`✅ BATCH ${i}: ${batch.length} registros inseridos com sucesso`);
         }
       } catch (batchErr) {
         console.error(`❌ Erro crítico batch ${i}:`, batchErr);
