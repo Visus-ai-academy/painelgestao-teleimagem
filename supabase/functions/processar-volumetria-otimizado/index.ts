@@ -131,17 +131,227 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, periodProcessamento?: { ano: number; mes: number } | null): VolumetriaRecord | null {
+// Interface para registros rejeitados
+interface RejectedRecord {
+  arquivo_fonte: string;
+  lote_upload: string;
+  linha_original: number;
+  dados_originais: any;
+  motivo_rejeicao: string;
+  detalhes_erro: string;
+}
+
+function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, periodProcessamento?: { ano: number; mes: number } | null, lineNumber?: number): { record: VolumetriaRecord | null, rejection: RejectedRecord | null } {
   try {
-    if (!row || typeof row !== 'object') return null;
+    if (!row || typeof row !== 'object') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'ESTRUTURA_INVALIDA',
+          detalhes_erro: 'Linha não contém um objeto válido ou está vazia'
+        }
+      };
+    }
 
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
+    const estudoDescricao = row['ESTUDO_DESCRICAO'] || '';
 
-    // REMOVIDO: Não excluir registros por campos vazios - tratar como string vazia se necessário
+    // VALIDAÇÕES COM CAPTURA DE EXCLUSÕES
+    
+    // 1. Campos obrigatórios
+    if (!empresaOriginal || empresaOriginal.toString().trim() === '') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'CAMPO_OBRIGATORIO_AUSENTE',
+          detalhes_erro: 'Campo EMPRESA está vazio ou nulo'
+        }
+      };
+    }
 
+    if (!nomePaciente || nomePaciente.toString().trim() === '') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'CAMPO_OBRIGATORIO_AUSENTE',
+          detalhes_erro: 'Campo NOME_PACIENTE está vazio ou nulo'
+        }
+      };
+    }
 
-    // Não aplicar limpeza aqui pois processRow é síncrono - será aplicado via trigger SQL
+    if (!estudoDescricao || estudoDescricao.toString().trim() === '') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'CAMPO_OBRIGATORIO_AUSENTE',
+          detalhes_erro: 'Campo ESTUDO_DESCRICAO está vazio ou nulo'
+        }
+      };
+    }
+
+    // 2. Validação de datas obrigatórias
+    const dataLaudoStr = row['DATA_LAUDO'];
+    const dataRealizacaoStr = row['DATA_REALIZACAO'];
+    
+    if (!dataLaudoStr || dataLaudoStr.toString().trim() === '') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'DATA_OBRIGATORIA_AUSENTE',
+          detalhes_erro: 'Campo DATA_LAUDO está vazio ou nulo'
+        }
+      };
+    }
+
+    if (!dataRealizacaoStr || dataRealizacaoStr.toString().trim() === '') {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'DATA_OBRIGATORIA_AUSENTE',
+          detalhes_erro: 'Campo DATA_REALIZACAO está vazio ou nulo'
+        }
+      };
+    }
+
+    // 3. Validação de formatos de data
+    const dataLaudo = convertBrazilianDate(dataLaudoStr.toString());
+    const dataRealizacao = convertBrazilianDate(dataRealizacaoStr.toString());
+
+    if (!dataLaudo) {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'FORMATO_DATA_INVALIDO',
+          detalhes_erro: `DATA_LAUDO em formato inválido: "${dataLaudoStr}". Formato esperado: DD/MM/YYYY`
+        }
+      };
+    }
+
+    if (!dataRealizacao) {
+      return {
+        record: null,
+        rejection: {
+          arquivo_fonte: arquivoFonte,
+          lote_upload: loteUpload,
+          linha_original: lineNumber || 0,
+          dados_originais: row,
+          motivo_rejeicao: 'FORMATO_DATA_INVALIDO',
+          detalhes_erro: `DATA_REALIZACAO em formato inválido: "${dataRealizacaoStr}". Formato esperado: DD/MM/YYYY`
+        }
+      };
+    }
+
+    // 4. Aplicar regras de período (v031) apenas para arquivos não-retroativos
+    if (!arquivoFonte.includes('retroativo') && periodProcessamento) {
+      const periodoAno = periodProcessamento.ano;
+      const periodoMes = periodProcessamento.mes;
+      
+      // Calcular datas do período
+      const inicioMes = new Date(periodoAno, periodoMes - 1, 1);
+      const fimMes = new Date(periodoAno, periodoMes, 0);
+      const fimJanelaLaudo = new Date(periodoAno, periodoMes, 7);
+      
+      // REGRA v031: DATA_REALIZACAO deve estar no mês do período
+      if (dataRealizacao < inicioMes || dataRealizacao > fimMes) {
+        return {
+          record: null,
+          rejection: {
+            arquivo_fonte: arquivoFonte,
+            lote_upload: loteUpload,
+            linha_original: lineNumber || 0,
+            dados_originais: row,
+            motivo_rejeicao: 'REGRA_V031_DATA_REALIZACAO',
+            detalhes_erro: `DATA_REALIZACAO (${dataRealizacaoStr}) fora do período permitido: ${inicioMes.toLocaleDateString('pt-BR')} a ${fimMes.toLocaleDateString('pt-BR')}`
+          }
+        };
+      }
+      
+      // REGRA v031: DATA_LAUDO deve estar na janela permitida
+      if (dataLaudo < inicioMes || dataLaudo > fimJanelaLaudo) {
+        return {
+          record: null,
+          rejection: {
+            arquivo_fonte: arquivoFonte,
+            lote_upload: loteUpload,
+            linha_original: lineNumber || 0,
+            dados_originais: row,
+            motivo_rejeicao: 'REGRA_V031_DATA_LAUDO',
+            detalhes_erro: `DATA_LAUDO (${dataLaudoStr}) fora da janela permitida: ${inicioMes.toLocaleDateString('pt-BR')} a ${fimJanelaLaudo.toLocaleDateString('pt-BR')}`
+          }
+        };
+      }
+    }
+
+    // 5. Aplicar regras retroativas (v002 e v003) para arquivos retroativos
+    if (arquivoFonte.includes('retroativo') && periodProcessamento) {
+      const periodoAno = periodProcessamento.ano;
+      const periodoMes = periodProcessamento.mes;
+      
+      const dataLimiteRealizacao = new Date(periodoAno, periodoMes - 1, 1);
+      const inicioFaturamento = new Date(periodoAno, periodoMes - 1, 8);
+      const fimFaturamento = new Date(periodoAno, periodoMes, 7);
+      
+      // REGRA v003: DATA_REALIZACAO >= 01 do mês especificado
+      if (dataRealizacao >= dataLimiteRealizacao) {
+        return {
+          record: null,
+          rejection: {
+            arquivo_fonte: arquivoFonte,
+            lote_upload: loteUpload,
+            linha_original: lineNumber || 0,
+            dados_originais: row,
+            motivo_rejeicao: 'REGRA_V003_RETROATIVO',
+            detalhes_erro: `DATA_REALIZACAO (${dataRealizacaoStr}) deve ser anterior a ${dataLimiteRealizacao.toLocaleDateString('pt-BR')} para arquivos retroativos`
+          }
+        };
+      }
+      
+      // REGRA v002: DATA_LAUDO fora do período de faturamento
+      if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
+        return {
+          record: null,
+          rejection: {
+            arquivo_fonte: arquivoFonte,
+            lote_upload: loteUpload,
+            linha_original: lineNumber || 0,
+            dados_originais: row,
+            motivo_rejeicao: 'REGRA_V002_RETROATIVO',
+            detalhes_erro: `DATA_LAUDO (${dataLaudoStr}) fora do período de faturamento: ${inicioFaturamento.toLocaleDateString('pt-BR')} a ${fimFaturamento.toLocaleDateString('pt-BR')}`
+          }
+        };
+      }
+    }
+
+    // Se chegou até aqui, o registro é válido - processar normalmente
     const empresa = empresaOriginal.trim();
 
     const safeString = (value: any): string | undefined => {
@@ -175,8 +385,8 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     };
 
     const record: VolumetriaRecord = {
-      EMPRESA: String(empresa || 'SEM_EMPRESA').trim(), // CORREÇÃO: Não deixar vazio
-      NOME_PACIENTE: String(nomePaciente || 'SEM_NOME').trim(), // CORREÇÃO: Não deixar vazio
+      EMPRESA: empresa,
+      NOME_PACIENTE: nomePaciente.toString().trim(),
       arquivo_fonte: arquivoFonte,
       lote_upload: loteUpload,
       periodo_referencia: periodoReferencia,
@@ -201,9 +411,9 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       IMAGENS_CAPTURADAS: row['IMAGENS_CAPTURADAS'] ? convertValues(row['IMAGENS_CAPTURADAS']) : undefined,
       CODIGO_INTERNO: row['CODIGO_INTERNO'] ? convertValues(row['CODIGO_INTERNO']) : undefined,
       
-      DATA_REALIZACAO: row['DATA_REALIZACAO'] ? convertBrazilianDate(String(row['DATA_REALIZACAO'])) : undefined,
+      DATA_REALIZACAO: dataRealizacao,
       DATA_TRANSFERENCIA: row['DATA_TRANSFERENCIA'] ? convertBrazilianDate(String(row['DATA_TRANSFERENCIA'])) : undefined,
-      DATA_LAUDO: row['DATA_LAUDO'] ? convertBrazilianDate(String(row['DATA_LAUDO'])) : undefined,
+      DATA_LAUDO: dataLaudo,
       DATA_PRAZO: row['DATA_PRAZO'] ? convertBrazilianDate(String(row['DATA_PRAZO'])) : undefined,
       DATA_REASSINATURA: row['DATA_REASSINATURA'] ? convertBrazilianDate(String(row['DATA_REASSINATURA'])) : undefined,
       
@@ -215,7 +425,6 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     };
 
     // REGRA v024: Definir data_referencia baseado no período de processamento escolhido
-    // Independente da data de realização/laudo, a data_referencia deve ser do período selecionado
     if (periodProcessamento && periodProcessamento.ano && periodProcessamento.mes) {
       const mesFormatado = String(periodProcessamento.mes).padStart(2, '0');
       record.data_referencia = new Date(`${periodProcessamento.ano}-${mesFormatado}-01`);
@@ -234,10 +443,20 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
       }
     }
 
-    return record;
+    return { record, rejection: null };
   } catch (error) {
     console.error('Erro ao processar linha:', error);
-    return null;
+    return {
+      record: null,
+      rejection: {
+        arquivo_fonte: arquivoFonte,
+        lote_upload: loteUpload,
+        linha_original: lineNumber || 0,
+        dados_originais: row,
+        motivo_rejeicao: 'ERRO_PROCESSAMENTO',
+        detalhes_erro: `Erro interno no processamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
+      }
+    };
   }
 }
 
@@ -344,9 +563,12 @@ serve(async (req) => {
 
     // Processar registros (otimizado)
     const loteUpload = `${arquivo_fonte}_${Date.now()}_${uploadLog.id.substring(0, 8)}`;
-    const batchSize = 1000; // Lote maior para melhor performance
+    const batchSize = 1000;
     let totalInserted = 0;
     let totalErrors = 0;
+    
+    // Arrays para capturar exclusões
+    const rejectedRecords: RejectedRecord[] = [];
 
     console.log(`📦 Processando ${jsonData.length} registros em lotes de ${batchSize}`);
 
@@ -366,83 +588,140 @@ serve(async (req) => {
       console.log(`📋 Processando lote ${batchNumber}/${totalBatches} (${i + 1}-${Math.min(i + batchSize, jsonData.length)})`);
 
       const records: VolumetriaRecord[] = [];
+      const batchRejections: RejectedRecord[] = [];
+      
       // Processar registros
-      for (const row of batch) {
+      for (let rowIndex = 0; rowIndex < batch.length; rowIndex++) {
+        const row = batch[rowIndex];
+        const lineNumber = i + rowIndex + 2; // +2 porque Excel começa em 1 e tem header
+        
         try {
           const nomeRaw = String(row['NOME_PACIENTE'] ?? '').toUpperCase().trim();
           if (nomeRaw === DEBUG_PACIENTE) {
             dbgFoundInFile++;
           }
 
-          const record = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, periodProcessamento);
-          if (record) { // CORREÇÃO: Aceitar TODOS os registros processados, mesmo com campos vazios
-            records.push(record);
-            if ((record.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE) {
+          const result = processRow(row, arquivo_fonte, loteUpload, periodoReferencia, periodProcessamento, lineNumber);
+          
+          if (result.record) {
+            // Registro válido - adicionar para inserção
+            records.push(result.record);
+            if ((result.record.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE) {
               dbgPrepared++;
               console.log('🔎 DEBUG PACIENTE - preparado', {
-                EMPRESA: record.EMPRESA,
-                ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO,
-                DATA_LAUDO: record.DATA_LAUDO,
-                MODALIDADE: record.MODALIDADE,
-                PRIORIDADE: record.PRIORIDADE
+                EMPRESA: result.record.EMPRESA,
+                ESTUDO_DESCRICAO: result.record.ESTUDO_DESCRICAO,
+                DATA_LAUDO: result.record.DATA_LAUDO,
+                MODALIDADE: result.record.MODALIDADE,
+                PRIORIDADE: result.record.PRIORIDADE
               });
             }
-          } else {
+          } else if (result.rejection) {
+            // Registro rejeitado - capturar exclusão
+            batchRejections.push(result.rejection);
             totalErrors++;
+            
             if (nomeRaw === DEBUG_PACIENTE) {
               dbgSkippedSemEmpresaOuNome++;
-              console.log('⚠️ DEBUG PACIENTE - descartado apenas se for registro "_local"');
+              console.log(`⚠️ DEBUG PACIENTE - rejeitado: ${result.rejection.motivo_rejeicao} - ${result.rejection.detalhes_erro}`);
             }
+            
+            console.log(`🚫 Linha ${lineNumber} rejeitada: ${result.rejection.motivo_rejeicao}`);
           }
         } catch (rowError) {
-          console.error('❌ Erro ao processar linha:', rowError);
+          // Erro não capturado - criar registro de rejeição de emergência
+          const emergencyRejection: RejectedRecord = {
+            arquivo_fonte: arquivoFonte,
+            lote_upload: loteUpload,
+            linha_original: lineNumber,
+            dados_originais: row,
+            motivo_rejeicao: 'ERRO_NAO_CAPTURADO',
+            detalhes_erro: `Erro não tratado: ${rowError instanceof Error ? rowError.message : 'Erro desconhecido'}`
+          };
+          
+          batchRejections.push(emergencyRejection);
           totalErrors++;
+          console.error(`❌ Erro não capturado na linha ${lineNumber}:`, rowError);
         }
       }
 
-      if (records.length === 0) {
-        console.log(`⚠️ Lote ${batchNumber}: Sem registros válidos`);
+      // Adicionar rejeições do lote ao array principal
+      rejectedRecords.push(...batchRejections);
+
+      if (records.length === 0 && batchRejections.length === 0) {
+        console.log(`⚠️ Lote ${batchNumber}: Sem registros para processar`);
         continue;
       }
 
-      console.log(`✅ Lote ${batchNumber}: ${records.length} registros preparados para inserção`);
+      console.log(`✅ Lote ${batchNumber}: ${records.length} registros válidos, ${batchRejections.length} rejeitados`);
 
-      // Inserir registros (com background task para não bloquear)
-      try {
-        EdgeRuntime.waitUntil(
-          supabaseClient
-            .from('volumetria_mobilemed')
-            .insert(records)
-            .then(({ error }) => {
-              if (error) {
-                console.error(`❌ Background insert error lote ${batchNumber}:`, error);
-              } else {
-                console.log(`🚀 Background insert lote ${batchNumber}: ${records.length} registros`);
-              }
-            })
-        );
-        
-        totalInserted += records.length;
-        const insertedThisBatch = records.filter(r => (r.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE).length;
-        if (insertedThisBatch > 0) {
-          dbgInserted += insertedThisBatch;
-          console.log(`🟢 DEBUG PACIENTE - preparado para inserção: ${insertedThisBatch}`);
+      // Inserir registros válidos (com background task para não bloquear)
+      if (records.length > 0) {
+        try {
+          EdgeRuntime.waitUntil(
+            supabaseClient
+              .from('volumetria_mobilemed')
+              .insert(records)
+              .then(({ error }) => {
+                if (error) {
+                  console.error(`❌ Background insert error lote ${batchNumber}:`, error);
+                } else {
+                  console.log(`🚀 Background insert lote ${batchNumber}: ${records.length} registros`);
+                }
+              })
+          );
+          
+          totalInserted += records.length;
+          const insertedThisBatch = records.filter(r => (r.NOME_PACIENTE || '').toUpperCase().trim() === DEBUG_PACIENTE).length;
+          if (insertedThisBatch > 0) {
+            dbgInserted += insertedThisBatch;
+            console.log(`🟢 DEBUG PACIENTE - preparado para inserção: ${insertedThisBatch}`);
+          }
+          console.log(`⚡ Lote ${batchNumber}: ${records.length} registros agendados para inserção`);
+        } catch (insertException) {
+          console.error(`❌ Exceção ao agendar lote ${batchNumber}:`, insertException);
+          totalErrors += records.length;
         }
-        console.log(`⚡ Lote ${batchNumber}: ${records.length} registros agendados para inserção`);
-      } catch (insertException) {
-        console.error(`❌ Exceção ao agendar lote ${batchNumber}:`, insertException);
-        totalErrors += records.length;
+      }
+      
+      // Inserir registros rejeitados (AUDITORIA DE EXCLUSÕES)
+      if (batchRejections.length > 0) {
+        try {
+          EdgeRuntime.waitUntil(
+            supabaseClient
+              .from('registros_rejeitados_processamento')
+              .insert(batchRejections)
+              .then(({ error }) => {
+                if (error) {
+                  console.error(`❌ Erro ao salvar rejeições lote ${batchNumber}:`, error);
+                } else {
+                  console.log(`📝 Lote ${batchNumber}: ${batchRejections.length} rejeições salvas para auditoria`);
+                }
+              })
+          );
+        } catch (rejectedException) {
+          console.error(`❌ Exceção ao salvar rejeições lote ${batchNumber}:`, rejectedException);
+        }
       }
 
       // Atualizar progresso
       const processedCount = Math.min(i + batchSize, jsonData.length);
       const progress = Math.min(Math.round((processedCount / jsonData.length) * 100), 100);
       
-      console.log(`📈 Progresso: ${progress}% (${processedCount}/${jsonData.length}) - ${totalInserted} inseridos, ${totalErrors} erros`);
+      console.log(`📈 Progresso: ${progress}% (${processedCount}/${jsonData.length}) - ${totalInserted} inseridos, ${totalErrors} rejeitados`);
     }
 
     console.log('✅ PROCESSAMENTO BÁSICO CONCLUÍDO!');
-    console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} erros de ${jsonData.length} registros`);
+    console.log(`📊 Resultado: ${totalInserted} inseridos, ${totalErrors} rejeitados de ${jsonData.length} registros`);
+    console.log(`📝 Total de exclusões capturadas para auditoria: ${rejectedRecords.length}`);
+
+    // Salvar resumo das exclusões no log de upload
+    const exclusoesResumo = rejectedRecords.reduce((acc, rejection) => {
+      acc[rejection.motivo_rejeicao] = (acc[rejection.motivo_rejeicao] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    console.log('📋 Resumo das exclusões por motivo:', exclusoesResumo);
 
     // 🔧 APLICAR EXCLUSÕES POR PERÍODO
     if (periodo) {
@@ -584,13 +863,21 @@ serve(async (req) => {
         registros_inseridos: totalInserted,
         registros_erro: totalErrors,
         detalhes_erro: JSON.stringify({
-          status: totalInserted > 0 ? 'Concluído' : 'Erro',
+          status: totalInserted > 0 ? 'Processamento Concluído' : 'Erro no Processamento',
+          total_processado: jsonData.length,
+          total_inserido: totalInserted,
+          total_erros: totalErrors,
+          regras_aplicadas: 0,
+          lote_upload: loteUpload,
+          exclusoes_capturadas: rejectedRecords.length,
+          exclusoes_por_motivo: exclusoesResumo,
           debug_paciente: {
             nome: DEBUG_PACIENTE,
             encontrados_no_arquivo: dbgFoundInFile,
             preparados_para_insercao: dbgPrepared,
             inseridos: dbgInserted,
-            descartados_apenas_por_local: dbgSkippedSemEmpresaOuNome
+            descartados_por_campos_obrigatorios: dbgSkippedSemEmpresaOuNome,
+            descartados_por_corte_data_laudo: 0
           }
         })
       })

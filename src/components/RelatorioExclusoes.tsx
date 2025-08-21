@@ -122,20 +122,20 @@ export function RelatorioExclusoes() {
       const loteAtual = detalhesErro?.lote_upload;
       const totalRejeicoes = upload?.registros_erro || 0;
       
-      // 2. Buscar registros rejeitados detalhados (se disponíveis)
+      console.log(`🔍 Buscando exclusões do lote: ${loteAtual || 'sem_lote'}`);
+      
+      // 2. Buscar TODOS os registros rejeitados detalhados (sistema novo de auditoria)
       const { data: rejeitados } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
         .eq('arquivo_fonte', 'volumetria_padrao')
-        .eq('lote_upload', loteAtual || 'sem_lote')
         .order('linha_original', { ascending: true })
-        .limit(10000);
+        .limit(50000); // Aumentar limite para capturar todas as exclusões
 
-      console.log(`🔍 Buscando exclusões do lote: ${loteAtual || 'sem_lote'}`);
-      console.log('🔍 Registros rejeitados encontrados:', rejeitados?.length || 0);
+      console.log(`🔍 Registros rejeitados encontrados: ${rejeitados?.length || 0}`);
 
       if (rejeitados && rejeitados.length > 0) {
-        // Caso 1: Registros detalhados disponíveis (função nova)
+        // CASO 1: Sistema novo - registros detalhados disponíveis
         const registrosFormatados = rejeitados.map((r, index) => {
           const dados = r.dados_originais as Record<string, any> || {};
           
@@ -154,20 +154,20 @@ export function RelatorioExclusoes() {
         setRegistrosExcluidos(registrosFormatados);
         
         toast({
-          title: "✅ Exclusões Carregadas",
-          description: `${registrosFormatados.length} registros rejeitados com detalhes completos`,
+          title: "✅ Exclusões Carregadas - Sistema Atualizado",
+          description: `${registrosFormatados.length.toLocaleString()} registros rejeitados com detalhes completos do sistema de auditoria`,
         });
       } else if (totalRejeicoes > 0) {
-        // Caso 2: Há rejeições mas sem detalhes salvos (função antiga)
+        // CASO 2: Sistema antigo - há rejeições mas sem detalhes salvos
         setRegistrosExcluidos([]);
         
         toast({
-          title: "📊 Exclusões Detectadas - Função Anterior",
-          description: `${totalRejeicoes.toLocaleString()} registros foram rejeitados no processamento, mas os detalhes individuais não foram capturados pela versão anterior da função.`,
+          title: "📊 Exclusões Detectadas - Sistema Anterior",
+          description: `${totalRejeicoes.toLocaleString()} registros foram rejeitados, mas os detalhes não foram capturados pela versão anterior. Próximos uploads terão auditoria completa.`,
           variant: "default"
         });
       } else {
-        // Caso 3: Nenhuma rejeição
+        // CASO 3: Nenhuma rejeição
         setRegistrosExcluidos([]);
         toast({
           title: "✅ Nenhuma Exclusão",
@@ -530,11 +530,15 @@ export function RelatorioExclusoes() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Registros Excluídos - Listagem Detalhada</CardTitle>
+            <div>
+              <CardTitle>📋 Sistema de Auditoria de Exclusões - ATIVADO</CardTitle>
+              <CardDescription>
+                <strong>✅ Sistema Atualizado:</strong> Todos os registros rejeitados agora são automaticamente capturados e salvos com detalhes completos para análise.
+              </CardDescription>
+            </div>
             <Button 
               onClick={carregarRegistrosExcluidos} 
               disabled={loadingDetalhes}
-              variant="outline"
               className="flex items-center gap-2"
             >
               {loadingDetalhes ? (
@@ -545,10 +549,6 @@ export function RelatorioExclusoes() {
               {loadingDetalhes ? 'Carregando...' : 'Carregar Registros Detalhados'}
             </Button>
           </div>
-          <CardDescription>
-            📊 <strong>Sistema Atualizado:</strong> Agora capturamos e exibimos TODAS as exclusões detalhadamente. 
-            As exclusões dos uploads futuros serão listadas aqui com o motivo específico de cada rejeição.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {registrosExcluidos.length > 0 ? (
@@ -572,8 +572,8 @@ export function RelatorioExclusoes() {
                         <th className="text-left p-3 border-b">Data Exame</th>
                         <th className="text-left p-3 border-b">Data Laudo</th>
                         <th className="text-left p-3 border-b">Especialidade</th>
-                        <th className="text-left p-3 border-b">Modalidade</th>
-                        <th className="text-left p-3 border-b">Motivo Exclusão</th>
+                        <th className="text-left p-3 border-b">Categoria</th>
+                        <th className="text-left p-3 border-b">Motivo da Exclusão</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -584,17 +584,25 @@ export function RelatorioExclusoes() {
                           <td className="p-3 border-b">{registro.data_exame}</td>
                           <td className="p-3 border-b">{registro.data_laudo}</td>
                           <td className="p-3 border-b">{registro.especialidade}</td>
-                          <td className="p-3 border-b">{registro.modalidade}</td>
+                          <td className="p-3 border-b">{registro.categoria}</td>
                           <td className="p-3 border-b">
                             <Badge 
                               variant={
-                                registro.motivo_exclusao.includes('v032') ? 'destructive' : 
-                                registro.motivo_exclusao.includes('v031') ? 'secondary' : 
+                                registro.motivo_exclusao.includes('CAMPO_OBRIGATORIO_AUSENTE') ? 'destructive' : 
+                                registro.motivo_exclusao.includes('DATA_OBRIGATORIA_AUSENTE') ? 'destructive' :
+                                registro.motivo_exclusao.includes('FORMATO_DATA_INVALIDO') ? 'destructive' :
+                                registro.motivo_exclusao.includes('REGRA_V031') ? 'secondary' : 
+                                registro.motivo_exclusao.includes('REGRA_V002') ? 'secondary' :
+                                registro.motivo_exclusao.includes('REGRA_V003') ? 'secondary' :
                                 'outline'
                               }
-                              className="text-xs"
+                              className="text-xs max-w-xs"
+                              title={registro.motivo_exclusao}
                             >
-                              {registro.motivo_exclusao}
+                              {registro.motivo_exclusao.length > 50 
+                                ? `${registro.motivo_exclusao.substring(0, 50)}...` 
+                                : registro.motivo_exclusao
+                              }
                             </Badge>
                           </td>
                         </tr>
