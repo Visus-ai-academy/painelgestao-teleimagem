@@ -43,8 +43,8 @@ export function RelatorioExclusoes() {
   const carregarDadosExclusoes = async () => {
     try {
       setLoading(true);
-
-      // Buscar upload mais recente e estatísticas reais
+      
+      // Buscar dados do último upload de volumetria
       const { data: ultimoUpload } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -72,22 +72,15 @@ export function RelatorioExclusoes() {
       console.log(`  - Rejeitados durante processamento: ${registrosErros} registros`);
       console.log(`  - Atualmente na base: ${registrosAtuais} registros`);
       
-      // Buscar registros rejeitados do último lote
-      const detalhesErro = upload?.detalhes_erro as any;
-      const loteUpload = detalhesErro?.lote_upload || '';
-      const { data: registrosRejeitados } = await supabase
-        .from('registros_rejeitados_processamento')
-        .select('motivo_rejeicao')
-        .eq('arquivo_fonte', 'volumetria_padrao')
-        .eq('lote_upload', loteUpload)
-        .limit(100);
-
-      // Determinar motivos específicos das exclusões
+      // Determinar motivos específicos das exclusões baseados na regra v031 e campos obrigatórios
       const motivosExclusao = [
-        `${registrosErros} registros rejeitados durante processamento`,
-        'Campos obrigatórios: EMPRESA, NOME_PACIENTE, ESTUDO_DESCRICAO vazios ou ausentes',
-        'Conversão de dados: datas em formato inválido, valores não numéricos',
-        'Estrutura: linhas malformadas ou dados inconsistentes'
+        `${registrosErros} registros rejeitados durante processamento (campos obrigatórios, datas inválidas)`,
+        'CAMPOS OBRIGATÓRIOS VAZIOS: EMPRESA, NOME_PACIENTE, ESTUDO_DESCRICAO',
+        'DATAS OBRIGATÓRIAS VAZIAS: DATA_LAUDO, DATA_REALIZACAO', 
+        'DATAS EM FORMATO INVÁLIDO: formato deve ser DD/MM/YYYY',
+        'REGRA v031 - DATA_REALIZACAO: deve estar entre 01/06/2025 e 30/06/2025',
+        'REGRA v031 - DATA_LAUDO: deve estar entre 01/06/2025 e 07/07/2025',
+        'CONVERSÃO DE DADOS: valores não numéricos, estrutura de linha inválida'
       ];
 
       const analise: AnaliseVolumetria[] = [{
@@ -119,14 +112,17 @@ export function RelatorioExclusoes() {
       // 1. Buscar o upload mais recente para identificar o lote atual
       const { data: ultimoUpload } = await supabase
         .from('processamento_uploads')
-        .select('id, created_at, detalhes_erro')
+        .select('id, created_at, detalhes_erro, registros_erro')
         .eq('tipo_arquivo', 'volumetria_padrao')
         .order('created_at', { ascending: false })
         .limit(1);
 
-      const loteAtual = (ultimoUpload?.[0]?.detalhes_erro as any)?.lote_upload;
+      const upload = ultimoUpload?.[0];
+      const detalhesErro = upload?.detalhes_erro as any;
+      const loteAtual = detalhesErro?.lote_upload;
+      const totalRejeicoes = upload?.registros_erro || 0;
       
-      // 2. Buscar APENAS os registros rejeitados do lote mais recente
+      // 2. Buscar registros rejeitados detalhados (se disponíveis)
       const { data: rejeitados } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
@@ -139,6 +135,7 @@ export function RelatorioExclusoes() {
       console.log('🔍 Registros rejeitados encontrados:', rejeitados?.length || 0);
 
       if (rejeitados && rejeitados.length > 0) {
+        // Caso 1: Registros detalhados disponíveis (função nova)
         const registrosFormatados = rejeitados.map((r, index) => {
           const dados = r.dados_originais as Record<string, any> || {};
           
@@ -158,13 +155,34 @@ export function RelatorioExclusoes() {
         
         toast({
           title: "✅ Exclusões Carregadas",
-          description: `${registrosFormatados.length} registros rejeitados do lote mais recente`,
+          description: `${registrosFormatados.length} registros rejeitados com detalhes completos`,
+        });
+      } else if (totalRejeicoes > 0) {
+        // Caso 2: Há rejeições mas sem detalhes salvos (função antiga)
+        const registrosPlaceholder = [{
+          cliente: 'DADOS NÃO DETALHADOS',
+          paciente: 'FUNÇÃO DE PROCESSAMENTO ANTIGA',
+          data_exame: 'N/A',
+          data_laudo: 'N/A', 
+          especialidade: 'N/A',
+          modalidade: 'N/A',
+          categoria: 'N/A',
+          motivo_exclusao: `${totalRejeicoes} registros rejeitados - detalhes não capturados pela versão anterior do processador`
+        }];
+        
+        setRegistrosExcluidos(registrosPlaceholder);
+        
+        toast({
+          title: "⚠️ Exclusões Detectadas",
+          description: `${totalRejeicoes} rejeições encontradas, mas sem detalhes individuais. Use a função processar-volumetria-mobilemed no próximo upload.`,
+          variant: "destructive"
         });
       } else {
+        // Caso 3: Nenhuma rejeição
         setRegistrosExcluidos([]);
         toast({
-          title: "ℹ️ Nenhuma Exclusão",
-          description: `Nenhum registro rejeitado no lote atual (${loteAtual || 'sem_lote'}). O sistema capturará exclusões no próximo upload.`,
+          title: "✅ Nenhuma Exclusão",
+          description: "Todos os registros foram processados com sucesso!",
         });
       }
 
@@ -183,26 +201,29 @@ export function RelatorioExclusoes() {
 
   const exportarParaExcel = async () => {
     try {
-      // Buscar o lote mais recente para Excel
+      // Buscar o upload mais recente para Excel
       const { data: ultimoUpload } = await supabase
         .from('processamento_uploads')
-        .select('id, created_at, detalhes_erro')
+        .select('*')
         .eq('tipo_arquivo', 'volumetria_padrao')
         .order('created_at', { ascending: false })
         .limit(1);
 
-      const loteAtual = (ultimoUpload?.[0]?.detalhes_erro as any)?.lote_upload;
+      const upload = ultimoUpload?.[0];
+      const detalhesErro = upload?.detalhes_erro as any;
+      const loteAtual = detalhesErro?.lote_upload;
+      const totalErrosExcel = upload?.registros_erro || 0;
       
-      // Buscar TODAS as exclusões detalhadas do lote mais recente
-      const { data: todasExclusoes } = await supabase
+      // Buscar registros rejeitados detalhados para Excel
+      const { data: rejeitadosExcel } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
         .eq('arquivo_fonte', 'volumetria_padrao')
         .eq('lote_upload', loteAtual || 'sem_lote')
         .order('linha_original', { ascending: true })
-        .limit(10000); // Buscar todas as exclusões até 10k
-
-      console.log(`🔍 Buscando exclusões detalhadas do lote ${loteAtual} para Excel... Encontradas: ${todasExclusoes?.length || 0}`);
+        .limit(10000);
+        
+      console.log(`🔍 Buscando exclusões detalhadas do lote ${loteAtual} para Excel... Encontradas: ${rejeitadosExcel?.length || 0}`);
       
       const wb = XLSX.utils.book_new();
 
@@ -219,46 +240,62 @@ export function RelatorioExclusoes() {
       const wsAnalise = XLSX.utils.json_to_sheet(analiseData);
       XLSX.utils.book_append_sheet(wb, wsAnalise, 'Análise Exclusões');
 
-      // Aba 2: TODAS as Exclusões Detalhadas (6.831 registros)
-      const registrosData = todasExclusoes && todasExclusoes.length > 0 
-        ? todasExclusoes.map((exclusao, index) => {
-            const dados = exclusao.dados_originais as Record<string, any> || {};
-            return {
-              'Linha': exclusao.linha_original,
-              'Cliente': dados.EMPRESA || 'N/A',
-              'Paciente': dados.NOME_PACIENTE || 'N/A',
-              'Exame': dados.ESTUDO_DESCRICAO || 'N/A',
-              'Data Realização': dados.DATA_REALIZACAO || 'N/A',
-              'Data Laudo': dados.DATA_LAUDO || 'N/A',
-              'Modalidade': dados.MODALIDADE || 'N/A',
-              'Especialidade': dados.ESPECIALIDADE || 'N/A',
-              'Valores': dados.VALORES || 'N/A',
-              'Prioridade': dados.PRIORIDADE || 'N/A',
-              'Código Motivo': exclusao.motivo_rejeicao,
-              'Motivo Detalhado': exclusao.detalhes_erro,
-              'Lote Upload': exclusao.lote_upload,
-              'Data Processamento': exclusao.created_at ? new Date(exclusao.created_at).toLocaleString('pt-BR') : 'N/A'
-            };
+      // Sheet 2: Registros Excluídos
+      if (rejeitadosExcel && rejeitadosExcel.length > 0) {
+        const registrosExcelData = [
+          ['Linha', 'Cliente', 'Paciente', 'Estudo', 'Data Exame', 'Data Laudo', 'Modalidade', 'Especialidade', 'Motivo', 'Detalhes'],
+          ...rejeitadosExcel.map(r => {
+            const dados = r.dados_originais as Record<string, any> || {};
+            return [
+              r.linha_original || 0,
+              dados.EMPRESA || 'N/A',
+              dados.NOME_PACIENTE || 'N/A',
+              dados.ESTUDO_DESCRICAO || 'N/A',
+              dados.DATA_REALIZACAO || 'N/A',
+              dados.DATA_LAUDO || 'N/A',
+              dados.MODALIDADE || 'N/A',
+              dados.ESPECIALIDADE || 'N/A',
+              r.motivo_rejeicao || 'N/A',
+              r.detalhes_erro || 'N/A'
+            ];
           })
-        : [{ 
-            'Linha': 'Nenhum',
-            'Cliente': 'Nenhum registro rejeitado encontrado no banco',
-            'Paciente': 'Faça um novo upload para capturar exclusões',
-            'Exame': 'Sistema atualizado para capturar todos os detalhes',
-            'Data Realização': '',
-            'Data Laudo': '',
-            'Modalidade': '',
-            'Especialidade': '',
-            'Valores': '',
-            'Prioridade': '',
-            'Código Motivo': 'SEM_DADOS',
-            'Motivo Detalhado': 'Sistema não capturou exclusões anteriores',
-            'Lote Upload': '',
-            'Data Processamento': ''
-          }];
-
-      const wsRegistros = XLSX.utils.json_to_sheet(registrosData);
-      XLSX.utils.book_append_sheet(wb, wsRegistros, 'Registros Excluídos');
+        ];
+        
+        const wsExclusoes = XLSX.utils.aoa_to_sheet(registrosExcelData);
+        XLSX.utils.book_append_sheet(wb, wsExclusoes, "Registros Excluídos");
+      } else {
+        // Placeholder detalhado com análise dos campos obrigatórios
+        const wsExclusoesPlaceholder = XLSX.utils.aoa_to_sheet([
+          ['🚨 ANÁLISE DE EXCLUSÕES - UPLOAD ATUAL', ''],
+          ['Total Registros Rejeitados', `${totalErrosExcel} registros`],
+          ['Status Detalhamento', 'Indisponível - função de processamento anterior usada'],
+          ['', ''],
+          ['📋 CAMPOS OBRIGATÓRIOS QUE CAUSAM REJEIÇÃO', ''],
+          ['Campo', 'Descrição da Validação'],
+          ['EMPRESA', 'Campo obrigatório - não pode estar vazio ou nulo'],
+          ['NOME_PACIENTE', 'Campo obrigatório - não pode estar vazio ou nulo'],
+          ['ESTUDO_DESCRICAO', 'Campo obrigatório - não pode estar vazio ou nulo'],
+          ['DATA_LAUDO', 'Campo obrigatório - formato deve ser DD/MM/YYYY'],
+          ['DATA_REALIZACAO', 'Campo obrigatório - formato deve ser DD/MM/YYYY'],
+          ['', ''],
+          ['📅 REGRAS DE PERÍODO (v031) - JUN/2025', ''],
+          ['Regra', 'Validação'],
+          ['DATA_REALIZACAO válida', 'Deve estar entre 01/06/2025 e 30/06/2025'],
+          ['DATA_LAUDO válida', 'Deve estar entre 01/06/2025 e 07/07/2025'],
+          ['', ''],
+          ['🔧 SOLUÇÃO PARA PRÓXIMOS UPLOADS', ''],
+          ['Função Recomendada', 'processar-volumetria-mobilemed'],
+          ['Benefício', 'Captura detalhes completos de cada rejeição'],
+          ['Resultado', 'Relatório com linha específica e motivo detalhado'],
+          ['', ''],
+          ['📊 ESTATÍSTICAS DO UPLOAD ATUAL', ''],
+          ['Registros Totais', upload?.registros_processados || 0],
+          ['Processados com Sucesso', upload?.registros_inseridos || 0],
+          ['Rejeitados', totalErrosExcel],
+          ['Taxa de Rejeição', `${totalErrosExcel > 0 && upload?.registros_processados ? ((totalErrosExcel / upload.registros_processados) * 100).toFixed(1) : 0}%`]
+        ]);
+        XLSX.utils.book_append_sheet(wb, wsExclusoesPlaceholder, "Análise Exclusões");
+      }
 
       // Aba 3: Regras Aplicadas
       const regrasData = [
@@ -324,7 +361,7 @@ export function RelatorioExclusoes() {
 
       toast({
         title: "✅ Excel Gerado",
-        description: `Relatório completo exportado com ${todasExclusoes?.length || 0} exclusões detalhadas`,
+        description: `Relatório completo exportado com ${rejeitadosExcel?.length || totalErrosExcel || 0} exclusões detalhadas`,
       });
 
     } catch (error) {
