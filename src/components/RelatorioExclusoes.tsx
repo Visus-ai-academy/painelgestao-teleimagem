@@ -46,29 +46,74 @@ export function RelatorioExclusoes() {
     try {
       setLoading(true);
       
-      // Buscar dados do último upload de volumetria
-      const { data: ultimoUpload } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .eq('tipo_arquivo', 'volumetria_padrao')
+      // Primeiro, buscar o último lote de upload baseado nos dados da volumetria
+      const { data: ultimoLote } = await supabase
+        .from('volumetria_mobilemed')
+        .select('lote_upload, arquivo_fonte, created_at')
         .order('created_at', { ascending: false })
         .limit(1);
 
-      setUltimoUpload(ultimoUpload?.[0]);
-
-      if (ultimoUpload && ultimoUpload.length > 0) {
-        const upload = ultimoUpload[0];
-        const detalhesErro = upload.detalhes_erro as any;
+      let ultimoUploadInfo = null;
+      
+      if (ultimoLote && ultimoLote.length > 0) {
+        const loteAtual = ultimoLote[0].lote_upload;
         
-        // Simular análise para exibição
+        // Contar registros do último lote
+        const { count: totalLote } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('lote_upload', loteAtual);
+
+        // Buscar se existe registro na tabela de uploads para este lote (busca mais ampla)
+        const { data: uploadData } = await supabase
+          .from('processamento_uploads')
+          .select('*')
+          .or(`detalhes_erro->>lote_upload.eq.${loteAtual},arquivo_nome.ilike.%${loteAtual.slice(-10)}%`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        // Contar registros rejeitados do lote atual
+        const { count: rejeitadosLote } = await supabase
+          .from('registros_rejeitados_processamento')
+          .select('*', { count: 'exact', head: true })
+          .eq('lote_upload', loteAtual);
+
+        if (uploadData && uploadData.length > 0) {
+          // Atualizar dados do upload existente com registros rejeitados corretos
+          ultimoUploadInfo = {
+            ...uploadData[0],
+            registros_erro: rejeitadosLote || 0
+          };
+        } else {
+          // Se não tem registro no processamento_uploads, criar estrutura com dados do lote
+          ultimoUploadInfo = {
+            id: 'virtual',
+            arquivo_nome: `Upload ${new Date(ultimoLote[0].created_at).toLocaleString('pt-BR')}`,
+            tipo_arquivo: ultimoLote[0].arquivo_fonte,
+            status: 'concluido',
+            created_at: ultimoLote[0].created_at,
+            registros_processados: totalLote || 0,
+            registros_inseridos: totalLote || 0,
+            registros_erro: rejeitadosLote || 0,
+            detalhes_erro: {}
+          };
+        }
+      }
+
+      setUltimoUpload(ultimoUploadInfo);
+
+      if (ultimoUploadInfo) {
+        const detalhesErro = ultimoUploadInfo.detalhes_erro as any;
+        
+        // Criar análise baseada nos dados reais
         const analise: AnaliseVolumetria[] = [{
-          arquivo_fonte: 'volumetria_padrao',
-          registros_atuais: upload.registros_inseridos || 0,
-          registros_originais: upload.registros_processados || 0,
-          registros_excluidos: upload.registros_erro || 0,
+          arquivo_fonte: ultimoUploadInfo.tipo_arquivo || 'volumetria_padrao',
+          registros_atuais: ultimoUploadInfo.registros_inseridos || 0,
+          registros_originais: ultimoUploadInfo.registros_processados || 0,
+          registros_excluidos: ultimoUploadInfo.registros_erro || 0,
           motivos_exclusao: detalhesErro?.exclusoes_por_motivo ? 
             Object.keys(detalhesErro.exclusoes_por_motivo) : 
-            ['Informações detalhadas não disponíveis']
+            ['Nenhum registro rejeitado']
         }];
         
         setAnaliseVolumetria(analise);
@@ -90,10 +135,20 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      // Buscar TODOS os registros rejeitados detalhados (sistema de auditoria)
+      // Primeiro, buscar o último lote de upload
+      const { data: ultimoLote } = await supabase
+        .from('volumetria_mobilemed')
+        .select('lote_upload')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const loteAtual = ultimoLote?.[0]?.lote_upload;
+      
+      // Buscar registros rejeitados APENAS do último lote
       const { data: rejeitados, error: rejeitadosError } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
+        .eq('lote_upload', loteAtual)
         .order('created_at', { ascending: false })
         .limit(50000);
 
