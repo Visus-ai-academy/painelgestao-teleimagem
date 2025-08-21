@@ -336,47 +336,21 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = useCallback(async () => {
-    console.log('🔄 FORÇANDO REFRESH TOTAL - RESETANDO TUDO...');
-    lastLoadTime.current = 0;
-    isLoadingRef.current = false;
+    console.log('🔄 FORÇANDO REFRESH TOTAL DOS DADOS...');
     
-    // LIMPAR TODOS OS CACHES
+    // LIMPAR CACHES
     localStorage.clear();
     sessionStorage.clear();
     
-    // RESETAR ESTADO COMPLETAMENTE
-    setData({
-      stats: {
-        volumetria_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
-        volumetria_fora_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
-        volumetria_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
-        volumetria_fora_padrao_retroativo: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
-        volumetria_onco_padrao: { totalRecords: 0, recordsWithValue: 0, recordsZeroed: 0, totalValue: 0 },
-      },
-      lastUploads: {},
-      detailedData: [],
-      clientesStats: [],
-      clientes: [],
-      modalidades: [],
-      especialidades: [],
-      prioridades: [],
-      medicos: [],
-      dashboardStats: {
-        total_exames: 0,
-        total_registros: 0,
-        total_atrasados: 0,
-        percentual_atraso: 0,
-        total_clientes: 0,
-        total_clientes_volumetria: 0,
-        total_modalidades: 0,
-        total_especialidades: 0,
-        total_medicos: 0,
-        total_prioridades: 0
-      },
-      loading: true
-    });
+    // RESETAR FLAGS
+    lastLoadTime.current = 0;
+    isLoadingRef.current = false;
     
-    console.log('💥 Estado resetado, carregando dados frescos...');
+    // MARCAR COMO CARREGANDO E RECARREGAR IMEDIATAMENTE
+    setData(prev => ({ ...prev, loading: true }));
+    console.log('💫 Iniciando carregamento após refresh...');
+    
+    // RECARREGAR DADOS IMEDIATAMENTE
     await loadStats();
   }, [loadStats]);
 
