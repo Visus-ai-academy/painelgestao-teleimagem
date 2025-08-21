@@ -112,17 +112,21 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
     // ANÁLISE DETALHADA DOS CAMPOS OBRIGATÓRIOS
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
+    const estudoDescricao = row['ESTUDO_DESCRICAO'] || '';
     
     // Log detalhado para TODOS os casos problemáticos
     const empresaVazia = !empresaOriginal || empresaOriginal.toString().trim() === '';
     const nomeVazio = !nomePaciente || nomePaciente.toString().trim() === '';
+    const estudoVazio = !estudoDescricao || estudoDescricao.toString().trim() === '';
     
-    if (empresaVazia || nomeVazio) {
+    if (empresaVazia || nomeVazio || estudoVazio) {
       console.log(`❌ REJEIÇÃO [${rowIndex}] - CAMPOS OBRIGATÓRIOS VAZIOS:`);
       console.log(`  - EMPRESA: "${empresaOriginal}" (vazia: ${empresaVazia})`);
-      console.log(`  - NOME_PACIENTE: "${nomePaciente}" (vazia: ${nomeVazio})`);
-      console.log(`  - Todas as chaves: [${Object.keys(row).join(', ')}]`);
-      console.log(`  - Valores das 10 primeiras: ${Object.keys(row).slice(0, 10).map(k => `${k}:"${row[k]}"`).join(', ')}`);
+      console.log(`  - NOME_PACIENTE: "${nomePaciente}" (vazio: ${nomeVazio})`);
+      console.log(`  - ESTUDO_DESCRICAO: "${estudoDescricao}" (vazio: ${estudoVazio})`);
+      console.log(`  - DATA_LAUDO: "${row['DATA_LAUDO']}"`);
+      console.log(`  - DATA_REALIZACAO: "${row['DATA_REALIZACAO']}"`);
+      console.log(`  - Linha do Excel: ${rowIndex}`);
       return null; // REJEITAR registro com campos obrigatórios vazios
     }
 
@@ -284,6 +288,17 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
           
           // Registrar motivo da rejeição para auditoria
           try {
+            // Determinar motivo específico baseado na análise dos campos
+            let motivoDetalhado = 'campos_obrigatorios_vazios';
+            let detalhesEspecificos = [];
+            
+            if (!row['EMPRESA'] || row['EMPRESA'].toString().trim() === '') {
+              detalhesEspecificos.push('EMPRESA vazio ou ausente');
+            }
+            if (!row['NOME_PACIENTE'] || row['NOME_PACIENTE'].toString().trim() === '') {
+              detalhesEspecificos.push('NOME_PACIENTE vazio ou ausente');
+            }
+            
             await supabaseClient
               .from('registros_rejeitados_processamento')
               .insert({
@@ -291,11 +306,13 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
                 lote_upload: loteUpload,
                 linha_original: totalProcessed + 1,
                 dados_originais: row,
-                motivo_rejeicao: 'erro_processamento',
-                detalhes_erro: 'Registro rejeitado durante processamento (campos obrigatórios ou outros erros)'
+                motivo_rejeicao: motivoDetalhado,
+                detalhes_erro: `Campos obrigatórios inválidos: ${detalhesEspecificos.join(', ')}`
               });
+              
+            console.log(`📝 Auditoria registrada: Linha ${totalProcessed + 1} - ${detalhesEspecificos.join(', ')}`);
           } catch (auditError) {
-            console.warn('Erro ao registrar rejeição:', auditError);
+            console.warn(`⚠️ Falha ao registrar auditoria linha ${totalProcessed + 1}:`, auditError);
           }
           totalErrors++;
         }
@@ -312,11 +329,13 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
               lote_upload: loteUpload,
               linha_original: totalProcessed + 1,
               dados_originais: row,
-              motivo_rejeicao: 'erro_processamento',
-              detalhes_erro: error.message
+              motivo_rejeicao: 'erro_conversao_dados',
+              detalhes_erro: `Erro na conversão de dados: ${error.message}`
             });
+            
+          console.log(`📝 Auditoria erro registrada: Linha ${totalProcessed + 1} - ${error.message}`);
         } catch (auditError) {
-          console.warn('Erro ao registrar erro de processamento:', auditError);
+          console.warn(`⚠️ Falha ao registrar erro linha ${totalProcessed + 1}:`, auditError);
         }
         totalErrors++;
       }

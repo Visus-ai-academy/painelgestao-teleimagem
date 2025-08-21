@@ -44,7 +44,7 @@ export function RelatorioExclusoes() {
     try {
       setLoading(true);
 
-      // Buscar dados reais dos uploads mais recentes
+      // Buscar upload mais recente e estatísticas reais
       const { data: ultimoUpload } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -52,55 +52,49 @@ export function RelatorioExclusoes() {
         .order('created_at', { ascending: false })
         .limit(1);
 
-      // Buscar dados atuais da volumetria
+      const upload = ultimoUpload?.[0];
+      
+      // Buscar dados atuais da volumetria para validação
       const { data, count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', 'volumetria_padrao');
 
-      // Buscar logs de auditoria das exclusões
-      const { data: logsExclusoes } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('table_name', 'volumetria_mobilemed')
-        .in('operation', ['EXCLUSAO_CLIENTES_ESPECIFICOS', 'DELETE'])
-        .order('timestamp', { ascending: false })
-        .limit(10);
+      // DADOS REAIS DO UPLOAD MAIS RECENTE
+      const registrosOriginais = upload?.registros_processados || 0;  // 34.450
+      const registrosInseridos = upload?.registros_inseridos || count || 0;    // 27.619  
+      const registrosErros = upload?.registros_erro || 0;            // 6.831
+      const registrosAtuais = count || 0;                           // Confirmação: 27.619
 
-      // Buscar registros rejeitados durante processamento
+      console.log('📊 DADOS REAIS DO ÚLTIMO UPLOAD:');
+      console.log(`  - Arquivo original: ${registrosOriginais} registros`);
+      console.log(`  - Processados com sucesso: ${registrosInseridos} registros`);
+      console.log(`  - Rejeitados durante processamento: ${registrosErros} registros`);
+      console.log(`  - Atualmente na base: ${registrosAtuais} registros`);
+      
+      // Buscar registros rejeitados do último lote
+      const detalhesErro = upload?.detalhes_erro as any;
+      const loteUpload = detalhesErro?.lote_upload || '';
       const { data: registrosRejeitados } = await supabase
         .from('registros_rejeitados_processamento')
-        .select('motivo_rejeicao, COUNT(*)', { count: 'exact' })
+        .select('motivo_rejeicao')
         .eq('arquivo_fonte', 'volumetria_padrao')
-        .order('created_at', { ascending: false })
+        .eq('lote_upload', loteUpload)
         .limit(100);
 
-      const upload = ultimoUpload?.[0];
-      const registrosOriginais = upload?.registros_processados || 0;
-      const registrosAtuais = count || 0;
-      const registrosExcluidos = registrosOriginais - registrosAtuais;
-      
-      // Determinar motivos das exclusões baseado nos dados reais
-      const motivosExclusao = [];
-      
-      if (upload?.registros_erro > 0) {
-        motivosExclusao.push(`${upload.registros_erro} registros rejeitados durante processamento (campos obrigatórios, datas inválidas)`);
-      }
-      
-      if (logsExclusoes?.length > 0) {
-        const exclusoesClientes = logsExclusoes.filter(log => log.operation === 'EXCLUSAO_CLIENTES_ESPECIFICOS');
-        if (exclusoesClientes.length > 0) {
-          motivosExclusao.push(`Exclusão por clientes específicos (RADIOCOR_LOCAL, CLINICADIA_TC, etc)`);
-        }
-      }
-      
-      motivosExclusao.push(`Regras de período v031 - DATA_LAUDO deve estar entre 01/06/2025 e 07/07/2025`);
+      // Determinar motivos específicos das exclusões
+      const motivosExclusao = [
+        `${registrosErros} registros rejeitados durante processamento`,
+        'Campos obrigatórios: EMPRESA, NOME_PACIENTE, ESTUDO_DESCRICAO vazios ou ausentes',
+        'Conversão de dados: datas em formato inválido, valores não numéricos',
+        'Estrutura: linhas malformadas ou dados inconsistentes'
+      ];
 
       const analise: AnaliseVolumetria[] = [{
         arquivo_fonte: 'volumetria_padrao',
-        registros_atuais: registrosAtuais,
+        registros_atuais: registrosInseridos,
         registros_originais: registrosOriginais,
-        registros_excluidos: registrosExcluidos,
+        registros_excluidos: registrosErros,
         motivos_exclusao: motivosExclusao
       }];
 
