@@ -1,0 +1,1 @@
+DELETE FROM especialidades WHERE nome = 'COLUNAS';
