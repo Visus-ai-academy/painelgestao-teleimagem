@@ -687,20 +687,36 @@ serve(async (req) => {
       // Inserir registros rejeitados (AUDITORIA DE EXCLUSÕES)
       if (batchRejections.length > 0) {
         try {
-          EdgeRuntime.waitUntil(
-            supabaseClient
-              .from('registros_rejeitados_processamento')
-              .insert(batchRejections)
-              .then(({ error }) => {
-                if (error) {
-                  console.error(`❌ Erro ao salvar rejeições lote ${batchNumber}:`, error);
-                } else {
-                  console.log(`📝 Lote ${batchNumber}: ${batchRejections.length} rejeições salvas para auditoria`);
-                }
-              })
-          );
+          // 💾 SALVAR REJEIÇÕES - VERSÃO CORRIGIDA COM AWAIT
+          console.log(`💾 Salvando ${batchRejections.length} rejeições para auditoria (lote ${batchNumber})...`);
+          
+          // Preparar dados para inserção com validação
+          const rejectionsToInsert = batchRejections.map((rejection, index) => {
+            const safeRejection = {
+              arquivo_fonte: String(rejection.arquivo_fonte || arquivo_fonte),
+              lote_upload: String(rejection.lote_upload || loteUpload),
+              linha_original: Number(rejection.linha_original || (i + index + 1)),
+              dados_originais: typeof rejection.dados_originais === 'object' ? rejection.dados_originais : {},
+              motivo_rejeicao: String(rejection.motivo_rejeicao || 'ERRO_DESCONHECIDO'),
+              detalhes_erro: String(rejection.detalhes_erro || 'Sem detalhes disponíveis'),
+            };
+            return safeRejection;
+          });
+          
+          const { data: insertResult, error: insertError } = await supabaseClient
+            .from('registros_rejeitados_processamento')
+            .insert(rejectionsToInsert)
+            .select('id');
+          
+          if (insertError) {
+            console.error(`❌ Erro detalhado ao inserir rejeições:`, insertError);
+            console.error(`❌ Dados tentando inserir:`, JSON.stringify(rejectionsToInsert.slice(0, 2), null, 2));
+          } else {
+            console.log(`✅ ${insertResult?.length || 0} rejeições salvas com sucesso no lote ${batchNumber}`);
+          }
         } catch (rejectedException) {
           console.error(`❌ Exceção ao salvar rejeições lote ${batchNumber}:`, rejectedException);
+          console.error(`❌ Stack trace:`, rejectedException.stack);
         }
       }
 
