@@ -87,14 +87,52 @@ export default async function handler(req: Request): Promise<Response> {
     let totalExcluidos = 0;
     const detalhes = [] as string[];
 
-    // CRÍTICO: REGRA v031 DESABILITADA para arquivos não-retroativos
-    // Esta regra estava excluindo registros automaticamente dos arquivos 1 e 2
-    // causando perda de dados não intencional
-    console.log(`⚠️ REGRA v031 DESABILITADA para volumetria_padrao e volumetria_fora_padrao`);
-    console.log(`📋 Para aplicar exclusões por período, usar função específica MANUALMENTE`);
-    
-    // A regra v031 só deve ser aplicada em arquivos retroativos através de triggers
-    // NÃO através desta função de exclusões por período
+    // REGRA v031: Filtro de período atual para arquivos NÃO-RETROATIVOS
+    console.log(`🗂️ Aplicando REGRA v031 nos arquivos não-retroativos...`);
+    console.log(`📅 REGRA v031 - REALIZAÇÃO entre: ${realizacaoInicioMes} e ${realizacaoFimMes}`);
+    console.log(`📅 REGRA v031 - LAUDO entre: ${laudoInicioJanela} e ${laudoFimJanela}`);
+
+    // Aplicar v031 em volumetria_padrao
+    const { error: errorV031_1, count: countV031_1 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_padrao')
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
+
+    if (!errorV031_1) {
+      const deletedV031_1 = countV031_1 || 0;
+      totalExcluidos += deletedV031_1;
+      detalhes.push(`REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_fora_padrao
+    const { error: errorV031_2, count: countV031_2 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_fora_padrao')
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
+
+    if (!errorV031_2) {
+      const deletedV031_2 = countV031_2 || 0;
+      totalExcluidos += deletedV031_2;
+      detalhes.push(`REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
+    }
+
+    // Aplicar v031 em volumetria_onco_padrao
+    const { error: errorV031_3, count: countV031_3 } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', 'volumetria_onco_padrao')
+      .or(`data_realizacao.lt.${realizacaoInicioMes},data_realizacao.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},data_laudo.lt.${laudoInicioJanela},data_laudo.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
+
+    if (!errorV031_3) {
+      const deletedV031_3 = countV031_3 || 0;
+      totalExcluidos += deletedV031_3;
+      detalhes.push(`REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+      console.log(`✅ REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
+    }
 
     // Arquivo 3: volumetria_padrao_retroativo
     console.log(`🗂️ Processando Arquivo 3 (volumetria_padrao_retroativo)...`);

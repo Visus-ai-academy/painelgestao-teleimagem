@@ -280,7 +280,7 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
         if (record) {
           allRecords.push(record);
         } else {
-          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Ver logs detalhados acima`);
+          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Campos obrigatórios vazios ou erro processamento`);
           totalErrors++;
         }
       } catch (error) {
@@ -380,9 +380,23 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
     try {
       console.log('🔧 Aplicando regras rápidas...');
       
-      // DESABILITADO: Exclusões automáticas por período causavam perda de registros
-      // As regras de exclusão devem ser aplicadas MANUALMENTE pelo usuário após validação
-      console.log('⚠️ EXCLUSÕES AUTOMÁTICAS DESABILITADAS para evitar perda de dados');
+      // Para arquivos 3 e 4 (retroativos), aplicar automaticamente as exclusões por período
+      if (arquivo_fonte.includes('retroativo') && periodo) {
+        console.log('🔧 Aplicando exclusões por período automaticamente...');
+        try {
+          const periodoReferencia = `${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(periodo.ano, periodo.mes - 1))}/${periodo.ano.toString().slice(-2)}`;
+          
+          const { data: exclusoesResult } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
+            body: { periodo_referencia: periodoReferencia }
+          });
+          
+          if (exclusoesResult) {
+            console.log('✅ Exclusões por período aplicadas:', exclusoesResult);
+          }
+        } catch (exclusoesError) {
+          console.warn('⚠️ Erro exclusões por período:', exclusoesError);
+        }
+      }
       
       // Aplicar correção de modalidade (Regra v030: DX→RX, CR→RX, mamografia→MG)
       try {
