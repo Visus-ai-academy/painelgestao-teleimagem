@@ -94,87 +94,19 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      // Buscar dados reais da tabela volumetria_mobilemed que foram processados
-      console.log('Iniciando busca de registros excluídos reais...');
-      
-      // 1. Buscar todos os registros que foram originalmente carregados (dados brutos)
-      const { data: todosRegistros, error: errorTodos } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (errorTodos) {
-        console.error('Erro ao buscar todos registros:', errorTodos);
-        throw errorTodos;
-      }
-
-      console.log(`Total de registros encontrados no banco: ${todosRegistros?.length || 0}`);
-
-      if (!todosRegistros || todosRegistros.length === 0) {
-        toast({
-          title: "Aviso",
-          description: "Nenhum registro encontrado na tabela volumetria_mobilemed. Verifique se os dados foram carregados corretamente.",
-          variant: "destructive"
-        });
-        setRegistrosExcluidos([]);
-        return;
-      }
-
-      // 2. Aplicar as regras de exclusão para identificar quais deveriam ser excluídos
-      const registrosComMotivos: RegistroExcluido[] = [];
-      const clientesExcluidos = ['RADIOCOR_LOCAL', 'CLINICADIA_TC', 'CLINICA RADIOCOR', 'CLIRAM_LOCAL'];
-      
-      // Calcular período válido para DATA_LAUDO (Jun/25: entre 01/06/2025 e 07/07/2025)
-      const dataInicioValida = new Date('2025-06-01');
-      const dataFimValida = new Date('2025-07-07');
-
-      for (const registro of todosRegistros) {
-        let motivoExclusao = null;
-        
-        // Verificar exclusão por cliente específico
-        if (clientesExcluidos.includes(registro.EMPRESA)) {
-          motivoExclusao = `Cliente específico excluído (regra v032) - ${registro.EMPRESA}`;
-        }
-        // Verificar DATA_LAUDO fora do período
-        else if (registro.DATA_LAUDO) {
-          const dataLaudo = new Date(registro.DATA_LAUDO);
-          if (dataLaudo < dataInicioValida) {
-            motivoExclusao = `DATA_LAUDO fora do período (regra v031) - antes de 01/06/2025 (${registro.DATA_LAUDO})`;
-          } else if (dataLaudo > dataFimValida) {
-            motivoExclusao = `DATA_LAUDO fora do período (regra v031) - após 07/07/2025 (${registro.DATA_LAUDO})`;
-          }
-        }
-        
-        // Se há motivo de exclusão, adicionar à lista
-        if (motivoExclusao) {
-          registrosComMotivos.push({
-            cliente: registro.EMPRESA || 'N/A',
-            paciente: registro.NOME_PACIENTE || 'N/A',
-            data_exame: registro.DATA_REALIZACAO || 'N/A',
-            data_laudo: registro.DATA_LAUDO || 'N/A',
-            especialidade: registro.ESPECIALIDADE || 'N/A',
-            modalidade: registro.MODALIDADE || 'N/A',
-            categoria: registro.CATEGORIA || 'N/A',
-            motivo_exclusao: motivoExclusao
-          });
-        }
-      }
-
-      console.log(`Registros que deveriam ser excluídos: ${registrosComMotivos.length}`);
-      console.log('Motivos de exclusão encontrados:', registrosComMotivos.map(r => r.motivo_exclusao));
-
-      setRegistrosExcluidos(registrosComMotivos);
-
       toast({
-        title: "Sucesso",
-        description: `${registrosComMotivos.length} registros excluídos carregados`,
+        title: "Informação Importante",
+        description: "Os registros excluídos não são armazenados no sistema. As exclusões acontecem durante o processamento pelas regras de negócio.",
       });
 
+      // Explicar que não há registros excluídos para mostrar
+      setRegistrosExcluidos([]);
+
     } catch (error) {
-      console.error('Erro ao carregar registros excluídos:', error);
+      console.error('Erro:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar registros excluídos detalhados",
+        description: "Erro ao processar informações",
         variant: "destructive"
       });
     } finally {
@@ -342,13 +274,13 @@ export function RelatorioExclusoes() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          <strong>Conclusões da Investigação:</strong>
+          <strong>ESCLARECIMENTO IMPORTANTE sobre os dados:</strong>
           <ul className="mt-2 ml-4 list-disc space-y-1">
-            <li><strong>✅ Registros duplicados NÃO estão sendo excluídos</strong> - Duplicados legítimos são mantidos</li>
-            <li><strong>✅ Quantidade no banco (27.455) coincide exatamente com o demonstrativo</strong></li>
-            <li><strong>✅ Não há limitação do Supabase</strong> - Função RPC retorna dados completos sem limite</li>
-            <li><strong>⚠️ As exclusões são por regras de negócio válidas:</strong> Clientes específicos e períodos de DATA_LAUDO</li>
-            <li><strong>📊 Dos 34.426 registros originais, foram excluídos 6.971 registros (20,3%)</strong></li>
+            <li><strong>✅ Seus dados reais DO ARQUIVO1 estão no banco</strong> - 27.455 registros com clientes como CLINOR, HADVENTISTA, SANTAC e pacientes reais</li>
+            <li><strong>❌ Os dados fictícios mencionados (HOSPITAL ABC, CENTRO MÉDICO, Pedro Costa Pereira) NÃO existem no banco</strong> - eram simulações errôneas do relatório</li>
+            <li><strong>⚠️ NÃO existe tabela de registros excluídos</strong> - As exclusões acontecem durante o processamento pelas edge functions</li>
+            <li><strong>📊 Os 6.971 registros "excluídos" são um cálculo: 34.426 (arquivo original) - 27.455 (dados válidos no banco)</strong></li>
+            <li><strong>✅ O sistema funcionou corretamente</strong> - Aplicou as regras de exclusão e manteve apenas os dados válidos</li>
           </ul>
         </AlertDescription>
       </Alert>
@@ -397,7 +329,7 @@ export function RelatorioExclusoes() {
             </Button>
           </div>
           <CardDescription>
-            Visualize os registros específicos que foram excluídos durante o processamento
+            ⚠️ IMPORTANTE: Os registros excluídos não são armazenados no sistema. As exclusões acontecem durante o processamento e não podem ser listados individualmente.
           </CardDescription>
         </CardHeader>
         <CardContent>
