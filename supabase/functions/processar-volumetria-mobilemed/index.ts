@@ -208,15 +208,15 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
   console.log(`🏷️ Lote: ${loteUpload}`);
   console.log(`📅 Período: ${periodoReferencia}`);
 
-  // Constantes otimizadas para processar arquivos grandes
-  const LARGE_FILE_THRESHOLD = 5000; // Aumentado para permitir arquivos maiores
+  // Configuração otimizada para arquivos grandes sem limitações
+  const LARGE_FILE_THRESHOLD = 10000; // Apenas para ajustar configuração
   const isLargeFile = jsonData.length > LARGE_FILE_THRESHOLD;
   
-  // Configuração balanceada para arquivos grandes
-  const CHUNK_SIZE = isLargeFile ? 100 : 50;     // Chunks maiores para arquivos grandes
-  const BATCH_SIZE = 500;                        // Batches maiores para eficiência
-  const MAX_EXECUTION_TIME = 480000;             // 8 minutos para arquivos grandes
-  const PROGRESS_UPDATE_INTERVAL = 10;           // Updates menos frequentes
+  // Configuração robusta para processar todos os registros
+  const CHUNK_SIZE = isLargeFile ? 200 : 100;     // Chunks maiores
+  const BATCH_SIZE = 1000;                        // Batches maiores para máxima eficiência
+  const MAX_EXECUTION_TIME = 600000;              // 10 minutos para arquivos grandes
+  const PROGRESS_UPDATE_INTERVAL = 20;            // Updates menos frequentes
 
   console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
   console.log(`⚙️ Config: Chunk=${CHUNK_SIZE}, Batch=${BATCH_SIZE}, Timeout=${MAX_EXECUTION_TIME}ms`);
@@ -570,90 +570,9 @@ serve(async (req) => {
       }
     }
     
-    // Se arquivo muito grande, processar apenas parte e agendar continuação
-    const MAX_RECORDS_PER_EXECUTION = 100000; // Aumentado para volumes altos
-    const needsMultipleExecutions = jsonData.length > MAX_RECORDS_PER_EXECUTION;
+    // Processar arquivo completo sem limitações
+    console.log(`🚀 Processando arquivo completo: ${jsonData.length} registros`);
     
-    if (needsMultipleExecutions) {
-      console.log(`⚠️ Arquivo grande detectado: ${jsonData.length} registros`);
-      console.log(`🔄 Processando primeiros ${MAX_RECORDS_PER_EXECUTION} registros nesta execução`);
-      
-      // Processa apenas os primeiros registros
-      const currentBatch = jsonData.slice(0, MAX_RECORDS_PER_EXECUTION);
-      const remainingData = jsonData.slice(MAX_RECORDS_PER_EXECUTION);
-      
-      console.log(`🚀 Processando lote atual: ${currentBatch.length} registros`);
-      console.log(`⏳ Registros restantes: ${remainingData.length}`);
-      
-      const resultado = await processFileWithBatchControl(
-        currentBatch, 
-        arquivo_fonte, 
-        uploadLog.id, 
-        supabaseClient, 
-        file_path, 
-        periodo
-      );
-      
-      // Se ainda há dados para processar, agendar próxima execução
-      if (remainingData.length > 0) {
-        // Salvar dados restantes em um arquivo temporário para próxima execução
-        const remainingFileName = `${file_path}_remaining_${Date.now()}.json`;
-        
-        // TODO: Implementar salvamento dos dados restantes e agendamento
-        console.log(`📋 Dados restantes serão processados em próxima execução: ${remainingData.length} registros`);
-        
-        // Atualizar status para indicar processamento parcial
-        await supabaseClient
-          .from('processamento_uploads')
-          .update({
-            status: 'processamento_parcial',
-            detalhes_erro: JSON.stringify({
-              status: 'Processamento Parcial - Arquivo Grande',
-              total_registros: jsonData.length,
-              processados_nesta_execucao: currentBatch.length,
-              restantes: remainingData.length,
-              progresso: `${Math.round((currentBatch.length / jsonData.length) * 100)}%`,
-              mensagem: 'Arquivo muito grande. Processamento em andamento...'
-            })
-          })
-          .eq('id', uploadLog.id);
-      }
-      
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: needsMultipleExecutions ? `Processamento parcial: ${resultado.totalInserted} registros inseridos. ${remainingData.length} registros restantes serão processados automaticamente.` : "Processamento concluído",
-          upload_log_id: uploadLog.id,
-          totalProcessed: resultado.totalProcessed,
-          totalInserted: resultado.totalInserted,
-          totalErrors: resultado.totalErrors,
-          registrosAtualizadosDePara: resultado.registrosAtualizadosDePara,
-          isComplete: remainingData.length === 0,
-          executionTime: resultado.executionTime,
-          remainingRecords: remainingData.length,
-          stats: {
-            total_arquivo: jsonData.length,
-            processados: resultado.totalProcessed,
-            inseridos: resultado.totalInserted,
-            atualizados: resultado.registrosAtualizadosDePara,
-            erros: resultado.totalErrors,
-            restantes: remainingData.length,
-            completo: remainingData.length === 0,
-            tempo_ms: resultado.executionTime,
-            lote_upload: resultado.loteUpload,
-            periodo_referencia: resultado.periodoReferencia
-          }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      );
-    } else {
-      console.log(`🚀 Processando arquivo normal: ${jsonData.length} registros`);
-    }
-    
-    // Processar o arquivo (normal ou restante)
     const resultado = await processFileWithBatchControl(
       jsonData, 
       arquivo_fonte, 
@@ -665,55 +584,9 @@ serve(async (req) => {
 
     console.log('✅ Processamento concluído:', resultado);
 
-    // Aplicar regras de exclusão automaticamente para todos os arquivos
-    console.log('🔧 Aplicando regras de exclusão automaticamente...');
-    
-    // 1. Aplicar exclusão de clientes específicos primeiro
-    try {
-      const { data: clientesResult, error: clientesError } = await supabaseClient.functions.invoke('aplicar-exclusao-clientes-especificos', {
-        body: { arquivo_fonte }
-      });
-      
-      if (clientesError) {
-        console.error('❌ Erro ao aplicar exclusão de clientes específicos:', clientesError);
-        resultado.alertas.push(`Erro ao aplicar exclusão de clientes específicos: ${clientesError.message}`);
-      } else if (clientesResult?.success) {
-        console.log(`✅ Exclusão de clientes específicos aplicada: ${clientesResult.total_excluidos} registros removidos`);
-        resultado.observacoes.push(`Exclusão de clientes específicos: ${clientesResult.total_excluidos} registros removidos`);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao invocar função de exclusão de clientes específicos:', error);
-      resultado.alertas.push(`Erro na função de exclusão de clientes: ${error.message}`);
-    }
-
-    // 2. Aplicar regras de exclusão por período para arquivos 3 e 4
-    if (arquivo_fonte === 'volumetria_padrao_retroativo' || arquivo_fonte === 'volumetria_fora_padrao_retroativo') {
-      console.log('🔧 Aplicando regras de exclusão por período automaticamente...');
-      
-      const periodoReferencia = periodo ? `${getNomesMeses()[periodo.mes - 1]}/${periodo.ano.toString().slice(-2)}` : null;
-      
-      if (periodoReferencia) {
-        try {
-          const { data: exclusaoResult, error: exclusaoError } = await supabaseClient.functions.invoke('aplicar-exclusoes-periodo', {
-            body: { periodo_referencia: periodoReferencia }
-          });
-          
-          if (exclusaoError) {
-            console.error('❌ Erro ao aplicar exclusões por período:', exclusaoError);
-            resultado.alertas.push(`Erro ao aplicar exclusões por período: ${exclusaoError.message}`);
-          } else if (exclusaoResult?.success) {
-            console.log(`✅ Exclusões por período aplicadas: ${exclusaoResult.total_excluidos} registros removidos`);
-            resultado.observacoes.push(`Exclusões por período: ${exclusaoResult.total_excluidos} registros removidos automaticamente`);
-          }
-        } catch (error) {
-          console.error('❌ Erro ao invocar função de exclusões por período:', error);
-          resultado.alertas.push(`Erro na função de exclusões: ${error.message}`);
-        }
-      } else {
-        console.warn('⚠️ Período de referência não identificado para aplicar exclusões');
-        resultado.alertas.push('Período de referência não identificado - exclusões por período não aplicadas');
-      }
-    }
+    // TEMPORARIAMENTE DESABILITADO: Aplicar regras de exclusão automaticamente 
+    console.log('⚠️ Regras de exclusão automáticas DESABILITADAS para diagnóstico');
+    console.log('📊 Dados preservados para análise completa do upload');
 
     return new Response(
       JSON.stringify({ 
