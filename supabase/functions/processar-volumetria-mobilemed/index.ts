@@ -208,15 +208,15 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
   console.log(`🏷️ Lote: ${loteUpload}`);
   console.log(`📅 Período: ${periodoReferencia}`);
 
-  // Constantes ULTRA otimizadas para evitar timeout
-  const LARGE_FILE_THRESHOLD = 500; // Muito menor para ser conservativo
+  // Constantes otimizadas para processar arquivos grandes
+  const LARGE_FILE_THRESHOLD = 5000; // Aumentado para permitir arquivos maiores
   const isLargeFile = jsonData.length > LARGE_FILE_THRESHOLD;
   
-  // Configuração ULTRA conservativa
-  const CHUNK_SIZE = 10;           // Chunks muito pequenos
-  const BATCH_SIZE = 100;            // Aumentado para volumes altos
-  const MAX_EXECUTION_TIME = 120000; // Aumentado para 2 minutos
-  const PROGRESS_UPDATE_INTERVAL = 5; // Updates menos frequentes
+  // Configuração balanceada para arquivos grandes
+  const CHUNK_SIZE = isLargeFile ? 100 : 50;     // Chunks maiores para arquivos grandes
+  const BATCH_SIZE = 500;                        // Batches maiores para eficiência
+  const MAX_EXECUTION_TIME = 480000;             // 8 minutos para arquivos grandes
+  const PROGRESS_UPDATE_INTERVAL = 10;           // Updates menos frequentes
 
   console.log(`📊 Arquivo ${isLargeFile ? 'GRANDE' : 'normal'}: ${jsonData.length} registros`);
   console.log(`⚙️ Config: Chunk=${CHUNK_SIZE}, Batch=${BATCH_SIZE}, Timeout=${MAX_EXECUTION_TIME}ms`);
