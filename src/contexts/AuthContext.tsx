@@ -33,12 +33,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_OUT') {
           // Após logout, redirecionar para a página principal
           navigate('/');
+        } else if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
+          // Se não está logado e está em rota protegida, redirecionar para auth
+          navigate('/auth');
         }
-        // Comentando redirecionamento automático temporariamente
-        // else if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
-        //   // Se não está logado e está em rota protegida, redirecionar para auth
-        //   navigate('/auth');
-        // }
       }
     );
 
