@@ -284,19 +284,38 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
         if (record) {
           allRecords.push(record);
         } else {
-          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Campos obrigatórios vazios ou erro processamento`);
+          console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Análise dos campos:`);
+          console.log(`  - EMPRESA: "${row['EMPRESA']}" (tipo: ${typeof row['EMPRESA']})`);
+          console.log(`  - NOME_PACIENTE: "${row['NOME_PACIENTE']}" (tipo: ${typeof row['NOME_PACIENTE']})`);
+          console.log(`  - ESTUDO_DESCRICAO: "${row['ESTUDO_DESCRICAO']}" (tipo: ${typeof row['ESTUDO_DESCRICAO']})`);
+          console.log(`  - DATA_LAUDO: "${row['DATA_LAUDO']}" (tipo: ${typeof row['DATA_LAUDO']})`);
+          
+          // INVESTIGAÇÃO: Verificar se realmente está vazio
+          const empresaVazia = !row['EMPRESA'] || row['EMPRESA'].toString().trim() === '';
+          const nomeVazio = !row['NOME_PACIENTE'] || row['NOME_PACIENTE'].toString().trim() === '';
+          const estudoVazio = !row['ESTUDO_DESCRICAO'] || row['ESTUDO_DESCRICAO'].toString().trim() === '';
+          
+          console.log(`  - EMPRESA vazia: ${empresaVazia}`);
+          console.log(`  - NOME_PACIENTE vazio: ${nomeVazio}`);
+          console.log(`  - ESTUDO_DESCRICAO vazio: ${estudoVazio}`);
+          
+          // Se não há campos vazios, investigar outra causa
+          if (!empresaVazia && !nomeVazio && !estudoVazio) {
+            console.log(`  - ⚠️ POSSÍVEL FALSO POSITIVO: registro rejeitado mas campos não estão vazios!`);
+          }
           
           // Registrar motivo da rejeição para auditoria
           try {
-            // Determinar motivo específico baseado na análise dos campos
             let motivoDetalhado = 'campos_obrigatorios_vazios';
             let detalhesEspecificos = [];
             
-            if (!row['EMPRESA'] || row['EMPRESA'].toString().trim() === '') {
-              detalhesEspecificos.push('EMPRESA vazio ou ausente');
-            }
-            if (!row['NOME_PACIENTE'] || row['NOME_PACIENTE'].toString().trim() === '') {
-              detalhesEspecificos.push('NOME_PACIENTE vazio ou ausente');
+            if (empresaVazia) detalhesEspecificos.push('EMPRESA vazio');
+            if (nomeVazio) detalhesEspecificos.push('NOME_PACIENTE vazio');
+            if (estudoVazio) detalhesEspecificos.push('ESTUDO_DESCRICAO vazio');
+            
+            if (detalhesEspecificos.length === 0) {
+              motivoDetalhado = 'erro_processamento_desconhecido';
+              detalhesEspecificos.push('Registro rejeitado mas campos obrigatórios não estão vazios');
             }
             
             await supabaseClient
@@ -307,7 +326,7 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
                 linha_original: totalProcessed + 1,
                 dados_originais: row,
                 motivo_rejeicao: motivoDetalhado,
-                detalhes_erro: `Campos obrigatórios inválidos: ${detalhesEspecificos.join(', ')}`
+                detalhes_erro: detalhesEspecificos.join(', ')
               });
               
             console.log(`📝 Auditoria registrada: Linha ${totalProcessed + 1} - ${detalhesEspecificos.join(', ')}`);
