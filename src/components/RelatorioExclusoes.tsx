@@ -273,9 +273,9 @@ export function RelatorioExclusoes() {
           ['DATA_LAUDO válida', 'Deve estar entre 01/06/2025 e 07/07/2025'],
           ['', ''],
           ['🔧 SOLUÇÃO PARA PRÓXIMOS UPLOADS', ''],
-          ['Função Recomendada', 'processar-volumetria-mobilemed'],
-          ['Benefício', 'Captura detalhes completos de cada rejeição'],
-          ['Resultado', 'Relatório com linha específica e motivo detalhado'],
+          ['Função Recomendada', 'processar-volumetria-otimizado'],
+          ['Benefício', 'Aplica regras v031/v002/v003 e captura rejeições detalhadas'],
+          ['Resultado', 'Processamento completo com auditoria automática'],
           ['', ''],
           ['📊 ESTATÍSTICAS DO UPLOAD ATUAL', ''],
           ['Registros Totais', upload?.registros_processados || 0],
@@ -654,11 +654,11 @@ export function RelatorioExclusoes() {
                           
                           <div>
                             <h4 className="font-semibold mb-2">🔧 Para Próximos Uploads:</h4>
-                            <ul className="text-xs space-y-1 list-disc list-inside">
-                              <li>Use a função <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">processar-volumetria-mobilemed</code></li>
-                              <li>Novos uploads capturarão detalhes completos</li>
-                              <li>Relatórios futuros mostrarão linha e motivo específico</li>
-                              <li>Export Excel incluirá análise detalhada</li>
+                             <ul className="text-xs space-y-1 list-disc list-inside">
+                              <li>Sistema usa <code className="bg-green-100 dark:bg-green-900/30 px-1 rounded">processar-volumetria-otimizado</code></li>
+                              <li>Regras v031/v002/v003 aplicadas automaticamente</li>
+                              <li>Rejeições salvas em <code>registros_rejeitados_processamento</code></li>
+                              <li>Auditoria completa disponível via relatórios</li>
                             </ul>
                           </div>
                         </div>

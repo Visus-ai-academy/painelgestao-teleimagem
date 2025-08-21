@@ -46,7 +46,7 @@ export function ProcessarArquivoCompleto({
         periodo: { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1 }
       });
 
-      const { data, error } = await supabase.functions.invoke('processar-volumetria-mobilemed', {
+      const { data, error } = await supabase.functions.invoke('processar-volumetria-otimizado', {
         body: {
           file_path: filePath,
           arquivo_fonte: arquivoFonte,

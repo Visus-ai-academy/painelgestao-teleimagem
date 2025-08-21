@@ -211,7 +211,7 @@ const RelatorioImplementacoes = () => {
       edgeFunctions: [
         "processar-escalas: Processamento automatizado de escalas",
         "processar-exames: Análise e validação de exames",
-        "processar-volumetria-mobilemed: Dados MobileMed",
+        "processar-volumetria-otimizado: Dados MobileMed com regras completas",
         "limpar-dados-volumetria: Limpeza inteligente"
       ]
     },

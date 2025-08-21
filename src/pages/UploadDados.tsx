@@ -95,7 +95,7 @@ export default function UploadDados() {
 
       // 2. Chamar edge function para processar
       const { data, error: processError } = await supabase.functions
-        .invoke('processar-volumetria-mobilemed', {
+        .invoke('processar-volumetria-otimizado', {
           body: { 
             file_path: fileName,
             arquivo_fonte: 'volumetria_padrao'
