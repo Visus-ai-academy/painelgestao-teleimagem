@@ -55,6 +55,7 @@ import MapaDistribuicaoClientes from "./pages/MapaDistribuicaoClientes";
 import NotFound from "./pages/NotFound";
 import LimparDados from "./pages/LimparDados";
 import RelatorioExclusoes from "./pages/RelatorioExclusoes";
+import LimparDadosCompleto from "./components/LimparDadosCompleto";
 
 const queryClient = new QueryClient();
 
