@@ -540,10 +540,10 @@ serve(async (req) => {
     
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
       defval: '',
-      raw: false, // CORREÇÃO: Usar false para preservar formatação de texto
+      raw: false, // Preservar formatação de texto
       dateNF: 'dd/mm/yyyy',
-      blankrows: false,
-      header: 1 // CORREÇÃO: Usar primeira linha como cabeçalho para garantir nomes corretos
+      blankrows: false
+      // REMOVIDO: header: 1 - voltando ao comportamento padrão para garantir mapeamento correto
     });
     
     console.log(`✅ Dados extraídos: ${jsonData.length} linhas (ARQUIVO COMPLETO)`);
