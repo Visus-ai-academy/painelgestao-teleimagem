@@ -102,43 +102,40 @@ function convertValues(valueStr: string | number): number | null {
   }
 }
 
-function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, rowIndex: number): VolumetriaRecord | null {
+function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoReferencia: string, rowIndex: number): VolumetriaRecord | { rejected: true; motivo: string; detalhes: string; dados: any } | null {
   try {
+    // 1. VALIDAÇÃO: Linha vazia ou inválida
     if (!row || typeof row !== 'object') {
       console.log(`❌ REJEIÇÃO [${rowIndex}]: Linha não é objeto válido:`, typeof row);
-      return null;
+      return {
+        rejected: true,
+        motivo: 'linha_invalida',
+        detalhes: `Linha ${rowIndex}: não é um objeto válido (tipo: ${typeof row})`,
+        dados: { linha: rowIndex, dados_brutos: row }
+      };
     }
 
-    // ANÁLISE DETALHADA DOS CAMPOS OBRIGATÓRIOS
+    // 2. VALIDAÇÃO: Campos obrigatórios
     const empresaOriginal = row['EMPRESA'] || '';
     const nomePaciente = row['NOME_PACIENTE'] || '';
     const estudoDescricao = row['ESTUDO_DESCRICAO'] || '';
     
-    // Log detalhado para TODOS os casos problemáticos
     const empresaVazia = !empresaOriginal || empresaOriginal.toString().trim() === '';
     const nomeVazio = !nomePaciente || nomePaciente.toString().trim() === '';
     const estudoVazio = !estudoDescricao || estudoDescricao.toString().trim() === '';
     
     if (empresaVazia || nomeVazio || estudoVazio) {
-      // Registrar TODAS as rejeições para análise posterior
       const motivosEspecificos = [];
       if (empresaVazia) motivosEspecificos.push('EMPRESA vazio');
       if (nomeVazio) motivosEspecificos.push('NOME_PACIENTE vazio');
       if (estudoVazio) motivosEspecificos.push('ESTUDO_DESCRICAO vazio');
       
-      console.log(`❌ REJEIÇÃO [${rowIndex}] - CAMPOS OBRIGATÓRIOS VAZIOS:`);
-      console.log(`  - EMPRESA: "${empresaOriginal}" (vazia: ${empresaVazia})`);
-      console.log(`  - NOME_PACIENTE: "${nomePaciente}" (vazio: ${nomeVazio})`);
-      console.log(`  - ESTUDO_DESCRICAO: "${estudoDescricao}" (vazio: ${estudoVazio})`);
-      console.log(`  - DATA_LAUDO: "${row['DATA_LAUDO']}"`);
-      console.log(`  - DATA_REALIZACAO: "${row['DATA_REALIZACAO']}"`);
-      console.log(`  - Linha do Excel: ${rowIndex}`);
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - CAMPOS OBRIGATÓRIOS VAZIOS: ${motivosEspecificos.join(', ')}`);
       
-      // Retornar dados para registro de auditoria
       return {
         rejected: true,
         motivo: 'campos_obrigatorios_vazios',
-        detalhes: motivosEspecificos.join(', '),
+        detalhes: `Linha ${rowIndex}: ${motivosEspecificos.join(', ')}`,
         dados: {
           linha: rowIndex,
           EMPRESA: empresaOriginal,
@@ -149,6 +146,128 @@ function processRow(row: any, arquivoFonte: string, loteUpload: string, periodoR
           MODALIDADE: row['MODALIDADE'],
           ESPECIALIDADE: row['ESPECIALIDADE'],
           VALORES: row['VALORES']
+        }
+      };
+    }
+
+    // 3. VALIDAÇÃO: Datas obrigatórias
+    const dataLaudo = row['DATA_LAUDO'];
+    const dataRealizacao = row['DATA_REALIZACAO'];
+    
+    if (!dataLaudo || dataLaudo.toString().trim() === '') {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - DATA_LAUDO vazia`);
+      return {
+        rejected: true,
+        motivo: 'data_laudo_vazia',
+        detalhes: `Linha ${rowIndex}: DATA_LAUDO é obrigatória mas está vazia`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao
+        }
+      };
+    }
+
+    if (!dataRealizacao || dataRealizacao.toString().trim() === '') {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - DATA_REALIZACAO vazia`);
+      return {
+        rejected: true,
+        motivo: 'data_realizacao_vazia',
+        detalhes: `Linha ${rowIndex}: DATA_REALIZACAO é obrigatória mas está vazia`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao
+        }
+      };
+    }
+
+    // 4. VALIDAÇÃO: Conversão de datas
+    const dataLaudoConvertida = convertBrazilianDate(String(dataLaudo));
+    const dataRealizacaoConvertida = convertBrazilianDate(String(dataRealizacao));
+    
+    if (!dataLaudoConvertida) {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - DATA_LAUDO inválida: "${dataLaudo}"`);
+      return {
+        rejected: true,
+        motivo: 'data_laudo_invalida',
+        detalhes: `Linha ${rowIndex}: DATA_LAUDO inválida "${dataLaudo}" - formato deve ser DD/MM/YYYY`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao
+        }
+      };
+    }
+
+    if (!dataRealizacaoConvertida) {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - DATA_REALIZACAO inválida: "${dataRealizacao}"`);
+      return {
+        rejected: true,
+        motivo: 'data_realizacao_invalida',
+        detalhes: `Linha ${rowIndex}: DATA_REALIZACAO inválida "${dataRealizacao}" - formato deve ser DD/MM/YYYY`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao
+        }
+      };
+    }
+
+    // 5. VALIDAÇÃO: Regras de período v031
+    const dataLaudoObj = new Date(dataLaudoConvertida);
+    const dataRealizacaoObj = new Date(dataRealizacaoConvertida);
+    
+    // Para jun/25: realizacao deve ser junho/2025, laudo entre 01/06/2025 e 07/07/2025
+    const inicioRealizacao = new Date('2025-06-01');
+    const fimRealizacao = new Date('2025-06-30');
+    const inicioLaudo = new Date('2025-06-01');
+    const fimLaudo = new Date('2025-07-07');
+    
+    if (dataRealizacaoObj < inicioRealizacao || dataRealizacaoObj > fimRealizacao) {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - REGRA v031: DATA_REALIZACAO fora do período permitido`);
+      return {
+        rejected: true,
+        motivo: 'regra_v031_data_realizacao',
+        detalhes: `Linha ${rowIndex}: DATA_REALIZACAO ${dataRealizacao} deve estar entre 01/06/2025 e 30/06/2025`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao,
+          periodo_permitido_realizacao: '01/06/2025 a 30/06/2025'
+        }
+      };
+    }
+
+    if (dataLaudoObj < inicioLaudo || dataLaudoObj > fimLaudo) {
+      console.log(`❌ REJEIÇÃO [${rowIndex}] - REGRA v031: DATA_LAUDO fora do período permitido`);
+      return {
+        rejected: true,
+        motivo: 'regra_v031_data_laudo',
+        detalhes: `Linha ${rowIndex}: DATA_LAUDO ${dataLaudo} deve estar entre 01/06/2025 e 07/07/2025`,
+        dados: {
+          linha: rowIndex,
+          EMPRESA: empresaOriginal,
+          NOME_PACIENTE: nomePaciente,
+          ESTUDO_DESCRICAO: estudoDescricao,
+          DATA_LAUDO: dataLaudo,
+          DATA_REALIZACAO: dataRealizacao,
+          periodo_permitido_laudo: '01/06/2025 a 07/07/2025'
         }
       };
     }
