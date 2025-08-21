@@ -42,10 +42,7 @@ export function RelatorioExclusoes() {
     try {
       setLoading(true);
 
-      // Buscar dados atuais do banco
-      const { data: dadosAtuais } = await supabase.rpc('get_volumetria_aggregated_stats');
-
-      // Buscar último upload do arquivo volumetria_padrao
+      // Buscar dados reais dos uploads mais recentes
       const { data: ultimoUpload } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -53,28 +50,57 @@ export function RelatorioExclusoes() {
         .order('created_at', { ascending: false })
         .limit(1);
 
-      // Análise específica para Volumetria Padrão
-      const volumetriaPadrao = dadosAtuais?.find((d: any) => d.arquivo_fonte === 'volumetria_padrao');
-      const registrosOriginais = ultimoUpload?.[0]?.registros_processados || 34426;
-      
-      const analise: AnaliseVolumetria[] = [];
-      
-      if (volumetriaPadrao) {
-        const registrosExcluidos = registrosOriginais - volumetriaPadrao.total_records;
-        const motivosExclusao = [
-          `Exclusão por clientes específicos (RADIOCOR_LOCAL, CLINICADIA_TC, CLINICA RADIOCOR, CLIRAM_LOCAL)`,
-          `Regras de período v031 - DATA_LAUDO deve estar entre 01 do mês atual e 07 do mês seguinte`,
-          `Regras de validação durante processamento (campos obrigatórios, datas inválidas)`
-        ];
+      // Buscar dados atuais da volumetria
+      const { data, count } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('arquivo_fonte', 'volumetria_padrao');
 
-        analise.push({
-          arquivo_fonte: 'volumetria_padrao',
-          registros_atuais: volumetriaPadrao.total_records,
-          registros_originais: registrosOriginais,
-          registros_excluidos: registrosExcluidos,
-          motivos_exclusao: motivosExclusao
-        });
+      // Buscar logs de auditoria das exclusões
+      const { data: logsExclusoes } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('table_name', 'volumetria_mobilemed')
+        .in('operation', ['EXCLUSAO_CLIENTES_ESPECIFICOS', 'DELETE'])
+        .order('timestamp', { ascending: false })
+        .limit(10);
+
+      // Buscar registros rejeitados durante processamento
+      const { data: registrosRejeitados } = await supabase
+        .from('registros_rejeitados_processamento')
+        .select('motivo_rejeicao, COUNT(*)', { count: 'exact' })
+        .eq('arquivo_fonte', 'volumetria_padrao')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const upload = ultimoUpload?.[0];
+      const registrosOriginais = upload?.registros_processados || 0;
+      const registrosAtuais = count || 0;
+      const registrosExcluidos = registrosOriginais - registrosAtuais;
+      
+      // Determinar motivos das exclusões baseado nos dados reais
+      const motivosExclusao = [];
+      
+      if (upload?.registros_erro > 0) {
+        motivosExclusao.push(`${upload.registros_erro} registros rejeitados durante processamento (campos obrigatórios, datas inválidas)`);
       }
+      
+      if (logsExclusoes?.length > 0) {
+        const exclusoesClientes = logsExclusoes.filter(log => log.operation === 'EXCLUSAO_CLIENTES_ESPECIFICOS');
+        if (exclusoesClientes.length > 0) {
+          motivosExclusao.push(`Exclusão por clientes específicos (RADIOCOR_LOCAL, CLINICADIA_TC, etc)`);
+        }
+      }
+      
+      motivosExclusao.push(`Regras de período v031 - DATA_LAUDO deve estar entre 01/06/2025 e 07/07/2025`);
+
+      const analise: AnaliseVolumetria[] = [{
+        arquivo_fonte: 'volumetria_padrao',
+        registros_atuais: registrosAtuais,
+        registros_originais: registrosOriginais,
+        registros_excluidos: registrosExcluidos,
+        motivos_exclusao: motivosExclusao
+      }];
 
       setAnaliseVolumetria(analise);
 
@@ -94,19 +120,51 @@ export function RelatorioExclusoes() {
     try {
       setLoadingDetalhes(true);
       
-      toast({
-        title: "Informação Importante",
-        description: "Os registros excluídos não são armazenados no sistema. As exclusões acontecem durante o processamento pelas regras de negócio.",
-      });
+      // Buscar registros rejeitados durante processamento
+      const { data: rejeitados } = await supabase
+        .from('registros_rejeitados_processamento')
+        .select('*')
+        .eq('arquivo_fonte', 'volumetria_padrao')
+        .order('created_at', { ascending: false })
+        .limit(1000);
 
-      // Explicar que não há registros excluídos para mostrar
-      setRegistrosExcluidos([]);
+      if (rejeitados && rejeitados.length > 0) {
+        const registrosFormatados = rejeitados.map(r => {
+          // Type-safe access para JSON data
+          const dados = r.dados_originais as Record<string, any> || {};
+          
+          return {
+            cliente: dados.EMPRESA || 'N/A',
+            paciente: dados.NOME_PACIENTE || 'N/A',
+            data_exame: dados.DATA_REALIZACAO || 'N/A',
+            data_laudo: dados.DATA_LAUDO || 'N/A',
+            especialidade: dados.ESPECIALIDADE || 'N/A',
+            modalidade: dados.MODALIDADE || 'N/A',
+            categoria: dados.CATEGORIA || 'N/A',
+            motivo_exclusao: r.motivo_rejeicao || 'N/A'
+          };
+        });
+        
+        setRegistrosExcluidos(registrosFormatados);
+        
+        toast({
+          title: "Registros Carregados",
+          description: `${registrosFormatados.length} registros rejeitados encontrados`,
+        });
+      } else {
+        // Se não há dados na nova tabela, mostrar explicação
+        toast({
+          title: "Informação",
+          description: "Os registros detalhados das exclusões estarão disponíveis a partir dos próximos uploads. As exclusões atuais são aplicadas pelas regras de negócio.",
+        });
+        setRegistrosExcluidos([]);
+      }
 
     } catch (error) {
       console.error('Erro:', error);
       toast({
         title: "Erro",
-        description: "Erro ao processar informações",
+        description: "Erro ao carregar registros rejeitados",
         variant: "destructive"
       });
     } finally {

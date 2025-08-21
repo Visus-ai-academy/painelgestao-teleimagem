@@ -281,11 +281,43 @@ async function processFileWithBatchControl(jsonData: any[], arquivo_fonte: strin
           allRecords.push(record);
         } else {
           console.log(`❌ LINHA ${totalProcessed + 1} REJEITADA - Campos obrigatórios vazios ou erro processamento`);
+          
+          // Registrar motivo da rejeição para auditoria
+          try {
+            await supabaseClient
+              .from('registros_rejeitados_processamento')
+              .insert({
+                arquivo_fonte: arquivo_fonte,
+                lote_upload: loteUpload,
+                linha_original: totalProcessed + 1,
+                dados_originais: row,
+                motivo_rejeicao: 'erro_processamento',
+                detalhes_erro: 'Registro rejeitado durante processamento (campos obrigatórios ou outros erros)'
+              });
+          } catch (auditError) {
+            console.warn('Erro ao registrar rejeição:', auditError);
+          }
           totalErrors++;
         }
       } catch (error) {
         console.error(`❌ ERRO PROCESSAMENTO LINHA ${totalProcessed + 1}:`, error.message);
         console.error(`❌ DADOS DA LINHA:`, JSON.stringify(row).substring(0, 300));
+        
+        // Registrar erro de processamento para auditoria
+        try {
+          await supabaseClient
+            .from('registros_rejeitados_processamento')
+            .insert({
+              arquivo_fonte: arquivo_fonte,
+              lote_upload: loteUpload,
+              linha_original: totalProcessed + 1,
+              dados_originais: row,
+              motivo_rejeicao: 'erro_processamento',
+              detalhes_erro: error.message
+            });
+        } catch (auditError) {
+          console.warn('Erro ao registrar erro de processamento:', auditError);
+        }
         totalErrors++;
       }
       totalProcessed++;

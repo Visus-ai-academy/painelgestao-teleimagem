@@ -2644,6 +2644,39 @@ export type Database = {
         }
         Relationships: []
       }
+      registros_rejeitados_processamento: {
+        Row: {
+          arquivo_fonte: string
+          created_at: string | null
+          dados_originais: Json | null
+          detalhes_erro: string | null
+          id: string
+          linha_original: number | null
+          lote_upload: string | null
+          motivo_rejeicao: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          created_at?: string | null
+          dados_originais?: Json | null
+          detalhes_erro?: string | null
+          id?: string
+          linha_original?: number | null
+          lote_upload?: string | null
+          motivo_rejeicao: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          created_at?: string | null
+          dados_originais?: Json | null
+          detalhes_erro?: string | null
+          id?: string
+          linha_original?: number | null
+          lote_upload?: string | null
+          motivo_rejeicao?: string
+        }
+        Relationships: []
+      }
       regras_contrato: {
         Row: {
           acrescimo_percentual: number | null
