@@ -4346,11 +4346,11 @@ export type Database = {
       }
       log_rejeicao_registro: {
         Args: {
-          p_arquivo_fonte?: string
-          p_dados_originais: Json
-          p_detalhes_erro?: string
-          p_lote_upload?: string
-          p_motivo_rejeicao: string
+          arquivo_fonte?: string
+          dados_registro: Json
+          detalhes_erro: string
+          lote_upload?: string
+          motivo_rejeicao: string
         }
         Returns: undefined
       }
