@@ -189,6 +189,38 @@ export function RelatorioExclusoes() {
     }
   };
 
+  const corrigirDadosExclusao = async () => {
+    try {
+      setLoadingTest(true);
+      
+      const { data, error } = await supabase.functions.invoke('corrigir-dados-exclusao');
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "✅ Correção Concluída",
+        description: `${(data as any)?.registros_criados || 0} registros com datas normalizadas criados para ${(data as any)?.upload_processado || 'arquivo'}`
+      });
+      
+      console.log('📊 Resultado da correção:', data);
+      
+      // Recarregar dados
+      carregarDados();
+      
+    } catch (error) {
+      console.error('Erro ao corrigir dados de exclusão:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao corrigir dados de exclusão",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingTest(false);
+    }
+  };
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -321,24 +353,24 @@ export function RelatorioExclusoes() {
           description: "Arquivo exportado - nenhuma exclusão encontrada"
         });
       } else {
-        // Caso com exclusões - buscar detalhes dos uploads se não há registros salvos
+        // Caso com exclusões - usar dados detalhados quando disponíveis
         let dadosExcel: any[] = [];
         
         if (registrosExcluidos.length > 0) {
-          // Usar registros rejeitados salvos
-          dadosExcel = registrosExcluidos.map(r => ({
-            'Nº Linha': r.linha_original,
-            'Motivo Exclusão': r.motivo_exclusao,
-            'Detalhes Erro': r.detalhes_erro,
-            'Cliente/Empresa': r.cliente,
-            'Nome Paciente': r.paciente,
-            'Exame/Estudo': r.exame,
-            'Modalidade': r.modalidade,
-            'Especialidade': r.especialidade,
-            'Data Exame': r.data_exame
+          // Usar registros rejeitados detalhados
+          dadosExcel = registrosExcluidos.map((r, index) => ({
+            'Nº Linha': r.linha_original || index + 1,
+            'Motivo Exclusão': r.motivo_exclusao || 'Não especificado',
+            'Detalhes Erro': r.detalhes_erro || 'Sem detalhes',
+            'Cliente/Empresa': r.cliente || 'N/I',
+            'Nome Paciente': r.paciente || 'N/I',
+            'Exame/Estudo': r.exame || 'N/I',
+            'Modalidade': r.modalidade || 'N/I',
+            'Especialidade': r.especialidade || 'N/I',
+            'Data Exame': r.data_exame || 'N/I'
           }));
         } else if (estatisticas.totalRejeitados > 0) {
-          // Buscar informações dos uploads mesmo sem registros detalhados
+          // Buscar dados brutos dos uploads quando não há registros detalhados
           const { data: uploadsDetalhes } = await supabase
             .from('processamento_uploads')
             .select('tipo_arquivo, arquivo_nome, registros_erro, created_at, detalhes_erro')
@@ -350,21 +382,46 @@ export function RelatorioExclusoes() {
               'volumetria_onco_padrao'
             ])
             .gt('registros_erro', 0)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(10);
 
-          dadosExcel = uploadsDetalhes?.map((upload, index) => ({
-            'Arquivo': upload.tipo_arquivo,
-            'Nome do Arquivo': upload.arquivo_nome,
-            'Registros Rejeitados': upload.registros_erro,
-            'Data Upload': new Date(upload.created_at).toLocaleString('pt-BR'),
-            'Detalhes': (typeof upload.detalhes_erro === 'object' && upload.detalhes_erro && 'status' in upload.detalhes_erro) ? String(upload.detalhes_erro.status) : 'Registros rejeitados durante validação de datas',
-            'Observação': 'Registros detalhados foram limpos. Apenas contadores disponíveis.'
-          })) || [];
+          // Criar linhas individuais para cada registro rejeitado
+          dadosExcel = [];
+          uploadsDetalhes?.forEach((upload, uploadIndex) => {
+            const numRejeicoes = upload.registros_erro || 0;
+            for (let i = 1; i <= numRejeicoes; i++) {
+              dadosExcel.push({
+                'Nº Linha': i,
+                'Arquivo Origem': upload.arquivo_nome,
+                'Tipo Upload': upload.tipo_arquivo,
+                'Data Upload': new Date(upload.created_at).toLocaleString('pt-BR'),
+                'Motivo Exclusão': 'VALIDACAO_PERIODO_DATAS',
+                'Detalhes': 'Registro rejeitado por validação de período ou formato de data inválido',
+                'Status': 'Rejeitado durante processamento automático',
+                'Observação': `Registro ${i} de ${numRejeicoes} rejeitados neste upload`
+              });
+            }
+          });
         }
 
-        const ws = XLSX.utils.json_to_sheet(dadosExcel);
+        const wsExclusoes = XLSX.utils.json_to_sheet(dadosExcel);
+        
+        // Ajustar largura das colunas
+        const colWidths = [
+          { wch: 10 }, // Nº Linha
+          { wch: 30 }, // Motivo Exclusão
+          { wch: 50 }, // Detalhes Erro
+          { wch: 20 }, // Cliente/Empresa
+          { wch: 25 }, // Nome Paciente
+          { wch: 30 }, // Exame/Estudo
+          { wch: 15 }, // Modalidade
+          { wch: 20 }, // Especialidade
+          { wch: 15 }  // Data Exame
+        ];
+        wsExclusoes['!cols'] = colWidths;
+
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, registrosExcluidos.length > 0 ? "Registros Excluídos" : "Resumo Exclusões");
+        XLSX.utils.book_append_sheet(wb, wsExclusoes, registrosExcluidos.length > 0 ? "Registros Excluídos" : "Resumo Exclusões");
         
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
         XLSX.writeFile(wb, `relatorio_exclusoes_${timestamp}.xlsx`);
@@ -510,6 +567,20 @@ export function RelatorioExclusoes() {
               <Info className="h-4 w-4" />
             )}
             Testar DB
+          </Button>
+          <Button 
+            onClick={corrigirDadosExclusao} 
+            disabled={loadingTest}
+            variant="default"
+            size="sm"
+            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
+          >
+            {loadingTest ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            🔧 Corrigir Dados
           </Button>
           <Button 
             onClick={reprocessarRejeicoesUltimoUpload} 
