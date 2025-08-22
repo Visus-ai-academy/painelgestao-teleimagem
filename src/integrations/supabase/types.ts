@@ -3849,9 +3849,119 @@ export type Database = {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
       }
+      aplicar_regras_periodo_atual: {
+        Args: {
+          registro_input: Database["public"]["Tables"]["volumetria_mobilemed"]["Row"]
+        }
+        Returns: {
+          ACCESSION_NUMBER: string | null
+          arquivo_fonte: string
+          CATEGORIA: string | null
+          cliente_nome_fantasia: string | null
+          Cliente_Nome_Fantasia: string | null
+          CODIGO_INTERNO: number | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
+          controle_origem_id: string | null
+          created_at: string
+          created_by: string | null
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
+          data_referencia: string | null
+          DATA_TRANSFERENCIA: string | null
+          data_upload: string
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
+          id: string
+          IMAGENS_CAPTURADAS: number | null
+          IMAGENS_CHAVES: number | null
+          lote_upload: string | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string
+          periodo_referencia: string | null
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          processamento_pendente: boolean | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
+          tipo_cliente: string | null
+          tipo_dados: string
+          tipo_faturamento: string | null
+          unidade_origem: string | null
+          updated_at: string
+          VALORES: number | null
+        }
+      }
       aplicar_regras_quebra_exames: {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
+      }
+      aplicar_regras_retroativas: {
+        Args: {
+          registro_input: Database["public"]["Tables"]["volumetria_mobilemed"]["Row"]
+        }
+        Returns: {
+          ACCESSION_NUMBER: string | null
+          arquivo_fonte: string
+          CATEGORIA: string | null
+          cliente_nome_fantasia: string | null
+          Cliente_Nome_Fantasia: string | null
+          CODIGO_INTERNO: number | null
+          CODIGO_PACIENTE: string | null
+          COMPLEMENTAR: string | null
+          controle_origem_id: string | null
+          created_at: string
+          created_by: string | null
+          DATA_LAUDO: string | null
+          DATA_PRAZO: string | null
+          DATA_REALIZACAO: string | null
+          DATA_REASSINATURA: string | null
+          data_referencia: string | null
+          DATA_TRANSFERENCIA: string | null
+          data_upload: string
+          DIGITADOR: string | null
+          DUPLICADO: string | null
+          EMPRESA: string
+          ESPECIALIDADE: string | null
+          ESTUDO_DESCRICAO: string | null
+          HORA_LAUDO: string | null
+          HORA_PRAZO: string | null
+          HORA_REALIZACAO: string | null
+          HORA_REASSINATURA: string | null
+          HORA_TRANSFERENCIA: string | null
+          id: string
+          IMAGENS_CAPTURADAS: number | null
+          IMAGENS_CHAVES: number | null
+          lote_upload: string | null
+          MEDICO: string | null
+          MEDICO_REASSINATURA: string | null
+          MODALIDADE: string | null
+          NOME_PACIENTE: string
+          periodo_referencia: string | null
+          POSSUI_IMAGENS_CHAVE: string | null
+          PRIORIDADE: string | null
+          processamento_pendente: boolean | null
+          SEGUNDA_ASSINATURA: string | null
+          STATUS: string | null
+          tipo_cliente: string | null
+          tipo_dados: string
+          tipo_faturamento: string | null
+          unidade_origem: string | null
+          updated_at: string
+          VALORES: number | null
+        }
       }
       aplicar_validacao_cliente_volumetria: {
         Args: { lote_upload_param?: string }
