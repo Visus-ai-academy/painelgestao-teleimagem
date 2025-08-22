@@ -684,39 +684,74 @@ serve(async (req) => {
         }
       }
       
-      // Inserir registros rejeitados (AUDITORIA DE EXCLUSÕES)
+      // Inserir registros rejeitados (AUDITORIA DE EXCLUSÕES) - MODO SÍNCRONO
       if (batchRejections.length > 0) {
         try {
-          // 💾 SALVAR REJEIÇÕES - VERSÃO CORRIGIDA COM AWAIT
           console.log(`💾 Salvando ${batchRejections.length} rejeições para auditoria (lote ${batchNumber})...`);
           
-          // Preparar dados para inserção com validação
+          // Preparar dados para inserção com validação rigorosa
           const rejectionsToInsert = batchRejections.map((rejection, index) => {
+            // Garantir que dados_originais seja um objeto JSON válido
+            let dadosOriginaisValidos = {};
+            try {
+              if (typeof rejection.dados_originais === 'object' && rejection.dados_originais !== null) {
+                dadosOriginaisValidos = rejection.dados_originais;
+              } else if (typeof rejection.dados_originais === 'string') {
+                dadosOriginaisValidos = JSON.parse(rejection.dados_originais);
+              }
+            } catch (parseError) {
+              dadosOriginaisValidos = { erro_parsing: String(rejection.dados_originais) };
+            }
+            
             const safeRejection = {
-              arquivo_fonte: String(rejection.arquivo_fonte || arquivo_fonte),
-              lote_upload: String(rejection.lote_upload || loteUpload),
+              arquivo_fonte: String(rejection.arquivo_fonte || arquivo_fonte || 'volumetria_padrao'),
+              lote_upload: String(rejection.lote_upload || loteUpload || 'unknown'),
               linha_original: Number(rejection.linha_original || (i + index + 1)),
-              dados_originais: typeof rejection.dados_originais === 'object' ? rejection.dados_originais : {},
+              dados_originais: dadosOriginaisValidos,
               motivo_rejeicao: String(rejection.motivo_rejeicao || 'ERRO_DESCONHECIDO'),
               detalhes_erro: String(rejection.detalhes_erro || 'Sem detalhes disponíveis'),
             };
             return safeRejection;
           });
           
+          // Inserção síncrona com melhor tratamento de erro
           const { data: insertResult, error: insertError } = await supabaseClient
             .from('registros_rejeitados_processamento')
             .insert(rejectionsToInsert)
             .select('id');
           
           if (insertError) {
-            console.error(`❌ Erro detalhado ao inserir rejeições:`, insertError);
-            console.error(`❌ Dados tentando inserir:`, JSON.stringify(rejectionsToInsert.slice(0, 2), null, 2));
+            console.error(`❌ CRÍTICO: Falha ao salvar rejeições lote ${batchNumber}:`, {
+              error: insertError,
+              message: insertError.message,
+              code: insertError.code,
+              details: insertError.details,
+              hint: insertError.hint
+            });
+            console.error(`❌ Amostra dos dados que falharam:`, JSON.stringify(rejectionsToInsert.slice(0, 1), null, 2));
+            
+            // Tentar inserir uma por vez para identificar registro problemático
+            for (let j = 0; j < rejectionsToInsert.length; j++) {
+              const singleRecord = rejectionsToInsert[j];
+              const { error: singleError } = await supabaseClient
+                .from('registros_rejeitados_processamento')
+                .insert([singleRecord]);
+              
+              if (singleError) {
+                console.error(`❌ Registro individual falhou (linha ${singleRecord.linha_original}):`, singleError);
+              } else {
+                console.log(`✅ Registro individual salvo (linha ${singleRecord.linha_original})`);
+              }
+            }
           } else {
-            console.log(`✅ ${insertResult?.length || 0} rejeições salvas com sucesso no lote ${batchNumber}`);
+            console.log(`✅ SUCESSO: ${insertResult?.length || 0} rejeições salvas no lote ${batchNumber}`);
           }
         } catch (rejectedException) {
-          console.error(`❌ Exceção ao salvar rejeições lote ${batchNumber}:`, rejectedException);
-          console.error(`❌ Stack trace:`, rejectedException.stack);
+          console.error(`❌ EXCEÇÃO CRÍTICA ao salvar rejeições lote ${batchNumber}:`, {
+            error: rejectedException,
+            message: rejectedException.message,
+            stack: rejectedException.stack
+          });
         }
       }
 
