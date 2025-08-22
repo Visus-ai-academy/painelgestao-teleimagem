@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download, FileText, AlertTriangle, CheckCircle, Info, Loader2 } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download, FileText, AlertTriangle, CheckCircle, Info, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
@@ -25,6 +27,8 @@ interface RegistroExcluido {
   modalidade: string;
   categoria: string;
   motivo_exclusao: string;
+  detalhes_erro?: string;
+  linha_original?: number;
 }
 
 export function RelatorioExclusoes() {
@@ -36,6 +40,17 @@ export function RelatorioExclusoes() {
   const [registrosExcluidos, setRegistrosExcluidos] = useState<RegistroExcluido[]>([]);
   const [totalRejeitados, setTotalRejeitados] = useState(0);
   const [ultimoUpload, setUltimoUpload] = useState<any>(null);
+  
+  // Estados para filtros e ordenação
+  const [filtroTexto, setFiltroTexto] = useState('');
+  const [filtroCliente, setFiltroCliente] = useState('');
+  const [filtroModalidade, setFiltroModalidade] = useState('');
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState('');
+  const [filtroMotivo, setFiltroMotivo] = useState('');
+  const [ordenacao, setOrdenacao] = useState<{campo: string, direcao: 'asc' | 'desc'}>({
+    campo: 'linha_original',
+    direcao: 'asc'
+  });
 
   useEffect(() => {
     carregarDadosExclusoes();
@@ -190,7 +205,9 @@ export function RelatorioExclusoes() {
             especialidade: dados.ESPECIALIDADE || 'N/A',
             modalidade: dados.MODALIDADE || 'N/A',
             categoria: dados.CATEGORIA || 'N/A',
-            motivo_exclusao: `[Linha ${r.linha_original}] ${r.motivo_rejeicao}: ${r.detalhes_erro}`
+            motivo_exclusao: r.motivo_rejeicao || 'N/A',
+            detalhes_erro: r.detalhes_erro || 'N/A',
+            linha_original: r.linha_original || (index + 1)
           };
         });
         
@@ -413,6 +430,83 @@ export function RelatorioExclusoes() {
     }
   };
 
+  // Dados filtrados e ordenados usando useMemo para performance
+  const dadosFiltrados = useMemo(() => {
+    let dados = registrosExcluidos;
+
+    // Aplicar filtros
+    if (filtroTexto) {
+      dados = dados.filter(registro => 
+        Object.values(registro).some(valor => 
+          String(valor).toLowerCase().includes(filtroTexto.toLowerCase())
+        )
+      );
+    }
+
+    if (filtroCliente) {
+      dados = dados.filter(registro => registro.cliente === filtroCliente);
+    }
+
+    if (filtroModalidade) {
+      dados = dados.filter(registro => registro.modalidade === filtroModalidade);
+    }
+
+    if (filtroEspecialidade) {
+      dados = dados.filter(registro => registro.especialidade === filtroEspecialidade);
+    }
+
+    if (filtroMotivo) {
+      dados = dados.filter(registro => registro.motivo_exclusao === filtroMotivo);
+    }
+
+    // Aplicar ordenação
+    dados.sort((a, b) => {
+      const valorA = a[ordenacao.campo as keyof RegistroExcluido];
+      const valorB = b[ordenacao.campo as keyof RegistroExcluido];
+      
+      if (ordenacao.direcao === 'asc') {
+        return valorA < valorB ? -1 : valorA > valorB ? 1 : 0;
+      } else {
+        return valorA > valorB ? -1 : valorA < valorB ? 1 : 0;
+      }
+    });
+
+    return dados;
+  }, [registrosExcluidos, filtroTexto, filtroCliente, filtroModalidade, filtroEspecialidade, filtroMotivo, ordenacao]);
+
+  // Opções únicas para filtros
+  const clientesUnicos = useMemo(() => 
+    [...new Set(registrosExcluidos.map(r => r.cliente))].filter(c => c !== 'N/A').sort(), 
+    [registrosExcluidos]
+  );
+
+  const modalidadesUnicas = useMemo(() => 
+    [...new Set(registrosExcluidos.map(r => r.modalidade))].filter(m => m !== 'N/A').sort(), 
+    [registrosExcluidos]
+  );
+
+  const especialidadesUnicas = useMemo(() => 
+    [...new Set(registrosExcluidos.map(r => r.especialidade))].filter(e => e !== 'N/A').sort(), 
+    [registrosExcluidos]
+  );
+
+  const motivosUnicos = useMemo(() => 
+    [...new Set(registrosExcluidos.map(r => r.motivo_exclusao))].filter(m => m !== 'N/A').sort(), 
+    [registrosExcluidos]
+  );
+
+  const handleOrdenacao = (campo: string) => {
+    setOrdenacao(prev => ({
+      campo,
+      direcao: prev.campo === campo && prev.direcao === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const getIconeOrdenacao = (campo: string) => {
+    if (ordenacao.campo !== campo) return <ArrowUpDown className="h-4 w-4" />;
+    return ordenacao.direcao === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -522,27 +616,208 @@ export function RelatorioExclusoes() {
                   Sistema de auditoria ativo - detalhes completos disponíveis
                 </span>
               </div>
+
+              {/* Controles de Filtro */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Busca Geral
+                  </label>
+                  <Input
+                    placeholder="Buscar em todos os campos..."
+                    value={filtroTexto}
+                    onChange={(e) => setFiltroTexto(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Cliente
+                  </label>
+                  <Select value={filtroCliente} onValueChange={setFiltroCliente}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos os clientes</SelectItem>
+                      {clientesUnicos.map(cliente => (
+                        <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Modalidade</label>
+                  <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas as modalidades</SelectItem>
+                      {modalidadesUnicas.map(modalidade => (
+                        <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Especialidade</label>
+                  <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas as especialidades</SelectItem>
+                      {especialidadesUnicas.map(especialidade => (
+                        <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Motivo</label>
+                  <Select value={filtroMotivo} onValueChange={setFiltroMotivo}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos os motivos</SelectItem>
+                      {motivosUnicos.map(motivo => (
+                        <SelectItem key={motivo} value={motivo}>{motivo}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 flex items-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setFiltroTexto('');
+                      setFiltroCliente('');
+                      setFiltroModalidade('');
+                      setFiltroEspecialidade('');
+                      setFiltroMotivo('');
+                    }}
+                    className="h-8"
+                  >
+                    Limpar Filtros
+                  </Button>
+                </div>
+              </div>
+
+              {/* Resultados Filtrados */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Mostrando {dadosFiltrados.length.toLocaleString()} de {registrosExcluidos.length.toLocaleString()} registros
+                </span>
+              </div>
               
-              <div className="border rounded-md max-h-96 overflow-y-auto">
+              {/* Tabela com Ordenação */}
+              <div className="border rounded-md max-h-[600px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 sticky top-0">
                     <tr>
-                      <th className="text-left p-2 border-b">Cliente</th>
-                      <th className="text-left p-2 border-b">Paciente</th>
-                      <th className="text-left p-2 border-b">Modalidade</th>
-                      <th className="text-left p-2 border-b">Especialidade</th>
-                      <th className="text-left p-2 border-b">Motivo da Exclusão</th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('linha_original')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Linha {getIconeOrdenacao('linha_original')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('cliente')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Cliente {getIconeOrdenacao('cliente')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('paciente')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Paciente {getIconeOrdenacao('paciente')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('modalidade')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Modalidade {getIconeOrdenacao('modalidade')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('especialidade')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Especialidade {getIconeOrdenacao('especialidade')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('data_exame')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Data Exame {getIconeOrdenacao('data_exame')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleOrdenacao('motivo_exclusao')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Motivo Exclusão {getIconeOrdenacao('motivo_exclusao')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">Detalhes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {registrosExcluidos.slice(0, 50).map((registro, index) => (
+                    {dadosFiltrados.map((registro, index) => (
                       <tr key={index} className="border-b hover:bg-muted/30">
+                        <td className="p-2 font-mono text-xs">{registro.linha_original}</td>
                         <td className="p-2">{registro.cliente}</td>
                         <td className="p-2">{registro.paciente}</td>
-                        <td className="p-2">{registro.modalidade}</td>
+                        <td className="p-2 text-center">
+                          <Badge variant="outline" className="text-xs">
+                            {registro.modalidade}
+                          </Badge>
+                        </td>
                         <td className="p-2">{registro.especialidade}</td>
-                        <td className="p-2 text-red-600 font-mono text-xs">
-                          {registro.motivo_exclusao}
+                        <td className="p-2 font-mono text-xs">{registro.data_exame}</td>
+                        <td className="p-2">
+                          <Badge variant="destructive" className="text-xs">
+                            {registro.motivo_exclusao}
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground max-w-48 truncate" title={registro.detalhes_erro}>
+                          {registro.detalhes_erro}
                         </td>
                       </tr>
                     ))}
@@ -550,13 +825,11 @@ export function RelatorioExclusoes() {
                 </table>
               </div>
               
-              {registrosExcluidos.length > 50 && (
+              {dadosFiltrados.length === 0 && registrosExcluidos.length > 0 && (
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Mostrando primeiros 50 registros. 
-                    <strong> {(registrosExcluidos.length - 50).toLocaleString()} registros adicionais</strong> 
-                    disponíveis na exportação Excel.
+                    Nenhum registro encontrado com os filtros aplicados. Tente ajustar os critérios de busca.
                   </AlertDescription>
                 </Alert>
               )}
