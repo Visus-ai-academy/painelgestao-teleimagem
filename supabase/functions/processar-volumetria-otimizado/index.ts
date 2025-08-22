@@ -72,14 +72,21 @@ serve(async (req) => {
     let dataReferencia: string;
     let periodoReferencia: string;
     
-    // Para Jun/25, usar formato correto
+    console.log(`📋 ARQUIVO: ${arquivo_fonte}`);
+    
+    // Para Jun/25, usar formato correto - CORRIGIR LÓGICA DE PERÍODO
     if (arquivo_fonte.includes('jun') || arquivo_fonte.includes('junho')) {
       dataReferencia = '2025-06-01';
       periodoReferencia = 'jun/25';
+      console.log(`📅 PERÍODO DETECTADO (junho): ${periodoReferencia} | Data ref: ${dataReferencia}`);
     } else {
-      // Fallback para período atual
-      dataReferencia = new Date().toISOString().split('T')[0];
-      periodoReferencia = '2025-06';
+      // Fallback para período atual - MAS DEVE SER DINÂMICO
+      const agora = new Date();
+      const ano = agora.getFullYear();
+      const mes = agora.getMonth() + 1; // 0-11 -> 1-12
+      dataReferencia = `${ano}-${mes.toString().padStart(2, '0')}-01`;
+      periodoReferencia = `${agora.toLocaleDateString('pt-BR', { month: 'short' })}/${ano.toString().slice(-2)}`;
+      console.log(`📅 PERÍODO ATUAL: ${periodoReferencia} | Data ref: ${dataReferencia}`);
     }
 
     // ========== RESPOSTA IMEDIATA ==========
@@ -234,6 +241,9 @@ serve(async (req) => {
               // ARQUIVOS RETROATIVOS: Regras v002/v003
               if (record.DATA_REALIZACAO) {
                 const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+                console.log(`🔍 RETROATIVO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}" -> ${dataRealizacao ? dataRealizacao.toISOString().split('T')[0] : 'INVÁLIDA'}`);
+                console.log(`🔍 Comparando com limite: ${primeiroDiaMes.toISOString().split('T')[0]} (>= para rejeitar)`);
+                
                 if (dataRealizacao && dataRealizacao >= primeiroDiaMes) {
                   console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
@@ -249,6 +259,9 @@ serve(async (req) => {
               
               if (record.DATA_LAUDO) {
                 const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+                console.log(`🔍 RETROATIVO - DATA_LAUDO: "${record.DATA_LAUDO}" -> ${dataLaudo ? dataLaudo.toISOString().split('T')[0] : 'INVÁLIDA'}`);
+                console.log(`🔍 Janela válida: ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
+                
                 if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento)) {
                   console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
@@ -265,6 +278,9 @@ serve(async (req) => {
               // ARQUIVOS NÃO-RETROATIVOS: Regra v031
               if (record.DATA_REALIZACAO) {
                 const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+                console.log(`🔍 NÃO-RETROATIVO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}" -> ${dataRealizacao ? dataRealizacao.toISOString().split('T')[0] : 'INVÁLIDA'}`);
+                console.log(`🔍 Mês válido: ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
+                
                 if (dataRealizacao && (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes)) {
                   console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
@@ -280,6 +296,9 @@ serve(async (req) => {
               
               if (record.DATA_LAUDO) {
                 const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+                console.log(`🔍 NÃO-RETROATIVO - DATA_LAUDO: "${record.DATA_LAUDO}" -> ${dataLaudo ? dataLaudo.toISOString().split('T')[0] : 'INVÁLIDA'}`);
+                console.log(`🔍 Janela válida: ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
+                
                 if (dataLaudo && (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento)) {
                   console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({

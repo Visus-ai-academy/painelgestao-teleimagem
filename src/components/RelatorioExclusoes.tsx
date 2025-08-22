@@ -26,6 +26,7 @@ export function RelatorioExclusoes() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadingExport, setLoadingExport] = useState(false);
+  const [loadingTest, setLoadingTest] = useState(false);
   const [registrosExcluidos, setRegistrosExcluidos] = useState<RegistroExcluido[]>([]);
   const [estatisticas, setEstatisticas] = useState({
     totalProcessados: 0,
@@ -75,6 +76,35 @@ export function RelatorioExclusoes() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testarConversaoDatas = async () => {
+    try {
+      setLoadingTest(true);
+      
+      const { data, error } = await supabase.functions.invoke('testar-conversao-datas');
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "🧪 Teste Executado",
+        description: `Teste de conversão de datas para ${data.periodo_testado} concluído. Verifique os logs do Edge Function.`
+      });
+      
+      console.log('📊 Resultados do teste:', data.resultados);
+      
+    } catch (error) {
+      console.error('Erro ao testar conversão de datas:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao executar teste de conversão de datas",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingTest(false);
     }
   };
 
