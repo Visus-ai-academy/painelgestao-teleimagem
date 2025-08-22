@@ -128,6 +128,28 @@ serve(async (req) => {
             const isRetroativo = arquivo_fonte.includes('retroativo');
             const periodoAtual = periodoReferencia;
             
+            // FUNÇÃO PARA CONVERTER DATA BRASILEIRA (dd/mm/yyyy) PARA Date
+            const parseDataBrasileira = (dataBrasileira: string): Date | null => {
+              if (!dataBrasileira) return null;
+              
+              // Se já está no formato ISO (yyyy-mm-dd), usar diretamente
+              if (dataBrasileira.includes('-') && dataBrasileira.length === 10) {
+                return new Date(dataBrasileira);
+              }
+              
+              // Converter formato brasileiro dd/mm/yyyy para yyyy-mm-dd
+              const partes = dataBrasileira.split('/');
+              if (partes.length === 3) {
+                const [dia, mes, ano] = partes;
+                // Criar no formato ISO: yyyy-mm-dd
+                const dataISO = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+                return new Date(dataISO);
+              }
+              
+              // Fallback: tentar interpretação direta
+              return new Date(dataBrasileira);
+            };
+            
             // Calcular datas válidas baseadas no período
             let ano: number, mes: number;
             if (periodoAtual.includes('/')) {
@@ -150,17 +172,21 @@ serve(async (req) => {
             const inicioFaturamento = new Date(ano, mes - 1, 8);
             const fimFaturamento = new Date(ano, mes, 7);
             
+            console.log(`🗓️ VALIDAÇÃO PERÍODO: ${periodoAtual} | Mês: ${mes}/${ano}`);
+            console.log(`📅 Datas válidas: ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
+            
             // Aplicar regras específicas por tipo de arquivo
             if (isRetroativo) {
               // ARQUIVOS RETROATIVOS: Regras v002/v003
               if (record.DATA_REALIZACAO) {
-                const dataRealizacao = new Date(record.DATA_REALIZACAO);
-                if (dataRealizacao >= primeiroDiaMes) {
+                const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+                if (dataRealizacao && dataRealizacao >= primeiroDiaMes) {
+                  console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
                     motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} >= ${primeiroDiaMes.toISOString().split('T')[0]} (retroativo)`
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (convertida para ${dataRealizacao.toISOString().split('T')[0]}) >= ${primeiroDiaMes.toISOString().split('T')[0]} (retroativo)`
                   });
                   totalErros++;
                   continue;
@@ -168,13 +194,14 @@ serve(async (req) => {
               }
               
               if (record.DATA_LAUDO) {
-                const dataLaudo = new Date(record.DATA_LAUDO);
-                if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
+                const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+                if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento)) {
+                  console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
                     motivo_rejeicao: 'REGRA_v002_DATA_LAUDO',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora do período ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (retroativo)`
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (convertida para ${dataLaudo.toISOString().split('T')[0]}) fora do período ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (retroativo)`
                   });
                   totalErros++;
                   continue;
@@ -183,13 +210,14 @@ serve(async (req) => {
             } else {
               // ARQUIVOS NÃO-RETROATIVOS: Regra v031
               if (record.DATA_REALIZACAO) {
-                const dataRealizacao = new Date(record.DATA_REALIZACAO);
-                if (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes) {
+                const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+                if (dataRealizacao && (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes)) {
+                  console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
                     motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} fora do mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]} (não-retroativo)`
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (convertida para ${dataRealizacao.toISOString().split('T')[0]}) fora do mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]} (não-retroativo)`
                   });
                   totalErros++;
                   continue;
@@ -197,13 +225,14 @@ serve(async (req) => {
               }
               
               if (record.DATA_LAUDO) {
-                const dataLaudo = new Date(record.DATA_LAUDO);
-                if (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento) {
+                const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+                if (dataLaudo && (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento)) {
+                  console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
                     motivo_rejeicao: 'REGRA_v031_DATA_LAUDO',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora da janela ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (não-retroativo)`
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (convertida para ${dataLaudo.toISOString().split('T')[0]}) fora da janela ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (não-retroativo)`
                   });
                   totalErros++;
                   continue;
