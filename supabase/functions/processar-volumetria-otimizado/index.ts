@@ -355,6 +355,8 @@ serve(async (req) => {
       }
 
       // Inserir registros rejeitados
+      console.log(`📝 Tentando inserir ${registrosRejeitados.length} registros rejeitados...`);
+      
       if (registrosRejeitados.length > 0) {
         const rejectionsToInsert = registrosRejeitados.map(r => ({
           arquivo_fonte: arquivo_fonte,
@@ -362,18 +364,30 @@ serve(async (req) => {
           linha_original: r.linha_original,
           dados_originais: r.dados_originais,
           motivo_rejeicao: r.motivo_rejeicao,
-          detalhes_erro: r.detalhes_erro
+          detalhes_erro: r.detalhes_erro,
+          created_at: new Date().toISOString()
         }));
 
-        const { error: rejectError } = await supabaseClient
+        console.log(`📝 Dados de rejeição a inserir:`, rejectionsToInsert.slice(0, 2)); // Log dos primeiros 2 para debug
+
+        const { data: insertedRejections, error: rejectError } = await supabaseClient
           .from('registros_rejeitados_processamento')
-          .insert(rejectionsToInsert);
+          .insert(rejectionsToInsert)
+          .select('id');
 
         if (rejectError) {
           console.error('❌ Erro ao inserir rejeições:', rejectError);
+          console.error('❌ Detalhes do erro:', {
+            code: rejectError.code,
+            message: rejectError.message,
+            details: rejectError.details,
+            hint: rejectError.hint
+          });
         } else {
-          console.log(`📝 Rejeições salvas: ${registrosRejeitados.length} registros`);
+          console.log(`📝 Rejeições salvas: ${insertedRejections?.length || registrosRejeitados.length} registros inseridos com sucesso`);
         }
+      } else {
+        console.log(`📝 Nenhum registro rejeitado para inserir`);
       }
 
       // Atualizar status final
