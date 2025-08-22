@@ -70,7 +70,7 @@ serve(async (req) => {
 
     console.log(`📊 Encontrados ${stagingData?.length || 0} registros no staging com erro`);
 
-    // 4. Função robusta para normalização de datas
+    // 4. Função robusta para normalização de datas - CORRIGIDA
     const parseDataBrasileira = (dataStr: string): Date | null => {
       if (!dataStr || typeof dataStr !== 'string') return null;
       
@@ -80,7 +80,7 @@ serve(async (req) => {
       const formatosBrasileiros = [
         /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/, // dd/mm/yyyy ou dd-mm-yyyy
         /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/,  // dd/mm/yy ou dd-mm-yy
-        /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/,  // yyyy/mm/dd ou yyyy-mm-dd
+        /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/   // yyyy/mm/dd ou yyyy-mm-dd
       ];
       
       for (let i = 0; i < formatosBrasileiros.length; i++) {
@@ -97,10 +97,17 @@ serve(async (req) => {
             // Formatos dd/mm/yyyy ou dd/mm/yy
             let [, diaStr, mesStr, anoStr] = match;
             
-            // Converter ano de 2 dígitos para 4 dígitos
+            // CORREÇÃO CRÍTICA: Conversão inteligente de anos
             if (anoStr.length === 2) {
               const anoNum = parseInt(anoStr);
-              anoStr = anoNum <= 30 ? `20${anoStr}` : `19${anoStr}`;
+              // Para dados históricos: 00-05 = 2000-2005, 06-30 = 2006-2030, 31-99 = 1931-1999
+              if (anoNum <= 5) {
+                anoStr = `200${anoStr}`;
+              } else if (anoNum <= 30) {
+                anoStr = `20${anoStr}`;
+              } else {
+                anoStr = `19${anoStr}`;
+              }
             }
             
             dia = parseInt(diaStr);
@@ -108,8 +115,18 @@ serve(async (req) => {
             ano = parseInt(anoStr);
           }
           
-          // Validações
+          // Validações básicas
           if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
+            continue;
+          }
+          
+          // VALIDAÇÃO ADICIONAL: Rejeitar datas futuras absurdas
+          const hoje = new Date();
+          const anoAtual = hoje.getFullYear();
+          const mesAtual = hoje.getMonth() + 1;
+          
+          if (ano > anoAtual + 1 || (ano === anoAtual + 1 && mes > mesAtual)) {
+            console.log(`⚠️ Data futura rejeitada: ${dia}/${mes}/${ano}`);
             continue;
           }
           

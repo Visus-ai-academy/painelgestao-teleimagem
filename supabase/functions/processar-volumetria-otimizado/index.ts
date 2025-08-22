@@ -80,18 +80,27 @@ serve(async (req) => {
     
     console.log(`📋 ARQUIVO: ${arquivo_fonte}`);
     
-    // Para Jun/25, usar formato correto - CORRIGIR LÓGICA DE PERÍODO
+    // DETERMINAÇÃO DINÂMICA DO PERÍODO BASEADA NO ARQUIVO E DATA ATUAL
+    const agora = new Date();
+    const anoAtual = agora.getFullYear();
+    const mesAtual = agora.getMonth() + 1;
+    
     if (arquivo_fonte.includes('jun') || arquivo_fonte.includes('junho')) {
-      dataReferencia = '2025-06-01';
-      periodoReferencia = 'jun/25';
+      // Para arquivo de junho, usar o período correto baseado no ano
+      const anoArquivo = arquivo_fonte.includes('2024') ? 2024 : anoAtual;
+      dataReferencia = `${anoArquivo}-06-01`;
+      periodoReferencia = `jun/${anoArquivo.toString().slice(-2)}`;
       console.log(`📅 PERÍODO DETECTADO (junho): ${periodoReferencia} | Data ref: ${dataReferencia}`);
+    } else if (arquivo_fonte.includes('mai') || arquivo_fonte.includes('maio')) {
+      const anoArquivo = arquivo_fonte.includes('2024') ? 2024 : anoAtual;
+      dataReferencia = `${anoArquivo}-05-01`;
+      periodoReferencia = `mai/${anoArquivo.toString().slice(-2)}`;
+      console.log(`📅 PERÍODO DETECTADO (maio): ${periodoReferencia} | Data ref: ${dataReferencia}`);
     } else {
-      // Fallback para período atual - MAS DEVE SER DINÂMICO
-      const agora = new Date();
-      const ano = agora.getFullYear();
-      const mes = agora.getMonth() + 1; // 0-11 -> 1-12
-      dataReferencia = `${ano}-${mes.toString().padStart(2, '0')}-01`;
-      periodoReferencia = `${agora.toLocaleDateString('pt-BR', { month: 'short' })}/${ano.toString().slice(-2)}`;
+      // Para outros arquivos, usar período atual ou anterior conforme necessário
+      dataReferencia = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}-01`;
+      const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      periodoReferencia = `${meses[mesAtual-1]}/${anoAtual.toString().slice(-2)}`;
       console.log(`📅 PERÍODO ATUAL: ${periodoReferencia} | Data ref: ${dataReferencia}`);
     }
 
@@ -123,50 +132,91 @@ serve(async (req) => {
 
       console.log(`⚡ Background: Iniciando processamento de ${stagingData.length} registros em batches de ${BATCH_SIZE}`);
 
-      // FUNÇÃO PARA CONVERTER DATA BRASILEIRA (dd/mm/yyyy) PARA Date
+      // FUNÇÃO ROBUSTA DE PARSING DE DATAS BRASILEIRAS - CORRIGIDA
       const parseDataBrasileira = (dataBrasileira: string): Date | null => {
-        if (!dataBrasileira || dataBrasileira.trim() === '') return null;
-        
-        console.log(`🔄 Processando data: "${dataBrasileira}"`);
-        
-        // Se já está no formato ISO (yyyy-mm-dd), usar diretamente
-        if (dataBrasileira.includes('-') && dataBrasileira.length === 10) {
-          const data = new Date(dataBrasileira);
-          console.log(`📅 Data ISO: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
-          return data;
+        if (!dataBrasileira || typeof dataBrasileira !== 'string') {
+          console.log('❌ Data vazia ou inválida:', dataBrasileira);
+          return null;
         }
         
-        // Converter formato brasileiro dd/mm/yyyy para yyyy-mm-dd
-        const partes = dataBrasileira.trim().split('/');
-        if (partes.length === 3) {
-          const [dia, mes, ano] = partes;
+        const dataNormalizada = dataBrasileira.trim();
+        console.log(`🔍 Tentando converter data: "${dataNormalizada}"`);
+        
+        // Suportar múltiplos formatos: dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, dd/mm/yy
+        const formatosBrasileiros = [
+          /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/, // dd/mm/yyyy ou dd-mm-yyyy
+          /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/,  // dd/mm/yy ou dd-mm-yy
+          /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/   // yyyy/mm/dd ou yyyy-mm-dd
+        ];
+        
+        for (let i = 0; i < formatosBrasileiros.length; i++) {
+          const formato = formatosBrasileiros[i];
+          const match = dataNormalizada.match(formato);
           
-          // Validar valores numéricos
-          const diaNum = parseInt(dia, 10);
-          const mesNum = parseInt(mes, 10);
-          const anoNum = parseInt(ano, 10);
-          
-          if (isNaN(diaNum) || isNaN(mesNum) || isNaN(anoNum)) {
-            console.log(`❌ Valores inválidos: dia=${dia}, mes=${mes}, ano=${ano}`);
-            return null;
-          }
-          
-          // Validar ranges
-          if (diaNum < 1 || diaNum > 31 || mesNum < 1 || mesNum > 12) {
-            console.log(`❌ Data fora de range: ${diaNum}/${mesNum}/${anoNum}`);
-            return null;
-          }
-          
-          // Criar no formato ISO: yyyy-mm-dd (usando Date constructor diretamente)
-          const data = new Date(anoNum, mesNum - 1, diaNum); // mes-1 porque Date usa 0-11 para meses
-          console.log(`📅 Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
-          
-          // Verificar se a data criada é válida
-          if (data.getFullYear() === anoNum && data.getMonth() === mesNum - 1 && data.getDate() === diaNum) {
+          if (match) {
+            let dia: number, mes: number, ano: number;
+            
+            if (i === 2) {
+              // Formato yyyy/mm/dd ou yyyy-mm-dd
+              [, ano, mes, dia] = match.map(Number);
+            } else {
+              // Formatos dd/mm/yyyy ou dd/mm/yy
+              let [, diaStr, mesStr, anoStr] = match;
+              
+              // CORREÇÃO CRÍTICA: Conversão inteligente de anos
+              if (anoStr.length === 2) {
+                const anoNum = parseInt(anoStr);
+                // Para período atual (2024/2025): 00-05 = 2000-2005, 06-30 = 2006-2030, 31-99 = 1931-1999
+                // Para arquivos históricos: interpretar com base no contexto
+                if (anoNum <= 5) {
+                  anoStr = `200${anoStr}`;
+                } else if (anoNum <= 30) {
+                  anoStr = `20${anoStr}`;
+                } else {
+                  anoStr = `19${anoStr}`;
+                }
+              }
+              
+              dia = parseInt(diaStr);
+              mes = parseInt(mesStr);
+              ano = parseInt(anoStr);
+            }
+            
+            console.log(`🔍 Parsed formato ${i}: ${dataNormalizada} -> ${dia}/${mes}/${ano}`);
+            
+            // Validar números
+            if (isNaN(dia) || isNaN(mes) || isNaN(ano)) {
+              console.log(`❌ Valores inválidos: dia=${dia}, mes=${mes}, ano=${ano}`);
+              continue;
+            }
+            
+            // Validações de range
+            if (dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+              console.log(`❌ Data fora de range: ${dia}/${mes}/${ano}`);
+              continue;
+            }
+            
+            // VALIDAÇÃO CRÍTICA: Rejeitar datas futuras além do período atual
+            const hoje = new Date();
+            const anoAtual = hoje.getFullYear();
+            const mesAtual = hoje.getMonth() + 1;
+            
+            if (ano > anoAtual || (ano === anoAtual && mes > mesAtual + 1)) {
+              console.log(`❌ Data futura rejeitada: ${dia}/${mes}/${ano} (atual: ${mesAtual}/${anoAtual})`);
+              return null;
+            }
+            
+            // Criar data
+            const data = new Date(ano, mes - 1, dia);
+            
+            // Verificar se a data criada é válida
+            if (data.getFullYear() !== ano || data.getMonth() !== (mes - 1) || data.getDate() !== dia) {
+              console.log(`❌ Data inválida após conversão: ${dataNormalizada}`);
+              continue;
+            }
+            
+            console.log(`✅ Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
             return data;
-          } else {
-            console.log(`❌ Data inválida após conversão: ${dataBrasileira}`);
-            return null;
           }
         }
         
@@ -217,20 +267,28 @@ serve(async (req) => {
             const isRetroativo = arquivo_fonte.includes('retroativo');
             const periodoAtual = periodoReferencia;
             
-            // Calcular datas válidas baseadas no período
+            // Calcular datas válidas baseadas no período - CORRIGIDO
             let ano: number, mes: number;
             if (periodoAtual.includes('/')) {
-              // Formato jun/25
+              // Formato jun/25, mai/24, etc
               const [mesStr, anoStr] = periodoAtual.split('/');
               const meses: Record<string, number> = {
                 'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
                 'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
               };
-              mes = meses[mesStr] || 6; // default junho
-              ano = 2000 + parseInt(anoStr);
+              mes = meses[mesStr] || new Date().getMonth() + 1;
+              // CORREÇÃO CRÍTICA: Interpretação correta do ano
+              const anoNum = parseInt(anoStr);
+              if (anoNum <= 30) {
+                ano = 2000 + anoNum; // 24 = 2024, 25 = 2025
+              } else {
+                ano = 1900 + anoNum; // 99 = 1999, etc
+              }
             } else {
-              // Formato 2025-06
-              [ano, mes] = periodoAtual.split('-').map(Number);
+              // Formato 2024-06
+              const [anoStr, mesStr] = periodoAtual.split('-');
+              ano = parseInt(anoStr);
+              mes = parseInt(mesStr);
             }
             
             // Datas de validação por tipo de arquivo
