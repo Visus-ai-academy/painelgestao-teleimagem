@@ -120,16 +120,7 @@ serve(async (req) => {
             continue;
           }
           
-          // VALIDAÇÃO ADICIONAL: Rejeitar datas futuras absurdas
-          const hoje = new Date();
-          const anoAtual = hoje.getFullYear();
-          const mesAtual = hoje.getMonth() + 1;
-          
-          if (ano > anoAtual + 1 || (ano === anoAtual + 1 && mes > mesAtual)) {
-            console.log(`⚠️ Data futura rejeitada: ${dia}/${mes}/${ano}`);
-            continue;
-          }
-          
+          // Validação básica da data criada
           const data = new Date(ano, mes - 1, dia);
           
           if (data.getFullYear() !== ano || 

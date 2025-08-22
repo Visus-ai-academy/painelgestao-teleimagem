@@ -159,8 +159,8 @@ function gerarRegrasPorArquivo(periodoReferencia?: string): Record<string, Regra
       },
       {
         campo: 'DATA_LAUDO',
-        tipo: 'data_maxima',
-        valor: new Date().toISOString().split('T')[0], // Hoje
+        tipo: 'formato_data',
+        valor: 'dd/mm/yyyy',
         aplicar_em: ['data_laudo'],
         ativo: true
       }
@@ -175,8 +175,8 @@ function gerarRegrasPorArquivo(periodoReferencia?: string): Record<string, Regra
       },
       {
         campo: 'DATA_REALIZACAO',
-        tipo: 'data_maxima',
-        valor: new Date().toISOString().split('T')[0], // Hoje
+        tipo: 'formato_data',
+        valor: 'dd/mm/yyyy',
         aplicar_em: ['data_exame'],
         ativo: true
       }
