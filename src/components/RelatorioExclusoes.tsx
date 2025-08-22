@@ -184,30 +184,12 @@ export function RelatorioExclusoes() {
           description: `${registrosFormatados.length.toLocaleString()} registros rejeitados encontrados com detalhes completos`,
         });
       } else {
-        // Verificar se há rejeições no upload mas sem auditoria
-        const { data: uploads } = await supabase
-          .from('processamento_uploads')
-          .select('registros_erro')
-          .eq('tipo_arquivo', 'volumetria_padrao')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        const totalErros = uploads?.[0]?.registros_erro || 0;
-        
-        if (totalErros > 0) {
-          setRegistrosExcluidos([]);
-          toast({
-            title: "📊 Exclusões Detectadas - Sistema Anterior",
-            description: `${totalErros.toLocaleString()} registros foram rejeitados, mas os detalhes não foram capturados. Sistema de auditoria agora está ativo.`,
-            variant: "default"
-          });
-        } else {
-          setRegistrosExcluidos([]);
-          toast({
-            title: "✅ Nenhuma Exclusão",
-            description: "Todos os registros foram processados com sucesso!",
-          });
-        }
+        // CASO 2: Nenhum registro rejeitado no último lote
+        setRegistrosExcluidos([]);
+        toast({
+          title: "✅ Nenhuma Exclusão",
+          description: "Todos os registros do último upload foram processados com sucesso!",
+        });
       }
 
     } catch (error) {
@@ -232,10 +214,20 @@ export function RelatorioExclusoes() {
         description: "Buscando registros rejeitados para exportação",
       });
 
-      // Buscar TODOS os registros rejeitados da auditoria
+      // Buscar o último lote de upload
+      const { data: ultimoLote } = await supabase
+        .from('volumetria_mobilemed')
+        .select('lote_upload')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const loteAtual = ultimoLote?.[0]?.lote_upload;
+
+      // Buscar registros rejeitados APENAS do último lote
       const { data: rejeitados, error: rejeitadosError } = await supabase
         .from('registros_rejeitados_processamento')
         .select('*')
+        .eq('lote_upload', loteAtual)
         .order('created_at', { ascending: false })
         .limit(100000);
 
@@ -244,18 +236,7 @@ export function RelatorioExclusoes() {
         throw new Error(`Erro ao buscar dados: ${rejeitadosError.message}`);
       }
 
-      const { data: ultimoUpload } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .eq('tipo_arquivo', 'volumetria_padrao')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const upload = ultimoUpload?.[0];
-      const totalErrosExcel = upload?.registros_erro || 0;
-
-      console.log(`🔍 Total de registros rejeitados encontrados: ${rejeitados?.length || 0}`);
-      console.log(`📊 Upload mais recente indica: ${totalErrosExcel} erros`);
+      console.log(`🔍 Total de registros rejeitados encontrados no último lote: ${rejeitados?.length || 0}`);
 
       let dadosExcel: any[] = [];
 
@@ -349,13 +330,13 @@ export function RelatorioExclusoes() {
         
         // Aba 3: Resumo do Upload
         const resumoUpload = [{
-          'Total Processado': upload?.registros_processados || 0,
-          'Total Inserido': upload?.registros_inseridos || 0,
-          'Total Rejeitado': upload?.registros_erro || 0,
-          'Taxa Rejeição': upload?.registros_processados ? `${((upload.registros_erro / upload.registros_processados) * 100).toFixed(1)}%` : '0%',
-          'Data Processamento': upload?.created_at ? new Date(upload.created_at).toLocaleString('pt-BR') : 'N/A',
-          'Nome Arquivo': upload?.arquivo_nome || 'N/A',
-          'Status': upload?.status || 'N/A',
+          'Total Processado': ultimoUpload?.registros_processados || 0,
+          'Total Inserido': ultimoUpload?.registros_inseridos || 0,
+          'Total Rejeitado': ultimoUpload?.registros_erro || 0,
+          'Taxa Rejeição': ultimoUpload?.registros_processados ? `${((ultimoUpload.registros_erro / ultimoUpload.registros_processados) * 100).toFixed(1)}%` : '0%',
+          'Data Processamento': ultimoUpload?.created_at ? new Date(ultimoUpload.created_at).toLocaleString('pt-BR') : 'N/A',
+          'Nome Arquivo': ultimoUpload?.arquivo_nome || 'N/A',
+          'Status': ultimoUpload?.status || 'N/A',
           'Registros com Auditoria': rejeitados.length,
           'Sistema Auditoria': rejeitados.length > 0 ? 'Ativo (Detalhes Completos)' : 'Inativo ou Sem Rejeições'
         }];
@@ -373,38 +354,12 @@ export function RelatorioExclusoes() {
           description: `${dadosExcel.length.toLocaleString()} registros rejeitados exportados com análise completa em 3 abas`,
         });
 
-      } else if (totalErrosExcel > 0) {
-        // CASO 2: Há erros mas sem detalhes (sistema antigo)
-        dadosExcel = [{
-          'Informação': 'Upload processado pelo sistema anterior',
-          'Total Rejeitados': totalErrosExcel,
-          'Observação': 'Detalhes não capturados - sistema de auditoria estava inativo',
-          'Recomendação': 'Reprocessar arquivos para obter detalhes completos das exclusões',
-          'Data Upload': upload?.created_at ? new Date(upload.created_at).toLocaleString('pt-BR') : 'N/A',
-          'Nome Arquivo': upload?.arquivo_nome || 'N/A',
-          'Status Upload': upload?.status || 'N/A'
-        }];
-
-        const ws = XLSX.utils.json_to_sheet(dadosExcel);
-        ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 50 }, { wch: 50 }, { wch: 20 }, { wch: 30 }, { wch: 15 }];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Info Sistema Anterior");
-        
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
-        XLSX.writeFile(wb, `info_exclusoes_sistema_anterior_${timestamp}.xlsx`);
-
-        toast({
-          title: "📊 Informações Exportadas",
-          description: `Upload anterior: ${totalErrosExcel.toLocaleString()} registros rejeitados (sem detalhes). Reprocesse para auditoria completa.`,
-          variant: "default"
-        });
-
       } else {
-        // CASO 3: Nenhuma exclusão encontrada
+        // CASO 2: Nenhuma exclusão encontrada
         dadosExcel = [{
           'Status': 'Nenhuma exclusão encontrada',
-          'Registros Processados': upload?.registros_processados || 0,
-          'Registros Inseridos': upload?.registros_inseridos || 0,
+          'Registros Processados': ultimoUpload?.registros_processados || 0,
+          'Registros Inseridos': ultimoUpload?.registros_inseridos || 0,
           'Taxa Sucesso': '100%',
           'Data Verificação': new Date().toLocaleString('pt-BR')
         }];
@@ -582,15 +537,6 @@ export function RelatorioExclusoes() {
                 </Alert>
               )}
             </div>
-          ) : ultimoUpload?.registros_erro > 0 ? (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>{ultimoUpload.registros_erro.toLocaleString()} registros foram rejeitados</strong> no último upload, 
-                mas os detalhes não foram capturados pelo sistema anterior. 
-                Sistema de auditoria agora está ativo - próximos uploads terão detalhes completos.
-              </AlertDescription>
-            </Alert>
           ) : (
             <Alert>
               <CheckCircle className="h-4 w-4 text-green-600" />
