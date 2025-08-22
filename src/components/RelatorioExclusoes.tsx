@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, FileText, AlertTriangle, CheckCircle, Info, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Download, FileText, AlertTriangle, CheckCircle, Info, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Settings, Trash2, Calendar } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
@@ -18,6 +18,7 @@ interface RegistroExcluido {
   especialidade: string;
   exame: string;
   data_exame: string;
+  data_laudo: string;
   motivo_exclusao: string;
   detalhes_erro: string;
 }
@@ -27,6 +28,7 @@ export function RelatorioExclusoes() {
   const [loading, setLoading] = useState(true);
   const [loadingExport, setLoadingExport] = useState(false);
   const [loadingTest, setLoadingTest] = useState(false);
+  const [loadingCorrection, setLoadingCorrection] = useState(false);
   const [registrosExcluidos, setRegistrosExcluidos] = useState<RegistroExcluido[]>([]);
   const [estatisticas, setEstatisticas] = useState({
     totalProcessados: 0,
@@ -48,6 +50,49 @@ export function RelatorioExclusoes() {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  const corrigirDadosExclusao = async () => {
+    try {
+      setLoadingCorrection(true);
+      
+      toast({
+        title: "🔧 Correção Iniciada",
+        description: "Corrigindo dados de exclusão...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('corrigir-dados-exclusao');
+
+      if (error) {
+        console.error('❌ Erro na correção:', error);
+        toast({
+          title: "Erro na Correção",
+          description: error.message || "Erro ao corrigir dados",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('📊 Resultado da correção:', data);
+      
+      toast({
+        title: "✅ Correção Concluída",
+        description: `${data.registros_inseridos || 0} registros corrigidos`,
+      });
+
+      // Recarregar dados
+      await carregarDados();
+
+    } catch (error) {
+      console.error('Erro na correção:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao corrigir dados de exclusão",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingCorrection(false);
+    }
+  };
 
   const limparRegistrosRejeitados = async () => {
     try {
@@ -101,133 +146,6 @@ export function RelatorioExclusoes() {
       toast({
         title: "Erro",
         description: "Erro ao executar teste de conversão de datas",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingTest(false);
-    }
-  };
-
-  const testarInsercaoRejeitados = async () => {
-    try {
-      setLoadingTest(true);
-      
-      const { data, error } = await supabase.functions.invoke('testar-insercao-rejeitados');
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "🧪 Teste DB Executado",
-        description: `Teste de inserção concluído. ${data.sucesso ? 'Sucesso' : 'Falha'} - Verifique os logs.`
-      });
-      
-      console.log('📊 Resultados do teste DB:', data);
-      
-    } catch (error) {
-      console.error('Erro ao testar inserção de rejeitados:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao executar teste de inserção",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingTest(false);
-    }
-  };
-
-  const reprocessarRejeicoesUltimoUpload = async () => {
-    try {
-      setLoadingTest(true);
-      
-      // Buscar o último upload com registros de erro
-      const { data: ultimoUpload } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .gt('registros_erro', 0)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!ultimoUpload) {
-        toast({
-          title: "⚠️ Nenhum Upload",
-          description: "Nenhum upload com registros rejeitados encontrado",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const { data, error } = await supabase.rpc('reprocessar_rejeicoes_upload', { 
-        upload_id_param: ultimoUpload.id 
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "✅ Reprocessamento Concluído",
-        description: `${(data as any)?.registros_inseridos || 0} registros rejeitados inseridos para ${(data as any)?.arquivo || 'arquivo'}`
-      });
-      
-      console.log('📊 Resultado do reprocessamento:', data);
-      
-      // Recarregar dados
-      carregarDados();
-      
-    } catch (error) {
-      console.error('Erro ao reprocessar rejeições:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao reprocessar rejeições do upload",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingTest(false);
-    }
-  };
-
-  const corrigirDadosExclusao = async () => {
-    try {
-      setLoadingTest(true);
-      toast({
-        title: "🔧 Iniciando Correção",
-        description: "Iniciando correção de dados...",
-      });
-      
-      // Chamada direta via fetch para contornar problema de CORS
-      const response = await fetch('https://atbvikgxdcohnznkmaus.supabase.co/functions/v1/corrigir-dados-exclusao', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YnZpa2d4ZGNvaG56bmttYXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2OTY1MzAsImV4cCI6MjA2ODI3MjUzMH0.P2eptjgahiMcUzE9b1eAVAW1HC9Ib52LYpRAO8S_9CE'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      toast({
-        title: "✅ Correção Concluída",
-        description: `${data?.registros_criados || 0} registros com datas normalizadas criados para ${data?.upload_processado || 'arquivo'}`
-      });
-      
-      console.log('📊 Resultado da correção:', data);
-      
-      // Recarregar dados
-      carregarDados();
-      
-    } catch (error) {
-      console.error('Erro ao corrigir dados de exclusão:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao corrigir dados de exclusão. Verifique os logs.",
         variant: "destructive"
       });
     } finally {
@@ -309,14 +227,22 @@ export function RelatorioExclusoes() {
         const registrosFormatados = allRejeitados.map((r, index) => {
           const dados = r.dados_originais as Record<string, any> || {};
           
+          console.log('📊 Formatando registro rejeitado:', {
+            linha: r.linha_original,
+            empresa: dados.EMPRESA,
+            paciente: dados.NOME_PACIENTE,
+            motivo: r.motivo_rejeicao
+          });
+          
           return {
-            linha_original: index + 1,
+            linha_original: r.linha_original || (index + 1),
             cliente: dados.EMPRESA || 'N/I',
             paciente: dados.NOME_PACIENTE || 'N/I',
             modalidade: dados.MODALIDADE || 'N/I',
             especialidade: dados.ESPECIALIDADE || 'N/I',
             exame: dados.ESTUDO_DESCRICAO || 'N/I',
             data_exame: dados.DATA_REALIZACAO_NORMALIZADA || dados.DATA_REALIZACAO || 'N/I',
+            data_laudo: dados.DATA_LAUDO_NORMALIZADA || dados.DATA_LAUDO || 'N/I',
             motivo_exclusao: r.motivo_rejeicao || 'Não especificado',
             detalhes_erro: r.detalhes_erro || 'Sem detalhes disponíveis'
           };
@@ -396,7 +322,8 @@ export function RelatorioExclusoes() {
             'Exame/Estudo': r.exame || 'N/I',
             'Modalidade': r.modalidade || 'N/I',
             'Especialidade': r.especialidade || 'N/I',
-            'Data Exame': r.data_exame || 'N/I'
+            'Data Exame': r.data_exame || 'N/I',
+            'Data Laudo': r.data_laudo || 'N/I'
           }));
         } else if (estatisticas.totalRejeitados > 0) {
           // Buscar dados brutos dos uploads quando não há registros detalhados
@@ -445,7 +372,8 @@ export function RelatorioExclusoes() {
           { wch: 30 }, // Exame/Estudo
           { wch: 15 }, // Modalidade
           { wch: 20 }, // Especialidade
-          { wch: 15 }  // Data Exame
+          { wch: 15 }, // Data Exame
+          { wch: 15 }  // Data Laudo
         ];
         wsExclusoes['!cols'] = colWidths;
 
@@ -570,73 +498,26 @@ export function RelatorioExclusoes() {
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={testarConversaoDatas} 
-            disabled={loadingTest}
-            variant="outline"
-            size="sm"
+            variant="outline" 
+            onClick={corrigirDadosExclusao}
+            disabled={loadingCorrection}
             className="flex items-center gap-2"
           >
-            {loadingTest ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {loadingCorrection ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
             ) : (
-              <CheckCircle className="h-4 w-4" />
+              <Settings className="h-4 w-4" />
             )}
-            Testar Datas
+            Corrigir Dados
           </Button>
           <Button 
-            onClick={testarInsercaoRejeitados} 
-            disabled={loadingTest}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            {loadingTest ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Info className="h-4 w-4" />
-            )}
-            Testar DB
-          </Button>
-          <Button 
-            onClick={corrigirDadosExclusao} 
-            disabled={loadingTest}
-            variant="default"
-            size="sm"
-            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
-          >
-            {loadingTest ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle className="h-4 w-4" />
-            )}
-            🔧 Corrigir Dados
-          </Button>
-          <Button 
-            onClick={reprocessarRejeicoesUltimoUpload} 
-            disabled={loadingTest}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            {loadingTest ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4" />
-            )}
-            Reprocessar Rejeitados
-          </Button>
-          <Button 
-            onClick={limparRegistrosRejeitados} 
+            variant="outline" 
+            onClick={limparRegistrosRejeitados}
             disabled={loading}
-            variant="outline"
             className="flex items-center gap-2"
           >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <AlertTriangle className="h-4 w-4" />
-            )}
-            Limpar Exclusões
+            <Trash2 className="h-4 w-4" />
+            Limpar Rejeitados
           </Button>
           <Button 
             onClick={exportarParaExcel} 
@@ -893,6 +774,16 @@ export function RelatorioExclusoes() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
+                          onClick={() => handleOrdenacao('data_laudo')}
+                          className="h-6 p-1 font-medium flex items-center gap-1"
+                        >
+                          Data Laudo {getIconeOrdenacao('data_laudo')}
+                        </Button>
+                      </th>
+                      <th className="text-left p-2 border-b">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
                           onClick={() => handleOrdenacao('motivo_exclusao')}
                           className="h-6 p-1 font-medium flex items-center gap-1"
                         >
@@ -915,6 +806,7 @@ export function RelatorioExclusoes() {
                         </td>
                         <td className="p-2">{registro.especialidade}</td>
                         <td className="p-2 font-mono text-xs">{registro.data_exame}</td>
+                        <td className="p-2 font-mono text-xs">{registro.data_laudo}</td>
                         <td className="p-2">
                           <Badge variant="destructive" className="text-xs">
                             {registro.motivo_exclusao}
