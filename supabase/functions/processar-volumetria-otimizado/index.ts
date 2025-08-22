@@ -111,28 +111,7 @@ serve(async (req) => {
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
 
-          // Validações básicas
-          if (!record.EMPRESA?.trim()) {
-            registrosRejeitados.push({
-              linha_original: linhaOriginal,
-              dados_originais: record,
-              motivo_rejeicao: 'CAMPO_OBRIGATORIO_AUSENTE',
-              detalhes_erro: 'Campo EMPRESA é obrigatório'
-            });
-            totalErros++;
-            continue;
-          }
-
-          if (!record.ESTUDO_DESCRICAO?.trim()) {
-            registrosRejeitados.push({
-              linha_original: linhaOriginal,
-              dados_originais: record,
-              motivo_rejeicao: 'CAMPO_OBRIGATORIO_AUSENTE',
-              detalhes_erro: 'Campo ESTUDO_DESCRICAO é obrigatório'
-            });
-            totalErros++;
-            continue;
-          }
+          // Validações básicas removidas - campos podem estar vazios
 
           // Validação de data
           if (record.DATA_LAUDO) {
