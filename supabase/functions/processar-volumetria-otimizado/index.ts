@@ -490,51 +490,77 @@ serve(async (req) => {
         if (registrosRejeitados.length > 0) {
           console.log(`💾 SALVANDO ${registrosRejeitados.length} registros rejeitados no banco...`);
           
-          // Preparar dados com todas as informações necessárias
-          const rejeicoes = registrosRejeitados.map(r => ({
-            arquivo_fonte: arquivo_fonte,
-            lote_upload: loteUpload,
-            linha_original: r.linha_original,
-            dados_originais: {
-              EMPRESA: r.dados_originais.EMPRESA || 'N/I',
-              NOME_PACIENTE: r.dados_originais.NOME_PACIENTE || 'N/I',
-              MODALIDADE: r.dados_originais.MODALIDADE || 'N/I',
-              ESPECIALIDADE: r.dados_originais.ESPECIALIDADE || 'N/I',
-              ESTUDO_DESCRICAO: r.dados_originais.ESTUDO_DESCRICAO || 'N/I',
-              DATA_REALIZACAO: r.dados_originais.DATA_REALIZACAO || 'N/I',
-              DATA_LAUDO: r.dados_originais.DATA_LAUDO || 'N/I',
-              VALORES: r.dados_originais.VALORES || 0,
-              // Incluir data normalizada para debug
-              DATA_REALIZACAO_NORMALIZADA: r.dados_originais.DATA_REALIZACAO ? 
-                parseDataBrasileira(r.dados_originais.DATA_REALIZACAO)?.toISOString().split('T')[0] || 'ERRO_CONVERSAO' : 'N/A',
-              DATA_LAUDO_NORMALIZADA: r.dados_originais.DATA_LAUDO ?
-                parseDataBrasileira(r.dados_originais.DATA_LAUDO)?.toISOString().split('T')[0] || 'ERRO_CONVERSAO' : 'N/A'
-            },
-            motivo_rejeicao: r.motivo_rejeicao,
-            detalhes_erro: r.detalhes_erro,
-            created_at: new Date().toISOString()
-          }));
+          try {
+            // Salvar na tabela volumetria_erros que é a correta para rejeições
+            const rejeicoes = registrosRejeitados.map(r => ({
+              empresa: r.dados_originais.EMPRESA || 'N/I',
+              nome_paciente: r.dados_originais.NOME_PACIENTE || 'N/I',
+              arquivo_fonte: arquivo_fonte,
+              erro_detalhes: `${r.motivo_rejeicao}: ${r.detalhes_erro}`,
+              dados_originais: {
+                EMPRESA: r.dados_originais.EMPRESA || 'N/I',
+                NOME_PACIENTE: r.dados_originais.NOME_PACIENTE || 'N/I',
+                MODALIDADE: r.dados_originais.MODALIDADE || 'N/I',
+                ESPECIALIDADE: r.dados_originais.ESPECIALIDADE || 'N/I',
+                ESTUDO_DESCRICAO: r.dados_originais.ESTUDO_DESCRICAO || 'N/I',
+                DATA_REALIZACAO: r.dados_originais.DATA_REALIZACAO || 'N/I',
+                DATA_LAUDO: r.dados_originais.DATA_LAUDO || 'N/I',
+                VALORES: r.dados_originais.VALORES || 0,
+                linha_original: r.linha_original,
+                motivo_rejeicao: r.motivo_rejeicao,
+                detalhes_completos: r.detalhes_erro
+              },
+              status: 'rejeitado',
+              created_at: new Date().toISOString()
+            }));
 
-          // Inserir em batches para garantir sucesso
-          const BATCH_SIZE_REJEICOES = 50;
-          let totalInseridosRejeicoes = 0;
-          
-          for (let i = 0; i < rejeicoes.length; i += BATCH_SIZE_REJEICOES) {
-            const batch = rejeicoes.slice(i, i + BATCH_SIZE_REJEICOES);
+            // Inserir em batches para garantir sucesso
+            const BATCH_SIZE_REJEICOES = 50;
+            let totalInseridosRejeicoes = 0;
             
-            const { error: rejeicaoError } = await supabaseClient
-              .from('registros_rejeitados_processamento')
-              .insert(batch);
+            for (let i = 0; i < rejeicoes.length; i += BATCH_SIZE_REJEICOES) {
+              const batch = rejeicoes.slice(i, i + BATCH_SIZE_REJEICOES);
+              
+              console.log(`🔄 Inserindo batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1}: ${batch.length} rejeições`);
+              
+              const { data: insertedData, error: rejeicaoError } = await supabaseClient
+                .from('volumetria_erros')
+                .insert(batch)
+                .select('id');
 
-            if (rejeicaoError) {
-              console.error(`❌ Erro no batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1} de rejeições:`, rejeicaoError);
-            } else {
-              totalInseridosRejeicoes += batch.length;
-              console.log(`✅ Batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1}: ${batch.length} rejeições salvas`);
+              if (rejeicaoError) {
+                console.error(`❌ ERRO CRÍTICO no batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1}:`, rejeicaoError);
+                console.error(`❌ Dados do batch que falharam:`, JSON.stringify(batch[0], null, 2));
+                
+                // Tentar inserir um por um para identificar o problema
+                for (const item of batch) {
+                  const { error: singleError } = await supabaseClient
+                    .from('volumetria_erros')
+                    .insert([item]);
+                  
+                  if (singleError) {
+                    console.error(`❌ Erro individual:`, singleError);
+                    console.error(`❌ Item problemático:`, JSON.stringify(item, null, 2));
+                  } else {
+                    totalInseridosRejeicoes++;
+                  }
+                }
+              } else {
+                totalInseridosRejeicoes += batch.length;
+                console.log(`✅ Batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1}: ${batch.length} rejeições salvas com sucesso`);
+                console.log(`✅ IDs inseridos: ${insertedData?.map(d => d.id).slice(0, 3)}...`);
+              }
             }
+            
+            console.log(`✅ RESULTADO FINAL: ${totalInseridosRejeicoes}/${registrosRejeitados.length} rejeições salvas`);
+            
+            if (totalInseridosRejeicoes < registrosRejeitados.length) {
+              console.error(`❌ ALERTA: Algumas rejeições não foram salvas! Salvas: ${totalInseridosRejeicoes}, Total: ${registrosRejeitados.length}`);
+            }
+            
+          } catch (saveError) {
+            console.error(`❌ ERRO GERAL ao salvar rejeições:`, saveError);
           }
-          
-          console.log(`✅ TOTAL REJEIÇÕES SALVAS: ${totalInseridosRejeicoes}/${registrosRejeitados.length}`);
         } else {
           console.log(`📝 Nenhum registro rejeitado - todos foram processados com sucesso`);
         }
