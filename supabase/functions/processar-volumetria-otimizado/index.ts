@@ -123,8 +123,6 @@ serve(async (req) => {
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
 
-          // Validações básicas removidas - campos podem estar vazios
-
           // Validação de data baseada no tipo de arquivo e período de referência
           if (record.DATA_LAUDO || record.DATA_REALIZACAO) {
             const isRetroativo = arquivo_fonte.includes('retroativo');
@@ -215,56 +213,38 @@ serve(async (req) => {
           }
 
           // Gravar exatamente como está no upload, preservando valores originais
-          batchValidRecords.push({
-            EMPRESA: record.EMPRESA || null,
-            NOME_PACIENTE: record.NOME_PACIENTE || null,
-            CODIGO_PACIENTE: record.CODIGO_PACIENTE || null,
-            ESTUDO_DESCRICAO: record.ESTUDO_DESCRICAO || null,
-            ACCESSION_NUMBER: record.ACCESSION_NUMBER || null,
-            MODALIDADE: record.MODALIDADE || null,
-            PRIORIDADE: record.PRIORIDADE || null,
-            VALORES: record.VALORES || null,
-            ESPECIALIDADE: record.ESPECIALIDADE || null,
-            MEDICO: record.MEDICO || null,
-            DUPLICADO: record.DUPLICADO || null,
-            DATA_REALIZACAO: record.DATA_REALIZACAO || null,
-            HORA_REALIZACAO: record.HORA_REALIZACAO || null,
-            DATA_TRANSFERENCIA: record.DATA_TRANSFERENCIA || null,
-            HORA_TRANSFERENCIA: record.HORA_TRANSFERENCIA || null,
-            DATA_LAUDO: record.DATA_LAUDO || null,
-            HORA_LAUDO: record.HORA_LAUDO || null,
-            DATA_PRAZO: record.DATA_PRAZO || null,
-            HORA_PRAZO: record.HORA_PRAZO || null,
-            STATUS: record.STATUS || null,
-            DATA_REASSINATURA: record.DATA_REASSINATURA || null,
-            HORA_REASSINATURA: record.HORA_REASSINATURA || null,
-            MEDICO_REASSINATURA: record.MEDICO_REASSINATURA || null,
-            SEGUNDA_ASSINATURA: record.SEGUNDA_ASSINATURA || null,
-            POSSUI_IMAGENS_CHAVE: record.POSSUI_IMAGENS_CHAVE || null,
-            IMAGENS_CHAVES: record.IMAGENS_CHAVES || null,
-            IMAGENS_CAPTURADAS: record.IMAGENS_CAPTURADAS || null,
-            CODIGO_INTERNO: record.CODIGO_INTERNO || null,
-            DIGITADOR: record.DIGITADOR || null,
-            COMPLEMENTAR: record.COMPLEMENTAR || null,
-            CATEGORIA: record.CATEGORIA || null,
+          const recordToInsert = {
+            ...record,
             data_referencia: dataReferencia,
             arquivo_fonte: arquivo_fonte,
             lote_upload: loteUpload,
             periodo_referencia: periodoReferencia,
-            tipo_faturamento: 'padrao',
-            processamento_pendente: false
-          });
+            processamento_pendente: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          batchValidRecords.push(recordToInsert);
         }
 
-        // Inserir batch válido em uma operação
+        // Inserir registros válidos do batch
         if (batchValidRecords.length > 0) {
-          const { error: batchError } = await supabaseClient
+          const { error: insertError } = await supabaseClient
             .from('volumetria_mobilemed')
             .insert(batchValidRecords);
 
-          if (batchError) {
-            console.error(`❌ Erro no batch:`, batchError);
-            totalErros += batchValidRecords.length;
+          if (insertError) {
+            console.error(`❌ Erro ao inserir batch:`, insertError);
+            // Adicionar todos os registros do batch como rejeitados
+            for (let i = 0; i < batchValidRecords.length; i++) {
+              registrosRejeitados.push({
+                linha_original: batchStart + i + 1,
+                dados_originais: batchValidRecords[i],
+                motivo_rejeicao: 'ERRO_INSERCAO_BANCO',
+                detalhes_erro: insertError.message
+              });
+              totalErros++;
+            }
           } else {
             totalInseridos += batchValidRecords.length;
             console.log(`✅ Batch inserido: ${batchValidRecords.length} registros`);
@@ -272,27 +252,25 @@ serve(async (req) => {
         }
       }
 
-      // Salvar rejeições em batch
+      // Inserir registros rejeitados
       if (registrosRejeitados.length > 0) {
-        console.log(`📋 Salvando ${registrosRejeitados.length} rejeições...`);
-        
-        const rejectionsToInsert = registrosRejeitados.map(rejection => ({
+        const rejectionsToInsert = registrosRejeitados.map(r => ({
           arquivo_fonte: arquivo_fonte,
           lote_upload: loteUpload,
-          linha_original: rejection.linha_original,
-          dados_originais: rejection.dados_originais,
-          motivo_rejeicao: rejection.motivo_rejeicao,
-          detalhes_erro: rejection.detalhes_erro
+          linha_original: r.linha_original,
+          dados_originais: r.dados_originais,
+          motivo_rejeicao: r.motivo_rejeicao,
+          detalhes_erro: r.detalhes_erro
         }));
 
-        const { error: rejectionsError } = await supabaseClient
+        const { error: rejectError } = await supabaseClient
           .from('registros_rejeitados_processamento')
           .insert(rejectionsToInsert);
 
-        if (rejectionsError) {
-          console.error(`❌ Erro ao salvar rejeições:`, rejectionsError);
+        if (rejectError) {
+          console.error('❌ Erro ao inserir rejeições:', rejectError);
         } else {
-          console.log(`✅ ${registrosRejeitados.length} rejeições salvas!`);
+          console.log(`📝 Rejeições salvas: ${registrosRejeitados.length} registros`);
         }
       }
 
@@ -316,7 +294,7 @@ serve(async (req) => {
         .eq('id', uploadId);
 
       console.log(`✅ BACKGROUND CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados de ${totalProcessados} processados`);
-    }; // Fim da função backgroundProcessing
+    };
 
     // Executar processamento em background
     EdgeRuntime.waitUntil(backgroundProcessing());
@@ -333,11 +311,8 @@ serve(async (req) => {
       }),
       { 
         status: 500,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
-})
+});
