@@ -35,10 +35,10 @@ export function RelatorioExclusoes() {
   
   // Estados para filtros e ordenação
   const [filtroTexto, setFiltroTexto] = useState('');
-  const [filtroCliente, setFiltroCliente] = useState('');
-  const [filtroModalidade, setFiltroModalidade] = useState('');
-  const [filtroEspecialidade, setFiltroEspecialidade] = useState('');
-  const [filtroMotivo, setFiltroMotivo] = useState('');
+  const [filtroCliente, setFiltroCliente] = useState('todos');
+  const [filtroModalidade, setFiltroModalidade] = useState('todas');
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState('todas');
+  const [filtroMotivo, setFiltroMotivo] = useState('todos');
   const [ordenacao, setOrdenacao] = useState<{campo: string, direcao: 'asc' | 'desc'}>({
     campo: 'linha_original',
     direcao: 'asc'
@@ -203,19 +203,19 @@ export function RelatorioExclusoes() {
       );
     }
 
-    if (filtroCliente) {
+    if (filtroCliente && filtroCliente !== 'todos') {
       dados = dados.filter(registro => registro.cliente === filtroCliente);
     }
 
-    if (filtroModalidade) {
+    if (filtroModalidade && filtroModalidade !== 'todas') {
       dados = dados.filter(registro => registro.modalidade === filtroModalidade);
     }
 
-    if (filtroEspecialidade) {
+    if (filtroEspecialidade && filtroEspecialidade !== 'todas') {
       dados = dados.filter(registro => registro.especialidade === filtroEspecialidade);
     }
 
-    if (filtroMotivo) {
+    if (filtroMotivo && filtroMotivo !== 'todos') {
       dados = dados.filter(registro => registro.motivo_exclusao === filtroMotivo);
     }
 
@@ -392,7 +392,7 @@ export function RelatorioExclusoes() {
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos os clientes</SelectItem>
+                      <SelectItem value="todos">Todos os clientes</SelectItem>
                       {clientesUnicos.map(cliente => (
                         <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
                       ))}
@@ -407,7 +407,7 @@ export function RelatorioExclusoes() {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as modalidades</SelectItem>
+                      <SelectItem value="todas">Todas as modalidades</SelectItem>
                       {modalidadesUnicas.map(modalidade => (
                         <SelectItem key={modalidade} value={modalidade}>{modalidade}</SelectItem>
                       ))}
@@ -422,7 +422,7 @@ export function RelatorioExclusoes() {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as especialidades</SelectItem>
+                      <SelectItem value="todas">Todas as especialidades</SelectItem>
                       {especialidadesUnicas.map(especialidade => (
                         <SelectItem key={especialidade} value={especialidade}>{especialidade}</SelectItem>
                       ))}
@@ -437,7 +437,7 @@ export function RelatorioExclusoes() {
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos os motivos</SelectItem>
+                      <SelectItem value="todos">Todos os motivos</SelectItem>
                       {motivosUnicos.map(motivo => (
                         <SelectItem key={motivo} value={motivo}>{motivo}</SelectItem>
                       ))}
@@ -451,10 +451,10 @@ export function RelatorioExclusoes() {
                     size="sm" 
                     onClick={() => {
                       setFiltroTexto('');
-                      setFiltroCliente('');
-                      setFiltroModalidade('');
-                      setFiltroEspecialidade('');
-                      setFiltroMotivo('');
+                      setFiltroCliente('todos');
+                      setFiltroModalidade('todas');
+                      setFiltroEspecialidade('todas');
+                      setFiltroMotivo('todos');
                     }}
                     className="h-8"
                   >
