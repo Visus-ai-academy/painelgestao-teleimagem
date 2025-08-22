@@ -462,6 +462,9 @@ serve(async (req) => {
             lote_upload: loteUpload,
             periodo_referencia: periodoReferencia,
             processamento_pendente: false,
+            // Garantir que campos de foreign key sejam NULL se não especificados
+            controle_origem_id: null,
+            created_by: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
