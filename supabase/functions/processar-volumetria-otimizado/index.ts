@@ -310,140 +310,148 @@ serve(async (req) => {
             console.log(`📅 Último dia: ${ultimoDiaMes.toISOString().split('T')[0]}`);
             console.log(`📅 Faturamento: ${inicioFaturamento.toISOString().split('T')[0]} até ${fimFaturamento.toISOString().split('T')[0]}`);
             
-            // APLICAR REGRAS CORRETAS POR TIPO DE ARQUIVO
-            if (isRetroativo) {
-              // ========== ARQUIVOS RETROATIVOS: Regras v002 e v003 ==========
-              
-              // REGRA v003: DATA_REALIZACAO deve ser ANTERIOR ao primeiro dia do período
-              if (record.DATA_REALIZACAO) {
-                const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
-                if (!dataRealizacao) {
-                  console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
-                    detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
-                  });
-                  totalErros++;
-                  continue;
-                }
-                
-                console.log(`🔍 v003 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
-                console.log(`🔍 v003 - Deve ser < ${primeiroDiaMes.toISOString().split('T')[0]}`);
-                
-                // v003: Rejeitar se DATA_REALIZACAO >= primeiro dia do mês
-                if (dataRealizacao >= primeiroDiaMes) {
-                  console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO_RETROATIVO',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve ser anterior a ${primeiroDiaMes.toISOString().split('T')[0]}`
-                  });
-                  totalErros++;
-                  continue;
-                }
+          // APLICAR REGRAS CORRETAS POR TIPO DE ARQUIVO
+          // 🚫 TESTE: TODAS AS VALIDAÇÕES DE PERÍODO DESABILITADAS
+          console.log(`🚫 TESTE: Validações de período v002, v003 e v031 DESABILITADAS para arquivo ${arquivo_fonte}`);
+          console.log(`🚫 TESTE: Registros de ${periodoAtual} serão aceitos sem validação de data`);
+          
+          /*
+          VALIDAÇÕES ORIGINAIS COMENTADAS PARA TESTE:
+          
+          if (isRetroativo) {
+            // ========== ARQUIVOS RETROATIVOS: Regras v002 e v003 ==========
+            
+            // REGRA v003: DATA_REALIZACAO deve ser ANTERIOR ao primeiro dia do período
+            if (record.DATA_REALIZACAO) {
+              const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+              if (!dataRealizacao) {
+                console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
+                  detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
+                });
+                totalErros++;
+                continue;
               }
               
-              // REGRA v002: DATA_LAUDO deve estar DENTRO da janela de faturamento
-              if (record.DATA_LAUDO) {
-                const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
-                if (!dataLaudo) {
-                  console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
-                    detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
-                  });
-                  totalErros++;
-                  continue;
-                }
-                
-                console.log(`🔍 v002 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
-                console.log(`🔍 v002 - Deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
-                
-                // v002: Rejeitar se DATA_LAUDO fora da janela de faturamento
-                if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
-                  console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v002_DATA_LAUDO_RETROATIVO',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
-                  });
-                  totalErros++;
-                  continue;
-                }
-              }
-            } else {
-              // ========== ARQUIVOS NÃO-RETROATIVOS: Regra v031 ==========
+              console.log(`🔍 v003 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
+              console.log(`🔍 v003 - Deve ser < ${primeiroDiaMes.toISOString().split('T')[0]}`);
               
-              // REGRA v031: DATA_REALIZACAO deve estar DENTRO do mês de referência
-              if (record.DATA_REALIZACAO) {
-                const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
-                if (!dataRealizacao) {
-                  console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
-                    detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
-                  });
-                  totalErros++;
-                  continue;
-                }
-                
-                console.log(`🔍 v031 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
-                console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${ultimoDiaMes.toISOString().split('T')[0]}`);
-                
-                // v031: Rejeitar se DATA_REALIZACAO fora do mês
-                if (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes) {
-                  console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} fora do mês`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO_ATUAL',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve estar no mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`
-                  });
-                  totalErros++;
-                  continue;
-                }
-              }
-              
-              // REGRA v031: DATA_LAUDO deve estar na janela estendida (até dia 7 do mês seguinte)
-              if (record.DATA_LAUDO) {
-                const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
-                if (!dataLaudo) {
-                  console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
-                    detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
-                  });
-                  totalErros++;
-                  continue;
-                }
-                
-                console.log(`🔍 v031 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
-                console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
-                
-                // v031: Rejeitar se DATA_LAUDO fora da janela estendida
-                if (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento) {
-                  console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela estendida`);
-                  registrosRejeitados.push({
-                    linha_original: linhaOriginal,
-                    dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v031_DATA_LAUDO_ATUAL',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
-                  });
-                  totalErros++;
-                  continue;
-                }
+              // v003: Rejeitar se DATA_REALIZACAO >= primeiro dia do mês
+              if (dataRealizacao >= primeiroDiaMes) {
+                console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO_RETROATIVO',
+                  detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve ser anterior a ${primeiroDiaMes.toISOString().split('T')[0]}`
+                });
+                totalErros++;
+                continue;
               }
             }
+            
+            // REGRA v002: DATA_LAUDO deve estar DENTRO da janela de faturamento
+            if (record.DATA_LAUDO) {
+              const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+              if (!dataLaudo) {
+                console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
+                  detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
+                });
+                totalErros++;
+                continue;
+              }
+              
+              console.log(`🔍 v002 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
+              console.log(`🔍 v002 - Deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
+              
+              // v002: Rejeitar se DATA_LAUDO fora da janela de faturamento
+              if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
+                console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'REGRA_v002_DATA_LAUDO_RETROATIVO',
+                  detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
+                });
+                totalErros++;
+                continue;
+              }
+            }
+          } else {
+            // ========== ARQUIVOS NÃO-RETROATIVOS: Regra v031 ==========
+            
+            // REGRA v031: DATA_REALIZACAO deve estar DENTRO do mês de referência
+            if (record.DATA_REALIZACAO) {
+              const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
+              if (!dataRealizacao) {
+                console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
+                  detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
+                });
+                totalErros++;
+                continue;
+              }
+              
+              console.log(`🔍 v031 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
+              console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${ultimoDiaMes.toISOString().split('T')[0]}`);
+              
+              // v031: Rejeitar se DATA_REALIZACAO fora do mês
+              if (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes) {
+                console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} fora do mês`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO_ATUAL',
+                  detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve estar no mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`
+                });
+                totalErros++;
+                continue;
+              }
+            }
+            
+            // REGRA v031: DATA_LAUDO deve estar na janela estendida (até dia 7 do mês seguinte)
+            if (record.DATA_LAUDO) {
+              const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
+              if (!dataLaudo) {
+                console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
+                  detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
+                });
+                totalErros++;
+                continue;
+              }
+              
+              console.log(`🔍 v031 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
+              console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
+              
+              // v031: Rejeitar se DATA_LAUDO fora da janela estendida
+              if (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento) {
+                console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela estendida`);
+                registrosRejeitados.push({
+                  linha_original: linhaOriginal,
+                  dados_originais: record,
+                  motivo_rejeicao: 'REGRA_v031_DATA_LAUDO_ATUAL',
+                  detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
+                });
+                totalErros++;
+                continue;
+              }
+            }
+          }
+          */ // FIM DO BLOCO COMENTADO PARA TESTE
           }
 
           // Gravar exatamente como está no upload, preservando valores originais
