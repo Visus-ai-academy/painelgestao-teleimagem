@@ -137,6 +137,58 @@ export function RelatorioExclusoes() {
     }
   };
 
+  const reprocessarRejeicoesUltimoUpload = async () => {
+    try {
+      setLoadingTest(true);
+      
+      // Buscar o último upload com registros de erro
+      const { data: ultimoUpload } = await supabase
+        .from('processamento_uploads')
+        .select('*')
+        .gt('registros_erro', 0)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!ultimoUpload) {
+        toast({
+          title: "⚠️ Nenhum Upload",
+          description: "Nenhum upload com registros rejeitados encontrado",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('reprocessar_rejeicoes_upload', { 
+        upload_id_param: ultimoUpload.id 
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "✅ Reprocessamento Concluído",
+        description: `${(data as any)?.registros_inseridos || 0} registros rejeitados inseridos para ${(data as any)?.arquivo || 'arquivo'}`
+      });
+      
+      console.log('📊 Resultado do reprocessamento:', data);
+      
+      // Recarregar dados
+      carregarDados();
+      
+    } catch (error) {
+      console.error('Erro ao reprocessar rejeições:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao reprocessar rejeições do upload",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingTest(false);
+    }
+  };
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -458,6 +510,20 @@ export function RelatorioExclusoes() {
               <Info className="h-4 w-4" />
             )}
             Testar DB
+          </Button>
+          <Button 
+            onClick={reprocessarRejeicoesUltimoUpload} 
+            disabled={loadingTest}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            {loadingTest ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            Reprocessar Rejeitados
           </Button>
           <Button 
             onClick={limparRegistrosRejeitados} 

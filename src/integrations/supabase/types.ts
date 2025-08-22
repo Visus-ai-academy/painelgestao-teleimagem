@@ -4432,6 +4432,10 @@ export type Database = {
         }
         Returns: Json
       }
+      reprocessar_rejeicoes_upload: {
+        Args: { upload_id_param: string }
+        Returns: Json
+      }
       reprocessar_volumetria_existente: {
         Args: { arquivo_fonte_param?: string }
         Returns: Json
