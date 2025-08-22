@@ -192,16 +192,30 @@ export function RelatorioExclusoes() {
   const corrigirDadosExclusao = async () => {
     try {
       setLoadingTest(true);
+      toast({
+        title: "🔧 Iniciando Correção",
+        description: "Iniciando correção de dados...",
+      });
       
-      const { data, error } = await supabase.functions.invoke('corrigir-dados-exclusao');
+      // Chamada direta via fetch para contornar problema de CORS
+      const response = await fetch('https://atbvikgxdcohnznkmaus.supabase.co/functions/v1/corrigir-dados-exclusao', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YnZpa2d4ZGNvaG56bmttYXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2OTY1MzAsImV4cCI6MjA2ODI3MjUzMH0.P2eptjgahiMcUzE9b1eAVAW1HC9Ib52LYpRAO8S_9CE'
+        }
+      });
       
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
       
       toast({
         title: "✅ Correção Concluída",
-        description: `${(data as any)?.registros_criados || 0} registros com datas normalizadas criados para ${(data as any)?.upload_processado || 'arquivo'}`
+        description: `${data?.registros_criados || 0} registros com datas normalizadas criados para ${data?.upload_processado || 'arquivo'}`
       });
       
       console.log('📊 Resultado da correção:', data);
@@ -213,7 +227,7 @@ export function RelatorioExclusoes() {
       console.error('Erro ao corrigir dados de exclusão:', error);
       toast({
         title: "Erro",
-        description: "Erro ao corrigir dados de exclusão",
+        description: "Erro ao corrigir dados de exclusão. Verifique os logs.",
         variant: "destructive"
       });
     } finally {
@@ -227,18 +241,33 @@ export function RelatorioExclusoes() {
       
       console.log('🔍 Carregando dados de exclusões...');
       
-      // Buscar todos os registros rejeitados
-      const { data: rejeitados, error: rejeitadosError } = await supabase
-        .from('registros_rejeitados_processamento')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Buscar TODOS os registros rejeitados sem limite
+      let allRejeitados: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      
+      while (true) {
+        const { data: batch, error: rejeitadosError } = await supabase
+          .from('registros_rejeitados_processamento')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
 
-      if (rejeitadosError) {
-        console.error('❌ Erro ao buscar registros rejeitados:', rejeitadosError);
-        throw rejeitadosError;
+        if (rejeitadosError) {
+          console.error('❌ Erro ao buscar registros rejeitados:', rejeitadosError);
+          throw rejeitadosError;
+        }
+
+        if (!batch || batch.length === 0) break;
+        
+        allRejeitados = [...allRejeitados, ...batch];
+        
+        if (batch.length < batchSize) break;
+        
+        from += batchSize;
       }
 
-      console.log(`✅ Encontrados ${rejeitados?.length || 0} registros rejeitados`);
+      console.log(`✅ Encontrados ${allRejeitados?.length || 0} registros rejeitados`);
 
       // Buscar dados de volumetria para calcular estatísticas
       const { count: totalVolumetria } = await supabase
@@ -262,7 +291,7 @@ export function RelatorioExclusoes() {
       const totalInseridosUploads = uploadsVolumetria?.reduce((sum, upload) => sum + (upload.registros_inseridos || 0), 0) || 0;
       const totalErrosUploads = uploadsVolumetria?.reduce((sum, upload) => sum + (upload.registros_erro || 0), 0) || 0;
 
-      const totalRejeitados = rejeitados?.length || 0;
+      const totalRejeitados = allRejeitados?.length || 0;
       
       // Usar o maior valor entre os rejeitados salvos e os erros dos uploads
       const totalErros = Math.max(totalRejeitados, totalErrosUploads);
@@ -276,8 +305,8 @@ export function RelatorioExclusoes() {
         taxaSucesso
       });
 
-      if (rejeitados && rejeitados.length > 0) {
-        const registrosFormatados = rejeitados.map((r, index) => {
+      if (allRejeitados && allRejeitados.length > 0) {
+        const registrosFormatados = allRejeitados.map((r, index) => {
           const dados = r.dados_originais as Record<string, any> || {};
           
           return {
