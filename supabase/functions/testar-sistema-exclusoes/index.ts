@@ -40,7 +40,7 @@ serve(async (req) => {
         "HORA_PRAZO": "10:00:00",
         "STATUS": "Finalizado",
         data_referencia: "2025-08-01",
-        arquivo_fonte: "teste_sistema_exclusoes",
+        arquivo_fonte: "volumetria_padrao",
         lote_upload: "teste_001",
         periodo_referencia: "ago/25"
         // Este registro pode ser excluído por valor zero ou outras regras
@@ -64,7 +64,7 @@ serve(async (req) => {
         "HORA_PRAZO": "14:30:00",
         "STATUS": "Finalizado",
         data_referencia: "2025-08-01",
-        arquivo_fonte: "teste_sistema_exclusoes",
+        arquivo_fonte: "volumetria_padrao",
         lote_upload: "teste_001",
         periodo_referencia: "ago/25"
         // Este registro será excluído por data futura
