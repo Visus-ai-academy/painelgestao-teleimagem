@@ -108,6 +108,35 @@ export function RelatorioExclusoes() {
     }
   };
 
+  const testarInsercaoRejeitados = async () => {
+    try {
+      setLoadingTest(true);
+      
+      const { data, error } = await supabase.functions.invoke('testar-insercao-rejeitados');
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "🧪 Teste DB Executado",
+        description: `Teste de inserção concluído. ${data.sucesso ? 'Sucesso' : 'Falha'} - Verifique os logs.`
+      });
+      
+      console.log('📊 Resultados do teste DB:', data);
+      
+    } catch (error) {
+      console.error('Erro ao testar inserção de rejeitados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao executar teste de inserção",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingTest(false);
+    }
+  };
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -402,6 +431,34 @@ export function RelatorioExclusoes() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={testarConversaoDatas} 
+            disabled={loadingTest}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            {loadingTest ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            Testar Datas
+          </Button>
+          <Button 
+            onClick={testarInsercaoRejeitados} 
+            disabled={loadingTest}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            {loadingTest ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Info className="h-4 w-4" />
+            )}
+            Testar DB
+          </Button>
           <Button 
             onClick={limparRegistrosRejeitados} 
             disabled={loading}
