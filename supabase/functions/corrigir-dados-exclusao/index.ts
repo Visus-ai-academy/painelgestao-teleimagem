@@ -180,80 +180,20 @@ serve(async (req) => {
         });
       });
     } else {
-      // Buscar dados da volumetria_mobilemed recente do mesmo período
-      console.log('📝 Tentando buscar dados reais da volumetria_mobilemed...');
+      console.log('📊 Encontrados 0 registros no staging com erro');
+      console.log('⚠️ Não há registros rejeitados reais - não gerando dados simulados');
       
-      const { data: volumetriaData } = await supabaseClient
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('arquivo_fonte', ultimoUpload.tipo_arquivo)
-        .order('created_at', { ascending: false })
-        .limit(Math.min(totalRejeitados, 500)); // Limite para performance
-      
-      if (volumetriaData && volumetriaData.length > 0) {
-        console.log(`📊 Encontrados ${volumetriaData.length} registros na volumetria para usar como base`);
-        
-        // Usar dados reais da volumetria como base para simular rejeições
-        volumetriaData.slice(0, totalRejeitados).forEach((registro, index) => {
-          let dataRealizacaoNorm = 'N/I';
-          let dataLaudoNorm = 'N/I';
-          
-          if (registro.DATA_REALIZACAO) {
-            const dataRealiz = parseDataBrasileira(registro.DATA_REALIZACAO);
-            dataRealizacaoNorm = dataRealiz ? dataRealiz.toISOString().split('T')[0] : registro.DATA_REALIZACAO;
-          }
-          
-          if (registro.DATA_LAUDO) {
-            const dataLaudo = parseDataBrasileira(registro.DATA_LAUDO);
-            dataLaudoNorm = dataLaudo ? dataLaudo.toISOString().split('T')[0] : registro.DATA_LAUDO;
-          }
-
-          registrosRejeitados.push({
-            arquivo_fonte: ultimoUpload.tipo_arquivo,
-            lote_upload: loteUpload,
-            linha_original: index + 1,
-            dados_originais: {
-              EMPRESA: registro.EMPRESA || 'N/I',
-              NOME_PACIENTE: registro.NOME_PACIENTE || 'N/I',
-              MODALIDADE: registro.MODALIDADE || 'N/I',
-              ESPECIALIDADE: registro.ESPECIALIDADE || 'N/I',
-              ESTUDO_DESCRICAO: registro.ESTUDO_DESCRICAO || 'N/I',
-              DATA_REALIZACAO: registro.DATA_REALIZACAO || 'N/I',
-              DATA_LAUDO: registro.DATA_LAUDO || 'N/I',
-              DATA_REALIZACAO_NORMALIZADA: dataRealizacaoNorm,
-              DATA_LAUDO_NORMALIZADA: dataLaudoNorm,
-              OBSERVACAO: 'Dados baseados em registros similares do mesmo upload'
-            },
-            motivo_rejeicao: 'DADOS_SIMULADOS_UPLOAD_SIMILAR',
-            detalhes_erro: `Registro simulado baseado em upload similar. Data realização: ${registro.DATA_REALIZACAO}, Data laudo: ${registro.DATA_LAUDO}. Fonte: ${ultimoUpload.arquivo_nome}`,
-            created_at: new Date().toISOString()
-          });
-        });
-      } else {
-        // Última opção: simular registros básicos
-        console.log('📝 Simulando registros rejeitados básicos...');
-        
-        for (let i = 1; i <= totalRejeitados; i++) {
-          registrosRejeitados.push({
-            arquivo_fonte: ultimoUpload.tipo_arquivo,
-            lote_upload: loteUpload,
-            linha_original: i,
-            dados_originais: {
-              EMPRESA: `Registro rejeitado ${i}`,
-              NOME_PACIENTE: `Paciente linha ${i}`,
-              MODALIDADE: 'N/I',
-              ESPECIALIDADE: 'N/I',
-              ESTUDO_DESCRICAO: `Exame linha ${i}`,
-              DATA_REALIZACAO: 'Data inválida ou fora do período',
-              DATA_LAUDO: 'Data inválida ou fora do período',
-              OBSERVACAO: 'Dados originais não disponíveis - baseado em contador de rejeições'
-            },
-            motivo_rejeicao: 'DADOS_SIMULADOS_CONTADOR',
-            detalhes_erro: `Registro simulado (${i} de ${totalRejeitados}) por não ter dados originais disponíveis do arquivo ${ultimoUpload.arquivo_nome}`,
-            created_at: new Date().toISOString()
-          });
-        }
-      }
+      return new Response(JSON.stringify({
+        sucesso: true,
+        upload_processado: ultimoUpload.arquivo_nome,
+        registros_criados: 0,
+        total_rejeitados: 0,
+        fonte_dados: 'nenhum_rejeitado_real',
+        lote_upload: loteUpload,
+        mensagem: 'Nenhum registro rejeitado encontrado - não há dados para correção'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     console.log(`📝 Preparados ${registrosRejeitados.length} registros para inserção`);
