@@ -94,6 +94,26 @@ export default async function handler(req: Request): Promise<Response> {
       console.log(`🗂️ Processando ${arquivo}...`);
       
       // 1. Excluir registros com DATA_REALIZACAO fora do período do mês
+      // Primeiro buscar registros que serão excluídos
+      const { data: registrosRealizacao } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('arquivo_fonte', arquivo)
+        .or(`DATA_REALIZACAO.lt.${inicioRealizacao},DATA_REALIZACAO.gt.${fimRealizacao}`);
+
+      if (registrosRealizacao && registrosRealizacao.length > 0) {
+        const rejectionsToInsert = registrosRealizacao.map((record, index) => ({
+          arquivo_fonte: arquivo,
+          lote_upload: record.lote_upload || 'filtro_periodo_atual',
+          linha_original: index + 1,
+          dados_originais: record,
+          motivo_rejeicao: 'FILTRO_DATA_REALIZACAO_PERIODO',
+          detalhes_erro: `Data de realização ${record.DATA_REALIZACAO} fora do período ${inicioRealizacao} a ${fimRealizacao}`
+        }));
+
+        await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+      }
+
       const { error: errorRealizacao, count: countRealizacao } = await supabase
         .from('volumetria_mobilemed')
         .delete({ count: 'exact' })
@@ -111,6 +131,26 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       // 2. Excluir registros com DATA_LAUDO fora do período permitido
+      // Primeiro buscar registros que serão excluídos
+      const { data: registrosLaudo } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('arquivo_fonte', arquivo)
+        .or(`DATA_LAUDO.lt.${inicioLaudo},DATA_LAUDO.gte.${new Date(new Date(fimLaudo).getTime() + 86400000).toISOString().split('T')[0]}`);
+
+      if (registrosLaudo && registrosLaudo.length > 0) {
+        const rejectionsToInsert = registrosLaudo.map((record, index) => ({
+          arquivo_fonte: arquivo,
+          lote_upload: record.lote_upload || 'filtro_periodo_atual',
+          linha_original: index + 1,
+          dados_originais: record,
+          motivo_rejeicao: 'FILTRO_DATA_LAUDO_PERIODO',
+          detalhes_erro: `Data de laudo ${record.DATA_LAUDO} fora do período ${inicioLaudo} a ${fimLaudo}`
+        }));
+
+        await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+      }
+
       const { error: errorLaudo, count: countLaudo } = await supabase
         .from('volumetria_mobilemed')
         .delete({ count: 'exact' })

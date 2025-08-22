@@ -169,7 +169,19 @@ serve(async (req) => {
             throw new Error(`Erro ao inserir registros quebrados: ${errorInsert.message}`);
           }
 
-          // 8. Remover registro original
+          // 8. Registrar remoção do registro original antes de deletar
+          const rejectionData = {
+            arquivo_fonte: registroOriginal.arquivo_fonte,
+            lote_upload: registroOriginal.lote_upload || 'quebra_exames',
+            linha_original: 1,
+            dados_originais: registroOriginal,
+            motivo_rejeicao: 'QUEBRA_EXAME_ORIGINAL_REMOVIDO',
+            detalhes_erro: `Exame original ${registroOriginal.ESTUDO_DESCRICAO} quebrado em ${quantidadeQuebras} registros`
+          };
+
+          await supabase.from('registros_rejeitados_processamento').insert([rejectionData]);
+
+          // 9. Remover registro original
           const { error: errorDelete } = await supabase
             .from('volumetria_mobilemed')
             .delete()

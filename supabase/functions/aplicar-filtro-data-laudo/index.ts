@@ -79,6 +79,27 @@ export default async function handler(req: Request): Promise<Response> {
     console.log(`📝 Regra v031: Exclusão por DATA_LAUDO para arquivos não-retroativos`);
     
     // Aplicar v031 em volumetria_padrao
+    // Primeiro buscar registros que serão excluídos
+    const { data: registrosV031_1 } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*')
+      .eq('arquivo_fonte', 'volumetria_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (registrosV031_1 && registrosV031_1.length > 0) {
+      // Salvar registros rejeitados
+      const rejectionsToInsert = registrosV031_1.map((record, index) => ({
+        arquivo_fonte: 'volumetria_padrao',
+        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        linha_original: index + 1,
+        dados_originais: record,
+        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+      }));
+
+      await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+    }
+
     const { error: errorV031_1, count: countV031_1 } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
@@ -92,7 +113,26 @@ export default async function handler(req: Request): Promise<Response> {
       console.log(`✅ REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
     }
 
-    // Aplicar v031 em volumetria_fora_padrao
+    // Aplicar v031 em volumetria_fora_padrao  
+    const { data: registrosV031_2 } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*')
+      .eq('arquivo_fonte', 'volumetria_fora_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (registrosV031_2 && registrosV031_2.length > 0) {
+      const rejectionsToInsert = registrosV031_2.map((record, index) => ({
+        arquivo_fonte: 'volumetria_fora_padrao',
+        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        linha_original: index + 1,
+        dados_originais: record,
+        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+      }));
+
+      await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+    }
+
     const { error: errorV031_2, count: countV031_2 } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
@@ -107,6 +147,25 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Aplicar v031 em volumetria_onco_padrao
+    const { data: registrosV031_3 } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*')
+      .eq('arquivo_fonte', 'volumetria_onco_padrao')
+      .gt('data_laudo', dataLimiteLaudo);
+
+    if (registrosV031_3 && registrosV031_3.length > 0) {
+      const rejectionsToInsert = registrosV031_3.map((record, index) => ({
+        arquivo_fonte: 'volumetria_onco_padrao',
+        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        linha_original: index + 1,
+        dados_originais: record,
+        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+      }));
+
+      await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+    }
+
     const { error: errorV031_3, count: countV031_3 } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })

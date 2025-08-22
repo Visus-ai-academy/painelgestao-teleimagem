@@ -112,7 +112,27 @@ serve(async (req) => {
     }
 
     // 6. Remover registros originais
+    // Registrar remoção dos registros originais antes de deletar
     if (registrosParaRemover.length > 0) {
+      // Buscar dados dos registros que serão removidos
+      const { data: registrosOriginais } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .in('id', registrosParaRemover);
+
+      if (registrosOriginais && registrosOriginais.length > 0) {
+        const rejectionsToInsert = registrosOriginais.map((record, index) => ({
+          arquivo_fonte: record.arquivo_fonte,
+          lote_upload: record.lote_upload || 'quebra_automatica',
+          linha_original: index + 1,
+          dados_originais: record,
+          motivo_rejeicao: 'QUEBRA_AUTOMATICA_ORIGINAL_REMOVIDO',
+          detalhes_erro: `Exame original ${record.ESTUDO_DESCRICAO} quebrado automaticamente`
+        }));
+
+        await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
+      }
+
       const { error: errorDelete } = await supabase
         .from('volumetria_mobilemed')
         .delete()
