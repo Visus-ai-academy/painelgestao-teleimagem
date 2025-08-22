@@ -46,9 +46,21 @@ serve(async (req) => {
         console.log(`🔧 Aplicando regra: ${regra}`);
         
         // Diferentes regras precisam de parâmetros diferentes
-        const body = ['aplicar-exclusoes-periodo', 'aplicar-filtro-data-laudo'].includes(regra)
-          ? { arquivo_fonte, periodo_referencia }
-          : { arquivo_fonte };
+        let body = { arquivo_fonte };
+        
+        if (['aplicar-exclusoes-periodo', 'aplicar-filtro-data-laudo'].includes(regra)) {
+          body = { arquivo_fonte, periodo_referencia };
+          
+          // TESTE: Desabilitar regras v002, v003 e v031 para teste
+          if (regra === 'aplicar-exclusoes-periodo') {
+            body = { 
+              arquivo_fonte, 
+              periodo_referencia, 
+              disable_rules: ['v002', 'v003', 'v031'] 
+            };
+            console.log(`🚫 TESTE: Desabilitando regras v002, v003 e v031 em ${regra}`);
+          }
+        }
         
         const { data, error } = await supabaseClient.functions.invoke(regra, { body });
 
