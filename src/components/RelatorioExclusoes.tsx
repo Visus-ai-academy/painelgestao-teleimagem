@@ -102,14 +102,34 @@ export function RelatorioExclusoes() {
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true });
 
+      // Buscar estatísticas dos uploads de volumetria
+      const { data: uploadsVolumetria } = await supabase
+        .from('processamento_uploads')
+        .select('registros_processados, registros_inseridos, registros_erro')
+        .in('tipo_arquivo', [
+          'volumetria_padrao', 
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo', 
+          'volumetria_fora_padrao_retroativo',
+          'volumetria_onco_padrao'
+        ]);
+
+      // Somar estatísticas dos uploads
+      const totalProcessadosUploads = uploadsVolumetria?.reduce((sum, upload) => sum + (upload.registros_processados || 0), 0) || 0;
+      const totalInseridosUploads = uploadsVolumetria?.reduce((sum, upload) => sum + (upload.registros_inseridos || 0), 0) || 0;
+      const totalErrosUploads = uploadsVolumetria?.reduce((sum, upload) => sum + (upload.registros_erro || 0), 0) || 0;
+
       const totalRejeitados = rejeitados?.length || 0;
-      const totalProcessados = (totalVolumetria || 0) + totalRejeitados;
+      
+      // Usar o maior valor entre os rejeitados salvos e os erros dos uploads
+      const totalErros = Math.max(totalRejeitados, totalErrosUploads);
+      const totalProcessados = Math.max(totalProcessadosUploads, (totalVolumetria || 0) + totalErros);
       const taxaSucesso = totalProcessados > 0 ? 
-        Math.round(((totalVolumetria || 0) / totalProcessados) * 100) : 100;
+        Math.round(((totalProcessados - totalErros) / totalProcessados) * 100) : 100;
 
       setEstatisticas({
         totalProcessados,
-        totalRejeitados,
+        totalRejeitados: totalErros,
         taxaSucesso
       });
 
@@ -134,7 +154,15 @@ export function RelatorioExclusoes() {
         
         toast({
           title: "✅ Dados Carregados",
-          description: `${registrosFormatados.length} registros rejeitados encontrados`
+          description: `${registrosFormatados.length} registros rejeitados encontrados (${totalErros} total conforme uploads)`
+        });
+      } else if (totalErros > 0) {
+        // Há registros de erro nos uploads mas não estão salvos na tabela de rejeições
+        setRegistrosExcluidos([]);
+        toast({
+          title: "⚠️ Inconsistência Detectada",
+          description: `${totalErros} exclusões registradas nos uploads, mas nenhuma rejeição salva. Possivelmente foram limpas.`,
+          variant: "destructive"
         });
       } else {
         setRegistrosExcluidos([]);
