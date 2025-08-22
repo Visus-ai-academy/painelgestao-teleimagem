@@ -185,16 +185,22 @@ serve(async (req) => {
               continue;
             }
             
-            // VALIDAÇÃO ANTI-FUTURA: Rejeitar datas claramente futuras
+            // VALIDAÇÃO ANTI-FUTURA: Rejeitar datas claramente futuras (mais flexível para dados médicos)
             const hoje = new Date();
             const anoAtual = hoje.getFullYear();
             const mesAtual = hoje.getMonth() + 1;
             
-            // Permitir apenas até 1 mês no futuro para flexibilidade
-            if (ano > anoAtual + 1 || (ano === anoAtual && mes > mesAtual + 2)) {
-              console.log(`❌ Data futura inválida rejeitada: ${dia}/${mes}/${ano}`);
+            // Para dados médicos, permitir processamento de dados do próximo ano (comum no final do ano)
+            // e até 3 meses no futuro no ano atual para flexibilidade de fechamento
+            const permitirProximoAno = (mesAtual >= 10); // Out, Nov, Dez podem processar ano seguinte
+            const limiteMesesFuturo = permitirProximoAno ? 15 : 6; // Mais flexibilidade no final do ano
+            
+            if (ano > anoAtual + 1 || (ano === anoAtual && mes > mesAtual + limiteMesesFuturo)) {
+              console.log(`❌ Data futura inválida rejeitada: ${dia}/${mes}/${ano} (Ano atual: ${anoAtual}, Mês atual: ${mesAtual})`);
               return null;
             }
+            
+            console.log(`✅ Data validada como aceita: ${dia}/${mes}/${ano} (Limites: ano <= ${anoAtual + 1}, mês <= ${mesAtual + limiteMesesFuturo} para ano atual)`);
             
             // Criar e validar data
             const data = new Date(ano, mes - 1, dia);
