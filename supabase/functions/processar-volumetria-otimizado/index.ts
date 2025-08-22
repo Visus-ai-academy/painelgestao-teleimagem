@@ -354,7 +354,7 @@ serve(async (req) => {
         }
       }
 
-      // Inserir registros rejeitados
+      // 📝 INSERIR REGISTROS REJEITADOS NA TABELA DE REJEIÇÕES
       console.log(`📝 Tentando inserir ${registrosRejeitados.length} registros rejeitados...`);
       
       if (registrosRejeitados.length > 0) {
@@ -368,24 +368,39 @@ serve(async (req) => {
           created_at: new Date().toISOString()
         }));
 
-        console.log(`📝 Dados de rejeição a inserir:`, rejectionsToInsert.slice(0, 2)); // Log dos primeiros 2 para debug
+        console.log(`📝 Exemplo de rejeição a inserir:`, JSON.stringify(rejectionsToInsert[0], null, 2));
 
-        const { data: insertedRejections, error: rejectError } = await supabaseClient
-          .from('registros_rejeitados_processamento')
-          .insert(rejectionsToInsert)
-          .select('id');
+        // Inserir em batches menores para evitar timeouts
+        const BATCH_SIZE_REJEITADOS = 50;
+        let totalInseridosRejeitados = 0;
+        
+        for (let i = 0; i < rejectionsToInsert.length; i += BATCH_SIZE_REJEITADOS) {
+          const batchRejeitados = rejectionsToInsert.slice(i, i + BATCH_SIZE_REJEITADOS);
+          const batchNum = Math.floor(i/BATCH_SIZE_REJEITADOS) + 1;
+          const totalBatches = Math.ceil(rejectionsToInsert.length/BATCH_SIZE_REJEITADOS);
+          
+          console.log(`📝 Inserindo batch ${batchNum}/${totalBatches} de registros rejeitados (${batchRejeitados.length} registros)...`);
 
-        if (rejectError) {
-          console.error('❌ Erro ao inserir rejeições:', rejectError);
-          console.error('❌ Detalhes do erro:', {
-            code: rejectError.code,
-            message: rejectError.message,
-            details: rejectError.details,
-            hint: rejectError.hint
-          });
-        } else {
-          console.log(`📝 Rejeições salvas: ${insertedRejections?.length || registrosRejeitados.length} registros inseridos com sucesso`);
+          const { data: insertedRejections, error: rejectError } = await supabaseClient
+            .from('registros_rejeitados_processamento')
+            .insert(batchRejeitados);
+
+          if (rejectError) {
+            console.error(`❌ Erro ao inserir batch ${batchNum} de rejeições:`, rejectError);
+            console.error('❌ Detalhes completos do erro:', {
+              code: rejectError.code,
+              message: rejectError.message,
+              details: rejectError.details,
+              hint: rejectError.hint
+            });
+            // Continuar com próximo batch mesmo se um falhar
+          } else {
+            totalInseridosRejeitados += batchRejeitados.length;
+            console.log(`✅ Batch ${batchNum} de rejeições inserido com sucesso (${batchRejeitados.length} registros)`);
+          }
         }
+        
+        console.log(`✅ TOTAL DE REJEIÇÕES INSERIDAS: ${totalInseridosRejeitados}/${registrosRejeitados.length}`);
       } else {
         console.log(`📝 Nenhum registro rejeitado para inserir`);
       }
