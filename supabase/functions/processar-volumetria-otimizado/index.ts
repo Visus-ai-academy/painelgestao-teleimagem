@@ -112,24 +112,53 @@ serve(async (req) => {
 
       // FUNÇÃO PARA CONVERTER DATA BRASILEIRA (dd/mm/yyyy) PARA Date
       const parseDataBrasileira = (dataBrasileira: string): Date | null => {
-        if (!dataBrasileira) return null;
+        if (!dataBrasileira || dataBrasileira.trim() === '') return null;
+        
+        console.log(`🔄 Processando data: "${dataBrasileira}"`);
         
         // Se já está no formato ISO (yyyy-mm-dd), usar diretamente
         if (dataBrasileira.includes('-') && dataBrasileira.length === 10) {
-          return new Date(dataBrasileira);
+          const data = new Date(dataBrasileira);
+          console.log(`📅 Data ISO: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
+          return data;
         }
         
         // Converter formato brasileiro dd/mm/yyyy para yyyy-mm-dd
-        const partes = dataBrasileira.split('/');
+        const partes = dataBrasileira.trim().split('/');
         if (partes.length === 3) {
           const [dia, mes, ano] = partes;
-          // Criar no formato ISO: yyyy-mm-dd
-          const dataISO = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-          return new Date(dataISO);
+          
+          // Validar valores numéricos
+          const diaNum = parseInt(dia, 10);
+          const mesNum = parseInt(mes, 10);
+          const anoNum = parseInt(ano, 10);
+          
+          if (isNaN(diaNum) || isNaN(mesNum) || isNaN(anoNum)) {
+            console.log(`❌ Valores inválidos: dia=${dia}, mes=${mes}, ano=${ano}`);
+            return null;
+          }
+          
+          // Validar ranges
+          if (diaNum < 1 || diaNum > 31 || mesNum < 1 || mesNum > 12) {
+            console.log(`❌ Data fora de range: ${diaNum}/${mesNum}/${anoNum}`);
+            return null;
+          }
+          
+          // Criar no formato ISO: yyyy-mm-dd (usando Date constructor diretamente)
+          const data = new Date(anoNum, mesNum - 1, diaNum); // mes-1 porque Date usa 0-11 para meses
+          console.log(`📅 Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
+          
+          // Verificar se a data criada é válida
+          if (data.getFullYear() === anoNum && data.getMonth() === mesNum - 1 && data.getDate() === diaNum) {
+            return data;
+          } else {
+            console.log(`❌ Data inválida após conversão: ${dataBrasileira}`);
+            return null;
+          }
         }
         
-        // Fallback: tentar interpretação direta
-        return new Date(dataBrasileira);
+        console.log(`❌ Formato não reconhecido: "${dataBrasileira}"`);
+        return null;
       };
 
       // APLICAR CONVERSÃO EM TODOS OS CAMPOS DE DATA

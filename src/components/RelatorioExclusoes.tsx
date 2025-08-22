@@ -210,29 +210,57 @@ export function RelatorioExclusoes() {
           description: "Arquivo exportado - nenhuma exclusão encontrada"
         });
       } else {
-        // Caso com exclusões
-        const dadosExcel = registrosExcluidos.map(r => ({
-          'Nº Linha': r.linha_original,
-          'Motivo Exclusão': r.motivo_exclusao,
-          'Detalhes Erro': r.detalhes_erro,
-          'Cliente/Empresa': r.cliente,
-          'Nome Paciente': r.paciente,
-          'Exame/Estudo': r.exame,
-          'Modalidade': r.modalidade,
-          'Especialidade': r.especialidade,
-          'Data Exame': r.data_exame
-        }));
+        // Caso com exclusões - buscar detalhes dos uploads se não há registros salvos
+        let dadosExcel: any[] = [];
+        
+        if (registrosExcluidos.length > 0) {
+          // Usar registros rejeitados salvos
+          dadosExcel = registrosExcluidos.map(r => ({
+            'Nº Linha': r.linha_original,
+            'Motivo Exclusão': r.motivo_exclusao,
+            'Detalhes Erro': r.detalhes_erro,
+            'Cliente/Empresa': r.cliente,
+            'Nome Paciente': r.paciente,
+            'Exame/Estudo': r.exame,
+            'Modalidade': r.modalidade,
+            'Especialidade': r.especialidade,
+            'Data Exame': r.data_exame
+          }));
+        } else if (estatisticas.totalRejeitados > 0) {
+          // Buscar informações dos uploads mesmo sem registros detalhados
+          const { data: uploadsDetalhes } = await supabase
+            .from('processamento_uploads')
+            .select('tipo_arquivo, arquivo_nome, registros_erro, created_at, detalhes_erro')
+            .in('tipo_arquivo', [
+              'volumetria_padrao', 
+              'volumetria_fora_padrao', 
+              'volumetria_padrao_retroativo', 
+              'volumetria_fora_padrao_retroativo',
+              'volumetria_onco_padrao'
+            ])
+            .gt('registros_erro', 0)
+            .order('created_at', { ascending: false });
+
+          dadosExcel = uploadsDetalhes?.map((upload, index) => ({
+            'Arquivo': upload.tipo_arquivo,
+            'Nome do Arquivo': upload.arquivo_nome,
+            'Registros Rejeitados': upload.registros_erro,
+            'Data Upload': new Date(upload.created_at).toLocaleString('pt-BR'),
+            'Detalhes': (typeof upload.detalhes_erro === 'object' && upload.detalhes_erro && 'status' in upload.detalhes_erro) ? String(upload.detalhes_erro.status) : 'Registros rejeitados durante validação de datas',
+            'Observação': 'Registros detalhados foram limpos. Apenas contadores disponíveis.'
+          })) || [];
+        }
 
         const ws = XLSX.utils.json_to_sheet(dadosExcel);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Registros Excluídos");
+        XLSX.utils.book_append_sheet(wb, ws, registrosExcluidos.length > 0 ? "Registros Excluídos" : "Resumo Exclusões");
         
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
         XLSX.writeFile(wb, `relatorio_exclusoes_${timestamp}.xlsx`);
 
         toast({
           title: "✅ Excel Exportado",
-          description: `${dadosExcel.length} registros rejeitados exportados`
+          description: `${dadosExcel.length} ${registrosExcluidos.length > 0 ? 'registros detalhados' : 'uploads com exclusões'} exportados`
         });
       }
 
