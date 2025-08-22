@@ -10,27 +10,40 @@ const corsHeaders = {
 function calcularDatasPeriodoAtual(periodoReferencia: string) {
   console.log(`🗓️ Calculando datas para período atual: ${periodoReferencia}`);
   
-  const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
+  let mes: number, ano: number;
   
-  const meses = {
-    'janeiro': 1, 'jan': 1,
-    'fevereiro': 2, 'fev': 2,
-    'março': 3, 'mar': 3,
-    'abril': 4, 'abr': 4,
-    'maio': 5, 'mai': 5,
-    'junho': 6, 'jun': 6,
-    'julho': 7, 'jul': 7,
-    'agosto': 8, 'ago': 8,
-    'setembro': 9, 'set': 9,
-    'outubro': 10, 'out': 10,
-    'novembro': 11, 'nov': 11,
-    'dezembro': 12, 'dez': 12
-  };
+  // Detectar formato: 'jun/25' ou '2025-06'
+  if (periodoReferencia.includes('/')) {
+    // Formato: 'jun/25'
+    const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
+    
+    const meses = {
+      'janeiro': 1, 'jan': 1,
+      'fevereiro': 2, 'fev': 2,
+      'março': 3, 'mar': 3,
+      'abril': 4, 'abr': 4,
+      'maio': 5, 'mai': 5,
+      'junho': 6, 'jun': 6,
+      'julho': 7, 'jul': 7,
+      'agosto': 8, 'ago': 8,
+      'setembro': 9, 'set': 9,
+      'outubro': 10, 'out': 10,
+      'novembro': 11, 'nov': 11,
+      'dezembro': 12, 'dez': 12
+    };
+    
+    mes = meses[mesStr];
+    ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr);
+  } else if (periodoReferencia.includes('-')) {
+    // Formato: '2025-06'
+    const [anoStr, mesStr] = periodoReferencia.split('-');
+    ano = parseInt(anoStr);
+    mes = parseInt(mesStr);
+  } else {
+    throw new Error(`Formato de período não reconhecido: ${periodoReferencia}`);
+  }
   
-  const mes = meses[mesStr];
-  const ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr);
-  
-  if (!mes || !ano) {
+  if (!mes || !ano || mes < 1 || mes > 12) {
     throw new Error(`Período inválido: ${periodoReferencia}`);
   }
   
