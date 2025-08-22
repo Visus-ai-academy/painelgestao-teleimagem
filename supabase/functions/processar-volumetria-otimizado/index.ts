@@ -132,14 +132,15 @@ serve(async (req) => {
 
       console.log(`⚡ Background: Iniciando processamento de ${stagingData.length} registros em batches de ${BATCH_SIZE}`);
 
-      // FUNÇÃO ROBUSTA DE PARSING DE DATAS BRASILEIRAS - CORRIGIDA DEFINITIVAMENTE
+      // FUNÇÃO ROBUSTA DE PARSING DE DATAS BRASILEIRAS - DEBUG COMPLETO
       const parseDataBrasileira = (dataBrasileira: string): Date | null => {
         if (!dataBrasileira || typeof dataBrasileira !== 'string') {
+          console.log(`❌ Data inválida (vazio/não-string): "${dataBrasileira}"`);
           return null;
         }
         
         const dataNormalizada = dataBrasileira.trim();
-        console.log(`🔍 Convertendo data: "${dataNormalizada}"`);
+        console.log(`🔍 Iniciando conversão da data: "${dataNormalizada}"`);
         
         // Suportar múltiplos formatos com prioridade para dd/mm/yyyy (formato dos uploads)
         const formatosBrasileiros = [
@@ -152,51 +153,75 @@ serve(async (req) => {
           const formato = formatosBrasileiros[i];
           const match = dataNormalizada.match(formato);
           
+          console.log(`🔍 Testando formato ${i}: ${formato} => Match: ${match ? 'SIM' : 'NÃO'}`);
+          
           if (match) {
             let dia: number, mes: number, ano: number;
+            
+            console.log(`🔍 Match encontrado: ${JSON.stringify(match)}`);
             
             if (i === 2) {
               // Formato ISO: yyyy/mm/dd ou yyyy-mm-dd
               [, ano, mes, dia] = match.map(Number);
+              console.log(`🔍 Formato ISO parseado: ${dia}/${mes}/${ano}`);
             } else {
               // Formatos brasileiros: dd/mm/yyyy ou dd/mm/yy
               let [, diaStr, mesStr, anoStr] = match;
               
+              console.log(`🔍 Strings extraídas: dia="${diaStr}", mes="${mesStr}", ano="${anoStr}"`);
+              
               // CORREÇÃO CRÍTICA: Interpretação correta de anos com 2 dígitos
               if (anoStr.length === 2) {
                 const anoNum = parseInt(anoStr);
+                console.log(`🔍 Ano 2 digitos: ${anoNum}`);
                 // REGRA FIXA: 00-30 = 2000-2030 | 31-99 = 1931-1999
-                // PARA DADOS MÉDICOS: 24 = 2024, 25 = 2025, etc.
                 if (anoNum <= 30) {
                   ano = 2000 + anoNum;
+                  console.log(`🔍 Convertido para: ${ano} (século 21)`);
                 } else {
                   ano = 1900 + anoNum;
+                  console.log(`🔍 Convertido para: ${ano} (século 20)`);
                 }
               } else {
                 ano = parseInt(anoStr);
+                console.log(`🔍 Ano 4 digitos: ${ano}`);
               }
               
               dia = parseInt(diaStr);
               mes = parseInt(mesStr);
+              console.log(`🔍 Valores finais: ${dia}/${mes}/${ano}`);
             }
+            
+            // DEBUG: Mostrar validações de range
+            console.log(`🔍 Validando ranges: dia=${dia} (1-31), mes=${mes} (1-12), ano=${ano} (1900-2030)`);
+            const diaValido = dia >= 1 && dia <= 31;
+            const mesValido = mes >= 1 && mes <= 12;
+            const anoValido = ano >= 1900 && ano <= 2030;
+            console.log(`🔍 Validações: dia=${diaValido}, mes=${mesValido}, ano=${anoValido}`);
             
             // Validações básicas de range
-            if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2030) {
+            if (!diaValido || !mesValido || !anoValido) {
+              console.log(`❌ Fora do range válido: ${dia}/${mes}/${ano}`);
               continue;
             }
             
-            // Criar e validar data
+            // Criar e validar data JavaScript
             const data = new Date(ano, mes - 1, dia);
+            console.log(`🔍 Data JavaScript criada: ${data.toISOString()}`);
+            console.log(`🔍 Validando consistência: ano=${data.getFullYear()} (${ano}), mes=${data.getMonth()+1} (${mes}), dia=${data.getDate()} (${dia})`);
+            
+            // Validação de data JavaScript (detecta datas inválidas como 31/02)
             if (data.getFullYear() !== ano || data.getMonth() !== (mes - 1) || data.getDate() !== dia) {
+              console.log(`❌ Data JavaScript inválida: ${dia}/${mes}/${ano} -> ${data.getFullYear()}/${data.getMonth()+1}/${data.getDate()}`);
               continue;
             }
             
-            console.log(`✅ Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]} (${dia}/${mes}/${ano})`);
+            console.log(`✅ Data convertida com sucesso: "${dataBrasileira}" -> ${data.toISOString().split('T')[0]} (${dia}/${mes}/${ano})`);
             return data;
           }
         }
         
-        console.log(`❌ Formato não reconhecido: "${dataBrasileira}"`);
+        console.log(`❌ NENHUM formato reconhecido para: "${dataBrasileira}"`);
         return null;
       };
       // APLICAR CONVERSÃO EM TODOS OS CAMPOS DE DATA
