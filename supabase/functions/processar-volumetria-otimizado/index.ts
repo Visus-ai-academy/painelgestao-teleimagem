@@ -212,7 +212,6 @@ serve(async (req) => {
                 }
               }
             }
-            }
           }
 
           // Gravar exatamente como está no upload, preservando valores originais
@@ -317,7 +316,7 @@ serve(async (req) => {
         .eq('id', uploadId);
 
       console.log(`✅ BACKGROUND CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados de ${totalProcessados} processados`);
-    };
+    }; // Fim da função backgroundProcessing
 
     // Executar processamento em background
     EdgeRuntime.waitUntil(backgroundProcessing());
