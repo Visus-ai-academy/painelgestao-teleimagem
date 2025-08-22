@@ -64,9 +64,9 @@ function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
   // Data limite para DATA_REALIZACAO (primeiro dia do mês do período)
   const dataLimiteRealizacao = new Date(ano, mes - 1, 1);
   
-  // Período de faturamento: dia 8 do mês anterior até dia 7 do mês atual
-  const inicioFaturamento = new Date(ano, mes - 2, 8); // mês anterior, dia 8
-  const fimFaturamento = new Date(ano, mes - 1, 7); // mês atual, dia 7
+  // Período de faturamento: dia 8 do mês de referência até dia 7 do mês seguinte
+  const inicioFaturamento = new Date(ano, mes - 1, 8); // mês de referência, dia 8
+  const fimFaturamento = new Date(ano, mes, 7); // mês seguinte, dia 7
   
   return {
     dataLimiteRealizacao,

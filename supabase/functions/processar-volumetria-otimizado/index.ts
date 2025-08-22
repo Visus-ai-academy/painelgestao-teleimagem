@@ -277,8 +277,8 @@ serve(async (req) => {
             // DEFINIÇÃO CORRETA DAS DATAS DE VALIDAÇÃO
             const primeiroDiaMes = new Date(ano, mes - 1, 1);           // 01/MM/AAAA
             const ultimoDiaMes = new Date(ano, mes, 0);                 // Último dia do mês
-            const inicioFaturamento = new Date(ano, mes - 1, 8);        // 08/MM/AAAA
-            const fimFaturamento = new Date(ano, mes, 7);               // 07/(MM+1)/AAAA
+            const inicioFaturamento = new Date(ano, mes - 1, 8);        // 08/MM/AAAA (mês de referência)
+            const fimFaturamento = new Date(ano, mes, 7);               // 07/(MM+1)/AAAA (mês seguinte)
             
             console.log(`🗓️ PERÍODO VALIDAÇÃO: ${periodoAtual} => ${mes}/${ano}`);
             console.log(`📅 Primeiro dia: ${primeiroDiaMes.toISOString().split('T')[0]}`);
