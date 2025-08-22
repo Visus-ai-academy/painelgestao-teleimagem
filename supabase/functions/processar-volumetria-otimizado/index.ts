@@ -113,18 +113,31 @@ serve(async (req) => {
 
           // Validações básicas removidas - campos podem estar vazios
 
-          // Validação de data
+          // Validação de data usando período de referência do arquivo
           if (record.DATA_LAUDO) {
             const dataLaudo = new Date(record.DATA_LAUDO);
-            const dataLimite = new Date('2025-06-01');
-            const dataLimiteFim = new Date('2025-07-07');
+            const periodoReferencia = record.periodo_referencia || record.data_referencia;
             
-            if (dataLaudo < dataLimite || dataLaudo > dataLimiteFim) {
+            // Calcular período válido baseado na data_referencia
+            let dataLimiteInicio: Date, dataLimiteFim: Date;
+            
+            if (periodoReferencia && periodoReferencia.includes('-')) {
+              // Formato YYYY-MM
+              const [ano, mes] = periodoReferencia.split('-').map(Number);
+              dataLimiteInicio = new Date(ano, mes - 1, 1); // 01 do mês
+              dataLimiteFim = new Date(ano, mes, 7); // 07 do mês seguinte
+            } else {
+              // Fallback para período fixo apenas se não houver data_referencia
+              dataLimiteInicio = new Date('2025-06-01');
+              dataLimiteFim = new Date('2025-07-07');
+            }
+            
+            if (dataLaudo < dataLimiteInicio || dataLaudo > dataLimiteFim) {
               registrosRejeitados.push({
                 linha_original: linhaOriginal,
                 dados_originais: record,
                 motivo_rejeicao: 'DATA_LAUDO_FORA_PERIODO',
-                detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora do período (01/06/2025 a 07/07/2025)`
+                detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora do período (${dataLimiteInicio.toISOString().split('T')[0]} a ${dataLimiteFim.toISOString().split('T')[0]})`
               });
               totalErros++;
               continue;
