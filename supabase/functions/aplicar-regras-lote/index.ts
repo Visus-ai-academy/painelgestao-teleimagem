@@ -22,12 +22,13 @@ serve(async (req) => {
     );
 
     console.log(`🔄 APLICANDO REGRAS EM LOTE PARA: ${arquivo_fonte || 'TODOS'}`);
+    console.log(`🚫 TESTE: Função 'aplicar-filtro-data-laudo' desabilitada para teste de exclusões`);
 
     // Sequência de regras a serem aplicadas
     const regras = [
       'aplicar-exclusao-clientes-especificos',
       'aplicar-exclusoes-periodo',
-      'aplicar-filtro-data-laudo', 
+      // 'aplicar-filtro-data-laudo',  // ← DESABILITADA PARA TESTE 
       'aplicar-regras-tratamento',
       'aplicar-correcao-modalidade-rx',
       'aplicar-correcao-modalidade-ot',
