@@ -45,6 +45,35 @@ export default async function handler(req: Request): Promise<Response> {
     for (const tipo of tiposArquivo) {
       console.log(`🗂️ Processando exclusões em ${tipo}...`);
       
+      // Primeiro buscar registros que serão excluídos para salvar na tabela de rejeições
+      const { data: registrosParaExcluir } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*')
+        .eq('arquivo_fonte', tipo)
+        .in('"EMPRESA"', CLIENTES_PARA_EXCLUIR);
+
+      if (registrosParaExcluir && registrosParaExcluir.length > 0) {
+        // Salvar registros rejeitados
+        const rejectionsToInsert = registrosParaExcluir.map((record, index) => ({
+          arquivo_fonte: tipo,
+          lote_upload: record.lote_upload || 'exclusao_clientes_especificos',
+          linha_original: index + 1,
+          dados_originais: record,
+          motivo_rejeicao: 'CLIENTE_ESPECIFICO_EXCLUIDO',
+          detalhes_erro: `Cliente ${record.EMPRESA} está na lista de exclusão específica`
+        }));
+
+        const { error: rejectionsError } = await supabase
+          .from('registros_rejeitados_processamento')
+          .insert(rejectionsToInsert);
+
+        if (rejectionsError) {
+          console.error(`❌ Erro ao salvar rejeições em ${tipo}:`, rejectionsError);
+        } else {
+          console.log(`✅ ${registrosParaExcluir.length} rejeições salvas para ${tipo}`);
+        }
+      }
+      
       // Excluir registros onde EMPRESA está na lista de clientes para excluir
       const { error, count } = await supabase
         .from('volumetria_mobilemed')
