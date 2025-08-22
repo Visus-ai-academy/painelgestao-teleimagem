@@ -54,6 +54,9 @@ verify_jwt = true
 [functions.limpar-dados-volumetria]
 verify_jwt = true
 
+[functions.limpar-cache-volumetria]
+verify_jwt = true
+
 [functions.validar-regras-processamento]
 verify_jwt = true
 
