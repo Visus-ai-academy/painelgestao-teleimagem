@@ -316,7 +316,7 @@ export function RelatorioExclusoes() {
             modalidade: dados.MODALIDADE || 'N/I',
             especialidade: dados.ESPECIALIDADE || 'N/I',
             exame: dados.ESTUDO_DESCRICAO || 'N/I',
-            data_exame: dados.DATA_REALIZACAO || 'N/I',
+            data_exame: dados.DATA_REALIZACAO_NORMALIZADA || dados.DATA_REALIZACAO || 'N/I',
             motivo_exclusao: r.motivo_rejeicao || 'Não especificado',
             detalhes_erro: r.detalhes_erro || 'Sem detalhes disponíveis'
           };

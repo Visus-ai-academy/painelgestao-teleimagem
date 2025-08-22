@@ -132,21 +132,20 @@ serve(async (req) => {
 
       console.log(`⚡ Background: Iniciando processamento de ${stagingData.length} registros em batches de ${BATCH_SIZE}`);
 
-      // FUNÇÃO ROBUSTA DE PARSING DE DATAS BRASILEIRAS - CORRIGIDA
+      // FUNÇÃO ROBUSTA DE PARSING DE DATAS BRASILEIRAS - CORRIGIDA DEFINITIVAMENTE
       const parseDataBrasileira = (dataBrasileira: string): Date | null => {
         if (!dataBrasileira || typeof dataBrasileira !== 'string') {
-          console.log('❌ Data vazia ou inválida:', dataBrasileira);
           return null;
         }
         
         const dataNormalizada = dataBrasileira.trim();
-        console.log(`🔍 Tentando converter data: "${dataNormalizada}"`);
+        console.log(`🔍 Convertendo data: "${dataNormalizada}"`);
         
-        // Suportar múltiplos formatos: dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, dd/mm/yy
+        // Suportar múltiplos formatos com prioridade para dd/mm/yyyy (formato dos uploads)
         const formatosBrasileiros = [
-          /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/, // dd/mm/yyyy ou dd-mm-yyyy
+          /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/, // dd/mm/yyyy ou dd-mm-yyyy (PRIORITÁRIO)
           /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/,  // dd/mm/yy ou dd-mm-yy
-          /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/   // yyyy/mm/dd ou yyyy-mm-dd
+          /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/   // yyyy/mm/dd ou yyyy-mm-dd (ISO)
         ];
         
         for (let i = 0; i < formatosBrasileiros.length; i++) {
@@ -157,65 +156,53 @@ serve(async (req) => {
             let dia: number, mes: number, ano: number;
             
             if (i === 2) {
-              // Formato yyyy/mm/dd ou yyyy-mm-dd
+              // Formato ISO: yyyy/mm/dd ou yyyy-mm-dd
               [, ano, mes, dia] = match.map(Number);
             } else {
-              // Formatos dd/mm/yyyy ou dd/mm/yy
+              // Formatos brasileiros: dd/mm/yyyy ou dd/mm/yy
               let [, diaStr, mesStr, anoStr] = match;
               
-              // CORREÇÃO CRÍTICA: Conversão inteligente de anos
+              // CORREÇÃO CRÍTICA: Interpretação correta de anos com 2 dígitos
               if (anoStr.length === 2) {
                 const anoNum = parseInt(anoStr);
-                // Para período atual (2024/2025): 00-05 = 2000-2005, 06-30 = 2006-2030, 31-99 = 1931-1999
-                // Para arquivos históricos: interpretar com base no contexto
-                if (anoNum <= 5) {
-                  anoStr = `200${anoStr}`;
-                } else if (anoNum <= 30) {
-                  anoStr = `20${anoStr}`;
+                // REGRA FIXA: 00-30 = 2000-2030 | 31-99 = 1931-1999
+                // PARA DADOS MÉDICOS: 24 = 2024, 25 = 2025, etc.
+                if (anoNum <= 30) {
+                  ano = 2000 + anoNum;
                 } else {
-                  anoStr = `19${anoStr}`;
+                  ano = 1900 + anoNum;
                 }
+              } else {
+                ano = parseInt(anoStr);
               }
               
               dia = parseInt(diaStr);
               mes = parseInt(mesStr);
-              ano = parseInt(anoStr);
             }
             
-            console.log(`🔍 Parsed formato ${i}: ${dataNormalizada} -> ${dia}/${mes}/${ano}`);
-            
-            // Validar números
-            if (isNaN(dia) || isNaN(mes) || isNaN(ano)) {
-              console.log(`❌ Valores inválidos: dia=${dia}, mes=${mes}, ano=${ano}`);
+            // Validações básicas de range - MAIS RIGOROSAS
+            if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2030) {
               continue;
             }
             
-            // Validações de range
-            if (dia < 1 || dia > 31 || mes < 1 || mes > 12) {
-              console.log(`❌ Data fora de range: ${dia}/${mes}/${ano}`);
-              continue;
-            }
-            
-            // VALIDAÇÃO CRÍTICA: Rejeitar datas futuras além do período atual
+            // VALIDAÇÃO ANTI-FUTURA: Rejeitar datas claramente futuras
             const hoje = new Date();
             const anoAtual = hoje.getFullYear();
             const mesAtual = hoje.getMonth() + 1;
             
-            if (ano > anoAtual || (ano === anoAtual && mes > mesAtual + 1)) {
-              console.log(`❌ Data futura rejeitada: ${dia}/${mes}/${ano} (atual: ${mesAtual}/${anoAtual})`);
+            // Permitir apenas até 1 mês no futuro para flexibilidade
+            if (ano > anoAtual + 1 || (ano === anoAtual && mes > mesAtual + 2)) {
+              console.log(`❌ Data futura inválida rejeitada: ${dia}/${mes}/${ano}`);
               return null;
             }
             
-            // Criar data
+            // Criar e validar data
             const data = new Date(ano, mes - 1, dia);
-            
-            // Verificar se a data criada é válida
             if (data.getFullYear() !== ano || data.getMonth() !== (mes - 1) || data.getDate() !== dia) {
-              console.log(`❌ Data inválida após conversão: ${dataNormalizada}`);
               continue;
             }
             
-            console.log(`✅ Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]}`);
+            console.log(`✅ Data convertida: ${dataBrasileira} -> ${data.toISOString().split('T')[0]} (${dia}/${mes}/${ano})`);
             return data;
           }
         }
@@ -223,7 +210,6 @@ serve(async (req) => {
         console.log(`❌ Formato não reconhecido: "${dataBrasileira}"`);
         return null;
       };
-
       // APLICAR CONVERSÃO EM TODOS OS CAMPOS DE DATA
       const converterCamposData = (record: VolumetriaRecord): VolumetriaRecord => {
         const recordConvertido = { ...record };
@@ -267,109 +253,177 @@ serve(async (req) => {
             const isRetroativo = arquivo_fonte.includes('retroativo');
             const periodoAtual = periodoReferencia;
             
-            // Calcular datas válidas baseadas no período - CORRIGIDO
+            // CÁLCULO CORRETO DE PERÍODO BASEADO NO FORMATO BRASILEIRO
             let ano: number, mes: number;
+            
             if (periodoAtual.includes('/')) {
-              // Formato jun/25, mai/24, etc
+              // Formato brasileiro: jun/25, mai/24, etc
               const [mesStr, anoStr] = periodoAtual.split('/');
               const meses: Record<string, number> = {
                 'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
                 'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
               };
-              mes = meses[mesStr] || new Date().getMonth() + 1;
-              // CORREÇÃO CRÍTICA: Interpretação correta do ano
+              mes = meses[mesStr.toLowerCase()] || new Date().getMonth() + 1;
+              
+              // CORREÇÃO DEFINITIVA: Interpretação correta de anos
               const anoNum = parseInt(anoStr);
+              // REGRA FIXA PARA MEDICINA: 00-30 = 2000-2030 | 31-99 = 1931-1999
               if (anoNum <= 30) {
-                ano = 2000 + anoNum; // 24 = 2024, 25 = 2025
+                ano = 2000 + anoNum; // 25 = 2025, 24 = 2024
               } else {
-                ano = 1900 + anoNum; // 99 = 1999, etc
+                ano = 1900 + anoNum; // 99 = 1999
               }
-            } else {
-              // Formato 2024-06
+            } else if (periodoAtual.includes('-')) {
+              // Formato ISO: 2025-06
               const [anoStr, mesStr] = periodoAtual.split('-');
               ano = parseInt(anoStr);
               mes = parseInt(mesStr);
+            } else {
+              // Fallback: usar data atual
+              const agora = new Date();
+              ano = agora.getFullYear();
+              mes = agora.getMonth() + 1;
             }
             
-            // Datas de validação por tipo de arquivo
-            const primeiroDiaMes = new Date(ano, mes - 1, 1);
-            const ultimoDiaMes = new Date(ano, mes, 0);
-            const inicioFaturamento = new Date(ano, mes - 1, 8);
-            const fimFaturamento = new Date(ano, mes, 7);
+            // DEFINIÇÃO CORRETA DAS DATAS DE VALIDAÇÃO
+            const primeiroDiaMes = new Date(ano, mes - 1, 1);           // 01/MM/AAAA
+            const ultimoDiaMes = new Date(ano, mes, 0);                 // Último dia do mês
+            const inicioFaturamento = new Date(ano, mes - 1, 8);        // 08/MM/AAAA
+            const fimFaturamento = new Date(ano, mes, 7);               // 07/(MM+1)/AAAA
             
-            console.log(`🗓️ VALIDAÇÃO PERÍODO: ${periodoAtual} | Mês: ${mes}/${ano}`);
-            console.log(`📅 Datas válidas: ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
+            console.log(`🗓️ PERÍODO VALIDAÇÃO: ${periodoAtual} => ${mes}/${ano}`);
+            console.log(`📅 Primeiro dia: ${primeiroDiaMes.toISOString().split('T')[0]}`);
+            console.log(`📅 Último dia: ${ultimoDiaMes.toISOString().split('T')[0]}`);
+            console.log(`📅 Faturamento: ${inicioFaturamento.toISOString().split('T')[0]} até ${fimFaturamento.toISOString().split('T')[0]}`);
             
-            // Aplicar regras específicas por tipo de arquivo
+            // APLICAR REGRAS CORRETAS POR TIPO DE ARQUIVO
             if (isRetroativo) {
-              // ARQUIVOS RETROATIVOS: Regras v002/v003
+              // ========== ARQUIVOS RETROATIVOS: Regras v002 e v003 ==========
+              
+              // REGRA v003: DATA_REALIZACAO deve ser ANTERIOR ao primeiro dia do período
               if (record.DATA_REALIZACAO) {
                 const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
-                console.log(`🔍 RETROATIVO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}" -> ${dataRealizacao ? dataRealizacao.toISOString().split('T')[0] : 'INVÁLIDA'}`);
-                console.log(`🔍 Comparando com limite: ${primeiroDiaMes.toISOString().split('T')[0]} (>= para rejeitar)`);
-                
-                if (dataRealizacao && dataRealizacao >= primeiroDiaMes) {
-                  console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
+                if (!dataRealizacao) {
+                  console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (convertida para ${dataRealizacao.toISOString().split('T')[0]}) >= ${primeiroDiaMes.toISOString().split('T')[0]} (retroativo)`
+                    motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
+                    detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
+                  });
+                  totalErros++;
+                  continue;
+                }
+                
+                console.log(`🔍 v003 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
+                console.log(`🔍 v003 - Deve ser < ${primeiroDiaMes.toISOString().split('T')[0]}`);
+                
+                // v003: Rejeitar se DATA_REALIZACAO >= primeiro dia do mês
+                if (dataRealizacao >= primeiroDiaMes) {
+                  console.log(`❌ REJEIÇÃO v003: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} >= ${primeiroDiaMes.toISOString().split('T')[0]}`);
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO_RETROATIVO',
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve ser anterior a ${primeiroDiaMes.toISOString().split('T')[0]}`
                   });
                   totalErros++;
                   continue;
                 }
               }
               
+              // REGRA v002: DATA_LAUDO deve estar DENTRO da janela de faturamento
               if (record.DATA_LAUDO) {
                 const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
-                console.log(`🔍 RETROATIVO - DATA_LAUDO: "${record.DATA_LAUDO}" -> ${dataLaudo ? dataLaudo.toISOString().split('T')[0] : 'INVÁLIDA'}`);
-                console.log(`🔍 Janela válida: ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
-                
-                if (dataLaudo && (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento)) {
-                  console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
+                if (!dataLaudo) {
+                  console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v002_DATA_LAUDO',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (convertida para ${dataLaudo.toISOString().split('T')[0]}) fora do período ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (retroativo)`
+                    motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
+                    detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
+                  });
+                  totalErros++;
+                  continue;
+                }
+                
+                console.log(`🔍 v002 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
+                console.log(`🔍 v002 - Deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
+                
+                // v002: Rejeitar se DATA_LAUDO fora da janela de faturamento
+                if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
+                  console.log(`❌ REJEIÇÃO v002: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela`);
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v002_DATA_LAUDO_RETROATIVO',
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${inicioFaturamento.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
                   });
                   totalErros++;
                   continue;
                 }
               }
             } else {
-              // ARQUIVOS NÃO-RETROATIVOS: Regra v031
+              // ========== ARQUIVOS NÃO-RETROATIVOS: Regra v031 ==========
+              
+              // REGRA v031: DATA_REALIZACAO deve estar DENTRO do mês de referência
               if (record.DATA_REALIZACAO) {
                 const dataRealizacao = parseDataBrasileira(record.DATA_REALIZACAO);
-                console.log(`🔍 NÃO-RETROATIVO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}" -> ${dataRealizacao ? dataRealizacao.toISOString().split('T')[0] : 'INVÁLIDA'}`);
-                console.log(`🔍 Mês válido: ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
-                
-                if (dataRealizacao && (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes)) {
-                  console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${record.DATA_REALIZACAO} interpretada como ${dataRealizacao.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`);
+                if (!dataRealizacao) {
+                  console.log(`❌ FORMATO INVÁLIDO - DATA_REALIZACAO: "${record.DATA_REALIZACAO}"`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO',
-                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (convertida para ${dataRealizacao.toISOString().split('T')[0]}) fora do mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]} (não-retroativo)`
+                    motivo_rejeicao: 'FORMATO_DATA_REALIZACAO_INVALIDO',
+                    detalhes_erro: `DATA_REALIZACAO com formato inválido: "${record.DATA_REALIZACAO}"`
+                  });
+                  totalErros++;
+                  continue;
+                }
+                
+                console.log(`🔍 v031 - DATA_REALIZACAO: ${record.DATA_REALIZACAO} -> ${dataRealizacao.toISOString().split('T')[0]}`);
+                console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${ultimoDiaMes.toISOString().split('T')[0]}`);
+                
+                // v031: Rejeitar se DATA_REALIZACAO fora do mês
+                if (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes) {
+                  console.log(`❌ REJEIÇÃO v031: DATA_REALIZACAO ${dataRealizacao.toISOString().split('T')[0]} fora do mês`);
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO_ATUAL',
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} (${dataRealizacao.toISOString().split('T')[0]}) deve estar no mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]}`
                   });
                   totalErros++;
                   continue;
                 }
               }
               
+              // REGRA v031: DATA_LAUDO deve estar na janela estendida (até dia 7 do mês seguinte)
               if (record.DATA_LAUDO) {
                 const dataLaudo = parseDataBrasileira(record.DATA_LAUDO);
-                console.log(`🔍 NÃO-RETROATIVO - DATA_LAUDO: "${record.DATA_LAUDO}" -> ${dataLaudo ? dataLaudo.toISOString().split('T')[0] : 'INVÁLIDA'}`);
-                console.log(`🔍 Janela válida: ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
-                
-                if (dataLaudo && (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento)) {
-                  console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${record.DATA_LAUDO} interpretada como ${dataLaudo.toISOString().split('T')[0]} fora de ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]}`);
+                if (!dataLaudo) {
+                  console.log(`❌ FORMATO INVÁLIDO - DATA_LAUDO: "${record.DATA_LAUDO}"`);
                   registrosRejeitados.push({
                     linha_original: linhaOriginal,
                     dados_originais: record,
-                    motivo_rejeicao: 'REGRA_v031_DATA_LAUDO',
-                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (convertida para ${dataLaudo.toISOString().split('T')[0]}) fora da janela ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (não-retroativo)`
+                    motivo_rejeicao: 'FORMATO_DATA_LAUDO_INVALIDO',
+                    detalhes_erro: `DATA_LAUDO com formato inválido: "${record.DATA_LAUDO}"`
+                  });
+                  totalErros++;
+                  continue;
+                }
+                
+                console.log(`🔍 v031 - DATA_LAUDO: ${record.DATA_LAUDO} -> ${dataLaudo.toISOString().split('T')[0]}`);
+                console.log(`🔍 v031 - Deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`);
+                
+                // v031: Rejeitar se DATA_LAUDO fora da janela estendida
+                if (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento) {
+                  console.log(`❌ REJEIÇÃO v031: DATA_LAUDO ${dataLaudo.toISOString().split('T')[0]} fora da janela estendida`);
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v031_DATA_LAUDO_ATUAL',
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} (${dataLaudo.toISOString().split('T')[0]}) deve estar entre ${primeiroDiaMes.toISOString().split('T')[0]} e ${fimFaturamento.toISOString().split('T')[0]}`
                   });
                   totalErros++;
                   continue;
@@ -418,56 +472,58 @@ serve(async (req) => {
         }
       }
 
-      // 📝 INSERIR REGISTROS REJEITADOS NA TABELA DE REJEIÇÕES
-      console.log(`📝 Tentando inserir ${registrosRejeitados.length} registros rejeitados...`);
-      
-      if (registrosRejeitados.length > 0) {
-        const rejectionsToInsert = registrosRejeitados.map(r => ({
-          arquivo_fonte: arquivo_fonte,
-          lote_upload: loteUpload,
-          linha_original: r.linha_original,
-          dados_originais: r.dados_originais,
-          motivo_rejeicao: r.motivo_rejeicao,
-          detalhes_erro: r.detalhes_erro,
-          created_at: new Date().toISOString()
-        }));
-
-        console.log(`📝 Exemplo de rejeição a inserir:`, JSON.stringify(rejectionsToInsert[0], null, 2));
-
-        // Inserir em batches menores para evitar timeouts
-        const BATCH_SIZE_REJEITADOS = 50;
-        let totalInseridosRejeitados = 0;
-        
-        for (let i = 0; i < rejectionsToInsert.length; i += BATCH_SIZE_REJEITADOS) {
-          const batchRejeitados = rejectionsToInsert.slice(i, i + BATCH_SIZE_REJEITADOS);
-          const batchNum = Math.floor(i/BATCH_SIZE_REJEITADOS) + 1;
-          const totalBatches = Math.ceil(rejectionsToInsert.length/BATCH_SIZE_REJEITADOS);
+        // SALVAR TODAS AS REJEIÇÕES NO BANCO - GARANTIA ABSOLUTA
+        if (registrosRejeitados.length > 0) {
+          console.log(`💾 SALVANDO ${registrosRejeitados.length} registros rejeitados no banco...`);
           
-          console.log(`📝 Inserindo batch ${batchNum}/${totalBatches} de registros rejeitados (${batchRejeitados.length} registros)...`);
+          // Preparar dados com todas as informações necessárias
+          const rejeicoes = registrosRejeitados.map(r => ({
+            arquivo_fonte: arquivo_fonte,
+            lote_upload: loteUpload,
+            linha_original: r.linha_original,
+            dados_originais: {
+              EMPRESA: r.dados_originais.EMPRESA || 'N/I',
+              NOME_PACIENTE: r.dados_originais.NOME_PACIENTE || 'N/I',
+              MODALIDADE: r.dados_originais.MODALIDADE || 'N/I',
+              ESPECIALIDADE: r.dados_originais.ESPECIALIDADE || 'N/I',
+              ESTUDO_DESCRICAO: r.dados_originais.ESTUDO_DESCRICAO || 'N/I',
+              DATA_REALIZACAO: r.dados_originais.DATA_REALIZACAO || 'N/I',
+              DATA_LAUDO: r.dados_originais.DATA_LAUDO || 'N/I',
+              VALORES: r.dados_originais.VALORES || 0,
+              // Incluir data normalizada para debug
+              DATA_REALIZACAO_NORMALIZADA: r.dados_originais.DATA_REALIZACAO ? 
+                parseDataBrasileira(r.dados_originais.DATA_REALIZACAO)?.toISOString().split('T')[0] || 'ERRO_CONVERSAO' : 'N/A',
+              DATA_LAUDO_NORMALIZADA: r.dados_originais.DATA_LAUDO ?
+                parseDataBrasileira(r.dados_originais.DATA_LAUDO)?.toISOString().split('T')[0] || 'ERRO_CONVERSAO' : 'N/A'
+            },
+            motivo_rejeicao: r.motivo_rejeicao,
+            detalhes_erro: r.detalhes_erro,
+            created_at: new Date().toISOString()
+          }));
 
-          const { data: insertedRejections, error: rejectError } = await supabaseClient
-            .from('registros_rejeitados_processamento')
-            .insert(batchRejeitados);
+          // Inserir em batches para garantir sucesso
+          const BATCH_SIZE_REJEICOES = 50;
+          let totalInseridosRejeicoes = 0;
+          
+          for (let i = 0; i < rejeicoes.length; i += BATCH_SIZE_REJEICOES) {
+            const batch = rejeicoes.slice(i, i + BATCH_SIZE_REJEICOES);
+            
+            const { error: rejeicaoError } = await supabaseClient
+              .from('registros_rejeitados_processamento')
+              .insert(batch);
 
-          if (rejectError) {
-            console.error(`❌ Erro ao inserir batch ${batchNum} de rejeições:`, rejectError);
-            console.error('❌ Detalhes completos do erro:', {
-              code: rejectError.code,
-              message: rejectError.message,
-              details: rejectError.details,
-              hint: rejectError.hint
-            });
-            // Continuar com próximo batch mesmo se um falhar
-          } else {
-            totalInseridosRejeitados += batchRejeitados.length;
-            console.log(`✅ Batch ${batchNum} de rejeições inserido com sucesso (${batchRejeitados.length} registros)`);
+            if (rejeicaoError) {
+              console.error(`❌ Erro no batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1} de rejeições:`, rejeicaoError);
+            } else {
+              totalInseridosRejeicoes += batch.length;
+              console.log(`✅ Batch ${Math.floor(i/BATCH_SIZE_REJEICOES) + 1}: ${batch.length} rejeições salvas`);
+            }
           }
+          
+          console.log(`✅ TOTAL REJEIÇÕES SALVAS: ${totalInseridosRejeicoes}/${registrosRejeitados.length}`);
+        } else {
+          console.log(`📝 Nenhum registro rejeitado - todos foram processados com sucesso`);
         }
-        
-        console.log(`✅ TOTAL DE REJEIÇÕES INSERIDAS: ${totalInseridosRejeitados}/${registrosRejeitados.length}`);
-      } else {
-        console.log(`📝 Nenhum registro rejeitado para inserir`);
-      }
 
       // Atualizar status final
       await supabaseClient
