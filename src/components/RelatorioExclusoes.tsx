@@ -48,6 +48,36 @@ export function RelatorioExclusoes() {
     carregarDados();
   }, []);
 
+  const limparRegistrosRejeitados = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('limpar-registros-rejeitados');
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "✅ Registros Limpos",
+        description: `${data.registros_removidos} registros rejeitados removidos`
+      });
+      
+      // Recarregar dados
+      carregarDados();
+      
+    } catch (error) {
+      console.error('Erro ao limpar registros rejeitados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao limpar registros rejeitados",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -285,18 +315,33 @@ export function RelatorioExclusoes() {
             Análise detalhada dos registros rejeitados durante o processamento
           </p>
         </div>
-        <Button 
-          onClick={exportarParaExcel} 
-          disabled={loadingExport}
-          className="flex items-center gap-2"
-        >
-          {loadingExport ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {loadingExport ? 'Exportando...' : 'Exportar Excel'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={limparRegistrosRejeitados} 
+            disabled={loading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+            Limpar Exclusões
+          </Button>
+          <Button 
+            onClick={exportarParaExcel} 
+            disabled={loadingExport}
+            className="flex items-center gap-2"
+          >
+            {loadingExport ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {loadingExport ? 'Exportando...' : 'Exportar Excel'}
+          </Button>
+        </div>
       </div>
 
       {/* Resumo Geral */}

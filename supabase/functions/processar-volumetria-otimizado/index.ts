@@ -110,6 +110,52 @@ serve(async (req) => {
 
       console.log(`⚡ Background: Iniciando processamento de ${stagingData.length} registros em batches de ${BATCH_SIZE}`);
 
+      // FUNÇÃO PARA CONVERTER DATA BRASILEIRA (dd/mm/yyyy) PARA Date
+      const parseDataBrasileira = (dataBrasileira: string): Date | null => {
+        if (!dataBrasileira) return null;
+        
+        // Se já está no formato ISO (yyyy-mm-dd), usar diretamente
+        if (dataBrasileira.includes('-') && dataBrasileira.length === 10) {
+          return new Date(dataBrasileira);
+        }
+        
+        // Converter formato brasileiro dd/mm/yyyy para yyyy-mm-dd
+        const partes = dataBrasileira.split('/');
+        if (partes.length === 3) {
+          const [dia, mes, ano] = partes;
+          // Criar no formato ISO: yyyy-mm-dd
+          const dataISO = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+          return new Date(dataISO);
+        }
+        
+        // Fallback: tentar interpretação direta
+        return new Date(dataBrasileira);
+      };
+
+      // APLICAR CONVERSÃO EM TODOS OS CAMPOS DE DATA
+      const converterCamposData = (record: VolumetriaRecord): VolumetriaRecord => {
+        const recordConvertido = { ...record };
+        
+        // Lista de todos os campos de data no formato dd/mm/yyyy
+        const camposData = [
+          'DATA_REALIZACAO', 'DATA_TRANSFERENCIA', 'DATA_LAUDO', 
+          'DATA_PRAZO', 'DATA_REASSINATURA'
+        ];
+        
+        camposData.forEach(campo => {
+          const valorCampo = recordConvertido[campo as keyof VolumetriaRecord] as string;
+          if (valorCampo && typeof valorCampo === 'string') {
+            const dataConvertida = parseDataBrasileira(valorCampo);
+            if (dataConvertida && !isNaN(dataConvertida.getTime())) {
+              // Manter o formato original mas garantir que seja interpretado corretamente
+              recordConvertido[campo as keyof VolumetriaRecord] = valorCampo as any;
+            }
+          }
+        });
+        
+        return recordConvertido;
+      };
+
       // Processar em batches para melhor performance
       for (let batchStart = 0; batchStart < stagingData.length; batchStart += BATCH_SIZE) {
         const batch = stagingData.slice(batchStart, batchStart + BATCH_SIZE);
@@ -119,7 +165,8 @@ serve(async (req) => {
 
         // Validar batch
         for (let i = 0; i < batch.length; i++) {
-          const record = batch[i] as VolumetriaRecord;
+          const recordOriginal = batch[i] as VolumetriaRecord;
+          const record = converterCamposData(recordOriginal); // Aplicar conversão de datas
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
 
@@ -127,28 +174,6 @@ serve(async (req) => {
           if (record.DATA_LAUDO || record.DATA_REALIZACAO) {
             const isRetroativo = arquivo_fonte.includes('retroativo');
             const periodoAtual = periodoReferencia;
-            
-            // FUNÇÃO PARA CONVERTER DATA BRASILEIRA (dd/mm/yyyy) PARA Date
-            const parseDataBrasileira = (dataBrasileira: string): Date | null => {
-              if (!dataBrasileira) return null;
-              
-              // Se já está no formato ISO (yyyy-mm-dd), usar diretamente
-              if (dataBrasileira.includes('-') && dataBrasileira.length === 10) {
-                return new Date(dataBrasileira);
-              }
-              
-              // Converter formato brasileiro dd/mm/yyyy para yyyy-mm-dd
-              const partes = dataBrasileira.split('/');
-              if (partes.length === 3) {
-                const [dia, mes, ano] = partes;
-                // Criar no formato ISO: yyyy-mm-dd
-                const dataISO = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-                return new Date(dataISO);
-              }
-              
-              // Fallback: tentar interpretação direta
-              return new Date(dataBrasileira);
-            };
             
             // Calcular datas válidas baseadas no período
             let ano: number, mes: number;
