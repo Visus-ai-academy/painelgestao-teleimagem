@@ -223,6 +223,15 @@ export function RelatorioExclusoes() {
 
       const loteAtual = ultimoLote?.[0]?.lote_upload;
 
+      // Buscar dados do último upload para o resumo
+      const { data: uploadInfo } = await supabase
+        .from('processamento_uploads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const ultimoUploadData = uploadInfo?.[0];
+
       // Buscar registros rejeitados APENAS do último lote
       const { data: rejeitados, error: rejeitadosError } = await supabase
         .from('registros_rejeitados_processamento')
@@ -330,13 +339,13 @@ export function RelatorioExclusoes() {
         
         // Aba 3: Resumo do Upload
         const resumoUpload = [{
-          'Total Processado': ultimoUpload?.registros_processados || 0,
-          'Total Inserido': ultimoUpload?.registros_inseridos || 0,
-          'Total Rejeitado': ultimoUpload?.registros_erro || 0,
-          'Taxa Rejeição': ultimoUpload?.registros_processados ? `${((ultimoUpload.registros_erro / ultimoUpload.registros_processados) * 100).toFixed(1)}%` : '0%',
-          'Data Processamento': ultimoUpload?.created_at ? new Date(ultimoUpload.created_at).toLocaleString('pt-BR') : 'N/A',
-          'Nome Arquivo': ultimoUpload?.arquivo_nome || 'N/A',
-          'Status': ultimoUpload?.status || 'N/A',
+          'Total Processado': ultimoUploadData?.registros_processados || 0,
+          'Total Inserido': ultimoUploadData?.registros_inseridos || 0,
+          'Total Rejeitado': ultimoUploadData?.registros_erro || 0,
+          'Taxa Rejeição': ultimoUploadData?.registros_processados ? `${((ultimoUploadData.registros_erro / ultimoUploadData.registros_processados) * 100).toFixed(1)}%` : '0%',
+          'Data Processamento': ultimoUploadData?.created_at ? new Date(ultimoUploadData.created_at).toLocaleString('pt-BR') : 'N/A',
+          'Nome Arquivo': ultimoUploadData?.arquivo_nome || 'N/A',
+          'Status': ultimoUploadData?.status || 'N/A',
           'Registros com Auditoria': rejeitados.length,
           'Sistema Auditoria': rejeitados.length > 0 ? 'Ativo (Detalhes Completos)' : 'Inativo ou Sem Rejeições'
         }];
@@ -358,8 +367,8 @@ export function RelatorioExclusoes() {
         // CASO 2: Nenhuma exclusão encontrada
         dadosExcel = [{
           'Status': 'Nenhuma exclusão encontrada',
-          'Registros Processados': ultimoUpload?.registros_processados || 0,
-          'Registros Inseridos': ultimoUpload?.registros_inseridos || 0,
+          'Registros Processados': ultimoUploadData?.registros_processados || 0,
+          'Registros Inseridos': ultimoUploadData?.registros_inseridos || 0,
           'Taxa Sucesso': '100%',
           'Data Verificação': new Date().toLocaleString('pt-BR')
         }];
