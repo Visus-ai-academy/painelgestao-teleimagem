@@ -67,8 +67,20 @@ serve(async (req) => {
     }
 
     const loteUpload = `${arquivo_fonte}_${Date.now()}`;
-    const dataReferencia = new Date().toISOString().split('T')[0];
-    const periodoReferencia = '2025-06';
+    
+    // Determinar período de referência dinamicamente baseado no tipo de arquivo
+    let dataReferencia: string;
+    let periodoReferencia: string;
+    
+    // Para Jun/25, usar formato correto
+    if (arquivo_fonte.includes('jun') || arquivo_fonte.includes('junho')) {
+      dataReferencia = '2025-06-01';
+      periodoReferencia = 'jun/25';
+    } else {
+      // Fallback para período atual
+      dataReferencia = new Date().toISOString().split('T')[0];
+      periodoReferencia = '2025-06';
+    }
 
     // ========== RESPOSTA IMEDIATA ==========
     // Enviar resposta imediatamente para não bloquear o frontend
@@ -113,34 +125,93 @@ serve(async (req) => {
 
           // Validações básicas removidas - campos podem estar vazios
 
-          // Validação de data usando período de referência do arquivo
-          if (record.DATA_LAUDO) {
-            const dataLaudo = new Date(record.DATA_LAUDO);
-            const periodoReferencia = record.periodo_referencia || record.data_referencia;
+          // Validação de data baseada no tipo de arquivo e período de referência
+          if (record.DATA_LAUDO || record.DATA_REALIZACAO) {
+            const isRetroativo = arquivo_fonte.includes('retroativo');
+            const periodoAtual = periodoReferencia;
             
-            // Calcular período válido baseado na data_referencia
-            let dataLimiteInicio: Date, dataLimiteFim: Date;
-            
-            if (periodoReferencia && periodoReferencia.includes('-')) {
-              // Formato YYYY-MM
-              const [ano, mes] = periodoReferencia.split('-').map(Number);
-              dataLimiteInicio = new Date(ano, mes - 1, 1); // 01 do mês
-              dataLimiteFim = new Date(ano, mes, 7); // 07 do mês seguinte
+            // Calcular datas válidas baseadas no período
+            let ano: number, mes: number;
+            if (periodoAtual.includes('/')) {
+              // Formato jun/25
+              const [mesStr, anoStr] = periodoAtual.split('/');
+              const meses: Record<string, number> = {
+                'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+                'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+              };
+              mes = meses[mesStr] || 6; // default junho
+              ano = 2000 + parseInt(anoStr);
             } else {
-              // Fallback para período fixo apenas se não houver data_referencia
-              dataLimiteInicio = new Date('2025-06-01');
-              dataLimiteFim = new Date('2025-07-07');
+              // Formato 2025-06
+              [ano, mes] = periodoAtual.split('-').map(Number);
             }
             
-            if (dataLaudo < dataLimiteInicio || dataLaudo > dataLimiteFim) {
-              registrosRejeitados.push({
-                linha_original: linhaOriginal,
-                dados_originais: record,
-                motivo_rejeicao: 'DATA_LAUDO_FORA_PERIODO',
-                detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora do período (${dataLimiteInicio.toISOString().split('T')[0]} a ${dataLimiteFim.toISOString().split('T')[0]})`
-              });
-              totalErros++;
-              continue;
+            // Datas de validação por tipo de arquivo
+            const primeiroDiaMes = new Date(ano, mes - 1, 1);
+            const ultimoDiaMes = new Date(ano, mes, 0);
+            const inicioFaturamento = new Date(ano, mes - 1, 8);
+            const fimFaturamento = new Date(ano, mes, 7);
+            
+            // Aplicar regras específicas por tipo de arquivo
+            if (isRetroativo) {
+              // ARQUIVOS RETROATIVOS: Regras v002/v003
+              if (record.DATA_REALIZACAO) {
+                const dataRealizacao = new Date(record.DATA_REALIZACAO);
+                if (dataRealizacao >= primeiroDiaMes) {
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v003_DATA_REALIZACAO',
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} >= ${primeiroDiaMes.toISOString().split('T')[0]} (retroativo)`
+                  });
+                  totalErros++;
+                  continue;
+                }
+              }
+              
+              if (record.DATA_LAUDO) {
+                const dataLaudo = new Date(record.DATA_LAUDO);
+                if (dataLaudo < inicioFaturamento || dataLaudo > fimFaturamento) {
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v002_DATA_LAUDO',
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora do período ${inicioFaturamento.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (retroativo)`
+                  });
+                  totalErros++;
+                  continue;
+                }
+              }
+            } else {
+              // ARQUIVOS NÃO-RETROATIVOS: Regra v031
+              if (record.DATA_REALIZACAO) {
+                const dataRealizacao = new Date(record.DATA_REALIZACAO);
+                if (dataRealizacao < primeiroDiaMes || dataRealizacao > ultimoDiaMes) {
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v031_DATA_REALIZACAO',
+                    detalhes_erro: `DATA_REALIZACAO ${record.DATA_REALIZACAO} fora do mês ${primeiroDiaMes.toISOString().split('T')[0]} a ${ultimoDiaMes.toISOString().split('T')[0]} (não-retroativo)`
+                  });
+                  totalErros++;
+                  continue;
+                }
+              }
+              
+              if (record.DATA_LAUDO) {
+                const dataLaudo = new Date(record.DATA_LAUDO);
+                if (dataLaudo < primeiroDiaMes || dataLaudo > fimFaturamento) {
+                  registrosRejeitados.push({
+                    linha_original: linhaOriginal,
+                    dados_originais: record,
+                    motivo_rejeicao: 'REGRA_v031_DATA_LAUDO',
+                    detalhes_erro: `DATA_LAUDO ${record.DATA_LAUDO} fora da janela ${primeiroDiaMes.toISOString().split('T')[0]} a ${fimFaturamento.toISOString().split('T')[0]} (não-retroativo)`
+                  });
+                  totalErros++;
+                  continue;
+                }
+              }
+            }
             }
           }
 
