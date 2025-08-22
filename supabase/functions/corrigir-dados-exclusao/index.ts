@@ -224,8 +224,8 @@ serve(async (req) => {
               DATA_LAUDO_NORMALIZADA: dataLaudoNorm,
               OBSERVACAO: 'Dados baseados em registros similares do mesmo upload'
             },
-            motivo_rejeicao: 'VALIDACAO_PERIODO_DATA_FORMATO',
-            detalhes_erro: `Data realização: ${registro.DATA_REALIZACAO} -> ${dataRealizacaoNorm}, Data laudo: ${registro.DATA_LAUDO} -> ${dataLaudoNorm}. Registro baseado em dados similares do arquivo ${ultimoUpload.arquivo_nome}`,
+            motivo_rejeicao: 'DADOS_SIMULADOS_UPLOAD_SIMILAR',
+            detalhes_erro: `Registro simulado baseado em upload similar. Data realização: ${registro.DATA_REALIZACAO}, Data laudo: ${registro.DATA_LAUDO}. Fonte: ${ultimoUpload.arquivo_nome}`,
             created_at: new Date().toISOString()
           });
         });
@@ -248,8 +248,8 @@ serve(async (req) => {
               DATA_LAUDO: 'Data inválida ou fora do período',
               OBSERVACAO: 'Dados originais não disponíveis - baseado em contador de rejeições'
             },
-            motivo_rejeicao: 'VALIDACAO_PERIODO_DATA_FORMATO',
-            detalhes_erro: `Registro ${i} de ${totalRejeitados} rejeitados por validação de período ou formato de data inválido no arquivo ${ultimoUpload.arquivo_nome}`,
+            motivo_rejeicao: 'DADOS_SIMULADOS_CONTADOR',
+            detalhes_erro: `Registro simulado (${i} de ${totalRejeitados}) por não ter dados originais disponíveis do arquivo ${ultimoUpload.arquivo_nome}`,
             created_at: new Date().toISOString()
           });
         }
