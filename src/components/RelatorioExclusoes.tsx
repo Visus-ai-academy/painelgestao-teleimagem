@@ -10,36 +10,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 
-interface AnaliseVolumetria {
-  arquivo_fonte: string;
-  registros_atuais: number;
-  registros_originais: number;
-  registros_excluidos: number;
-  motivos_exclusao: string[];
-}
-
 interface RegistroExcluido {
+  linha_original: number;
   cliente: string;
   paciente: string;
-  data_exame: string;
-  data_laudo: string;
-  especialidade: string;
   modalidade: string;
-  categoria: string;
+  especialidade: string;
+  exame: string;
+  data_exame: string;
   motivo_exclusao: string;
-  detalhes_erro?: string;
-  linha_original?: number;
+  detalhes_erro: string;
 }
 
 export function RelatorioExclusoes() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
   const [loadingExport, setLoadingExport] = useState(false);
-  const [analiseVolumetria, setAnaliseVolumetria] = useState<AnaliseVolumetria[]>([]);
   const [registrosExcluidos, setRegistrosExcluidos] = useState<RegistroExcluido[]>([]);
-  const [totalRejeitados, setTotalRejeitados] = useState(0);
-  const [ultimoUpload, setUltimoUpload] = useState<any>(null);
+  const [estatisticas, setEstatisticas] = useState({
+    totalProcessados: 0,
+    totalRejeitados: 0,
+    taxaSucesso: 100
+  });
   
   // Estados para filtros e ordenação
   const [filtroTexto, setFiltroTexto] = useState('');
@@ -53,85 +45,73 @@ export function RelatorioExclusoes() {
   });
 
   useEffect(() => {
-    carregarDadosExclusoes();
-    carregarRegistrosExcluidos();
+    carregarDados();
   }, []);
 
-  const carregarDadosExclusoes = async () => {
+  const carregarDados = async () => {
     try {
       setLoading(true);
       
-      // Primeiro, buscar o último lote de upload baseado nos dados da volumetria
-      const { data: ultimoLote } = await supabase
-        .from('volumetria_mobilemed')
-        .select('lote_upload, arquivo_fonte, created_at')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      let ultimoUploadInfo = null;
+      console.log('🔍 Carregando dados de exclusões...');
       
-      if (ultimoLote && ultimoLote.length > 0) {
-        const loteAtual = ultimoLote[0].lote_upload;
-        
-        // Contar registros do último lote
-        const { count: totalLote } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true })
-          .eq('lote_upload', loteAtual);
+      // Buscar todos os registros rejeitados
+      const { data: rejeitados, error: rejeitadosError } = await supabase
+        .from('registros_rejeitados_processamento')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        // Buscar se existe registro na tabela de uploads para este lote (busca mais ampla)
-        const { data: uploadData } = await supabase
-          .from('processamento_uploads')
-          .select('*')
-          .or(`detalhes_erro->>lote_upload.eq.${loteAtual},arquivo_nome.ilike.%${loteAtual.slice(-10)}%`)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        // Contar registros rejeitados do lote atual
-        const { count: rejeitadosLote } = await supabase
-          .from('registros_rejeitados_processamento')
-          .select('*', { count: 'exact', head: true })
-          .eq('lote_upload', loteAtual);
-
-        if (uploadData && uploadData.length > 0) {
-          // Atualizar dados do upload existente com registros rejeitados corretos
-          ultimoUploadInfo = {
-            ...uploadData[0],
-            registros_erro: rejeitadosLote || 0
-          };
-        } else {
-          // Se não tem registro no processamento_uploads, criar estrutura com dados do lote
-          ultimoUploadInfo = {
-            id: 'virtual',
-            arquivo_nome: `Upload ${new Date(ultimoLote[0].created_at).toLocaleString('pt-BR')}`,
-            tipo_arquivo: ultimoLote[0].arquivo_fonte,
-            status: 'concluido',
-            created_at: ultimoLote[0].created_at,
-            registros_processados: totalLote || 0,
-            registros_inseridos: totalLote || 0,
-            registros_erro: rejeitadosLote || 0,
-            detalhes_erro: {}
-          };
-        }
+      if (rejeitadosError) {
+        console.error('❌ Erro ao buscar registros rejeitados:', rejeitadosError);
+        throw rejeitadosError;
       }
 
-      setUltimoUpload(ultimoUploadInfo);
+      console.log(`✅ Encontrados ${rejeitados?.length || 0} registros rejeitados`);
 
-      if (ultimoUploadInfo) {
-        const detalhesErro = ultimoUploadInfo.detalhes_erro as any;
+      // Buscar dados de volumetria para calcular estatísticas
+      const { count: totalVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true });
+
+      const totalRejeitados = rejeitados?.length || 0;
+      const totalProcessados = (totalVolumetria || 0) + totalRejeitados;
+      const taxaSucesso = totalProcessados > 0 ? 
+        Math.round(((totalVolumetria || 0) / totalProcessados) * 100) : 100;
+
+      setEstatisticas({
+        totalProcessados,
+        totalRejeitados,
+        taxaSucesso
+      });
+
+      if (rejeitados && rejeitados.length > 0) {
+        const registrosFormatados = rejeitados.map((r, index) => {
+          const dados = r.dados_originais as Record<string, any> || {};
+          
+          return {
+            linha_original: index + 1,
+            cliente: dados.EMPRESA || 'N/I',
+            paciente: dados.NOME_PACIENTE || 'N/I',
+            modalidade: dados.MODALIDADE || 'N/I',
+            especialidade: dados.ESPECIALIDADE || 'N/I',
+            exame: dados.ESTUDO_DESCRICAO || 'N/I',
+            data_exame: dados.DATA_REALIZACAO || 'N/I',
+            motivo_exclusao: r.motivo_rejeicao || 'Não especificado',
+            detalhes_erro: r.detalhes_erro || 'Sem detalhes disponíveis'
+          };
+        });
+
+        setRegistrosExcluidos(registrosFormatados);
         
-        // Criar análise baseada nos dados reais
-        const analise: AnaliseVolumetria[] = [{
-          arquivo_fonte: ultimoUploadInfo.tipo_arquivo || 'volumetria_padrao',
-          registros_atuais: ultimoUploadInfo.registros_inseridos || 0,
-          registros_originais: ultimoUploadInfo.registros_processados || 0,
-          registros_excluidos: ultimoUploadInfo.registros_erro || 0,
-          motivos_exclusao: detalhesErro?.exclusoes_por_motivo ? 
-            Object.keys(detalhesErro.exclusoes_por_motivo) : 
-            ['Nenhum registro rejeitado']
-        }];
-        
-        setAnaliseVolumetria(analise);
+        toast({
+          title: "✅ Dados Carregados",
+          description: `${registrosFormatados.length} registros rejeitados encontrados`
+        });
+      } else {
+        setRegistrosExcluidos([]);
+        toast({
+          title: "✅ Nenhuma Exclusão",
+          description: "Todos os registros foram processados com sucesso!"
+        });
       }
 
     } catch (error) {
@@ -146,275 +126,55 @@ export function RelatorioExclusoes() {
     }
   };
 
-  const carregarRegistrosExcluidos = async () => {
-    try {
-      setLoadingDetalhes(true);
-      
-      // Buscar o último upload de processamento para correlacionar
-      const { data: ultimoUpload } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (!ultimoUpload?.[0]) {
-        console.log('❌ Nenhum upload encontrado na tabela processamento_uploads');
-        setRegistrosExcluidos([]);
-        setTotalRejeitados(0);
-        return;
-      }
-
-      const uploadData = ultimoUpload[0];
-      console.log('🔍 Último upload processamento:', {
-        id: uploadData.id,
-        arquivo: uploadData.arquivo_nome,
-        registros_erro: uploadData.registros_erro,
-        created_at: uploadData.created_at
-      });
-      
-      // Buscar registros rejeitados usando padrão de lote_upload
-      // O padrão é: {arquivo_fonte}_{timestamp}_{upload_id_8chars}
-      const uploadIdPattern = `%${uploadData.id.substring(0, 8)}`;
-      
-      console.log('🔍 Buscando rejeições com padrão:', uploadIdPattern);
-      
-      const { data: rejeitados, error: rejeitadosError } = await supabase
-        .from('registros_rejeitados_processamento')
-        .select('*')
-        .ilike('lote_upload', uploadIdPattern)
-        .order('linha_original');
-
-      if (rejeitadosError) {
-        console.error('Erro ao buscar registros rejeitados:', rejeitadosError);
-        throw rejeitadosError;
-      }
-
-      console.log(`🔍 Registros rejeitados encontrados: ${rejeitados?.length || 0}`);
-      setTotalRejeitados(rejeitados?.length || 0);
-
-      if (rejeitados && rejeitados.length > 0) {
-        // CASO 1: Sistema novo - registros detalhados disponíveis
-        const registrosFormatados = rejeitados.map((r, index) => {
-          const dados = r.dados_originais as Record<string, any> || {};
-          
-          return {
-            cliente: dados.EMPRESA || 'N/A',
-            paciente: dados.NOME_PACIENTE || 'N/A', 
-            data_exame: dados.DATA_REALIZACAO || 'N/A',
-            data_laudo: dados.DATA_LAUDO || 'N/A',
-            especialidade: dados.ESPECIALIDADE || 'N/A',
-            modalidade: dados.MODALIDADE || 'N/A',
-            categoria: dados.CATEGORIA || 'N/A',
-            motivo_exclusao: r.motivo_rejeicao || 'N/A',
-            detalhes_erro: r.detalhes_erro || 'N/A',
-            linha_original: r.linha_original || (index + 1)
-          };
-        });
-        
-        setRegistrosExcluidos(registrosFormatados);
-        
-        toast({
-          title: "✅ Exclusões Carregadas",
-          description: `${registrosFormatados.length.toLocaleString()} registros rejeitados encontrados com detalhes completos`,
-        });
-      } else {
-        // CASO 2: Nenhum registro rejeitado no último lote
-        setRegistrosExcluidos([]);
-        toast({
-          title: "✅ Nenhuma Exclusão",
-          description: "Todos os registros do último upload foram processados com sucesso!",
-        });
-      }
-
-    } catch (error) {
-      console.error('Erro:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar registros rejeitados",
-        variant: "destructive"
-      });
-      setRegistrosExcluidos([]);
-    } finally {
-      setLoadingDetalhes(false);
-    }
-  };
-
   const exportarParaExcel = async () => {
     try {
       setLoadingExport(true);
       
-      toast({
-        title: "🔄 Preparando Exportação...",
-        description: "Buscando registros rejeitados para exportação",
-      });
-
-      // Buscar dados do último upload para o resumo
-      const { data: uploadInfo } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const ultimoUploadData = uploadInfo?.[0];
-
-      if (!ultimoUploadData) {
-        throw new Error('Nenhum upload encontrado para gerar relatório');
-      }
-
-      // Buscar registros rejeitados usando padrão de lote_upload
-      const uploadIdPattern = `%${ultimoUploadData.id.substring(0, 8)}`;
-      
-      console.log('🔍 Exportação - Buscando rejeições com padrão:', uploadIdPattern);
-      
-      const { data: rejeitados, error: rejeitadosError } = await supabase
-        .from('registros_rejeitados_processamento')
-        .select('*')
-        .ilike('lote_upload', uploadIdPattern)
-        .order('linha_original');
-
-      if (rejeitadosError) {
-        console.error('Erro ao buscar rejeitados:', rejeitadosError);
-        throw new Error(`Erro ao buscar dados: ${rejeitadosError.message}`);
-      }
-
-      console.log(`🔍 Total de registros rejeitados encontrados no último lote: ${rejeitados?.length || 0}`);
-
-      let dadosExcel: any[] = [];
-
-      if (rejeitados && rejeitados.length > 0) {
-        // CASO 1: Dados detalhados disponíveis (sistema novo com auditoria)
-        dadosExcel = rejeitados.map((r, index) => {
-          const dados = r.dados_originais as Record<string, any> || {};
-          
-          return {
-            'Nº Linha': r.linha_original || (index + 1),
-            'Motivo Exclusão': r.motivo_rejeicao || 'N/A',
-            'Detalhes Erro': r.detalhes_erro || 'N/A',
-            'Cliente/Empresa': dados.EMPRESA || 'N/A',
-            'Nome Paciente': dados.NOME_PACIENTE || 'N/A',
-            'Código Paciente': dados.CODIGO_PACIENTE || 'N/A',
-            'Exame/Estudo': dados.ESTUDO_DESCRICAO || 'N/A',
-            'Accession Number': dados.ACCESSION_NUMBER || 'N/A',
-            'Modalidade': dados.MODALIDADE || 'N/A',
-            'Prioridade': dados.PRIORIDADE || 'N/A',
-            'Valores': dados.VALORES || 'N/A',
-            'Especialidade': dados.ESPECIALIDADE || 'N/A',
-            'Médico': dados.MEDICO || 'N/A',
-            'Data Realização': dados.DATA_REALIZACAO || 'N/A',
-            'Hora Realização': dados.HORA_REALIZACAO || 'N/A',
-            'Data Laudo': dados.DATA_LAUDO || 'N/A',
-            'Hora Laudo': dados.HORA_LAUDO || 'N/A',
-            'Data Prazo': dados.DATA_PRAZO || 'N/A',
-            'Hora Prazo': dados.HORA_PRAZO || 'N/A',
-            'Status': dados.STATUS || 'N/A',
-            'Categoria': dados.CATEGORIA || 'N/A',
-            'Duplicado': dados.DUPLICADO || 'N/A',
-            'Arquivo Fonte': r.arquivo_fonte || 'N/A',
-            'Lote Upload': r.lote_upload || 'N/A',
-            'Data Rejeição': new Date(r.created_at).toLocaleString('pt-BR')
-          };
-        });
-
-        // Gerar estatísticas resumidas
-        const estatisticas = rejeitados.reduce((acc, r) => {
-          const motivo = r.motivo_rejeicao || 'DESCONHECIDO';
-          acc[motivo] = (acc[motivo] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const estatisticasFormatadas = Object.entries(estatisticas).map(([motivo, quantidade]) => ({
-          'Motivo de Exclusão': motivo,
-          'Quantidade': quantidade,
-          'Percentual': `${((quantidade / rejeitados.length) * 100).toFixed(1)}%`
-        }));
-
-        // Criar workbook Excel com múltiplas abas
-        const wb = XLSX.utils.book_new();
-        
-        // Aba 1: Registros Detalhados
-        const ws1 = XLSX.utils.json_to_sheet(dadosExcel);
-        // Aplicar formatação nas colunas
-        const wsColWidths = [
-          { wch: 8 },   // Nº Linha
-          { wch: 25 },  // Motivo Exclusão
-          { wch: 40 },  // Detalhes Erro
-          { wch: 20 },  // Cliente/Empresa
-          { wch: 30 },  // Nome Paciente
-          { wch: 15 },  // Código Paciente
-          { wch: 35 },  // Exame/Estudo
-          { wch: 15 },  // Accession Number
-          { wch: 12 },  // Modalidade
-          { wch: 12 },  // Prioridade
-          { wch: 10 },  // Valores
-          { wch: 20 },  // Especialidade
-          { wch: 25 },  // Médico
-          { wch: 12 },  // Data Realização
-          { wch: 12 },  // Hora Realização
-          { wch: 12 },  // Data Laudo
-          { wch: 12 },  // Hora Laudo
-          { wch: 12 },  // Data Prazo
-          { wch: 12 },  // Hora Prazo
-          { wch: 12 },  // Status
-          { wch: 12 },  // Categoria
-          { wch: 10 },  // Duplicado
-          { wch: 20 },  // Arquivo Fonte
-          { wch: 25 },  // Lote Upload
-          { wch: 20 }   // Data Rejeição
-        ];
-        ws1['!cols'] = wsColWidths;
-        XLSX.utils.book_append_sheet(wb, ws1, "Registros Excluídos");
-        
-        // Aba 2: Estatísticas por Motivo
-        const ws2 = XLSX.utils.json_to_sheet(estatisticasFormatadas);
-        ws2['!cols'] = [{ wch: 35 }, { wch: 12 }, { wch: 12 }];
-        XLSX.utils.book_append_sheet(wb, ws2, "Estatísticas");
-        
-        // Aba 3: Resumo do Upload
-        const resumoUpload = [{
-          'Total Processado': ultimoUploadData?.registros_processados || 0,
-          'Total Inserido': ultimoUploadData?.registros_inseridos || 0,
-          'Total Rejeitado': ultimoUploadData?.registros_erro || 0,
-          'Taxa Rejeição': ultimoUploadData?.registros_processados ? `${((ultimoUploadData.registros_erro / ultimoUploadData.registros_processados) * 100).toFixed(1)}%` : '0%',
-          'Data Processamento': ultimoUploadData?.created_at ? new Date(ultimoUploadData.created_at).toLocaleString('pt-BR') : 'N/A',
-          'Nome Arquivo': ultimoUploadData?.arquivo_nome || 'N/A',
-          'Status': ultimoUploadData?.status || 'N/A',
-          'Registros com Auditoria': rejeitados.length,
-          'Sistema Auditoria': rejeitados.length > 0 ? 'Ativo (Detalhes Completos)' : 'Inativo ou Sem Rejeições'
-        }];
-        
-        const ws3 = XLSX.utils.json_to_sheet(resumoUpload);
-        ws3['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 30 }];
-        XLSX.utils.book_append_sheet(wb, ws3, "Resumo Upload");
-        
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
-        const nomeArquivo = `relatorio_exclusoes_volumetria_${timestamp}.xlsx`;
-        XLSX.writeFile(wb, nomeArquivo);
-
-        toast({
-          title: "✅ Excel Exportado com Sucesso!",
-          description: `${dadosExcel.length.toLocaleString()} registros rejeitados exportados com análise completa em 3 abas`,
-        });
-
-      } else {
-        // CASO 2: Nenhuma exclusão encontrada
-        dadosExcel = [{
+      if (registrosExcluidos.length === 0) {
+        // Caso sem exclusões
+        const dadosExcel = [{
           'Status': 'Nenhuma exclusão encontrada',
-          'Registros Processados': ultimoUploadData?.registros_processados || 0,
-          'Registros Inseridos': ultimoUploadData?.registros_inseridos || 0,
-          'Taxa Sucesso': '100%',
+          'Registros Processados': estatisticas.totalProcessados,
+          'Registros Inseridos': estatisticas.totalProcessados - estatisticas.totalRejeitados,
+          'Taxa Sucesso': `${estatisticas.taxaSucesso}%`,
           'Data Verificação': new Date().toLocaleString('pt-BR')
         }];
 
         const ws = XLSX.utils.json_to_sheet(dadosExcel);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Sem Exclusões");
+        XLSX.utils.book_append_sheet(wb, ws, "Status");
         
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
-        XLSX.writeFile(wb, `status_sem_exclusoes_${timestamp}.xlsx`);
+        XLSX.writeFile(wb, `relatorio_sem_exclusoes_${timestamp}.xlsx`);
 
         toast({
-          title: "✅ Nenhuma Exclusão para Exportar",
-          description: "Todos os registros foram processados com sucesso!",
+          title: "✅ Excel Gerado",
+          description: "Arquivo exportado - nenhuma exclusão encontrada"
+        });
+      } else {
+        // Caso com exclusões
+        const dadosExcel = registrosExcluidos.map(r => ({
+          'Nº Linha': r.linha_original,
+          'Motivo Exclusão': r.motivo_exclusao,
+          'Detalhes Erro': r.detalhes_erro,
+          'Cliente/Empresa': r.cliente,
+          'Nome Paciente': r.paciente,
+          'Exame/Estudo': r.exame,
+          'Modalidade': r.modalidade,
+          'Especialidade': r.especialidade,
+          'Data Exame': r.data_exame
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dadosExcel);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Registros Excluídos");
+        
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
+        XLSX.writeFile(wb, `relatorio_exclusoes_${timestamp}.xlsx`);
+
+        toast({
+          title: "✅ Excel Exportado",
+          description: `${dadosExcel.length} registros rejeitados exportados`
         });
       }
 
@@ -422,7 +182,7 @@ export function RelatorioExclusoes() {
       console.error('Erro na exportação:', error);
       toast({
         title: "❌ Erro na Exportação",
-        description: `Erro ao exportar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        description: "Erro ao exportar dados",
         variant: "destructive"
       });
     } finally {
@@ -430,7 +190,7 @@ export function RelatorioExclusoes() {
     }
   };
 
-  // Dados filtrados e ordenados usando useMemo para performance
+  // Dados filtrados e ordenados
   const dadosFiltrados = useMemo(() => {
     let dados = registrosExcluidos;
 
@@ -476,22 +236,22 @@ export function RelatorioExclusoes() {
 
   // Opções únicas para filtros
   const clientesUnicos = useMemo(() => 
-    [...new Set(registrosExcluidos.map(r => r.cliente))].filter(c => c !== 'N/A').sort(), 
+    [...new Set(registrosExcluidos.map(r => r.cliente))].filter(c => c !== 'N/I').sort(), 
     [registrosExcluidos]
   );
 
   const modalidadesUnicas = useMemo(() => 
-    [...new Set(registrosExcluidos.map(r => r.modalidade))].filter(m => m !== 'N/A').sort(), 
+    [...new Set(registrosExcluidos.map(r => r.modalidade))].filter(m => m !== 'N/I').sort(), 
     [registrosExcluidos]
   );
 
   const especialidadesUnicas = useMemo(() => 
-    [...new Set(registrosExcluidos.map(r => r.especialidade))].filter(e => e !== 'N/A').sort(), 
+    [...new Set(registrosExcluidos.map(r => r.especialidade))].filter(e => e !== 'N/I').sort(), 
     [registrosExcluidos]
   );
 
   const motivosUnicos = useMemo(() => 
-    [...new Set(registrosExcluidos.map(r => r.motivo_exclusao))].filter(m => m !== 'N/A').sort(), 
+    [...new Set(registrosExcluidos.map(r => r.motivo_exclusao))].filter(m => m !== 'Não especificado').sort(), 
     [registrosExcluidos]
   );
 
@@ -548,10 +308,10 @@ export function RelatorioExclusoes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {ultimoUpload?.registros_processados?.toLocaleString() || 0}
+              {estatisticas.totalProcessados.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              registros no último upload
+              registros no total
             </p>
           </CardContent>
         </Card>
@@ -563,10 +323,10 @@ export function RelatorioExclusoes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {totalRejeitados.toLocaleString()}
+              {estatisticas.totalRejeitados.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              registros com detalhes de auditoria
+              registros rejeitados
             </p>
           </CardContent>
         </Card>
@@ -578,9 +338,7 @@ export function RelatorioExclusoes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {ultimoUpload?.registros_processados 
-                ? ((ultimoUpload.registros_inseridos / ultimoUpload.registros_processados) * 100).toFixed(1)
-                : 0}%
+              {estatisticas.taxaSucesso}%
             </div>
             <p className="text-xs text-muted-foreground">
               registros processados com sucesso
@@ -597,23 +355,18 @@ export function RelatorioExclusoes() {
             Registros Rejeitados - Detalhes
           </CardTitle>
           <CardDescription>
-            Lista completa dos registros que foram rejeitados durante o processamento com motivos específicos
+            Lista completa dos registros que foram rejeitados durante o processamento
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loadingDetalhes ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Carregando detalhes...</span>
-            </div>
-          ) : registrosExcluidos.length > 0 ? (
+          {registrosExcluidos.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Badge variant="destructive">
                   {registrosExcluidos.length.toLocaleString()} registros rejeitados
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  Sistema de auditoria ativo - detalhes completos disponíveis
+                  Sistema de auditoria ativo
                 </span>
               </div>
 
@@ -625,7 +378,7 @@ export function RelatorioExclusoes() {
                     Busca Geral
                   </label>
                   <Input
-                    placeholder="Buscar em todos os campos..."
+                    placeholder="Buscar..."
                     value={filtroTexto}
                     onChange={(e) => setFiltroTexto(e.target.value)}
                     className="h-8"
@@ -633,10 +386,7 @@ export function RelatorioExclusoes() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Filter className="h-4 w-4" />
-                    Cliente
-                  </label>
+                  <label className="text-sm font-medium">Cliente</label>
                   <Select value={filtroCliente} onValueChange={setFiltroCliente}>
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder="Todos" />
@@ -792,7 +542,7 @@ export function RelatorioExclusoes() {
                           onClick={() => handleOrdenacao('motivo_exclusao')}
                           className="h-6 p-1 font-medium flex items-center gap-1"
                         >
-                          Motivo Exclusão {getIconeOrdenacao('motivo_exclusao')}
+                          Motivo {getIconeOrdenacao('motivo_exclusao')}
                         </Button>
                       </th>
                       <th className="text-left p-2 border-b">Detalhes</th>
@@ -829,7 +579,7 @@ export function RelatorioExclusoes() {
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Nenhum registro encontrado com os filtros aplicados. Tente ajustar os critérios de busca.
+                    Nenhum registro encontrado com os filtros aplicados.
                   </AlertDescription>
                 </Alert>
               )}
@@ -854,31 +604,20 @@ export function RelatorioExclusoes() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Sistema de auditoria: <strong>Ativo</strong></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Captura de rejeições: <strong>Habilitada</strong></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Exportação Excel: <strong>Completa</strong></span>
-              </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span>Trigger de auditoria: <strong>Ativo</strong></span>
             </div>
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">
-                <strong>Última verificação:</strong> {new Date().toLocaleString('pt-BR')}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <strong>Registros rejeitados captados:</strong> {totalRejeitados.toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <strong>Edge Function:</strong> processar-volumetria-otimizado
-              </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span>Captura automática: <strong>Habilitada</strong></span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <strong>Última verificação:</strong> {new Date().toLocaleString('pt-BR')}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <strong>Total rejeitados:</strong> {estatisticas.totalRejeitados.toLocaleString()}
             </div>
           </div>
         </CardContent>
