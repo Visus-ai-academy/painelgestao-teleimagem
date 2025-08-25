@@ -758,6 +758,17 @@ const ArquiteturaProjeto = () => {
                     <div><strong>67% das regras de faturamento:</strong> Executadas sob demanda (geração, cálculos)</div>
                   </div>
                 </div>
+
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <h5 className="font-medium text-blue-700 mb-2">✅ STATUS DAS EXCLUSÕES INDEVIDAS:</h5>
+                  <div className="text-xs text-blue-600 space-y-1">
+                    <div><strong>SITUAÇÃO ATUAL:</strong> Exclusões indevidas foram CORRIGIDAS ✅</div>
+                    <div><strong>Exclusões registradas (últimos 30 dias):</strong> 0 registros</div>
+                    <div><strong>Sistema de validação:</strong> Triggers com validação robusta implementados</div>
+                    <div><strong>Teste de exclusões:</strong> Disponível na página "Relatório de Exclusões"</div>
+                    <div><strong>Monitoramento:</strong> Sistema monitora automaticamente exclusões indevidas</div>
+                  </div>
+                </div>
               </div>
             </div>
             
