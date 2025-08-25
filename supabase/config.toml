@@ -127,3 +127,6 @@ verify_jwt = false
 
 [functions.identificar-exclusoes-registros]
 verify_jwt = false
+
+[functions.popular-registros-rejeitados]
+verify_jwt = false

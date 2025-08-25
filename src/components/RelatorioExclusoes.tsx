@@ -56,37 +56,37 @@ export function RelatorioExclusoes() {
       setLoadingCorrection(true);
       
       toast({
-        title: "🔧 Correção Iniciada",
-        description: "Corrigindo dados de exclusão...",
+        title: "🔧 Populando Registros Rejeitados",
+        description: "Criando registros de exclusão para o relatório...",
       });
 
-      const { data, error } = await supabase.functions.invoke('corrigir-dados-exclusao');
+      const { data, error } = await supabase.functions.invoke('popular-registros-rejeitados');
 
       if (error) {
-        console.error('❌ Erro na correção:', error);
+        console.error('❌ Erro ao popular registros:', error);
         toast({
-          title: "Erro na Correção",
-          description: error.message || "Erro ao corrigir dados",
+          title: "Erro ao Popular Registros",
+          description: error.message || "Erro ao criar registros",
           variant: "destructive"
         });
         return;
       }
 
-      console.log('📊 Resultado da correção:', data);
+      console.log('📊 Resultado da população:', data);
       
       toast({
-        title: "✅ Correção Concluída",
-        description: `${data.registros_inseridos || 0} registros corrigidos`,
+        title: "✅ Registros Criados",
+        description: `${data.registros_criados || 0} registros de exclusão criados com sucesso`,
       });
 
       // Recarregar dados
       await carregarDados();
 
     } catch (error) {
-      console.error('Erro na correção:', error);
+      console.error('Erro ao popular registros:', error);
       toast({
         title: "Erro",
-        description: "Erro ao corrigir dados de exclusão",
+        description: "Erro ao popular registros de exclusão",
         variant: "destructive"
       });
     } finally {
@@ -508,7 +508,7 @@ export function RelatorioExclusoes() {
             ) : (
               <Settings className="h-4 w-4" />
             )}
-            Corrigir Dados
+            Popular Registros Rejeitados
           </Button>
           <Button 
             variant="outline" 
