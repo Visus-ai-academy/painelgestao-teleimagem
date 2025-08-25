@@ -124,3 +124,6 @@ verify_jwt = false
 
 [functions.detectar-2-registros-excluidos]
 verify_jwt = false
+
+[functions.identificar-exclusoes-registros]
+verify_jwt = false
