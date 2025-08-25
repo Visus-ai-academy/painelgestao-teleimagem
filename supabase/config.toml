@@ -109,3 +109,18 @@ verify_jwt = false
 
 [functions.testar-sistema-exclusoes]
 verify_jwt = false
+
+[functions.investigar-exclusoes-upload-atual]
+verify_jwt = false
+
+[functions.debug-exclusoes-2-registros]
+verify_jwt = false
+
+[functions.investigar-exclusoes-especificas]
+verify_jwt = false
+
+[functions.identificar-registros-excluidos]
+verify_jwt = false
+
+[functions.detectar-2-registros-excluidos]
+verify_jwt = false
