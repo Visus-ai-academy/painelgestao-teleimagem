@@ -51,7 +51,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros. Inclui botão de "fechar faturamento" que bloqueia novos dados após fechamento.',
       status: 'ativa',
       implementadaEm: '2024-01-15',
-      observacoes: 'Implementado via RLS policies can_edit_data(), can_insert_data() + controle de fechamento por período',
+      observacoes: 'RLS policies can_edit_data() e can_insert_data() + tabela fechamento_faturamento para controle por período',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
@@ -121,7 +121,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
       status: 'ativa',
       implementadaEm: '2024-01-28',
-      observacoes: 'Edge function: processar-valores-de-para + RPC aplicar_valores_de_para',
+      observacoes: 'Função SQL: aplicar_de_para_automatico() + tabela valores_referencia_de_para',
       ordem_execucao: 6,
       tipo_regra: 'negocio'
     },
@@ -133,7 +133,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Aplica regras configuradas para quebrar exames compostos em exames individuais.',
       status: 'ativa',
       implementadaEm: '2024-01-30',
-      observacoes: 'Edge function: processar-quebra-exames, tabela regras_quebra_exames',
+      observacoes: 'Função SQL: aplicar_regras_quebra_exames() + tabela regras_quebra_exames',
       ordem_execucao: 7,
       tipo_regra: 'negocio'
     },
@@ -145,7 +145,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Processa e categoriza exames com base na tabela de categorias configuradas.',
       status: 'ativa',
       implementadaEm: '2024-02-01',
-      observacoes: 'Edge function: processar-categorias-exame, tabela categorias_exame',
+      observacoes: 'Função SQL: aplicar_categorias_volumetria() + tabela categorias_exame',
       ordem_execucao: 8,
       tipo_regra: 'negocio'
     },
@@ -226,7 +226,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Remove códigos entre parênteses (E1, E2, E3), prefixos DR/DRA, pontos finais e limpa espaços extras dos nomes de médicos.',
       status: 'ativa',
       implementadaEm: '2024-02-16',
-      observacoes: 'Trigger: trigger_normalizar_medico, Função: normalizar_medico()',
+      observacoes: 'Função SQL: normalizar_medico() aplicada via trigger_aplicar_regras_completas()',
       ordem_execucao: 15,
       tipo_regra: 'negocio'
     },
@@ -235,10 +235,10 @@ export function ControleRegrasNegocio() {
       nome: 'De-Para Prioridades',
       modulo: 'volumetria',
       categoria: 'dados',
-      criterio: 'Aplica mapeamento de prioridades usando tabela de_para_prioridade para padronizar valores de prioridade.',
+      criterio: 'Aplica mapeamento de prioridades usando tabela valores_prioridade_de_para para padronizar valores de prioridade.',
       status: 'ativa',
       implementadaEm: '2024-02-17',
-      observacoes: 'Trigger: aplicar_prioridades_de_para, Tabela: de_para_prioridade',
+      observacoes: 'Função SQL: aplicar_prioridades_de_para() + tabela valores_prioridade_de_para',
       ordem_execucao: 16,
       tipo_regra: 'negocio'
     },
@@ -250,7 +250,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Aplica valores específicos para exames oncológicos baseado em regras especiais para a categoria "onco".',
       status: 'ativa',
       implementadaEm: '2024-02-18',
-      observacoes: 'Trigger: aplicar_valor_onco, aplicado apenas para arquivo volumetria_onco_padrao',
+      observacoes: 'Função SQL: aplicar_valor_onco() - aplicado apenas para arquivo volumetria_onco_padrao',
       ordem_execucao: 17,
       tipo_regra: 'negocio'
     },
@@ -262,7 +262,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Aplica regras de exclusão configuradas dinamicamente baseadas em critérios JSON (empresa, modalidade, especialidade, categoria, médico).',
       status: 'ativa',
       implementadaEm: '2024-02-19',
-      observacoes: 'Trigger: aplicar_regras_exclusao_dinamicas, Tabela: regras_exclusao_faturamento',
+      observacoes: 'Sistema automático baseado na tabela regras_exclusao_faturamento (aplicado via triggers)',
       ordem_execucao: 18,
       tipo_regra: 'exclusao'
     },
@@ -274,7 +274,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Valida se cliente existe no cadastro e está ativo antes de processar dados de volumetria.',
       status: 'ativa',
       implementadaEm: '2024-02-20',
-      observacoes: 'Edge function: aplicar-validacao-cliente, RPC: aplicar_validacao_cliente_volumetria',
+      observacoes: 'Edge function: aplicar-validacao-cliente + função SQL: aplicar_validacao_cliente_volumetria()',
       ordem_execucao: 19,
       tipo_regra: 'negocio'
     },
@@ -286,7 +286,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Define especialidade automaticamente baseado em regras de negócio quando não informada no arquivo.',
       status: 'ativa',
       implementadaEm: '2024-02-21',
-      observacoes: 'Trigger: aplicar_especialidade_automatica',
+      observacoes: 'Função SQL: aplicar_especialidade_automatica() - aplicada automaticamente durante processamento',
       ordem_execucao: 20,
       tipo_regra: 'negocio'
     },
@@ -359,7 +359,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Seleciona a faixa de preço conforme volume total e arranjo Modalidade + Especialidade + Categoria (+ Prioridade opcional): filtra precos_servicos por esses campos; escolhe a faixa onde volume_inicial <= volume_total <= volume_final (limites nulos permitem faixa aberta); prioriza match exato de prioridade e, em empate, a maior volume_inicial; aplica valor_urgencia quando Prioridade = Urgência/Plantão ou quando considera_prioridade_plantao estiver ativa; caso contrário usa valor_base.',
       status: 'ativa',
       implementadaEm: '2025-08-11',
-      observacoes: 'Implementada na função SQL public.calcular_preco_exame (Postgres).',
+      observacoes: 'Implementada na função SQL calcular_preco_exame() - considera volume, modalidade, especialidade, categoria e prioridade.',
       ordem_execucao: 1,
       tipo_regra: 'negocio'
     },
@@ -393,7 +393,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Define tipificação para 10 clientes NC originais: CDICARDIO, CDIGOIAS, CISP, CLIRAM, CRWANDERLEY, DIAGMAX-PR, GOLD, PRODIMAGEM, TRANSDUSON, ZANELLO. NC-FT para especialidade CARDIO, ou prioridade PLANTÃO, ou quando ESTUDO_DESCRICAO for "ANGIOTC VENOSA TORAX CARDIOLOGIA" ou "RM CRANIO NEUROBRAIN".',
       status: 'ativa',
       implementadaEm: '2025-01-07',
-      observacoes: 'Implementado em utils/tipoFaturamento.ts - aplica automaticamente na volumetria e faturamento',
+      observacoes: 'Regra base definida em utils/tipoFaturamento.ts - implementação completa via função aplicar_tipificacao_faturamento()',
       ordem_execucao: 4,
       tipo_regra: 'negocio'
     },
@@ -405,7 +405,7 @@ export function ControleRegrasNegocio() {
       criterio: 'Define tipificação para 3 clientes NC adicionais: CEMVALENCA, RMPADUA, RADI-IMAGEM. NC-FT para: especialidades CARDIO/MEDICINA INTERNA/NEUROBRAIN, prioridade PLANTÃO, 29 médicos específicos, ou especialidade MAMA (apenas RADI-IMAGEM).',
       status: 'ativa',
       implementadaEm: '2025-01-07',
-      observacoes: 'Extensão da regra F005 com critérios adicionais por médico e especialidade MAMA para RADI-IMAGEM',
+      observacoes: 'Extensão da regra F005 - implementação completa via função aplicar_tipificacao_faturamento()',
       ordem_execucao: 5,
       tipo_regra: 'negocio'
     },
