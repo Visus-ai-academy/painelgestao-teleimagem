@@ -12,6 +12,7 @@ import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadS
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraProcessamento';
+import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,7 +33,7 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
@@ -40,6 +41,10 @@ export default function DadosVolumetria() {
             <TabsTrigger value="status-regras" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Status das Regras
+            </TabsTrigger>
+            <TabsTrigger value="registros-excluidos" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Registros Excluídos
             </TabsTrigger>
           </TabsList>
 
@@ -153,6 +158,10 @@ export default function DadosVolumetria() {
 
           <TabsContent value="status-regras">
             <StatusRegraProcessamento />
+          </TabsContent>
+          
+          <TabsContent value="registros-excluidos">
+            <AnaliseRegistrosExcluidos />
           </TabsContent>
         </Tabs>
       </VolumetriaProvider>
