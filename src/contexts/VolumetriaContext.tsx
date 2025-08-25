@@ -353,35 +353,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     console.log('🧹 Limpando dados DEFINITIVOS do banco...');
     
     try {
-      // Limpar dados de volumetria
-      const { error: volumetriaError } = await supabase
-        .from('volumetria_mobilemed')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      // Usar edge function otimizada para limpeza em background
+      const { error: limparError } = await supabase.functions.invoke('limpar-dados-volumetria');
 
-      if (volumetriaError) {
-        throw new Error(`Erro ao limpar volumetria: ${volumetriaError.message}`);
+      if (limparError) {
+        throw new Error(`Erro ao limpar volumetria: ${limparError.message}`);
       }
 
-      // Limpar status de processamento
-      const { error: statusError } = await supabase
-        .from('processamento_uploads')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (statusError) {
-        console.warn('Aviso ao limpar status:', statusError.message);
-      }
-
-      // Limpar import_history
-      const { error: importError } = await supabase
-        .from('import_history')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (importError) {
-        console.warn('Aviso ao limpar import history:', importError.message);
-      }
+      console.log('✅ Limpeza iniciada em background com sucesso!');
+      
+      // A edge function já cuida de limpar todas as tabelas relacionadas
 
 
       // Resetar dados locais imediatamente
