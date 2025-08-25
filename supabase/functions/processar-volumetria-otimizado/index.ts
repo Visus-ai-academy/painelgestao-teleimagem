@@ -441,6 +441,30 @@ serve(async (req) => {
           console.log(`📝 Nenhum registro rejeitado - todos foram processados com sucesso`);
         }
 
+      // ========== APLICAR REGRAS DE DE-PARA AUTOMATICAMENTE ==========
+      let regrasAplicadas = 0;
+      console.log(`🔧 Aplicando regras de de-para para arquivo: ${arquivo_fonte}`);
+      
+      try {
+        // Chamar função de aplicação de regras de tratamento
+        const { data: regrasTratamento, error: regrasError } = await supabaseClient.functions.invoke(
+          'aplicar-regras-tratamento',
+          {
+            body: { arquivo_fonte: arquivo_fonte }
+          }
+        );
+
+        if (regrasError) {
+          console.error(`❌ Erro ao aplicar regras de tratamento:`, regrasError);
+        } else if (regrasTratamento) {
+          regrasAplicadas = regrasTratamento.registros_atualizados || 0;
+          console.log(`✅ Regras de de-para aplicadas: ${regrasAplicadas} registros atualizados`);
+          console.log(`📋 Detalhes das regras:`, regrasTratamento.detalhes);
+        }
+      } catch (regrasError) {
+        console.error(`❌ Erro ao aplicar regras de tratamento:`, regrasError);
+      }
+
       // Atualizar status final
       await supabaseClient
         .from('processamento_uploads')
@@ -455,7 +479,7 @@ serve(async (req) => {
             total_processado: totalProcessados,
             total_inserido: totalInseridos,
             total_erros: totalErros,
-            regras_aplicadas: 0,
+            regras_aplicadas: regrasAplicadas,
             debug_paciente: {
               nome: stagingData[0]?.NOME_PACIENTE || 'N/A',
               encontrados_no_arquivo: stagingData.length,
@@ -468,7 +492,7 @@ serve(async (req) => {
         })
         .eq('id', uploadId);
 
-      console.log(`✅ BACKGROUND CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados de ${totalProcessados} processados`);
+      console.log(`✅ BACKGROUND CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados, ${regrasAplicadas} com de-para aplicado de ${totalProcessados} processados`);
     };
 
     // Executar processamento em background
