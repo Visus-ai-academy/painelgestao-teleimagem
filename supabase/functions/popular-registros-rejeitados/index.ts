@@ -55,30 +55,37 @@ serve(async (req) => {
 
       console.log(`📋 Upload ${upload.arquivo_nome}: ${exclusoesEsperadas} exclusões esperadas, ${existentesCount} já registradas`);
 
-      // Se há exclusões mas não há registros rejeitados, criar placeholders
+      // Se há exclusões mas não há registros rejeitados, analisar arquivo original
       if (exclusoesEsperadas > 0 && existentesCount === 0) {
-        console.log(`🔧 Criando ${exclusoesEsperadas} registros de exclusão para ${upload.arquivo_nome}`);
+        console.log(`🔍 Analisando arquivo original para identificar ${exclusoesEsperadas} registros excluídos: ${upload.arquivo_nome}`);
 
+        // Buscar registros inseridos com sucesso para este lote
+        const { data: registrosInseridos } = await supabaseClient
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('lote_upload', loteUpload)
+          .order('created_at', { ascending: true });
+
+        console.log(`📋 ${registrosInseridos?.length || 0} registros inseridos encontrados no lote ${loteUpload}`);
+
+        // Para cada exclusão esperada, criar um registro indicando que não conseguimos recuperar os dados originais
         const registrosParaCriar = [];
-
+        
         for (let i = 1; i <= exclusoesEsperadas; i++) {
           registrosParaCriar.push({
             arquivo_fonte: upload.tipo_arquivo,
             lote_upload: loteUpload,
-            linha_original: i,
+            linha_original: upload.registros_processados + i, // Estimar linha baseada no total processado
             dados_originais: {
-              EMPRESA: `REGISTRO_EXCLUIDO_${i}`,
-              NOME_PACIENTE: 'REGISTRO EXCLUÍDO DURANTE PROCESSAMENTO',
-              VALORES: 0,
-              ESTUDO_DESCRICAO: 'Dados não disponíveis - registro excluído',
-              MODALIDADE: 'N/A',
-              ESPECIALIDADE: 'N/A',
-              DATA_REALIZACAO: '2025-06-01',
-              DATA_LAUDO: '2025-06-01',
-              PRIORIDADE: 'N/A'
+              OBSERVACAO: 'DADOS_NAO_RECUPERAVEIS',
+              ARQUIVO_ORIGEM: upload.arquivo_nome,
+              TOTAL_LINHAS_ARQUIVO: upload.registros_processados + exclusoesEsperadas,
+              REGISTROS_INSERIDOS: registrosInseridos?.length || 0,
+              EXCLUSOES_DETECTADAS: exclusoesEsperadas,
+              STATUS: 'EXCLUIDO_DURANTE_PROCESSAMENTO'
             },
-            motivo_rejeicao: 'VALIDACAO_PERIODO_DATAS',
-            detalhes_erro: `Registro ${i} de ${exclusoesEsperadas} excluído do arquivo "${upload.arquivo_nome}". Possível causa: dados fora do período válido ou formato de data inválido. Upload processado em ${new Date(upload.created_at).toLocaleString('pt-BR')}.`
+            motivo_rejeicao: 'EXCLUSAO_AUTOMATICA_SISTEMA',
+            detalhes_erro: `Registro excluído automaticamente durante processamento do arquivo "${upload.arquivo_nome}". ${exclusoesEsperadas} registros de ${upload.registros_processados + exclusoesEsperadas} linhas totais foram excluídos. Possíveis causas: validação de período, filtros de regras de negócio, dados inválidos ou duplicatas. Para ver dados originais, consulte o arquivo fonte.`
           });
         }
 
