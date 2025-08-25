@@ -6,9 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Função para calcular data limite do laudo
-function calcularDataLimiteLaudo(periodoReferencia: string) {
-  console.log(`🗓️ Calculando data limite para período: ${periodoReferencia}`);
+// Função para calcular período válido de laudos
+function calcularPeriodoValidoLaudo(periodoReferencia: string) {
+  console.log(`🗓️ Calculando período válido para laudos - período: ${periodoReferencia}`);
   
   const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
   
@@ -34,16 +34,23 @@ function calcularDataLimiteLaudo(periodoReferencia: string) {
     throw new Error(`Período inválido: ${periodoReferencia}`);
   }
   
-  // Data limite: dia 7 do mês SEGUINTE ao período (INCLUSIVE)
-  // Para Jun/25: limite é 07/07/2025 (laudos APÓS 07/07/2025 devem ser excluídos)
-  const dataLimiteLaudo = new Date(ano, mes - 1, 7);
+  // PERÍODO VÁLIDO PARA LAUDOS:
+  // Data início: dia 8 do mês de referência
+  // Data fim: dia 7 do mês seguinte
+  // Exemplo para jun/25: 08/06/2025 até 07/07/2025 (ambos inclusive)
+  
+  const dataInicioLaudo = new Date(ano, mes - 1, 8); // dia 8 do mês
+  const dataFimLaudo = new Date(ano, mes, 7); // dia 7 do mês seguinte
   
   const result = {
-    dataLimiteLaudo: dataLimiteLaudo.toISOString().split('T')[0]
+    dataInicioLaudo: dataInicioLaudo.toISOString().split('T')[0],
+    dataFimLaudo: dataFimLaudo.toISOString().split('T')[0]
   };
   
-  console.log(`📊 Data limite calculada: ${result.dataLimiteLaudo}`);
-  console.log(`   - Excluir DATA_LAUDO > ${result.dataLimiteLaudo}`);
+  console.log(`📊 Período válido calculado:`);
+  console.log(`   - Data início: ${result.dataInicioLaudo} (inclusive)`);
+  console.log(`   - Data fim: ${result.dataFimLaudo} (inclusive)`);
+  console.log(`   - Excluir DATA_LAUDO < ${result.dataInicioLaudo} OU DATA_LAUDO > ${result.dataFimLaudo}`);
   
   return result;
 }
@@ -67,34 +74,34 @@ export default async function handler(req: Request): Promise<Response> {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { dataLimiteLaudo } = calcularDataLimiteLaudo(periodo_referencia);
+    const { dataInicioLaudo, dataFimLaudo } = calcularPeriodoValidoLaudo(periodo_referencia);
     
-    console.log(`📅 Data limite para DATA_LAUDO: ${dataLimiteLaudo}`);
+    console.log(`📅 Período válido para DATA_LAUDO: ${dataInicioLaudo} até ${dataFimLaudo}`);
 
     let totalExcluidos = 0;
     const detalhes = [];
 
-    // REGRA v031: Filtro de DATA_LAUDO para arquivos NÃO-RETROATIVOS
-    // Excluir laudos APÓS dia 7 do mês seguinte ao período (dia 7 é permitido)
-    console.log(`📝 Regra v031: Exclusão por DATA_LAUDO para arquivos não-retroativos`);
+    // REGRA v031: Filtro de PERÍODO de DATA_LAUDO para arquivos NÃO-RETROATIVOS
+    // Manter apenas laudos dentro do período válido
+    console.log(`📝 Regra v031: Filtro de período de DATA_LAUDO para arquivos não-retroativos`);
     
     // Aplicar v031 em volumetria_padrao
-    // Primeiro buscar registros que serão excluídos
+    // Buscar registros FORA do período válido (antes da data início OU depois da data fim)
     const { data: registrosV031_1 } = await supabase
       .from('volumetria_mobilemed')
       .select('*')
       .eq('arquivo_fonte', 'volumetria_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (registrosV031_1 && registrosV031_1.length > 0) {
-      // Salvar registros rejeitados
+      // Salvar registros rejeitados com motivo específico
       const rejectionsToInsert = registrosV031_1.map((record, index) => ({
         arquivo_fonte: 'volumetria_padrao',
-        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        lote_upload: record.lote_upload || 'filtro_periodo_laudo',
         linha_original: index + 1,
         dados_originais: record,
-        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
-        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+        motivo_rejeicao: 'FILTRO_PERIODO_DATA_LAUDO',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} fora do período válido (${dataInicioLaudo} até ${dataFimLaudo})`
       }));
 
       await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
@@ -104,7 +111,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (!errorV031_1) {
       const deletedV031_1 = countV031_1 || 0;
@@ -118,16 +125,16 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .select('*')
       .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (registrosV031_2 && registrosV031_2.length > 0) {
       const rejectionsToInsert = registrosV031_2.map((record, index) => ({
         arquivo_fonte: 'volumetria_fora_padrao',
-        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        lote_upload: record.lote_upload || 'filtro_periodo_laudo',
         linha_original: index + 1,
         dados_originais: record,
-        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
-        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+        motivo_rejeicao: 'FILTRO_PERIODO_DATA_LAUDO',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} fora do período válido (${dataInicioLaudo} até ${dataFimLaudo})`
       }));
 
       await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
@@ -137,7 +144,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_fora_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (!errorV031_2) {
       const deletedV031_2 = countV031_2 || 0;
@@ -151,16 +158,16 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .select('*')
       .eq('arquivo_fonte', 'volumetria_onco_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (registrosV031_3 && registrosV031_3.length > 0) {
       const rejectionsToInsert = registrosV031_3.map((record, index) => ({
         arquivo_fonte: 'volumetria_onco_padrao',
-        lote_upload: record.lote_upload || 'filtro_data_laudo',
+        lote_upload: record.lote_upload || 'filtro_periodo_laudo',
         linha_original: index + 1,
         dados_originais: record,
-        motivo_rejeicao: 'FILTRO_DATA_LAUDO_LIMITE',
-        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} > limite ${dataLimiteLaudo}`
+        motivo_rejeicao: 'FILTRO_PERIODO_DATA_LAUDO',
+        detalhes_erro: `Data de laudo ${record.DATA_LAUDO} fora do período válido (${dataInicioLaudo} até ${dataFimLaudo})`
       }));
 
       await supabase.from('registros_rejeitados_processamento').insert(rejectionsToInsert);
@@ -170,7 +177,7 @@ export default async function handler(req: Request): Promise<Response> {
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
       .eq('arquivo_fonte', 'volumetria_onco_padrao')
-      .gt('data_laudo', dataLimiteLaudo);
+      .or(`data_laudo.lt.${dataInicioLaudo},data_laudo.gt.${dataFimLaudo}`);
 
     if (!errorV031_3) {
       const deletedV031_3 = countV031_3 || 0;
@@ -186,7 +193,10 @@ export default async function handler(req: Request): Promise<Response> {
       periodo_referencia,
       total_excluidos: totalExcluidos,
       detalhes,
-      data_limite_aplicada: dataLimiteLaudo,
+      periodo_valido_aplicado: {
+        data_inicio: dataInicioLaudo,
+        data_fim: dataFimLaudo
+      },
       arquivos_processados: []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
