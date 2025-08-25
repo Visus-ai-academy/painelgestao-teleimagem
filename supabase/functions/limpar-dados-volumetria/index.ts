@@ -27,29 +27,57 @@ Deno.serve(async (req: Request): Promise<Response> => {
       'volumetria_onco_padrao'
     ]
 
-    console.log(`🧹 LIMPEZA DIRETA - Executando limpeza síncrona imediata`)
+    console.log(`🧹 LIMPEZA EM LOTES - Executando limpeza controlada para evitar timeout`)
     
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // 1. LIMPAR TABELA volumetria_mobilemed - MAIS SIMPLES E DIRETO
-    console.log(`📊 Deletando TODOS os registros de volumetria_mobilemed`)
+    // 1. LIMPAR TABELA volumetria_mobilemed EM LOTES PEQUENOS
+    console.log(`📊 Limpando volumetria_mobilemed em lotes pequenos`)
     
-    const { error: volumetriaError, count: volumetriaCount } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .gt('created_at', '1900-01-01') // Condição que sempre é verdadeira para deletar todos
+    let removidosVolumetria = 0
+    let loteAtual = 1
+    const batchSize = 1000 // Lotes menores para evitar timeout
+    
+    while (true) {
+      console.log(`🗑️ Processando lote ${loteAtual} (${batchSize} registros)...`)
+      
+      const { error, count } = await supabase
+        .from('volumetria_mobilemed')
+        .delete({ count: 'exact' })
+        .limit(batchSize)
 
-    if (volumetriaError) {
-      console.error('❌ Erro ao deletar volumetria_mobilemed:', volumetriaError)
-      throw new Error(`Erro ao deletar volumetria: ${volumetriaError.message}`)
+      if (error) {
+        console.error(`❌ Erro no lote ${loteAtual}:`, error)
+        throw new Error(`Erro ao deletar lote ${loteAtual}: ${error.message}`)
+      }
+
+      const deletedCount = count || 0
+      removidosVolumetria += deletedCount
+      console.log(`✅ Lote ${loteAtual}: ${deletedCount} registros removidos (total: ${removidosVolumetria})`)
+
+      // Se deletou menos que o lote, não há mais registros
+      if (deletedCount < batchSize) {
+        break
+      }
+
+      loteAtual++
+      
+      // Pausa entre lotes para não sobrecarregar
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Limite de segurança para evitar loop infinito
+      if (loteAtual > 100) {
+        console.log('⚠️ Limite de segurança atingido (100 lotes)')
+        break
+      }
     }
 
-    console.log(`🗑️ Removidos ${volumetriaCount || 0} registros de volumetria_mobilemed`)
-    totalRemovidoGeral += volumetriaCount || 0
+    console.log(`🎉 VOLUMETRIA LIMPA: ${removidosVolumetria} registros removidos`)
+    totalRemovidoGeral += removidosVolumetria
     resultadosLimpeza.push({
       tabela: 'volumetria_mobilemed',
-      registros_removidos: volumetriaCount || 0
+      registros_removidos: removidosVolumetria
     })
 
     // 2. LIMPAR TABELA processamento_uploads
