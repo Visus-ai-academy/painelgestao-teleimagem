@@ -10,6 +10,11 @@ interface UploadStatus {
   isProcessing: boolean;
   progressPercentage: number;
   lastUpdate: string | null;
+  lastUploadDetails?: {
+    arquivo_fonte: string;
+    lote_upload: string;
+    timestamp: string;
+  };
 }
 
 export function useUploadStatus(fileType: string | string[] = 'faturamento') {
@@ -21,7 +26,8 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
     totalRecordsProcessed: 0,
     isProcessing: false,
     progressPercentage: 0,
-    lastUpdate: null
+    lastUpdate: null,
+    lastUploadDetails: undefined
   });
 
   const fetchStatus = async () => {
@@ -31,7 +37,7 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       
       let query = supabase
         .from('processamento_uploads')
-        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at')
+        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at, tipo_arquivo, detalhes_erro')
         .in('status', ['processando', 'concluido']) // Incluir concluídos também
         .gte('created_at', cutoffTime); // Últimos 3 minutos
       
@@ -82,6 +88,28 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
         ? activeUploads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
         : null;
 
+      // Capturar detalhes do último upload para o monitor de regras
+      let lastUploadDetails = undefined;
+      if (activeUploads.length > 0) {
+        const latestUpload = activeUploads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        
+        // Extrair lote_upload do detalhes_erro se disponível
+        let loteUpload = 'unknown';
+        if (latestUpload.detalhes_erro && typeof latestUpload.detalhes_erro === 'object' && !Array.isArray(latestUpload.detalhes_erro)) {
+          const detalhes = latestUpload.detalhes_erro as Record<string, any>;
+          loteUpload = detalhes.lote_upload || `lote_${latestUpload.created_at.split('T')[0]}`;
+        } else {
+          // Gerar lote baseado na data se não estiver nos detalhes
+          loteUpload = `lote_${latestUpload.created_at.split('T')[0]}`;
+        }
+
+        lastUploadDetails = {
+          arquivo_fonte: latestUpload.tipo_arquivo,
+          lote_upload: loteUpload,
+          timestamp: latestUpload.created_at
+        };
+      }
+
       console.log('Upload Status Debug:', {
         totalUploads,
         processingUploads,
@@ -99,7 +127,8 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
         totalRecordsProcessed,
         isProcessing,
         progressPercentage,
-        lastUpdate
+        lastUpdate,
+        lastUploadDetails
       });
 
     } catch (error) {

@@ -15,6 +15,7 @@ import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraProcessamento';
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
+import { MonitorAplicacaoRegras } from '@/components/MonitorAplicacaoRegras';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
@@ -48,10 +49,14 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
+            </TabsTrigger>
+            <TabsTrigger value="monitor-regras" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Monitor de Regras
             </TabsTrigger>
             <TabsTrigger value="monitoramento" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -189,6 +194,13 @@ export default function DadosVolumetria() {
                 <VolumetriaExamesNaoIdentificados />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="monitor-regras">
+            <MonitorAplicacaoRegras 
+              arquivoFonte={uploadStatus.lastUploadDetails?.arquivo_fonte}
+              loteUpload={uploadStatus.lastUploadDetails?.lote_upload}
+            />
           </TabsContent>
 
           <TabsContent value="monitoramento">
