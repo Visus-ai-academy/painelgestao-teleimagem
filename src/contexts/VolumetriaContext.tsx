@@ -364,6 +364,15 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
 
       console.log('✅ Limpeza concluída:', responseData);
 
+      // FORÇAR INVALIDAÇÃO COMPLETA DO CACHE
+      console.log('🔄 Invalidando cache do contexto...');
+      
+      // Invalidar completamente o contexto
+      (window as any).volumetriaContext?.refreshData?.();
+      
+      // Aguardar um pouco para garantir que a invalidação seja processada
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
 
       // Resetar dados locais imediatamente
       setData({

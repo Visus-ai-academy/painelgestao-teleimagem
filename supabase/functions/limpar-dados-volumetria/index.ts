@@ -38,7 +38,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { error: volumetriaError, count: volumetriaCount } = await supabase
       .from('volumetria_mobilemed')
       .delete({ count: 'exact' })
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete todos os registros (usando condição que sempre é true)
+      .gt('created_at', '1900-01-01') // Condição que sempre é verdadeira para deletar todos
 
     if (volumetriaError) {
       console.error('❌ Erro ao deletar volumetria_mobilemed:', volumetriaError)
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { error: deParaError, count: deParaCount } = await supabase
       .from('valores_referencia_de_para')
       .delete({ count: 'exact' })
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+      .gt('created_at', '1900-01-01') // Condição que sempre é verdadeira
 
     if (!deParaError) {
       console.log(`🗑️ Removidos ${deParaCount || 0} registros de valores_referencia_de_para`)
