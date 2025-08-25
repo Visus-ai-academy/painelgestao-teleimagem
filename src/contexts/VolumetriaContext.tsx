@@ -353,16 +353,25 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     console.log('🧹 Limpando dados DEFINITIVOS do banco...');
     
     try {
-      // Usar edge function otimizada para limpeza em background
-      const { error: limparError } = await supabase.functions.invoke('limpar-dados-volumetria');
+      setData(prev => ({ ...prev, loading: true }));
+      
+      // Usar edge function otimizada para limpeza em background com timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na limpeza - operação demorou mais que 30 segundos')), 30000)
+      );
+      
+      const limparPromise = supabase.functions.invoke('limpar-dados-volumetria');
+      
+      const { data: responseData, error: limparError } = await Promise.race([limparPromise, timeoutPromise]) as any;
 
       if (limparError) {
         throw new Error(`Erro ao limpar volumetria: ${limparError.message}`);
       }
 
-      console.log('✅ Limpeza iniciada em background com sucesso!');
+      console.log('✅ Limpeza iniciada em background:', responseData);
       
-      // A edge function já cuida de limpar todas as tabelas relacionadas
+      // Aguardar um pouco para garantir que a limpeza começou
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
 
       // Resetar dados locais imediatamente
@@ -401,7 +410,47 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       
     } catch (error) {
       console.error('❌ Erro na limpeza centralizada:', error);
+      
+      console.log('🔄 Tentando limpeza alternativa direta no banco...');
+      
+      try {
+        // Fallback: limpeza direta se edge function falhar
+        console.log('🧹 Executando limpeza DIRETA nas tabelas...');
+        
+        // Limpar volumetria_mobilemed
+        const { error: volumetriaError, count: volumetriaCount } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos
+
+        if (volumetriaError) {
+          console.error('❌ Erro ao limpar volumetria_mobilemed:', volumetriaError);
+        } else {
+          console.log(`✅ ${volumetriaCount || 0} registros removidos de volumetria_mobilemed`);
+        }
+
+        // Limpar processamento_uploads
+        const { error: uploadsError, count: uploadsCount } = await supabase
+          .from('processamento_uploads')
+          .delete()
+          .in('tipo_arquivo', ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao']);
+
+        if (uploadsError) {
+          console.error('❌ Erro ao limpar processamento_uploads:', uploadsError);
+        } else {
+          console.log(`✅ ${uploadsCount || 0} registros removidos de processamento_uploads`);
+        }
+
+        console.log('✅ Limpeza alternativa concluída com sucesso');
+        
+      } catch (fallbackError) {
+        console.error('❌ Erro na limpeza alternativa:', fallbackError);
+        throw new Error(`Erro na limpeza: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      }
+      
       throw error;
+    } finally {
+      setData(prev => ({ ...prev, loading: false }));
     }
   };
 
