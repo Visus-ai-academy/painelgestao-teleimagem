@@ -8,6 +8,7 @@ import { AlertCircle, Download, Search, FileText } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 interface RegistroExcluido {
   id: string;
@@ -197,38 +198,82 @@ export function AnaliseRegistrosExcluidos() {
       return;
     }
 
-    const csvContent = [
-      // Cabeçalho
-      'Linha,Motivo,Detalhes,Empresa,Paciente,Estudo,Modalidade,Especialidade,Médico,Valores,Data_Realizacao,Data_Laudo',
-      // Dados  
-      ...registrosExcluidos.map(registro => {
-        const dados = registro.dados_originais || {};
-        return [
-          registro.linha_original,
-          registro.motivo_rejeicao,
-          `"${registro.detalhes_erro || ''}"`,
-          `"${dados.EMPRESA || ''}"`,
-          `"${dados.NOME_PACIENTE || ''}"`,
-          `"${dados.ESTUDO_DESCRICAO || ''}"`,
-          dados.MODALIDADE || '',
-          dados.ESPECIALIDADE || '',
-          `"${dados.MEDICO || ''}"`,
-          dados.VALORES || '',
-          dados.DATA_REALIZACAO || '',
-          dados.DATA_LAUDO || ''
-        ].join(',');
-      })
-    ].join('\n');
+    // Preparar dados para Excel
+    const dadosExcel = registrosExcluidos.map(registro => {
+      const dados = registro.dados_originais || {};
+      return {
+        'Linha': registro.linha_original,
+        'Motivo': registro.motivo_rejeicao,
+        'Detalhes': registro.detalhes_erro || '',
+        'Empresa': dados.EMPRESA || '',
+        'Paciente': dados.NOME_PACIENTE || '',
+        'Código Paciente': dados.CODIGO_PACIENTE || '',
+        'Estudo': dados.ESTUDO_DESCRICAO || '',
+        'Accession Number': dados.ACCESSION_NUMBER || '',
+        'Modalidade': dados.MODALIDADE || '',
+        'Prioridade': dados.PRIORIDADE || '',
+        'Especialidade': dados.ESPECIALIDADE || '',
+        'Médico': dados.MEDICO || '',
+        'Valores': dados.VALORES || '',
+        'Data Realização': dados.DATA_REALIZACAO || '',
+        'Data Laudo': dados.DATA_LAUDO || '',
+        'Categoria': dados.CATEGORIA || '',
+        'Data Exclusão': new Date(registro.created_at).toLocaleString('pt-BR')
+      };
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `registros_excluidos_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Criar workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Criar worksheet com os dados
+    const ws = XLSX.utils.json_to_sheet(dadosExcel);
+    
+    // Ajustar largura das colunas
+    const colWidths = [
+      { wch: 8 },   // Linha
+      { wch: 20 },  // Motivo
+      { wch: 30 },  // Detalhes
+      { wch: 15 },  // Empresa
+      { wch: 25 },  // Paciente
+      { wch: 15 },  // Código Paciente
+      { wch: 40 },  // Estudo
+      { wch: 15 },  // Accession Number
+      { wch: 12 },  // Modalidade
+      { wch: 12 },  // Prioridade
+      { wch: 15 },  // Especialidade
+      { wch: 25 },  // Médico
+      { wch: 10 },  // Valores
+      { wch: 15 },  // Data Realização
+      { wch: 15 },  // Data Laudo
+      { wch: 15 },  // Categoria
+      { wch: 18 }   // Data Exclusão
+    ];
+    ws['!cols'] = colWidths;
+
+    // Adicionar worksheet ao workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Registros Excluídos");
+
+    // Criar segunda aba com resumo por motivos
+    if (analiseMotivos.length > 0) {
+      const resumoMotivos = analiseMotivos.map(analise => ({
+        'Motivo': analise.motivo,
+        'Quantidade': analise.quantidade,
+        'Percentual': ((analise.quantidade / registrosExcluidos.length) * 100).toFixed(2) + '%'
+      }));
+      
+      const wsResumo = XLSX.utils.json_to_sheet(resumoMotivos);
+      wsResumo['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo por Motivos");
+    }
+
+    // Exportar arquivo
+    const fileName = `registros_excluidos_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({
+      title: "Exportação Concluída",
+      description: `Arquivo ${fileName} baixado com sucesso`,
+    });
   };
 
   useEffect(() => {
@@ -299,7 +344,7 @@ export function AnaliseRegistrosExcluidos() {
             {registrosExcluidos.length > 0 && (
               <Button onClick={exportarRegistros} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
-                Exportar CSV
+                Exportar Excel
               </Button>
             )}
           </div>
@@ -413,7 +458,7 @@ export function AnaliseRegistrosExcluidos() {
                 {registrosExcluidos.length > 100 && (
                   <p className="text-sm text-muted-foreground mt-4">
                     Mostrando primeiros 100 registros de {registrosExcluidos.length.toLocaleString()} total.
-                    Use a exportação CSV para ver todos os dados.
+                    Use a exportação Excel para ver todos os dados.
                   </p>
                 )}
               </CardContent>
