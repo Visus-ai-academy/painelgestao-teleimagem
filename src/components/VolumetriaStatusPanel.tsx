@@ -34,6 +34,17 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
       const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
       const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
+      // Primeiro verificar se existe algum upload no banco (debug)
+      const { data: allUploads, error: countError } = await supabase
+        .from('processamento_uploads')
+        .select('id, tipo_arquivo, status, created_at')
+        .limit(5);
+
+      console.log(`📊 Status do banco de uploads:`, {
+        totalUploadsNoBanco: allUploads?.length || 0,
+        uploads: allUploads || []
+      });
+
       // Buscar uploads de volumetria/mobilemed
       const { data, error } = await supabase
         .from('processamento_uploads')
@@ -73,6 +84,8 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
         // Se são do mesmo tipo, ordenar pela data (mais recente primeiro)
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
+      
+      console.log(`📊 Uploads de volumetria encontrados: ${sortedData.length}`);
       
       setUploadStats(sortedData);
     } catch (error) {
@@ -158,8 +171,18 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
       </CardHeader>
       <CardContent>
         {uploadStats.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            Nenhum upload realizado ainda
+          <div className="text-center py-8">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <AlertCircle className="h-8 w-8 text-amber-600 mx-auto mb-3" />
+              <h3 className="font-semibold text-amber-800 mb-2">Nenhum upload encontrado</h3>
+              <p className="text-amber-700 text-sm mb-4">
+                Não há registros de upload no período selecionado. 
+                Isso pode indicar que os dados foram limpos ou ainda não foram enviados.
+              </p>
+              <div className="text-xs text-amber-600 bg-amber-100 rounded p-2">
+                💡 <strong>Dica:</strong> Se você acabou de limpar os dados, faça um novo upload dos arquivos de volumetria.
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-2">
