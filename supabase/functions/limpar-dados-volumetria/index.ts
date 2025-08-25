@@ -32,48 +32,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // 1. LIMPAR TABELA volumetria_mobilemed EM LOTES MUITO PEQUENOS
-    console.log(`📊 Limpando volumetria_mobilemed em lotes ultra pequenos`)
+    // 1. LIMPAR TABELA volumetria_mobilemed - USANDO TRUNCATE (MUITO MAIS RÁPIDO)
+    console.log(`📊 Limpando volumetria_mobilemed usando TRUNCATE (bypassa triggers)`)
     
-    let removidosVolumetria = 0
-    let loteAtual = 1
-    const batchSize = 250 // Lotes ultra pequenos para evitar timeout
+    // Contar registros antes da limpeza
+    const { count: countAntes } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
     
-    while (true) {
-      console.log(`🗑️ Processando lote ${loteAtual} (${batchSize} registros)...`)
+    console.log(`📊 Total de registros para limpar: ${countAntes || 0}`)
+    
+    // TRUNCATE é muito mais rápido que DELETE para limpar toda a tabela
+    const { error: truncateError } = await supabase.rpc('exec_truncate_volumetria')
+    
+    if (truncateError) {
+      console.error('❌ Erro ao executar TRUNCATE, tentando DELETE simples:', truncateError)
       
-      const { error, count } = await supabase
+      // Fallback: DELETE simples sem condições
+      const { error: deleteError } = await supabase
         .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .limit(batchSize)
-
-      if (error) {
-        console.error(`❌ Erro no lote ${loteAtual}:`, error)
-        throw new Error(`Erro ao deletar lote ${loteAtual}: ${error.message}`)
-      }
-
-      const deletedCount = count || 0
-      removidosVolumetria += deletedCount
-      console.log(`✅ Lote ${loteAtual}: ${deletedCount} registros removidos (total: ${removidosVolumetria})`)
-
-      // Se deletou menos que o lote, não há mais registros
-      if (deletedCount < batchSize) {
-        break
-      }
-
-      loteAtual++
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // Condição que sempre é verdadeira
       
-      // Pausa maior entre lotes para não sobrecarregar o banco
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Limite de segurança aumentado devido a lotes menores
-      if (loteAtual > 200) {
-        console.log('⚠️ Limite de segurança atingido (200 lotes)')
-        break
+      if (deleteError) {
+        console.error('❌ Erro no DELETE fallback:', deleteError)
+        throw new Error(`Erro ao limpar volumetria: ${deleteError.message}`)
       }
     }
-
+    
+    // Contar registros após a limpeza
+    const { count: countDepois } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+    
+    const removidosVolumetria = (countAntes || 0) - (countDepois || 0)
     console.log(`🎉 VOLUMETRIA LIMPA: ${removidosVolumetria} registros removidos`)
+    
     totalRemovidoGeral += removidosVolumetria
     resultadosLimpeza.push({
       tabela: 'volumetria_mobilemed',
