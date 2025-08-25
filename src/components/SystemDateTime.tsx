@@ -6,9 +6,9 @@ import { CalendarDays, Clock, Database, Monitor } from 'lucide-react';
 
 interface SystemDateTimeData {
   clientDateTime: Date;
-  serverDateTime: string | null;
+  serverDateTime: Date | null;
   timezone: string;
-  databaseTimezone: string | null;
+  databaseTimezone: string;
   error?: string;
 }
 
@@ -17,61 +17,46 @@ export function SystemDateTime() {
     clientDateTime: new Date(),
     serverDateTime: null,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    databaseTimezone: null
+    databaseTimezone: 'UTC'
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchServerDateTime = async () => {
       try {
-        // Buscar data/hora do servidor usando uma query SQL
+        // Buscar data/hora atual do servidor inserindo um log de teste
         const { data, error } = await supabase
           .from('audit_logs')
+          .insert({
+            table_name: 'sistema',
+            operation: 'CHECK_DATETIME',
+            record_id: 'datetime_check',
+            user_email: 'system',
+            severity: 'info'
+          })
           .select('timestamp')
-          .limit(1);
+          .single();
 
-        if (error) {
-          console.error('Erro ao buscar data do servidor:', error);
+        if (error || !data) {
           setDateTimeInfo(prev => ({ 
             ...prev, 
             error: 'Erro ao conectar com o banco de dados',
             serverDateTime: null
           }));
-          return;
-        }
-
-        // Executar query direta para obter informações do banco
-        const { data: timeData, error: timeError } = await supabase.rpc('get_current_timestamp');
-        
-        if (timeError) {
-          // Fallback: usar NOW() diretamente
-          const { data: nowData, error: nowError } = await supabase
-            .from('audit_logs')
-            .select('id')
-            .limit(0); // Não queremos dados, só queremos executar a query
-
-          const serverTime = new Date().toISOString(); // Fallback para cliente
+        } else {
+          const serverTime = new Date(data.timestamp);
           
           setDateTimeInfo(prev => ({
             ...prev,
             serverDateTime: serverTime,
-            databaseTimezone: 'UTC (assumido)',
-            error: nowError ? 'Falha na conexão com banco' : undefined
-          }));
-        } else {
-          setDateTimeInfo(prev => ({
-            ...prev,
-            serverDateTime: timeData || new Date().toISOString(),
-            databaseTimezone: 'UTC',
             error: undefined
           }));
         }
       } catch (err) {
-        console.error('Erro geral:', err);
+        console.error('Erro:', err);
         setDateTimeInfo(prev => ({ 
           ...prev, 
-          error: 'Erro de conexão',
-          serverDateTime: new Date().toISOString()
+          error: 'Erro de conexão'
         }));
       } finally {
         setLoading(false);
@@ -91,20 +76,19 @@ export function SystemDateTime() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatDateTime = (date: Date | string) => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const formatDateTime = (date: Date) => {
     return {
-      date: dateObj.toLocaleDateString('pt-BR', {
+      date: date.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
       }),
-      time: dateObj.toLocaleTimeString('pt-BR', {
+      time: date.toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
       }),
-      year: dateObj.getFullYear()
+      year: date.getFullYear()
     };
   };
 
@@ -112,7 +96,7 @@ export function SystemDateTime() {
   const serverFormatted = dateTimeInfo.serverDateTime ? formatDateTime(dateTimeInfo.serverDateTime) : null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       {/* Data/Hora do Cliente (Frontend) */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -120,17 +104,17 @@ export function SystemDateTime() {
             <Monitor className="h-4 w-4" />
             Sistema Cliente (Frontend)
           </CardTitle>
-          <Badge variant="outline" className="bg-blue-50">
+          <Badge variant="outline" className="bg-primary/10 text-primary">
             Ano {clientFormatted.year}
           </Badge>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-2xl font-bold">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
+              <CalendarDays className="h-5 w-5 text-primary" />
               {clientFormatted.date}
             </div>
-            <div className="flex items-center gap-2 text-xl font-semibold text-blue-600">
+            <div className="flex items-center gap-2 text-xl font-semibold text-primary">
               <Clock className="h-4 w-4" />
               {clientFormatted.time}
             </div>
@@ -149,7 +133,7 @@ export function SystemDateTime() {
             Sistema Servidor (Backend/DB)
           </CardTitle>
           {serverFormatted && (
-            <Badge variant="outline" className="bg-green-50">
+            <Badge variant="outline" className="bg-green-100 text-green-700">
               Ano {serverFormatted.year}
             </Badge>
           )}
@@ -157,12 +141,12 @@ export function SystemDateTime() {
         <CardContent>
           {loading ? (
             <div className="text-center py-4">
-              <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
               <p className="text-sm text-muted-foreground mt-2">Consultando servidor...</p>
             </div>
           ) : dateTimeInfo.error ? (
             <div className="space-y-2">
-              <div className="text-red-600 font-medium">
+              <div className="text-destructive font-medium">
                 ❌ {dateTimeInfo.error}
               </div>
               <div className="text-sm text-muted-foreground">
@@ -180,7 +164,7 @@ export function SystemDateTime() {
                 {serverFormatted.time}
               </div>
               <div className="text-sm text-muted-foreground">
-                Timezone: {dateTimeInfo.databaseTimezone || 'UTC'}
+                Timezone: {dateTimeInfo.databaseTimezone}
               </div>
             </div>
           ) : (

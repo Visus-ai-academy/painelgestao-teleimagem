@@ -4077,6 +4077,10 @@ export type Database = {
           valor_medio_exame: number
         }[]
       }
+      get_current_timestamp: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_laudos_atrasados_completos: {
         Args: Record<PropertyKey, never>
         Returns: {

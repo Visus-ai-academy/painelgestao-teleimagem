@@ -15,6 +15,7 @@ import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraProcessamento';
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
+import { SystemDateTime } from '@/components/SystemDateTime';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,6 +33,9 @@ export default function DadosVolumetria() {
         <h1 className="text-3xl font-bold text-gray-900">Dados para Volumetria</h1>
         <p className="text-gray-600 mt-1">Upload e processamento dos dados MobileMed com regras automáticas v002, v003, v031</p>
       </div>
+
+      {/* Data e Hora do Sistema */}
+      <SystemDateTime />
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
