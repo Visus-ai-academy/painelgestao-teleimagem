@@ -594,23 +594,149 @@ const ArquiteturaProjeto = () => {
               </TabsList>
 
         <TabsContent value="sistema" className="mt-6">
-          <div className="space-y-4">
-            <div className="bg-background/95 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-3">🎯 Status Atual do Processamento</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <h4 className="font-medium text-green-600">✅ TRIGGERS ATIVOS (3)</h4>
-                  <ul className="mt-1 space-y-1 text-muted-foreground">
-                    <li>• trigger_processamento_automatico_volumetria</li>
-                    <li>• trigger_data_referencia</li>
-                    <li>• set_data_referencia_trigger</li>
-                  </ul>
+          <div className="space-y-6">
+            <div className="bg-background/95 border rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">🎯 Status Atual do Processamento - Sistema Totalmente Automático</h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-green-600 mb-2">✅ TRIGGERS ATIVOS (4 Essenciais)</h4>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>• trigger_processamento_automatico_volumetria</span>
+                        <span className="text-green-600 font-medium">ATIVO</span>
+                      </div>
+                      <div className="text-xs ml-4 text-muted-foreground">
+                        Função: trigger_aplicar_regras_completas() - Aplica todas as 8 regras unificadas
+                      </div>
+                      <div className="flex justify-between">
+                        <span>• trigger_data_referencia</span>
+                        <span className="text-green-600 font-medium">ATIVO</span>
+                      </div>
+                      <div className="text-xs ml-4 text-muted-foreground">
+                        Função: trigger_aplicar_data_referencia() - Define data de referência
+                      </div>
+                      <div className="flex justify-between">
+                        <span>• set_data_referencia_trigger</span>
+                        <span className="text-green-600 font-medium">ATIVO</span>
+                      </div>
+                      <div className="text-xs ml-4 text-muted-foreground">
+                        Função: set_data_referencia_volumetria() - Backup para data de referência
+                      </div>
+                      <div className="flex justify-between">
+                        <span>• update_volumetria_mobilemed_updated_at</span>
+                        <span className="text-green-600 font-medium">ATIVO</span>
+                      </div>
+                      <div className="text-xs ml-4 text-muted-foreground">
+                        Função: update_updated_at_column() - Atualiza timestamps
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium text-blue-600 mb-2">📋 REGRAS APLICADAS AUTOMATICAMENTE (8)</h4>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div>1. Normalização nome do cliente</div>
+                      <div>2. Correção de modalidades (CR/DX→RX/MG, OT→DO)</div>
+                      <div>3. De-Para para valores zerados</div>
+                      <div>4. Aplicação de categorias do cadastro de exames</div>
+                      <div>5. Categoria especial para arquivo onco</div>
+                      <div>6. Definição de tipo de faturamento</div>
+                      <div>7. Normalização de médico</div>
+                      <div>8. Lógica de quebra automática</div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-medium text-orange-600">📋 EDGE FUNCTIONS EXISTENTES (100+)</h4>
-                  <p className="text-muted-foreground mt-1">Todas existem mas NÃO são usadas no fluxo automático atual</p>
-                  <p className="text-xs mt-2 text-muted-foreground">Ex: aplicar-correcao-modalidade-ot, aplicar-exclusoes-periodo, processar-volumetria-otimizado, etc.</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-orange-600 mb-2">🔧 EDGE FUNCTIONS EXISTENTES (100+)</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Todas existem mas <strong>NÃO são usadas</strong> no fluxo automático atual. 
+                      Disponíveis para processamento manual ou casos especiais.
+                    </p>
+                    
+                    <div className="max-h-64 overflow-y-auto space-y-1 text-xs">
+                      <div className="font-medium text-gray-700 mb-2">Principais Edge Functions:</div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span>• aplicar-correcao-modalidade-ot</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-correcao-modalidade-rx</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-exclusoes-periodo</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-filtro-periodo-atual</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-regras-lote</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-substituicao-especialidade-categoria</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-tipificacao-faturamento</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• aplicar-validacao-cliente</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• buscar-valor-onco</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• gerar-faturamento-periodo</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• limpar-dados-volumetria</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• processar-volumetria-otimizado</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• processar-clientes</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• processar-contratos</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• sincronizar-omie</span>
+                          <span className="text-orange-500">MANUAL</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground italic mt-2">
+                          + 85 outras Edge Functions disponíveis...
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </div>
+              
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-medium text-green-800 mb-2">🎉 RESUMO: Processamento 100% Automático</h4>
+                <p className="text-sm text-green-700">
+                  Sistema configurado para processamento <strong>totalmente automático</strong> via triggers. 
+                  Todas as regras são aplicadas instantaneamente quando dados são inseridos na tabela volumetria_mobilemed, 
+                  sem necessidade de Edge Functions manuais.
+                </p>
               </div>
             </div>
             
@@ -633,7 +759,7 @@ const ArquiteturaProjeto = () => {
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
             <p><strong>Fluxo Principal:</strong> Upload → Processamento AUTOMÁTICO → Aplicação Tipos → Volumetria → Faturamento → Saídas</p>
-            <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+            <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro | Verde = Automático | Laranja = Manual</p>
           </div>
         </TabsContent>
 
