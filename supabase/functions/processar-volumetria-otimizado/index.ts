@@ -474,25 +474,55 @@ serve(async (req) => {
 
         // Inserir registros válidos do batch
         if (batchValidRecords.length > 0) {
-          const { error: insertError } = await supabaseClient
+          console.log(`🔄 Tentando inserir batch de ${batchValidRecords.length} registros...`);
+          console.log(`📝 Amostra do primeiro registro:`, JSON.stringify(batchValidRecords[0], null, 2));
+          
+          const { data: insertData, error: insertError } = await supabaseClient
             .from('volumetria_mobilemed')
-            .insert(batchValidRecords);
+            .insert(batchValidRecords)
+            .select('id');
 
           if (insertError) {
-            console.error(`❌ Erro ao inserir batch:`, insertError);
+            console.error(`❌ ERRO DETALHADO ao inserir batch:`, {
+              message: insertError.message,
+              code: insertError.code,
+              details: insertError.details,
+              hint: insertError.hint
+            });
+            
+            // Tentar inserir um registro individual para diagnóstico
+            console.log(`🔍 Tentativa de diagnóstico - inserindo registro individual...`);
+            const { data: singleData, error: singleError } = await supabaseClient
+              .from('volumetria_mobilemed')
+              .insert([batchValidRecords[0]])
+              .select('id');
+              
+            if (singleError) {
+              console.error(`❌ ERRO no registro individual:`, {
+                message: singleError.message,
+                code: singleError.code,
+                details: singleError.details,
+                hint: singleError.hint,
+                registro: JSON.stringify(batchValidRecords[0], null, 2)
+              });
+            } else {
+              console.log(`✅ Registro individual inserido com sucesso:`, singleData);
+            }
+            
             // Adicionar todos os registros do batch como rejeitados
             for (let i = 0; i < batchValidRecords.length; i++) {
               registrosRejeitados.push({
                 linha_original: batchStart + i + 1,
                 dados_originais: batchValidRecords[i],
                 motivo_rejeicao: 'ERRO_INSERCAO_BANCO',
-                detalhes_erro: insertError.message
+                detalhes_erro: `${insertError.code}: ${insertError.message}`
               });
             }
             totalErros += batchValidRecords.length;
           } else {
             totalInseridos += batchValidRecords.length;
-            console.log(`✅ Batch inserido: ${batchValidRecords.length} registros`);
+            console.log(`✅ Batch inserido com sucesso: ${batchValidRecords.length} registros`);
+            console.log(`✅ IDs inseridos: ${insertData?.map(d => d.id).slice(0, 3)}...`);
           }
         }
       }
