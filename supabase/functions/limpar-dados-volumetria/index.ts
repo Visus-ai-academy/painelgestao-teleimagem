@@ -32,12 +32,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // 1. LIMPAR TABELA volumetria_mobilemed EM LOTES PEQUENOS
-    console.log(`📊 Limpando volumetria_mobilemed em lotes pequenos`)
+    // 1. LIMPAR TABELA volumetria_mobilemed EM LOTES MUITO PEQUENOS
+    console.log(`📊 Limpando volumetria_mobilemed em lotes ultra pequenos`)
     
     let removidosVolumetria = 0
     let loteAtual = 1
-    const batchSize = 1000 // Lotes menores para evitar timeout
+    const batchSize = 250 // Lotes ultra pequenos para evitar timeout
     
     while (true) {
       console.log(`🗑️ Processando lote ${loteAtual} (${batchSize} registros)...`)
@@ -63,12 +63,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       loteAtual++
       
-      // Pausa entre lotes para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Pausa maior entre lotes para não sobrecarregar o banco
+      await new Promise(resolve => setTimeout(resolve, 300))
       
-      // Limite de segurança para evitar loop infinito
-      if (loteAtual > 100) {
-        console.log('⚠️ Limite de segurança atingido (100 lotes)')
+      // Limite de segurança aumentado devido a lotes menores
+      if (loteAtual > 200) {
+        console.log('⚠️ Limite de segurança atingido (200 lotes)')
         break
       }
     }
