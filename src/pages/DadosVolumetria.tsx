@@ -16,8 +16,10 @@ import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraPro
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
 import { SystemDateTime } from '@/components/SystemDateTime';
+import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUploadStatus } from "@/hooks/useUploadStatus";
 
 // Período atual - onde estão os dados carregados (junho/2025)
 const PERIODO_ATUAL = "2025-06";
@@ -26,6 +28,13 @@ export default function DadosVolumetria() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
   const { toast } = useToast();
+  const { status: uploadStatus, refresh: refreshUploadData } = useUploadStatus([
+    'volumetria_padrao', 
+    'volumetria_fora_padrao', 
+    'volumetria_padrao_retroativo', 
+    'volumetria_fora_padrao_retroativo',
+    'volumetria_onco_padrao'
+  ]);
 
   return (
     <div className="space-y-6">
@@ -137,8 +146,24 @@ export default function DadosVolumetria() {
               <CardHeader>
                 <CardTitle>Status dos Uploads</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <VolumetriaStatusPanel />
+                
+                {/* Detectar e resetar uploads travados */}
+                {uploadStatus.processingUploads > 0 && uploadStatus.progressPercentage < 50 && (
+                  <LimparUploadTravado
+                    uploadId="57f5e609-a624-4712-999d-cf87f1b4762c"
+                    fileName="relatorio_exames_especialidade_junho_padrao.xlsx"
+                    onSuccess={() => {
+                      refreshUploadData();
+                      setRefreshUploadStatus(prev => prev + 1);
+                      toast({
+                        title: "Upload Resetado",
+                        description: "Você pode fazer o upload do arquivo novamente.",
+                      });
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
 
