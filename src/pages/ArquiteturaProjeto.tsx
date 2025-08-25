@@ -39,13 +39,13 @@ const ArquiteturaProjeto = () => {
       style: { backgroundColor: '#e5e7eb', borderColor: '#6b7280', width: 160, height: 70 }
     },
 
-    // PROCESSAMENTO
+    // PROCESSAMENTO AUTOMÁTICO
     {
       id: 'processamento-volumetria',
       type: 'default',
       position: { x: 150, y: 220 },
-      data: { label: '⚙️ PROCESSAMENTO\nREGRAS & TRATAMENTOS' },
-      style: { backgroundColor: '#f59e0b', color: 'white', borderColor: '#d97706', width: 180, height: 70 }
+      data: { label: '⚙️ PROCESSAMENTO AUTOMÁTICO\nVIA TRIGGERS\n(8 Regras Unificadas)' },
+      style: { backgroundColor: '#10b981', color: 'white', borderColor: '#059669', width: 180, height: 80 }
     },
     {
       id: 'tipo-cliente-faturamento',
@@ -175,7 +175,16 @@ const ArquiteturaProjeto = () => {
       style: { backgroundColor: '#1f2937', color: 'white', borderColor: '#374151', width: 100, height: 60 }
     },
 
-    // ÁREAS FUNCIONAIS
+    // STATUS ATUAL DO PROCESSAMENTO
+    {
+      id: 'status-processamento',
+      type: 'default',
+      position: { x: 350, y: 220 },
+      data: { label: '✅ PROCESSAMENTO\nTOTALMENTE AUTOMÁTICO\n• 3 Triggers Ativos\n• 0 Edge Functions Manuais' },
+      style: { backgroundColor: '#059669', color: 'white', borderColor: '#047857', width: 200, height: 90 }
+    },
+
+    // ÁREAS FUNCIONAIS  
     {
       id: 'gestao-escalas',
       type: 'default',
@@ -221,11 +230,14 @@ const ArquiteturaProjeto = () => {
   ], []);
 
   const sistemaEdges: Edge[] = useMemo(() => [
-    // Fluxo principal de dados
-    { id: 'e1', source: 'upload-volumetria', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#f59e0b' } },
+    // Fluxo principal de dados (AUTOMÁTICO VIA TRIGGERS)
+    { id: 'e1', source: 'upload-volumetria', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
     { id: 'e2', source: 'mobilemed-futuro', target: 'processamento-volumetria', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#6b7280', strokeDasharray: '5,5' } },
     { id: 'e3', source: 'processamento-volumetria', target: 'tipo-cliente-faturamento', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#dc2626' } },
     { id: 'e4', source: 'tipo-cliente-faturamento', target: 'volumetria-periodo', type: 'smoothstep', style: { strokeWidth: 3, stroke: '#10b981' } },
+    
+    // Status do processamento
+    { id: 'e_status', source: 'processamento-volumetria', target: 'status-processamento', type: 'smoothstep', style: { strokeWidth: 2, stroke: '#059669' } },
     
     // Conexões com cadastros
     { id: 'e5', source: 'cadastros', target: 'clientes', type: 'smoothstep', style: { stroke: '#3b82f6' } },
@@ -581,28 +593,49 @@ const ArquiteturaProjeto = () => {
                 <TabsTrigger value="arquitetura">🏗️ Arquitetura Técnica</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="sistema" className="mt-6">
-                <div className="h-[800px] w-full border rounded-lg bg-gray-50">
-                  <ReactFlow
-                    nodes={sistemaNodesState}
-                    edges={sistemaEdgesState}
-                    onNodesChange={onSistemaNodesChange}
-                    onEdgesChange={onSistemaEdgesChange}
-                    onConnect={onSistemaConnect}
-                    nodeTypes={nodeTypes}
-                    fitView
-                    attributionPosition="top-right"
-                  >
-                    <MiniMap />
-                    <Controls />
-                    <Background gap={12} size={1} />
-                  </ReactFlow>
+        <TabsContent value="sistema" className="mt-6">
+          <div className="space-y-4">
+            <div className="bg-background/95 border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-3">🎯 Status Atual do Processamento</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <h4 className="font-medium text-green-600">✅ TRIGGERS ATIVOS (3)</h4>
+                  <ul className="mt-1 space-y-1 text-muted-foreground">
+                    <li>• trigger_processamento_automatico_volumetria</li>
+                    <li>• trigger_data_referencia</li>
+                    <li>• set_data_referencia_trigger</li>
+                  </ul>
                 </div>
-                <div className="mt-4 text-sm text-muted-foreground">
-                  <p><strong>Fluxo Principal:</strong> Upload → Processamento → Aplicação Tipos → Volumetria → Faturamento → Saídas</p>
-                  <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+                <div>
+                  <h4 className="font-medium text-orange-600">📋 EDGE FUNCTIONS EXISTENTES (100+)</h4>
+                  <p className="text-muted-foreground mt-1">Todas existem mas NÃO são usadas no fluxo automático atual</p>
+                  <p className="text-xs mt-2 text-muted-foreground">Ex: aplicar-correcao-modalidade-ot, aplicar-exclusoes-periodo, processar-volumetria-otimizado, etc.</p>
                 </div>
-              </TabsContent>
+              </div>
+            </div>
+            
+            <div className="h-[800px] w-full border rounded-lg bg-gray-50">
+              <ReactFlow
+                nodes={sistemaNodesState}
+                edges={sistemaEdgesState}
+                onNodesChange={onSistemaNodesChange}
+                onEdgesChange={onSistemaEdgesChange}
+                onConnect={onSistemaConnect}
+                nodeTypes={nodeTypes}
+                fitView
+                attributionPosition="top-right"
+              >
+                <MiniMap />
+                <Controls />
+                <Background gap={12} size={1} />
+              </ReactFlow>
+            </div>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground">
+            <p><strong>Fluxo Principal:</strong> Upload → Processamento AUTOMÁTICO → Aplicação Tipos → Volumetria → Faturamento → Saídas</p>
+            <p><strong>Legenda:</strong> Linhas sólidas = Implementado | Linhas tracejadas = Futuro</p>
+          </div>
+        </TabsContent>
 
               <TabsContent value="integracoes" className="mt-6">
                 <div className="h-[600px] w-full border rounded-lg bg-gray-50">
