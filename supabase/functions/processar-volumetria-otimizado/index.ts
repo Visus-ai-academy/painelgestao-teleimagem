@@ -66,7 +66,19 @@ serve(async (req) => {
 
     const { data: stagingData, uploadId, arquivo_fonte = 'volumetria_padrao' } = await req.json();
     
-    console.log(`🚀 PROCESSAMENTO INICIADO - ${stagingData?.length || 0} registros`);
+    console.log(`🚀 PROCESSAMENTO INICIADO - Dados recebidos:`);
+    console.log(`📋 Upload ID: ${uploadId}`);
+    console.log(`📋 Arquivo fonte: ${arquivo_fonte}`);
+    console.log(`📋 Staging data length: ${stagingData?.length || 0}`);
+    console.log(`📋 Tipo de dados: ${typeof stagingData}`);
+    console.log(`📋 É array: ${Array.isArray(stagingData)}`);
+    
+    if (stagingData && stagingData.length > 0) {
+      console.log(`📋 Amostra do primeiro registro:`, JSON.stringify(stagingData[0], null, 2));
+      console.log(`📋 Campos disponíveis no primeiro registro:`, Object.keys(stagingData[0] || {}));
+    } else {
+      console.log(`❌ PROBLEMA: stagingData está vazio ou inválido`);
+    }
 
     if (!stagingData || !Array.isArray(stagingData)) {
       throw new Error('Dados de staging inválidos');
@@ -261,6 +273,14 @@ serve(async (req) => {
           const record = converterCamposData(recordOriginal); // Aplicar conversão de datas
           const linhaOriginal = batchStart + i + 1;
           totalProcessados++;
+          
+          console.log(`🔍 Processando registro ${linhaOriginal}:`, {
+            EMPRESA: record.EMPRESA,
+            NOME_PACIENTE: record.NOME_PACIENTE?.substring(0, 20) + '...',
+            DATA_REALIZACAO: record.DATA_REALIZACAO,
+            DATA_LAUDO: record.DATA_LAUDO,
+            VALORES: record.VALORES
+          });
 
           // Validação de data baseada no tipo de arquivo e período de referência
           if (record.DATA_LAUDO || record.DATA_REALIZACAO) {
