@@ -157,8 +157,8 @@ export function AnaliseRegistrosExcluidos() {
   const investigarProblemasSilenciosos = async () => {
     setLoading(true);
     try {
-      // Invocar função para investigar registros que podem ter sido excluídos silenciosamente
-      const { data, error } = await supabase.functions.invoke('corrigir-dados-exclusao');
+      // Invocar nova função específica para investigar exclusões silenciosas
+      const { data, error } = await supabase.functions.invoke('investigar-exclusoes-silenciosas');
 
       if (error) {
         console.error('Erro ao investigar:', error);
@@ -168,13 +168,25 @@ export function AnaliseRegistrosExcluidos() {
           variant: "destructive"
         });
       } else {
-        toast({
-          title: "Investigação Concluída",
-          description: `Encontrados ${data?.registros_processados || 0} registros com problemas`,
-        });
+        console.log('Resultado da investigação:', data);
         
-        // Recarregar dados após investigação
-        await fetchRegistrosExcluidos();
+        if (data.sucesso) {
+          const resumo = data.resumo;
+          const motivos = data.motivos_exclusao || [];
+          
+          toast({
+            title: "Investigação Concluída",
+            description: `Identificados ${resumo.registros_excluidos} registros excluídos (${resumo.taxa_exclusao}). Principais motivos: ${motivos.slice(0, 2).map(m => m.motivo).join(', ')}`,
+          });
+          
+          // Recarregar dados após investigação
+          await fetchRegistrosExcluidos();
+        } else {
+          toast({
+            title: "Nenhum Problema Encontrado",
+            description: data.erro || "Não foram identificadas exclusões silenciosas",
+          });
+        }
       }
     } catch (error) {
       console.error('Erro:', error);
@@ -355,10 +367,15 @@ export function AnaliseRegistrosExcluidos() {
               <p className="text-muted-foreground mb-4">
                 Nenhum registro excluído encontrado na tabela de rejeitados.
               </p>
-              <p className="text-sm text-muted-foreground">
-                Isso pode indicar que as exclusões foram feitas por filtros automáticos sem registro detalhado.
-                Use o botão "Investigar Exclusões" para analisar possíveis exclusões silenciosas.
+              <p className="text-sm text-muted-foreground mb-4">
+                <strong>O que significa isso:</strong>
               </p>
+              <div className="text-left max-w-md mx-auto space-y-2 text-sm text-muted-foreground">
+                <div>• <strong>2558 registros foram excluídos</strong> durante o processamento</div>
+                <div>• As exclusões ocorreram por <strong>filtros automáticos</strong> ou regras de negócio</div>
+                <div>• Os registros foram rejeitados <strong>silenciosamente</strong> sem detalhamento</div>
+                <div>• Use o botão "Investigar Exclusões" para identificar os motivos específicos</div>
+              </div>
             </div>
           )}
         </CardContent>

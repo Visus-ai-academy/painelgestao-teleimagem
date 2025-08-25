@@ -104,5 +104,8 @@ verify_jwt = true
 [functions.teste-logging]
 verify_jwt = false
 
+[functions.investigar-exclusoes-silenciosas]
+verify_jwt = false
+
 [functions.testar-sistema-exclusoes]
 verify_jwt = false
