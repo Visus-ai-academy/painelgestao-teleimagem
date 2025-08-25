@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload,
   BarChart3,
-  Settings
+  Settings,
+  Activity
 } from "lucide-react";
 import { VolumetriaUpload } from "@/components/VolumetriaUpload";
 import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPeriodoSelector";
@@ -13,6 +14,7 @@ import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/Volume
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraProcessamento';
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
+import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,15 +30,19 @@ export default function DadosVolumetria() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dados para Volumetria</h1>
-        <p className="text-gray-600 mt-1">Upload e processamento dos dados MobileMed para geração da volumetria</p>
+        <p className="text-gray-600 mt-1">Upload e processamento dos dados MobileMed com regras automáticas v002, v003, v031</p>
       </div>
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
+            </TabsTrigger>
+            <TabsTrigger value="monitoramento" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Monitoramento
             </TabsTrigger>
             <TabsTrigger value="status-regras" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -154,6 +160,10 @@ export default function DadosVolumetria() {
                 <VolumetriaExamesNaoIdentificados />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="monitoramento">
+            <MonitoramentoExclusoes titulo="Monitoramento em Tempo Real - Regras v002, v003, v031" />
           </TabsContent>
 
           <TabsContent value="status-regras">
