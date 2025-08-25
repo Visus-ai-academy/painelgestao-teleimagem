@@ -488,8 +488,8 @@ serve(async (req) => {
                 motivo_rejeicao: 'ERRO_INSERCAO_BANCO',
                 detalhes_erro: insertError.message
               });
-              totalErros++;
             }
+            totalErros += batchValidRecords.length;
           } else {
             totalInseridos += batchValidRecords.length;
             console.log(`✅ Batch inserido: ${batchValidRecords.length} registros`);
@@ -590,7 +590,15 @@ serve(async (req) => {
             total_processado: totalProcessados,
             total_inserido: totalInseridos,
             total_erros: totalErros,
-            regras_aplicadas: 0
+            regras_aplicadas: 0,
+            debug_paciente: {
+              nome: stagingData[0]?.NOME_PACIENTE || 'N/A',
+              encontrados_no_arquivo: stagingData.length,
+              preparados_para_insercao: totalInseridos + totalErros,
+              inseridos: totalInseridos,
+              descartados_por_campos_obrigatorios: 0,
+              descartados_por_corte_data_laudo: 0
+            }
           }
         })
         .eq('id', uploadId);
