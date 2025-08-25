@@ -7,6 +7,7 @@ import { useVolumetria } from '@/contexts/VolumetriaContext';
 import { processVolumetriaFile, processVolumetriaOtimizado, VOLUMETRIA_UPLOAD_CONFIGS } from '@/lib/volumetriaUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessarArquivoCompleto } from '@/components/ProcessarArquivoCompleto';
+import { MonitorRegrasTempoReal } from '@/components/MonitorRegrasTempoReal';
 import { Upload, FileText, CheckCircle, Lock, Zap } from 'lucide-react';
 
 interface VolumetriaUploadProps {
@@ -24,6 +25,8 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
     total: number;
     inserted: number;
   } | null>(null);
+  const [currentLoteUpload, setCurrentLoteUpload] = useState<string | null>(null);
+  const [regrasCompletas, setRegrasCompletas] = useState<{total: number, aplicadas: number} | null>(null);
   const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
   const [showProcessarCompleto, setShowProcessarCompleto] = useState(false);
   const [isLimitedProcessing, setIsLimitedProcessing] = useState(false);
@@ -100,6 +103,10 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
       console.log(`🚀 Iniciando processamento para ${arquivoFonte}...`);
       
+      // Gerar lote único para o upload
+      const loteUpload = `${arquivoFonte}_${Date.now()}`;
+      setCurrentLoteUpload(loteUpload);
+      
       // SEMPRE usar processamento otimizado para garantir que todos os registros sejam processados
       const result = await processVolumetriaOtimizado(
         file,
@@ -143,6 +150,8 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
       });
     } finally {
       setIsProcessing(false);
+      setCurrentLoteUpload(null);
+      setRegrasCompletas(null);
       // Reset input
       event.target.value = '';
     }
@@ -214,6 +223,30 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
               <span>Inseridas: {stats.inserted}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Monitor de Regras em Tempo Real */}
+      {isProcessing && currentLoteUpload && (
+        <MonitorRegrasTempoReal
+          loteUpload={currentLoteUpload}
+          arquivoFonte={arquivoFonte}
+          isProcessing={isProcessing}
+          onRegrasCompletas={(total, aplicadas) => {
+            setRegrasCompletas({ total, aplicadas });
+          }}
+        />
+      )}
+
+      {/* Resumo das Regras Aplicadas */}
+      {regrasCompletas && !isProcessing && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+          <div className="font-medium text-green-800">
+            ✅ Regras aplicadas: {regrasCompletas.aplicadas}/{regrasCompletas.total}
+          </div>
+          <div className="text-green-600">
+            {Math.round((regrasCompletas.aplicadas / regrasCompletas.total) * 100)}% de cobertura das regras
+          </div>
         </div>
       )}
 
