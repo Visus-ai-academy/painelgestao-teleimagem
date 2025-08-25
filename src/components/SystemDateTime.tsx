@@ -24,31 +24,26 @@ export function SystemDateTime() {
   useEffect(() => {
     const fetchServerDateTime = async () => {
       try {
-        // Buscar data/hora atual do servidor inserindo um log de teste
+        // Usar a função RPC para obter timestamp do servidor
         const { data, error } = await supabase
-          .from('audit_logs')
-          .insert({
-            table_name: 'sistema',
-            operation: 'CHECK_DATETIME',
-            record_id: 'datetime_check',
-            user_email: 'system',
-            severity: 'info'
-          })
-          .select('timestamp')
-          .single();
+          .rpc('get_current_timestamp');
 
-        if (error || !data) {
+        if (error) {
+          console.error('RPC Error:', error);
           setDateTimeInfo(prev => ({ 
             ...prev, 
             error: 'Erro ao conectar com o banco de dados',
             serverDateTime: null
           }));
         } else {
-          const serverTime = new Date(data.timestamp);
+          // Parse do JSON retornado pela função
+          const serverInfo = JSON.parse(data);
+          const serverTime = new Date(serverInfo.current_timestamp);
           
           setDateTimeInfo(prev => ({
             ...prev,
             serverDateTime: serverTime,
+            databaseTimezone: serverInfo.timezone || 'UTC',
             error: undefined
           }));
         }
