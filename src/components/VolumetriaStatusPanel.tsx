@@ -29,23 +29,70 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
 
   const fetchUploadStats = async () => {
     try {
-      // Limitar pela janela do mês selecionado
+      // Buscar uploads de volumetria mais recentes (últimas 24 horas)
+      const last24Hours = new Date();
+      last24Hours.setDate(last24Hours.getDate() - 1);
+
+      // Primeiro verificar uploads recentes
+      const { data: recentUploads, error: recentError } = await supabase
+        .from('processamento_uploads')
+        .select('*')
+        .in('tipo_arquivo', [
+          'volumetria_padrao', 
+          'volumetria_fora_padrao', 
+          'volumetria_padrao_retroativo', 
+          'volumetria_fora_padrao_retroativo',
+          'volumetria_onco_padrao'
+        ])
+        .gte('created_at', last24Hours.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (recentError) throw recentError;
+
+      console.log(`📊 Uploads recentes (24h):`, {
+        total: recentUploads?.length || 0,
+        uploads: recentUploads?.map(u => ({
+          id: u.id,
+          tipo: u.tipo_arquivo,
+          status: u.status,
+          processados: u.registros_processados,
+          inseridos: u.registros_inseridos,
+          erros: u.registros_erro,
+          created_at: u.created_at
+        })) || []
+      });
+
+      // Se há uploads recentes, usar eles
+      if (recentUploads && recentUploads.length > 0) {
+        const sortedData = recentUploads.sort((a, b) => {
+          const orderedTypes = [
+            'volumetria_padrao', 
+            'volumetria_fora_padrao', 
+            'volumetria_padrao_retroativo', 
+            'volumetria_fora_padrao_retroativo',
+            'volumetria_onco_padrao'
+          ];
+          
+          const indexA = orderedTypes.indexOf(a.tipo_arquivo);
+          const indexB = orderedTypes.indexOf(b.tipo_arquivo);
+          
+          if (indexA !== indexB) {
+            return indexA - indexB;
+          }
+          
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        
+        setUploadStats(sortedData);
+        return;
+      }
+
+      // Fallback: buscar no período selecionado
       const baseDate = selectedDate || new Date();
       const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
       const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      // Primeiro verificar se existe algum upload no banco (debug)
-      const { data: allUploads, error: countError } = await supabase
-        .from('processamento_uploads')
-        .select('id, tipo_arquivo, status, created_at')
-        .limit(5);
-
-      console.log(`📊 Status do banco de uploads:`, {
-        totalUploadsNoBanco: allUploads?.length || 0,
-        uploads: allUploads || []
-      });
-
-      // Buscar uploads de volumetria/mobilemed
       const { data, error } = await supabase
         .from('processamento_uploads')
         .select('*')
@@ -59,7 +106,7 @@ export function VolumetriaStatusPanel({ refreshTrigger }: { refreshTrigger?: num
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false })
-        .limit(100000); // Removida limitação - volumes altos
+        .limit(100);
 
       if (error) throw error;
 
