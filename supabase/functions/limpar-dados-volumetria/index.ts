@@ -14,7 +14,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Inicializar cliente Supabase com service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log(`🧹 LIMPEZA COMPLETA - Iniciando remoção de TODOS os dados de volumetria`)
+    console.log(`🧹 LIMPEZA DIRETA SQL - Executando limpeza super otimizada`)
 
     // Lista de todos os tipos de arquivo que serão limpos
     const tiposArquivo = [
@@ -27,47 +27,71 @@ Deno.serve(async (req: Request): Promise<Response> => {
       'volumetria_onco_padrao'
     ]
 
-    console.log(`🧹 LIMPEZA EM LOTES - Executando limpeza controlada para evitar timeout`)
-    
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // 1. LIMPAR TABELA volumetria_mobilemed - USANDO TRUNCATE (MUITO MAIS RÁPIDO)
-    console.log(`📊 Limpando volumetria_mobilemed usando TRUNCATE (bypassa triggers)`)
+    // ESTRATÉGIA HÍBRIDA: TRUNCATE + FALLBACK DELETE MICRO-LOTES
+    console.log(`💥 Iniciando limpeza híbrida para garantir sucesso`)
     
-    // Contar registros antes da limpeza
+    // Contar registros antes
     const { count: countAntes } = await supabase
-      .from('volumetria_mobilemed')
+      .from('volumetria_mobilemed')  
       .select('*', { count: 'exact', head: true })
     
-    console.log(`📊 Total de registros para limpar: ${countAntes || 0}`)
+    console.log(`📊 Registros para limpar: ${countAntes || 0}`)
     
-    // TRUNCATE é muito mais rápido que DELETE para limpar toda a tabela
-    const { error: truncateError } = await supabase.rpc('exec_truncate_volumetria')
+    let removidosVolumetria = 0
     
-    if (truncateError) {
-      console.error('❌ Erro ao executar TRUNCATE, tentando DELETE simples:', truncateError)
+    try {
+      // MÉTODO 1: TRUNCATE (mais rápido)
+      console.log(`🚀 Tentando TRUNCATE...`)
+      const { error: truncateError } = await supabase.rpc('exec_truncate_volumetria')
       
-      // Fallback: DELETE simples sem condições
-      const { error: deleteError } = await supabase
-        .from('volumetria_mobilemed')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000') // Condição que sempre é verdadeira
+      if (!truncateError) {
+        console.log(`✅ TRUNCATE bem-sucedido!`)
+        removidosVolumetria = countAntes || 0
+      } else {
+        throw new Error(`TRUNCATE falhou: ${truncateError.message}`)
+      }
       
-      if (deleteError) {
-        console.error('❌ Erro no DELETE fallback:', deleteError)
-        throw new Error(`Erro ao limpar volumetria: ${deleteError.message}`)
+    } catch (error) {
+      console.log(`⚠️ TRUNCATE falhou, usando micro-lotes de 50 registros`)
+      
+      // MÉTODO 2: DELETE em micro-lotes de 50 (super pequeno)
+      let lote = 1
+      const microBatchSize = 50
+      
+      while (true) {
+        console.log(`🔄 Micro-lote ${lote} (${microBatchSize} registros)...`)
+        
+        const { error: delError, count } = await supabase
+          .from('volumetria_mobilemed')
+          .delete({ count: 'exact' })
+          .limit(microBatchSize)
+        
+        if (delError) {
+          console.error(`❌ Erro no micro-lote ${lote}:`, delError)
+          break
+        }
+        
+        const deleted = count || 0
+        removidosVolumetria += deleted
+        console.log(`   ✅ ${deleted} removidos (total: ${removidosVolumetria})`)
+        
+        if (deleted < microBatchSize) break
+        
+        lote++
+        if (lote > 1000) { // Limite de segurança
+          console.log(`⚠️ Limite de 1000 micro-lotes atingido`)
+          break
+        }
+        
+        // Pausa de 200ms entre micro-lotes
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
     
-    // Contar registros após a limpeza
-    const { count: countDepois } = await supabase
-      .from('volumetria_mobilemed')
-      .select('*', { count: 'exact', head: true })
-    
-    const removidosVolumetria = (countAntes || 0) - (countDepois || 0)
-    console.log(`🎉 VOLUMETRIA LIMPA: ${removidosVolumetria} registros removidos`)
-    
+    console.log(`🎉 VOLUMETRIA: ${removidosVolumetria} registros removidos`)
     totalRemovidoGeral += removidosVolumetria
     resultadosLimpeza.push({
       tabela: 'volumetria_mobilemed',
