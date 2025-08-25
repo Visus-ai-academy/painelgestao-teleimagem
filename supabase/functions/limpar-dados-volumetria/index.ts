@@ -48,54 +48,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     
     let removidosVolumetria = 0
     
-    try {
-      // MÉTODO 1: TRUNCATE (mais rápido)
-      console.log(`🚀 Tentando TRUNCATE...`)
-      const { error: truncateError } = await supabase.rpc('exec_truncate_volumetria')
-      
-      if (!truncateError) {
-        console.log(`✅ TRUNCATE bem-sucedido!`)
-        removidosVolumetria = countAntes || 0
-      } else {
-        throw new Error(`TRUNCATE falhou: ${truncateError.message}`)
-      }
-      
-    } catch (error) {
-      console.log(`⚠️ TRUNCATE falhou, usando micro-lotes de 50 registros`)
-      
-      // MÉTODO 2: DELETE em micro-lotes de 50 (super pequeno)
-      let lote = 1
-      const microBatchSize = 50
-      
-      while (true) {
-        console.log(`🔄 Micro-lote ${lote} (${microBatchSize} registros)...`)
-        
-        const { error: delError, count } = await supabase
-          .from('volumetria_mobilemed')
-          .delete({ count: 'exact' })
-          .limit(microBatchSize)
-        
-        if (delError) {
-          console.error(`❌ Erro no micro-lote ${lote}:`, delError)
-          break
-        }
-        
-        const deleted = count || 0
-        removidosVolumetria += deleted
-        console.log(`   ✅ ${deleted} removidos (total: ${removidosVolumetria})`)
-        
-        if (deleted < microBatchSize) break
-        
-        lote++
-        if (lote > 1000) { // Limite de segurança
-          console.log(`⚠️ Limite de 1000 micro-lotes atingido`)
-          break
-        }
-        
-        // Pausa de 200ms entre micro-lotes
-        await new Promise(resolve => setTimeout(resolve, 200))
-      }
+    // MÉTODO SIMPLES: DELETE direto sem LIMIT
+    console.log(`🚀 Executando DELETE direto na tabela volumetria_mobilemed...`)
+    
+    const { error: deleteError, count: deleteCount } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .gte('created_at', '1900-01-01') // Condição que sempre é verdadeira para todos os registros
+    
+    if (deleteError) {
+      console.error(`❌ Erro no DELETE:`, deleteError)
+      throw new Error(`DELETE falhou: ${deleteError.message}`)
     }
+    
+    removidosVolumetria = deleteCount || 0
+    console.log(`✅ DELETE bem-sucedido! ${removidosVolumetria} registros removidos`)
     
     console.log(`🎉 VOLUMETRIA: ${removidosVolumetria} registros removidos`)
     totalRemovidoGeral += removidosVolumetria
