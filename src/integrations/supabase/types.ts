@@ -4001,6 +4001,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      exec_truncate_volumetria: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       executar_rollback_upload: {
         Args: { p_motivo: string; p_upload_id: string }
         Returns: Json
