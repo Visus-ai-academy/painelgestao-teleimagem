@@ -355,23 +355,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     try {
       setData(prev => ({ ...prev, loading: true }));
       
-      // Usar edge function otimizada para limpeza em background com timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na limpeza - operação demorou mais que 30 segundos')), 30000)
-      );
-      
-      const limparPromise = supabase.functions.invoke('limpar-dados-volumetria');
-      
-      const { data: responseData, error: limparError } = await Promise.race([limparPromise, timeoutPromise]) as any;
+      // Usar edge function para limpeza síncrona
+      const { data: responseData, error: limparError } = await supabase.functions.invoke('limpar-dados-volumetria');
 
       if (limparError) {
         throw new Error(`Erro ao limpar volumetria: ${limparError.message}`);
       }
 
-      console.log('✅ Limpeza iniciada em background:', responseData);
-      
-      // Aguardar um pouco para garantir que a limpeza começou
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('✅ Limpeza concluída:', responseData);
 
 
       // Resetar dados locais imediatamente
@@ -401,12 +392,14 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           total_modalidades: 0,
           total_especialidades: 0,
           total_medicos: 0,
-          total_prioridades: 0
+          total_prioridades: 0,
+          periodo_ativo: undefined,
+          ultima_atualizacao: new Date().toISOString()
         },
         loading: false
       });
       
-      console.log('✅ Limpeza FÍSICA do banco concluída');
+      console.log('✅ Limpeza finalizada com sucesso! Dados locais resetados.');
       
     } catch (error) {
       console.error('❌ Erro na limpeza centralizada:', error);
