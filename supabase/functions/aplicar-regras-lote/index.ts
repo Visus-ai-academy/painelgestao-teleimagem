@@ -30,6 +30,7 @@ serve(async (req) => {
       'aplicar-regras-tratamento',              // v026 - De-Para Valores (PRIORIDADE: exames zerados)
       'aplicar-correcao-modalidade-rx',         // v030 - Correção Modalidade RX
       'aplicar-correcao-modalidade-ot',         // Correção Modalidade OT
+      'aplicar-especialidade-automatica',       // v023 - Especialidade Automática
       'aplicar-substituicao-especialidade-categoria', // v033 - Substituição Especialidade/Categoria
       'aplicar-categorias-cadastro',            // v028 - Aplicar Categorias baseado no Cadastro
       'aplicar-regra-colunas-musculo-neuro',    // v034 - Colunas→Músculo/Neuro

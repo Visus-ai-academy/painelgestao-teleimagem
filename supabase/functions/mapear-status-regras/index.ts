@@ -38,7 +38,7 @@ const REGRAS_MAPEAMENTO = {
   'v018': 'aplicar-de-para-prioridades', // De-Para prioridades
   'v019': 'SQL_TRIGGER', // Valor onco
   'v022': 'SQL_TRIGGER', // Limpeza caracteres
-  'v023': 'SQL_TRIGGER', // Especialidade automática
+  'v023': 'aplicar-especialidade-automatica', // Especialidade automática
   'v024': 'SQL_TRIGGER', // Data referência
   'v029': 'SQL_TRIGGER', // Exames fora padrão
   'v008': 'SQL_TRIGGER', // Cache performance
@@ -77,7 +77,8 @@ serve(async (req) => {
         'aplicar-tipificacao-faturamento',
         'aplicar-validacao-cliente',
         'aplicar-regras-quebra-exames',
-        'aplicar-de-para-prioridades'
+        'aplicar-de-para-prioridades',
+        'aplicar-especialidade-automatica'
       ])
       .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Últimas 24h
       .order('timestamp', { ascending: false });
