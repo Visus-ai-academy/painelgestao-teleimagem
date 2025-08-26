@@ -397,7 +397,7 @@ export function VolumetriaClientesComparison({
     }
   }, [context.clientesStats, context.detailedData, dadosPeriodo, periodoSelecionado, toast]);
 
-  // Agregar dados do arquivo - PRIORIZAR uploadedExams se disponível
+  // Agregar dados do arquivo - CORRIGIDO para agrupar por cliente adequadamente
   const arquivoClientes = useMemo<ClienteAggregated[] | null>(() => {
     // Usar primeiro uploadedExams (mais detalhado) se disponível
     const sourceData = uploadedExams && uploadedExams.length > 0 ? uploadedExams : uploaded;
@@ -409,16 +409,25 @@ export function VolumetriaClientesComparison({
     
     const agg = new Map<string, ClienteAggregated>();
     
-    sourceData.forEach((row: any) => {
-      const cliente = String(row.cliente || '').trim();
-      if (!cliente) return;
+    sourceData.forEach((row: any, index) => {
+      const clienteRaw = String(row.cliente || '').trim();
+      if (!clienteRaw) return;
+      
+      // CRÍTICO: Normalizar nome do cliente para agrupamento correto
+      const clienteNormalizado = normalizeClientName(clienteRaw);
+      const chaveCliente = clienteNormalizado.toLowerCase();
       
       // Calcular valor: usar quant (de uploadedExams) ou totalExames (de uploaded)
       const val = Number(row.quant || row.totalExames || 1) || 1;
       
-      if (!agg.has(cliente)) {
-        agg.set(cliente, {
-          cliente,
+      if (index < 10) {
+        console.log(`🔍 [ARQUIVO DEBUG ${index}] Cliente original: "${clienteRaw}" -> Normalizado: "${clienteNormalizado}" -> Chave: "${chaveCliente}" -> Valor: ${val}`);
+      }
+      
+      // Se cliente não existe no mapa, criar nova entrada
+      if (!agg.has(chaveCliente)) {
+        agg.set(chaveCliente, {
+          cliente: clienteNormalizado, // Usar nome normalizado
           total_exames: 0,
           modalidades: {},
           especialidades: {},
@@ -426,13 +435,14 @@ export function VolumetriaClientesComparison({
           categorias: {},
           exames: {},
         });
+        console.log(`🆕 [NOVO CLIENTE ARQUIVO] "${clienteNormalizado}" adicionado ao mapa`);
       }
       
-      const ref = agg.get(cliente)!;
+      const ref = agg.get(chaveCliente)!;
       ref.total_exames += val;
       
       // Adicionar detalhes (normalizando campos)
-      let mod = canonicalModalidade(row.modalidade);
+      const mod = canonicalModalidade(row.modalidade);
       const esp = canonical(row.especialidade);
       const pri = canonicalPrioridade(row.prioridade);
       const cat = canonical(row.categoria);
@@ -443,11 +453,22 @@ export function VolumetriaClientesComparison({
       if (pri) ref.prioridades[pri] = (ref.prioridades[pri] || 0) + val;
       if (cat) ref.categorias[cat] = (ref.categorias[cat] || 0) + val;
       if (exame) ref.exames[exame] = (ref.exames[exame] || 0) + val;
+      
+      // Debug detalhado para os primeiros registros
+      if (index < 5) {
+        console.log(`🔍 [AGREGAÇÃO ARQUIVO ${index}] Cliente: "${clienteNormalizado}" -> Total acumulado: ${ref.total_exames}, Modalidades: ${Object.keys(ref.modalidades).length}, Especialidades: ${Object.keys(ref.especialidades).length}`);
+      }
     });
     
     const resultado = Array.from(agg.values()).sort((a, b) => a.cliente.localeCompare(b.cliente));
-    console.log('🔍 [COMPARATIVO] Resultado arquivo:', resultado.length, 'clientes');
-    console.log('🔍 [COMPARATIVO] Primeiros 3 clientes arquivo:', resultado.slice(0, 3).map(c => ({ nome: c.cliente, total: c.total_exames })));
+    console.log('🔍 [COMPARATIVO] Resultado arquivo AGRUPADO POR CLIENTE:', resultado.length, 'clientes únicos');
+    console.log('🔍 [COMPARATIVO] TODOS os clientes do arquivo:', resultado.map(c => ({ nome: c.cliente, total: c.total_exames, modalidades: Object.keys(c.modalidades).length })));
+    
+    // Validação final
+    if (resultado.length === 0) {
+      console.error('❌ [ARQUIVO] Nenhum cliente foi processado após agregação!');
+    }
+    
     return resultado;
   }, [uploaded, uploadedExams]);
 

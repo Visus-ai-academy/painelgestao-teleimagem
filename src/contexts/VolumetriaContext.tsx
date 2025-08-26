@@ -417,18 +417,29 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       
       try {
         // Fallback: limpeza direta se edge function falhar
-        console.log('🧹 Executando limpeza DIRETA nas tabelas...');
+        console.log('🧹 Executando limpeza DIRETA nas tabelas com TRUNCATE...');
         
-        // Limpar volumetria_mobilemed
-        const { error: volumetriaError, count: volumetriaCount } = await supabase
-          .from('volumetria_mobilemed')
-          .delete()
-          .gte('id', '00000000-0000-0000-0000-000000000000'); // Remove todos
+        // Usar a nova função TRUNCATE que é muito mais eficiente
+        console.log('🚀 Chamando função truncate_volumetria_table...');
+        const { error: truncateError } = await supabase.rpc('truncate_volumetria_table');
 
-        if (volumetriaError) {
-          console.error('❌ Erro ao limpar volumetria_mobilemed:', volumetriaError);
+        if (truncateError) {
+          console.error('❌ Erro no TRUNCATE da volumetria:', truncateError);
+          // Se TRUNCATE falhar, tentar DELETE como último recurso
+          console.log('🔄 Fallback para DELETE...');
+          const { error: deleteError, count: deleteCount } = await supabase
+            .from('volumetria_mobilemed')
+            .delete()
+            .gte('id', '00000000-0000-0000-0000-000000000000');
+          
+          if (deleteError) {
+            console.error('❌ Erro no DELETE fallback:', deleteError);
+            throw deleteError;
+          } else {
+            console.log(`✅ Fallback DELETE: ${deleteCount || 0} registros removidos`);
+          }
         } else {
-          console.log(`✅ ${volumetriaCount || 0} registros removidos de volumetria_mobilemed`);
+          console.log('✅ TRUNCATE da volumetria concluído com sucesso!');
         }
 
         // Limpar processamento_uploads
@@ -441,6 +452,16 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           console.error('❌ Erro ao limpar processamento_uploads:', uploadsError);
         } else {
           console.log(`✅ ${uploadsCount || 0} registros removidos de processamento_uploads`);
+        }
+
+        // Atualizar view materializada após limpeza
+        console.log('🔄 Atualizando view materializada...');
+        const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard');
+        
+        if (refreshError) {
+          console.error('⚠️ Erro ao atualizar view materializada:', refreshError);
+        } else {
+          console.log('✅ View materializada atualizada');
         }
 
         console.log('✅ Limpeza alternativa concluída com sucesso');
