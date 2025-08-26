@@ -1,265 +1,375 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, CheckCircle, XCircle, Clock, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
+import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Info } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface RegraValidacao {
-  campo: string;
-  tipo: string;
-  valor: any;
-  arquivo_fonte: string;
-  aplicada: boolean;
+  id: string;
+  nome: string;
+  descricao: string;
+  regra_aplicada: boolean;
   total_registros: number;
-  registros_aprovados: number;
-  registros_rejeitados: number;
-  ultima_aplicacao?: string;
-}
-
-interface ValidacaoMonitor {
-  arquivo_fonte: string;
-  total_regras: number;
-  regras_aplicadas: number;
   registros_processados: number;
-  registros_validos: number;
-  registros_rejeitados: number;
-  percentual_aprovacao: number;
-  status: 'processando' | 'concluido' | 'erro';
-  detalhes_erro?: string[];
+  registros_pendentes: number;
+  percentual_aplicacao: number;
+  detalhes_falha?: string;
+  exemplos_nao_processados?: string[];
 }
 
-export function MonitorValidacaoRegras() {
-  const [monitores, setMonitores] = useState<ValidacaoMonitor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+interface ValidacaoStats {
+  total_regras: number;
+  regras_ok: number;
+  regras_falha: number;
+  regras_parcial: number;
+  percentual_geral: number;
+}
 
-  const buscarStatusValidacoes = async () => {
+export const MonitorValidacaoRegras = () => {
+  const [regras, setRegras] = useState<RegraValidacao[]>([]);
+  const [stats, setStats] = useState<ValidacaoStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedRule, setSelectedRule] = useState<RegraValidacao | null>(null);
+  const { toast } = useToast();
+
+  const verificarRegras = async () => {
+    setLoading(true);
     try {
-      // Buscar logs de processamento recente
-      const { data: logs, error: logsError } = await supabase
-        .from('processamento_uploads')
-        .select('*')
-        .eq('tipo_dados', 'volumetria')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const resultados: RegraValidacao[] = [];
+      
+      // Regra v001: Filtro Data Laudo
+      const { data: dataLaudo } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id, "DATA_LAUDO", "EMPRESA"', { count: 'exact' })
+        .neq('arquivo_fonte', 'volumetria_onco_padrao');
 
-      if (logsError) throw logsError;
+      const totalRegistros = dataLaudo?.length || 0;
+      const semDataLaudo = dataLaudo?.filter(r => !r.DATA_LAUDO || r.DATA_LAUDO === '').length || 0;
+      
+      resultados.push({
+        id: 'v001',
+        nome: 'Filtro Data Laudo',
+        descricao: 'Exclui registros sem data de laudo ou fora do período',
+        regra_aplicada: semDataLaudo === 0,
+        total_registros: totalRegistros,
+        registros_processados: totalRegistros - semDataLaudo,
+        registros_pendentes: semDataLaudo,
+        percentual_aplicacao: totalRegistros > 0 ? Math.round(((totalRegistros - semDataLaudo) / totalRegistros) * 100) : 100,
+        detalhes_falha: semDataLaudo > 0 ? `${semDataLaudo} registros sem data de laudo` : undefined,
+        exemplos_nao_processados: dataLaudo?.filter(r => !r.DATA_LAUDO).slice(0, 5).map(r => r.EMPRESA) || []
+      });
 
-      const monitoresAtualizados: ValidacaoMonitor[] = [];
+      // Regra v003: Mapeamento CEDI
+      const { data: cediData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .neq('arquivo_fonte', 'volumetria_onco_padrao')
+        .or('"EMPRESA".like.CEDI-%,"EMPRESA".eq.CEDIDIAG');
 
-      for (const log of logs || []) {
-        const detalhes = typeof log.detalhes_erro === 'string' 
-          ? JSON.parse(log.detalhes_erro || '{}')
-          : log.detalhes_erro || {};
+      const cediNaoMapeados = cediData?.filter(r => r.EMPRESA?.includes('CEDI-')).length || 0;
+      const cediMapeados = cediData?.filter(r => r.EMPRESA === 'CEDIDIAG').length || 0;
+      
+      resultados.push({
+        id: 'v003',
+        nome: 'Mapeamento Nome Cliente (CEDI)',
+        descricao: 'Aplica mapeamento de nomes de clientes (CEDI-* para CEDIDIAG)',
+        regra_aplicada: cediNaoMapeados === 0,
+        total_registros: cediNaoMapeados + cediMapeados,
+        registros_processados: cediMapeados,
+        registros_pendentes: cediNaoMapeados,
+        percentual_aplicacao: (cediNaoMapeados + cediMapeados) > 0 ? Math.round((cediMapeados / (cediNaoMapeados + cediMapeados)) * 100) : 100,
+        detalhes_falha: cediNaoMapeados > 0 ? `${cediNaoMapeados} registros CEDI-* não mapeados para CEDIDIAG` : undefined
+      });
 
-        const monitor: ValidacaoMonitor = {
-          arquivo_fonte: log.tipo_arquivo || 'Desconhecido',
-          total_regras: getRegrasPeloArquivo(log.tipo_arquivo || ''),
-          regras_aplicadas: log.registros_atualizados || 0,
-          registros_processados: log.registros_processados || 0,
-          registros_validos: log.registros_inseridos || 0,
-          registros_rejeitados: log.registros_erro || 0,
-          percentual_aprovacao: log.registros_processados > 0 
-            ? Math.round((log.registros_inseridos / log.registros_processados) * 100)
-            : 0,
-          status: log.status === 'concluido' ? 'concluido' : 
-                 log.status === 'erro' ? 'erro' : 'processando',
-          detalhes_erro: detalhes.erros_validacao || []
-        };
+      // Regra v030: Correção Modalidade DX/CR
+      const { data: modalidadeData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"MODALIDADE"')
+        .neq('arquivo_fonte', 'volumetria_onco_padrao')
+        .or('"MODALIDADE".eq.DX,"MODALIDADE".eq.CR');
 
-        monitoresAtualizados.push(monitor);
-      }
+      const modalidadeDX = modalidadeData?.filter(r => r.MODALIDADE === 'DX').length || 0;
+      const modalidadeCR = modalidadeData?.filter(r => r.MODALIDADE === 'CR').length || 0;
+      
+      resultados.push({
+        id: 'v030',
+        nome: 'Correção Modalidade DX/CR',
+        descricao: 'Converte modalidades DX para CR conforme regra de negócio',
+        regra_aplicada: modalidadeDX === 0,
+        total_registros: modalidadeDX + modalidadeCR,
+        registros_processados: modalidadeCR,
+        registros_pendentes: modalidadeDX,
+        percentual_aplicacao: (modalidadeDX + modalidadeCR) > 0 ? Math.round((modalidadeCR / (modalidadeDX + modalidadeCR)) * 100) : 100,
+        detalhes_falha: modalidadeDX > 0 ? `${modalidadeDX} registros com modalidade DX não convertidos para CR` : undefined
+      });
 
-      setMonitores(monitoresAtualizados);
+      // Regra v034: Especialidade Coluna
+      const { data: colunaData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"ESPECIALIDADE", "CATEGORIA"')
+        .neq('arquivo_fonte', 'volumetria_onco_padrao')
+        .ilike('"ESPECIALIDADE"', '%coluna%');
+
+      const especialidadeColuna = colunaData?.length || 0;
+      const colunaProcessada = colunaData?.filter(r => r.CATEGORIA?.includes('COLUNA') || r.CATEGORIA?.includes('MUSCULO')).length || 0;
+      
+      resultados.push({
+        id: 'v034',
+        nome: 'Tratamento Especialidade Coluna',
+        descricao: 'Processa especialidade "Coluna" conforme regras específicas',
+        regra_aplicada: especialidadeColuna === colunaProcessada,
+        total_registros: especialidadeColuna,
+        registros_processados: colunaProcessada,
+        registros_pendentes: especialidadeColuna - colunaProcessada,
+        percentual_aplicacao: especialidadeColuna > 0 ? Math.round((colunaProcessada / especialidadeColuna) * 100) : 100,
+        detalhes_falha: (especialidadeColuna - colunaProcessada) > 0 ? `${especialidadeColuna - colunaProcessada} registros de especialidade Coluna não processados adequadamente` : undefined
+      });
+
+      // Regra v005: Aplicação Categorias
+      const { data: categoriaData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"CATEGORIA"', { count: 'exact' })
+        .neq('arquivo_fonte', 'volumetria_onco_padrao');
+
+      const totalCategorias = categoriaData?.length || 0;
+      const semCategoria = categoriaData?.filter(r => !r.CATEGORIA || r.CATEGORIA === '').length || 0;
+      
+      resultados.push({
+        id: 'v005',
+        nome: 'Aplicação Categorias',
+        descricao: 'Define categorias baseadas em modalidade e especialidade',
+        regra_aplicada: semCategoria === 0,
+        total_registros: totalCategorias,
+        registros_processados: totalCategorias - semCategoria,
+        registros_pendentes: semCategoria,
+        percentual_aplicacao: totalCategorias > 0 ? Math.round(((totalCategorias - semCategoria) / totalCategorias) * 100) : 100,
+        detalhes_falha: semCategoria > 0 ? `${semCategoria} registros sem categoria definida` : undefined
+      });
+
+      // Regra v007: De-Para Valores
+      const { data: valoresData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"VALORES"', { count: 'exact' })
+        .neq('arquivo_fonte', 'volumetria_onco_padrao');
+
+      const totalValores = valoresData?.length || 0;
+      const valoresZerados = valoresData?.filter(r => !r.VALORES || r.VALORES === 0).length || 0;
+      
+      resultados.push({
+        id: 'v007',
+        nome: 'De-Para Valores',
+        descricao: 'Aplica valores de referência para exames zerados',
+        regra_aplicada: valoresZerados === 0,
+        total_registros: totalValores,
+        registros_processados: totalValores - valoresZerados,
+        registros_pendentes: valoresZerados,
+        percentual_aplicacao: totalValores > 0 ? Math.round(((totalValores - valoresZerados) / totalValores) * 100) : 100,
+        detalhes_falha: valoresZerados > 0 ? `${valoresZerados} registros com valores zerados (não aplicado de-para)` : undefined
+      });
+
+      // Regra v008: Tipificação Faturamento
+      const { data: tipificacaoData } = await supabase
+        .from('volumetria_mobilemed')
+        .select('tipo_faturamento', { count: 'exact' })
+        .neq('arquivo_fonte', 'volumetria_onco_padrao');
+
+      const totalTipificacao = tipificacaoData?.length || 0;
+      const semTipificacao = tipificacaoData?.filter(r => !r.tipo_faturamento || r.tipo_faturamento === '').length || 0;
+      
+      resultados.push({
+        id: 'v008',
+        nome: 'Tipificação Faturamento',
+        descricao: 'Define tipo de faturamento baseado nas características do exame',
+        regra_aplicada: semTipificacao === 0,
+        total_registros: totalTipificacao,
+        registros_processados: totalTipificacao - semTipificacao,
+        registros_pendentes: semTipificacao,
+        percentual_aplicacao: totalTipificacao > 0 ? Math.round(((totalTipificacao - semTipificacao) / totalTipificacao) * 100) : 100,
+        detalhes_falha: semTipificacao > 0 ? `${semTipificacao} registros sem tipificação de faturamento` : undefined
+      });
+
+      setRegras(resultados);
+      
+      // Calcular estatísticas
+      const total_regras = resultados.length;
+      const regras_ok = resultados.filter(r => r.percentual_aplicacao === 100).length;
+      const regras_falha = resultados.filter(r => r.percentual_aplicacao === 0).length;
+      const regras_parcial = resultados.filter(r => r.percentual_aplicacao > 0 && r.percentual_aplicacao < 100).length;
+      const percentual_geral = Math.round(resultados.reduce((acc, r) => acc + r.percentual_aplicacao, 0) / total_regras);
+
+      setStats({
+        total_regras,
+        regras_ok,
+        regras_falha,
+        regras_parcial,
+        percentual_geral
+      });
+
     } catch (error) {
-      console.error('Erro ao buscar status de validações:', error);
-      toast.error('Erro ao carregar monitor de validações');
+      console.error('Erro ao verificar regras:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao verificar regras de processamento"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getRegrasPeloArquivo = (arquivo: string): number => {
-    const regrasMap: Record<string, number> = {
-      'volumetria_padrao': 2,
-      'volumetria_fora_padrao': 1,
-      'volumetria_padrao_retroativo': 5,
-      'volumetria_fora_padrao_retroativo': 6,
-      'data_laudo': 2,
-      'data_exame': 2,
-      'volumetria_onco_padrao': 2 // Categoria + Busca De-Para/Quebra
-    };
-    return regrasMap[arquivo] || 0;
+  const getStatusIcon = (percentual: number) => {
+    if (percentual === 100) return <CheckCircle className="w-4 h-4 text-green-600" />;
+    if (percentual === 0) return <XCircle className="w-4 h-4 text-red-600" />;
+    return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
   };
 
-  const testarValidacoes = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('validar-regras-processamento', {
-        body: {
-          registros: [{
-            EMPRESA: 'TESTE',
-            NOME_PACIENTE: 'PACIENTE TESTE',
-            ESTUDO_DESCRICAO: 'EXAME TESTE',
-            DATA_REALIZACAO: '2022-12-31', // Data anterior ao limite
-            VALORES: 0
-          }],
-          arquivo_fonte: 'volumetria_padrao_retroativo'
-        }
-      });
-
-      if (error) throw error;
-
-      const resultado = data.resultados;
-      toast.success(`Teste concluído: ${resultado.total_valido} válidos, ${resultado.total_rejeitado} rejeitados`);
-      
-      // Atualizar monitores após teste
-      await buscarStatusValidacoes();
-    } catch (error) {
-      console.error('Erro no teste:', error);
-      toast.error('Erro ao executar teste de validações');
-    }
+  const getStatusBadge = (percentual: number) => {
+    if (percentual === 100) return <Badge variant="default" className="bg-green-100 text-green-800">OK</Badge>;
+    if (percentual === 0) return <Badge variant="destructive">FALHA</Badge>;
+    return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">PARCIAL</Badge>;
   };
 
   useEffect(() => {
-    buscarStatusValidacoes();
-    
-    let interval: NodeJS.Timeout;
-    if (autoRefresh) {
-      interval = setInterval(buscarStatusValidacoes, 5000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh]);
+    verificarRegras();
+  }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'concluido': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'erro': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'processando': return <Clock className="h-4 w-4 text-yellow-500" />;
-      default: return <AlertTriangle className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (percentual: number) => {
-    if (percentual >= 95) return 'bg-green-500';
-    if (percentual >= 80) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  if (loading) {
-    return (
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Monitor de Validação de Regras
+            <Info className="w-5 h-5" />
+            Monitor de Validação de Regras - Análise Real dos Dados
           </CardTitle>
+          <CardDescription>
+            Verificação efetiva da aplicação das regras através da análise dos dados processados na volumetria
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-4">Carregando...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          Monitor de Validação de Regras
-        </CardTitle>
-        <CardDescription>
-          Acompanhamento em tempo real das validações automáticas aplicadas durante o processamento
-        </CardDescription>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={testarValidacoes}
-          >
-            Testar Validações
-          </Button>
-          <Button 
-            variant={autoRefresh ? "default" : "outline"}
-            size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-          >
-            Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {monitores.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhum processamento recente encontrado
+          <div className="flex justify-between items-center mb-4">
+            <Button onClick={verificarRegras} disabled={loading} className="flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Verificando...' : 'Verificar Regras'}
+            </Button>
+            
+            {stats && (
+              <div className="flex gap-4 text-sm">
+                <span className="text-green-600">✓ {stats.regras_ok} OK</span>
+                <span className="text-yellow-600">⚠ {stats.regras_parcial} Parcial</span>
+                <span className="text-red-600">✗ {stats.regras_falha} Falha</span>
+                <span className="font-semibold">Geral: {stats.percentual_geral}%</span>
+              </div>
+            )}
           </div>
-        ) : (
-          monitores.map((monitor, index) => (
-            <div key={index} className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(monitor.status)}
-                  <span className="font-medium">{monitor.arquivo_fonte}</span>
-                  <Badge variant="outline">
-                    {monitor.total_regras} regras
-                  </Badge>
-                </div>
-                <Badge 
-                  variant={monitor.percentual_aprovacao >= 95 ? "default" : "destructive"}
-                >
-                  {monitor.percentual_aprovacao}% aprovação
-                </Badge>
+
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList>
+              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+              <TabsTrigger value="details">Detalhes por Regra</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="space-y-4">
+              {stats && stats.percentual_geral < 100 && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Atenção:</strong> {stats.regras_falha + stats.regras_parcial} regras apresentam problemas na aplicação. 
+                    Verifique a aba "Detalhes por Regra" para mais informações.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid gap-4">
+                {regras.map((regra) => (
+                  <Card key={regra.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedRule(regra)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(regra.percentual_aplicacao)}
+                          <div>
+                            <span className="font-medium">{regra.id} - {regra.nome}</span>
+                            <p className="text-sm text-gray-600">{regra.descricao}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {getStatusBadge(regra.percentual_aplicacao)}
+                          <div className="text-sm text-gray-600 mt-1">
+                            {regra.registros_processados.toLocaleString()}/{regra.total_registros.toLocaleString()} ({regra.percentual_aplicacao}%)
+                          </div>
+                        </div>
+                      </div>
+                      {regra.detalhes_falha && (
+                        <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                          ⚠️ {regra.detalhes_falha}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
+            </TabsContent>
 
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground">Processados</div>
-                  <div className="font-medium">{monitor.registros_processados}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Válidos</div>
-                  <div className="font-medium text-green-600">{monitor.registros_validos}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Rejeitados</div>
-                  <div className="font-medium text-red-600">{monitor.registros_rejeitados}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Regras Aplicadas</div>
-                  <div className="font-medium">{monitor.regras_aplicadas}</div>
-                </div>
-              </div>
-
-              <Progress 
-                value={monitor.percentual_aprovacao} 
-                className="h-2"
-              />
-
-              {monitor.detalhes_erro && monitor.detalhes_erro.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded p-2">
-                  <div className="text-sm font-medium text-red-800 mb-1">
-                    Erros de Validação:
-                  </div>
-                  <ul className="text-xs text-red-700 space-y-1">
-                    {monitor.detalhes_erro.slice(0, 3).map((erro, i) => (
-                      <li key={i}>• {erro}</li>
-                    ))}
-                    {monitor.detalhes_erro.length > 3 && (
-                      <li>• ... e mais {monitor.detalhes_erro.length - 3} erros</li>
+            <TabsContent value="details" className="space-y-4">
+              {selectedRule ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{selectedRule.id} - {selectedRule.nome}</CardTitle>
+                    <CardDescription>{selectedRule.descricao}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="text-center p-3 bg-gray-50 rounded">
+                        <div className="text-2xl font-bold">{selectedRule.total_registros.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">Total de Registros</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded">
+                        <div className="text-2xl font-bold text-green-600">{selectedRule.registros_processados.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">Processados OK</div>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 rounded">
+                        <div className="text-2xl font-bold text-red-600">{selectedRule.registros_pendentes.toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">Não Processados</div>
+                      </div>
+                      <div className="text-center p-3 bg-blue-50 rounded">
+                        <div className="text-2xl font-bold text-blue-600">{selectedRule.percentual_aplicacao}%</div>
+                        <div className="text-sm text-gray-600">Efetividade</div>
+                      </div>
+                    </div>
+                    
+                    {selectedRule.detalhes_falha && (
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          <strong>Problema Identificado:</strong> {selectedRule.detalhes_falha}
+                        </AlertDescription>
+                      </Alert>
                     )}
-                  </ul>
+
+                    {selectedRule.exemplos_nao_processados && selectedRule.exemplos_nao_processados.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2">Exemplos de registros não processados:</h4>
+                        <div className="bg-gray-50 p-3 rounded text-sm">
+                          {selectedRule.exemplos_nao_processados.map((exemplo, idx) => (
+                            <div key={idx} className="text-gray-700">• {exemplo}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="text-center p-8 text-gray-500">
+                  Selecione uma regra na aba "Visão Geral" para ver os detalhes
                 </div>
               )}
-            </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
   );
-}
+};
