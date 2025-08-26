@@ -38,23 +38,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // ESTRATÉGIA ULTRA SIMPLES: DELETE direto sem contagem prévia
-    console.log(`🚀 Executando DELETE direto na tabela volumetria_mobilemed...`)
+    // ESTRATÉGIA DEFINITIVA: TRUNCATE TABLE (muito mais rápido que DELETE)
+    console.log(`💥 Executando TRUNCATE TABLE na tabela volumetria_mobilemed...`)
     
     let removidosVolumetria = 0
     
-    // DELETE simples com condição sempre verdadeira (evita timeout)
-    const { error: deleteError } = await supabase
-      .from('volumetria_mobilemed')
-      .delete()
-      .gte('created_at', '1900-01-01') // Condição sempre verdadeira
+    // TRUNCATE é muito mais eficiente para limpar toda a tabela
+    const { error: truncateError } = await supabase.rpc('truncate_volumetria_table')
     
-    if (deleteError) {
-      console.error(`❌ Erro no DELETE:`, deleteError)
-      throw new Error(`DELETE falhou: ${deleteError.message}`)
+    if (truncateError) {
+      console.error(`❌ Erro no TRUNCATE:`, truncateError)
+      // Fallback para DELETE em caso de erro no TRUNCATE
+      console.log(`🔄 Tentando fallback com DELETE...`)
+      
+      const { error: deleteError } = await supabase
+        .from('volumetria_mobilemed')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000')
+      
+      if (deleteError) {
+        console.error(`❌ Erro no DELETE fallback:`, deleteError)
+        throw new Error(`Limpeza falhou: ${deleteError.message}`)
+      }
     }
     
-    // Assumir sucesso se não houve erro
     removidosVolumetria = 1 // Placeholder para indicar sucesso
     console.log(`🎉 Limpeza da volumetria concluída com sucesso!`)
     
