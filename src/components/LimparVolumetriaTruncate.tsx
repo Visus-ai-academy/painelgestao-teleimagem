@@ -58,15 +58,9 @@ export function LimparVolumetriaTruncate() {
         console.warn('⚠️ Erro ao limpar uploads:', uploadsError);
       }
 
-      // Limpar valores_referencia_de_para
-      const { error: deParaError } = await supabase
-        .from('valores_referencia_de_para')
-        .delete()
-        .gt('created_at', '1900-01-01');
-
-      if (deParaError) {
-        console.warn('⚠️ Erro ao limpar de-para:', deParaError);
-      }
+      // ❗ REMOVIDO: Não devemos limpar valores_referencia_de_para
+      // Esta tabela contém dados do cadastro base (aba "Fora Padrão")
+      // que são configurações permanentes e não dados temporários de volumetria
 
       // Limpar registros_rejeitados_processamento
       const { error: rejeitadosError } = await supabase
@@ -141,9 +135,10 @@ export function LimparVolumetriaTruncate() {
               <div className="font-semibold mb-1">⚠️ ATENÇÃO - Operação Irreversível</div>
               <ul className="list-disc list-inside space-y-1">
                 <li>Remove TODOS os dados da tabela volumetria_mobilemed</li>
-                <li>Limpa histórico de processamento e uploads</li>
+                <li>Limpa histórico de processamento e uploads de volumetria</li>
                 <li>Usa TRUNCATE TABLE para máxima eficiência</li>
-                <li>Não há como recuperar os dados após esta operação</li>
+                <li>⚠️ PRESERVA dados do Cadastro Base (templates/configurações)</li>
+                <li>Não há como recuperar os dados de volumetria após esta operação</li>
               </ul>
             </div>
           </div>
