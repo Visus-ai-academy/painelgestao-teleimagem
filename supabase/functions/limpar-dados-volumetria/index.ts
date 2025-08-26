@@ -48,21 +48,53 @@ Deno.serve(async (req: Request): Promise<Response> => {
     
     let removidosVolumetria = 0
     
-    // MÉTODO SIMPLES: DELETE direto sem LIMIT
-    console.log(`🚀 Executando DELETE direto na tabela volumetria_mobilemed...`)
+    // ESTRATÉGIA DE LOTES PEQUENOS PARA EVITAR TIMEOUT
+    console.log(`🚀 Iniciando limpeza em lotes pequenos para evitar timeout...`)
     
-    const { error: deleteError, count: deleteCount } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .gte('created_at', '1900-01-01') // Condição que sempre é verdadeira para todos os registros
+    const loteSize = 1000 // Lotes pequenos para evitar timeout
+    let totalRemovido = 0
+    let continuarLimpeza = true
     
-    if (deleteError) {
-      console.error(`❌ Erro no DELETE:`, deleteError)
-      throw new Error(`DELETE falhou: ${deleteError.message}`)
+    while (continuarLimpeza) {
+      console.log(`🔄 Processando lote de ${loteSize} registros...`)
+      
+      // Buscar IDs dos próximos registros a serem removidos
+      const { data: registrosParaRemover } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id')
+        .limit(loteSize)
+      
+      if (!registrosParaRemover || registrosParaRemover.length === 0) {
+        console.log(`✅ Nenhum registro encontrado para remoção - limpeza completa!`)
+        continuarLimpeza = false
+        break
+      }
+      
+      const ids = registrosParaRemover.map(r => r.id)
+      console.log(`🗑️ Removendo ${ids.length} registros...`)
+      
+      const { error: deleteError, count: deleteCount } = await supabase
+        .from('volumetria_mobilemed')
+        .delete({ count: 'exact' })
+        .in('id', ids)
+      
+      if (deleteError) {
+        console.error(`❌ Erro no DELETE do lote:`, deleteError)
+        throw new Error(`DELETE do lote falhou: ${deleteError.message}`)
+      }
+      
+      const removidos = deleteCount || 0
+      totalRemovido += removidos
+      console.log(`✅ Lote processado: ${removidos} registros removidos (Total: ${totalRemovido})`)
+      
+      // Se removeu menos que o tamanho do lote, significa que acabaram os registros
+      if (removidos < loteSize) {
+        continuarLimpeza = false
+      }
     }
     
-    removidosVolumetria = deleteCount || 0
-    console.log(`✅ DELETE bem-sucedido! ${removidosVolumetria} registros removidos`)
+    removidosVolumetria = totalRemovido
+    console.log(`🎉 Limpeza em lotes concluída! Total removido: ${totalRemovido}`)
     
     // CRÍTICO: Atualizar view materializada após limpeza
     console.log(`🔄 Atualizando view materializada mv_volumetria_dashboard...`)
