@@ -22,8 +22,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Inicializar cliente Supabase com service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log(`🧹 LIMPEZA DIRETA SQL - Executando limpeza super otimizada`)
-
     // Lista de todos os tipos de arquivo que serão limpos
     const tiposArquivo = [
       'volumetria_padrao',
@@ -35,157 +33,91 @@ Deno.serve(async (req: Request): Promise<Response> => {
       'volumetria_onco_padrao'
     ]
 
-    let totalRemovidoGeral = 0
-    const resultadosLimpeza = []
-
-    // ESTRATÉGIA MELHORADA: Limpeza por lotes para evitar timeout
-    console.log(`🚀 Executando DELETE direto na tabela volumetria_mobilemed...`)
-    
-    let totalRemovidos = 0
-    
-    // Fazer limpeza em lotes pequenos para evitar timeout
-    const batchSize = 2000 // Reduzir ainda mais o batch size
-    let hasMoreRecords = true
-    let attempts = 0
-    const maxAttempts = 25 // Máximo de 25 lotes (50k registros)
-    
-    while (hasMoreRecords && attempts < maxAttempts) {
-      attempts++
-      console.log(`📦 Processando lote ${attempts}/${maxAttempts}...`)
+    // Definir tarefa de limpeza como background task
+    const backgroundCleanup = async () => {
+      console.log(`🧹 INICIANDO LIMPEZA EM BACKGROUND...`)
       
       try {
-        const { count, error: deleteError } = await supabase
+        // 1. LIMPAR TABELA volumetria_mobilemed (operação principal)
+        console.log(`🚀 Executando DELETE completo na tabela volumetria_mobilemed...`)
+        
+        const { count: volumetriaCount, error: volumetriaError } = await supabase
           .from('volumetria_mobilemed')
           .delete()
-          .order('id')
-          .limit(batchSize)
+          .gte('id', '00000000-0000-0000-0000-000000000000') // Remove todos os registros
         
-        if (deleteError) {
-          console.error(`❌ Erro no DELETE lote ${attempts}:`, deleteError)
-          
-          // Se for timeout, tentar lote menor
-          if (deleteError.message?.includes('timeout')) {
-            console.log(`⏰ Timeout detectado, tentando com lote menor...`)
-            const { count: smallCount, error: smallError } = await supabase
-              .from('volumetria_mobilemed')
-              .delete()
-              .order('id')
-              .limit(500) // Lote muito menor para timeout
-              
-            if (!smallError) {
-              const removedSmall = smallCount || 0
-              totalRemovidos += removedSmall
-              console.log(`✅ Lote pequeno: ${removedSmall} registros (total: ${totalRemovidos})`)
-              hasMoreRecords = removedSmall > 0
-            } else {
-              throw smallError
-            }
-          } else {
-            throw deleteError
-          }
+        if (volumetriaError) {
+          console.error(`❌ Erro ao limpar volumetria_mobilemed:`, volumetriaError)
+          throw volumetriaError
+        }
+        
+        const removidosVolumetria = volumetriaCount || 0
+        console.log(`✅ VOLUMETRIA: ${removidosVolumetria} registros removidos`)
+
+        // 2. LIMPAR TABELA processamento_uploads
+        console.log(`📊 Limpando tabela: processamento_uploads`)
+        
+        const { error: statusError } = await supabase
+          .from('processamento_uploads')
+          .delete()
+          .in('tipo_arquivo', tiposArquivo)
+
+        if (!statusError) {
+          console.log(`✅ Registros de processamento_uploads removidos`)
+        }
+
+        // 3. LIMPAR TABELA valores_referencia_de_para
+        console.log(`📊 Limpando tabela: valores_referencia_de_para`)
+        
+        const { error: deParaError } = await supabase
+          .from('valores_referencia_de_para')
+          .delete()
+          .gte('created_at', '1900-01-01') // Remove todos os registros
+
+        if (!deParaError) {
+          console.log(`✅ Registros de valores_referencia_de_para removidos`)
+        }
+
+        // 4. LIMPAR registros_rejeitados_processamento
+        console.log(`📊 Limpando tabela: registros_rejeitados_processamento`)
+        
+        const { error: rejeitadosError } = await supabase
+          .from('registros_rejeitados_processamento')
+          .delete()
+          .in('arquivo_fonte', tiposArquivo)
+
+        if (!rejeitadosError) {
+          console.log(`✅ Registros de registros_rejeitados_processamento removidos`)
+        }
+
+        // 5. Tentar atualizar view materializada (opcional)
+        console.log(`🔄 Tentando atualizar view materializada...`)
+        const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard')
+        
+        if (refreshError) {
+          console.log(`ℹ️ View materializada não atualizada (normal se não existir):`, refreshError.message)
         } else {
-          const removedInBatch = count || 0
-          totalRemovidos += removedInBatch
-          
-          console.log(`✅ Lote ${attempts}: ${removedInBatch} registros removidos (total: ${totalRemovidos})`)
-          
-          // Se removeu menos que o batch size, não há mais registros
-          hasMoreRecords = removedInBatch === batchSize
+          console.log(`✅ View materializada atualizada com sucesso`)
         }
+
+        console.log(`🎉 LIMPEZA EM BACKGROUND FINALIZADA! Total volumetria: ${removidosVolumetria}`)
         
-        // Pequena pausa para não sobrecarregar o banco
-        if (hasMoreRecords && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 200)) // Pausa maior
-        }
-      } catch (batchError) {
-        console.error(`❌ Erro crítico no lote ${attempts}:`, batchError)
-        if (attempts >= 3) { // Permitir algumas tentativas antes de falhar
-          throw batchError
-        }
-        console.log(`🔄 Tentativa ${attempts}/3 falhou, continuando...`)
+      } catch (error) {
+        console.error('❌ Erro durante limpeza em background:', error)
       }
     }
+
+    // Iniciar limpeza em background sem aguardar
+    EdgeRuntime.waitUntil(backgroundCleanup())
+
+    // Retornar resposta imediata
+    console.log(`✅ Limpeza iniciada em background`)
     
-    const removidosVolumetria = totalRemovidos
-    console.log(`🎉 Limpeza da volumetria concluída com sucesso! Total removido: ${totalRemovidos}`)
-    
-    // Tentar atualizar view materializada (opcional)
-    console.log(`🔄 Tentando atualizar view materializada...`)
-    const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard')
-    
-    if (refreshError) {
-      console.log(`ℹ️ View materializada não atualizada (normal se não existir):`, refreshError.message)
-    } else {
-      console.log(`✅ View materializada atualizada com sucesso`)
-    }
-    
-    console.log(`🎉 VOLUMETRIA: ${removidosVolumetria} registros removidos`)
-    totalRemovidoGeral += removidosVolumetria
-    resultadosLimpeza.push({
-      tabela: 'volumetria_mobilemed',
-      registros_removidos: removidosVolumetria
-    })
-
-    // 2. LIMPAR TABELA processamento_uploads
-    console.log(`📊 Limpando tabela: processamento_uploads`)
-    
-    const { error: statusError } = await supabase
-      .from('processamento_uploads')
-      .delete()
-      .in('tipo_arquivo', tiposArquivo)
-
-    if (!statusError) {
-      console.log(`🗑️ Registros de processamento_uploads removidos com sucesso`)
-      resultadosLimpeza.push({
-        tabela: 'processamento_uploads',
-        registros_removidos: 1 // Placeholder para sucesso
-      })
-    }
-
-    // 3. LIMPAR TABELA valores_referencia_de_para
-    console.log(`📊 Limpando tabela: valores_referencia_de_para`)
-    
-    const { error: deParaError } = await supabase
-      .from('valores_referencia_de_para')
-      .delete()
-      .gt('created_at', '1900-01-01') // Condição que sempre é verdadeira
-
-    if (!deParaError) {
-      console.log(`🗑️ Registros de valores_referencia_de_para removidos com sucesso`)
-      resultadosLimpeza.push({
-        tabela: 'valores_referencia_de_para',
-        registros_removidos: 1 // Placeholder para sucesso
-      })
-    }
-
-    // 4. LIMPAR registros_rejeitados_processamento
-    console.log(`📊 Limpando tabela: registros_rejeitados_processamento`)
-    
-    const { error: rejeitadosError } = await supabase
-      .from('registros_rejeitados_processamento')
-      .delete()
-      .in('arquivo_fonte', tiposArquivo)
-
-    if (!rejeitadosError) {
-      console.log(`🗑️ Registros de registros_rejeitados_processamento removidos com sucesso`)
-      resultadosLimpeza.push({
-        tabela: 'registros_rejeitados_processamento',
-        registros_removidos: 1 // Placeholder para sucesso
-      })
-    }
-
-    const totalFinal = resultadosLimpeza.reduce((acc, curr) => acc + curr.registros_removidos, 0)
-
-    console.log(`✅ LIMPEZA SÍNCRONA FINALIZADA!`)
-    console.log(`📊 Total de registros removidos: ${totalFinal}`)
-    console.log(`📋 Detalhes por tabela:`, JSON.stringify(resultadosLimpeza, null, 2))
-
-    // RETORNAR RESPOSTA COM RESULTADO REAL
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Limpeza concluída! ${totalFinal} registros removidos.`,
-        details: resultadosLimpeza,
+        message: 'Limpeza iniciada com sucesso. O processo está sendo executado em background.',
+        status: 'processing',
         timestamp: new Date().toISOString()
       }),
       { 
