@@ -64,6 +64,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     removidosVolumetria = deleteCount || 0
     console.log(`✅ DELETE bem-sucedido! ${removidosVolumetria} registros removidos`)
     
+    // CRÍTICO: Atualizar view materializada após limpeza
+    console.log(`🔄 Atualizando view materializada mv_volumetria_dashboard...`)
+    const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard')
+    
+    if (refreshError) {
+      console.error(`⚠️ Erro ao atualizar view materializada:`, refreshError)
+    } else {
+      console.log(`✅ View materializada atualizada com sucesso`)
+    }
+    
     console.log(`🎉 VOLUMETRIA: ${removidosVolumetria} registros removidos`)
     totalRemovidoGeral += removidosVolumetria
     resultadosLimpeza.push({
