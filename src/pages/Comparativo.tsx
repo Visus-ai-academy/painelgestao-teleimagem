@@ -113,7 +113,7 @@ export default function Comparativo() {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
-      const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome'];
+      const nameKeys = ['cliente','empresa','nome_cliente','cliente_nome','client','company','empresa_nome','nome_empresa'];
       const totalKeys = ['total_exames','exames','qtd_exames','total','quant','quantidade','qtd','qtdade','qte','laudos','total_laudos','qtd_laudos','qtde_laudos','laudos_exames','laudos_exame','qtd_laudos_exames','qtd_laudos_exame','total_laudos_exames','quantidade_laudos','quantidade_exames','qtd_exame','qtd_exames_total','num_laudos','num_exames'];
       const modalidadeKeys = ['modalidade'];
       const especialidadeKeys = ['especialidade'];
@@ -159,7 +159,33 @@ export default function Comparativo() {
         const prioridadeKey = findKey(prioridadeKeys);
         const categoriaKey = findKey(categoriaKeys);
         const exameKey = findKey(exameKeys);
-        const clienteRaw = nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]]);
+        
+        // DEBUG: Log dos cabeçalhos encontrados
+        if (keys.length > 0) {
+          console.log('🔍 [EXCEL DEBUG] Headers encontrados:', keys.slice(0, 10));
+          console.log('🔍 [EXCEL DEBUG] NormMap sample:', Object.entries(normMap).slice(0, 10));
+          console.log('🔍 [EXCEL DEBUG] NameKey encontrado:', nameKey, 'mapeado para:', nameKey ? normMap[nameKey] : 'N/A');
+        }
+        
+        // Melhorar a lógica de identificação do cliente
+        let clienteRaw;
+        if (nameKey) {
+          clienteRaw = r[normMap[nameKey]];
+          console.log('🔍 [EXCEL DEBUG] Cliente via nameKey:', clienteRaw);
+        } else {
+          // Procurar diretamente nas chaves originais
+          const directMatch = keys.find(k => 
+            ['cliente', 'Cliente', 'CLIENTE', 'empresa', 'Empresa', 'EMPRESA', 'client', 'Client', 'CLIENT'].includes(k)
+          );
+          if (directMatch) {
+            clienteRaw = r[directMatch];
+            console.log('🔍 [EXCEL DEBUG] Cliente via match direto:', directMatch, '=', clienteRaw);
+          } else {
+            clienteRaw = r[keys[0]]; // fallback para primeira coluna
+            console.log('🔍 [EXCEL DEBUG] Cliente via fallback (primeira coluna):', keys[0], '=', clienteRaw);
+          }
+        }
+        
         const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
         const num = parseCount(totalRaw);
         const modVal = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : '';
@@ -202,7 +228,22 @@ export default function Comparativo() {
         const pacienteKey = findKey(pacienteKeys);
         const accessionKey = findKey(accessionKeys);
         const codigoPacKey = findKey(codigoPacienteKeys);
-        const cliente = String(nameKey ? r[normMap[nameKey]] : (r['cliente'] ?? r['Cliente'] ?? r[keys[0]])).trim();
+        // Melhorar a lógica de identificação do cliente (mesma lógica do parsedRows)
+        let clienteRaw;
+        if (nameKey) {
+          clienteRaw = r[normMap[nameKey]];
+        } else {
+          const directMatch = keys.find(k => 
+            ['cliente', 'Cliente', 'CLIENTE', 'empresa', 'Empresa', 'EMPRESA', 'client', 'Client', 'CLIENT'].includes(k)
+          );
+          if (directMatch) {
+            clienteRaw = r[directMatch];
+          } else {
+            clienteRaw = r[keys[0]]; // fallback para primeira coluna
+          }
+        }
+        
+        const cliente = String(clienteRaw || '').trim();
         const totalRaw = totalKey ? r[normMap[totalKey]] : undefined;
         const num = parseCount(totalRaw);
         const modalidade = modalidadeKey ? String(r[normMap[modalidadeKey]] ?? '').trim() : undefined;
