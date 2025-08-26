@@ -23,20 +23,20 @@ serve(async (req) => {
 
     console.log(`🔄 APLICANDO REGRAS EM LOTE PARA: ${arquivo_fonte || 'TODOS'}`);
 
-    // Sequência completa de regras (todas ativadas)
+    // Sequência otimizada de regras - De-Para movido para início para garantir execução
     const regras = [
-      'aplicar-filtro-periodo-atual',           // v031 - Filtro de Período Atual
-      'aplicar-exclusao-clientes-especificos',  // v032 - Exclusão Clientes Específicos
-      'aplicar-exclusoes-periodo',              // v002, v003 - Exclusões por período
-      'aplicar-mapeamento-nome-cliente',        // v035 - Mapeamento Nome Cliente
-      'aplicar-regras-tratamento',              // v026 - De-Para Valores
+      'aplicar-mapeamento-nome-cliente',        // v035 - Mapeamento Nome Cliente (rápido)
+      'aplicar-regras-tratamento',              // v026 - De-Para Valores (PRIORIDADE: exames zerados)
       'aplicar-correcao-modalidade-rx',         // v030 - Correção Modalidade RX
       'aplicar-correcao-modalidade-ot',         // Correção Modalidade OT
       'aplicar-substituicao-especialidade-categoria', // v033 - Substituição Especialidade/Categoria
       'aplicar-regra-colunas-musculo-neuro',    // v034 - Colunas→Músculo/Neuro
       'aplicar-validacao-cliente',              // v021 - Validação Cliente
       'aplicar-regras-quebra-exames',           // v027 - Quebra de Exames
-      'aplicar-tipificacao-faturamento'         // f005, f006 - Tipificação Faturamento
+      'aplicar-tipificacao-faturamento',        // f005, f006 - Tipificação Faturamento
+      'aplicar-exclusao-clientes-especificos',  // v032 - Exclusão Clientes Específicos
+      'aplicar-exclusoes-periodo',              // v002, v003 - Exclusões por período
+      'aplicar-filtro-periodo-atual'            // v031 - Filtro de Período Atual (FINAL - mais lento)
     ];
 
     const resultados = [];
@@ -53,27 +53,54 @@ serve(async (req) => {
           body = { arquivo_fonte, periodo_referencia };
         }
         
-        const { data, error } = await supabaseClient.functions.invoke(regra, { body });
-
-        if (error) {
-          console.error(`❌ Erro na regra ${regra}:`, error);
-          resultados.push({
-            regra,
-            status: 'erro',
-            erro: error.message,
-            timestamp: new Date().toISOString()
-          });
-        } else {
-          console.log(`✅ Regra ${regra} aplicada com sucesso:`, data);
-          resultados.push({
-            regra,
-            status: 'sucesso',
-            resultado: data,
-            timestamp: new Date().toISOString()
+        // Timeout específico por regra (mais tempo para filtros complexos)
+        const timeoutMs = regra.includes('filtro-periodo') ? 45000 : 15000;
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        
+        try {
+          const { data, error } = await supabaseClient.functions.invoke(regra, { 
+            body,
+            signal: controller.signal 
           });
           
-          if (data?.registros_processados) {
-            totalProcessado += data.registros_processados;
+          clearTimeout(timeoutId);
+
+          if (error) {
+            console.error(`❌ Erro na regra ${regra}:`, error);
+            resultados.push({
+              regra,
+              status: 'erro',
+              erro: error.message,
+              timestamp: new Date().toISOString()
+            });
+            // CONTINUAR mesmo com erro - não interromper o lote
+          } else {
+            console.log(`✅ Regra ${regra} aplicada com sucesso:`, data);
+            resultados.push({
+              regra,
+              status: 'sucesso',
+              resultado: data,
+              timestamp: new Date().toISOString()
+            });
+            
+            if (data?.registros_processados) {
+              totalProcessado += data.registros_processados;
+            }
+          }
+        } catch (invokeError) {
+          clearTimeout(timeoutId);
+          if (invokeError.name === 'AbortError') {
+            console.error(`⏰ Timeout na regra ${regra} após ${timeoutMs}ms`);
+            resultados.push({
+              regra,
+              status: 'timeout',
+              erro: `Timeout após ${timeoutMs}ms`,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            throw invokeError; // Re-lançar se não for timeout
           }
         }
 
@@ -88,6 +115,7 @@ serve(async (req) => {
           erro: err.message,
           timestamp: new Date().toISOString()
         });
+        // CONTINUAR processamento mesmo com falha crítica
       }
     }
 
