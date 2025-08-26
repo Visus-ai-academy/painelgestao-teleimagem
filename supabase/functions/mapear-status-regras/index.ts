@@ -114,22 +114,47 @@ serve(async (req) => {
         const timestamp = log.timestamp;
         const newData = log.new_data;
 
-        // Mapear edge functions para regras
-        Object.keys(REGRAS_MAPEAMENTO).forEach(regraId => {
-          const edgeFunction = REGRAS_MAPEAMENTO[regraId];
+        if (operation === 'APLICAR_REGRAS_LOTE' && newData?.resultados) {
+          // Processar resultados detalhados do lote
+          console.log(`📊 Processando resultados do lote:`, newData.resultados);
           
-          if (operation === edgeFunction || operation === 'APLICAR_REGRAS_LOTE') {
-            statusRegras[regraId].aplicada = true;
-            statusRegras[regraId].timestamp_aplicacao = timestamp;
-            
-            if (newData) {
-              statusRegras[regraId].detalhes = {
-                registros_processados: newData.registros_processados || newData.total_processado,
-                resultado: newData.resultado || newData.resultados
-              };
+          newData.resultados.forEach((resultado: any) => {
+            if (resultado.status === 'sucesso') {
+              // Mapear edge function para regra específica
+              Object.keys(REGRAS_MAPEAMENTO).forEach(regraId => {
+                const edgeFunction = REGRAS_MAPEAMENTO[regraId];
+                
+                if (resultado.regra === edgeFunction) {
+                  statusRegras[regraId].aplicada = true;
+                  statusRegras[regraId].timestamp_aplicacao = timestamp;
+                  statusRegras[regraId].detalhes = {
+                    registros_processados: resultado.resultado?.registros_processados || resultado.resultado?.total_processados,
+                    resultado: resultado.resultado,
+                    status_lote: 'sucesso'
+                  };
+                }
+              });
             }
-          }
-        });
+          });
+        } else {
+          // Processar execuções individuais (não-lote)
+          Object.keys(REGRAS_MAPEAMENTO).forEach(regraId => {
+            const edgeFunction = REGRAS_MAPEAMENTO[regraId];
+            
+            if (operation === edgeFunction) {
+              statusRegras[regraId].aplicada = true;
+              statusRegras[regraId].timestamp_aplicacao = timestamp;
+              
+              if (newData) {
+                statusRegras[regraId].detalhes = {
+                  registros_processados: newData.registros_processados || newData.total_processado,
+                  resultado: newData.resultado || newData.resultados,
+                  status_lote: 'individual'
+                };
+              }
+            }
+          });
+        }
       });
     }
 
