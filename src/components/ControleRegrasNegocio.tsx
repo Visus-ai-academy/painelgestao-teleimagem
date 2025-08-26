@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Settings, AlertTriangle, CheckCircle, Clock, Users, ChevronDown, ChevronRight, Trash2, Calculator, FileText, DollarSign, ClipboardList, BarChart3, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ControleVerificacaoRegras } from "./ControleVerificacaoRegras";
 
 interface Regra {
   id: string;
@@ -744,7 +745,8 @@ export function ControleRegrasNegocio() {
   }
 
   return (
-    <Card>
+    <div className="space-y-6">
+      <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
@@ -842,5 +844,9 @@ export function ControleRegrasNegocio() {
         })}
       </CardContent>
     </Card>
-  );
+
+    {/* Componente de Verificação de Regras */}
+    <ControleVerificacaoRegras />
+  </div>
+);
 }
