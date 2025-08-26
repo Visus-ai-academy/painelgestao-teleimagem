@@ -13,7 +13,7 @@ interface RegraVerificacao {
   nome: string;
   descricao: string;
   edgeFunction: string;
-  categoria: 'modalidade' | 'especialidade' | 'quebra' | 'exclusao' | 'validacao' | 'tipificacao';
+  categoria: 'modalidade' | 'especialidade' | 'quebra' | 'exclusao' | 'validacao' | 'tipificacao' | 'mapeamento' | 'tratamento' | 'trigger' | 'especial';
   aplicada: boolean;
   ultimaExecucao?: string;
   registrosProcessados?: number;
@@ -39,6 +39,7 @@ export function ControleVerificacaoRegras() {
   const { toast } = useToast();
 
   const regrasDefinidas: Omit<RegraVerificacao, 'aplicada' | 'ultimaExecucao' | 'registrosProcessados' | 'registrosAfetados' | 'erros' | 'status'>[] = [
+    // === REGRAS DE MODALIDADE ===
     {
       id: 'v030',
       nome: 'Correção Modalidade DX/CR → RX/MG',
@@ -46,6 +47,15 @@ export function ControleVerificacaoRegras() {
       edgeFunction: 'aplicar-correcao-modalidade-rx',
       categoria: 'modalidade'
     },
+    {
+      id: 'v035',
+      nome: 'Correção Modalidade OT → US',
+      descricao: 'Corrige modalidade OT para US baseado em critérios específicos',
+      edgeFunction: 'aplicar-correcao-modalidade-ot',
+      categoria: 'modalidade'
+    },
+    
+    // === REGRAS DE ESPECIALIDADE ===
     {
       id: 'v034',
       nome: 'Especialidade Coluna → Músculo/Neuro',
@@ -60,13 +70,24 @@ export function ControleVerificacaoRegras() {
       edgeFunction: 'aplicar-substituicao-especialidade-categoria',
       categoria: 'especialidade'
     },
+    
+    // === REGRAS DE QUEBRA ===
     {
       id: 'v027',
-      nome: 'Quebra de Exames',
+      nome: 'Quebra de Exames Automática',
       descricao: 'Aplica regras de quebra configuradas para dividir exames compostos',
       edgeFunction: 'aplicar-quebras-automatico',
       categoria: 'quebra'
     },
+    {
+      id: 'v028',
+      nome: 'Regras Quebra Exames',
+      descricao: 'Aplicação manual de regras de quebra configuradas',
+      edgeFunction: 'aplicar-regras-quebra-exames',
+      categoria: 'quebra'
+    },
+    
+    // === REGRAS DE EXCLUSÃO ===
     {
       id: 'v031',
       nome: 'Filtro Período Atual',
@@ -82,12 +103,44 @@ export function ControleVerificacaoRegras() {
       categoria: 'exclusao'
     },
     {
+      id: 'v036',
+      nome: 'Exclusões por Período',
+      descricao: 'Aplicação de exclusões baseadas em período de referência',
+      edgeFunction: 'aplicar-exclusoes-periodo',
+      categoria: 'exclusao'
+    },
+    {
+      id: 'v037',
+      nome: 'Filtro Data Laudo',
+      descricao: 'Aplica filtro baseado na data do laudo médico',
+      edgeFunction: 'aplicar-filtro-data-laudo',
+      categoria: 'exclusao'
+    },
+    
+    // === REGRAS DE VALIDAÇÃO ===
+    {
       id: 'v021',
       nome: 'Validação Cliente',
       descricao: 'Valida se cliente existe e está ativo no sistema',
       edgeFunction: 'aplicar-validacao-cliente',
       categoria: 'validacao'
     },
+    {
+      id: 'v026',
+      nome: 'De-Para Valores Automático',
+      descricao: 'Aplica valores de referência para exames com valores zerados',
+      edgeFunction: 'aplicar-de-para-automatico',
+      categoria: 'validacao'
+    },
+    {
+      id: 'v038',
+      nome: 'Validação Regras Processamento',
+      descricao: 'Validação completa de regras aplicadas no processamento',
+      edgeFunction: 'validar-regras-processamento',
+      categoria: 'validacao'
+    },
+    
+    // === REGRAS DE TIPIFICAÇÃO ===
     {
       id: 'f005',
       nome: 'Tipificação Faturamento',
@@ -96,11 +149,103 @@ export function ControleVerificacaoRegras() {
       categoria: 'tipificacao'
     },
     {
-      id: 'v026',
-      nome: 'De-Para Valores',
-      descricao: 'Aplica valores de referência para exames com valores zerados',
-      edgeFunction: 'aplicar-de-para-automatico',
-      categoria: 'validacao'
+      id: 'f006',
+      nome: 'Tipificação Retroativa',
+      descricao: 'Aplicação retroativa de tipificação de faturamento',
+      edgeFunction: 'aplicar-tipificacao-retroativa',
+      categoria: 'tipificacao'
+    },
+    
+    // === REGRAS DE MAPEAMENTO ===
+    {
+      id: 'v039',
+      nome: 'Mapeamento Nome Cliente',
+      descricao: 'Aplica mapeamento de nomes de clientes para padronização',
+      edgeFunction: 'aplicar-mapeamento-nome-cliente',
+      categoria: 'mapeamento'
+    },
+    {
+      id: 'v040',
+      nome: 'Processamento Valores De-Para',
+      descricao: 'Processa valores usando tabela de-para configurada',
+      edgeFunction: 'processar-valores-de-para',
+      categoria: 'mapeamento'
+    },
+    
+    // === REGRAS DE TRATAMENTO ===
+    {
+      id: 'v041',
+      nome: 'Aplicação Regras Tratamento',
+      descricao: 'Aplica regras de tratamento configuradas no sistema',
+      edgeFunction: 'aplicar-regras-tratamento',
+      categoria: 'tratamento'
+    },
+    {
+      id: 'v042',
+      nome: 'Regras em Lote',
+      descricao: 'Aplicação de múltiplas regras em processamento de lote',
+      edgeFunction: 'aplicar-regras-lote',
+      categoria: 'tratamento'
+    },
+    
+    // === TRIGGERS E FUNÇÕES AUTOMÁTICAS ===
+    {
+      id: 't001',
+      nome: 'Trigger Processamento Volumetria',
+      descricao: 'Trigger principal que executa automaticamente no INSERT',
+      edgeFunction: 'trigger_volumetria_processamento',
+      categoria: 'trigger'
+    },
+    {
+      id: 't002',
+      nome: 'Trigger Normalização Médico',
+      descricao: 'Normaliza automaticamente nomes de médicos',
+      edgeFunction: 'trigger_normalizar_medico',
+      categoria: 'trigger'
+    },
+    {
+      id: 't003',
+      nome: 'Trigger Quebra Automática',
+      descricao: 'Trigger que aplica quebras automaticamente durante inserção',
+      edgeFunction: 'trigger_quebra_automatica',
+      categoria: 'trigger'
+    },
+    {
+      id: 't004',
+      nome: 'Trigger Tipificação Faturamento',
+      descricao: 'Aplica tipificação automaticamente via trigger',
+      edgeFunction: 'aplicar_tipificacao_faturamento',
+      categoria: 'trigger'
+    },
+    {
+      id: 't005',
+      nome: 'Trigger Cliente Normalização',
+      descricao: 'Normalização automática de nomes de clientes',
+      edgeFunction: 'trigger_limpar_nome_cliente',
+      categoria: 'trigger'
+    },
+    
+    // === REGRAS ESPECIAIS ===
+    {
+      id: 's001',
+      nome: 'Buscar Valor Onco',
+      descricao: 'Busca e aplica valores específicos para exames oncológicos',
+      edgeFunction: 'buscar-valor-onco',
+      categoria: 'especial'
+    },
+    {
+      id: 's002',
+      nome: 'Correção Dados Exclusão',
+      descricao: 'Corrige dados que foram excluídos incorretamente',
+      edgeFunction: 'corrigir-dados-exclusao',
+      categoria: 'especial'
+    },
+    {
+      id: 's003',
+      nome: 'Mapeamento Status Regras',
+      descricao: 'Mapeia e monitora status de aplicação das regras',
+      edgeFunction: 'mapear-status-regras',
+      categoria: 'especial'
     }
   ];
 
@@ -389,7 +534,11 @@ export function ControleVerificacaoRegras() {
       quebra: 'bg-orange-100 text-orange-800',
       exclusao: 'bg-red-100 text-red-800',
       validacao: 'bg-green-100 text-green-800',
-      tipificacao: 'bg-indigo-100 text-indigo-800'
+      tipificacao: 'bg-indigo-100 text-indigo-800',
+      mapeamento: 'bg-teal-100 text-teal-800',
+      tratamento: 'bg-amber-100 text-amber-800',
+      trigger: 'bg-violet-100 text-violet-800',
+      especial: 'bg-rose-100 text-rose-800'
     };
     return cores[categoria] || 'bg-gray-100 text-gray-800';
   };
@@ -406,7 +555,7 @@ export function ControleVerificacaoRegras() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
-              Verificação de Regras de Processamento
+              Verificação de 27 Regras de Processamento
             </CardTitle>
             <div className="flex gap-2">
               <Button 
@@ -428,6 +577,36 @@ export function ControleVerificacaoRegras() {
               </Button>
             </div>
           </div>
+          
+          {/* Resumo Estatístico */}
+          {regras.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {Object.entries(
+                regras.reduce((acc, regra) => {
+                  if (!acc[regra.categoria]) {
+                    acc[regra.categoria] = { total: 0, aplicadas: 0 };
+                  }
+                  acc[regra.categoria].total++;
+                  if (regra.aplicada && regra.status === 'ok') {
+                    acc[regra.categoria].aplicadas++;
+                  }
+                  return acc;
+                }, {} as Record<string, { total: number; aplicadas: number }>)
+              ).map(([categoria, stats]) => (
+                <div key={categoria} className="text-center p-3 bg-muted rounded-lg">
+                  <div className={`text-sm font-medium mb-1 ${getCategoriaColor(categoria as any)?.replace('bg-', 'text-').replace('-100', '-600')}`}>
+                    {categoria.toUpperCase()}
+                  </div>
+                  <div className="text-lg font-bold">
+                    {stats.aplicadas}/{stats.total}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {Math.round((stats.aplicadas / stats.total) * 100)}% OK
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardHeader>
       </Card>
 
@@ -487,17 +666,25 @@ export function ControleVerificacaoRegras() {
             <TableBody>
               {regras.map((regra) => (
                 <TableRow key={regra.id}>
-                  <TableCell>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(regra.status)}
-                        <span className="font-medium">{regra.id}: {regra.nome}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {regra.descricao}
-                      </div>
-                    </div>
-                  </TableCell>
+                   <TableCell>
+                     <div>
+                       <div className="flex items-center gap-2">
+                         {getStatusIcon(regra.status)}
+                         <span className="font-medium">{regra.id}: {regra.nome}</span>
+                       </div>
+                       <div className="text-sm text-muted-foreground mt-1">
+                         {regra.descricao}
+                       </div>
+                       <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                         <span className="bg-muted px-2 py-1 rounded">
+                           {regra.categoria === 'trigger' ? '🔄 Automático (Trigger)' : '⚙️ Manual (Edge Function)'}
+                         </span>
+                         <span className="text-muted-foreground">
+                           {regra.categoria === 'trigger' ? 'Executa no INSERT/UPDATE' : 'Execução sob demanda'}
+                         </span>
+                       </div>
+                     </div>
+                   </TableCell>
                   <TableCell>
                     <Badge className={getCategoriaColor(regra.categoria)}>
                       {regra.categoria}
