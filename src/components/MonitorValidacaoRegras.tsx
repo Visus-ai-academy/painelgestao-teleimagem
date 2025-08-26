@@ -89,18 +89,27 @@ export function MonitorValidacaoRegras() {
         // Verificações específicas por regra (sem limite de 1000)
         switch (regra.id) {
           case 'v030':
-            const { count: dxCrCount } = await supabase.from('volumetria_mobilemed').select('*', { count: 'exact', head: true }).in('"MODALIDADE"', ['DX', 'CR']);
-            registrosPendentes = dxCrCount || 0;
+            const dxCrResult = await supabase
+              .from('volumetria_mobilemed')
+              .select('id', { count: 'exact', head: true })
+              .in('MODALIDADE', ['DX', 'CR']);
+            registrosPendentes = dxCrResult.count || 0;
             if (registrosPendentes > 0) falhas.push(`${registrosPendentes} registros com modalidade DX/CR`);
             break;
           case 'v034':
-            const { count: colunasCount } = await supabase.from('volumetria_mobilemed').select('*', { count: 'exact', head: true }).eq('"ESPECIALIDADE"', 'Colunas');
-            registrosPendentes = colunasCount || 0;
+            const colunasResult = await supabase
+              .from('volumetria_mobilemed')
+              .select('id', { count: 'exact', head: true })
+              .eq('ESPECIALIDADE', 'Colunas');
+            registrosPendentes = colunasResult.count || 0;
             if (registrosPendentes > 0) falhas.push(`${registrosPendentes} registros com especialidade "Colunas"`);
             break;
           case 'v026':
-            const { count: valorZeroCount } = await supabase.from('volumetria_mobilemed').select('*', { count: 'exact', head: true }).eq('"VALORES"', 0);
-            registrosPendentes = valorZeroCount || 0;
+            const valorZeroResult = await supabase
+              .from('volumetria_mobilemed')
+              .select('id', { count: 'exact', head: true })
+              .eq('VALORES', 0);
+            registrosPendentes = valorZeroResult.count || 0;
             if (registrosPendentes > 0) falhas.push(`${registrosPendentes} registros com valores zerados`);
             break;
           default:
