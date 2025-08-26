@@ -48,53 +48,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     
     let removidosVolumetria = 0
     
-    // ESTRATÉGIA DE LOTES PEQUENOS PARA EVITAR TIMEOUT
-    console.log(`🚀 Iniciando limpeza em lotes pequenos para evitar timeout...`)
+    // ESTRATÉGIA ULTRA SIMPLES: DELETE direto com condição sempre verdadeira
+    console.log(`🚀 Executando DELETE simples na tabela volumetria_mobilemed...`)
     
-    const loteSize = 1000 // Lotes pequenos para evitar timeout
-    let totalRemovido = 0
-    let continuarLimpeza = true
+    const { error: deleteError, count: deleteCount } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Condição sempre verdadeira
     
-    while (continuarLimpeza) {
-      console.log(`🔄 Processando lote de ${loteSize} registros...`)
-      
-      // Buscar IDs dos próximos registros a serem removidos
-      const { data: registrosParaRemover } = await supabase
-        .from('volumetria_mobilemed')
-        .select('id')
-        .limit(loteSize)
-      
-      if (!registrosParaRemover || registrosParaRemover.length === 0) {
-        console.log(`✅ Nenhum registro encontrado para remoção - limpeza completa!`)
-        continuarLimpeza = false
-        break
-      }
-      
-      const ids = registrosParaRemover.map(r => r.id)
-      console.log(`🗑️ Removendo ${ids.length} registros...`)
-      
-      const { error: deleteError, count: deleteCount } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .in('id', ids)
-      
-      if (deleteError) {
-        console.error(`❌ Erro no DELETE do lote:`, deleteError)
-        throw new Error(`DELETE do lote falhou: ${deleteError.message}`)
-      }
-      
-      const removidos = deleteCount || 0
-      totalRemovido += removidos
-      console.log(`✅ Lote processado: ${removidos} registros removidos (Total: ${totalRemovido})`)
-      
-      // Se removeu menos que o tamanho do lote, significa que acabaram os registros
-      if (removidos < loteSize) {
-        continuarLimpeza = false
-      }
+    if (deleteError) {
+      console.error(`❌ Erro no DELETE:`, deleteError)
+      throw new Error(`DELETE falhou: ${deleteError.message}`)
     }
     
-    removidosVolumetria = totalRemovido
-    console.log(`🎉 Limpeza em lotes concluída! Total removido: ${totalRemovido}`)
+    removidosVolumetria = deleteCount || 0
+    console.log(`🎉 Limpeza concluída! Total removido: ${removidosVolumetria}`)
     
     // CRÍTICO: Atualizar view materializada após limpeza
     console.log(`🔄 Atualizando view materializada mv_volumetria_dashboard...`)
