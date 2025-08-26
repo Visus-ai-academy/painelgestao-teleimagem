@@ -114,7 +114,7 @@ serve(async (req) => {
         operation: 'APLICAR_CATEGORIAS_CADASTRO',
         record_id: arquivo_fonte,
         new_data: {
-          regra: 'v040',
+          regra: 'v028',
           arquivo_fonte,
           total_processados: totalProcessados,
           total_atualizados: totalAtualizados,
@@ -133,7 +133,7 @@ serve(async (req) => {
       registros_atualizados: totalAtualizados,
       registros_erro: totalErros,
       exemplos_categorizados: exemplosCategorizados,
-      regra_aplicada: 'v040 - Aplicação de Categorias baseado no Cadastro de Exames',
+      regra_aplicada: 'v028 - Aplicação de Categorias baseado no Cadastro de Exames',
       data_processamento: new Date().toISOString(),
       observacao: `Aplicadas categorias para ${totalAtualizados} exames baseadas no cadastro_exames`
     }

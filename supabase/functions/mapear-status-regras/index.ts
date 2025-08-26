@@ -20,7 +20,7 @@ const REGRAS_MAPEAMENTO = {
   'v027': 'aplicar-regras-quebra-exames',
   'v030': 'aplicar-correcao-modalidade-rx',
   'v033': 'aplicar-substituicao-especialidade-categoria',
-  'v040': 'aplicar-categorias-cadastro',
+  'v028': 'aplicar-categorias-cadastro', // Aplicar categorias do cadastro
   'v034': 'aplicar-regra-colunas-musculo-neuro',
   'v035': 'aplicar-mapeamento-nome-cliente',
   'v021': 'aplicar-validacao-cliente',
@@ -35,12 +35,11 @@ const REGRAS_MAPEAMENTO = {
   'v014': 'SQL_TRIGGER', // Mapeamento dinâmico
   'v016': 'SQL_TRIGGER', // Processamento em lotes
   'v017': 'SQL_TRIGGER', // Normalização médico
-  'v018': 'SQL_TRIGGER', // De-Para prioridades
+  'v018': 'aplicar-de-para-prioridades', // De-Para prioridades
   'v019': 'SQL_TRIGGER', // Valor onco
   'v022': 'SQL_TRIGGER', // Limpeza caracteres
   'v023': 'SQL_TRIGGER', // Especialidade automática
   'v024': 'SQL_TRIGGER', // Data referência
-  'v028': 'SQL_TRIGGER', // Categorias
   'v029': 'SQL_TRIGGER', // Exames fora padrão
   'v008': 'SQL_TRIGGER', // Cache performance
 };
@@ -77,7 +76,8 @@ serve(async (req) => {
         'aplicar-regra-colunas-musculo-neuro',
         'aplicar-tipificacao-faturamento',
         'aplicar-validacao-cliente',
-        'aplicar-regras-quebra-exames'
+        'aplicar-regras-quebra-exames',
+        'aplicar-de-para-prioridades'
       ])
       .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Últimas 24h
       .order('timestamp', { ascending: false });

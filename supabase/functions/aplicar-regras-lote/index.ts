@@ -26,11 +26,12 @@ serve(async (req) => {
     // Sequência otimizada de regras - De-Para movido para início para garantir execução
     const regras = [
       'aplicar-mapeamento-nome-cliente',        // v035 - Mapeamento Nome Cliente (rápido)
+      'aplicar-de-para-prioridades',            // v018 - De-Para Prioridades (PRIORIDADE)
       'aplicar-regras-tratamento',              // v026 - De-Para Valores (PRIORIDADE: exames zerados)
       'aplicar-correcao-modalidade-rx',         // v030 - Correção Modalidade RX
       'aplicar-correcao-modalidade-ot',         // Correção Modalidade OT
       'aplicar-substituicao-especialidade-categoria', // v033 - Substituição Especialidade/Categoria
-      'aplicar-categorias-cadastro',            // v040 - Aplicar Categorias baseado no Cadastro
+      'aplicar-categorias-cadastro',            // v028 - Aplicar Categorias baseado no Cadastro
       'aplicar-regra-colunas-musculo-neuro',    // v034 - Colunas→Músculo/Neuro
       'aplicar-validacao-cliente',              // v021 - Validação Cliente
       'aplicar-regras-quebra-exames',           // v027 - Quebra de Exames
