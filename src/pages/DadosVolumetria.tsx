@@ -16,6 +16,7 @@ import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraPro
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
 import { MonitorAplicacaoRegras } from '@/components/MonitorAplicacaoRegras';
+import { MonitorValidacaoRegras } from '@/components/MonitorValidacaoRegras';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
@@ -49,10 +50,14 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
+            </TabsTrigger>
+            <TabsTrigger value="validacao-regras" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Validação de Regras
             </TabsTrigger>
             <TabsTrigger value="monitor-regras" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -194,6 +199,10 @@ export default function DadosVolumetria() {
                 <VolumetriaExamesNaoIdentificados />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="validacao-regras">
+            <MonitorValidacaoRegras />
           </TabsContent>
 
           <TabsContent value="monitor-regras">
