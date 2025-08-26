@@ -631,30 +631,39 @@ export async function processVolumetriaOtimizado(
   console.log('📅 Período para processamento:', periodo);
   
   try {
-    // USAR SEMPRE processamento local - os triggers aplicam TODAS as regras automaticamente
-    console.log('🔧 Processamento com triggers automáticos (v002, v003, v031, de-para, categorias, etc.)');
+    // Primeiro, processar o arquivo normalmente
+    console.log('🔧 Processamento inicial dos dados...');
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     
     if (result.success) {
-      console.log('✅ DADOS PROCESSADOS AUTOMATICAMENTE VIA DATABASE TRIGGERS');
-      console.log('✅ Regras aplicadas automaticamente: v002, v003, v031, de-para, categorias, prioridades, tipificação');
+      console.log('✅ DADOS INSERIDOS COM SUCESSO - Iniciando aplicação de regras...');
       
-      // Aplicar quebras automaticamente após processamento
-      console.log('🔧 Aplicando quebras de exames automaticamente...');
+      // Aplicar TODAS as regras através da função de lote
+      console.log('🔧 Aplicando todas as regras de negócio via aplicar-regras-lote...');
       try {
-        // Usar o lote_upload do processamento
-        const loteUpload = `${arquivoFonte}_${Date.now()}`;
-        const { data: resultQuebras, error: errorQuebras } = await supabase.functions.invoke('aplicar-quebras-automatico', {
-          body: { lote_upload: loteUpload }
+        const periodoReferencia = periodo ? 
+          `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][periodo.mes-1]}/${periodo.ano.toString().slice(-2)}` : 
+          undefined;
+        
+        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
+          body: { 
+            arquivo_fonte: arquivoFonte,
+            periodo_referencia: periodoReferencia
+          }
         });
 
-        if (errorQuebras) {
-          console.error('⚠️ Erro ao aplicar quebras automáticas:', errorQuebras);
+        if (errorRegras) {
+          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
+          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
         } else {
-          console.log(`✅ Quebras aplicadas: ${resultQuebras.registros_quebrados} exames quebrados automaticamente`);
+          console.log('✅ REGRAS APLICADAS COM SUCESSO!');
+          console.log(`📊 Total de regras aplicadas: ${resultRegras.total_regras}`);
+          console.log(`📋 Registros processados: ${resultRegras.total_processado}`);
+          console.log(`📂 Arquivo fonte: ${resultRegras.arquivo_fonte}`);
         }
       } catch (error) {
-        console.error('⚠️ Erro ao aplicar quebras automáticas:', error);
+        console.error('⚠️ Erro ao aplicar regras em lote:', error);
+        console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas');
       }
     }
     
