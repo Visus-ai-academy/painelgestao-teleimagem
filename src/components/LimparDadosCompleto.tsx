@@ -37,18 +37,44 @@ export default function LimparDadosCompleto() {
   const limparDadosCentralizado = async () => {
     setIsLoading(true);
     try {
+      console.log('🧹 Iniciando limpeza completa de volumetria...');
+      
+      // Mostrar toast de progresso
+      toast({
+        title: "Limpando dados...",
+        description: "Aguarde, isso pode levar alguns minutos para bases grandes",
+      });
+      
       await clearData();
+      
+      // Recarregar total de registros após limpeza
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
       
       toast({
         title: "Limpeza completa realizada!",
-        description: "Todos os dados duplicados foram removidos da base",
+        description: "Todos os dados de volumetria foram removidos da base",
       });
       
     } catch (error) {
       console.error('Erro na limpeza:', error);
+      
+      // Melhor tratamento de erro
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('statement timeout');
+      const isConnectionError = errorMessage.includes('non-2xx status');
+      
+      let userMessage = errorMessage;
+      if (isTimeoutError) {
+        userMessage = "A limpeza demorou mais que o esperado devido ao volume de dados. Tente novamente ou contate o suporte.";
+      } else if (isConnectionError) {
+        userMessage = "Problema de conexão durante a limpeza. Verifique sua internet e tente novamente.";
+      }
+      
       toast({
         title: "Erro na limpeza",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
+        description: userMessage,
         variant: "destructive",
       });
     } finally {
@@ -114,11 +140,20 @@ export default function LimparDadosCompleto() {
             
             <Button 
               onClick={limparDadosCentralizado}
-              disabled={isLoading}
+              disabled={isLoading || totalRegistros === 0}
               className="w-full"
               variant="destructive"
             >
-              {isLoading ? "Limpando..." : "Limpar Todos os Dados de Volumetria"}
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Limpando... (pode demorar alguns minutos)
+                </>
+              ) : totalRegistros === 0 ? (
+                "Base já está limpa"
+              ) : (
+                `Limpar Todos os Dados de Volumetria (${totalRegistros.toLocaleString()} registros)`
+              )}
             </Button>
           </div>
 

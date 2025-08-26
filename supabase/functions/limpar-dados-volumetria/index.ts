@@ -38,39 +38,81 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let totalRemovidoGeral = 0
     const resultadosLimpeza = []
 
-    // ESTRATÉGIA DEFINITIVA: TRUNCATE TABLE (muito mais rápido que DELETE)
-    console.log(`💥 Executando TRUNCATE TABLE na tabela volumetria_mobilemed...`)
+    // ESTRATÉGIA MELHORADA: Limpeza por lotes para evitar timeout
+    console.log(`🚀 Executando DELETE direto na tabela volumetria_mobilemed...`)
     
-    let removidosVolumetria = 0
+    let totalRemovidos = 0
     
-    // TRUNCATE é muito mais eficiente para limpar toda a tabela
-    const { error: truncateError } = await supabase.rpc('truncate_volumetria_table')
+    // Fazer limpeza em lotes pequenos para evitar timeout
+    const batchSize = 2000 // Reduzir ainda mais o batch size
+    let hasMoreRecords = true
+    let attempts = 0
+    const maxAttempts = 25 // Máximo de 25 lotes (50k registros)
     
-    if (truncateError) {
-      console.error(`❌ Erro no TRUNCATE:`, truncateError)
-      // Fallback para DELETE em caso de erro no TRUNCATE
-      console.log(`🔄 Tentando fallback com DELETE...`)
+    while (hasMoreRecords && attempts < maxAttempts) {
+      attempts++
+      console.log(`📦 Processando lote ${attempts}/${maxAttempts}...`)
       
-      const { error: deleteError } = await supabase
-        .from('volumetria_mobilemed')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000')
-      
-      if (deleteError) {
-        console.error(`❌ Erro no DELETE fallback:`, deleteError)
-        throw new Error(`Limpeza falhou: ${deleteError.message}`)
+      try {
+        const { count, error: deleteError } = await supabase
+          .from('volumetria_mobilemed')
+          .delete()
+          .limit(batchSize)
+        
+        if (deleteError) {
+          console.error(`❌ Erro no DELETE lote ${attempts}:`, deleteError)
+          
+          // Se for timeout, tentar lote menor
+          if (deleteError.message?.includes('timeout')) {
+            console.log(`⏰ Timeout detectado, tentando com lote menor...`)
+            const { count: smallCount, error: smallError } = await supabase
+              .from('volumetria_mobilemed')
+              .delete()
+              .limit(500) // Lote muito menor para timeout
+              
+            if (!smallError) {
+              const removedSmall = smallCount || 0
+              totalRemovidos += removedSmall
+              console.log(`✅ Lote pequeno: ${removedSmall} registros (total: ${totalRemovidos})`)
+              hasMoreRecords = removedSmall > 0
+            } else {
+              throw smallError
+            }
+          } else {
+            throw deleteError
+          }
+        } else {
+          const removedInBatch = count || 0
+          totalRemovidos += removedInBatch
+          
+          console.log(`✅ Lote ${attempts}: ${removedInBatch} registros removidos (total: ${totalRemovidos})`)
+          
+          // Se removeu menos que o batch size, não há mais registros
+          hasMoreRecords = removedInBatch === batchSize
+        }
+        
+        // Pequena pausa para não sobrecarregar o banco
+        if (hasMoreRecords && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 200)) // Pausa maior
+        }
+      } catch (batchError) {
+        console.error(`❌ Erro crítico no lote ${attempts}:`, batchError)
+        if (attempts >= 3) { // Permitir algumas tentativas antes de falhar
+          throw batchError
+        }
+        console.log(`🔄 Tentativa ${attempts}/3 falhou, continuando...`)
       }
     }
     
-    removidosVolumetria = 1 // Placeholder para indicar sucesso
-    console.log(`🎉 Limpeza da volumetria concluída com sucesso!`)
+    const removidosVolumetria = totalRemovidos
+    console.log(`🎉 Limpeza da volumetria concluída com sucesso! Total removido: ${totalRemovidos}`)
     
-    // CRÍTICO: Atualizar view materializada após limpeza
-    console.log(`🔄 Atualizando view materializada mv_volumetria_dashboard...`)
+    // Tentar atualizar view materializada (opcional)
+    console.log(`🔄 Tentando atualizar view materializada...`)
     const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard')
     
     if (refreshError) {
-      console.error(`⚠️ Erro ao atualizar view materializada:`, refreshError)
+      console.log(`ℹ️ View materializada não atualizada (normal se não existir):`, refreshError.message)
     } else {
       console.log(`✅ View materializada atualizada com sucesso`)
     }

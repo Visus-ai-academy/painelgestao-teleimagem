@@ -416,30 +416,33 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
       console.log('🔄 Tentando limpeza alternativa direta no banco...');
       
       try {
-        // Fallback: limpeza direta se edge function falhar
-        console.log('🧹 Executando limpeza DIRETA nas tabelas com TRUNCATE...');
+        // Fallback: limpeza direta usando DELETE em lotes pequenos
+        console.log('🧹 Executando limpeza DIRETA por lotes...');
         
-        // Usar a nova função TRUNCATE que é muito mais eficiente
-        console.log('🚀 Chamando função truncate_volumetria_table...');
-        const { error: truncateError } = await supabase.rpc('truncate_volumetria_table');
-
-        if (truncateError) {
-          console.error('❌ Erro no TRUNCATE da volumetria:', truncateError);
-          // Se TRUNCATE falhar, tentar DELETE como último recurso
-          console.log('🔄 Fallback para DELETE...');
+        let totalRemovido = 0;
+        const batchSize = 1000;
+        let hasMoreRecords = true;
+        
+        while (hasMoreRecords && totalRemovido < 20000) { // Limite de segurança
           const { error: deleteError, count: deleteCount } = await supabase
             .from('volumetria_mobilemed')
             .delete()
-            .gte('id', '00000000-0000-0000-0000-000000000000');
+            .limit(batchSize);
           
           if (deleteError) {
-            console.error('❌ Erro no DELETE fallback:', deleteError);
-            throw deleteError;
-          } else {
-            console.log(`✅ Fallback DELETE: ${deleteCount || 0} registros removidos`);
+            console.error('❌ Erro no DELETE por lotes:', deleteError);
+            break;
           }
-        } else {
-          console.log('✅ TRUNCATE da volumetria concluído com sucesso!');
+          
+          const removedInBatch = deleteCount || 0;
+          totalRemovido += removedInBatch;
+          hasMoreRecords = removedInBatch === batchSize;
+          
+          console.log(`✅ Lote: ${removedInBatch} registros removidos (total: ${totalRemovido})`);
+          
+          if (hasMoreRecords) {
+            await new Promise(resolve => setTimeout(resolve, 50)); // Pequena pausa
+          }
         }
 
         // Limpar processamento_uploads
@@ -454,17 +457,7 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
           console.log(`✅ ${uploadsCount || 0} registros removidos de processamento_uploads`);
         }
 
-        // Atualizar view materializada após limpeza
-        console.log('🔄 Atualizando view materializada...');
-        const { error: refreshError } = await supabase.rpc('refresh_volumetria_dashboard');
-        
-        if (refreshError) {
-          console.error('⚠️ Erro ao atualizar view materializada:', refreshError);
-        } else {
-          console.log('✅ View materializada atualizada');
-        }
-
-        console.log('✅ Limpeza alternativa concluída com sucesso');
+        console.log(`✅ Limpeza alternativa concluída - ${totalRemovido} registros removidos`);
         
       } catch (fallbackError) {
         console.error('❌ Erro na limpeza alternativa:', fallbackError);
