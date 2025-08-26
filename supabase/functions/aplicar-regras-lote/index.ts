@@ -22,21 +22,21 @@ serve(async (req) => {
     );
 
     console.log(`🔄 APLICANDO REGRAS EM LOTE PARA: ${arquivo_fonte || 'TODOS'}`);
-    console.log(`🚫 TESTE: TODAS as regras de exclusão desabilitadas para teste`);
 
-    // Sequência de regras a serem aplicadas
+    // Sequência completa de regras (todas ativadas)
     const regras = [
-      // 'aplicar-exclusao-clientes-especificos',  // ← DESABILITADA PARA TESTE
-      // 'aplicar-exclusoes-periodo',              // ← DESABILITADA PARA TESTE
-      // 'aplicar-filtro-data-laudo',              // ← DESABILITADA PARA TESTE 
-      'aplicar-regras-tratamento',
-      'aplicar-correcao-modalidade-rx',
-      'aplicar-correcao-modalidade-ot',
-      'aplicar-substituicao-especialidade-categoria',
-      'aplicar-regra-colunas-musculo-neuro',
-      'aplicar-tipificacao-faturamento',
-      'aplicar-validacao-cliente',
-      'aplicar-regras-quebra-exames'
+      'aplicar-filtro-periodo-atual',           // v031 - Filtro de Período Atual
+      'aplicar-exclusao-clientes-especificos',  // v032 - Exclusão Clientes Específicos
+      'aplicar-exclusoes-periodo',              // v002, v003 - Exclusões por período
+      'aplicar-mapeamento-nome-cliente',        // v035 - Mapeamento Nome Cliente
+      'aplicar-regras-tratamento',              // v026 - De-Para Valores
+      'aplicar-correcao-modalidade-rx',         // v030 - Correção Modalidade RX
+      'aplicar-correcao-modalidade-ot',         // Correção Modalidade OT
+      'aplicar-substituicao-especialidade-categoria', // v033 - Substituição Especialidade/Categoria
+      'aplicar-regra-colunas-musculo-neuro',    // v034 - Colunas→Músculo/Neuro
+      'aplicar-validacao-cliente',              // v021 - Validação Cliente
+      'aplicar-regras-quebra-exames',           // v027 - Quebra de Exames
+      'aplicar-tipificacao-faturamento'         // f005, f006 - Tipificação Faturamento
     ];
 
     const resultados = [];
@@ -49,18 +49,8 @@ serve(async (req) => {
         // Diferentes regras precisam de parâmetros diferentes
         let body = { arquivo_fonte };
         
-        if (['aplicar-exclusoes-periodo', 'aplicar-filtro-data-laudo'].includes(regra)) {
+        if (['aplicar-exclusoes-periodo', 'aplicar-filtro-data-laudo', 'aplicar-filtro-periodo-atual'].includes(regra)) {
           body = { arquivo_fonte, periodo_referencia };
-          
-          // TESTE: Desabilitar regras v002, v003 e v031 para teste
-          if (regra === 'aplicar-exclusoes-periodo') {
-            body = { 
-              arquivo_fonte, 
-              periodo_referencia, 
-              disable_rules: ['v002', 'v003', 'v031'] 
-            };
-            console.log(`🚫 TESTE: Desabilitando regras v002, v003 e v031 em ${regra}`);
-          }
         }
         
         const { data, error } = await supabaseClient.functions.invoke(regra, { body });
