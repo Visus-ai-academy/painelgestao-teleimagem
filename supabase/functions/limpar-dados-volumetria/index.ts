@@ -57,6 +57,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const { count, error: deleteError } = await supabase
           .from('volumetria_mobilemed')
           .delete()
+          .order('id')
           .limit(batchSize)
         
         if (deleteError) {
@@ -68,6 +69,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             const { count: smallCount, error: smallError } = await supabase
               .from('volumetria_mobilemed')
               .delete()
+              .order('id')
               .limit(500) // Lote muito menor para timeout
               
             if (!smallError) {
