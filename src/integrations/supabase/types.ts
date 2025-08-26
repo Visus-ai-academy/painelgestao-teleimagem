@@ -4531,6 +4531,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      truncate_volumetria_table: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       update_custom_metrics: {
         Args: Record<PropertyKey, never>
         Returns: number
