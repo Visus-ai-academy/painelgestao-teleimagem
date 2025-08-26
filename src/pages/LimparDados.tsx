@@ -1,4 +1,3 @@
-import LimparDadosCompleto from '@/components/LimparDadosCompleto';
 import { LimparPrecos } from '@/components/LimparPrecos';
 import { LimparUploads } from '@/components/LimparUploads';
 import { LimparContratosPrecos } from '@/components/LimparContratosPrecos';
@@ -24,7 +23,6 @@ export default function LimparDados() {
         <LimparClientesContratosPrecos />
         <LimparContratosPrecos />
         <LimparPrecos />
-        <LimparDadosCompleto />
         <LimparUploads />
       </div>
     </div>

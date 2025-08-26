@@ -355,14 +355,44 @@ export function VolumetriaProvider({ children }: { children: ReactNode }) {
     try {
       setData(prev => ({ ...prev, loading: true }));
       
-      // Usar edge function para limpeza síncrona
-      const { data: responseData, error: limparError } = await supabase.functions.invoke('limpar-dados-volumetria');
+      // USAR TRUNCATE DIRETO - mais simples e eficiente
+      console.log('🚀 Executando TRUNCATE TABLE diretamente...');
+      const { error: truncateError } = await supabase.rpc('truncate_volumetria_table');
 
-      if (limparError) {
-        throw new Error(`Erro ao limpar volumetria: ${limparError.message}`);
+      if (truncateError) {
+        throw new Error(`Erro no TRUNCATE: ${truncateError.message}`);
       }
 
-      console.log('✅ Limpeza concluída:', responseData);
+      console.log('✅ TRUNCATE concluído com sucesso!');
+
+      // Limpar tabelas relacionadas
+      const tiposArquivo = [
+        'volumetria_padrao',
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao'
+      ];
+
+      // Limpar processamento_uploads
+      await supabase
+        .from('processamento_uploads')
+        .delete()
+        .in('tipo_arquivo', tiposArquivo);
+
+      // Limpar valores_referencia_de_para  
+      await supabase
+        .from('valores_referencia_de_para')
+        .delete()
+        .gte('created_at', '1900-01-01');
+
+      // Limpar registros_rejeitados_processamento
+      await supabase
+        .from('registros_rejeitados_processamento')
+        .delete()
+        .in('arquivo_fonte', tiposArquivo);
+
+      console.log('✅ Limpeza completa realizada!');
 
       // FORÇAR INVALIDAÇÃO COMPLETA DO CACHE
       console.log('🔄 Invalidando cache do contexto...');
