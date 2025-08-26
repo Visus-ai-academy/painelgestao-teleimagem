@@ -175,15 +175,28 @@ export function MonitorRegrasTempoReal({
     return () => clearInterval(interval);
   }, [isProcessing, loteUpload]);
 
-  // Notificar quando regras forem completadas
+  // Notificar quando regras forem completadas e alertar sobre regras não aplicadas
   useEffect(() => {
     const regrasAplicadas = regrasStatus.filter(r => r.aplicada).length;
     const totalRegras = regrasStatus.length;
+    const regrasNaoAplicadas = regrasStatus.filter(r => !r.aplicada && !r.em_execucao);
     
     if (onRegrasCompletas) {
       onRegrasCompletas(totalRegras, regrasAplicadas);
     }
-  }, [regrasStatus, onRegrasCompletas]);
+
+    // Se o processamento terminou e ainda há regras não aplicadas, alertar
+    if (!isProcessing && totalRegras > 0 && regrasNaoAplicadas.length > 0) {
+      // Aguardar um tempo para ter certeza que o processamento terminou
+      const timer = setTimeout(() => {
+        if (regrasNaoAplicadas.length > 0) {
+          console.warn('⚠️ REGRAS NÃO APLICADAS:', regrasNaoAplicadas.map(r => `${r.id}: ${r.nome}`));
+        }
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [regrasStatus, onRegrasCompletas, isProcessing]);
 
   const getStatusIcon = (regra: RegraStatus) => {
     if (regra.em_execucao) {
@@ -234,33 +247,55 @@ export function MonitorRegrasTempoReal({
 
         {/* Lista de Regras */}
         <div className="space-y-2 max-h-60 overflow-y-auto">
-          {regrasStatus.map((regra) => (
-            <div
-              key={regra.id}
-              className="flex items-center justify-between p-3 bg-white rounded-lg border"
-            >
-              <div className="flex items-center gap-3">
-                {getStatusIcon(regra)}
-                <div>
-                  <div className="font-medium text-sm">{regra.id}: {regra.nome}</div>
-                  {regra.timestamp && (
-                    <div className="text-xs text-gray-500">
-                      Aplicada às {new Date(regra.timestamp).toLocaleTimeString()}
+          {regrasStatus.map((regra) => {
+            const isRegraNaoAplicada = !isProcessing && !regra.aplicada && !regra.em_execucao;
+            
+            return (
+              <div
+                key={regra.id}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                  isRegraNaoAplicada 
+                    ? 'bg-red-50 border-red-200 animate-pulse' 
+                    : regra.aplicada 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-white border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(regra)}
+                  <div>
+                    <div className={`font-medium text-sm ${
+                      isRegraNaoAplicada ? 'text-red-700' : 'text-gray-900'
+                    }`}>
+                      {regra.id}: {regra.nome}
+                      {isRegraNaoAplicada && (
+                        <span className="ml-2 text-red-600 font-bold">⚠️ NÃO APLICADA</span>
+                      )}
                     </div>
-                  )}
-                  {regra.registros_afetados && (
-                    <div className="text-xs text-blue-600">
-                      {regra.registros_afetados} registros processados
-                    </div>
-                  )}
+                    {regra.timestamp && (
+                      <div className="text-xs text-gray-500">
+                        Aplicada às {new Date(regra.timestamp).toLocaleTimeString()}
+                      </div>
+                    )}
+                    {regra.registros_afetados && (
+                      <div className="text-xs text-blue-600">
+                        {regra.registros_afetados} registros processados
+                      </div>
+                    )}
+                    {isRegraNaoAplicada && (
+                      <div className="text-xs text-red-600 font-medium">
+                        Esta regra deveria ter sido aplicada para este tipo de arquivo
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(regra)}
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                {getStatusBadge(regra)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Informações Adicionais */}

@@ -254,17 +254,45 @@ export function MonitorAplicacaoRegras({ arquivoFonte, loteUpload }: MonitorApli
                 <CardHeader>
                   <CardTitle className="text-red-800 flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5" />
-                    Regras Não Aplicadas ({monitorData.regras_nao_aplicadas.length})
+                    🚨 REGRAS NÃO APLICADAS ({monitorData.regras_nao_aplicadas.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {monitorData.regras_nao_aplicadas.map((regra) => (
-                      <div key={regra.id} className="text-sm text-red-700">
-                        • {regra.id}: {NOMES_REGRAS[regra.id] || 'Regra não catalogada'} 
-                        <span className="text-red-600"> ({regra.edge_function})</span>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-red-100 border border-red-300 rounded-lg">
+                      <div className="font-bold text-red-800 mb-2">
+                        ⚠️ ATENÇÃO: As seguintes regras deveriam ter sido aplicadas mas não foram detectadas:
                       </div>
-                    ))}
+                      <div className="text-red-700 text-sm mb-3">
+                        Isso pode indicar problemas no processamento que requerem atenção imediata.
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {monitorData.regras_nao_aplicadas.map((regra) => (
+                        <div key={regra.id} className="p-3 bg-white border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <div className="font-medium text-red-800">
+                              {regra.id}: {NOMES_REGRAS[regra.id] || 'Regra não catalogada'}
+                            </div>
+                          </div>
+                          <div className="text-sm text-red-600 mt-1">
+                            Edge Function: {regra.edge_function}
+                          </div>
+                          <div className="text-xs text-red-500 mt-1">
+                            Esta regra é esperada para arquivos do tipo: {monitorData.arquivo_fonte}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="text-sm text-yellow-800">
+                        <strong>💡 Recomendação:</strong> Execute manualmente essas regras na aba "Status das Regras" 
+                        ou verifique se há problemas no processamento automático.
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

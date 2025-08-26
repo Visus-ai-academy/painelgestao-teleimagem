@@ -240,13 +240,37 @@ export function VolumetriaUpload({ arquivoFonte, onSuccess, disabled = false, pe
 
       {/* Resumo das Regras Aplicadas */}
       {regrasCompletas && !isProcessing && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
-          <div className="font-medium text-green-800">
-            ✅ Regras aplicadas: {regrasCompletas.aplicadas}/{regrasCompletas.total}
+        <div className={`border rounded-lg p-4 text-sm ${
+          regrasCompletas.aplicadas === regrasCompletas.total
+            ? 'bg-green-50 border-green-200'
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <div className={`font-medium mb-2 ${
+            regrasCompletas.aplicadas === regrasCompletas.total
+              ? 'text-green-800'
+              : 'text-red-800'
+          }`}>
+            {regrasCompletas.aplicadas === regrasCompletas.total ? '✅' : '⚠️'} 
+            Regras aplicadas: {regrasCompletas.aplicadas}/{regrasCompletas.total}
           </div>
-          <div className="text-green-600">
+          <div className={`${
+            regrasCompletas.aplicadas === regrasCompletas.total
+              ? 'text-green-600'
+              : 'text-red-600'
+          }`}>
             {Math.round((regrasCompletas.aplicadas / regrasCompletas.total) * 100)}% de cobertura das regras
           </div>
+          
+          {regrasCompletas.aplicadas < regrasCompletas.total && (
+            <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded">
+              <div className="font-medium text-red-800 mb-1">
+                🚨 ATENÇÃO: {regrasCompletas.total - regrasCompletas.aplicadas} regra(s) não foram aplicadas!
+              </div>
+              <div className="text-red-700 text-xs">
+                Isso pode indicar um problema no processamento. Verifique o monitor de regras abaixo para mais detalhes.
+              </div>
+            </div>
+          )}
         </div>
       )}
 
