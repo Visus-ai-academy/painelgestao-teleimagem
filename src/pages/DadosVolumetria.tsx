@@ -23,6 +23,7 @@ import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados'
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
+import { AutoAplicarRegrasRetroativas } from "@/components/AutoAplicarRegrasRetroativas";
 
 // Período atual - onde estão os dados carregados (junho/2025)
 const PERIODO_ATUAL = "2025-06";
@@ -48,6 +49,9 @@ export default function DadosVolumetria() {
 
       {/* Data e Hora do Sistema */}
       <SystemDateTime />
+      
+      {/* Verificação automática das regras v002/v003 */}
+      <AutoAplicarRegrasRetroativas />
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
