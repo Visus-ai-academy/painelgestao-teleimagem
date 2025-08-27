@@ -19,6 +19,7 @@ import { MonitorAplicacaoRegras } from '@/components/MonitorAplicacaoRegras';
 import { MonitorValidacaoRegras } from '@/components/MonitorValidacaoRegras';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
+import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
@@ -158,6 +159,9 @@ export default function DadosVolumetria() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <VolumetriaStatusPanel />
+                
+                {/* Finalizar uploads travados */}
+                <FinalizarUploadsTravados />
                 
                 {/* Detectar e resetar uploads travados */}
                 {uploadStatus.processingUploads > 0 && uploadStatus.progressPercentage < 50 && (
