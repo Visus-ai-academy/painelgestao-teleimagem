@@ -4568,6 +4568,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      verificar_e_aplicar_regras_automaticas: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "user" | "medico"
