@@ -76,6 +76,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
         .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%');
       return count === 0; // Não deveria ter DX/CR não-mamográficos
+    }
   },
   
   // 4. CORREÇÃO DE MODALIDADES (OT → DO)
