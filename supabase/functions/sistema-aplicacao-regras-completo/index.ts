@@ -101,12 +101,12 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Todos os arquivos
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda há prioridades não padronizadas (usando aspas duplas)
+      // Verificar se ainda há prioridades não padronizadas - aceitar as variações válidas
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
-        .not('"PRIORIDADE"', 'in', '("ROTINA","URGÊNCIA","PLANTÃO")');
+        .not('PRIORIDADE', 'in', '(ROTINA,URGÊNCIA,PLANTÃO,Rotina,Urgência,Plantão,Ambulatório,Internado)');
       return count === 0;
     }
   },
