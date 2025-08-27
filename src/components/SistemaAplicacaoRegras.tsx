@@ -79,6 +79,7 @@ export function SistemaAplicacaoRegras() {
     const nomes: Record<string, string> = {
       'v002_v003_exclusoes_periodo': 'Regras v002/v003 - Exclusões por Período',
       'correcao_modalidades_dx_cr': 'Correção Modalidades DX/CR → RX',
+      'correcao_modalidades_ot': 'Correção Modalidades OT → DO',
       'de_para_prioridades': 'De-Para Prioridades',
       'de_para_valores_zerados': 'De-Para Valores Zerados',
       'tipificacao_faturamento': 'Tipificação de Faturamento',

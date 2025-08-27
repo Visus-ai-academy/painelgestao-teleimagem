@@ -67,7 +67,24 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 3. DE-PARA PRIORIDADES
+  // 3. CORREÇÃO DE MODALIDADES (OT → DO)
+  {
+    nome: "correcao_modalidades_ot",
+    funcao: "aplicar-correcao-modalidade-ot",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      // Verificar se ainda existem modalidades OT (deveriam ter sido convertidas para DO)
+      const { count } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('arquivo_fonte', arquivo)
+        .eq('MODALIDADE', 'OT');
+      return count === 0; // Não deveria ter modalidade OT
+    }
+  },
+  
+  // 4. DE-PARA PRIORIDADES
   {
     nome: "de_para_prioridades",
     funcao: "aplicar-de-para-prioridades",
@@ -84,7 +101,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 4. DE-PARA VALORES ZERADOS
+  // 5. DE-PARA VALORES ZERADOS
   {
     nome: "de_para_valores_zerados",
     funcao: "aplicar-regras-tratamento",
@@ -108,7 +125,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 5. TIPIFICAÇÃO DE FATURAMENTO
+  // 6. TIPIFICAÇÃO DE FATURAMENTO
   {
     nome: "tipificacao_faturamento",
     funcao: "aplicar-tipificacao-faturamento",
@@ -125,7 +142,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 6. VALIDAÇÃO DE CLIENTE
+  // 7. VALIDAÇÃO DE CLIENTE
   {
     nome: "validacao_cliente",
     funcao: "aplicar-validacao-cliente",
