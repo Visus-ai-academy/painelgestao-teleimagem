@@ -56,6 +56,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         return count === 0; // Deveria ser 0 após v003
       }
       return true;
+    }
   },
   
   // 3. CORREÇÃO DE MODALIDADES (DX/CR → RX)
