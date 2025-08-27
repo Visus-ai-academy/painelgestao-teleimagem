@@ -259,6 +259,28 @@ serve(async (req) => {
         console.error(`❌ Erro ao aplicar regras:`, regrasError);
       }
 
+      // Aplicar regras v002/v003 automaticamente para arquivos retroativos
+      let regrasExclusao = 0;
+      if (arquivo_fonte.includes('retroativo')) {
+        try {
+          console.log(`🔥 Aplicando regras v002/v003 automaticamente para arquivo retroativo: ${arquivo_fonte}`);
+          const { data: exclusoesResult } = await supabaseClient.functions.invoke(
+            'aplicar-exclusoes-periodo',
+            { 
+              body: { 
+                periodo_referencia: periodoReferencia,
+                automatico: true,
+                aplicar_sempre: true 
+              } 
+            }
+          );
+          regrasExclusao = exclusoesResult?.total_excluidos || 0;
+          console.log(`✅ Regras v002/v003 aplicadas: ${regrasExclusao} registros excluídos`);
+        } catch (exclusoesError) {
+          console.error(`❌ Erro ao aplicar regras v002/v003:`, exclusoesError);
+        }
+      }
+
       // Atualizar status final
       await supabaseClient
         .from('processamento_uploads')
@@ -274,6 +296,8 @@ serve(async (req) => {
             total_inserido: totalInseridos,
             total_erros: totalErros,
             regras_aplicadas: regrasAplicadas,
+            regras_exclusao_aplicadas: regrasExclusao,
+            arquivo_retroativo: arquivo_fonte.includes('retroativo'),
             debug_info: {
               arquivo_fonte,
               lote_upload,
@@ -283,7 +307,7 @@ serve(async (req) => {
         })
         .eq('id', uploadId);
 
-      console.log(`✅ PROCESSAMENTO CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados, ${regrasAplicadas} regras aplicadas de ${totalProcessados} processados`);
+      console.log(`✅ PROCESSAMENTO CONCLUÍDO: ${totalInseridos} inseridos, ${totalErros} rejeitados, ${regrasAplicadas} regras aplicadas${arquivo_fonte.includes('retroativo') ? `, ${regrasExclusao} exclusões v002/v003` : ''} de ${totalProcessados} processados`);
       
       return {
         sucesso: true,
@@ -291,6 +315,7 @@ serve(async (req) => {
         totalInseridos,
         totalErros,
         regrasAplicadas,
+        regrasExclusao,
         arquivo_fonte,
         lote_upload: loteUpload
       };
