@@ -130,3 +130,6 @@ verify_jwt = false
 
 [functions.popular-registros-rejeitados]
 verify_jwt = false
+
+[functions.aplicar-de-para-prioridades]
+verify_jwt = true

@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,167 +7,177 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { arquivo_fonte } = await req.json();
-    
-    // Initialize Supabase client
-    const supabaseClient = createClient(
+    console.log(`Iniciando aplicação De-Para prioridades no arquivo: ${arquivo_fonte}`);
+
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log(`🏷️ Iniciando aplicação de De-Para Prioridades para arquivo: ${arquivo_fonte}`);
-    
-    // Buscar mapeamento de prioridades
-    const { data: deParaPrioridades, error: deParaError } = await supabaseClient
+    // Buscar mapeamentos de prioridades ativos
+    const { data: mapeamentos, error: errorMapeamentos } = await supabase
       .from('valores_prioridade_de_para')
-      .select('prioridade_original, nome_final');
+      .select('*')
+      .eq('ativo', true);
 
-    if (deParaError) {
-      console.error('❌ Erro ao buscar De-Para prioridades:', deParaError);
-      throw deParaError;
-    }
-
-    console.log(`📚 Carregados ${deParaPrioridades?.length || 0} mapeamentos de prioridade`);
-
-    if (!deParaPrioridades || deParaPrioridades.length === 0) {
-      const resultado = {
-        sucesso: true,
-        arquivo_fonte,
-        registros_processados: 0,
-        registros_atualizados: 0,
-        registros_erro: 0,
-        regra_aplicada: 'v018 - De-Para Prioridades',
-        observacao: 'Nenhum mapeamento de prioridade encontrado'
-      };
-
-      console.log('⚠️ Nenhum mapeamento de prioridade encontrado');
-      return new Response(JSON.stringify(resultado), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (errorMapeamentos) {
+      console.error('Erro ao buscar mapeamentos:', errorMapeamentos);
+      return new Response(JSON.stringify({ 
+        sucesso: false, 
+        erro: errorMapeamentos.message 
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
       });
     }
 
-    // Criar mapa de prioridades para busca eficiente
-    const mapaPrioridades = new Map();
-    deParaPrioridades.forEach(item => {
-      mapaPrioridades.set(item.prioridade_original, item.nome_final);
+    if (!mapeamentos || mapeamentos.length === 0) {
+      console.log('Nenhum mapeamento de prioridade encontrado');
+      return new Response(JSON.stringify({
+        sucesso: true,
+        arquivo_fonte,
+        registros_encontrados: 0,
+        registros_atualizados: 0,
+        mensagem: 'Nenhum mapeamento de prioridade configurado'
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`Encontrados ${mapeamentos.length} mapeamentos de prioridade`);
+
+    // Buscar registros que precisam ser atualizados
+    const prioridadesOriginais = mapeamentos.map(m => m.prioridade_original);
+    
+    const { data: registrosParaAtualizar, error: errorRegistros } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id, PRIORIDADE')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .in('PRIORIDADE', prioridadesOriginais);
+
+    if (errorRegistros) {
+      console.error('Erro ao buscar registros:', errorRegistros);
+      return new Response(JSON.stringify({ 
+        sucesso: false, 
+        erro: errorRegistros.message 
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
+    }
+
+    if (!registrosParaAtualizar || registrosParaAtualizar.length === 0) {
+      console.log('Nenhum registro encontrado para atualização');
+      return new Response(JSON.stringify({
+        sucesso: true,
+        arquivo_fonte,
+        registros_encontrados: 0,
+        registros_atualizados: 0,
+        mensagem: 'Nenhum registro encontrado para De-Para de prioridades'
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`Encontrados ${registrosParaAtualizar.length} registros para atualização`);
+
+    // Criar mapa de conversão para facilitar lookup
+    const mapaConversao = new Map();
+    mapeamentos.forEach(m => {
+      mapaConversao.set(m.prioridade_original, m.nome_final);
     });
 
-    // Buscar registros com prioridades que podem ser mapeadas
-    const prioridadesOriginais = Array.from(mapaPrioridades.keys());
-    
-    const { data: registrosParaAtualizar, error: selectError } = await supabaseClient
-      .from('volumetria_mobilemed')
-      .select('id, "PRIORIDADE"')
-      .eq('arquivo_fonte', arquivo_fonte)
-      .in('"PRIORIDADE"', prioridadesOriginais);
-
-    if (selectError) {
-      console.error('❌ Erro ao buscar registros para atualização:', selectError);
-      throw selectError;
-    }
-
-    console.log(`📊 Encontrados ${registrosParaAtualizar?.length || 0} registros para aplicar De-Para`);
-
-    let totalProcessados = 0;
+    // Processar em lotes de 1000 registros
     let totalAtualizados = 0;
-    let totalErros = 0;
-    const exemplosMapeados: any[] = [];
+    const batchSize = 1000;
+    const exemplosConvertidos = [];
 
-    // Processar em lotes de 100 registros
-    const batchSize = 100;
-    for (let i = 0; i < (registrosParaAtualizar?.length || 0); i += batchSize) {
-      const lote = registrosParaAtualizar!.slice(i, i + batchSize);
-      console.log(`🔄 Processando lote ${Math.floor(i / batchSize) + 1}/${Math.ceil((registrosParaAtualizar?.length || 0) / batchSize)} - ${lote.length} registros`);
+    for (let i = 0; i < registrosParaAtualizar.length; i += batchSize) {
+      const batch = registrosParaAtualizar.slice(i, i + batchSize);
       
-      for (const registro of lote) {
-        totalProcessados++;
+      for (const registro of batch) {
+        const novaprioridade = mapaConversao.get(registro.PRIORIDADE);
         
-        try {
-          const prioridadeOriginal = registro.PRIORIDADE;
-          const prioridadeFinal = mapaPrioridades.get(prioridadeOriginal);
-          
-          if (prioridadeFinal && prioridadeFinal !== prioridadeOriginal) {
-            const { error: updateError } = await supabaseClient
-              .from('volumetria_mobilemed')
-              .update({
-                'PRIORIDADE': prioridadeFinal,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', registro.id);
+        if (novaprioridade && novaprioridade !== registro.PRIORIDADE) {
+          const { error: updateError } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ PRIORIDADE: novaprioridade })
+            .eq('id', registro.id);
 
-            if (updateError) {
-              console.error(`❌ Erro ao atualizar prioridade do registro ${registro.id}:`, updateError);
-              totalErros++;
-            } else {
-              totalAtualizados++;
-              
-              // Armazenar exemplo para log
-              if (exemplosMapeados.length < 10) {
-                exemplosMapeados.push({
-                  prioridade_original: prioridadeOriginal,
-                  prioridade_final: prioridadeFinal
-                });
-              }
-              
-              console.log(`✅ Prioridade mapeada: "${prioridadeOriginal}" → "${prioridadeFinal}"`);
-            }
+          if (updateError) {
+            console.error(`Erro ao atualizar registro ${registro.id}:`, updateError);
+            continue;
           }
-        } catch (error) {
-          console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
-          totalErros++;
+
+          totalAtualizados++;
+          
+          // Coletar exemplos para o log
+          if (exemplosConvertidos.length < 5) {
+            exemplosConvertidos.push({
+              prioridade_original: registro.PRIORIDADE,
+              prioridade_nova: novaprioridade
+            });
+          }
         }
       }
+
+      console.log(`Processado lote ${Math.floor(i / batchSize) + 1}, atualizados: ${totalAtualizados}`);
     }
 
-    // Log da operação no audit_logs
-    await supabaseClient
+    // Log da operação
+    const { error: logError } = await supabase
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'APLICAR_DE_PARA_PRIORIDADES',
+        operation: 'CORRECAO_AUTOMATICA',
         record_id: arquivo_fonte,
         new_data: {
-          regra: 'v018',
           arquivo_fonte,
-          total_processados: totalProcessados,
-          total_atualizados: totalAtualizados,
-          total_erros: totalErros,
-          exemplos_mapeados: exemplosMapeados,
-          data_processamento: new Date().toISOString()
+          registros_encontrados: registrosParaAtualizar.length,
+          registros_atualizados: totalAtualizados,
+          exemplos_convertidos: exemplosConvertidos,
+          regra: 'v032',
+          tipo_correcao: 'DE_PARA_PRIORIDADES'
         },
         user_email: 'system',
         severity: 'info'
       });
 
+    if (logError) {
+      console.error('Erro ao registrar log:', logError);
+    }
+
     const resultado = {
       sucesso: true,
       arquivo_fonte,
-      registros_processados: totalProcessados,
+      registros_encontrados: registrosParaAtualizar.length,
       registros_atualizados: totalAtualizados,
-      registros_erro: totalErros,
-      exemplos_mapeados: exemplosMapeados,
-      regra_aplicada: 'v018 - De-Para Prioridades',
+      exemplos_convertidos: exemplosConvertidos,
+      regra_aplicada: 'v032 - De-Para Prioridades',
       data_processamento: new Date().toISOString(),
-      observacao: `Aplicado De-Para de prioridades para ${totalAtualizados} registros`
+      observacao: `${totalAtualizados} registros tiveram suas prioridades padronizadas`
     };
 
-    console.log('✅ De-Para de prioridades aplicado com sucesso:', resultado);
+    console.log('De-Para prioridades concluído:', resultado);
 
-    return new Response(JSON.stringify(resultado), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify(resultado), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (error) {
-    console.error('❌ Erro geral na aplicação de De-Para prioridades:', error);
-    return new Response(
-      JSON.stringify({ erro: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    );
+    console.error('Erro na função aplicar-de-para-prioridades:', error);
+    return new Response(JSON.stringify({ 
+      sucesso: false, 
+      erro: error.message 
+    }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500 
+    });
   }
 });
