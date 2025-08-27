@@ -96,14 +96,15 @@ serve(async (req) => {
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'CORRECAO_MODALIDADE_OT',
+        operation: 'CORRECAO_AUTOMATICA',
         record_id: arquivo_fonte,
         new_data: {
           arquivo_fonte,
           registros_encontrados: registrosParaCorrigir.length,
           registros_corrigidos: registrosCorrigidos,
           exemplos_corrigidos: exemplosCorrigan,
-          regra: 'v031'
+          regra: 'v031',
+          tipo_correcao: 'MODALIDADE_OT'
         },
         user_email: 'system',
         severity: 'info'
