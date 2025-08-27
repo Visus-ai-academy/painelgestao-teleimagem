@@ -142,7 +142,7 @@ serve(async (req) => {
           registros_encontrados: registrosParaAtualizar.length,
           registros_atualizados: totalAtualizados,
           exemplos_convertidos: exemplosConvertidos,
-          regra: 'v032',
+          regra: 'v018',
           tipo_correcao: 'DE_PARA_PRIORIDADES'
         },
         user_email: 'system',
@@ -159,7 +159,7 @@ serve(async (req) => {
       registros_encontrados: registrosParaAtualizar.length,
       registros_atualizados: totalAtualizados,
       exemplos_convertidos: exemplosConvertidos,
-      regra_aplicada: 'v032 - De-Para Prioridades',
+      regra_aplicada: 'v018 - De-Para Prioridades',
       data_processamento: new Date().toISOString(),
       observacao: `${totalAtualizados} registros tiveram suas prioridades padronizadas`
     };

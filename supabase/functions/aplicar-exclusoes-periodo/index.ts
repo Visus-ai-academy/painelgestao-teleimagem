@@ -1,272 +1,160 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Função para calcular datas do período de faturamento
-function calcularDatasPeriodoFaturamento(periodoReferencia: string) {
-  console.log(`🗓️ Calculando datas para período: ${periodoReferencia}`);
-  const [mesStr, anoStr] = periodoReferencia.toLowerCase().split('/');
-  const meses: Record<string, number> = {
-    'janeiro': 1, 'jan': 1,
-    'fevereiro': 2, 'fev': 2,
-    'março': 3, 'mar': 3,
-    'abril': 4, 'abr': 4,
-    'maio': 5, 'mai': 5,
-    'junho': 6, 'jun': 6,
-    'julho': 7, 'jul': 7,
-    'agosto': 8, 'ago': 8,
-    'setembro': 9, 'set': 9,
-    'outubro': 10, 'out': 10,
-    'novembro': 11, 'nov': 11,
-    'dezembro': 12, 'dez': 12
-  };
-  const mes = meses[mesStr];
-  const ano = anoStr.length === 2 ? 2000 + parseInt(anoStr) : parseInt(anoStr);
-  if (!mes || !ano) throw new Error(`Período inválido: ${periodoReferencia}`);
-
-  // Datas base
-  const primeiroDiaMes = new Date(ano, mes - 1, 1);
-  const ultimoDiaMes = new Date(ano, mes, 0); // dia 0 do próximo mês = último dia do mês atual
-  const inicioFaturamento = new Date(ano, mes - 1, 8); // 08 do mês de referência
-  const fimFaturamento = new Date(ano, mes, 7); // 07 do mês seguinte
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
-  const result = {
-    // Para retroativos (v002/v003)
-    dataLimiteRealizacao: fmt(primeiroDiaMes),
-    inicioFaturamento: fmt(inicioFaturamento),
-    fimFaturamento: fmt(fimFaturamento),
-    // Para não-retroativos (v031)
-    realizacaoInicioMes: fmt(primeiroDiaMes),
-    realizacaoFimMes: fmt(ultimoDiaMes),
-    laudoInicioJanela: fmt(primeiroDiaMes),
-    laudoFimJanela: fmt(fimFaturamento),
-  };
-
-  console.log('📊 Datas calculadas:', result);
-  return result;
-}
-
-export default async function handler(req: Request): Promise<Response> {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { periodo_referencia, disable_rules } = await req.json();
-    
-    if (!periodo_referencia) {
-      throw new Error('período_referencia é obrigatório');
-    }
-
-    console.log(`🔧 Aplicando exclusões por período: ${periodo_referencia}`);
-    
-    // TESTE: Verificar se regras específicas devem ser desabilitadas
-    const regrasDesabilitadas = disable_rules || [];
-    console.log(`🚫 Regras desabilitadas para teste: ${regrasDesabilitadas.join(', ')}`);
+    const { arquivo_fonte, periodo_referencia } = await req.json();
+    console.log(`Aplicando exclusões por período - Arquivo: ${arquivo_fonte}, Período: ${periodo_referencia}`);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { 
-      dataLimiteRealizacao,
-      inicioFaturamento,
-      fimFaturamento,
-      realizacaoInicioMes,
-      realizacaoFimMes,
-      laudoInicioJanela,
-      laudoFimJanela,
-    } = calcularDatasPeriodoFaturamento(periodo_referencia);
+    let dataLimite: Date;
     
-    console.log(`📅 Datas calculadas:`);
-    console.log(`   - Data limite DATA_REALIZACAO (retroativos): ${dataLimiteRealizacao}`);
-    console.log(`   - Período DATA_LAUDO (retroativos): ${inicioFaturamento} a ${fimFaturamento}`);
-
-    let totalExcluidos = 0;
-    const detalhes = [] as string[];
-
-    // REGRA v031: Filtro de período atual para arquivos NÃO-RETROATIVOS
-    if (regrasDesabilitadas.includes('v031')) {
-      console.log(`🚫 REGRA v031 DESABILITADA para teste`);
-      detalhes.push(`REGRA v031 - DESABILITADA PARA TESTE`);
+    // Determinar data limite baseada no período de referência
+    if (periodo_referencia === 'jun/25') {
+      // Para junho/25, a data limite é 01/06/2025
+      dataLimite = new Date('2025-06-01');
     } else {
-      console.log(`🗂️ Aplicando REGRA v031 nos arquivos não-retroativos...`);
-      console.log(`📅 REGRA v031 - REALIZAÇÃO entre: ${realizacaoInicioMes} e ${realizacaoFimMes}`);
-      console.log(`📅 REGRA v031 - LAUDO entre: ${laudoInicioJanela} e ${laudoFimJanela}`);
-
-      // Aplicar v031 em volumetria_padrao
-      const { error: errorV031_1, count: countV031_1 } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_padrao')
-        .or(`DATA_REALIZACAO.lt.${realizacaoInicioMes},DATA_REALIZACAO.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},DATA_LAUDO.lt.${laudoInicioJanela},DATA_LAUDO.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
-
-      if (!errorV031_1) {
-        const deletedV031_1 = countV031_1 || 0;
-        totalExcluidos += deletedV031_1;
-        detalhes.push(`REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
-        console.log(`✅ REGRA v031 - volumetria_padrao: ${deletedV031_1} registros excluídos`);
-      }
-
-      // Aplicar v031 em volumetria_fora_padrao
-      const { error: errorV031_2, count: countV031_2 } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_fora_padrao')
-        .or(`DATA_REALIZACAO.lt.${realizacaoInicioMes},DATA_REALIZACAO.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},DATA_LAUDO.lt.${laudoInicioJanela},DATA_LAUDO.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
-
-      if (!errorV031_2) {
-        const deletedV031_2 = countV031_2 || 0;
-        totalExcluidos += deletedV031_2;
-        detalhes.push(`REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
-        console.log(`✅ REGRA v031 - volumetria_fora_padrao: ${deletedV031_2} registros excluídos`);
-      }
-
-      // Aplicar v031 em volumetria_onco_padrao
-      const { error: errorV031_3, count: countV031_3 } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_onco_padrao')
-        .or(`DATA_REALIZACAO.lt.${realizacaoInicioMes},DATA_REALIZACAO.gte.${new Date(new Date(realizacaoFimMes).getTime() + 86400000).toISOString().split('T')[0]},DATA_LAUDO.lt.${laudoInicioJanela},DATA_LAUDO.gte.${new Date(new Date(laudoFimJanela).getTime() + 86400000).toISOString().split('T')[0]}`);
-
-      if (!errorV031_3) {
-        const deletedV031_3 = countV031_3 || 0;
-        totalExcluidos += deletedV031_3;
-        detalhes.push(`REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
-        console.log(`✅ REGRA v031 - volumetria_onco_padrao: ${deletedV031_3} registros excluídos`);
-      }
+      // Para outros períodos, calcular dinamicamente
+      const [mes, ano] = periodo_referencia.split('/');
+      const meses: { [key: string]: number } = {
+        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+      };
+      const anoCompleto = 2000 + parseInt(ano);
+      const mesNumero = meses[mes];
+      dataLimite = new Date(anoCompleto, mesNumero - 1, 1); // Primeiro dia do mês
     }
 
-    // Arquivo 3: volumetria_padrao_retroativo
-    console.log(`🗂️ Processando Arquivo 3 (volumetria_padrao_retroativo)...`);
-    
-    // Excluir registros com DATA_REALIZACAO a partir de 01/XX/2025 (INCLUSIVE)
-    const { error: error3_realizacao, count: count3_realizacao } = await supabase
+    console.log(`Data limite para exclusão: ${dataLimite.toISOString().split('T')[0]}`);
+
+    // Primeiro, contar quantos registros serão afetados
+    const { data: registrosParaExcluir, error: errorContar } = await supabase
       .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-      .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+      .select('id, DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
-    if (error3_realizacao) {
-      console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 3):', error3_realizacao);
-    } else {
-      const deletedCount3_realizacao = count3_realizacao || 0;
-      totalExcluidos += deletedCount3_realizacao;
-      detalhes.push(`Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
-      console.log(`✅ Arquivo 3: ${deletedCount3_realizacao} registros excluídos por DATA_REALIZACAO`);
+    if (errorContar) {
+      console.error('Erro ao contar registros:', errorContar);
+      return new Response(JSON.stringify({ 
+        sucesso: false, 
+        erro: errorContar.message 
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
     }
 
-    // REGRA v002: Excluir registros com DATA_LAUDO fora do período de faturamento
-    if (regrasDesabilitadas.includes('v002')) {
-      console.log(`🚫 REGRA v002 DESABILITADA para teste - Arquivo 3`);
-      detalhes.push(`REGRA v002 - Arquivo 3: DESABILITADA PARA TESTE`);
-    } else {
-      // Manter apenas laudos entre inicioFaturamento e fimFaturamento (ambos INCLUSIVE)
-      // Para jun/25: manter laudos entre 08/06/2025 e 07/07/2025 (inclusive)
-      console.log(`📋 REGRA v002 - Excluindo laudos < ${inicioFaturamento} OU > ${fimFaturamento}`);
+    if (!registrosParaExcluir || registrosParaExcluir.length === 0) {
+      console.log('Nenhum registro encontrado para exclusão');
+      return new Response(JSON.stringify({
+        sucesso: true,
+        arquivo_fonte,
+        registros_encontrados: 0,
+        registros_excluidos: 0,
+        data_limite: dataLimite.toISOString().split('T')[0],
+        mensagem: 'Nenhum registro fora do período encontrado'
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`Encontrados ${registrosParaExcluir.length} registros para exclusão`);
+
+    // Coletar exemplos antes da exclusão
+    const exemplosExcluidos = registrosParaExcluir.slice(0, 5).map(reg => ({
+      data_laudo: reg.DATA_LAUDO,
+      estudo_descricao: reg.ESTUDO_DESCRICAO,
+      empresa: reg.EMPRESA
+    }));
+
+    // Processar exclusão em lotes para evitar timeout
+    let totalExcluidos = 0;
+    const batchSize = 1000;
+    const idsParaExcluir = registrosParaExcluir.map(r => r.id);
+
+    for (let i = 0; i < idsParaExcluir.length; i += batchSize) {
+      const batchIds = idsParaExcluir.slice(i, i + batchSize);
       
-      const { error: error3_laudo, count: count3_laudo } = await supabase
+      const { error: deleteError } = await supabase
         .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_padrao_retroativo')
-        .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
+        .delete()
+        .in('id', batchIds);
 
-      if (error3_laudo) {
-        console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 3):', error3_laudo);
-      } else {
-        const deletedCount3_laudo = count3_laudo || 0;
-        totalExcluidos += deletedCount3_laudo;
-        detalhes.push(`REGRA v002 - Arquivo 3: ${deletedCount3_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento} (inclusive)`);
-        console.log(`✅ REGRA v002 - Arquivo 3: ${deletedCount3_laudo} registros excluídos por DATA_LAUDO`);
+      if (deleteError) {
+        console.error(`Erro ao excluir lote ${Math.floor(i / batchSize) + 1}:`, deleteError);
+        continue;
       }
+
+      totalExcluidos += batchIds.length;
+      console.log(`Lote ${Math.floor(i / batchSize) + 1} processado: ${batchIds.length} registros excluídos`);
     }
 
-    // Arquivo 4: volumetria_fora_padrao_retroativo
-    console.log(`🗂️ Processando Arquivo 4 (volumetria_fora_padrao_retroativo)...`);
-    
-    // REGRA v003: Excluir registros com DATA_REALIZACAO a partir de 01/XX/2025 (INCLUSIVE)
-    if (regrasDesabilitadas.includes('v003')) {
-      console.log(`🚫 REGRA v003 DESABILITADA para teste - Arquivo 4`);
-      detalhes.push(`REGRA v003 - Arquivo 4: DESABILITADA PARA TESTE`);
-    } else {
-      const { error: error4_realizacao, count: count4_realizacao } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-        .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+    // Log da operação
+    const { error: logError } = await supabase
+      .from('audit_logs')
+      .insert({
+        table_name: 'volumetria_mobilemed',
+        operation: 'CORRECAO_AUTOMATICA',
+        record_id: arquivo_fonte,
+        new_data: {
+          arquivo_fonte,
+          periodo_referencia,
+          data_limite: dataLimite.toISOString().split('T')[0],
+          registros_encontrados: registrosParaExcluir.length,
+          registros_excluidos: totalExcluidos,
+          exemplos_excluidos: exemplosExcluidos,
+          regra: 'v002_v003',
+          tipo_correcao: 'EXCLUSOES_PERIODO'
+        },
+        user_email: 'system',
+        severity: 'info'
+      });
 
-      if (error4_realizacao) {
-        console.error('❌ Erro ao excluir por DATA_REALIZACAO (Arquivo 4):', error4_realizacao);
-      } else {
-        const deletedCount4_realizacao = count4_realizacao || 0;
-        totalExcluidos += deletedCount4_realizacao;
-        detalhes.push(`REGRA v003 - Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
-        console.log(`✅ REGRA v003 - Arquivo 4: ${deletedCount4_realizacao} registros excluídos por DATA_REALIZACAO`);
-      }
+    if (logError) {
+      console.error('Erro ao registrar log:', logError);
     }
 
-    // REGRA v002: Excluir registros com DATA_LAUDO fora do período de faturamento (Arquivo 4)
-    if (regrasDesabilitadas.includes('v002')) {
-      console.log(`🚫 REGRA v002 DESABILITADA para teste - Arquivo 4`);
-      detalhes.push(`REGRA v002 - Arquivo 4: DESABILITADA PARA TESTE`);
-    } else {
-      // Manter apenas laudos entre inicioFaturamento e fimFaturamento (ambos INCLUSIVE)
-      console.log(`📋 REGRA v002 - Excluindo laudos < ${inicioFaturamento} OU > ${fimFaturamento}`);
-      
-      const { error: error4_laudo, count: count4_laudo } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', 'volumetria_fora_padrao_retroativo')
-        .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
-
-      if (error4_laudo) {
-        console.error('❌ Erro ao excluir por DATA_LAUDO (Arquivo 4):', error4_laudo);
-      } else {
-        const deletedCount4_laudo = count4_laudo || 0;
-        totalExcluidos += deletedCount4_laudo;
-        detalhes.push(`Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO fora do período ${inicioFaturamento} a ${fimFaturamento}`);
-        console.log(`✅ Arquivo 4: ${deletedCount4_laudo} registros excluídos por DATA_LAUDO`);
-      }
-    }
-
-    // REGRAS APLICADAS:
-    // v031: Filtro período atual (arquivos não-retroativos)
-    // v002: Exclusão DATA_LAUDO (arquivos retroativos)  
-    // v003: Exclusão DATA_REALIZACAO (arquivos retroativos)
-    console.log(`✅ Regras v002, v003 e v031 aplicadas na ordem correta de execução`)
-
-    console.log(`🎯 Total de registros excluídos: ${totalExcluidos}`);
-
-    return new Response(JSON.stringify({
-      success: true,
+    const resultado = {
+      sucesso: true,
+      arquivo_fonte,
       periodo_referencia,
-      total_deletados: totalExcluidos, // Usar chave consistente
-      total_excluidos: totalExcluidos, // Manter compatibilidade
-      detalhes,
-      datas_aplicadas: {
-        data_limite_realizacao: dataLimiteRealizacao,
-        inicio_faturamento: inicioFaturamento,
-        fim_faturamento: fimFaturamento
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      data_limite: dataLimite.toISOString().split('T')[0],
+      registros_encontrados: registrosParaExcluir.length,
+      registros_excluidos: totalExcluidos,
+      exemplos_excluidos: exemplosExcluidos,
+      regra_aplicada: 'v002/v003 - Exclusões por Período',
+      data_processamento: new Date().toISOString(),
+      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO posterior a ${dataLimite.toISOString().split('T')[0]}`
+    };
+
+    console.log('Exclusões por período concluídas:', resultado);
+
+    return new Response(JSON.stringify(resultado), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (error) {
-    console.error('💥 Erro ao aplicar exclusões:', error);
-    
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    console.error('Erro na função aplicar-exclusoes-periodo:', error);
+    return new Response(JSON.stringify({ 
+      sucesso: false, 
+      erro: error.message 
+    }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500 
     });
   }
-}
+});

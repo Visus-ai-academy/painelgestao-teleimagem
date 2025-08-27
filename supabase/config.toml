@@ -133,3 +133,6 @@ verify_jwt = false
 
 [functions.aplicar-de-para-prioridades]
 verify_jwt = true
+
+[functions.aplicar-exclusoes-periodo]
+verify_jwt = true
