@@ -32,14 +32,14 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
 
   const fetchStatus = async () => {
     try {
-      // Buscar uploads ativos (processando) E recém-concluídos (últimos 3 minutos)
-      const cutoffTime = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      // Buscar uploads ativos (processando) E recém-concluídos (últimos 10 minutos para detectar travados)
+      const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       
       let query = supabase
         .from('processamento_uploads')
-        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at, tipo_arquivo, detalhes_erro')
+        .select('status, registros_processados, registros_inseridos, registros_atualizados, registros_erro, created_at, tipo_arquivo, detalhes_erro, id')
         .in('status', ['processando', 'concluido']) // Incluir concluídos também
-        .gte('created_at', cutoffTime); // Últimos 3 minutos
+        .gte('created_at', cutoffTime); // Últimos 10 minutos
       
       // Aplicar filtro de tipo(s)
       if (Array.isArray(fileType)) {
@@ -61,6 +61,23 @@ export function useUploadStatus(fileType: string | string[] = 'faturamento') {
       const processingUploads = activeUploads.filter(u => u.status === 'processando').length;
       const errorUploads = activeUploads.filter(u => u.status === 'erro').length;
       const totalRecordsProcessed = activeUploads.reduce((sum, u) => sum + (u.registros_processados || 0), 0);
+      
+      // Detectar uploads travados (processando há mais de 5 minutos)
+      const stuckUploads = activeUploads.filter(u => 
+        u.status === 'processando' && 
+        new Date().getTime() - new Date(u.created_at).getTime() > 5 * 60 * 1000
+      );
+      
+      // Auto-finalizar uploads travados
+      if (stuckUploads.length > 0) {
+        console.warn(`Detectados ${stuckUploads.length} uploads travados. Iniciando finalização automática...`);
+        try {
+          await supabase.functions.invoke('finalizar-uploads-travados');
+          console.log('Finalização automática de uploads travados executada');
+        } catch (error) {
+          console.error('Erro na finalização automática:', error);
+        }
+      }
       
       const isProcessing = processingUploads > 0;
       
