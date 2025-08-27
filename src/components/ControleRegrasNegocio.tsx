@@ -628,6 +628,30 @@ export function ControleRegrasNegocio() {
     }
   };
 
+  // Função para executar correção de exclusões retroativas
+  const corrigirExclusoesRetroativo = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Iniciando correção de exclusões retroativas...');
+      
+      const { data, error } = await supabase.functions.invoke('corrigir-exclusoes-retroativo');
+      
+      if (error) {
+        console.error('❌ Erro na correção:', error);
+        return;
+      }
+      
+      console.log('✅ Correção concluída:', data);
+      // Recarregar dados
+      await carregarRegrasExclusao();
+      
+    } catch (error) {
+      console.error('❌ Erro crítico na correção:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Converter regras de exclusão do banco para o formato padrão
   const regrasExclusaoFormatadas: Regra[] = regrasExclusao.map((regra, index) => ({
     id: regra.id,
