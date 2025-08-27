@@ -136,3 +136,6 @@ verify_jwt = true
 
 [functions.aplicar-exclusoes-periodo]
 verify_jwt = true
+
+[functions.aplicar-correcao-modalidade-rx]
+verify_jwt = true

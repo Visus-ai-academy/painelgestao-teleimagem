@@ -15,6 +15,30 @@ serve(async (req) => {
     const { arquivo_fonte, periodo_referencia } = await req.json();
     console.log(`Aplicando exclusões por período - Arquivo: ${arquivo_fonte}, Período: ${periodo_referencia}`);
 
+    // Validar arquivo_fonte
+    const arquivosValidos = [
+      'volumetria_padrao',
+      'volumetria_fora_padrao', 
+      'volumetria_padrao_retroativo',
+      'volumetria_fora_padrao_retroativo',
+      'volumetria_onco_padrao',
+      'arquivo_1_padrao',
+      'arquivo_2_padrao',
+      'arquivo_3_padrao', 
+      'arquivo_4_padrao',
+      'arquivo_5_padrao'
+    ];
+
+    if (!arquivosValidos.includes(arquivo_fonte)) {
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: `Arquivo ${arquivo_fonte} não é válido para esta regra`
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

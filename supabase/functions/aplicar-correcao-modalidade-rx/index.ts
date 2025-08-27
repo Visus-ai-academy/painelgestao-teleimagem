@@ -29,7 +29,12 @@ serve(async (req) => {
       'volumetria_fora_padrao', 
       'volumetria_padrao_retroativo',
       'volumetria_fora_padrao_retroativo',
-      'volumetria_onco_padrao'
+      'volumetria_onco_padrao',
+      'arquivo_1_padrao',
+      'arquivo_2_padrao',
+      'arquivo_3_padrao', 
+      'arquivo_4_padrao',
+      'arquivo_5_padrao'
     ];
 
     if (!arquivosValidos.includes(arquivo_fonte)) {
