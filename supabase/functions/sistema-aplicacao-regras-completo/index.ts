@@ -66,16 +66,27 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Arquivos 1,2,3,4,5
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda existem modalidades DX/CR que deveriam ser RX
-      const { count } = await supabase
+      // Verificar se ainda existem modalidades DX/CR (permitir algumas exceções para mamografia)
+      const { count: totalCRDX } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
-        .in('MODALIDADE', ['DX', 'CR'])
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%');
-      return count === 0; // Não deveria ter DX/CR não-mamográficos
+        .in('MODALIDADE', ['DX', 'CR']);
+      
+      // Se há CR/DX, verificar se são mamografias (que podem permanecer)
+      if (totalCRDX > 0) {
+        const { count: mamografias } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', arquivo)
+          .in('MODALIDADE', ['DX', 'CR'])
+          .or('"ESTUDO_DESCRICAO".ilike.%mamografia%,"ESTUDO_DESCRICAO".ilike.%mamogra%,"ESTUDO_DESCRICAO".ilike.%tomo%');
+        
+        // Aceitar se todos os CR/DX restantes são mamografias
+        return totalCRDX === mamografias;
+      }
+      
+      return true; // Se não há CR/DX, validação passou
     }
   },
   

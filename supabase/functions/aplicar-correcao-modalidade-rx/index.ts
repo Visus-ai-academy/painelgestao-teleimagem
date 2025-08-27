@@ -44,21 +44,23 @@ serve(async (req) => {
     console.log(`Iniciando correção de modalidade RX para arquivo: ${arquivo_fonte}`);
 
     // 1. Buscar registros que precisam ser corrigidos
-    // Critério 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA' → RX
+    // Critério 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ mamografia → RX
     const { data: registrosParaRX, error: errorBuscaRX } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
       .eq('arquivo_fonte', arquivo_fonte)
       .in('MODALIDADE', ['CR', 'DX'])
-      .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA');
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%');
 
-    // Critério 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = 'MAMOGRAFIA' → MG
+    // Critério 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = mamografia → MG
     const { data: registrosParaMG, error: errorBuscaMG } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
       .eq('arquivo_fonte', arquivo_fonte)
       .in('MODALIDADE', ['CR', 'DX'])
-      .eq('ESTUDO_DESCRICAO', 'MAMOGRAFIA');
+      .or('"ESTUDO_DESCRICAO".ilike.%mamografia%,"ESTUDO_DESCRICAO".ilike.%mamogra%,"ESTUDO_DESCRICAO".ilike.%tomo%');
 
     if (errorBuscaRX) {
       throw new Error(`Erro ao buscar registros RX para correção: ${errorBuscaRX.message}`);
@@ -88,7 +90,7 @@ serve(async (req) => {
     console.log(`Encontrados ${registrosParaRX?.length || 0} exames para RX e ${registrosParaMG?.length || 0} exames para MG`);
 
     // 2. Aplicar correções
-    // Correção 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ 'MAMOGRAFIA' → RX
+    // Correção 1: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO ≠ mamografia → RX
     const { data: resultadoUpdateRX, error: errorUpdateRX } = await supabase
       .from('volumetria_mobilemed')
       .update({ 
@@ -97,10 +99,12 @@ serve(async (req) => {
       })
       .eq('arquivo_fonte', arquivo_fonte)
       .in('MODALIDADE', ['CR', 'DX'])
-      .neq('ESTUDO_DESCRICAO', 'MAMOGRAFIA')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
+      .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
 
-    // Correção 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = 'MAMOGRAFIA' → MG
+    // Correção 2: MODALIDADE = 'CR' OU 'DX' E ESTUDO_DESCRICAO = mamografia → MG
     const { data: resultadoUpdateMG, error: errorUpdateMG } = await supabase
       .from('volumetria_mobilemed')
       .update({ 
@@ -109,7 +113,7 @@ serve(async (req) => {
       })
       .eq('arquivo_fonte', arquivo_fonte)
       .in('MODALIDADE', ['CR', 'DX'])
-      .eq('ESTUDO_DESCRICAO', 'MAMOGRAFIA')
+      .or('"ESTUDO_DESCRICAO".ilike.%mamografia%,"ESTUDO_DESCRICAO".ilike.%mamogra%,"ESTUDO_DESCRICAO".ilike.%tomo%')
       .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
 
     if (errorUpdateRX) {
