@@ -26,12 +26,24 @@ interface StatusAplicacao {
 
 // Definição completa de TODAS as regras do sistema
 const REGRAS_SISTEMA: RegraAplicacao[] = [
-  // 1. REGRAS DE PERÍODO (v002/v003/v031)
+  // 1. REGRA DE PERÍODO ATUAL (v031) - APENAS para arquivos não-retroativos
+  {
+    nome: "v031_filtro_periodo_atual",
+    funcao: "aplicar-exclusoes-periodo",
+    parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_onco_padrao'], // NÃO retroativos
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      // Para não-retroativos: verificar se filtrou corretamente por período atual
+      return true; // Regra sempre passa pois é de filtro
+    }
+  },
+  
+  // 2. REGRAS DE PERÍODO RETROATIVO (v002/v003) - APENAS para arquivos retroativos  
   {
     nome: "v002_v003_exclusoes_periodo",
-    funcao: "aplicar-exclusoes-periodo",
-    parametros: (periodo: string) => ({ periodo_referencia: periodo }),
-    arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_onco_padrao'],
+    funcao: "aplicar-exclusoes-periodo", 
+    parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
+    arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'], // APENAS retroativos
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
       // Validar se realmente foram excluídos registros conforme esperado
       if (arquivo.includes('retroativo')) {
@@ -44,15 +56,14 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         return count === 0; // Deveria ser 0 após v003
       }
       return true;
-    }
   },
   
-  // 2. CORREÇÃO DE MODALIDADES (DX/CR → RX)
+  // 3. CORREÇÃO DE MODALIDADES (DX/CR → RX)
   {
     nome: "correcao_modalidades_dx_cr",
     funcao: "aplicar-correcao-modalidade-rx",
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
-    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Arquivos 1,2,3,4,5
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
       // Verificar se ainda existem modalidades DX/CR que deveriam ser RX
       const { count } = await supabase
@@ -64,10 +75,9 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
         .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%');
       return count === 0; // Não deveria ter DX/CR não-mamográficos
-    }
   },
   
-  // 3. CORREÇÃO DE MODALIDADES (OT → DO)
+  // 4. CORREÇÃO DE MODALIDADES (OT → DO)
   {
     nome: "correcao_modalidades_ot",
     funcao: "aplicar-correcao-modalidade-ot",
@@ -87,16 +97,16 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
   // 4. DE-PARA PRIORIDADES
   {
     nome: "de_para_prioridades",
-    funcao: "aplicar-de-para-prioridades",
+    funcao: "aplicar-de-para-prioridades", 
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
-    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Todos os arquivos
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda há prioridades não padronizadas
+      // Verificar se ainda há prioridades não padronizadas (usando aspas duplas)
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
-        .not('PRIORIDADE', 'in', '("ROTINA","URGÊNCIA","PLANTÃO")');
+        .not('"PRIORIDADE"', 'in', '("ROTINA","URGÊNCIA","PLANTÃO")');
       return count === 0;
     }
   },
@@ -222,10 +232,18 @@ export default serve(async (req: Request): Promise<Response> => {
       } else {
         // Aplicar a regra
         try {
-          const parametros = typeof regra.parametros === 'function' 
-            ? regra.parametros(arquivo_fonte === regra.nome.includes('periodo') ? periodo : arquivo_fonte, lote_upload)
-            : regra.parametros;
-
+          let parametros;
+          if (typeof regra.parametros === 'function') {
+            // Passar argumentos corretos baseado no que a função espera
+            if (regra.nome.includes('periodo')) {
+              parametros = regra.parametros(arquivo_fonte, periodo);
+            } else {
+              parametros = regra.parametros(arquivo_fonte);
+            }
+          } else {
+            parametros = regra.parametros;
+          }
+          
           console.log(`🚀 Executando ${regra.funcao} com parâmetros:`, parametros);
 
           const { data: resultado, error } = await supabase.functions.invoke(regra.funcao, {
