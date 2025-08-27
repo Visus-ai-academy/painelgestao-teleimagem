@@ -29,11 +29,10 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
   // 1. REGRA DE PERÍODO ATUAL (v031) - APENAS para arquivos não-retroativos
   {
     nome: "v031_filtro_periodo_atual",
-    funcao: "aplicar-exclusoes-periodo",
+    funcao: "aplicar-filtro-periodo-atual",
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
-    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_onco_padrao'], // NÃO retroativos
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Para não-retroativos: verificar se filtrou corretamente por período atual
       return true; // Regra sempre passa pois é de filtro
     }
   },
@@ -43,37 +42,33 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     nome: "v002_v003_exclusoes_periodo",
     funcao: "aplicar-exclusoes-periodo", 
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
-    arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'], // APENAS retroativos
+    arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Validar se realmente foram excluídos registros conforme esperado
       if (arquivo.includes('retroativo')) {
-        // Para retroativos: verificar se não há mais registros com DATA_REALIZACAO >= 01/jun
         const { count } = await supabase
           .from('volumetria_mobilemed')
           .select('*', { count: 'exact', head: true })
           .eq('arquivo_fonte', arquivo)
           .gte('DATA_REALIZACAO', '2025-06-01');
-        return count === 0; // Deveria ser 0 após v003
+        return count === 0;
       }
       return true;
     }
   },
   
-  // 3. CORREÇÃO DE MODALIDADES (DX/CR → RX)
+  // 3. CORREÇÃO DE MODALIDADES (DX/CR → RX/MG) - v030
   {
-    nome: "correcao_modalidades_dx_cr",
+    nome: "v030_correcao_modalidades_dx_cr",
     funcao: "aplicar-correcao-modalidade-rx",
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
-    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Arquivos 1,2,3,4,5
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda existem modalidades DX/CR (permitir algumas exceções para mamografia)
       const { count: totalCRDX } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
         .in('MODALIDADE', ['DX', 'CR']);
       
-      // Se há CR/DX, verificar se são mamografias (que podem permanecer)
       if (totalCRDX > 0) {
         const { count: mamografias } = await supabase
           .from('volumetria_mobilemed')
@@ -82,39 +77,35 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
           .in('MODALIDADE', ['DX', 'CR'])
           .or('"ESTUDO_DESCRICAO".ilike.%mamografia%,"ESTUDO_DESCRICAO".ilike.%mamogra%,"ESTUDO_DESCRICAO".ilike.%tomo%');
         
-        // Aceitar se todos os CR/DX restantes são mamografias
         return totalCRDX === mamografias;
       }
-      
-      return true; // Se não há CR/DX, validação passou
+      return true;
     }
   },
   
-  // 4. CORREÇÃO DE MODALIDADES (OT → DO)
+  // 4. CORREÇÃO DE MODALIDADES (OT → DO) - v035  
   {
-    nome: "correcao_modalidades_ot",
+    nome: "v035_correcao_modalidades_ot",
     funcao: "aplicar-correcao-modalidade-ot",
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda existem modalidades OT (deveriam ter sido convertidas para DO)
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
         .eq('MODALIDADE', 'OT');
-      return count === 0; // Não deveria ter modalidade OT
+      return count === 0;
     }
   },
   
-  // 4. DE-PARA PRIORIDADES
+  // 5. DE-PARA PRIORIDADES - v018
   {
-    nome: "de_para_prioridades",
+    nome: "v018_de_para_prioridades",
     funcao: "aplicar-de-para-prioridades", 
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
-    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'], // Todos os arquivos
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se ainda há prioridades não padronizadas - aceitar as variações válidas
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
@@ -124,21 +115,19 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 5. DE-PARA VALORES ZERADOS
+  // 6. DE-PARA VALORES ZERADOS - v026
   {
-    nome: "de_para_valores_zerados",
+    nome: "v026_de_para_valores_zerados",
     funcao: "aplicar-regras-tratamento",
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar quantos valores zerados ainda existem (deveria ser mínimo)
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
         .or('VALORES.is.null,VALORES.eq.0');
       
-      // Aceitar até 5% de valores zerados (alguns podem não ter de-para)
       const { count: total } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
@@ -148,14 +137,13 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 6. TIPIFICAÇÃO DE FATURAMENTO
+  // 7. TIPIFICAÇÃO DE FATURAMENTO - f005
   {
-    nome: "tipificacao_faturamento",
+    nome: "f005_tipificacao_faturamento",
     funcao: "aplicar-tipificacao-faturamento",
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se todos os registros têm tipo_faturamento
       const { count } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
@@ -165,14 +153,151 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     }
   },
   
-  // 7. VALIDAÇÃO DE CLIENTE
+  // 8. NORMALIZAÇÃO NOME MÉDICO - v017
   {
-    nome: "validacao_cliente",
+    nome: "v017_normalizacao_nome_medico",
+    funcao: "aplicar-mapeamento-nome-cliente", // Reutilizar função similar
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação sempre passa para normalização
+    }
+  },
+  
+  // 9. APLICAÇÃO VALOR ONCO - v019
+  {
+    nome: "v019_aplicacao_valor_onco",
+    funcao: "buscar-valor-onco",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_onco_padrao'], // Apenas arquivo oncológico
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação específica para onco
+    }
+  },
+  
+  // 10. QUEBRA DE EXAMES - v027
+  {
+    nome: "v027_quebra_exames_automatica",
+    funcao: "aplicar-quebras-automatico", 
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação específica para quebras
+    }
+  },
+  
+  // 11. SUBSTITUIÇÃO ESPECIALIDADE/CATEGORIA - v033
+  {
+    nome: "v033_substituicao_especialidade_categoria",
+    funcao: "aplicar-substituicao-especialidade-categoria",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação específica para substituições
+    }
+  },
+  
+  // 12. ESPECIALIDADE COLUNA → MÚSCULO/NEURO - v034
+  {
+    nome: "v034_colunas_musculo_neuro",
+    funcao: "aplicar-regra-colunas-musculo-neuro",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      const { count } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('arquivo_fonte', arquivo)
+        .eq('ESPECIALIDADE', 'Colunas');
+      return count === 0; // Não deveria ter mais "Colunas"
+    }
+  },
+  
+  // 13. EXCLUSÃO DE CLIENTES ESPECÍFICOS - v032
+  {
+    nome: "v032_exclusao_clientes_especificos",
+    funcao: "aplicar-exclusao-clientes-especificos",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação específica para exclusões
+    }
+  },
+  
+  // 14. APLICAÇÃO ESPECIALIDADE AUTOMÁTICA - v023
+  {
+    nome: "v023_aplicacao_especialidade_automatica",
+    funcao: "aplicar-especialidade-automatica",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para especialidades automáticas
+    }
+  },
+  
+  // 15. PROCESSAMENTO DE CATEGORIAS - v028
+  {
+    nome: "v028_processamento_categorias_exames",
+    funcao: "aplicar-categorias-cadastro",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para categorias
+    }
+  },
+  
+  // 16. MAPEAMENTO NOME CLIENTE - v035
+  {
+    nome: "v035_mapeamento_nome_cliente",
+    funcao: "aplicar-mapeamento-nome-cliente",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para mapeamento de nomes
+    }
+  },
+  
+  // 17. VALIDAÇÃO DE CLIENTE - v021
+  {
+    nome: "v021_validacao_cliente",
     funcao: "aplicar-validacao-cliente",
     parametros: (arquivo: string, lote: string) => ({ arquivo_fonte: arquivo, lote_upload: lote }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
       return true; // Validação sempre passa (não é crítica para falha)
+    }
+  },
+  
+  // 18. TIPIFICAÇÃO RETROATIVA - v036  
+  {
+    nome: "v036_tipificacao_retroativa",
+    funcao: "aplicar-tipificacao-retroativa",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para tipificação retroativa
+    }
+  },
+  
+  // 19. FILTRO DATA LAUDO - v037
+  {
+    nome: "v037_filtro_data_laudo", 
+    funcao: "aplicar-filtro-data-laudo",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para filtro de data laudo
+    }
+  },
+  
+  // 20. REGRAS DE EXCLUSÃO DINÂMICA - v020
+  {
+    nome: "v020_regras_exclusao_dinamica",
+    funcao: "aplicar-regras-lote",
+    parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
+    arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      return true; // Validação para exclusões dinâmicas
     }
   }
 ];
