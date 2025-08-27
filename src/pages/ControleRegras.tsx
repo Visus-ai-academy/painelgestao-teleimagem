@@ -1,5 +1,4 @@
 import { ControleRegrasNegocio } from '@/components/ControleRegrasNegocio';
-import { CorrigirExclusoesRetroativo } from '@/components/CorrigirExclusoesRetroativo';
 
 export default function ControleRegras() {
   return (
@@ -11,8 +10,6 @@ export default function ControleRegras() {
         </p>
       </div>
       
-      {/* Componente de Correção Emergencial */}
-      <CorrigirExclusoesRetroativo />
       
       <ControleRegrasNegocio />
     </div>
