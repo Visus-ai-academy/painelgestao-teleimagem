@@ -245,41 +245,57 @@ serve(async (req) => {
         }
       }
 
-      // Aplicar regras de de-para
+      // APLICAR TODAS AS REGRAS USANDO SISTEMA COMPLETO
       let regrasAplicadas = 0;
+      let regrasValidadas = 0;
+      let sistemaSucesso = false;
+      
       try {
-        console.log(`🔧 Aplicando regras de de-para para: ${arquivo_fonte}`);
-        const { data: regrasTratamento } = await supabaseClient.functions.invoke(
-          'aplicar-regras-tratamento',
-          { body: { arquivo_fonte: arquivo_fonte } }
+        console.log(`🎯 Aplicando TODAS as regras via sistema completo para: ${arquivo_fonte}`);
+        const { data: sistemaResult } = await supabaseClient.functions.invoke(
+          'sistema-aplicacao-regras-completo',
+          { 
+            body: { 
+              arquivo_fonte: arquivo_fonte,
+              lote_upload: loteUpload,
+              periodo_referencia: periodoReferencia,
+              forcar_aplicacao: true // Sempre forçar para garantir aplicação
+            } 
+          }
         );
-        regrasAplicadas = regrasTratamento?.registros_atualizados || 0;
-        console.log(`✅ Regras aplicadas: ${regrasAplicadas} registros`);
+        
+        if (sistemaResult) {
+          regrasAplicadas = sistemaResult.regras_aplicadas || 0;
+          regrasValidadas = sistemaResult.regras_validadas_ok || 0;
+          sistemaSucesso = sistemaResult.success || false;
+          
+          console.log(`✅ Sistema completo de regras:`);
+          console.log(`   - Regras aplicadas: ${regrasAplicadas}/${sistemaResult.total_regras}`);
+          console.log(`   - Regras validadas: ${regrasValidadas}/${sistemaResult.total_regras}`);
+          console.log(`   - Sucesso geral: ${sistemaSucesso}`);
+          
+          if (!sistemaSucesso) {
+            console.log(`⚠️ Algumas regras falharam. Detalhes:`, sistemaResult.status_detalhado);
+          }
+        }
       } catch (regrasError) {
-        console.error(`❌ Erro ao aplicar regras:`, regrasError);
-      }
-
-      // Aplicar regras v002/v003 automaticamente para arquivos retroativos
-      let regrasExclusao = 0;
-      if (arquivo_fonte.includes('retroativo')) {
+        console.error(`❌ Erro no sistema completo de regras:`, regrasError);
+        
+        // Fallback: aplicar regras individuais (método antigo)
+        console.log(`🔄 Aplicando regras individuais como fallback...`);
         try {
-          console.log(`🔥 Aplicando regras v002/v003 automaticamente para arquivo retroativo: ${arquivo_fonte}`);
-          const { data: exclusoesResult } = await supabaseClient.functions.invoke(
-            'aplicar-exclusoes-periodo',
-            { 
-              body: { 
-                periodo_referencia: periodoReferencia,
-                automatico: true,
-                aplicar_sempre: true 
-              } 
-            }
+          const { data: regrasTratamento } = await supabaseClient.functions.invoke(
+            'aplicar-regras-tratamento',
+            { body: { arquivo_fonte: arquivo_fonte } }
           );
-          regrasExclusao = exclusoesResult?.total_excluidos || 0;
-          console.log(`✅ Regras v002/v003 aplicadas: ${regrasExclusao} registros excluídos`);
-        } catch (exclusoesError) {
-          console.error(`❌ Erro ao aplicar regras v002/v003:`, exclusoesError);
+          regrasAplicadas = regrasTratamento?.registros_atualizados || 0;
+        } catch (fallbackError) {
+          console.error(`❌ Fallback também falhou:`, fallbackError);
         }
       }
+
+      // Variável para compatibilidade com código existente
+      const regrasExclusao = sistemaSucesso ? regrasValidadas : 0;
 
       // Atualizar status final
       await supabaseClient

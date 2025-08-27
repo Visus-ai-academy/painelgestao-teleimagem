@@ -1,4 +1,5 @@
 import { ControleRegrasNegocio } from '@/components/ControleRegrasNegocio';
+import { SistemaAplicacaoRegras } from '@/components/SistemaAplicacaoRegras';
 
 export default function ControleRegras() {
   return (
@@ -10,7 +11,7 @@ export default function ControleRegras() {
         </p>
       </div>
       
-      
+      <SistemaAplicacaoRegras />
       <ControleRegrasNegocio />
     </div>
   );
