@@ -23,6 +23,7 @@ import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados'
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
+import { useAutoRegras } from "@/hooks/useAutoRegras";
 
 
 // Período atual - onde estão os dados carregados (junho/2025)
@@ -39,6 +40,9 @@ export default function DadosVolumetria() {
     'volumetria_fora_padrao_retroativo',
     'volumetria_onco_padrao'
   ]);
+  
+  // Hook para monitoramento automático de regras quando upload for concluído
+  useAutoRegras();
 
   return (
     <div className="space-y-6">
