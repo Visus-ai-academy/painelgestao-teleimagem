@@ -4,10 +4,10 @@ import { toast } from 'sonner';
 
 interface UploadStatus {
   id: string;
-  arquivo_fonte: string;
-  lote_upload: string;
+  arquivo_nome: string;
+  tipo_arquivo: string;
   status: string;
-  total_registros: number;
+  registros_inseridos: number;
   created_at: string;
 }
 
@@ -27,7 +27,7 @@ export function useAutoRegras() {
           event: 'UPDATE',
           schema: 'public',
           table: 'processamento_uploads',
-          filter: 'status=eq.completed'
+          filter: 'status=eq.concluido'
         },
         async (payload) => {
           console.log('🔔 Upload concluído detectado:', payload);
@@ -43,17 +43,18 @@ export function useAutoRegras() {
             'volumetria_onco_padrao'
           ];
 
-          if (arquivosComRegras.includes(uploadData.arquivo_fonte)) {
+          if (arquivosComRegras.includes(uploadData.tipo_arquivo)) {
             console.log('⚡ Disparando aplicação automática de regras...');
             setProcessandoRegras(true);
             
             try {
               const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
                 body: {
-                  arquivo_fonte: uploadData.arquivo_fonte,
-                  lote_upload: uploadData.lote_upload,
+                  arquivo_fonte: uploadData.tipo_arquivo,
+                  upload_id: uploadData.id,
+                  arquivo_nome: uploadData.arquivo_nome,
                   status: uploadData.status,
-                  total_registros: uploadData.total_registros,
+                  total_registros: uploadData.registros_inseridos,
                   auto_aplicar: autoAplicarAtivo
                 }
               });
@@ -65,10 +66,10 @@ export function useAutoRegras() {
               }
 
               if (data.success) {
-                toast.success(`✅ Regras aplicadas automaticamente para ${uploadData.arquivo_fonte}!`);
+                toast.success(`✅ Regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
                 console.log('✅ Aplicação automática concluída:', data);
               } else {
-                toast.warning(`⚠️ Algumas regras falharam para ${uploadData.arquivo_fonte}. Verifique o painel de controle.`);
+                toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. Verifique o painel de controle.`);
                 console.log('⚠️ Aplicação parcial:', data);
               }
             } catch (error: any) {
@@ -104,7 +105,7 @@ export function useAutoRegras() {
       const { data, error } = await supabase.functions.invoke('sistema-aplicacao-regras-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          lote_upload: loteUpload,
+          upload_id: loteUpload,
           periodo_referencia: 'jun/25',
           forcar_aplicacao: true,
           validar_apenas: false

@@ -8,7 +8,8 @@ const corsHeaders = {
 
 interface UploadEvent {
   arquivo_fonte: string;
-  lote_upload: string;
+  upload_id: string;
+  arquivo_nome: string;
   status: string;
   total_registros: number;
 }
@@ -21,20 +22,22 @@ export default serve(async (req: Request): Promise<Response> => {
   try {
     const { 
       arquivo_fonte, 
-      lote_upload, 
+      upload_id,
+      arquivo_nome,
       status,
       total_registros,
       auto_aplicar = true 
     }: UploadEvent & { auto_aplicar?: boolean } = await req.json();
 
     console.log(`🚀 SISTEMA AUTOMÁTICO DE APLICAÇÃO DE REGRAS`);
-    console.log(`📁 Arquivo: ${arquivo_fonte}`);
-    console.log(`📦 Lote: ${lote_upload}`);
+    console.log(`📁 Tipo Arquivo: ${arquivo_fonte}`);
+    console.log(`📂 Nome Arquivo: ${arquivo_nome}`);
+    console.log(`🆔 Upload ID: ${upload_id}`);
     console.log(`📊 Total registros: ${total_registros}`);
     console.log(`⚡ Auto aplicar: ${auto_aplicar}`);
 
-    if (!arquivo_fonte || !lote_upload) {
-      throw new Error('Parâmetros arquivo_fonte e lote_upload são obrigatórios');
+    if (!arquivo_fonte || !upload_id) {
+      throw new Error('Parâmetros arquivo_fonte e upload_id são obrigatórios');
     }
 
     const supabase = createClient(
@@ -43,13 +46,13 @@ export default serve(async (req: Request): Promise<Response> => {
     );
 
     // Se o upload não foi concluído com sucesso, não aplicar regras
-    if (status !== 'completed' && status !== 'staging_concluido') {
+    if (status !== 'concluido') {
       console.log(`❌ Upload não concluído (status: ${status}). Aguardando conclusão...`);
       return new Response(JSON.stringify({
         success: false,
         message: 'Upload não concluído ainda',
         arquivo_fonte,
-        lote_upload,
+        upload_id,
         status_upload: status
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -63,7 +66,7 @@ export default serve(async (req: Request): Promise<Response> => {
         success: true,
         message: 'Auto-aplicação desabilitada',
         arquivo_fonte,
-        lote_upload,
+        upload_id,
         requer_aplicacao_manual: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -78,10 +81,11 @@ export default serve(async (req: Request): Promise<Response> => {
       .insert({
         table_name: 'sistema_automatico',
         operation: 'APLICACAO_AUTOMATICA_INICIADA',
-        record_id: lote_upload,
+        record_id: upload_id,
         new_data: {
           arquivo_fonte,
-          lote_upload,
+          upload_id,
+          arquivo_nome,
           total_registros,
           timestamp_inicio: new Date().toISOString()
         },
@@ -97,7 +101,7 @@ export default serve(async (req: Request): Promise<Response> => {
       {
         body: {
           arquivo_fonte,
-          lote_upload,
+          upload_id,
           periodo_referencia: 'jun/25', // Pode ser parametrizado
           forcar_aplicacao: true, // Forçar aplicação em modo automático
           validar_apenas: false
@@ -114,10 +118,10 @@ export default serve(async (req: Request): Promise<Response> => {
         .insert({
           table_name: 'sistema_automatico',
           operation: 'APLICACAO_AUTOMATICA_ERRO',
-          record_id: lote_upload,
+          record_id: upload_id,
           new_data: {
             arquivo_fonte,
-            lote_upload,
+            upload_id,
             erro: errorRegras.message,
             timestamp_erro: new Date().toISOString()
           },
@@ -130,7 +134,7 @@ export default serve(async (req: Request): Promise<Response> => {
         error: 'Erro na aplicação automática das regras',
         details: errorRegras.message,
         arquivo_fonte,
-        lote_upload,
+        upload_id,
         requer_intervencao: true
       }), {
         status: 500,
@@ -150,10 +154,10 @@ export default serve(async (req: Request): Promise<Response> => {
       .insert({
         table_name: 'sistema_automatico',
         operation: sucesso_total ? 'APLICACAO_AUTOMATICA_SUCESSO' : 'APLICACAO_AUTOMATICA_PARCIAL',
-        record_id: lote_upload,
+        record_id: upload_id,
         new_data: {
           arquivo_fonte,
-          lote_upload,
+          upload_id,
           resultado_completo: resultadoRegras,
           sucesso_total,
           timestamp_fim: new Date().toISOString()
@@ -173,7 +177,7 @@ export default serve(async (req: Request): Promise<Response> => {
         },
         updated_at: new Date().toISOString()
       })
-      .eq('lote_upload', lote_upload);
+      .eq('id', upload_id);
 
     const mensagemStatus = sucesso_total 
       ? 'Todas as regras foram aplicadas automaticamente com sucesso!'
@@ -185,7 +189,7 @@ export default serve(async (req: Request): Promise<Response> => {
       success: sucesso_total,
       message: mensagemStatus,
       arquivo_fonte,
-      lote_upload,
+      upload_id,
       detalhes_aplicacao: {
         total_regras: resultadoRegras?.total_regras || 0,
         regras_aplicadas: resultadoRegras?.regras_aplicadas || 0,
