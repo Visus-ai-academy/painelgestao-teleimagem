@@ -44,11 +44,42 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
     arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Validar baseado no resultado da função, não re-querying o banco
-      if (resultado && typeof resultado.sucesso !== 'undefined') {
-        return resultado.sucesso;
+      console.log(`🔍 Validando v002/v003 para ${arquivo}:`, resultado);
+      
+      // Verificar se a função foi executada com sucesso
+      if (!resultado || typeof resultado.sucesso === 'undefined') {
+        console.log(`❌ v002/v003: Resultado inválido ou indefinido`);
+        return false;
       }
-      return false; // Se não há resultado ou resultado inválido, falha
+      
+      if (!resultado.sucesso) {
+        console.log(`❌ v002/v003: Função retornou sucesso=false`);
+        return false;
+      }
+      
+      // Validar contando registros que deveriam ter sido excluídos
+      const { count, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('arquivo_fonte', arquivo)
+        .gte('DATA_LAUDO', '2025-06-01');
+      
+      if (error) {
+        console.log(`❌ v002/v003: Erro na validação:`, error);
+        return false;
+      }
+      
+      const registrosForaPeriodo = count || 0;
+      console.log(`🔍 v002/v003: Registros ainda fora do período: ${registrosForaPeriodo}`);
+      
+      // Se há registros fora do período, a regra falhou
+      if (registrosForaPeriodo > 0) {
+        console.log(`❌ v002/v003: ${registrosForaPeriodo} registros ainda presentes fora do período`);
+        return false;
+      }
+      
+      console.log(`✅ v002/v003: Validação passou - nenhum registro fora do período`);
+      return true;
     }
   },
   

@@ -116,7 +116,7 @@ serve(async (req) => {
 
     // Executar exclusão em lotes pequenos para evitar problemas de timeout
     try {
-      console.log('Iniciando exclusão por condições diretas...');
+      console.log(`Iniciando exclusão de registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}...`);
       
       const { error: deleteError, count } = await supabase
         .from('volumetria_mobilemed')
@@ -125,17 +125,61 @@ serve(async (req) => {
         .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
       if (deleteError) {
-        console.error('Erro ao excluir registros:', deleteError);
-        throw new Error(`Erro na exclusão: ${deleteError.message}`);
+        console.error('❌ Erro ao excluir registros:', deleteError);
+        
+        return new Response(JSON.stringify({
+          sucesso: false,
+          arquivo_fonte,
+          periodo_referencia,
+          erro: `Falha na exclusão: ${deleteError.message}`,
+          registros_encontrados: totalParaExcluir || 0,
+          registros_excluidos: 0,
+          data_limite: dataLimite.toISOString().split('T')[0],
+          regra_aplicada: 'v002/v003 - Exclusões por Período'
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        });
       }
 
       totalExcluidos = count || 0;
-      console.log(`Exclusão concluída: ${totalExcluidos} registros excluídos`);
+      console.log(`✅ Exclusão concluída: ${totalExcluidos} registros excluídos de ${totalParaExcluir} encontrados`);
+      
+      // Verificar se realmente excluiu o esperado
+      if (totalParaExcluir > 0 && totalExcluidos === 0) {
+        console.error(`⚠️ ALERTA: ${totalParaExcluir} registros deveriam ser excluídos, mas 0 foram excluídos`);
+        
+        return new Response(JSON.stringify({
+          sucesso: false,
+          arquivo_fonte,
+          periodo_referencia,
+          erro: `Falha: ${totalParaExcluir} registros encontrados mas nenhum excluído`,
+          registros_encontrados: totalParaExcluir,
+          registros_excluidos: 0,
+          data_limite: dataLimite.toISOString().split('T')[0],
+          regra_aplicada: 'v002/v003 - Exclusões por Período'
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        });
+      }
       
     } catch (error) {
-      console.error('Erro durante exclusão:', error);
-      // Em caso de erro, considerar sucesso parcial se algum registro foi processado
-      totalExcluidos = 0;
+      console.error('💥 Erro durante exclusão:', error);
+      
+      return new Response(JSON.stringify({
+        sucesso: false,
+        arquivo_fonte,
+        periodo_referencia,
+        erro: `Exceção durante exclusão: ${error.message}`,
+        registros_encontrados: totalParaExcluir || 0,
+        registros_excluidos: 0,
+        data_limite: dataLimite.toISOString().split('T')[0],
+        regra_aplicada: 'v002/v003 - Exclusões por Período'
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      });
     }
 
     // Log da operação
