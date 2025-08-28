@@ -40,17 +40,20 @@ export function AutoRegrasDashboard() {
 
   const carregarLogs = async () => {
     try {
+      // Query otimizada: selecionar apenas campos necessários e filtro mais eficiente
       const { data, error } = await supabase
         .from('audit_logs')
-        .select('*')
-        .like('operation', '%APLICACAO_AUTOMATICA%')
+        .select('id, operation, record_id, new_data, timestamp, severity')
+        .eq('operation', 'APLICACAO_AUTOMATICA_REGRAS')
         .order('timestamp', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setLogsRecentes(data || []);
     } catch (error) {
       console.error('Erro ao carregar logs:', error);
+      // Em caso de erro, limpar logs para não travar a interface
+      setLogsRecentes([]);
     }
   };
 
