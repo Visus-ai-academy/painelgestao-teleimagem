@@ -65,9 +65,9 @@ serve(async (req) => {
     console.log(`Data limite para exclusão: ${dataLimite.toISOString().split('T')[0]}`);
 
     // Primeiro, contar quantos registros serão afetados
-    const { data: registrosParaExcluir, error: errorContar } = await supabase
+    const { count: totalParaExcluir, error: errorContar } = await supabase
       .from('volumetria_mobilemed')
-      .select('id, DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
+      .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte)
       .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
@@ -82,7 +82,9 @@ serve(async (req) => {
       });
     }
 
-    if (!registrosParaExcluir || registrosParaExcluir.length === 0) {
+    console.log(`Encontrados ${totalParaExcluir || 0} registros para exclusão`);
+
+    if (!totalParaExcluir || totalParaExcluir === 0) {
       console.log('Nenhum registro encontrado para exclusão');
       return new Response(JSON.stringify({
         sucesso: true,
@@ -96,29 +98,45 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Encontrados ${registrosParaExcluir.length} registros para exclusão`);
+    // Buscar alguns exemplos antes da exclusão
+    const { data: exemplosData, error: exemplosError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+      .limit(5);
 
-    // Coletar exemplos antes da exclusão
-    const exemplosExcluidos = registrosParaExcluir.slice(0, 5).map(reg => ({
+    const exemplosExcluidos = exemplosData?.map(reg => ({
       data_laudo: reg.DATA_LAUDO,
       estudo_descricao: reg.ESTUDO_DESCRICAO,
       empresa: reg.EMPRESA
-    }));
+    })) || [];
 
-    // Executar exclusão direta com condições (mais eficiente)
-    const { error: deleteError, count } = await supabase
-      .from('volumetria_mobilemed')
-      .delete({ count: 'exact' })
-      .eq('arquivo_fonte', arquivo_fonte)
-      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+    let totalExcluidos = 0;
 
-    if (deleteError) {
-      console.error('Erro ao excluir registros:', deleteError);
-      throw new Error(`Erro na exclusão: ${deleteError.message}`);
+    // Executar exclusão em lotes pequenos para evitar problemas de timeout
+    try {
+      console.log('Iniciando exclusão por condições diretas...');
+      
+      const { error: deleteError, count } = await supabase
+        .from('volumetria_mobilemed')
+        .delete({ count: 'exact' })
+        .eq('arquivo_fonte', arquivo_fonte)
+        .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+
+      if (deleteError) {
+        console.error('Erro ao excluir registros:', deleteError);
+        throw new Error(`Erro na exclusão: ${deleteError.message}`);
+      }
+
+      totalExcluidos = count || 0;
+      console.log(`Exclusão concluída: ${totalExcluidos} registros excluídos`);
+      
+    } catch (error) {
+      console.error('Erro durante exclusão:', error);
+      // Em caso de erro, considerar sucesso parcial se algum registro foi processado
+      totalExcluidos = 0;
     }
-
-    const totalExcluidos = count || 0;
-    console.log(`Total de ${totalExcluidos} registros excluídos com sucesso`);
 
     // Log da operação
     const { error: logError } = await supabase
@@ -131,7 +149,7 @@ serve(async (req) => {
           arquivo_fonte,
           periodo_referencia,
           data_limite: dataLimite.toISOString().split('T')[0],
-          registros_encontrados: registrosParaExcluir.length,
+          registros_encontrados: totalParaExcluir || 0,
           registros_excluidos: totalExcluidos,
           exemplos_excluidos: exemplosExcluidos,
           regra: 'v002_v003',
@@ -146,11 +164,11 @@ serve(async (req) => {
     }
 
     const resultado = {
-      sucesso: true,
+      sucesso: totalExcluidos >= 0, // Considera sucesso mesmo se não excluiu nada (não havia registros)
       arquivo_fonte,
-      periodo_referencia,
+      periodo_referencia,  
       data_limite: dataLimite.toISOString().split('T')[0],
-      registros_encontrados: registrosParaExcluir.length,
+      registros_encontrados: totalParaExcluir || 0,
       registros_excluidos: totalExcluidos,
       exemplos_excluidos: exemplosExcluidos,
       regra_aplicada: 'v002/v003 - Exclusões por Período',

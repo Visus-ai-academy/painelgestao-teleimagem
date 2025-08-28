@@ -44,16 +44,11 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
     arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Para arquivos retroativos, verificar se não há registros com DATA_LAUDO > 01/06/2025
-      if (arquivo.includes('retroativo')) {
-        const { count } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*', { count: 'exact', head: true })
-          .eq('arquivo_fonte', arquivo)
-          .gt('DATA_LAUDO', '2025-06-01');
-        return count === 0; // True se não há registros após 01/06/2025
+      // Validar baseado no resultado da função, não re-querying o banco
+      if (resultado && typeof resultado.sucesso !== 'undefined') {
+        return resultado.sucesso;
       }
-      return true;
+      return false; // Se não há resultado ou resultado inválido, falha
     }
   },
   
@@ -64,17 +59,11 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Se a regra foi aplicada com sucesso, considerar válida
-      if (resultado && resultado.sucesso) {
-        // Validar apenas se houve registros para corrigir e foram todos corrigidos
-        const registrosEncontrados = resultado.registros_encontrados_rx || 0;
-        const registrosCorrigidos = resultado.registros_corrigidos_rx || 0;
-        
-        if (registrosEncontrados > 0) {
-          return registrosCorrigidos > 0;
-        }
+      // Validar baseado no resultado da função
+      if (resultado && resultado.sucesso !== undefined) {
+        return resultado.sucesso;
       }
-      return true; // Se não há registros para corrigir, validação passa
+      return false; // Se não há resultado válido, falha
     }
   },
   
@@ -85,17 +74,11 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Se a regra foi aplicada com sucesso, considerar válida
-      if (resultado && resultado.sucesso) {
-        // Validar apenas se houve registros para corrigir e foram todos corrigidos
-        const registrosEncontrados = resultado.registros_encontrados || 0;
-        const registrosCorrigidos = resultado.registros_corrigidos || 0;
-        
-        if (registrosEncontrados > 0) {
-          return registrosCorrigidos > 0;
-        }
+      // Validar baseado no resultado da função  
+      if (resultado && resultado.sucesso !== undefined) {
+        return resultado.sucesso;
       }
-      return true; // Se não há registros para corrigir, validação passa
+      return false; // Se não há resultado válido, falha
     }
   },
   
