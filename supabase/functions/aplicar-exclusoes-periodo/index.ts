@@ -114,36 +114,57 @@ serve(async (req) => {
 
     let totalExcluidos = 0;
 
-    // Executar exclusão em lotes pequenos para evitar problemas de timeout
+    // Executar exclusão em lotes pequenos para evitar problemas de timeout e EarlyDrop
+    const BATCH_SIZE = 1000; // Processar em lotes de 1000 registros
+    totalExcluidos = 0;
+    let processedBatches = 0;
+    
     try {
-      console.log(`Iniciando exclusão de registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}...`);
+      console.log(`Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}...`);
       
-      const { error: deleteError, count } = await supabase
-        .from('volumetria_mobilemed')
-        .delete({ count: 'exact' })
-        .eq('arquivo_fonte', arquivo_fonte)
-        .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+      // Processar em lotes até não haver mais registros para excluir
+      while (true) {
+        const { error: deleteError, count } = await supabase
+          .from('volumetria_mobilemed')
+          .delete({ count: 'exact' })
+          .eq('arquivo_fonte', arquivo_fonte)
+          .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+          .limit(BATCH_SIZE);
 
-      if (deleteError) {
-        console.error('❌ Erro ao excluir registros:', deleteError);
+        if (deleteError) {
+          console.error('❌ Erro ao excluir registros no lote:', deleteError);
+          
+          return new Response(JSON.stringify({
+            sucesso: false,
+            arquivo_fonte,
+            periodo_referencia,
+            erro: `Falha na exclusão (lote ${processedBatches + 1}): ${deleteError.message}`,
+            registros_encontrados: totalParaExcluir || 0,
+            registros_excluidos: totalExcluidos,
+            data_limite: dataLimite.toISOString().split('T')[0],
+            regra_aplicada: 'v002/v003 - Exclusões por Período'
+          }), { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          });
+        }
+
+        const batchDeleted = count || 0;
+        totalExcluidos += batchDeleted;
+        processedBatches++;
         
-        return new Response(JSON.stringify({
-          sucesso: false,
-          arquivo_fonte,
-          periodo_referencia,
-          erro: `Falha na exclusão: ${deleteError.message}`,
-          registros_encontrados: totalParaExcluir || 0,
-          registros_excluidos: 0,
-          data_limite: dataLimite.toISOString().split('T')[0],
-          regra_aplicada: 'v002/v003 - Exclusões por Período'
-        }), { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        });
+        console.log(`Lote ${processedBatches}: ${batchDeleted} registros excluídos (Total: ${totalExcluidos})`);
+        
+        // Se o lote excluiu menos que o tamanho do lote, significa que acabaram os registros
+        if (batchDeleted < BATCH_SIZE) {
+          break;
+        }
+        
+        // Pequena pausa entre lotes para evitar sobrecarga
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
-
-      totalExcluidos = count || 0;
-      console.log(`✅ Exclusão concluída: ${totalExcluidos} registros excluídos de ${totalParaExcluir} encontrados`);
+      
+      console.log(`✅ Exclusão concluída: ${totalExcluidos} registros excluídos em ${processedBatches} lotes de ${totalParaExcluir} encontrados`);
       
       // Verificar se realmente excluiu o esperado
       if (totalParaExcluir > 0 && totalExcluidos === 0) {
