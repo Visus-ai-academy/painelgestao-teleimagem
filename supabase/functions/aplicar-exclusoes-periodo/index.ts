@@ -105,27 +105,20 @@ serve(async (req) => {
       empresa: reg.EMPRESA
     }));
 
-    // Processar exclusão em lotes para evitar timeout
-    let totalExcluidos = 0;
-    const batchSize = 1000;
-    const idsParaExcluir = registrosParaExcluir.map(r => r.id);
+    // Executar exclusão direta com condições (mais eficiente)
+    const { error: deleteError, count } = await supabase
+      .from('volumetria_mobilemed')
+      .delete({ count: 'exact' })
+      .eq('arquivo_fonte', arquivo_fonte)
+      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
-    for (let i = 0; i < idsParaExcluir.length; i += batchSize) {
-      const batchIds = idsParaExcluir.slice(i, i + batchSize);
-      
-      const { error: deleteError } = await supabase
-        .from('volumetria_mobilemed')
-        .delete()
-        .in('id', batchIds);
-
-      if (deleteError) {
-        console.error(`Erro ao excluir lote ${Math.floor(i / batchSize) + 1}:`, deleteError);
-        continue;
-      }
-
-      totalExcluidos += batchIds.length;
-      console.log(`Lote ${Math.floor(i / batchSize) + 1} processado: ${batchIds.length} registros excluídos`);
+    if (deleteError) {
+      console.error('Erro ao excluir registros:', deleteError);
+      throw new Error(`Erro na exclusão: ${deleteError.message}`);
     }
+
+    const totalExcluidos = count || 0;
+    console.log(`Total de ${totalExcluidos} registros excluídos com sucesso`);
 
     // Log da operação
     const { error: logError } = await supabase

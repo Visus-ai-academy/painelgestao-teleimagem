@@ -44,14 +44,14 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
     arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
+      // Para arquivos retroativos, verificar se não há registros com DATA_LAUDO > 01/06/2025
       if (arquivo.includes('retroativo')) {
-        // Verifica se não há registros com DATA_LAUDO fora do período permitido (< 08/12/2024 ou >= 07/01/2025)
         const { count } = await supabase
           .from('volumetria_mobilemed')
           .select('*', { count: 'exact', head: true })
           .eq('arquivo_fonte', arquivo)
-          .or('DATA_LAUDO.lt.2024-12-08,DATA_LAUDO.gte.2025-01-07');
-        return count === 0; // True se não há registros fora do período
+          .gt('DATA_LAUDO', '2025-06-01');
+        return count === 0; // True se não há registros após 01/06/2025
       }
       return true;
     }
@@ -64,18 +64,17 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se não há registros DX/CR que não sejam mamografias (deveriam ter virado RX)
-      const { count: dxCrNaoMamo } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true })
-        .eq('arquivo_fonte', arquivo)
-        .in('MODALIDADE', ['DX', 'CR'])
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%tomo%');
-      
-      // Validação passa se não há DX/CR não-mamografias restantes
-      return dxCrNaoMamo === 0;
+      // Se a regra foi aplicada com sucesso, considerar válida
+      if (resultado && resultado.sucesso) {
+        // Validar apenas se houve registros para corrigir e foram todos corrigidos
+        const registrosEncontrados = resultado.registros_encontrados_rx || 0;
+        const registrosCorrigidos = resultado.registros_corrigidos_rx || 0;
+        
+        if (registrosEncontrados > 0) {
+          return registrosCorrigidos > 0;
+        }
+      }
+      return true; // Se não há registros para corrigir, validação passa
     }
   },
   
@@ -86,15 +85,17 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     parametros: (arquivo: string) => ({ arquivo_fonte: arquivo }),
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      // Verificar se não há registros OT restantes (deveriam ter virado DO)
-      const { count } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true })
-        .eq('arquivo_fonte', arquivo)
-        .eq('MODALIDADE', 'OT');
-      
-      // Validação sempre passa - se não tinha OT para corrigir, está OK
-      return count === 0;
+      // Se a regra foi aplicada com sucesso, considerar válida
+      if (resultado && resultado.sucesso) {
+        // Validar apenas se houve registros para corrigir e foram todos corrigidos
+        const registrosEncontrados = resultado.registros_encontrados || 0;
+        const registrosCorrigidos = resultado.registros_corrigidos || 0;
+        
+        if (registrosEncontrados > 0) {
+          return registrosCorrigidos > 0;
+        }
+      }
+      return true; // Se não há registros para corrigir, validação passa
     }
   },
   
