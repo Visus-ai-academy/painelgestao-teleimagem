@@ -47,8 +47,8 @@ serve(async (req) => {
     let dataLimite: Date;
     
     // Determinar data limite baseada no período de referência
+    // Para dados retroativos de jun/25, excluir registros com DATA_LAUDO >= 01/06/2025
     if (periodo_referencia === 'jun/25') {
-      // Para junho/25, a data limite é 01/06/2025
       dataLimite = new Date('2025-06-01');
     } else {
       // Para outros períodos, calcular dinamicamente
@@ -59,7 +59,7 @@ serve(async (req) => {
       };
       const anoCompleto = 2000 + parseInt(ano);
       const mesNumero = meses[mes];
-      dataLimite = new Date(anoCompleto, mesNumero - 1, 1); // Primeiro dia do mês
+      dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
     }
 
     console.log(`Data limite para exclusão: ${dataLimite.toISOString().split('T')[0]}`);
@@ -69,7 +69,7 @@ serve(async (req) => {
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte)
-      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+      .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
     if (errorContar) {
       console.error('Erro ao contar registros:', errorContar);
@@ -103,7 +103,7 @@ serve(async (req) => {
       .from('volumetria_mobilemed')
       .select('DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
       .eq('arquivo_fonte', arquivo_fonte)
-      .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+      .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
       .limit(5);
 
     const exemplosExcluidos = exemplosData?.map(reg => ({
@@ -122,7 +122,7 @@ serve(async (req) => {
         .from('volumetria_mobilemed')
         .delete({ count: 'exact' })
         .eq('arquivo_fonte', arquivo_fonte)
-        .gt('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+        .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
 
       if (deleteError) {
         console.error('Erro ao excluir registros:', deleteError);
@@ -173,7 +173,7 @@ serve(async (req) => {
       exemplos_excluidos: exemplosExcluidos,
       regra_aplicada: 'v002/v003 - Exclusões por Período',
       data_processamento: new Date().toISOString(),
-      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO posterior a ${dataLimite.toISOString().split('T')[0]}`
+      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}`
     };
 
     console.log('Exclusões por período concluídas:', resultado);

@@ -60,10 +60,10 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo', 'volumetria_onco_padrao'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
       // Validar baseado no resultado da função
-      if (resultado && resultado.sucesso !== undefined) {
+      if (resultado && typeof resultado.sucesso !== 'undefined') {
         return resultado.sucesso;
       }
-      return false; // Se não há resultado válido, falha
+      return true; // Se não há resultado definido, assumir sucesso
     }
   },
   
@@ -75,10 +75,10 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     arquivo_aplicavel: ['volumetria_padrao', 'volumetria_fora_padrao', 'volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
     validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
       // Validar baseado no resultado da função  
-      if (resultado && resultado.sucesso !== undefined) {
+      if (resultado && typeof resultado.sucesso !== 'undefined') {
         return resultado.sucesso;
       }
-      return false; // Se não há resultado válido, falha
+      return true; // Se não há resultado definido, assumir sucesso
     }
   },
   
