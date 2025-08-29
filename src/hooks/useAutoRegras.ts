@@ -31,37 +31,74 @@ export function useAutoRegras() {
       setProcessandoRegras(true);
       
       try {
-        console.log('📞 Chamando função automática de regras:', {
-          arquivo_fonte: uploadData.tipo_arquivo,
-          upload_id: uploadData.id,
-          auto_aplicar: autoAplicarAtivo
-        });
+        // Para arquivos retroativos, aplicar primeiro as regras v002/v003 (críticas)
+        const arquivosRetroativos = ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
+        
+        if (arquivosRetroativos.includes(uploadData.tipo_arquivo)) {
+          console.log('🔥 Aplicando regras v002/v003 (críticas) primeiro...');
+          
+          const { data: dataV002V003, error: errorV002V003 } = await supabase.functions.invoke('aplicar-regras-v002-v003-automatico', {
+            body: {
+              arquivo_fonte: uploadData.tipo_arquivo,
+              upload_id: uploadData.id,
+              arquivo_nome: uploadData.arquivo_nome,
+              status: uploadData.status,
+              total_registros: uploadData.registros_inseridos
+            }
+          });
 
-        const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
-          body: {
-            arquivo_fonte: uploadData.tipo_arquivo,
-            upload_id: uploadData.id,
-            arquivo_nome: uploadData.arquivo_nome,
-            status: uploadData.status,
-            total_registros: uploadData.registros_inseridos,
-            auto_aplicar: autoAplicarAtivo
+          console.log('📥 Resposta v002/v003:', { dataV002V003, errorV002V003 });
+
+          if (errorV002V003) {
+            console.error('❌ Erro na aplicação v002/v003:', errorV002V003);
+            toast.error(`Erro na aplicação das regras v002/v003: ${errorV002V003.message}`);
+            return;
           }
-        });
 
-        console.log('📥 Resposta da função:', { data, error });
-
-        if (error) {
-          console.error('❌ Erro na aplicação automática:', error);
-          toast.error(`Erro na aplicação automática de regras: ${error.message}`);
-          return;
+          if (dataV002V003.success) {
+            toast.success(`✅ Regras v002/v003 aplicadas! ${dataV002V003.detalhes_aplicacao?.registros_excluidos || 0} registros excluídos.`);
+            console.log('✅ v002/v003 aplicadas com sucesso:', dataV002V003);
+          } else {
+            toast.warning(`⚠️ Falha na aplicação das regras v002/v003 para ${uploadData.tipo_arquivo}.`);
+            console.log('⚠️ Falha v002/v003:', dataV002V003);
+            return;
+          }
         }
 
-        if (data.success) {
-          toast.success(`✅ Regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
-          console.log('✅ Aplicação automática concluída:', data);
-        } else {
-          toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. Verifique o painel de controle.`);
-          console.log('⚠️ Aplicação parcial:', data);
+        // Aplicar demais regras se necessário (só se auto aplicar estiver ativo)
+        if (autoAplicarAtivo) {
+          console.log('📞 Chamando função automática para demais regras:', {
+            arquivo_fonte: uploadData.tipo_arquivo,
+            upload_id: uploadData.id,
+            auto_aplicar: autoAplicarAtivo
+          });
+
+          const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
+            body: {
+              arquivo_fonte: uploadData.tipo_arquivo,
+              upload_id: uploadData.id,
+              arquivo_nome: uploadData.arquivo_nome,
+              status: uploadData.status,
+              total_registros: uploadData.registros_inseridos,
+              auto_aplicar: autoAplicarAtivo
+            }
+          });
+
+          console.log('📥 Resposta demais regras:', { data, error });
+
+          if (error) {
+            console.error('❌ Erro na aplicação das demais regras:', error);
+            toast.warning(`Regras v002/v003 aplicadas, mas falha nas demais regras: ${error.message}`);
+            return;
+          }
+
+          if (data.success) {
+            toast.success(`✅ Todas as regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
+            console.log('✅ Todas as regras aplicadas:', data);
+          } else {
+            toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. v002/v003 foram aplicadas com sucesso.`);
+            console.log('⚠️ Aplicação parcial das demais regras:', data);
+          }
         }
       } catch (error: any) {
         console.error('💥 Erro inesperado:', error);
