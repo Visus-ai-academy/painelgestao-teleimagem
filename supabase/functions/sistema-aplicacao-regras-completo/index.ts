@@ -12,7 +12,7 @@ interface RegraAplicacao {
   parametros: any;
   arquivo_aplicavel: string[];
   condicao_aplicacao?: (arquivo: string) => boolean;
-  validacao_pos_aplicacao?: (supabase: any, arquivo: string, resultado: any) => Promise<boolean>;
+  validacao_pos_aplicacao?: (supabase: any, arquivo: string, resultado: any, periodo_referencia?: string) => Promise<boolean>;
 }
 
 interface StatusAplicacao {
@@ -43,8 +43,8 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
     funcao: "aplicar-exclusoes-periodo", 
     parametros: (arquivo: string, periodo: string) => ({ arquivo_fonte: arquivo, periodo_referencia: periodo }),
     arquivo_aplicavel: ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'],
-    validacao_pos_aplicacao: async (supabase, arquivo, resultado) => {
-      console.log(`🔍 Validando v002/v003 para ${arquivo}:`, resultado);
+    validacao_pos_aplicacao: async (supabase, arquivo, resultado, periodo_referencia) => {
+      console.log(`🔍 Validando v002/v003 para ${arquivo}, período: ${periodo_referencia}:`, resultado);
       
       // Verificar se a função foi executada com sucesso
       if (!resultado || typeof resultado.sucesso === 'undefined') {
@@ -53,16 +53,36 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
       }
       
       if (!resultado.sucesso) {
-        console.log(`❌ v002/v003: Função retornou sucesso=false`);
+        console.log(`❌ v002/v003: Função retornou sucesso=false - erro: ${resultado.erro}`);
         return false;
       }
+      
+      // Calcular data limite dinamicamente baseada no período
+      let dataLimite: string;
+      
+      if (periodo_referencia === 'jun/25') {
+        dataLimite = '2025-06-01';
+      } else {
+        // Calcular dinamicamente para outros períodos
+        const [mes, ano] = periodo_referencia.split('/');
+        const meses: { [key: string]: number } = {
+          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+        };
+        const anoCompleto = 2000 + parseInt(ano);
+        const mesNumero = meses[mes];
+        const dataCalculada = new Date(anoCompleto, mesNumero - 1, 1);
+        dataLimite = dataCalculada.toISOString().split('T')[0];
+      }
+      
+      console.log(`🔍 v002/v003: Usando data limite: ${dataLimite}`);
       
       // Validar contando registros que deveriam ter sido excluídos
       const { count, error } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
         .eq('arquivo_fonte', arquivo)
-        .gte('DATA_LAUDO', '2025-06-01');
+        .gte('DATA_LAUDO', dataLimite);
       
       if (error) {
         console.log(`❌ v002/v003: Erro na validação:`, error);
@@ -74,7 +94,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
       
       // Se há registros fora do período, a regra falhou
       if (registrosForaPeriodo > 0) {
-        console.log(`❌ v002/v003: ${registrosForaPeriodo} registros ainda presentes fora do período`);
+        console.log(`❌ v002/v003: ${registrosForaPeriodo} registros ainda presentes com DATA_LAUDO >= ${dataLimite}`);
         return false;
       }
       
@@ -370,7 +390,7 @@ export default serve(async (req: Request): Promise<Response> => {
         // Apenas validar se a regra foi aplicada corretamente
         if (regra.validacao_pos_aplicacao) {
           try {
-            const validacaoOk = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, null);
+            const validacaoOk = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, null, periodo);
             status.validacao_ok = validacaoOk;
             status.aplicada = validacaoOk;
             console.log(`✅ Validação ${regra.nome}: ${validacaoOk ? 'OK' : 'FALHOU'}`);
@@ -413,7 +433,7 @@ export default serve(async (req: Request): Promise<Response> => {
 
           // Validar pós-aplicação se definida
           if (regra.validacao_pos_aplicacao) {
-            const validacaoOk = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, resultado);
+            const validacaoOk = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, resultado, periodo);
             status.validacao_ok = validacaoOk;
             
             if (!validacaoOk) {
@@ -424,7 +444,7 @@ export default serve(async (req: Request): Promise<Response> => {
                 const { data: resultadoReaplicacao } = await supabase.functions.invoke(regra.funcao, {
                   body: parametros
                 });
-                const validacaoReaplicacao = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, resultadoReaplicacao);
+                const validacaoReaplicacao = await regra.validacao_pos_aplicacao(supabase, arquivo_fonte, resultadoReaplicacao, periodo);
                 status.validacao_ok = validacaoReaplicacao;
                 console.log(`🎯 Reaplicação: ${validacaoReaplicacao ? 'SUCESSO' : 'AINDA FALHOU'}`);
               }
