@@ -48,7 +48,7 @@ serve(async (req) => {
 
     let dataLimite: Date;
     
-    // Lógica uniforme para todos os arquivos (retroativos e padrão)
+    // Lógica diferenciada para retroativos vs padrão
     if (periodo_referencia === 'jun/25') {
       dataLimite = new Date('2025-06-01');
     } else {
@@ -63,17 +63,33 @@ serve(async (req) => {
     }
 
     const dataLimiteStr = dataLimite.toISOString().split('T')[0];
+    const isRetroativo = arquivo_fonte.includes('retroativo');
+    
     console.log(`📊 Data limite calculada: ${dataLimiteStr}`);
-    console.log(`🔍 Tipo de arquivo: ${arquivo_fonte.includes('retroativo') ? 'RETROATIVO' : 'PADRÃO'}`);
-    console.log(`🔍 Buscando registros com DATA_LAUDO >= ${dataLimiteStr} no arquivo: ${arquivo_fonte}`);
-    console.log(`📝 Lógica: Para ${arquivo_fonte.includes('retroativo') ? 'retroativos' : 'padrão'}, excluir laudos >= ${dataLimiteStr}`);
+    console.log(`🔍 Tipo de arquivo: ${isRetroativo ? 'RETROATIVO' : 'PADRÃO'}`);
+    
+    // Lógica corrigida: 
+    // - RETROATIVOS: manter apenas registros >= dataLimite (excluir < dataLimite)
+    // - PADRÃO: excluir registros >= dataLimite (manter < dataLimite)
+    const operadorComparacao = isRetroativo ? 'lt' : 'gte';
+    const operadorTexto = isRetroativo ? '<' : '>=';
+    
+    console.log(`🔍 Buscando registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr} no arquivo: ${arquivo_fonte}`);
+    console.log(`📝 Lógica: Para ${isRetroativo ? 'retroativos' : 'padrão'}, excluir laudos ${operadorTexto} ${dataLimiteStr}`);
 
     // Primeiro, contar quantos registros serão afetados
-    const { count: totalParaExcluir, error: errorContar } = await supabase
+    let query = supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
-      .eq('arquivo_fonte', arquivo_fonte)
-      .gte('DATA_LAUDO', dataLimiteStr);
+      .eq('arquivo_fonte', arquivo_fonte);
+    
+    if (isRetroativo) {
+      query = query.lt('DATA_LAUDO', dataLimiteStr);
+    } else {
+      query = query.gte('DATA_LAUDO', dataLimiteStr);
+    }
+    
+    const { count: totalParaExcluir, error: errorContar } = await query;
 
     if (errorContar) {
       console.error('Erro ao contar registros:', errorContar);
@@ -103,12 +119,19 @@ serve(async (req) => {
     }
 
     // Buscar alguns exemplos antes da exclusão
-    const { data: exemplosData, error: exemplosError } = await supabase
+    let exemplosQuery = supabase
       .from('volumetria_mobilemed')
       .select('DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
       .eq('arquivo_fonte', arquivo_fonte)
-      .gte('DATA_LAUDO', dataLimiteStr)
       .limit(5);
+    
+    if (isRetroativo) {
+      exemplosQuery = exemplosQuery.lt('DATA_LAUDO', dataLimiteStr);
+    } else {
+      exemplosQuery = exemplosQuery.gte('DATA_LAUDO', dataLimiteStr);
+    }
+    
+    const { data: exemplosData, error: exemplosError } = await exemplosQuery;
 
     const exemplosExcluidos = exemplosData?.map(reg => ({
       data_laudo: reg.DATA_LAUDO,
@@ -124,18 +147,25 @@ serve(async (req) => {
     let processedBatches = 0;
     
     try {
-      console.log(`🔄 Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO >= ${dataLimiteStr}...`);
+      console.log(`🔄 Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr}...`);
       
       // Processar em lotes até não haver mais registros para excluir
       while (true) {
         // Primeiro buscar IDs dos registros a serem excluídos
-        const { data: idsToDelete, error: selectError } = await supabase
+        let selectQuery = supabase
           .from('volumetria_mobilemed')
           .select('id')
           .eq('arquivo_fonte', arquivo_fonte)
-          .gte('DATA_LAUDO', dataLimiteStr)
           .order('id')
           .limit(BATCH_SIZE);
+        
+        if (isRetroativo) {
+          selectQuery = selectQuery.lt('DATA_LAUDO', dataLimiteStr);
+        } else {
+          selectQuery = selectQuery.gte('DATA_LAUDO', dataLimiteStr);
+        }
+        
+        const { data: idsToDelete, error: selectError } = await selectQuery;
 
         if (selectError) {
           console.error('❌ Erro ao buscar registros para exclusão:', selectError);
@@ -273,7 +303,7 @@ serve(async (req) => {
       exemplos_excluidos: exemplosExcluidos,
       regra_aplicada: 'v002/v003 - Exclusões por Período',
       data_processamento: new Date().toISOString(),
-      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO >= ${dataLimiteStr}`
+      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr}`
     };
 
     console.log('Exclusões por período concluídas:', resultado);

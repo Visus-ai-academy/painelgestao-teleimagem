@@ -75,16 +75,30 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         dataLimite = dataCalculada.toISOString().split('T')[0];
       }
       
+      const isRetroativo = arquivo.includes('retroativo');
+      const operadorTexto = isRetroativo ? '<' : '>=';
+      
       console.log(`🔍 v002/v003: Período de referência: ${periodo_referencia}`);
       console.log(`🔍 v002/v003: Usando data limite: ${dataLimite}`);
-      console.log(`📝 v002/v003: Validar se laudos >= ${dataLimite} foram excluídos`);
+      console.log(`🔍 v002/v003: Tipo arquivo: ${isRetroativo ? 'RETROATIVO' : 'PADRÃO'}`);
+      console.log(`📝 v002/v003: Validar se laudos ${operadorTexto} ${dataLimite} foram excluídos`);
       
-      // Validar contando registros que deveriam ter sido excluídos
-      const { count, error } = await supabase
+      // Validar contando registros que deveriam ter sido excluídos - agora usando lógica correta
+      let validationQuery = supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
-        .eq('arquivo_fonte', arquivo)
-        .gte('DATA_LAUDO', dataLimite);
+        .eq('arquivo_fonte', arquivo);
+      
+      // Aplicar filtro correto baseado no tipo de arquivo
+      if (isRetroativo) {
+        // Para retroativos: não deve haver registros com DATA_LAUDO < dataLimite
+        validationQuery = validationQuery.lt('DATA_LAUDO', dataLimite);
+      } else {
+        // Para padrão: não deve haver registros com DATA_LAUDO >= dataLimite
+        validationQuery = validationQuery.gte('DATA_LAUDO', dataLimite);
+      }
+      
+      const { count, error } = await validationQuery;
       
       if (error) {
         console.log(`❌ v002/v003: Erro na validação:`, error);
@@ -92,7 +106,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
       }
       
       const registrosForaPeriodo = count || 0;
-      console.log(`🔍 v002/v003: Registros ainda fora do período (DATA_LAUDO >= ${dataLimite}): ${registrosForaPeriodo}`);
+      console.log(`🔍 v002/v003: Registros ainda fora do período (DATA_LAUDO ${operadorTexto} ${dataLimite}): ${registrosForaPeriodo}`);
       console.log(`🔍 v002/v003: Total de registros no arquivo ${arquivo}: ${await (async () => {
         const { count: totalRegistros } = await supabase
           .from('volumetria_mobilemed')
@@ -103,7 +117,7 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
       
       // Se há registros fora do período, a regra falhou
       if (registrosForaPeriodo > 0) {
-        console.log(`❌ v002/v003: ${registrosForaPeriodo} registros ainda presentes com DATA_LAUDO >= ${dataLimite}`);
+        console.log(`❌ v002/v003: ${registrosForaPeriodo} registros ainda presentes com DATA_LAUDO ${operadorTexto} ${dataLimite}`);
         return false;
       }
       
