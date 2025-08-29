@@ -33,6 +33,7 @@ export default serve(async (req: Request): Promise<Response> => {
     console.log(`📂 Nome Arquivo: ${arquivo_nome}`);
     console.log(`🆔 Upload ID: ${upload_id}`);
     console.log(`📊 Total registros: ${total_registros}`);
+    console.log(`📋 Status do upload: ${status}`);
 
     if (!arquivo_fonte || !upload_id) {
       throw new Error('Parâmetros arquivo_fonte e upload_id são obrigatórios');
@@ -42,6 +43,14 @@ export default serve(async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    // Verificar se há registros no banco antes da aplicação
+    const { count: registrosAntes } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte);
+    
+    console.log(`📊 Registros no banco antes da aplicação: ${registrosAntes || 0}`);
 
     // Se o upload não foi concluído com sucesso, não aplicar regras
     if (status !== 'concluido') {
@@ -142,6 +151,14 @@ export default serve(async (req: Request): Promise<Response> => {
     }
 
     console.log(`✅ Regras v002/v003 aplicadas automaticamente:`, resultadoV002V003);
+    
+    // Verificar registros após aplicação
+    const { count: registrosDepois } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte);
+    
+    console.log(`📊 Registros no banco após aplicação: ${registrosDepois || 0}`);
 
     const sucesso = resultadoV002V003?.sucesso === true;
 

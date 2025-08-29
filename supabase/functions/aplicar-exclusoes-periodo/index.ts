@@ -12,8 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const { arquivo_fonte, periodo_referencia } = await req.json();
-    console.log(`🎯 APLICAR EXCLUSÕES POR PERÍODO`);
+    const requestBody = await req.json();
+    const { arquivo_fonte, periodo_referencia } = requestBody;
+    
+    console.log(`🎯 APLICAR EXCLUSÕES POR PERÍODO v002/v003`);
+    console.log(`📝 Request body completo:`, JSON.stringify(requestBody, null, 2));
     console.log(`📁 Arquivo: ${arquivo_fonte}`);
     console.log(`📅 Período: ${periodo_referencia}`);
 
@@ -46,11 +49,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let dataLimite: Date;
+    const isRetroativo = arquivo_fonte.includes('retroativo');
+    console.log(`🔍 Tipo de arquivo: ${isRetroativo ? 'RETROATIVO' : 'PADRÃO'}`);
+
+    if (!isRetroativo) {
+      console.log(`⏸️ Arquivo ${arquivo_fonte} não é retroativo - regras v002/v003 não aplicáveis`);
+      return new Response(JSON.stringify({
+        sucesso: true,
+        arquivo_fonte,
+        periodo_referencia,
+        mensagem: 'Regras v002/v003 são aplicáveis apenas para arquivos retroativos',
+        registros_encontrados: 0,
+        registros_excluidos: 0
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Calcular datas para jun/25
+    let dataLimiteRealizacao: Date;
+    let dataInicioJanelaLaudo: Date;
+    let dataFimJanelaLaudo: Date;
     
-    // Lógica diferenciada para retroativos vs padrão
     if (periodo_referencia === 'jun/25') {
-      dataLimite = new Date('2025-06-01');
+      dataLimiteRealizacao = new Date('2025-06-01'); // v003: excluir >= esta data
+      dataInicioJanelaLaudo = new Date('2025-06-08'); // v002: janela válida início
+      dataFimJanelaLaudo = new Date('2025-07-07');   // v002: janela válida fim
     } else {
       const [mes, ano] = periodo_referencia.split('/');
       const meses: { [key: string]: number } = {
@@ -59,137 +83,71 @@ serve(async (req) => {
       };
       const anoCompleto = 2000 + parseInt(ano);
       const mesNumero = meses[mes];
-      dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
+      
+      dataLimiteRealizacao = new Date(anoCompleto, mesNumero - 1, 1);
+      dataInicioJanelaLaudo = new Date(anoCompleto, mesNumero - 1, 8);
+      dataFimJanelaLaudo = new Date(anoCompleto, mesNumero, 7);
     }
 
-    const dataLimiteStr = dataLimite.toISOString().split('T')[0];
-    const isRetroativo = arquivo_fonte.includes('retroativo');
-    
-    console.log(`📊 Data limite calculada: ${dataLimiteStr}`);
-    console.log(`🔍 Tipo de arquivo: ${isRetroativo ? 'RETROATIVO' : 'PADRÃO'}`);
-    
-    // Lógica corrigida: 
-    // - RETROATIVOS: manter apenas registros >= dataLimite (excluir < dataLimite)
-    // - PADRÃO: excluir registros >= dataLimite (manter < dataLimite)
-    const operadorComparacao = isRetroativo ? 'lt' : 'gte';
-    const operadorTexto = isRetroativo ? '<' : '>=';
-    
-    console.log(`🔍 Buscando registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr} no arquivo: ${arquivo_fonte}`);
-    console.log(`📝 Lógica: Para ${isRetroativo ? 'retroativos' : 'padrão'}, excluir laudos ${operadorTexto} ${dataLimiteStr}`);
+    const dataLimiteRealizacaoStr = dataLimiteRealizacao.toISOString().split('T')[0];
+    const dataInicioJanelaLaudoStr = dataInicioJanelaLaudo.toISOString().split('T')[0];
+    const dataFimJanelaLaudoStr = dataFimJanelaLaudo.toISOString().split('T')[0];
 
-    // Primeiro, contar quantos registros serão afetados
-    let query = supabase
+    console.log(`📊 REGRAS APLICADAS:`);
+    console.log(`   v003 - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}`);
+    console.log(`   v002 - Manter DATA_LAUDO apenas entre ${dataInicioJanelaLaudoStr} e ${dataFimJanelaLaudoStr}`);
+
+    // Verificar registros totais antes da aplicação
+    const { count: totalRegistrosInicial } = await supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte);
-    
-    if (isRetroativo) {
-      query = query.lt('DATA_LAUDO', dataLimiteStr);
-    } else {
-      query = query.gte('DATA_LAUDO', dataLimiteStr);
-    }
-    
-    const { count: totalParaExcluir, error: errorContar } = await query;
 
-    if (errorContar) {
-      console.error('Erro ao contar registros:', errorContar);
+    console.log(`📊 Total de registros inicial: ${totalRegistrosInicial || 0}`);
+
+    let totalExcludosV003 = 0;
+    let totalExcludosV002 = 0;
+
+    // ===== APLICAR REGRA v003 PRIMEIRO =====
+    console.log(`🔧 Aplicando v003: Excluindo DATA_REALIZACAO >= ${dataLimiteRealizacaoStr}...`);
+    
+    const { count: registrosV003, error: errorV003Count } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte)
+      .gte('DATA_REALIZACAO', dataLimiteRealizacaoStr);
+
+    if (errorV003Count) {
+      console.error('❌ Erro ao contar registros v003:', errorV003Count);
       return new Response(JSON.stringify({ 
         sucesso: false, 
-        erro: errorContar.message 
+        erro: errorV003Count.message 
       }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400 
       });
     }
 
-    console.log(`Encontrados ${totalParaExcluir || 0} registros para exclusão`);
+    console.log(`📊 v003: ${registrosV003 || 0} registros encontrados para exclusão`);
 
-    if (!totalParaExcluir || totalParaExcluir === 0) {
-      console.log('Nenhum registro encontrado para exclusão');
-      return new Response(JSON.stringify({
-        sucesso: true,
-        arquivo_fonte,
-        registros_encontrados: 0,
-        registros_excluidos: 0,
-        data_limite: dataLimite.toISOString().split('T')[0],
-        mensagem: 'Nenhum registro fora do período encontrado'
-      }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
-    // Buscar alguns exemplos antes da exclusão
-    let exemplosQuery = supabase
-      .from('volumetria_mobilemed')
-      .select('DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
-      .eq('arquivo_fonte', arquivo_fonte)
-      .limit(5);
-    
-    if (isRetroativo) {
-      exemplosQuery = exemplosQuery.lt('DATA_LAUDO', dataLimiteStr);
-    } else {
-      exemplosQuery = exemplosQuery.gte('DATA_LAUDO', dataLimiteStr);
-    }
-    
-    const { data: exemplosData, error: exemplosError } = await exemplosQuery;
-
-    const exemplosExcluidos = exemplosData?.map(reg => ({
-      data_laudo: reg.DATA_LAUDO,
-      estudo_descricao: reg.ESTUDO_DESCRICAO,
-      empresa: reg.EMPRESA
-    })) || [];
-
-    let totalExcluidos = 0;
-
-    // Executar exclusão em lotes pequenos para evitar problemas de URI muito longa (CloudFlare 414)
-    const BATCH_SIZE = 100; // Reduzido para 100 registros para evitar erro 414 Request-URI Too Large
-    totalExcluidos = 0;
-    let processedBatches = 0;
-    
-    try {
-      console.log(`🔄 Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr}...`);
+    if (registrosV003 && registrosV003 > 0) {
+      // Excluir em lotes
+      const BATCH_SIZE = 100;
+      let processedBatches = 0;
       
-      // Processar em lotes até não haver mais registros para excluir
       while (true) {
-        // Primeiro buscar IDs dos registros a serem excluídos
-        let selectQuery = supabase
+        const { data: idsToDelete, error: selectError } = await supabase
           .from('volumetria_mobilemed')
           .select('id')
           .eq('arquivo_fonte', arquivo_fonte)
+          .gte('DATA_REALIZACAO', dataLimiteRealizacaoStr)
           .order('id')
           .limit(BATCH_SIZE);
-        
-        if (isRetroativo) {
-          selectQuery = selectQuery.lt('DATA_LAUDO', dataLimiteStr);
-        } else {
-          selectQuery = selectQuery.gte('DATA_LAUDO', dataLimiteStr);
-        }
-        
-        const { data: idsToDelete, error: selectError } = await selectQuery;
 
-        if (selectError) {
-          console.error('❌ Erro ao buscar registros para exclusão:', selectError);
-          return new Response(JSON.stringify({
-            sucesso: false,
-            arquivo_fonte,
-            periodo_referencia,
-            erro: `Falha na busca (lote ${processedBatches + 1}): ${selectError.message}`,
-            registros_encontrados: totalParaExcluir || 0,
-            registros_excluidos: totalExcluidos,
-            data_limite: dataLimite.toISOString().split('T')[0],
-            regra_aplicada: 'v002/v003 - Exclusões por Período'
-          }), { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          });
-        }
-
-        // Se não há registros, terminar
-        if (!idsToDelete || idsToDelete.length === 0) {
+        if (selectError || !idsToDelete || idsToDelete.length === 0) {
           break;
         }
 
-        // Excluir por IDs
         const idsArray = idsToDelete.map(row => row.id);
         const { error: deleteError, count } = await supabase
           .from('volumetria_mobilemed')
@@ -197,123 +155,140 @@ serve(async (req) => {
           .in('id', idsArray);
 
         if (deleteError) {
-          console.error('❌ Erro ao excluir registros no lote:', deleteError);
-          
-          return new Response(JSON.stringify({
-            sucesso: false,
-            arquivo_fonte,
-            periodo_referencia,
-            erro: `Falha na exclusão (lote ${processedBatches + 1}): ${deleteError.message}`,
-            registros_encontrados: totalParaExcluir || 0,
-            registros_excluidos: totalExcluidos,
-        data_limite: dataLimiteStr,
-        regra_aplicada: 'v002/v003 - Exclusões por Período'
-          }), { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          });
+          console.error('❌ Erro ao excluir registros v003:', deleteError);
+          break;
         }
 
         const batchDeleted = count || 0;
-        totalExcluidos += batchDeleted;
+        totalExcludosV003 += batchDeleted;
         processedBatches++;
         
-        console.log(`Lote ${processedBatches}: ${batchDeleted} registros excluídos (Total: ${totalExcluidos})`);
+        console.log(`v003 - Lote ${processedBatches}: ${batchDeleted} excluídos (Total v003: ${totalExcludosV003})`);
         
-        // Se o lote excluiu menos que o tamanho do lote, significa que acabaram os registros
-        if (batchDeleted < BATCH_SIZE) {
-          break;
-        }
-        
-        // Pequena pausa entre lotes para evitar sobrecarga
+        if (batchDeleted < BATCH_SIZE) break;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      
-      console.log(`✅ Exclusão concluída: ${totalExcluidos} registros excluídos em ${processedBatches} lotes de ${totalParaExcluir} encontrados`);
-      
-      // Verificar se realmente excluiu o esperado
-      if (totalParaExcluir > 0 && totalExcluidos === 0) {
-        console.error(`⚠️ ALERTA: ${totalParaExcluir} registros deveriam ser excluídos, mas 0 foram excluídos`);
-        
-        return new Response(JSON.stringify({
-          sucesso: false,
-          arquivo_fonte,
-          periodo_referencia,
-          erro: `Falha: ${totalParaExcluir} registros encontrados mas nenhum excluído`,
-          registros_encontrados: totalParaExcluir,
-          registros_excluidos: 0,
-        data_limite: dataLimiteStr,
-        regra_aplicada: 'v002/v003 - Exclusões por Período'
-        }), { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        });
-      }
-      
-    } catch (error) {
-      console.error('💥 Erro durante exclusão:', error);
-      
-      return new Response(JSON.stringify({
-        sucesso: false,
-        arquivo_fonte,
-        periodo_referencia,
-        erro: `Exceção durante exclusão: ${error.message}`,
-        registros_encontrados: totalParaExcluir || 0,
-        registros_excluidos: 0,
-        data_limite: dataLimiteStr,
-        regra_aplicada: 'v002/v003 - Exclusões por Período'
-      }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      });
     }
 
+    console.log(`✅ v003 concluída: ${totalExcludosV003} registros excluídos`);
+
+    // ===== APLICAR REGRA v002 NOS REGISTROS RESTANTES =====
+    console.log(`🔧 Aplicando v002: Excluindo DATA_LAUDO fora da janela ${dataInicioJanelaLaudoStr} - ${dataFimJanelaLaudoStr}...`);
+    
+    const { count: registrosV002, error: errorV002Count } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte)
+      .or(`DATA_LAUDO.lt.${dataInicioJanelaLaudoStr},DATA_LAUDO.gt.${dataFimJanelaLaudoStr}`);
+
+    if (errorV002Count) {
+      console.error('❌ Erro ao contar registros v002:', errorV002Count);
+    } else {
+      console.log(`📊 v002: ${registrosV002 || 0} registros encontrados para exclusão`);
+
+      if (registrosV002 && registrosV002 > 0) {
+        // Excluir em lotes
+        const BATCH_SIZE = 100;
+        let processedBatches = 0;
+        
+        while (true) {
+          const { data: idsToDelete, error: selectError } = await supabase
+            .from('volumetria_mobilemed')
+            .select('id')
+            .eq('arquivo_fonte', arquivo_fonte)
+            .or(`DATA_LAUDO.lt.${dataInicioJanelaLaudoStr},DATA_LAUDO.gt.${dataFimJanelaLaudoStr}`)
+            .order('id')
+            .limit(BATCH_SIZE);
+
+          if (selectError || !idsToDelete || idsToDelete.length === 0) {
+            break;
+          }
+
+          const idsArray = idsToDelete.map(row => row.id);
+          const { error: deleteError, count } = await supabase
+            .from('volumetria_mobilemed')
+            .delete({ count: 'exact' })
+            .in('id', idsArray);
+
+          if (deleteError) {
+            console.error('❌ Erro ao excluir registros v002:', deleteError);
+            break;
+          }
+
+          const batchDeleted = count || 0;
+          totalExcludosV002 += batchDeleted;
+          processedBatches++;
+          
+          console.log(`v002 - Lote ${processedBatches}: ${batchDeleted} excluídos (Total v002: ${totalExcludosV002})`);
+          
+          if (batchDeleted < BATCH_SIZE) break;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+    }
+
+    console.log(`✅ v002 concluída: ${totalExcludosV002} registros excluídos`);
+
+    // Verificar registros finais
+    const { count: registrosFinais } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte);
+
+    const totalExcluidos = totalExcludosV003 + totalExcludosV002;
+
     // Log da operação
-    const { error: logError } = await supabase
+    await supabase
       .from('audit_logs')
       .insert({
         table_name: 'volumetria_mobilemed',
-        operation: 'CORRECAO_AUTOMATICA',
+        operation: 'REGRAS_V002_V003_APLICADAS',
         record_id: arquivo_fonte,
         new_data: {
           arquivo_fonte,
           periodo_referencia,
-          data_limite: dataLimiteStr,
-          registros_encontrados: totalParaExcluir || 0,
-          registros_excluidos: totalExcluidos,
-          exemplos_excluidos: exemplosExcluidos,
-          regra: 'v002_v003',
-          tipo_correcao: 'EXCLUSOES_PERIODO'
+          registros_inicial: totalRegistrosInicial || 0,
+          registros_excluidos_v003: totalExcludosV003,
+          registros_excluidos_v002: totalExcludosV002,
+          total_excluidos: totalExcluidos,
+          registros_finais: registrosFinais || 0,
+          regras: 'v002_v003',
+          data_limite_realizacao: dataLimiteRealizacaoStr,
+          janela_laudo_inicio: dataInicioJanelaLaudoStr,
+          janela_laudo_fim: dataFimJanelaLaudoStr
         },
         user_email: 'system',
         severity: 'info'
       });
 
-    if (logError) {
-      console.error('Erro ao registrar log:', logError);
-    }
-
     const resultado = {
-      sucesso: totalExcluidos >= 0, // Considera sucesso mesmo se não excluiu nada (não havia registros)
+      sucesso: true,
       arquivo_fonte,
-      periodo_referencia,  
-      data_limite: dataLimiteStr,
-      registros_encontrados: totalParaExcluir || 0,
+      periodo_referencia,
+      registros_inicial: totalRegistrosInicial || 0,
+      registros_encontrados: (registrosV003 || 0) + (registrosV002 || 0),
       registros_excluidos: totalExcluidos,
-      exemplos_excluidos: exemplosExcluidos,
+      registros_restantes: registrosFinais || 0,
+      detalhes: {
+        v003_excluidos: totalExcludosV003,
+        v002_excluidos: totalExcludosV002,
+        data_limite_realizacao: dataLimiteRealizacaoStr,
+        janela_laudo_inicio: dataInicioJanelaLaudoStr,
+        janela_laudo_fim: dataFimJanelaLaudoStr
+      },
       regra_aplicada: 'v002/v003 - Exclusões por Período',
       data_processamento: new Date().toISOString(),
-      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO ${operadorTexto} ${dataLimiteStr}`
+      observacao: `Aplicadas ambas as regras v002 e v003. Total excluído: ${totalExcluidos}. Restantes: ${registrosFinais || 0}.`
     };
 
-    console.log('Exclusões por período concluídas:', resultado);
+    console.log(`✅ RESULTADO FINAL:`, resultado);
 
     return new Response(JSON.stringify(resultado), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (error) {
-    console.error('Erro na função aplicar-exclusoes-periodo:', error);
+    console.error('💥 Erro na função aplicar-exclusoes-periodo:', error);
     return new Response(JSON.stringify({ 
       sucesso: false, 
       erro: error.message 
