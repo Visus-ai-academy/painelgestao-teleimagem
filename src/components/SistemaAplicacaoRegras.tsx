@@ -38,7 +38,7 @@ export function SistemaAplicacaoRegras() {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<ResultadoSistema | null>(null);
   const [arquivoSelecionado, setArquivoSelecionado] = useState('volumetria_padrao');
-  const [modoOperacao, setModoOperacao] = useState<'validar' | 'aplicar'>('validar');
+  const [modoOperacao, setModoOperacao] = useState<'validar' | 'aplicar'>('aplicar');
 
   const executarSistema = async (validarApenas: boolean = false) => {
     setLoading(true);
