@@ -48,38 +48,18 @@ serve(async (req) => {
 
     let dataLimite: Date;
     
-    // CORREÇÃO CRÍTICA: Para dados retroativos, a lógica de exclusão deve ser DIFERENTE
-    // Dados retroativos devem conter registros do PASSADO, não do futuro
-    if (arquivo_fonte.includes('retroativo')) {
-      // Para retroativos, excluir registros FUTUROS ao período de referência
-      // Ex: para jun/25 retroativo, excluir DATA_LAUDO >= 01/07/2025 (mês seguinte)
-      if (periodo_referencia === 'jun/25') {
-        dataLimite = new Date('2025-07-01'); // Próximo mês após referência
-      } else {
-        const [mes, ano] = periodo_referencia.split('/');
-        const meses: { [key: string]: number } = {
-          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-        };
-        const anoCompleto = 2000 + parseInt(ano);
-        const mesNumero = meses[mes];
-        // Próximo mês após o período de referência
-        dataLimite = new Date(anoCompleto, mesNumero, 1); // Mês seguinte, dia 1
-      }
+    // Lógica uniforme para todos os arquivos (retroativos e padrão)
+    if (periodo_referencia === 'jun/25') {
+      dataLimite = new Date('2025-06-01');
     } else {
-      // Para dados atuais/padrão, manter lógica original
-      if (periodo_referencia === 'jun/25') {
-        dataLimite = new Date('2025-06-01');
-      } else {
-        const [mes, ano] = periodo_referencia.split('/');
-        const meses: { [key: string]: number } = {
-          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-        };
-        const anoCompleto = 2000 + parseInt(ano);
-        const mesNumero = meses[mes];
-        dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
-      }
+      const [mes, ano] = periodo_referencia.split('/');
+      const meses: { [key: string]: number } = {
+        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+      };
+      const anoCompleto = 2000 + parseInt(ano);
+      const mesNumero = meses[mes];
+      dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
     }
 
     const dataLimiteStr = dataLimite.toISOString().split('T')[0];
