@@ -48,6 +48,12 @@ export function useAutoRegras() {
             setProcessandoRegras(true);
             
             try {
+              console.log('📞 Chamando função automática de regras:', {
+                arquivo_fonte: uploadData.tipo_arquivo,
+                upload_id: uploadData.id,
+                auto_aplicar: autoAplicarAtivo
+              });
+
               const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
                 body: {
                   arquivo_fonte: uploadData.tipo_arquivo,
@@ -58,6 +64,8 @@ export function useAutoRegras() {
                   auto_aplicar: autoAplicarAtivo
                 }
               });
+
+              console.log('📥 Resposta da função:', { data, error });
 
               if (error) {
                 console.error('❌ Erro na aplicação automática:', error);
