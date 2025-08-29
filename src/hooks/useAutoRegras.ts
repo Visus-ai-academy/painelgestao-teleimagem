@@ -15,6 +15,63 @@ export function useAutoRegras() {
   const [autoAplicarAtivo, setAutoAplicarAtivo] = useState(true);
   const [processandoRegras, setProcessandoRegras] = useState(false);
 
+  // Função para processar regras automaticamente (reutilizada por INSERT e UPDATE)
+  const processarRegrasAutomaticas = async (uploadData: UploadStatus) => {
+    // Verificar se é um arquivo que precisa de regras
+    const arquivosComRegras = [
+      'volumetria_padrao',
+      'volumetria_fora_padrao', 
+      'volumetria_padrao_retroativo',
+      'volumetria_fora_padrao_retroativo',
+      'volumetria_onco_padrao'
+    ];
+
+    if (arquivosComRegras.includes(uploadData.tipo_arquivo)) {
+      console.log('⚡ Disparando aplicação automática de regras...');
+      setProcessandoRegras(true);
+      
+      try {
+        console.log('📞 Chamando função automática de regras:', {
+          arquivo_fonte: uploadData.tipo_arquivo,
+          upload_id: uploadData.id,
+          auto_aplicar: autoAplicarAtivo
+        });
+
+        const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
+          body: {
+            arquivo_fonte: uploadData.tipo_arquivo,
+            upload_id: uploadData.id,
+            arquivo_nome: uploadData.arquivo_nome,
+            status: uploadData.status,
+            total_registros: uploadData.registros_inseridos,
+            auto_aplicar: autoAplicarAtivo
+          }
+        });
+
+        console.log('📥 Resposta da função:', { data, error });
+
+        if (error) {
+          console.error('❌ Erro na aplicação automática:', error);
+          toast.error(`Erro na aplicação automática de regras: ${error.message}`);
+          return;
+        }
+
+        if (data.success) {
+          toast.success(`✅ Regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
+          console.log('✅ Aplicação automática concluída:', data);
+        } else {
+          toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. Verifique o painel de controle.`);
+          console.log('⚠️ Aplicação parcial:', data);
+        }
+      } catch (error: any) {
+        console.error('💥 Erro inesperado:', error);
+        toast.error(`Erro inesperado: ${error.message}`);
+      } finally {
+        setProcessandoRegras(false);
+      }
+    }
+  };
+
   // Monitorar uploads concluídos para aplicar regras automaticamente
   useEffect(() => {
     if (!autoAplicarAtivo) return;
@@ -24,69 +81,27 @@ export function useAutoRegras() {
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processamento_uploads',
+          filter: 'status=eq.concluido'
+        },
+        async (payload) => {
+          console.log('🔔 Upload concluído detectado (INSERT):', payload);
+          await processarRegrasAutomaticas(payload.new as UploadStatus);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'processamento_uploads',
           filter: 'status=eq.concluido'
         },
         async (payload) => {
-          console.log('🔔 Upload concluído detectado:', payload);
-          
-          const uploadData = payload.new as UploadStatus;
-          
-          // Verificar se é um arquivo que precisa de regras
-          const arquivosComRegras = [
-            'volumetria_padrao',
-            'volumetria_fora_padrao', 
-            'volumetria_padrao_retroativo',
-            'volumetria_fora_padrao_retroativo',
-            'volumetria_onco_padrao'
-          ];
-
-          if (arquivosComRegras.includes(uploadData.tipo_arquivo)) {
-            console.log('⚡ Disparando aplicação automática de regras...');
-            setProcessandoRegras(true);
-            
-            try {
-              console.log('📞 Chamando função automática de regras:', {
-                arquivo_fonte: uploadData.tipo_arquivo,
-                upload_id: uploadData.id,
-                auto_aplicar: autoAplicarAtivo
-              });
-
-              const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
-                body: {
-                  arquivo_fonte: uploadData.tipo_arquivo,
-                  upload_id: uploadData.id,
-                  arquivo_nome: uploadData.arquivo_nome,
-                  status: uploadData.status,
-                  total_registros: uploadData.registros_inseridos,
-                  auto_aplicar: autoAplicarAtivo
-                }
-              });
-
-              console.log('📥 Resposta da função:', { data, error });
-
-              if (error) {
-                console.error('❌ Erro na aplicação automática:', error);
-                toast.error(`Erro na aplicação automática de regras: ${error.message}`);
-                return;
-              }
-
-              if (data.success) {
-                toast.success(`✅ Regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
-                console.log('✅ Aplicação automática concluída:', data);
-              } else {
-                toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. Verifique o painel de controle.`);
-                console.log('⚠️ Aplicação parcial:', data);
-              }
-            } catch (error: any) {
-              console.error('💥 Erro inesperado:', error);
-              toast.error(`Erro inesperado: ${error.message}`);
-            } finally {
-              setProcessandoRegras(false);
-            }
-          }
+          console.log('🔔 Upload concluído detectado (UPDATE):', payload);
+          await processarRegrasAutomaticas(payload.new as UploadStatus);
         }
       )
       .subscribe();
