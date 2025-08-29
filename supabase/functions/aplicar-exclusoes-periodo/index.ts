@@ -114,8 +114,8 @@ serve(async (req) => {
 
     let totalExcluidos = 0;
 
-    // Executar exclusão em lotes pequenos para evitar problemas de timeout e EarlyDrop
-    const BATCH_SIZE = 1000; // Processar em lotes de 1000 registros
+    // Executar exclusão em lotes pequenos para evitar problemas de URI muito longa (CloudFlare 414)
+    const BATCH_SIZE = 100; // Reduzido para 100 registros para evitar erro 414 Request-URI Too Large
     totalExcluidos = 0;
     let processedBatches = 0;
     
