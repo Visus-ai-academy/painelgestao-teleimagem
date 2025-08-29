@@ -124,12 +124,43 @@ serve(async (req) => {
       
       // Processar em lotes até não haver mais registros para excluir
       while (true) {
+        // Primeiro buscar IDs dos registros a serem excluídos
+        const { data: idsToDelete, error: selectError } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id')
+          .eq('arquivo_fonte', arquivo_fonte)
+          .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+          .order('id')
+          .limit(BATCH_SIZE);
+
+        if (selectError) {
+          console.error('❌ Erro ao buscar registros para exclusão:', selectError);
+          return new Response(JSON.stringify({
+            sucesso: false,
+            arquivo_fonte,
+            periodo_referencia,
+            erro: `Falha na busca (lote ${processedBatches + 1}): ${selectError.message}`,
+            registros_encontrados: totalParaExcluir || 0,
+            registros_excluidos: totalExcluidos,
+            data_limite: dataLimite.toISOString().split('T')[0],
+            regra_aplicada: 'v002/v003 - Exclusões por Período'
+          }), { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          });
+        }
+
+        // Se não há registros, terminar
+        if (!idsToDelete || idsToDelete.length === 0) {
+          break;
+        }
+
+        // Excluir por IDs
+        const idsArray = idsToDelete.map(row => row.id);
         const { error: deleteError, count } = await supabase
           .from('volumetria_mobilemed')
           .delete({ count: 'exact' })
-          .eq('arquivo_fonte', arquivo_fonte)
-          .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
-          .limit(BATCH_SIZE);
+          .in('id', idsArray);
 
         if (deleteError) {
           console.error('❌ Erro ao excluir registros no lote:', deleteError);
