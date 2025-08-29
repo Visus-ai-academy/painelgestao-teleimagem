@@ -13,7 +13,9 @@ serve(async (req) => {
 
   try {
     const { arquivo_fonte, periodo_referencia } = await req.json();
-    console.log(`Aplicando exclusões por período - Arquivo: ${arquivo_fonte}, Período: ${periodo_referencia}`);
+    console.log(`🎯 APLICAR EXCLUSÕES POR PERÍODO`);
+    console.log(`📁 Arquivo: ${arquivo_fonte}`);
+    console.log(`📅 Período: ${periodo_referencia}`);
 
     // Validar arquivo_fonte
     const arquivosValidos = [
@@ -46,30 +48,52 @@ serve(async (req) => {
 
     let dataLimite: Date;
     
-    // Determinar data limite baseada no período de referência
-    // Para dados retroativos de jun/25, excluir registros com DATA_LAUDO >= 01/06/2025
-    if (periodo_referencia === 'jun/25') {
-      dataLimite = new Date('2025-06-01');
+    // CORREÇÃO CRÍTICA: Para dados retroativos, a lógica de exclusão deve ser DIFERENTE
+    // Dados retroativos devem conter registros do PASSADO, não do futuro
+    if (arquivo_fonte.includes('retroativo')) {
+      // Para retroativos, excluir registros FUTUROS ao período de referência
+      // Ex: para jun/25 retroativo, excluir DATA_LAUDO >= 01/07/2025 (mês seguinte)
+      if (periodo_referencia === 'jun/25') {
+        dataLimite = new Date('2025-07-01'); // Próximo mês após referência
+      } else {
+        const [mes, ano] = periodo_referencia.split('/');
+        const meses: { [key: string]: number } = {
+          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+        };
+        const anoCompleto = 2000 + parseInt(ano);
+        const mesNumero = meses[mes];
+        // Próximo mês após o período de referência
+        dataLimite = new Date(anoCompleto, mesNumero, 1); // Mês seguinte, dia 1
+      }
     } else {
-      // Para outros períodos, calcular dinamicamente
-      const [mes, ano] = periodo_referencia.split('/');
-      const meses: { [key: string]: number } = {
-        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-      };
-      const anoCompleto = 2000 + parseInt(ano);
-      const mesNumero = meses[mes];
-      dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
+      // Para dados atuais/padrão, manter lógica original
+      if (periodo_referencia === 'jun/25') {
+        dataLimite = new Date('2025-06-01');
+      } else {
+        const [mes, ano] = periodo_referencia.split('/');
+        const meses: { [key: string]: number } = {
+          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+        };
+        const anoCompleto = 2000 + parseInt(ano);
+        const mesNumero = meses[mes];
+        dataLimite = new Date(anoCompleto, mesNumero - 1, 1);
+      }
     }
 
-    console.log(`Data limite para exclusão: ${dataLimite.toISOString().split('T')[0]}`);
+    const dataLimiteStr = dataLimite.toISOString().split('T')[0];
+    console.log(`📊 Data limite calculada: ${dataLimiteStr}`);
+    console.log(`🔍 Tipo de arquivo: ${arquivo_fonte.includes('retroativo') ? 'RETROATIVO' : 'PADRÃO'}`);
+    console.log(`🔍 Buscando registros com DATA_LAUDO >= ${dataLimiteStr} no arquivo: ${arquivo_fonte}`);
+    console.log(`📝 Lógica: Para ${arquivo_fonte.includes('retroativo') ? 'retroativos' : 'padrão'}, excluir laudos >= ${dataLimiteStr}`);
 
     // Primeiro, contar quantos registros serão afetados
     const { count: totalParaExcluir, error: errorContar } = await supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte)
-      .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0]);
+      .gte('DATA_LAUDO', dataLimiteStr);
 
     if (errorContar) {
       console.error('Erro ao contar registros:', errorContar);
@@ -103,7 +127,7 @@ serve(async (req) => {
       .from('volumetria_mobilemed')
       .select('DATA_LAUDO, ESTUDO_DESCRICAO, EMPRESA')
       .eq('arquivo_fonte', arquivo_fonte)
-      .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+      .gte('DATA_LAUDO', dataLimiteStr)
       .limit(5);
 
     const exemplosExcluidos = exemplosData?.map(reg => ({
@@ -120,7 +144,7 @@ serve(async (req) => {
     let processedBatches = 0;
     
     try {
-      console.log(`Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}...`);
+      console.log(`🔄 Iniciando exclusão em lotes de ${BATCH_SIZE} registros com DATA_LAUDO >= ${dataLimiteStr}...`);
       
       // Processar em lotes até não haver mais registros para excluir
       while (true) {
@@ -129,7 +153,7 @@ serve(async (req) => {
           .from('volumetria_mobilemed')
           .select('id')
           .eq('arquivo_fonte', arquivo_fonte)
-          .gte('DATA_LAUDO', dataLimite.toISOString().split('T')[0])
+          .gte('DATA_LAUDO', dataLimiteStr)
           .order('id')
           .limit(BATCH_SIZE);
 
@@ -172,8 +196,8 @@ serve(async (req) => {
             erro: `Falha na exclusão (lote ${processedBatches + 1}): ${deleteError.message}`,
             registros_encontrados: totalParaExcluir || 0,
             registros_excluidos: totalExcluidos,
-            data_limite: dataLimite.toISOString().split('T')[0],
-            regra_aplicada: 'v002/v003 - Exclusões por Período'
+        data_limite: dataLimiteStr,
+        regra_aplicada: 'v002/v003 - Exclusões por Período'
           }), { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500 
@@ -208,8 +232,8 @@ serve(async (req) => {
           erro: `Falha: ${totalParaExcluir} registros encontrados mas nenhum excluído`,
           registros_encontrados: totalParaExcluir,
           registros_excluidos: 0,
-          data_limite: dataLimite.toISOString().split('T')[0],
-          regra_aplicada: 'v002/v003 - Exclusões por Período'
+        data_limite: dataLimiteStr,
+        regra_aplicada: 'v002/v003 - Exclusões por Período'
         }), { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500 
@@ -226,7 +250,7 @@ serve(async (req) => {
         erro: `Exceção durante exclusão: ${error.message}`,
         registros_encontrados: totalParaExcluir || 0,
         registros_excluidos: 0,
-        data_limite: dataLimite.toISOString().split('T')[0],
+        data_limite: dataLimiteStr,
         regra_aplicada: 'v002/v003 - Exclusões por Período'
       }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -244,7 +268,7 @@ serve(async (req) => {
         new_data: {
           arquivo_fonte,
           periodo_referencia,
-          data_limite: dataLimite.toISOString().split('T')[0],
+          data_limite: dataLimiteStr,
           registros_encontrados: totalParaExcluir || 0,
           registros_excluidos: totalExcluidos,
           exemplos_excluidos: exemplosExcluidos,
@@ -263,13 +287,13 @@ serve(async (req) => {
       sucesso: totalExcluidos >= 0, // Considera sucesso mesmo se não excluiu nada (não havia registros)
       arquivo_fonte,
       periodo_referencia,  
-      data_limite: dataLimite.toISOString().split('T')[0],
+      data_limite: dataLimiteStr,
       registros_encontrados: totalParaExcluir || 0,
       registros_excluidos: totalExcluidos,
       exemplos_excluidos: exemplosExcluidos,
       regra_aplicada: 'v002/v003 - Exclusões por Período',
       data_processamento: new Date().toISOString(),
-      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO >= ${dataLimite.toISOString().split('T')[0]}`
+      observacao: `Excluídos ${totalExcluidos} registros com DATA_LAUDO >= ${dataLimiteStr}`
     };
 
     console.log('Exclusões por período concluídas:', resultado);

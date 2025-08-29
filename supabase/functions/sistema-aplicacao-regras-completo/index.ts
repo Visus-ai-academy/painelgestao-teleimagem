@@ -57,25 +57,46 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
         return false;
       }
       
-      // Calcular data limite dinamicamente baseada no período
+      // Calcular data limite dinamicamente baseada no período e tipo de arquivo
       let dataLimite: string;
       
-      if (periodo_referencia === 'jun/25') {
-        dataLimite = '2025-06-01';
+      // CORREÇÃO CRÍTICA: Para dados retroativos, a lógica deve ser DIFERENTE
+      if (arquivo.includes('retroativo')) {
+        // Para retroativos, excluir registros FUTUROS ao período de referência
+        if (periodo_referencia === 'jun/25') {
+          dataLimite = '2025-07-01'; // Próximo mês após referência
+        } else {
+          const [mes, ano] = periodo_referencia.split('/');
+          const meses: { [key: string]: number } = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+          };
+          const anoCompleto = 2000 + parseInt(ano);
+          const mesNumero = meses[mes];
+          const dataCalculada = new Date(anoCompleto, mesNumero, 1); // Mês seguinte
+          dataLimite = dataCalculada.toISOString().split('T')[0];
+        }
       } else {
-        // Calcular dinamicamente para outros períodos
-        const [mes, ano] = periodo_referencia.split('/');
-        const meses: { [key: string]: number } = {
-          'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
-          'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
-        };
-        const anoCompleto = 2000 + parseInt(ano);
-        const mesNumero = meses[mes];
-        const dataCalculada = new Date(anoCompleto, mesNumero - 1, 1);
-        dataLimite = dataCalculada.toISOString().split('T')[0];
+        // Para dados padrão, manter lógica original
+        if (periodo_referencia === 'jun/25') {
+          dataLimite = '2025-06-01';
+        } else {
+          const [mes, ano] = periodo_referencia.split('/');
+          const meses: { [key: string]: number } = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+          };
+          const anoCompleto = 2000 + parseInt(ano);
+          const mesNumero = meses[mes];
+          const dataCalculada = new Date(anoCompleto, mesNumero - 1, 1);
+          dataLimite = dataCalculada.toISOString().split('T')[0];
+        }
       }
       
+      console.log(`🔍 v002/v003: Período de referência: ${periodo_referencia}`);
+      console.log(`🔍 v002/v003: Tipo de arquivo: ${arquivo.includes('retroativo') ? 'RETROATIVO' : 'PADRÃO'}`);
       console.log(`🔍 v002/v003: Usando data limite: ${dataLimite}`);
+      console.log(`📝 v002/v003: Lógica: Para ${arquivo.includes('retroativo') ? 'retroativos' : 'padrão'}, validar se laudos >= ${dataLimite} foram excluídos`);
       
       // Validar contando registros que deveriam ter sido excluídos
       const { count, error } = await supabase
@@ -90,7 +111,14 @@ const REGRAS_SISTEMA: RegraAplicacao[] = [
       }
       
       const registrosForaPeriodo = count || 0;
-      console.log(`🔍 v002/v003: Registros ainda fora do período: ${registrosForaPeriodo}`);
+      console.log(`🔍 v002/v003: Registros ainda fora do período (DATA_LAUDO >= ${dataLimite}): ${registrosForaPeriodo}`);
+      console.log(`🔍 v002/v003: Total de registros no arquivo ${arquivo}: ${await (async () => {
+        const { count: totalRegistros } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*', { count: 'exact', head: true })
+          .eq('arquivo_fonte', arquivo);
+        return totalRegistros || 0;
+      })()}`);
       
       // Se há registros fora do período, a regra falhou
       if (registrosForaPeriodo > 0) {
