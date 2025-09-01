@@ -737,6 +737,62 @@ export async function processVolumetriaOtimizado(
         }
         
         console.log('✅ Regras de exclusão e tratamento aplicadas diretamente');
+        
+        // 4. Para arquivos retroativos, aplicar regras v002/v003 automaticamente
+        if (arquivoFonte.includes('retroativo')) {
+          console.log('🚀 Aplicando regras v002/v003 automaticamente para arquivo retroativo...');
+          
+          try {
+            const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
+              'aplicar-regras-v002-v003-automatico',
+              {
+                body: {
+                  arquivo_fonte: arquivoFonte,
+                  upload_id: 'auto-process',
+                  arquivo_nome: `auto-${arquivoFonte}`,
+                  status: 'concluido',
+                  total_registros: result.totalInserted
+                }
+              }
+            );
+            
+            if (errorV002V003) {
+              console.warn('⚠️ Aviso: Falha nas regras v002/v003:', errorV002V003);
+            } else {
+              console.log('✅ Regras v002/v003 aplicadas automaticamente:', regrasV002V003);
+            }
+          } catch (errorAutomatico) {
+            console.warn('⚠️ Erro ao aplicar regras v002/v003 automaticamente:', errorAutomatico);
+          }
+        }
+        
+        // 5. Aplicar demais regras automáticas
+        console.log('🚀 Aplicando demais regras automáticas...');
+        
+        try {
+          const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
+            'auto-aplicar-regras-pos-upload',
+            {
+              body: {
+                arquivo_fonte: arquivoFonte,
+                upload_id: 'auto-process',
+                arquivo_nome: `auto-${arquivoFonte}`,
+                status: 'concluido',
+                total_registros: result.totalInserted,
+                auto_aplicar: true
+              }
+            }
+          );
+          
+          if (errorRegrasCompletas) {
+            console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+          } else {
+            console.log('✅ Regras automáticas completas aplicadas:', regrasCompletas);
+          }
+        } catch (errorRegrasFull) {
+          console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+        }
+        
       } catch (error) {
         console.warn('⚠️ Erro ao aplicar regras:', error);
       }
