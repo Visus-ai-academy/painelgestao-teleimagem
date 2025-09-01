@@ -152,13 +152,15 @@ export function useAutoRegras() {
     setProcessandoRegras(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('sistema-aplicacao-regras-completo', {
+      console.log('🚀 Aplicando TODAS as 27 regras manualmente...');
+      
+      // Usar aplicar-regras-lote que aplica todas as regras na ordem correta
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
         body: {
           arquivo_fonte: arquivoFonte,
-          upload_id: loteUpload,
-          periodo_referencia: 'jun/25',
-          forcar_aplicacao: true,
-          validar_apenas: false
+          lote_upload: loteUpload,
+          aplicar_todas_regras: true,
+          incluir_triggers: true
         }
       });
 
@@ -214,23 +216,28 @@ export function useAutoRegras() {
     setProcessandoRegras(true);
     
     try {
-      toast.info('🚀 Iniciando correção COMPLETA de TODOS os dados existentes...');
-      console.log('🚀 Executando correção COMPLETA de TODOS os dados existentes...');
+      toast.info('🚀 Aplicando TODAS as 27 regras em TODOS os dados existentes...');
+      console.log('🚀 Executando aplicação completa das 27 regras nos dados existentes...');
       
-      const { data, error } = await supabase.functions.invoke('corrigir-todos-dados-existentes', {
-        body: {}
+      // Usar aplicar-regras-lote para aplicar todas as 27 regras
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
+        body: {
+          aplicar_em_todos_dados: true,
+          incluir_todas_27_regras: true
+        }
       });
 
       if (error) {
         throw new Error(error.message);
       }
 
-      if (data.sucesso) {
-        const { total_processados, total_atualizados, detalhes_por_arquivo } = data;
-        toast.success(`✅ Correção COMPLETA concluída! ${total_atualizados} de ${total_processados} registros corrigidos`);
-        console.log('📋 Detalhes da correção completa:', detalhes_por_arquivo);
+      if (data.success) {
+        const { resultados } = data;
+        const totalRegrasAplicadas = resultados?.filter((r: any) => r.status === 'sucesso').length || 0;
+        toast.success(`✅ TODAS as 27 regras aplicadas! ${totalRegrasAplicadas} regras executadas com sucesso`);
+        console.log('📋 Detalhes da aplicação das 27 regras:', resultados);
       } else {
-        toast.error(`❌ Falha na correção completa: ${data.erro}`);
+        toast.error(`❌ Falha na aplicação das regras: ${data.error}`);
       }
       
       return data;
