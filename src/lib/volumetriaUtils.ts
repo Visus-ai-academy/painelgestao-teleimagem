@@ -738,6 +738,16 @@ export async function processVolumetriaOtimizado(
         
         console.log('✅ Regras de exclusão e tratamento aplicadas diretamente');
         
+        // Determinar período de referência dinamicamente para uso posterior
+        let periodoReferencia = 'jun/25'; // default
+        if (periodo) {
+          const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+          const mesAbrev = meses[periodo.mes - 1];
+          const anoAbrev = periodo.ano.toString().slice(-2);
+          periodoReferencia = `${mesAbrev}/${anoAbrev}`;
+        }
+        console.log(`📅 Período de referência calculado: ${periodoReferencia}`);
+        
         // 4. Para arquivos retroativos, aplicar regras v002/v003 automaticamente
         if (arquivoFonte.includes('retroativo')) {
           console.log('🚀 Aplicando regras v002/v003 automaticamente para arquivo retroativo...');
@@ -751,7 +761,8 @@ export async function processVolumetriaOtimizado(
                   upload_id: 'auto-process',
                   arquivo_nome: `auto-${arquivoFonte}`,
                   status: 'concluido',
-                  total_registros: result.totalInserted
+                  total_registros: result.totalInserted,
+                  periodo_referencia: periodoReferencia
                 }
               }
             );
@@ -779,7 +790,8 @@ export async function processVolumetriaOtimizado(
                 arquivo_nome: `auto-${arquivoFonte}`,
                 status: 'concluido',
                 total_registros: result.totalInserted,
-                auto_aplicar: true
+                auto_aplicar: true,
+                periodo_referencia: periodoReferencia
               }
             }
           );
