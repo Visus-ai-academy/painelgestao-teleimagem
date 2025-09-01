@@ -75,6 +75,7 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          evento_tipo: string | null
           id: string
           ip_address: unknown | null
           new_data: Json | null
@@ -90,6 +91,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          evento_tipo?: string | null
           id?: string
           ip_address?: unknown | null
           new_data?: Json | null
@@ -105,6 +107,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          evento_tipo?: string | null
           id?: string
           ip_address?: unknown | null
           new_data?: Json | null
