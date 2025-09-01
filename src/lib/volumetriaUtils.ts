@@ -683,120 +683,55 @@ export async function processVolumetriaOtimizado(
       console.log(`📅 Período de referência: ${periodoReferencia}`);
       
       if (arquivoFonte.includes('retroativo')) {
-        // Para arquivos retroativos: aplicar exclusões por data + regras v002/v003
-        console.log('📅 Aplicando regras de exclusão por data para arquivo retroativo...');
-        
-        // Aplicar exclusões de datas diretamente no banco
-        const mes = periodo.mes;
-        const ano = periodo.ano;
-        const dataLimiteRealizacao = `${ano}-${mes.toString().padStart(2, '0')}-01`;
-        const inicioFaturamento = `${ano}-${mes.toString().padStart(2, '0')}-08`;
-        
-        // Calcular próximo mês para fim do faturamento
-        let proximoMes = mes + 1;
-        let proximoAno = ano;
-        if (proximoMes > 12) {
-          proximoMes = 1;
-          proximoAno = ano + 1;
-        }
-        const fimFaturamento = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-07`;
-        
-        console.log(`📊 Exclusões para período ${periodoReferencia}:`);
-        console.log(`   - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
-        console.log(`   - Manter DATA_LAUDO entre ${inicioFaturamento} e ${fimFaturamento}`);
+        // PRIORIDADE MÁXIMA: Aplicar regras v002/v003 PRIMEIRO para arquivos retroativos
+        console.log('🚀🚀🚀 APLICANDO REGRAS v002/v003 COMO PRIMEIRA PRIORIDADE...');
         
         try {
-          // 1. Excluir registros com DATA_REALIZACAO >= data limite
-          const { error: errorRealizacao, count: countRealizacao } = await supabase
-            .from('volumetria_mobilemed')
-            .delete({ count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .gte('DATA_REALIZACAO', dataLimiteRealizacao);
-          
-          if (errorRealizacao) {
-            console.error('❌ Erro ao excluir por DATA_REALIZACAO:', errorRealizacao);
-          } else {
-            console.log(`✅ Excluídos ${countRealizacao || 0} registros por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
-          }
-          
-          // 2. Excluir registros com DATA_LAUDO fora do período
-          const { error: errorLaudo, count: countLaudo } = await supabase
-            .from('volumetria_mobilemed')
-            .delete({ count: 'exact' })
-            .eq('arquivo_fonte', arquivoFonte)
-            .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
-          
-          if (errorLaudo) {
-            console.error('❌ Erro ao excluir por DATA_LAUDO:', errorLaudo);
-          } else {
-            console.log(`✅ Excluídos ${countLaudo || 0} registros por DATA_LAUDO fora do período`);
-          }
-          
-          // 3. Aplicar De-Para para valores zerados
-          const { data: deParaResult, error: deParaError } = await supabase
-            .rpc('aplicar_de_para_automatico', { 
-              arquivo_fonte_param: arquivoFonte 
-            });
-          
-          if (deParaError) {
-            console.log(`⚠️ De-Para falhou: ${deParaError.message}`);
-          } else {
-            const registrosAtualizados = (deParaResult as any)?.registros_atualizados || 0;
-            console.log(`✅ De-Para aplicado em ${registrosAtualizados} registros`);
-          }
-          
-          // 4. Aplicar regras v002/v003 automaticamente
-          console.log('🚀 Aplicando regras v002/v003 automaticamente para arquivo retroativo...');
-          
-          try {
-            const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
-              'aplicar-regras-v002-v003-automatico',
-              {
-                body: {
-                  arquivo_fonte: arquivoFonte,
-                  upload_id: 'auto-process',
-                  arquivo_nome: `auto-${arquivoFonte}`,
-                  status: 'concluido',
-                  total_registros: result.totalInserted,
-                  periodo_referencia: periodoReferencia
-                }
+          const { data: regrasV002V003, error: errorV002V003 } = await supabase.functions.invoke(
+            'aplicar-regras-v002-v003-automatico',
+            {
+              body: {
+                arquivo_fonte: arquivoFonte,
+                upload_id: 'priority-process',
+                arquivo_nome: `priority-${arquivoFonte}`,
+                status: 'concluido',
+                total_registros: result.totalInserted,
+                periodo_referencia: periodoReferencia
               }
-            );
-            
-            if (errorV002V003) {
-              console.warn('⚠️ Aviso: Falha nas regras v002/v003:', errorV002V003);
-            } else {
-              console.log('✅ Regras v002/v003 aplicadas automaticamente:', regrasV002V003);
             }
-          } catch (errorAutomatico) {
-            console.warn('⚠️ Erro ao aplicar regras v002/v003 automaticamente:', errorAutomatico);
-          }
+          );
           
-        } catch (error) {
-          console.warn('⚠️ Erro ao aplicar regras para arquivo retroativo:', error);
+          if (errorV002V003) {
+            console.error('❌ ERRO CRÍTICO: Falha nas regras v002/v003 PRIORITÁRIAS:', errorV002V003);
+          } else {
+            console.log('✅✅✅ REGRAS v002/v003 PRIORITÁRIAS APLICADAS COM SUCESSO:', regrasV002V003);
+          }
+        } catch (errorAutomatico) {
+          console.error('❌ ERRO CRÍTICO ao aplicar regras v002/v003 prioritárias:', errorAutomatico);
         }
         
       } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
-        // Para arquivos não-retroativos: aplicar regra v031 (filtro período atual)
-        console.log('🚀 Aplicando regra v031 (filtro período atual) para arquivo não-retroativo...');
+        // PRIORIDADE MÁXIMA: Aplicar regra v031 PRIMEIRO para arquivos não-retroativos
+        console.log('🚀🚀🚀 APLICANDO REGRA v031 COMO PRIMEIRA PRIORIDADE...');
         
         try {
           const { data: regraV031, error: errorV031 } = await supabase.functions.invoke(
             'aplicar-filtro-periodo-atual',
             {
               body: {
-                periodo_referencia: periodoReferencia
+                periodo_referencia: periodoReferencia,
+                arquivo_fonte: arquivoFonte
               }
             }
           );
           
           if (errorV031) {
-            console.warn('⚠️ Aviso: Falha na regra v031:', errorV031);
+            console.error('❌ ERRO CRÍTICO: Falha na regra v031 PRIORITÁRIA:', errorV031);
           } else {
-            console.log('✅ Regra v031 aplicada automaticamente:', regraV031);
+            console.log('✅✅✅ REGRA v031 PRIORITÁRIA APLICADA COM SUCESSO:', regraV031);
           }
         } catch (errorV031) {
-          console.warn('⚠️ Erro ao aplicar regra v031:', errorV031);
+          console.error('❌ ERRO CRÍTICO ao aplicar regra v031 prioritária:', errorV031);
         }
       }
       
