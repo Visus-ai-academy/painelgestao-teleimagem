@@ -210,13 +210,14 @@ export function useAutoRegras() {
     }
   };
 
-  const corrigirDadosExistentes = async () => {
+  const corrigirTodosDadosExistentes = async () => {
     setProcessandoRegras(true);
     
     try {
-      toast.info('⚡ Iniciando correção de dados existentes...');
+      toast.info('🚀 Iniciando correção COMPLETA de TODOS os dados existentes...');
+      console.log('🚀 Executando correção COMPLETA de TODOS os dados existentes...');
       
-      const { data, error } = await supabase.functions.invoke('corrigir-dados-existentes', {
+      const { data, error } = await supabase.functions.invoke('corrigir-todos-dados-existentes', {
         body: {}
       });
 
@@ -225,39 +226,39 @@ export function useAutoRegras() {
       }
 
       if (data.sucesso) {
-        const { arquivos_processados, total_correcoes } = data;
-        toast.success(`✅ Correção concluída! ${arquivos_processados} arquivos, ${total_correcoes} correções aplicadas`);
-        console.log('📋 Detalhes da correção:', data.detalhes_por_arquivo);
+        const { total_processados, total_atualizados, detalhes_por_arquivo } = data;
+        toast.success(`✅ Correção COMPLETA concluída! ${total_atualizados} de ${total_processados} registros corrigidos`);
+        console.log('📋 Detalhes da correção completa:', detalhes_por_arquivo);
       } else {
-        toast.error(`❌ Falha na correção: ${data.erro}`);
+        toast.error(`❌ Falha na correção completa: ${data.erro}`);
       }
       
       return data;
     } catch (error: any) {
-      toast.error(`❌ Erro ao corrigir dados: ${error.message}`);
+      toast.error(`❌ Erro ao corrigir todos os dados: ${error.message}`);
       throw error;
     } finally {
       setProcessandoRegras(false);
     }
   };
 
-  // Executar correção automática uma única vez ao inicializar o sistema
+  // Executar correção COMPLETA automática uma única vez ao inicializar o sistema
   useEffect(() => {
-    const executarCorrecaoUnicaVez = async () => {
-      const jaExecutou = localStorage.getItem('correcao_regras_executada');
+    const executarCorrecaoCompleta = async () => {
+      const jaExecutou = localStorage.getItem('correcao_completa_regras_executada');
       if (!jaExecutou) {
-        console.log('🔧 Executando correção única dos dados existentes...');
+        console.log('🚀 Executando correção COMPLETA única dos dados existentes...');
         try {
-          await corrigirDadosExistentes();
-          localStorage.setItem('correcao_regras_executada', 'true');
+          await corrigirTodosDadosExistentes();
+          localStorage.setItem('correcao_completa_regras_executada', 'true');
         } catch (error) {
-          console.error('Erro na correção única:', error);
+          console.error('Erro na correção completa única:', error);
         }
       }
     };
 
     // Executar imediatamente ao carregar
-    executarCorrecaoUnicaVez();
+    executarCorrecaoCompleta();
   }, []);
 
   return {
@@ -266,6 +267,6 @@ export function useAutoRegras() {
     toggleAutoAplicar,
     aplicarRegrasManual,
     validarRegras,
-    corrigirDadosExistentes
+    corrigirTodosDadosExistentes
   };
 }
