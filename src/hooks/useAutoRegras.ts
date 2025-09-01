@@ -210,11 +210,43 @@ export function useAutoRegras() {
     }
   };
 
+  const corrigirDadosExistentes = async () => {
+    setProcessandoRegras(true);
+    
+    try {
+      toast.info('⚡ Iniciando correção de dados existentes...');
+      
+      const { data, error } = await supabase.functions.invoke('corrigir-dados-existentes', {
+        body: {}
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data.sucesso) {
+        const { arquivos_processados, total_correcoes } = data;
+        toast.success(`✅ Correção concluída! ${arquivos_processados} arquivos, ${total_correcoes} correções aplicadas`);
+        console.log('📋 Detalhes da correção:', data.detalhes_por_arquivo);
+      } else {
+        toast.error(`❌ Falha na correção: ${data.erro}`);
+      }
+      
+      return data;
+    } catch (error: any) {
+      toast.error(`❌ Erro ao corrigir dados: ${error.message}`);
+      throw error;
+    } finally {
+      setProcessandoRegras(false);
+    }
+  };
+
   return {
     autoAplicarAtivo,
     processandoRegras,
     toggleAutoAplicar,
     aplicarRegrasManual,
-    validarRegras
+    validarRegras,
+    corrigirDadosExistentes
   };
 }

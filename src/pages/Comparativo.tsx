@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { Badge } from "@/components/ui/badge";
 import { ComparativoPeriodoSelector } from "@/components/volumetria/ComparativoPeriodoSelector";
+import { useAutoRegras } from "@/hooks/useAutoRegras";
 
 export default function Comparativo() {
   const [uploaded, setUploaded] = useState<UploadedRow[] | null>(null);
@@ -22,6 +23,7 @@ export default function Comparativo() {
   const [periodoComparativo, setPeriodoComparativo] = useState<string | null>(null);
   const { toast } = useToast();
   const { data: volumetriaData, refreshData, getDataByPeriod } = useVolumetria();
+  const { corrigirDadosExistentes, processandoRegras } = useAutoRegras();
 
   // Persistência simples para manter o comparativo ao sair/voltar da tela
   const STORAGE_KEYS = {
@@ -325,6 +327,15 @@ export default function Comparativo() {
             className="text-xs"
           >
             {volumetriaData.loading ? '🔄 Atualizando...' : '🔄 Forçar Atualização'}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={corrigirDadosExistentes} 
+            disabled={processandoRegras}
+            className="text-xs"
+          >
+            {processandoRegras ? '⚡ Corrigindo...' : '🔧 Corrigir Regras'}
           </Button>
         </div>
       </div>
