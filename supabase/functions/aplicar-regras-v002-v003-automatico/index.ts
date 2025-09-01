@@ -12,6 +12,7 @@ interface UploadEvent {
   arquivo_nome: string;
   status: string;
   total_registros: number;
+  periodo_referencia?: string;
 }
 
 export default serve(async (req: Request): Promise<Response> => {
@@ -25,7 +26,8 @@ export default serve(async (req: Request): Promise<Response> => {
       upload_id,
       arquivo_nome,
       status,
-      total_registros
+      total_registros,
+      periodo_referencia
     }: UploadEvent = await req.json();
 
     console.log(`🚀 APLICAÇÃO AUTOMÁTICA V002/V003`);
@@ -34,6 +36,7 @@ export default serve(async (req: Request): Promise<Response> => {
     console.log(`🆔 Upload ID: ${upload_id}`);
     console.log(`📊 Total registros: ${total_registros}`);
     console.log(`📋 Status do upload: ${status}`);
+    console.log(`📅 Período referência: ${periodo_referencia || 'jun/25 (fallback)'}`);
 
     if (!arquivo_fonte || !upload_id) {
       throw new Error('Parâmetros arquivo_fonte e upload_id são obrigatórios');
@@ -112,7 +115,7 @@ export default serve(async (req: Request): Promise<Response> => {
       {
         body: {
           arquivo_fonte,
-          periodo_referencia: 'jun/25'
+          periodo_referencia: periodo_referencia || 'jun/25'
         }
       }
     );
