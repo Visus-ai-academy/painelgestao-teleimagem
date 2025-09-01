@@ -1533,6 +1533,54 @@ export type Database = {
         }
         Relationships: []
       }
+      fila_processamento_avancado: {
+        Row: {
+          arquivo_fonte: string
+          created_at: string
+          erro_detalhes: string | null
+          id: string
+          lote_upload: string
+          max_tentativas: number
+          prioridade: string
+          processado_em: string | null
+          status: string
+          tentativas: number
+          tipos_processamento: Json
+          updated_at: string
+          volumetria_id: string
+        }
+        Insert: {
+          arquivo_fonte: string
+          created_at?: string
+          erro_detalhes?: string | null
+          id?: string
+          lote_upload: string
+          max_tentativas?: number
+          prioridade?: string
+          processado_em?: string | null
+          status?: string
+          tentativas?: number
+          tipos_processamento?: Json
+          updated_at?: string
+          volumetria_id: string
+        }
+        Update: {
+          arquivo_fonte?: string
+          created_at?: string
+          erro_detalhes?: string | null
+          id?: string
+          lote_upload?: string
+          max_tentativas?: number
+          prioridade?: string
+          processado_em?: string | null
+          status?: string
+          tentativas?: number
+          tipos_processamento?: Json
+          updated_at?: string
+          volumetria_id?: string
+        }
+        Relationships: []
+      }
       historico_contratos: {
         Row: {
           aplicado_em: string | null
