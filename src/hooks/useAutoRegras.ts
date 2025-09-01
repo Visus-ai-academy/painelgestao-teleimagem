@@ -15,9 +15,11 @@ export function useAutoRegras() {
   const [autoAplicarAtivo, setAutoAplicarAtivo] = useState(true);
   const [processandoRegras, setProcessandoRegras] = useState(false);
 
-  // Função para processar regras automaticamente (reutilizada por INSERT e UPDATE)
+  // Sistema coordenado: Trigger + Edge Functions
   const processarRegrasAutomaticas = async (uploadData: UploadStatus) => {
-    // Verificar se é um arquivo que precisa de regras
+    console.log('🚀 Sistema coordenado ativo - Triggers aplicaram regras básicas');
+    
+    // Verificar se é um arquivo que precisa de regras avançadas
     const arquivosComRegras = [
       'volumetria_padrao',
       'volumetria_fora_padrao', 
@@ -26,86 +28,74 @@ export function useAutoRegras() {
       'volumetria_onco_padrao'
     ];
 
-    if (arquivosComRegras.includes(uploadData.tipo_arquivo)) {
-      console.log('⚡ Disparando aplicação automática de regras...');
-      setProcessandoRegras(true);
-      
-      try {
-        // Para arquivos retroativos, aplicar primeiro as regras v002/v003 (críticas)
-        const arquivosRetroativos = ['volumetria_padrao_retroativo', 'volumetria_fora_padrao_retroativo'];
-        
-        if (arquivosRetroativos.includes(uploadData.tipo_arquivo)) {
-          console.log('🔥 Aplicando regras v002/v003 (críticas) primeiro...');
-          
-          const { data: dataV002V003, error: errorV002V003 } = await supabase.functions.invoke('aplicar-regras-v002-v003-automatico', {
-            body: {
-              arquivo_fonte: uploadData.tipo_arquivo,
-              upload_id: uploadData.id,
-              arquivo_nome: uploadData.arquivo_nome,
-              status: uploadData.status,
-              total_registros: uploadData.registros_inseridos
-            }
-          });
+    if (!arquivosComRegras.includes(uploadData.tipo_arquivo)) {
+      console.log('📝 Arquivo não precisa de regras avançadas:', uploadData.tipo_arquivo);
+      return;
+    }
 
-          console.log('📥 Resposta v002/v003:', { dataV002V003, errorV002V003 });
+    console.log('⚡ Verificando fila de processamento avançado...');
+    setProcessandoRegras(true);
+    
+    try {
+      // Aguardar um pouco para os triggers processarem
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-          if (errorV002V003) {
-            console.error('❌ Erro na aplicação v002/v003:', errorV002V003);
-            toast.error(`Erro na aplicação das regras v002/v003: ${errorV002V003.message}`);
-            return;
-          }
+      // Verificar se há itens na fila de processamento avançado
+      const { data: filaItens, error: filaError } = await supabase
+        .from('fila_processamento_avancado')
+        .select('*')
+        .eq('arquivo_fonte', uploadData.tipo_arquivo)
+        .eq('status', 'pendente');
 
-          if (dataV002V003.success) {
-            toast.success(`✅ Regras v002/v003 aplicadas! ${dataV002V003.detalhes_aplicacao?.registros_excluidos || 0} registros excluídos.`);
-            console.log('✅ v002/v003 aplicadas com sucesso:', dataV002V003);
-          } else {
-            toast.warning(`⚠️ Falha na aplicação das regras v002/v003 para ${uploadData.tipo_arquivo}.`);
-            console.log('⚠️ Falha v002/v003:', dataV002V003);
-            return;
-          }
-        }
-
-        // Aplicar demais regras se necessário (só se auto aplicar estiver ativo)
-        if (autoAplicarAtivo) {
-          console.log('📞 Chamando função automática para demais regras:', {
-            arquivo_fonte: uploadData.tipo_arquivo,
-            upload_id: uploadData.id,
-            auto_aplicar: autoAplicarAtivo
-          });
-
-          const { data, error } = await supabase.functions.invoke('auto-aplicar-regras-pos-upload', {
-            body: {
-              arquivo_fonte: uploadData.tipo_arquivo,
-              upload_id: uploadData.id,
-              arquivo_nome: uploadData.arquivo_nome,
-              status: uploadData.status,
-              total_registros: uploadData.registros_inseridos,
-              auto_aplicar: autoAplicarAtivo
-            }
-          });
-
-          console.log('📥 Resposta demais regras:', { data, error });
-
-          if (error) {
-            console.error('❌ Erro na aplicação das demais regras:', error);
-            toast.warning(`Regras v002/v003 aplicadas, mas falha nas demais regras: ${error.message}`);
-            return;
-          }
-
-          if (data.success) {
-            toast.success(`✅ Todas as regras aplicadas automaticamente para ${uploadData.tipo_arquivo}!`);
-            console.log('✅ Todas as regras aplicadas:', data);
-          } else {
-            toast.warning(`⚠️ Algumas regras falharam para ${uploadData.tipo_arquivo}. v002/v003 foram aplicadas com sucesso.`);
-            console.log('⚠️ Aplicação parcial das demais regras:', data);
-          }
-        }
-      } catch (error: any) {
-        console.error('💥 Erro inesperado:', error);
-        toast.error(`Erro inesperado: ${error.message}`);
-      } finally {
-        setProcessandoRegras(false);
+      if (filaError) {
+        console.error('❌ Erro ao verificar fila:', filaError);
+        toast.error(`Erro ao verificar fila: ${filaError.message}`);
+        return;
       }
+
+      console.log(`📋 Encontrados ${filaItens?.length || 0} itens na fila para processamento avançado`);
+
+      if (!filaItens || filaItens.length === 0) {
+        toast.success(`✅ Upload processado com sucesso! Regras básicas aplicadas via trigger.`);
+        return;
+      }
+
+      // Processar regras avançadas via edge function
+      console.log('🔧 Disparando processamento de regras avançadas...');
+      
+      const { data, error } = await supabase.functions.invoke('processar-regras-avancadas', {
+        body: {
+          arquivo_fonte: uploadData.tipo_arquivo,
+          lote_upload: uploadData.arquivo_nome
+        }
+      });
+
+      console.log('📥 Resposta regras avançadas:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro no processamento avançado:', error);
+        toast.warning(`Regras básicas aplicadas, mas falha nas regras avançadas: ${error.message}`);
+        return;
+      }
+
+      if (data.sucesso) {
+        const { processados, erros } = data;
+        if (erros > 0) {
+          toast.warning(`⚠️ Processamento parcial: ${processados} processados, ${erros} erros`);
+        } else {
+          toast.success(`✅ Todas as regras aplicadas! ${processados} registros processados.`);
+        }
+        console.log('✅ Processamento avançado concluído:', data);
+      } else {
+        toast.warning(`⚠️ Falha no processamento avançado para ${uploadData.tipo_arquivo}`);
+        console.log('⚠️ Falha no processamento avançado:', data);
+      }
+
+    } catch (error: any) {
+      console.error('💥 Erro inesperado no sistema coordenado:', error);
+      toast.error(`Erro inesperado: ${error.message}`);
+    } finally {
+      setProcessandoRegras(false);
     }
   };
 
