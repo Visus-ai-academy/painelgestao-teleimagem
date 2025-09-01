@@ -673,83 +673,79 @@ export async function processVolumetriaOtimizado(
       }
     }
     
-    // Aplicar regras específicas APÓS o upload para arquivos retroativos
-    if (arquivoFonte.includes('retroativo') && periodo) {
-      console.log('📅 Aplicando regras de exclusão por data para arquivo retroativo...');
+    // Aplicar regras específicas pós-upload baseado no tipo de arquivo
+    if (periodo) {
+      // Determinar período de referência dinamicamente
+      const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      const mesAbrev = meses[periodo.mes - 1];
+      const anoAbrev = periodo.ano.toString().slice(-2);
+      const periodoReferencia = `${mesAbrev}/${anoAbrev}`;
+      console.log(`📅 Período de referência: ${periodoReferencia}`);
       
-      // Aplicar exclusões de datas diretamente no banco
-      const mes = periodo.mes;
-      const ano = periodo.ano;
-      const dataLimiteRealizacao = `${ano}-${mes.toString().padStart(2, '0')}-01`;
-      const inicioFaturamento = `${ano}-${mes.toString().padStart(2, '0')}-08`;
-      
-      // Calcular próximo mês para fim do faturamento
-      let proximoMes = mes + 1;
-      let proximoAno = ano;
-      if (proximoMes > 12) {
-        proximoMes = 1;
-        proximoAno = ano + 1;
-      }
-      const fimFaturamento = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-07`;
-      
-      console.log(`📊 Exclusões para período Jun/25:`);
-      console.log(`   - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
-      console.log(`   - Manter DATA_LAUDO entre ${inicioFaturamento} e ${fimFaturamento}`);
-      
-      try {
-        // 1. Excluir registros com DATA_REALIZACAO >= data limite
-        const { error: errorRealizacao, count: countRealizacao } = await supabase
-          .from('volumetria_mobilemed')
-          .delete({ count: 'exact' })
-          .eq('arquivo_fonte', arquivoFonte)
-          .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+      if (arquivoFonte.includes('retroativo')) {
+        // Para arquivos retroativos: aplicar exclusões por data + regras v002/v003
+        console.log('📅 Aplicando regras de exclusão por data para arquivo retroativo...');
         
-        if (errorRealizacao) {
-          console.error('❌ Erro ao excluir por DATA_REALIZACAO:', errorRealizacao);
-        } else {
-          console.log(`✅ Excluídos ${countRealizacao || 0} registros por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+        // Aplicar exclusões de datas diretamente no banco
+        const mes = periodo.mes;
+        const ano = periodo.ano;
+        const dataLimiteRealizacao = `${ano}-${mes.toString().padStart(2, '0')}-01`;
+        const inicioFaturamento = `${ano}-${mes.toString().padStart(2, '0')}-08`;
+        
+        // Calcular próximo mês para fim do faturamento
+        let proximoMes = mes + 1;
+        let proximoAno = ano;
+        if (proximoMes > 12) {
+          proximoMes = 1;
+          proximoAno = ano + 1;
         }
+        const fimFaturamento = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-07`;
         
-        // 2. Excluir registros com DATA_LAUDO fora do período
-        const { error: errorLaudo, count: countLaudo } = await supabase
-          .from('volumetria_mobilemed')
-          .delete({ count: 'exact' })
-          .eq('arquivo_fonte', arquivoFonte)
-          .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
+        console.log(`📊 Exclusões para período ${periodoReferencia}:`);
+        console.log(`   - Excluir DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+        console.log(`   - Manter DATA_LAUDO entre ${inicioFaturamento} e ${fimFaturamento}`);
         
-        if (errorLaudo) {
-          console.error('❌ Erro ao excluir por DATA_LAUDO:', errorLaudo);
-        } else {
-          console.log(`✅ Excluídos ${countLaudo || 0} registros por DATA_LAUDO fora do período`);
-        }
-        
-        // 3. Aplicar De-Para para valores zerados
-        const { data: deParaResult, error: deParaError } = await supabase
-          .rpc('aplicar_de_para_automatico', { 
-            arquivo_fonte_param: arquivoFonte 
-          });
-        
-        if (deParaError) {
-          console.log(`⚠️ De-Para falhou: ${deParaError.message}`);
-        } else {
-          const registrosAtualizados = (deParaResult as any)?.registros_atualizados || 0;
-          console.log(`✅ De-Para aplicado em ${registrosAtualizados} registros`);
-        }
-        
-        console.log('✅ Regras de exclusão e tratamento aplicadas diretamente');
-        
-        // Determinar período de referência dinamicamente para uso posterior
-        let periodoReferencia = 'jun/25'; // default
-        if (periodo) {
-          const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-          const mesAbrev = meses[periodo.mes - 1];
-          const anoAbrev = periodo.ano.toString().slice(-2);
-          periodoReferencia = `${mesAbrev}/${anoAbrev}`;
-        }
-        console.log(`📅 Período de referência calculado: ${periodoReferencia}`);
-        
-        // 4. Para arquivos retroativos, aplicar regras v002/v003 automaticamente
-        if (arquivoFonte.includes('retroativo')) {
+        try {
+          // 1. Excluir registros com DATA_REALIZACAO >= data limite
+          const { error: errorRealizacao, count: countRealizacao } = await supabase
+            .from('volumetria_mobilemed')
+            .delete({ count: 'exact' })
+            .eq('arquivo_fonte', arquivoFonte)
+            .gte('DATA_REALIZACAO', dataLimiteRealizacao);
+          
+          if (errorRealizacao) {
+            console.error('❌ Erro ao excluir por DATA_REALIZACAO:', errorRealizacao);
+          } else {
+            console.log(`✅ Excluídos ${countRealizacao || 0} registros por DATA_REALIZACAO >= ${dataLimiteRealizacao}`);
+          }
+          
+          // 2. Excluir registros com DATA_LAUDO fora do período
+          const { error: errorLaudo, count: countLaudo } = await supabase
+            .from('volumetria_mobilemed')
+            .delete({ count: 'exact' })
+            .eq('arquivo_fonte', arquivoFonte)
+            .or(`DATA_LAUDO.lt.${inicioFaturamento},DATA_LAUDO.gt.${fimFaturamento}`);
+          
+          if (errorLaudo) {
+            console.error('❌ Erro ao excluir por DATA_LAUDO:', errorLaudo);
+          } else {
+            console.log(`✅ Excluídos ${countLaudo || 0} registros por DATA_LAUDO fora do período`);
+          }
+          
+          // 3. Aplicar De-Para para valores zerados
+          const { data: deParaResult, error: deParaError } = await supabase
+            .rpc('aplicar_de_para_automatico', { 
+              arquivo_fonte_param: arquivoFonte 
+            });
+          
+          if (deParaError) {
+            console.log(`⚠️ De-Para falhou: ${deParaError.message}`);
+          } else {
+            const registrosAtualizados = (deParaResult as any)?.registros_atualizados || 0;
+            console.log(`✅ De-Para aplicado em ${registrosAtualizados} registros`);
+          }
+          
+          // 4. Aplicar regras v002/v003 automaticamente
           console.log('🚀 Aplicando regras v002/v003 automaticamente para arquivo retroativo...');
           
           try {
@@ -775,38 +771,61 @@ export async function processVolumetriaOtimizado(
           } catch (errorAutomatico) {
             console.warn('⚠️ Erro ao aplicar regras v002/v003 automaticamente:', errorAutomatico);
           }
+          
+        } catch (error) {
+          console.warn('⚠️ Erro ao aplicar regras para arquivo retroativo:', error);
         }
         
-        // 5. Aplicar demais regras automáticas
-        console.log('🚀 Aplicando demais regras automáticas...');
+      } else if (arquivoFonte.includes('volumetria_padrao') || arquivoFonte.includes('volumetria_fora_padrao')) {
+        // Para arquivos não-retroativos: aplicar regra v031 (filtro período atual)
+        console.log('🚀 Aplicando regra v031 (filtro período atual) para arquivo não-retroativo...');
         
         try {
-          const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
-            'auto-aplicar-regras-pos-upload',
+          const { data: regraV031, error: errorV031 } = await supabase.functions.invoke(
+            'aplicar-filtro-periodo-atual',
             {
               body: {
-                arquivo_fonte: arquivoFonte,
-                upload_id: 'auto-process',
-                arquivo_nome: `auto-${arquivoFonte}`,
-                status: 'concluido',
-                total_registros: result.totalInserted,
-                auto_aplicar: true,
                 periodo_referencia: periodoReferencia
               }
             }
           );
           
-          if (errorRegrasCompletas) {
-            console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+          if (errorV031) {
+            console.warn('⚠️ Aviso: Falha na regra v031:', errorV031);
           } else {
-            console.log('✅ Regras automáticas completas aplicadas:', regrasCompletas);
+            console.log('✅ Regra v031 aplicada automaticamente:', regraV031);
           }
-        } catch (errorRegrasFull) {
-          console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+        } catch (errorV031) {
+          console.warn('⚠️ Erro ao aplicar regra v031:', errorV031);
         }
+      }
+      
+      // 5. Aplicar demais regras automáticas para todos os tipos de arquivo
+      console.log('🚀 Aplicando demais regras automáticas...');
+      
+      try {
+        const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
+          'auto-aplicar-regras-pos-upload',
+          {
+            body: {
+              arquivo_fonte: arquivoFonte,
+              upload_id: 'auto-process',
+              arquivo_nome: `auto-${arquivoFonte}`,
+              status: 'concluido',
+              total_registros: result.totalInserted,
+              auto_aplicar: true,
+              periodo_referencia: periodoReferencia
+            }
+          }
+        );
         
-      } catch (error) {
-        console.warn('⚠️ Erro ao aplicar regras:', error);
+        if (errorRegrasCompletas) {
+          console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+        } else {
+          console.log('✅ Regras automáticas completas aplicadas:', regrasCompletas);
+        }
+      } catch (errorRegrasFull) {
+        console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
       }
     }
     
