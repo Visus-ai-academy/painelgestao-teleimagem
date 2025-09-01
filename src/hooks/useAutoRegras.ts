@@ -241,6 +241,24 @@ export function useAutoRegras() {
     }
   };
 
+  // Executar correção automática uma única vez ao inicializar o sistema
+  useEffect(() => {
+    const executarCorrecaoUnicaVez = async () => {
+      const jaExecutou = localStorage.getItem('correcao_regras_executada');
+      if (!jaExecutou) {
+        console.log('🔧 Executando correção única dos dados existentes...');
+        try {
+          await corrigirDadosExistentes();
+          localStorage.setItem('correcao_regras_executada', 'true');
+        } catch (error) {
+          console.error('Erro na correção única:', error);
+        }
+      }
+    };
+
+    executarCorrecaoUnicaVez();
+  }, []);
+
   return {
     autoAplicarAtivo,
     processandoRegras,
