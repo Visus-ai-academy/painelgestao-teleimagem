@@ -85,7 +85,7 @@ export function SistemaRegrasUnificado() {
       setResultado({
         success: false,
         total_processados: 0,
-        total_corrigidos: 0,
+        total_corrigidos: 0, 
         status_regras: [{ regra: 'Sistema', aplicada: false, erro: error.message }],
         tempo_processamento: '0'
       });
