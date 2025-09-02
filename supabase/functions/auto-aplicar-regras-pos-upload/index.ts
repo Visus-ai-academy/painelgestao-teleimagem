@@ -93,18 +93,17 @@ export default serve(async (req: Request): Promise<Response> => {
         severity: 'info'
       });
 
-    // Chamar o sistema completo de aplicação de regras
-    console.log(`🔧 Chamando sistema completo de aplicação de regras...`);
+    // Chamar o sistema otimizado de aplicação de regras (em batches menores)
+    console.log(`🔧 Chamando sistema otimizado de aplicação de regras...`);
     
     const { data: resultadoRegras, error: errorRegras } = await supabase.functions.invoke(
-      'sistema-aplicacao-regras-completo',
+      'sistema-aplicacao-regras-otimizado',
       {
         body: {
           arquivo_fonte,
-          upload_id,
-          periodo_referencia: 'jun/25', // Pode ser parametrizado
-          forcar_aplicacao: true, // Forçar aplicação em modo automático
-          validar_apenas: false
+          lote_upload: upload_id,
+          periodo_referencia: 'jun/25',
+          forcar_aplicacao: true
         }
       }
     );

@@ -21,20 +21,41 @@ serve(async (req) => {
     
     console.log(`Aplicando quebras automáticas para lote: ${lote_upload}`);
 
-    // 1. Buscar registros que precisam de quebra no lote específico
+    // 1. Buscar registros que precisam de quebra (sem JOIN que causa erro)
+    const { data: regrasAtivas, error: errorRegras } = await supabase
+      .from('regras_quebra_exames')
+      .select('exame_original, exame_quebrado, categoria_quebrada')
+      .eq('ativo', true);
+
+    if (errorRegras || !regrasAtivas || regrasAtivas.length === 0) {
+      return new Response(JSON.stringify({
+        sucesso: true,
+        mensagem: 'Nenhuma regra de quebra ativa encontrada',
+        registros_processados: 0,
+        lote_upload
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    // Criar mapa de regras para consulta rápida
+    const mapaRegras = new Map();
+    regrasAtivas.forEach(regra => {
+      if (!mapaRegras.has(regra.exame_original)) {
+        mapaRegras.set(regra.exame_original, []);
+      }
+      mapaRegras.get(regra.exame_original).push(regra);
+    });
+
+    const examesParaQuebrar = Array.from(mapaRegras.keys());
+
+    // Buscar registros que têm exames para quebrar
     const { data: registrosPendentes, error: errorPendentes } = await supabase
       .from('volumetria_mobilemed')
-      .select(`
-        *,
-        regras_quebra_exames!inner(
-          exame_original,
-          exame_quebrado,
-          categoria_quebrada,
-          ativo
-        )
-      `)
+      .select('*')
       .eq('lote_upload', lote_upload)
-      .eq('regras_quebra_exames.ativo', true);
+      .in('ESTUDO_DESCRICAO', examesParaQuebrar);
 
     if (errorPendentes) {
       throw new Error(`Erro ao buscar registros pendentes: ${errorPendentes.message}`);
@@ -58,24 +79,18 @@ serve(async (req) => {
     let totalQuebrados = 0;
     const registrosParaRemover: string[] = [];
 
-    // 2. Processar cada registro
+    // 2. Processar cada registro usando o mapa de regras
     for (const registro of registrosPendentes) {
       try {
-        // Buscar todas as regras de quebra para este exame
-        const { data: todasRegras, error: errorRegras } = await supabase
-          .from('regras_quebra_exames')
-          .select('*')
-          .eq('exame_original', registro.ESTUDO_DESCRICAO)
-          .eq('ativo', true);
-
-        if (errorRegras || !todasRegras || todasRegras.length === 0) {
+        const regrasParaEsteExame = mapaRegras.get(registro.ESTUDO_DESCRICAO);
+        if (!regrasParaEsteExame || regrasParaEsteExame.length === 0) {
           continue;
         }
 
-        console.log(`Quebrando exame ${registro.ESTUDO_DESCRICAO} em ${todasRegras.length} partes`);
+        console.log(`Quebrando exame ${registro.ESTUDO_DESCRICAO} em ${regrasParaEsteExame.length} partes`);
 
         // 3. Criar registros quebrados
-        const registrosQuebrados = todasRegras.map((regra) => {
+        const registrosQuebrados = regrasParaEsteExame.map((regra) => {
           const novoRegistro = { ...registro };
           delete novoRegistro.id;
           delete novoRegistro.created_at;
@@ -104,7 +119,7 @@ serve(async (req) => {
         // 5. Marcar para remoção
         registrosParaRemover.push(registro.id);
         totalProcessados++;
-        totalQuebrados += todasRegras.length;
+        totalQuebrados += regrasParaEsteExame.length;
 
       } catch (error: any) {
         console.error(`Erro ao processar registro ${registro.id}:`, error.message);
