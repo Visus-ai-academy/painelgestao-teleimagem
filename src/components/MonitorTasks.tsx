@@ -2,29 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSystemTasks } from "@/hooks/useSystemTasks";
-import { RefreshCw, Play, Trash2, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 export function MonitorTasks() {
-  const { tasks, loading, buscarTasks, processarTasksPendentes, limparTasksAntigas } = useSystemTasks();
-  const { toast } = useToast();
+  const { tasks, loading, buscarTasks } = useSystemTasks();
 
-  const handleProcessarTasks = async () => {
-    const resultado = await processarTasksPendentes();
-    
-    if (resultado.success) {
-      toast({
-        title: "✅ Sucesso",
-        description: resultado.message || "Tasks processadas com sucesso",
-      });
-    } else {
-      toast({
-        title: "❌ Erro",
-        description: resultado.error || "Erro ao processar tasks",
-        variant: "destructive",
-      });
-    }
-  };
+  // Tasks são processadas automaticamente pelo sistema
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -59,44 +42,22 @@ export function MonitorTasks() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Monitor de Tasks do Sistema
+              Status das Tasks
             </CardTitle>
             <CardDescription>
-              Acompanhe e gerencie tasks automáticas do sistema
+              Monitoramento automático das regras de negócio
             </CardDescription>
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={buscarTasks}
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Atualizar
-            </Button>
-            
-            <Button 
-              variant="default" 
-              size="sm"
-              onClick={handleProcessarTasks}
-              disabled={loading}
-            >
-              <Play className="h-4 w-4 mr-1" />
-              Processar Pendentes
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={limparTasksAntigas}
-              disabled={loading}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Limpar Antigas
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={buscarTasks}
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Atualizar
+          </Button>
         </div>
       </CardHeader>
 
