@@ -139,3 +139,6 @@ verify_jwt = true
 
 [functions.aplicar-correcao-modalidade-rx]
 verify_jwt = true
+
+[functions.aplicar-27-regras-completas]
+verify_jwt = true
