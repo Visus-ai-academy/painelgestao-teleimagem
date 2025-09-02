@@ -83,7 +83,8 @@ serve(async (req) => {
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO"')
       .eq('arquivo_fonte', arquivo_fonte)
-      .or('CATEGORIA.is.null,CATEGORIA.eq.');
+      .or('CATEGORIA.is.null,CATEGORIA.eq.')
+      .range(0, 50000); // Remover limite de 1000 registros
 
     if (semCategoria && semCategoria.length > 0) {
       // Buscar categorias do cadastro_exames
@@ -166,12 +167,12 @@ serve(async (req) => {
       .not('MODALIDADE', 'in', '("CT","MR","DO")');
 
     // Contar total de correções
-    const { data: contagem } = await supabase
+    const { count: totalCount } = await supabase
       .from('volumetria_mobilemed')
-      .select('id', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte);
 
-    totalCorrigidos = contagem?.length || 0;
+    totalCorrigidos = totalCount || 0;
 
     const resultado = {
       success: true,
