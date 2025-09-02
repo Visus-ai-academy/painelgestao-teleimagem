@@ -36,10 +36,22 @@ serve(async (req) => {
       console.log(`✅ ONCO MEDICINA INTERNA → ONCOLOGIA: ${oncoCount || 0} registros`);
     }
 
-    // 2. REMOVIDA correção incorreta de MEDICINA INTERNA
-    console.log('⚠️  MEDICINA INTERNA não será alterada (sem instrução do usuário)');
-    const medicinaCount = 0;
-    const medicinaError = null;
+    // 2. Corrigir MEDICINA INTERNA → CLINICA MEDICA  
+    console.log('🔄 Corrigindo MEDICINA INTERNA → CLINICA MEDICA');
+    const { count: medicinaCount, error: medicinaError } = await supabase
+      .from('volumetria_mobilemed')
+      .update({ 
+        "ESPECIALIDADE": 'CLINICA MEDICA',
+        updated_at: new Date().toISOString()
+      })
+      .eq('"ESPECIALIDADE"', 'MEDICINA INTERNA')
+      .select('*', { count: 'exact' });
+
+    if (medicinaError) {
+      console.error('❌ Erro ao corrigir MEDICINA INTERNA:', medicinaError);
+    } else {
+      console.log(`✅ MEDICINA INTERNA → CLINICA MEDICA: ${medicinaCount || 0} registros`);
+    }
 
     // 3. Verificação final
     const { data: verificacaoFinal } = await supabase
