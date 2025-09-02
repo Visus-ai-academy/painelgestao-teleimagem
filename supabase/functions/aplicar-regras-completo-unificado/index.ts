@@ -236,13 +236,13 @@ serve(async (req) => {
         for (const registro of registrosSemCategoria) {
           let categoria = '';
           
-          // Buscar no cadastro de exames
+          // Buscar no cadastro de exames primeiro
           const estudoNormalizado = registro.ESTUDO_DESCRICAO?.toUpperCase().trim() || '';
           
-          if (mapeamentoCategorias.has(estudoNormalizado)) {
+          if (estudoNormalizado && mapeamentoCategorias.has(estudoNormalizado)) {
             categoria = mapeamentoCategorias.get(estudoNormalizado);
-          } else {
-            // Busca por palavras-chave
+          } else if (estudoNormalizado) {
+            // Busca por palavras-chave apenas se não encontrou match exato
             let encontrado = false;
             for (const [nomeExame, cat] of mapeamentoCategorias) {
               if (estudoNormalizado.includes(nomeExame) || nomeExame.includes(estudoNormalizado)) {
@@ -252,14 +252,24 @@ serve(async (req) => {
               }
             }
             
-            // Se não encontrou, usar categoria padrão por modalidade
-            if (!encontrado) {
+            // Se não encontrou no cadastro, usar categoria padrão por modalidade
+            if (!encontrado && registro.MODALIDADE) {
               categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
-              console.log(`📋 Usando categoria padrão: ${registro.MODALIDADE} -> ${categoria} para "${estudoNormalizado}"`);
             }
+          } else {
+            // Se não tem ESTUDO_DESCRICAO, usar modalidade
+            categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
           }
 
-          if (categoria) {
+          // Garantir que a categoria é válida e limpa
+          if (categoria && typeof categoria === 'string' && categoria.trim() !== '') {
+            categoria = categoria.trim().toUpperCase();
+            
+            // Evitar categorias inválidas
+            if (categoria.length > 50 || categoria.includes('(') || categoria.includes('→')) {
+              categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
+            }
+            
             if (!atualizacoesPorCategoria[categoria]) {
               atualizacoesPorCategoria[categoria] = [];
             }
