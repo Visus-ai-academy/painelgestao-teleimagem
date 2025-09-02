@@ -158,6 +158,50 @@ export function SistemaAplicacaoRegras() {
     }
   };
 
+  const aplicarCategoriasFaltando = async () => {
+    setLoading(true);
+    try {
+      console.log('🔧 Aplicando categorias faltando...');
+      const { data, error } = await supabase.functions.invoke('aplicar-categorias-faltando', {
+        body: { arquivo_fonte: arquivoSelecionado }
+      });
+
+      if (error) throw error;
+      
+      const totalCorrecoes = data.total_registros_corrigidos || 0;
+      
+      setResultado({
+        success: data.success,
+        arquivo_fonte: data.arquivo_fonte,
+        total_regras: 1,
+        regras_aplicadas: totalCorrecoes,
+        regras_validadas_ok: 1,
+        regras_falharam: 0,
+        status_detalhado: [{
+          regra: 'aplicacao_categorias_faltando',
+          arquivo: data.arquivo_fonte,
+          aplicada: true,
+          validacao_ok: true
+        }],
+        recomendacao: `✅ Categorias aplicadas: ${totalCorrecoes} registros foram atualizados com categorias corretas.`
+      });
+
+      console.log('✅ Aplicação de categorias concluída:', data);
+      
+      // Forçar atualização do comparativo
+      setTimeout(() => {
+        if (window.location.pathname.includes('comparativo')) {
+          window.location.reload();
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Erro na aplicação de categorias:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusIcon = (status: StatusRegra) => {
     if (status.erro) return <XCircle className="h-4 w-4 text-destructive" />;
     if (status.validacao_ok === false) return <AlertCircle className="h-4 w-4 text-warning" />;
@@ -283,6 +327,22 @@ export function SistemaAplicacaoRegras() {
                 <>
                   <AlertTriangle className="h-4 w-4" />
                   Corrigir Dados Problemáticos
+                </>
+              )}
+            </Button>
+
+            <Button 
+              onClick={aplicarCategoriasFaltando}
+              disabled={loading}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Aplicar Categorias Faltando
                 </>
               )}
             </Button>
