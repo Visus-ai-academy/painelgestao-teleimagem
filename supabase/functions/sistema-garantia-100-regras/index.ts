@@ -96,8 +96,8 @@ async function corrigirEspecialidades(supabase: any) {
   
   const correcoes = [
     { de: 'ONCO MEDICINA INTERNA', para: 'ONCOLOGIA' },
-    { de: 'Colunas', para: 'ORTOPEDIA' },
-    { de: 'MEDICINA INTERNA', para: 'CLINICA MEDICA' }
+    { de: 'Colunas', para: 'ORTOPEDIA' }
+    // REMOVIDA regra incorreta de MEDICINA INTERNA
   ];
 
   const resultados = [];
