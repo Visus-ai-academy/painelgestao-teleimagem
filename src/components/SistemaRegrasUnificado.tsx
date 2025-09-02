@@ -47,7 +47,7 @@ export function SistemaRegrasUnificado() {
       const inicioTempo = Date.now();
 
       // Executar função unificada que aplica TODAS as regras corretamente
-      const { data, error } = await supabase.functions.invoke('aplicar-regras-completo-unificado', {
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: { 
           aplicar_todos_arquivos: true,
           periodo_referencia: '2025-06'
@@ -162,7 +162,7 @@ export function SistemaRegrasUnificado() {
           <TabsContent value="aplicar" className="space-y-4">
             <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Aplicar Regras:</strong> Executa TODAS as regras automaticamente em TODOS os arquivos de volumetria (Padrão, Fora do Padrão e Retroativo) com processamento otimizado.
+                <strong>Nova Abordagem Sistema Completo:</strong> Aplica TODAS as regras diretamente registro por registro, garantindo aplicação correta de categorias, especialidades, prioridades e valores baseados no cadastro de exames.
               </p>
             </div>
             
