@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, AlertCircle, Clock, Settings } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CheckCircle2, AlertCircle, Clock, Settings, ChevronDown } from 'lucide-react';
 
 interface StatusRegras {
   aplicacoes_automaticas: number;
@@ -12,6 +13,37 @@ interface StatusRegras {
   sistema_ativo: boolean;
 }
 
+// Lista das 27 regras aplicadas automaticamente
+const REGRAS_SISTEMA = [
+  { id: 'v001', nome: 'Correção Modalidade BMD → DO', categoria: 'Modalidade' },
+  { id: 'v002', nome: 'Correção Modalidade CR/DX → MG/RX', categoria: 'Modalidade' },
+  { id: 'v003', nome: 'Correção Especialidade ONCO MEDICINA INTERNA', categoria: 'Especialidade' },
+  { id: 'v004', nome: 'Aplicar Categoria do Cadastro de Exames', categoria: 'Categoria' },
+  { id: 'v005', nome: 'Aplicar Especialidade do Cadastro de Exames', categoria: 'Especialidade' },
+  { id: 'v006', nome: 'Categoria Padrão por Modalidade', categoria: 'Categoria' },
+  { id: 'v007', nome: 'De-Para Prioridades', categoria: 'Prioridade' },
+  { id: 'v008', nome: 'De-Para Valores (VALORES = 0)', categoria: 'Valores' },
+  { id: 'v009', nome: 'Tipificação Faturamento - Categoria ONCO', categoria: 'Faturamento' },
+  { id: 'v010', nome: 'Tipificação Faturamento - Categoria MUSCULO', categoria: 'Faturamento' },
+  { id: 'v011', nome: 'Tipificação Faturamento - Categoria NEURO', categoria: 'Faturamento' },
+  { id: 'v012', nome: 'Tipificação Faturamento - Modalidade TC', categoria: 'Faturamento' },
+  { id: 'v013', nome: 'Tipificação Faturamento - Modalidade RM', categoria: 'Faturamento' },
+  { id: 'v014', nome: 'Tipificação Faturamento - Modalidade US', categoria: 'Faturamento' },
+  { id: 'v015', nome: 'Tipificação Faturamento - Modalidade MG', categoria: 'Faturamento' },
+  { id: 'v016', nome: 'Tipificação Faturamento - Modalidade RX', categoria: 'Faturamento' },
+  { id: 'v017', nome: 'Tipificação Faturamento - Modalidade DO', categoria: 'Faturamento' },
+  { id: 'v018', nome: 'Tipificação Faturamento - Prioridade URGENTE', categoria: 'Faturamento' },
+  { id: 'v019', nome: 'Tipificação Faturamento - Prioridade EMERGENCIA', categoria: 'Faturamento' },
+  { id: 'v020', nome: 'Tipificação Faturamento - Prioridade ROTINA', categoria: 'Faturamento' },
+  { id: 'v021', nome: 'Tipificação Faturamento - Categoria CORPO', categoria: 'Faturamento' },
+  { id: 'v022', nome: 'Tipificação Faturamento - Categoria TORAX', categoria: 'Faturamento' },
+  { id: 'v023', nome: 'Tipificação Faturamento - Categoria ABDOME', categoria: 'Faturamento' },
+  { id: 'v024', nome: 'Tipificação Faturamento - Categoria PELVE', categoria: 'Faturamento' },
+  { id: 'v025', nome: 'Tipificação Faturamento - Categoria CRANIO', categoria: 'Faturamento' },
+  { id: 'v026', nome: 'Tipificação Faturamento - Categoria PESCOCO', categoria: 'Faturamento' },
+  { id: 'v027', nome: 'Tipificação Faturamento - Padrão (outros casos)', categoria: 'Faturamento' }
+];
+
 export function AutoRegrasMaster() {
   const [status, setStatus] = useState<StatusRegras>({
     aplicacoes_automaticas: 0,
@@ -19,6 +51,7 @@ export function AutoRegrasMaster() {
     ultima_aplicacao: '',
     sistema_ativo: true
   });
+  const [mostrarRegras, setMostrarRegras] = useState(false);
 
   useEffect(() => {
     // Monitorar uploads concluídos para aplicação automática GARANTIDA
@@ -198,11 +231,43 @@ export function AutoRegrasMaster() {
           </div>
         </div>
         
-        <div className="mt-4 p-3 bg-muted rounded-lg">
-          <p className="text-sm text-muted-foreground">
-            <strong>Funcionamento:</strong> O sistema monitora automaticamente todos os uploads de volumetria 
-            e aplica instantaneamente as 27 regras de negócio. Não requer intervenção manual.
-          </p>
+        <div className="mt-4 space-y-4">
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Funcionamento:</strong> O sistema monitora automaticamente todos os uploads de volumetria 
+              e aplica instantaneamente as 27 regras de negócio. Não requer intervenção manual.
+            </p>
+          </div>
+
+          <Collapsible open={mostrarRegras} onOpenChange={setMostrarRegras}>
+            <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors">
+              <ChevronDown className={`h-4 w-4 transition-transform ${mostrarRegras ? 'rotate-180' : ''}`} />
+              <span className="font-semibold">Ver Lista das 27 Regras Aplicadas Automaticamente</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="grid gap-3 p-4 bg-muted/30 rounded-lg">
+                {Object.entries(
+                  REGRAS_SISTEMA.reduce((acc, regra) => {
+                    if (!acc[regra.categoria]) acc[regra.categoria] = [];
+                    acc[regra.categoria].push(regra);
+                    return acc;
+                  }, {} as Record<string, typeof REGRAS_SISTEMA>)
+                ).map(([categoria, regras]) => (
+                  <div key={categoria} className="space-y-2">
+                    <h4 className="font-semibold text-sm text-primary">{categoria}</h4>
+                    <div className="grid gap-1 ml-4">
+                      {regras.map((regra) => (
+                        <div key={regra.id} className="flex items-center gap-2 text-sm">
+                          <Badge variant="outline" className="text-xs">{regra.id}</Badge>
+                          <span className="text-muted-foreground">{regra.nome}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </CardContent>
     </Card>
