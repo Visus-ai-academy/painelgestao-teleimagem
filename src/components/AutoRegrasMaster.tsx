@@ -13,35 +13,197 @@ interface StatusRegras {
   sistema_ativo: boolean;
 }
 
-// Lista das 27 regras aplicadas automaticamente
+// Lista das 27 regras aplicadas automaticamente - SISTEMA COMPLETO
 const REGRAS_SISTEMA = [
-  { id: 'v001', nome: 'Correção Modalidade BMD → DO', categoria: 'Modalidade' },
-  { id: 'v002', nome: 'Correção Modalidade CR/DX → MG/RX', categoria: 'Modalidade' },
-  { id: 'v003', nome: 'Correção Especialidade ONCO MEDICINA INTERNA', categoria: 'Especialidade' },
-  { id: 'v004', nome: 'Aplicar Categoria do Cadastro de Exames', categoria: 'Categoria' },
-  { id: 'v005', nome: 'Aplicar Especialidade do Cadastro de Exames', categoria: 'Especialidade' },
-  { id: 'v006', nome: 'Categoria Padrão por Modalidade', categoria: 'Categoria' },
-  { id: 'v007', nome: 'De-Para Prioridades', categoria: 'Prioridade' },
-  { id: 'v008', nome: 'De-Para Valores (VALORES = 0)', categoria: 'Valores' },
-  { id: 'v009', nome: 'Tipificação Faturamento - Categoria ONCO', categoria: 'Faturamento' },
-  { id: 'v010', nome: 'Tipificação Faturamento - Categoria MUSCULO', categoria: 'Faturamento' },
-  { id: 'v011', nome: 'Tipificação Faturamento - Categoria NEURO', categoria: 'Faturamento' },
-  { id: 'v012', nome: 'Tipificação Faturamento - Modalidade TC', categoria: 'Faturamento' },
-  { id: 'v013', nome: 'Tipificação Faturamento - Modalidade RM', categoria: 'Faturamento' },
-  { id: 'v014', nome: 'Tipificação Faturamento - Modalidade US', categoria: 'Faturamento' },
-  { id: 'v015', nome: 'Tipificação Faturamento - Modalidade MG', categoria: 'Faturamento' },
-  { id: 'v016', nome: 'Tipificação Faturamento - Modalidade RX', categoria: 'Faturamento' },
-  { id: 'v017', nome: 'Tipificação Faturamento - Modalidade DO', categoria: 'Faturamento' },
-  { id: 'v018', nome: 'Tipificação Faturamento - Prioridade URGENTE', categoria: 'Faturamento' },
-  { id: 'v019', nome: 'Tipificação Faturamento - Prioridade EMERGENCIA', categoria: 'Faturamento' },
-  { id: 'v020', nome: 'Tipificação Faturamento - Prioridade ROTINA', categoria: 'Faturamento' },
-  { id: 'v021', nome: 'Tipificação Faturamento - Categoria CORPO', categoria: 'Faturamento' },
-  { id: 'v022', nome: 'Tipificação Faturamento - Categoria TORAX', categoria: 'Faturamento' },
-  { id: 'v023', nome: 'Tipificação Faturamento - Categoria ABDOME', categoria: 'Faturamento' },
-  { id: 'v024', nome: 'Tipificação Faturamento - Categoria PELVE', categoria: 'Faturamento' },
-  { id: 'v025', nome: 'Tipificação Faturamento - Categoria CRANIO', categoria: 'Faturamento' },
-  { id: 'v026', nome: 'Tipificação Faturamento - Categoria PESCOCO', categoria: 'Faturamento' },
-  { id: 'v027', nome: 'Tipificação Faturamento - Padrão (outros casos)', categoria: 'Faturamento' }
+  {
+    id: 'v001',
+    nome: 'Proteção Temporal de Dados',
+    categoria: 'Temporal',
+    criterio: 'Impede edição de dados com mais de 5 dias do mês anterior. Bloqueia inserção de dados futuros. Inclui botão de "fechar faturamento" que bloqueia novos dados após fechamento.',
+    implementacao: 'RLS policies can_edit_data() e can_insert_data() + tabela fechamento_faturamento'
+  },
+  {
+    id: 'v002',
+    nome: 'Exclusão por DATA_LAUDO fora do período',
+    categoria: 'Exclusão',
+    criterio: 'Remove registros com DATA_LAUDO fora do período de faturamento (dia 8 do mês até dia 7 do mês seguinte). Aplicada SOMENTE nos arquivos: volumetria_padrao_retroativo e volumetria_fora_padrao_retroativo.',
+    implementacao: 'Edge function: aplicar-exclusoes-periodo'
+  },
+  {
+    id: 'v003',
+    nome: 'Exclusão por DATA_REALIZACAO >= período',
+    categoria: 'Exclusão',
+    criterio: 'Remove registros retroativos com DATA_REALIZACAO >= 01 do mês especificado.',
+    implementacao: 'Edge function: aplicar-exclusoes-periodo'
+  },
+  {
+    id: 'v004',
+    nome: 'Filtro de período atual para arquivos não-retroativos',
+    categoria: 'Exclusão',
+    criterio: 'Remove registros com DATA_REALIZACAO fora do mês de referência (01 ao último dia) e DATA_LAUDO fora do período permitido. Aplicada SOMENTE nos arquivos: volumetria_padrao, volumetria_fora_padrao e volumetria_onco_padrao.',
+    implementacao: 'Edge function: aplicar-filtro-periodo-atual'
+  },
+  {
+    id: 'v005',
+    nome: 'Correção de Modalidade para Exames RX',
+    categoria: 'Modalidade',
+    criterio: 'Todos os exames na coluna ESTUDO_DESCRICAO que começam com "RX " têm a modalidade alterada para "RX". Aplica-se aos arquivos de upload 1,2,3,4,5.',
+    implementacao: 'Aplicado durante processamento dos dados de volumetria'
+  },
+  {
+    id: 'v006',
+    nome: 'Mapeamento Nome Cliente - Mobilemed para Nome Fantasia',
+    categoria: 'Dados',
+    criterio: 'Substitui o campo EMPRESA (nome_mobilemed que vem dos arquivos 1,2,3,4) pelo nome_fantasia cadastrado na tabela clientes. O nome original vira "Unidade_Origem".',
+    implementacao: 'Edge function: aplicar-mapeamento-nome-cliente'
+  },
+  {
+    id: 'v007',
+    nome: 'Normalização Nome Médico',
+    categoria: 'Dados',
+    criterio: 'Remove códigos entre parênteses (E1, E2, E3), prefixos DR/DRA, pontos finais e limpa espaços extras dos nomes de médicos.',
+    implementacao: 'Função SQL: normalizar_medico()'
+  },
+  {
+    id: 'v008',
+    nome: 'De-Para Prioridades',
+    categoria: 'Prioridade',
+    criterio: 'Aplica mapeamento de prioridades usando tabela valores_prioridade_de_para para padronizar valores de prioridade.',
+    implementacao: 'Função SQL: aplicar_prioridades_de_para()'
+  },
+  {
+    id: 'v009',
+    nome: 'Mapeamento De Para - Valores por Estudo',
+    categoria: 'Valores',
+    criterio: 'Utiliza arquivo de referência (ESTUDO_DESCRICAO, VALORES) para preencher valores zerados.',
+    implementacao: 'Função SQL: aplicar_de_para_automatico() + tabela valores_referencia_de_para'
+  },
+  {
+    id: 'v010',
+    nome: 'Aplicação de Regras de Quebra de Exames',
+    categoria: 'Dados',
+    criterio: 'Aplica regras configuradas para quebrar exames compostos em exames individuais.',
+    implementacao: 'Função SQL: aplicar_regras_quebra_exames() + tabela regras_quebra_exames'
+  },
+  {
+    id: 'v011',
+    nome: 'Processamento de Categorias de Exames',
+    categoria: 'Categoria',
+    criterio: 'Processa e categoriza exames com base na tabela de categorias configuradas.',
+    implementacao: 'Função SQL: aplicar_categorias_volumetria() + tabela categorias_exame'
+  },
+  {
+    id: 'v012',
+    nome: 'Validação Cliente Volumetria',
+    categoria: 'Validação',
+    criterio: 'Valida se cliente existe no cadastro e está ativo antes de processar dados de volumetria.',
+    implementacao: 'Edge function: aplicar-validacao-cliente'
+  },
+  {
+    id: 'v013',
+    nome: 'Aplicação Especialidade Automática',
+    categoria: 'Especialidade',
+    criterio: 'Define especialidade automaticamente baseado em regras de negócio quando não informada no arquivo.',
+    implementacao: 'Função SQL: aplicar_especialidade_automatica()'
+  },
+  {
+    id: 'v014',
+    nome: 'Aplicação Valor Onco',
+    categoria: 'Valores',
+    criterio: 'Aplica valores específicos para exames oncológicos baseado em regras especiais para a categoria "onco".',
+    implementacao: 'Função SQL: aplicar_valor_onco() - apenas volumetria_onco_padrao'
+  },
+  {
+    id: 'v015',
+    nome: 'Regras de Exclusão Dinâmica',
+    categoria: 'Exclusão',
+    criterio: 'Aplica regras de exclusão configuradas dinamicamente baseadas em critérios JSON (empresa, modalidade, especialidade, categoria, médico).',
+    implementacao: 'Sistema automático baseado na tabela regras_exclusao_faturamento'
+  },
+  {
+    id: 'v016',
+    nome: 'Definição Data Referência',
+    categoria: 'Dados',
+    criterio: 'Define data de referência baseada no período de processamento selecionado para garantir consistência temporal dos dados.',
+    implementacao: 'Edge function: set-data-referencia-volumetria'
+  },
+  {
+    id: 'v017',
+    nome: 'Exclusão de Clientes Específicos',
+    categoria: 'Exclusão',
+    criterio: 'Exclui registros de clientes específicos: RADIOCOR_LOCAL, CLINICADIA_TC, CLINICA RADIOCOR, CLIRAM_LOCAL.',
+    implementacao: 'Edge function: aplicar-exclusao-clientes-especificos'
+  },
+  {
+    id: 'v018',
+    nome: 'Substituição de Especialidade/Categoria por Cadastro',
+    categoria: 'Dados',
+    criterio: 'Para exames com especialidades "Cardio com Score", "Corpo" ou "Onco Medicina Interna", substitui pelos valores do cadastro_exames baseado no nome do exame.',
+    implementacao: 'Edge function: aplicar-substituicao-especialidade-categoria'
+  },
+  {
+    id: 'v019',
+    nome: 'ColunasxMusculoxNeuro com Normalização Avançada',
+    categoria: 'Dados',
+    criterio: 'Exames com especialidade "Colunas" viram "Músculo Esquelético", exceto para 43 médicos específicos que viram "Neuro". Normalização inteligente de nomes.',
+    implementacao: 'Edge function: aplicar-regra-colunas-musculo-neuro'
+  },
+  {
+    id: 'v020',
+    nome: 'Tipificação Faturamento - Clientes NC Originais',
+    categoria: 'Faturamento',
+    criterio: 'Define tipificação para 10 clientes NC: CDICARDIO, CDIGOIAS, CISP, etc. NC-FT para CARDIO, PLANTÃO, ou estudos específicos ("ANGIOTC VENOSA TORAX CARDIOLOGIA", "RM CRANIO NEUROBRAIN").',
+    implementacao: 'Edge function: aplicar-tipificacao-faturamento'
+  },
+  {
+    id: 'v021',
+    nome: 'Tipificação Faturamento - Clientes NC Adicionais',
+    categoria: 'Faturamento',
+    criterio: 'Define tipificação para 3 clientes NC adicionais: CEMVALENCA, RMPADUA, RADI-IMAGEM. NC-FT para CARDIO/MEDICINA INTERNA/NEUROBRAIN, PLANTÃO, 29 médicos específicos.',
+    implementacao: 'Edge function: aplicar-tipificacao-faturamento (extensão)'
+  },
+  {
+    id: 'v022',
+    nome: 'Tipificação por Categoria ONCO',
+    categoria: 'Faturamento',
+    criterio: 'Define tipo_faturamento = "oncologia" quando categoria contém "onco".',
+    implementacao: 'Aplicado durante processamento de tipificação'
+  },
+  {
+    id: 'v023',
+    nome: 'Tipificação por Prioridade URGENTE',
+    categoria: 'Faturamento',
+    criterio: 'Define tipo_faturamento = "urgencia" quando prioridade contém "urgenc".',
+    implementacao: 'Aplicado durante processamento de tipificação'
+  },
+  {
+    id: 'v024',
+    nome: 'Tipificação por Modalidade Alta Complexidade',
+    categoria: 'Faturamento',
+    criterio: 'Define tipo_faturamento = "alta_complexidade" para modalidades CT, MR, TC, RM.',
+    implementacao: 'Aplicado durante processamento de tipificação'
+  },
+  {
+    id: 'v025',
+    nome: 'Tipificação Padrão',
+    categoria: 'Faturamento',
+    criterio: 'Define tipo_faturamento = "padrao" para todos os outros casos não cobertos pelas regras específicas.',
+    implementacao: 'Aplicado durante processamento de tipificação'
+  },
+  {
+    id: 'v026',
+    nome: 'Aplicação Automática pós-Upload',
+    categoria: 'Sistema',
+    criterio: 'Sistema monitora uploads concluídos e aplica automaticamente todas as 25 regras anteriores via trigger otimizado.',
+    implementacao: 'Trigger: trigger_aplicar_regras_pos_upload + sistema de tasks'
+  },
+  {
+    id: 'v027',
+    nome: 'Validação Final e Auditoria',
+    categoria: 'Sistema',
+    criterio: 'Executa validação final dos dados processados e registra todas as aplicações de regras no audit_logs para rastreabilidade completa.',
+    implementacao: 'Sistema de auditoria + logs detalhados'
+  }
 ];
 
 export function AutoRegrasMaster() {
@@ -245,7 +407,7 @@ export function AutoRegrasMaster() {
               <span className="font-semibold">Ver Lista das 27 Regras Aplicadas Automaticamente</span>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
-              <div className="grid gap-3 p-4 bg-muted/30 rounded-lg">
+              <div className="grid gap-4 p-4 bg-muted/30 rounded-lg">
                 {Object.entries(
                   REGRAS_SISTEMA.reduce((acc, regra) => {
                     if (!acc[regra.categoria]) acc[regra.categoria] = [];
@@ -253,13 +415,27 @@ export function AutoRegrasMaster() {
                     return acc;
                   }, {} as Record<string, typeof REGRAS_SISTEMA>)
                 ).map(([categoria, regras]) => (
-                  <div key={categoria} className="space-y-2">
-                    <h4 className="font-semibold text-sm text-primary">{categoria}</h4>
-                    <div className="grid gap-1 ml-4">
+                  <div key={categoria} className="space-y-3">
+                    <h4 className="font-semibold text-base text-primary border-b border-primary/20 pb-1">
+                      {categoria} ({regras.length} regras)
+                    </h4>
+                    <div className="grid gap-3 ml-2">
                       {regras.map((regra) => (
-                        <div key={regra.id} className="flex items-center gap-2 text-sm">
-                          <Badge variant="outline" className="text-xs">{regra.id}</Badge>
-                          <span className="text-muted-foreground">{regra.nome}</span>
+                        <div key={regra.id} className="bg-background/50 p-3 rounded-lg border border-muted">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="text-xs font-mono">{regra.id}</Badge>
+                            <span className="font-medium text-sm">{regra.nome}</span>
+                          </div>
+                          <div className="space-y-2 ml-4">
+                            <div>
+                              <strong className="text-xs text-muted-foreground">Critério:</strong>
+                              <p className="text-xs text-muted-foreground mt-1">{regra.criterio}</p>
+                            </div>
+                            <div>
+                              <strong className="text-xs text-muted-foreground">Implementação:</strong>
+                              <p className="text-xs text-muted-foreground mt-1 font-mono">{regra.implementacao}</p>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
