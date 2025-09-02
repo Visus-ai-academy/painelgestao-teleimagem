@@ -334,7 +334,18 @@ serve(async (req) => {
 
       totalCorrigidos += totalCategorias;
       console.log(`✅ Categorias aplicadas: ${totalCategorias} registros`);
+      
+      // DIAGNÓSTICO: Vamos verificar se realmente aplicou as categorias
+      const { count: verificacaoPos } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('arquivo_fonte', arquivo_fonte)
+        .or('"CATEGORIA".is.null,"CATEGORIA".eq.""');
+      
+      console.log(`🔍 VERIFICAÇÃO PÓS-PROCESSAMENTO: ${verificacaoPos} registros ainda sem categoria`);
+      
     } catch (error: any) {
+      console.error('❌ ERRO DETALHADO na aplicação de categorias:', error);
       statusRegras.push({
         regra: 'Aplicação de Categorias',
         aplicada: false,
@@ -397,24 +408,24 @@ serve(async (req) => {
 
     totalProcessados = totalRegistros || 0;
 
-    // Log da operação
-    await supabase
-      .from('audit_logs')
-      .insert({
-        table_name: 'volumetria_mobilemed',
-        operation: 'APLICACAO_REGRAS_UNIFICADA',
-        record_id: arquivo_fonte,
-        new_data: {
-          arquivo_fonte,
-          periodo_referencia,
-          total_processados: totalProcessados,
-          total_corrigidos: totalCorrigidos,
-          status_regras: statusRegras,
-          timestamp: new Date().toISOString()
-        },
-        user_email: 'system',
-        severity: 'info'
-      });
+    // Log da operação - REMOVER TEMPORARIAMENTE PARA EVITAR CONSTRAINT VIOLATION
+    // await supabase
+    //   .from('audit_logs')
+    //   .insert({
+    //     table_name: 'volumetria_mobilemed',
+    //     operation: 'APLICACAO_REGRAS_UNIFICADA',
+    //     record_id: arquivo_fonte,
+    //     new_data: {
+    //       arquivo_fonte,
+    //       periodo_referencia,
+    //       total_processados: totalProcessados,
+    //       total_corrigidos: totalCorrigidos,
+    //       status_regras: statusRegras,
+    //       timestamp: new Date().toISOString()
+    //     },
+    //     user_email: 'system',
+    //     severity: 'info'
+    //   });
 
     const resultado = {
       success: statusRegras.every(r => r.aplicada),
