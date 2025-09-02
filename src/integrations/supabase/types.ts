@@ -4632,6 +4632,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_categoria_by_modalidade: {
+        Args: {
+          p_arquivo_fonte: string
+          p_categoria: string
+          p_modalidade: string
+        }
+        Returns: number
+      }
       update_custom_metrics: {
         Args: Record<PropertyKey, never>
         Returns: number
