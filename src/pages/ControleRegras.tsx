@@ -1,6 +1,5 @@
 import { ControleRegrasNegocio } from '@/components/ControleRegrasNegocio';
-import { SistemaAplicacaoRegras } from '@/components/SistemaAplicacaoRegras';
-import { AutoRegrasDashboard } from '@/components/AutoRegrasDashboard';
+import { SistemaRegrasUnificado } from '@/components/SistemaRegrasUnificado';
 import { MonitorTasks } from '@/components/MonitorTasks';
 
 export default function ControleRegras() {
@@ -9,13 +8,12 @@ export default function ControleRegras() {
       <div>
         <h1 className="text-3xl font-bold">Controle de Regras de Negócio</h1>
         <p className="text-muted-foreground mt-1">
-          Gerenciamento automatizado de regras de negócio e proteção temporal de dados
+          Sistema unificado de aplicação e validação de regras com processamento em lotes
         </p>
       </div>
       
       <MonitorTasks />
-      <AutoRegrasDashboard />
-      <SistemaAplicacaoRegras />
+      <SistemaRegrasUnificado />
       <ControleRegrasNegocio />
     </div>
   );
