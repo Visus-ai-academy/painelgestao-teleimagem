@@ -255,24 +255,7 @@ serve(async (req) => {
             }
           }
 
-          // 6. TIPIFICAÇÃO DE FATURAMENTO
-          if (!registro.tipo_faturamento || registro.tipo_faturamento === '') {
-            const modalidadeAtual = updates.MODALIDADE || registro.MODALIDADE;
-            const categoriaAtual = updates.CATEGORIA || registro.CATEGORIA;
-            const prioridadeAtual = updates.PRIORIDADE || registro.PRIORIDADE;
-
-            if (categoriaAtual?.toLowerCase().includes('onco')) {
-              updates.tipo_faturamento = 'oncologia';
-            } else if (prioridadeAtual?.toLowerCase().includes('urgenc')) {
-              updates.tipo_faturamento = 'urgencia';
-            } else if (['CT', 'MR', 'TC', 'RM'].includes(modalidadeAtual)) {
-              updates.tipo_faturamento = 'alta_complexidade';
-            } else {
-              updates.tipo_faturamento = 'padrao';
-            }
-            needsUpdate = true;
-            corrrecoesTipificacao++;
-          }
+          // Tipificação de faturamento removida - deve ser feita por regras específicas de negócio
 
           // Aplicar as atualizações se necessário
           if (needsUpdate) {
