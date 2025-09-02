@@ -4636,6 +4636,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      update_modalidade_cr_dx_to_rx: {
+        Args: { p_arquivo_fonte: string }
+        Returns: number
+      }
+      update_modalidade_mamografia_to_mg: {
+        Args: { p_arquivo_fonte: string }
+        Returns: number
+      }
       user_can_access_empresa: {
         Args: { empresa_name: string }
         Returns: boolean
