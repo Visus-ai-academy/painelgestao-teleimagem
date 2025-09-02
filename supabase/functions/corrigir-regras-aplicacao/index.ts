@@ -98,23 +98,33 @@ serve(async (req) => {
         categoriasMap.set(exame.nome.toUpperCase().trim(), exame.categoria);
       });
 
-      // Aplicar categorias
+      // Aplicar categorias em lotes (mais eficiente)
+      const categoriasParaAtualizar = new Map<string, string[]>();
+      
       for (const registro of semCategoria) {
         const categoria = categoriasMap.get(registro.ESTUDO_DESCRICAO?.toUpperCase()?.trim() || '');
-        if (categoria) {
+        const categoriaFinal = categoria || 'SC';
+        
+        if (!categoriasParaAtualizar.has(categoriaFinal)) {
+          categoriasParaAtualizar.set(categoriaFinal, []);
+        }
+        categoriasParaAtualizar.get(categoriaFinal)!.push(registro.id);
+      }
+      
+      // Aplicar updates em lote por categoria
+      for (const [categoria, ids] of categoriasParaAtualizar) {
+        // Processar em chunks de 1000 para evitar limites de query
+        const chunkSize = 1000;
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
           await supabase
             .from('volumetria_mobilemed')
             .update({ CATEGORIA: categoria })
-            .eq('id', registro.id);
-          correcoes.categorias++;
-        } else {
-          // Categoria padrão
-          await supabase
-            .from('volumetria_mobilemed')
-            .update({ CATEGORIA: 'SC' })
-            .eq('id', registro.id);
-          correcoes.categorias++;
+            .in('id', chunk);
+          
+          correcoes.categorias += chunk.length;
         }
+        console.log(`✅ ${ids.length} registros atualizados para categoria ${categoria}`);
       }
       console.log(`✅ ${correcoes.categorias} categorias aplicadas`);
     }
