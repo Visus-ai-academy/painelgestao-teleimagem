@@ -5,7 +5,6 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Settings, AlertTriangle, CheckCircle, Clock, Users, ChevronDown, ChevronRight, Trash2, Calculator, FileText, DollarSign, ClipboardList, BarChart3, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { MonitorValidacaoRegras } from "./MonitorValidacaoRegras";
 
 interface Regra {
   id: string;
@@ -868,9 +867,6 @@ export function ControleRegrasNegocio() {
         })}
       </CardContent>
     </Card>
-
-    {/* Componente de Verificação de Regras */}
-    <MonitorValidacaoRegras />
   </div>
 );
 }

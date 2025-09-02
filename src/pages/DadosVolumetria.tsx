@@ -12,11 +12,8 @@ import { VolumetriaPeriodoSelector } from "@/components/volumetria/VolumetriaPer
 import { VolumetriaUploadStats } from '@/components/volumetria/VolumetriaUploadStats';
 import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/VolumetriaExamesNaoIdentificados';
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
-import { StatusRegraProcessamento } from '@/components/volumetria/StatusRegraProcessamento';
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
-import { MonitoramentoExclusoes } from '@/components/MonitoramentoExclusoes';
-import { MonitorAplicacaoRegras } from '@/components/MonitorAplicacaoRegras';
-import { MonitorValidacaoRegras } from '@/components/MonitorValidacaoRegras';
+import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
@@ -57,26 +54,14 @@ export default function DadosVolumetria() {
 
       <VolumetriaProvider>
         <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Upload de Dados
             </TabsTrigger>
-            <TabsTrigger value="validacao-regras" className="flex items-center gap-2">
+            <TabsTrigger value="sistema-regras" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
-              Validação de Regras
-            </TabsTrigger>
-            <TabsTrigger value="monitor-regras" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Monitor de Regras
-            </TabsTrigger>
-            <TabsTrigger value="monitoramento" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Monitoramento
-            </TabsTrigger>
-            <TabsTrigger value="status-regras" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Status das Regras
+              Sistema de Regras
             </TabsTrigger>
             <TabsTrigger value="registros-excluidos" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
@@ -211,23 +196,8 @@ export default function DadosVolumetria() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="validacao-regras">
-            <MonitorValidacaoRegras />
-          </TabsContent>
-
-          <TabsContent value="monitor-regras">
-            <MonitorAplicacaoRegras 
-              arquivoFonte={uploadStatus.lastUploadDetails?.arquivo_fonte}
-              loteUpload={uploadStatus.lastUploadDetails?.lote_upload}
-            />
-          </TabsContent>
-
-          <TabsContent value="monitoramento">
-            <MonitoramentoExclusoes titulo="Monitoramento em Tempo Real - Regras v002, v003, v031" />
-          </TabsContent>
-
-          <TabsContent value="status-regras">
-            <StatusRegraProcessamento />
+          <TabsContent value="sistema-regras">
+            <AutoRegrasMaster />
           </TabsContent>
           
           <TabsContent value="registros-excluidos">
