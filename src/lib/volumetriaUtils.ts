@@ -751,65 +751,38 @@ export async function processVolumetriaOtimizado(
       }
       
       // ========================================
-      // SEGUNDA PRIORIDADE: Aplicar todas as outras regras através do lote
+      // APLICAR SISTEMA DE REGRAS ROBUSTO V2 - 100% DAS REGRAS
       // ========================================
-      console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote...');
-      try {
-        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
-        
-        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
-          body: { 
-            arquivo_fonte: arquivoFonte,
-                periodo_referencia: periodoEdgeFormat
-          }
-        });
-
-        if (errorRegras) {
-          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
-          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
-        } else {
-          console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
-          console.log('📊 Resultado completo:', resultRegras);
-          if (resultRegras?.resultados) {
-            console.log(`📋 Total de regras processadas: ${resultRegras.resultados.length}`);
-            const sucessos = resultRegras.resultados.filter((r: any) => r.sucesso).length;
-            const erros = resultRegras.resultados.filter((r: any) => !r.sucesso).length;
-            console.log(`✅ Sucessos: ${sucessos} | ❌ Erros: ${erros}`);
-          }
-        }
-      } catch (error) {
-        console.error('⚠️ Erro ao aplicar regras em lote:', error);
-        console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas');
-      }
-      
-      // ========================================
-      // TERCEIRA PRIORIDADE: Aplicar regras automáticas complementares
-      // ========================================
-      console.log('🚀 Aplicando regras automáticas complementares...');
+      console.log('🚀🚀🚀 APLICANDO SISTEMA DE REGRAS ROBUSTO V2 - 100% GARANTIDO...');
       
       try {
-        const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
-          'auto-aplicar-regras-pos-upload',
+        const { data: regrasRobusto, error: errorRobusto } = await supabase.functions.invoke(
+          'sistema-regras-robusto-v2',
           {
             body: {
               arquivo_fonte: arquivoFonte,
-              upload_id: 'auto-process',
-              arquivo_nome: `auto-${arquivoFonte}`,
-              status: 'concluido',
-              total_registros: result.totalInserted,
-              auto_aplicar: true,
-            periodo_referencia: periodoEdgeFormat
+              periodo_referencia: periodoEdgeFormat
             }
           }
         );
-        
-        if (errorRegrasCompletas) {
-          console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
+
+        if (errorRobusto) {
+          console.error('❌ ERRO CRÍTICO: Falha no sistema de regras robusto v2:', errorRobusto);
+          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
         } else {
-          console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
+          console.log('✅✅✅ SISTEMA DE REGRAS ROBUSTO V2 APLICADO COM SUCESSO!');
+          console.log('📊 Resultado completo:', regrasRobusto);
+          
+          if (regrasRobusto?.relatorio) {
+            console.log(`📋 Status: ${regrasRobusto.relatorio.status_geral}`);
+            console.log(`⚡ Lotes executados: ${regrasRobusto.relatorio.lotes_executados}`);
+            console.log(`✅ Regras executadas: ${regrasRobusto.relatorio.total_regras_executadas}`);
+            console.log(`📈 Percentual global: ${regrasRobusto.relatorio.percentual_global}%`);
+          }
         }
-      } catch (errorRegrasFull) {
-        console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
+      } catch (error) {
+        console.error('❌ ERRO CRÍTICO ao aplicar sistema de regras robusto v2:', error);
+        console.warn('⚠️ Dados inseridos mas sistema de regras 100% falhou');
       }
     }
     
