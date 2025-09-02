@@ -31,6 +31,16 @@ serve(async (req) => {
     }
 
     console.log(`🎯 Iniciando aplicação unificada de regras para: ${arquivo_fonte}`);
+    console.log(`📊 Período de referência: ${periodo_referencia}`);
+    
+    // Primeiro, vamos verificar quantos registros sem categoria existem
+    const { count: registrosSemCategoriaCount } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('arquivo_fonte', arquivo_fonte)
+      .or('"CATEGORIA".is.null,"CATEGORIA".eq.""');
+    
+    console.log(`📊 Total de registros sem categoria encontrados: ${registrosSemCategoriaCount}`);
 
     const statusRegras: StatusRegra[] = [];
     let totalProcessados = 0;
@@ -226,7 +236,13 @@ serve(async (req) => {
 
         console.log(`📊 Lote ${Math.floor(offset/loteSize) + 1}: ${registrosSemCategoria?.length || 0} registros sem categoria`);
 
-        if (errorBusca || !registrosSemCategoria || registrosSemCategoria.length === 0) {
+        if (errorBusca) {
+          console.error('❌ Erro ao buscar registros sem categoria:', errorBusca);
+          break;
+        }
+
+        if (!registrosSemCategoria || registrosSemCategoria.length === 0) {
+          console.log('✅ Não há mais registros sem categoria para processar');
           break;
         }
 
