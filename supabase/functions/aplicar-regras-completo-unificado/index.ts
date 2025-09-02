@@ -226,54 +226,79 @@ serve(async (req) => {
         let totalCategorias = 0;
         
         // MR → RM
-        const { data: updateMR, error: errorMR } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'MR',
-            p_categoria: 'RM'
-          });
+        const { data: updateMRData, error: errorMR } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 
+            "CATEGORIA": 'RM',
+            updated_at: new Date().toISOString()
+          })
+          .eq('arquivo_fonte', arquivo)
+          .eq('MODALIDADE', 'MR')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .select('id');
         
-        if (!errorMR) totalCategorias += updateMR || 0;
+        const updateMR = updateMRData?.length || 0;
+        if (!errorMR) totalCategorias += updateMR;
         
         // CT → TC  
-        const { data: updateCT, error: errorCT } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'CT',
-            p_categoria: 'TC'
-          });
+        const { data: updateCTData, error: errorCT } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 
+            "CATEGORIA": 'TC',
+            updated_at: new Date().toISOString()
+          })
+          .eq('arquivo_fonte', arquivo)
+          .eq('MODALIDADE', 'CT')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .select('id');
         
-        if (!errorCT) totalCategorias += updateCT || 0;
+        const updateCT = updateCTData?.length || 0;
+        if (!errorCT) totalCategorias += updateCT;
         
         // RX → RX
-        const { data: updateRX, error: errorRX } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'RX',
-            p_categoria: 'RX'
-          });
+        const { data: updateRXData, error: errorRX } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 
+            "CATEGORIA": 'RX',
+            updated_at: new Date().toISOString()
+          })
+          .eq('arquivo_fonte', arquivo)
+          .eq('MODALIDADE', 'RX')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .select('id');
         
-        if (!errorRX) totalCategorias += updateRX || 0;
+        const updateRX = updateRXData?.length || 0;
+        if (!errorRX) totalCategorias += updateRX;
         
         // MG → MG
-        const { data: updateMG, error: errorMG } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'MG',
-            p_categoria: 'MG'
-          });
+        const { data: updateMGData, error: errorMG } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 
+            "CATEGORIA": 'MG',
+            updated_at: new Date().toISOString()
+          })
+          .eq('arquivo_fonte', arquivo)
+          .eq('MODALIDADE', 'MG')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .select('id');
         
-        if (!errorMG) totalCategorias += updateMG || 0;
+        const updateMG = updateMGData?.length || 0;
+        if (!errorMG) totalCategorias += updateMG;
         
         // DO → DO
-        const { data: updateDO, error: errorDO } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'DO',
-            p_categoria: 'DO'
-          });
+        const { data: updateDOData, error: errorDO } = await supabase
+          .from('volumetria_mobilemed')
+          .update({ 
+            "CATEGORIA": 'DO',
+            updated_at: new Date().toISOString()
+          })
+          .eq('arquivo_fonte', arquivo)
+          .eq('MODALIDADE', 'DO')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .select('id');
         
-        if (!errorDO) totalCategorias += updateDO || 0;
+        const updateDO = updateDOData?.length || 0;
+        if (!errorDO) totalCategorias += updateDO;
 
         statusRegras.push({
           regra: `Aplicação de Categorias - ${arquivo}`,

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Play, Settings, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Play, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -87,72 +87,6 @@ export function SistemaRegrasUnificado() {
         total_processados: 0,
         total_corrigidos: 0,
         status_regras: [{ regra: 'Sistema', aplicada: false, erro: error.message }],
-        tempo_processamento: '0'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const corrigirCategorias = async () => {
-    setLoading(true);
-    setResultado(null);
-    
-    try {
-      toast.info('Iniciando correção específica de categorias...', {
-        description: 'Corrigindo divergências de categorias e especialidades'
-      });
-
-      const inicioTempo = Date.now();
-
-      const { data, error } = await supabase.functions.invoke('aplicar-categorias-corretas', {
-        body: {}
-      });
-
-      if (error) throw error;
-
-      const tempoDecorrido = ((Date.now() - inicioTempo) / 1000).toFixed(1);
-
-      setResultado({
-        success: data.success,
-        total_processados: data.total_corrigidos + data.especialidades_corrigidas || 0,
-        total_corrigidos: data.total_corrigidos || 0,
-        status_regras: [
-          { 
-            regra: 'Correção de Categorias por Modalidade', 
-            aplicada: data.success,
-            detalhes: data.detalhes_por_arquivo
-          },
-          { 
-            regra: 'Correção de Especialidades por Cadastro', 
-            aplicada: data.success,
-            detalhes: { especialidades_corrigidas: data.especialidades_corrigidas }
-          }
-        ],
-        tempo_processamento: tempoDecorrido
-      });
-
-      if (data.success) {
-        toast.success('Categorias corrigidas com sucesso!', {
-          description: `${data.total_corrigidos} categorias + ${data.especialidades_corrigidas} especialidades corrigidas`
-        });
-      } else {
-        toast.warning('Correção de categorias com falhas', {
-          description: 'Verifique os detalhes no resultado'
-        });
-      }
-
-    } catch (error: any) {
-      console.error('Erro ao corrigir categorias:', error);
-      toast.error('Erro na correção de categorias', {
-        description: error.message
-      });
-      
-      setResultado({
-        success: false,
-        total_processados: 0,
-        total_corrigidos: 0,
-        status_regras: [{ regra: 'Correção de Categorias', aplicada: false, erro: error.message }],
         tempo_processamento: '0'
       });
     } finally {
@@ -245,29 +179,6 @@ export function SistemaRegrasUnificado() {
               )}
               {loading ? 'Aplicando Regras em Todos os Arquivos...' : 'Aplicar Todas as Regras (Todos os Arquivos)'}
             </Button>
-
-            {/* Botão para Correção Específica de Categorias */}
-            <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <h3 className="font-medium text-orange-800 dark:text-orange-200 mb-2">
-                🔧 Correção Específica de Divergências
-              </h3>
-              <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
-                Use esta função se ainda há divergências de categorias/especialidades após aplicar todas as regras.
-              </p>
-              <Button 
-                onClick={corrigirCategorias}
-                disabled={loading}
-                variant="outline"
-                className="w-full border-orange-300 hover:bg-orange-100 dark:border-orange-700 dark:hover:bg-orange-900/50"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Settings className="h-4 w-4" />
-                )}
-                {loading ? 'Corrigindo Categorias...' : 'Corrigir Categorias e Especialidades'}
-              </Button>
-            </div>
           </TabsContent>
 
           <TabsContent value="validar" className="space-y-4">
