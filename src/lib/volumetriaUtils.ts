@@ -37,6 +37,33 @@ interface VolumetriaRecord {
   periodo_referencia?: string;
 }
 
+// ============= UTILITÁRIO DE CONVERSÃO DE PERÍODO =============
+
+/**
+ * Converte período de formato DB (YYYY-MM) para formato Edge Function (mmm/YY)
+ * Exemplo: "2025-06" -> "jun/25"
+ */
+export function convertDbPeriodToEdgeFormat(dbPeriod: string): string {
+  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const [ano, mes] = dbPeriod.split('-');
+  const mesIdx = parseInt(mes) - 1;
+  const anoAbrev = ano.slice(-2);
+  return `${meses[mesIdx]}/${anoAbrev}`;
+}
+
+/**
+ * Converte período de formato Edge Function (mmm/YY) para formato DB (YYYY-MM)
+ * Exemplo: "jun/25" -> "2025-06"
+ */
+function convertEdgePeriodToDbFormat(edgePeriod: string): string {
+  const meses: { [key: string]: string } = {
+    'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04', 'mai': '05', 'jun': '06',
+    'jul': '07', 'ago': '08', 'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
+  };
+  const [mes, ano] = edgePeriod.split('/');
+  return `20${ano}-${meses[mes]}`;
+}
+
 export const VOLUMETRIA_UPLOAD_CONFIGS = {
   volumetria_padrao: {
     label: 'Arquivo 1: Volumetria Padrão',
@@ -235,8 +262,9 @@ export async function processVolumetriaFile(
       onProgress({ progress: 15, processed: 0, total: jsonData.length, status: 'Log criado, iniciando processamento...' });
     }
 
-    // Limpar dados anteriores do período
-    const periodoReferencia = periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : new Date().toISOString().substring(0, 7);
+    // Período para salvar no banco (formato YYYY-MM)
+    const periodoReferenciaDb = periodoFaturamento ? `${periodoFaturamento.ano}-${periodoFaturamento.mes.toString().padStart(2, '0')}` : new Date().toISOString().substring(0, 7);
+    console.log(`📅 Período de referência para DB: ${periodoReferenciaDb}`);
     
     // Atualizar status para processando
     await supabase
@@ -409,7 +437,7 @@ export async function processVolumetriaFile(
             NOME_PACIENTE: String(nomePaciente).trim(),
             arquivo_fonte: arquivoFonte,
             lote_upload: loteUpload,
-            periodo_referencia: periodoReferencia,
+            periodo_referencia: periodoReferenciaDb,
             
             CODIGO_PACIENTE: safeString(row['CODIGO_PACIENTE']),
             ESTUDO_DESCRICAO: cleanExameName(row['ESTUDO_DESCRICAO']),
@@ -643,7 +671,27 @@ export async function processVolumetriaOtimizado(
       const mesAbrev = meses[periodo.mes - 1];
       const anoAbrev = periodo.ano.toString().slice(-2);
       const periodoReferencia = `${mesAbrev}/${anoAbrev}`;
-      console.log(`📅 Período de referência: ${periodoReferencia}`);
+      console.log(`📅 Período de referência para edge functions: ${periodoReferencia}`);
+      
+      // Converter período do upload para formato correto das edge functions
+      let periodoEdgeFormat: string;
+      if (result.uploadLogId) {
+        // Buscar o período do upload no banco
+        const { data: uploadData } = await supabase
+          .from('processamento_uploads')
+          .select('periodo_referencia')
+          .eq('id', result.uploadLogId)
+          .single();
+        
+        if (uploadData?.periodo_referencia) {
+          periodoEdgeFormat = convertDbPeriodToEdgeFormat(uploadData.periodo_referencia);
+          console.log(`📅 Período convertido do DB: ${uploadData.periodo_referencia} → ${periodoEdgeFormat}`);
+        } else {
+          periodoEdgeFormat = periodoReferencia;
+        }
+      } else {
+        periodoEdgeFormat = periodoReferencia;
+      }
       
       // ========================================
       // PRIMEIRA PRIORIDADE: Aplicar regras específicas por tipo de arquivo
@@ -663,7 +711,7 @@ export async function processVolumetriaOtimizado(
                 arquivo_nome: `priority-${arquivoFonte}`,
                 status: 'concluido',
                 total_registros: result.totalInserted,
-                periodo_referencia: periodoReferencia
+                periodo_referencia: periodoEdgeFormat
               }
             }
           );
@@ -712,7 +760,7 @@ export async function processVolumetriaOtimizado(
         const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
           body: { 
             arquivo_fonte: arquivoFonte,
-            periodo_referencia: periodoReferencia
+                periodo_referencia: periodoEdgeFormat
           }
         });
 
@@ -750,7 +798,7 @@ export async function processVolumetriaOtimizado(
               status: 'concluido',
               total_registros: result.totalInserted,
               auto_aplicar: true,
-              periodo_referencia: periodoReferencia
+            periodo_referencia: periodoEdgeFormat
             }
           }
         );
@@ -765,15 +813,6 @@ export async function processVolumetriaOtimizado(
       }
     }
     
-    return {
-      success: result.success,
-      message: result.message,
-      stats: {
-        total_rows: result.totalProcessed,
-        inserted_count: result.totalInserted,
-        error_count: result.totalProcessed - result.totalInserted
-      }
-    };
     return {
       success: result.success,
       message: result.message,
