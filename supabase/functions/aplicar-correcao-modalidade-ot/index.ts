@@ -55,18 +55,18 @@ serve(async (req) => {
 
     console.log(`Iniciando correção de modalidade OT para DO no arquivo: ${arquivo_fonte}`);
 
-    // 1. Buscar registros que precisam ser corrigidos
-    const { data: registrosParaCorrigir, error: errorBusca } = await supabase
+    // 1. Buscar registros que precisam ser corrigidos - USANDO COUNT PARA EFICIÊNCIA
+    const { count, error: errorCount } = await supabase
       .from('volumetria_mobilemed')
-      .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
+      .select('id', { count: 'exact', head: true })
       .eq('arquivo_fonte', arquivo_fonte)
       .eq('MODALIDADE', 'OT');
 
-    if (errorBusca) {
-      throw new Error(`Erro ao buscar registros para correção: ${errorBusca.message}`);
+    if (errorCount) {
+      throw new Error(`Erro ao contar registros para correção: ${errorCount.message}`);
     }
 
-    if (!registrosParaCorrigir || registrosParaCorrigir.length === 0) {
+    if (!count || count === 0) {
       console.log(`Nenhum exame OT encontrado no arquivo: ${arquivo_fonte}`);
       return new Response(JSON.stringify({
         sucesso: true,
@@ -80,33 +80,70 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Encontrados ${registrosParaCorrigir.length} exames OT para correção`);
+    console.log(`Encontrados ${count} exames OT para correção`);
 
-    // 2. Aplicar correção - atualizar modalidade para "DO"
-    const { data: resultadoUpdate, error: errorUpdate } = await supabase
-      .from('volumetria_mobilemed')
-      .update({ 
-        "MODALIDADE": 'DO',
-        updated_at: new Date().toISOString()
-      })
-      .eq('arquivo_fonte', arquivo_fonte)
-      .eq('MODALIDADE', 'OT')
-      .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"');
+    // 2. Aplicar correção EM LOTES para evitar timeout
+    const BATCH_SIZE = 500;
+    let totalCorrigidos = 0;
+    let offset = 0;
 
-    if (errorUpdate) {
-      throw new Error(`Erro ao aplicar correção: ${errorUpdate.message}`);
+    while (offset < count) {
+      console.log(`Processando lote ${Math.floor(offset/BATCH_SIZE) + 1}/${Math.ceil(count/BATCH_SIZE)}`);
+      
+      // Buscar IDs do lote atual
+      const { data: batchIds, error: errorBatch } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id')
+        .eq('arquivo_fonte', arquivo_fonte)
+        .eq('MODALIDADE', 'OT')
+        .range(offset, offset + BATCH_SIZE - 1);
+
+      if (errorBatch || !batchIds?.length) {
+        console.log(`Fim dos registros no offset ${offset}`);
+        break;
+      }
+
+      // Atualizar o lote atual
+      const { data: resultadoUpdate, error: errorUpdate } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ 
+          "MODALIDADE": 'DO',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', batchIds.map(r => r.id))
+        .select('id, "ESTUDO_DESCRICAO"');
+
+      if (errorUpdate) {
+        console.error(`Erro no lote ${Math.floor(offset/BATCH_SIZE) + 1}:`, errorUpdate.message);
+        break;
+      }
+
+      const loteCorrigidos = resultadoUpdate?.length || 0;
+      totalCorrigidos += loteCorrigidos;
+      
+      console.log(`Lote ${Math.floor(offset/BATCH_SIZE) + 1}: ${loteCorrigidos} registros corrigidos`);
+      
+      offset += BATCH_SIZE;
+      
+      // Pequena pausa entre lotes para evitar sobrecarga
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const registrosCorrigidos = resultadoUpdate?.length || 0;
+    console.log(`Correção aplicada com sucesso: ${totalCorrigidos} registros atualizados`);
 
-    console.log(`Correção aplicada com sucesso: ${registrosCorrigidos} registros atualizados`);
+    // 3. Criar relatório de correções (só precisamos de exemplos)
+    const { data: exemplos } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"ESTUDO_DESCRICAO", "MODALIDADE"')
+      .eq('arquivo_fonte', arquivo_fonte)
+      .eq('MODALIDADE', 'DO')
+      .limit(5);
 
-    // 3. Criar relatório de correções
-    const exemplosCorrigan = registrosParaCorrigir.slice(0, 5).map(registro => ({
+    const exemplosCorrigan = exemplos?.map(registro => ({
       estudo_descricao: registro.ESTUDO_DESCRICAO,
-      modalidade_anterior: registro.MODALIDADE,
+      modalidade_anterior: 'OT',
       modalidade_nova: 'DO'
-    }));
+    })) || [];
 
     // 4. Log da operação
     const { error: logError } = await supabase
@@ -117,8 +154,8 @@ serve(async (req) => {
         record_id: arquivo_fonte,
         new_data: {
           arquivo_fonte,
-          registros_encontrados: registrosParaCorrigir.length,
-          registros_corrigidos: registrosCorrigidos,
+          registros_encontrados: count,
+          registros_corrigidos: totalCorrigidos,
           exemplos_corrigidos: exemplosCorrigan,
           regra: 'v031',
           tipo_correcao: 'MODALIDADE_OT'
@@ -134,12 +171,12 @@ serve(async (req) => {
     const resultado = {
       sucesso: true,
       arquivo_fonte,
-      registros_encontrados: registrosParaCorrigir.length,
-      registros_corrigidos: registrosCorrigidos,
+      registros_encontrados: count,
+      registros_corrigidos: totalCorrigidos,
       exemplos_corrigidos: exemplosCorrigan,
       regra_aplicada: 'v031 - Correção de Modalidade OT para DO',
       data_processamento: new Date().toISOString(),
-      observacao: 'Todos os exames com MODALIDADE "OT" foram alterados para "DO"'
+      observacao: `Processados ${totalCorrigidos} exames com MODALIDADE "OT" alterados para "DO" em lotes de ${BATCH_SIZE}`
     };
 
     console.log('Correção de modalidade OT concluída:', resultado);

@@ -1,6 +1,7 @@
 import { ControleRegrasNegocio } from '@/components/ControleRegrasNegocio';
 import { SistemaAplicacaoRegras } from '@/components/SistemaAplicacaoRegras';
 import { AutoRegrasDashboard } from '@/components/AutoRegrasDashboard';
+import { MonitorTasks } from '@/components/MonitorTasks';
 
 export default function ControleRegras() {
   return (
@@ -12,6 +13,7 @@ export default function ControleRegras() {
         </p>
       </div>
       
+      <MonitorTasks />
       <AutoRegrasDashboard />
       <SistemaAplicacaoRegras />
       <ControleRegrasNegocio />

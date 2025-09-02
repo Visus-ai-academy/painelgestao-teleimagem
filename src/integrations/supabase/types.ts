@@ -3047,6 +3047,48 @@ export type Database = {
         }
         Relationships: []
       }
+      system_tasks: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          max_attempts: number | null
+          priority: number | null
+          processed_at: string | null
+          status: string | null
+          task_data: Json
+          task_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          status?: string | null
+          task_data: Json
+          task_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          status?: string | null
+          task_data?: Json
+          task_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tipos_ausencia: {
         Row: {
           ativo: boolean
@@ -4523,6 +4565,10 @@ export type Database = {
       processar_checkout_automatico: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      processar_tasks_sistema: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       promote_user_to_admin: {
         Args: { user_email: string }

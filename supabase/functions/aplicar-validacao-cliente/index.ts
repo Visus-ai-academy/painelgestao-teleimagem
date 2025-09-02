@@ -17,12 +17,12 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log('📦 Dados recebidos:', JSON.stringify(requestData));
     
-    const { lote_upload, arquivo_fonte } = requestData;
+    const { arquivo_fonte, lote_upload = 'auto-process' } = requestData;
     
-    if (!lote_upload) {
-      throw new Error('Parâmetro obrigatório: lote_upload');
+    if (!arquivo_fonte) {
+      throw new Error('Parâmetro obrigatório: arquivo_fonte');
     }
-    
+    console.log('🏷️ Arquivo fonte:', arquivo_fonte);
     console.log('🏷️ Lote de upload:', lote_upload);
     
     const supabaseClient = createClient(
@@ -33,13 +33,13 @@ serve(async (req) => {
     console.log('✅ Cliente Supabase criado');
 
     // Validar clientes diretamente via query otimizada
-    console.log('🔍 Validando clientes do lote:', lote_upload);
+    console.log('🔍 Validando clientes do arquivo:', arquivo_fonte);
     
-    // Buscar registros que precisam validação
+    // Buscar registros que precisam validação - USAR arquivo_fonte em vez de lote_upload
     const { data: registros, error: errorRegistros } = await supabaseClient
       .from('volumetria_mobilemed')
       .select('id, EMPRESA')
-      .eq('lote_upload', lote_upload)
+      .eq('arquivo_fonte', arquivo_fonte)
       .limit(1000); // Limite para evitar timeout
 
     if (errorRegistros) {
