@@ -84,7 +84,6 @@ serve(async (req) => {
       .select('id, "ESTUDO_DESCRICAO"')
       .eq('arquivo_fonte', arquivo_fonte)
       .or('CATEGORIA.is.null,CATEGORIA.eq.')
-      .range(0, 50000); // Remover limite de 1000 registros
 
     if (semCategoria && semCategoria.length > 0) {
       // Buscar categorias do cadastro_exames
