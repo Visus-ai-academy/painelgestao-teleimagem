@@ -105,7 +105,7 @@ export function SistemaAplicacaoRegras() {
           aplicada: true,
           validacao_ok: true
         })),
-        recomendacao: `Dados corrigidos com sucesso! ${resultado.total_registros_processados} registros processados.`
+        recomendacao: `✅ Correção concluída: ${resultado.total_registros_processados} registros verificados, ${totalCorrecoes} correções aplicadas nos dados.`
       });
 
       console.log('✅ Correção concluída:', data);
