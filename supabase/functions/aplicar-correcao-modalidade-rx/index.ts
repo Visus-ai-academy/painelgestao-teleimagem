@@ -17,10 +17,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { arquivo_fonte } = await req.json();
+    const requestBody = await req.json().catch(() => ({}));
+    const { arquivo_fonte } = requestBody;
 
-    if (!arquivo_fonte) {
-      throw new Error('Parâmetro arquivo_fonte é obrigatório');
+    console.log('📦 Dados recebidos:', requestBody);
+
+    if (!arquivo_fonte || arquivo_fonte === '') {
+      console.error('❌ ERRO: Parâmetro arquivo_fonte não fornecido');
+      return new Response(JSON.stringify({ 
+        sucesso: false, 
+        erro: 'Parâmetro arquivo_fonte é obrigatório',
+        dados_recebidos: requestBody,
+        exemplo_uso: { arquivo_fonte: 'volumetria_padrao' }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     // Validar arquivo_fonte
