@@ -154,11 +154,12 @@ export function useAutoRegras() {
     try {
       console.log('🚀 Aplicando TODAS as 27 regras manualmente...');
       
-      // Usar aplicar-regras-lote que aplica todas as regras na ordem correta
-      const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
+      // Usar a única função que funciona
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          periodo_referencia: 'jun/25'
+          periodo_referencia: '2025-06',
+          aplicar_todos_arquivos: false
         }
       });
 
@@ -167,10 +168,12 @@ export function useAutoRegras() {
       }
 
       if (data.success) {
-        toast.success(`✅ Regras aplicadas manualmente com sucesso para ${arquivoFonte}!`);
+        const totalCorrigidos = data.total_corrigidos || 0;
+        const totalProcessados = data.total_processados || 0;
+        toast.success(`✅ Regras aplicadas! ${totalCorrigidos} correções em ${totalProcessados} registros`);
         return data;
       } else {
-        toast.warning(`⚠️ Algumas regras falharam para ${arquivoFonte}`);
+        toast.warning(`⚠️ Algumas regras falharam: ${data.erro}`);
         return data;
       }
     } catch (error: any) {
@@ -183,10 +186,11 @@ export function useAutoRegras() {
 
   const validarRegras = async (arquivoFonte: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('sistema-aplicacao-regras-completo', {
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
           arquivo_fonte: arquivoFonte,
-          validar_apenas: true
+          periodo_referencia: '2025-06',
+          aplicar_todos_arquivos: false
         }
       });
 
@@ -194,14 +198,10 @@ export function useAutoRegras() {
         throw new Error(error.message);
       }
 
-      const regrasOk = data.regras_validadas_ok || 0;
-      const totalRegras = data.total_regras || 0;
+      const totalProcessados = data.total_processados || 0;
+      const totalCorrigidos = data.total_corrigidos || 0;
       
-      if (regrasOk === totalRegras) {
-        toast.success(`✅ Todas as ${totalRegras} regras estão OK para ${arquivoFonte}`);
-      } else {
-        toast.warning(`⚠️ ${totalRegras - regrasOk} de ${totalRegras} regras precisam de atenção`);
-      }
+      toast.success(`✅ Validação concluída: ${totalProcessados} registros, ${totalCorrigidos} correções necessárias`);
       
       return data;
     } catch (error: any) {
@@ -217,11 +217,12 @@ export function useAutoRegras() {
       toast.info('🚀 Aplicando TODAS as 27 regras em TODOS os dados existentes...');
       console.log('🚀 Executando aplicação completa das 27 regras nos dados existentes...');
       
-      // Usar aplicar-regras-lote para aplicar todas as regras em todos os arquivos
-      const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
+      // Usar a única função que funciona para todos os arquivos
+      const { data, error } = await supabase.functions.invoke('aplicar-regras-sistema-completo', {
         body: {
-          arquivo_fonte: null, // null = processar todos os arquivos
-          periodo_referencia: 'jun/25'
+          arquivo_fonte: null,
+          periodo_referencia: '2025-06',
+          aplicar_todos_arquivos: true
         }
       });
 
@@ -230,12 +231,12 @@ export function useAutoRegras() {
       }
 
       if (data.success) {
-        const { resultados } = data;
-        const totalRegrasAplicadas = resultados?.filter((r: any) => r.status === 'sucesso').length || 0;
-        toast.success(`✅ TODAS as 27 regras aplicadas! ${totalRegrasAplicadas} regras executadas com sucesso`);
-        console.log('📋 Detalhes da aplicação das 27 regras:', resultados);
+        const totalCorrigidos = data.total_corrigidos || 0;
+        const totalProcessados = data.total_processados || 0;
+        toast.success(`✅ TODAS as 27 regras aplicadas! ${totalCorrigidos} correções em ${totalProcessados} registros`);
+        console.log('📋 Detalhes da aplicação das 27 regras:', data);
       } else {
-        toast.error(`❌ Falha na aplicação das regras: ${data.error}`);
+        toast.error(`❌ Falha na aplicação das regras: ${data.erro}`);
       }
       
       return data;
