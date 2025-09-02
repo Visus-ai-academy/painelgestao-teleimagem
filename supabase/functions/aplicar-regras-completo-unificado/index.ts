@@ -192,16 +192,28 @@ serve(async (req) => {
         mapeamentoCategorias.set(nomeNormalizado, exame.categoria);
       });
 
-      // Categorias padrão por modalidade
+      // Categorias padrão por modalidade (corrigidas)
       const categoriasPadrao: Record<string, string> = {
-        'TC': 'TC', 'RM': 'RM', 'RX': 'RX', 'MG': 'MG', 
-        'US': 'US', 'DO': 'DO', 'MN': 'MN', 'CR': 'RX', 
-        'DX': 'RX', 'BMD': 'DO', 'OT': 'GERAL'
+        'TC': 'TC', 
+        'CT': 'TC',  // CT é modalidade, categoria é TC
+        'MR': 'RM',  // MR é modalidade, categoria é RM  
+        'RM': 'RM', 
+        'RX': 'RX', 
+        'MG': 'MG', 
+        'US': 'US', 
+        'DO': 'DO', 
+        'MN': 'MN', 
+        'CR': 'RX', 
+        'DX': 'RX', 
+        'BMD': 'DO', 
+        'OT': 'GERAL'
       };
 
       let totalCategorias = 0;
       let offset = 0;
       const loteSize = 2000; // Processar em lotes de 2000
+
+      console.log(`📊 Buscando registros sem categoria para arquivo: ${arquivo_fonte}`);
 
       while (true) {
         // Buscar registros sem categoria em lotes
@@ -211,6 +223,8 @@ serve(async (req) => {
           .eq('arquivo_fonte', arquivo_fonte)
           .or('"CATEGORIA".is.null,"CATEGORIA".eq.""')
           .range(offset, offset + loteSize - 1);
+
+        console.log(`📊 Lote ${Math.floor(offset/loteSize) + 1}: ${registrosSemCategoria?.length || 0} registros sem categoria`);
 
         if (errorBusca || !registrosSemCategoria || registrosSemCategoria.length === 0) {
           break;
@@ -241,6 +255,7 @@ serve(async (req) => {
             // Se não encontrou, usar categoria padrão por modalidade
             if (!encontrado) {
               categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
+              console.log(`📋 Usando categoria padrão: ${registro.MODALIDADE} -> ${categoria} para "${estudoNormalizado}"`);
             }
           }
 
@@ -255,6 +270,8 @@ serve(async (req) => {
         // Executar atualizações em bulk por categoria
         for (const [categoria, ids] of Object.entries(atualizacoesPorCategoria)) {
           if (ids.length > 0) {
+            console.log(`🔄 Aplicando categoria "${categoria}" em ${ids.length} registros`);
+            
             const { error: updateError } = await supabase
               .from('volumetria_mobilemed')
               .update({ 
@@ -263,8 +280,11 @@ serve(async (req) => {
               })
               .in('id', ids);
 
-            if (!updateError) {
+            if (updateError) {
+              console.error(`❌ Erro ao aplicar categoria "${categoria}":`, updateError);
+            } else {
               totalCategorias += ids.length;
+              console.log(`✅ Categoria "${categoria}" aplicada com sucesso em ${ids.length} registros`);
             }
           }
         }
