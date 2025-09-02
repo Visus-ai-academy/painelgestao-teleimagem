@@ -218,14 +218,14 @@ serve(async (req) => {
       }
 
       // ============================================================================
-      // ETAPA 4: APLICAÇÃO DE CATEGORIAS
+      // ETAPA 4: APLICAÇÃO DE CATEGORIAS BASEADAS NAS MODALIDADES
       // ============================================================================
       
-      console.log(`🔄 [4/6] Aplicando categorias no ${arquivo}...`);
+      console.log(`🔄 [4/6] Aplicando categorias baseadas nas modalidades no ${arquivo}...`);
       try {
         let totalCategorias = 0;
         
-        // MR → RM
+        // MODALIDADE MR → CATEGORIA RM
         const { data: updateMRData, error: errorMR } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -234,13 +234,13 @@ serve(async (req) => {
           })
           .eq('arquivo_fonte', arquivo)
           .eq('MODALIDADE', 'MR')
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq."SC"')
           .select('id');
         
         const updateMR = updateMRData?.length || 0;
         if (!errorMR) totalCategorias += updateMR;
         
-        // CT → TC  
+        // MODALIDADE CT → CATEGORIA TC  
         const { data: updateCTData, error: errorCT } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -249,13 +249,13 @@ serve(async (req) => {
           })
           .eq('arquivo_fonte', arquivo)
           .eq('MODALIDADE', 'CT')
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq."SC"')
           .select('id');
         
         const updateCT = updateCTData?.length || 0;
         if (!errorCT) totalCategorias += updateCT;
         
-        // RX → RX
+        // MODALIDADE RX → CATEGORIA RX
         const { data: updateRXData, error: errorRX } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -264,13 +264,13 @@ serve(async (req) => {
           })
           .eq('arquivo_fonte', arquivo)
           .eq('MODALIDADE', 'RX')
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq."SC"')
           .select('id');
         
         const updateRX = updateRXData?.length || 0;
         if (!errorRX) totalCategorias += updateRX;
         
-        // MG → MG
+        // MODALIDADE MG → CATEGORIA MG
         const { data: updateMGData, error: errorMG } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -279,13 +279,13 @@ serve(async (req) => {
           })
           .eq('arquivo_fonte', arquivo)
           .eq('MODALIDADE', 'MG')
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq."SC"')
           .select('id');
         
         const updateMG = updateMGData?.length || 0;
         if (!errorMG) totalCategorias += updateMG;
         
-        // DO → DO
+        // MODALIDADE DO → CATEGORIA DO
         const { data: updateDOData, error: errorDO } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -294,7 +294,7 @@ serve(async (req) => {
           })
           .eq('arquivo_fonte', arquivo)
           .eq('MODALIDADE', 'DO')
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq.SC')
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq."","CATEGORIA".eq."SC"')
           .select('id');
         
         const updateDO = updateDOData?.length || 0;
