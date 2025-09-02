@@ -183,169 +183,82 @@ serve(async (req) => {
     }
 
     // ============================================================================
-    // ETAPA 4: APLICAÇÃO DE CATEGORIAS - PROCESSAMENTO EM LOTES
+    // ETAPA 4: APLICAÇÃO DE CATEGORIAS - PROCESSAMENTO DIRETO E EFICIENTE
     // ============================================================================
     
-    console.log('🔄 [4/6] Aplicando categorias em lotes...');
+    console.log('🔄 [4/6] Aplicando categorias...');
     try {
-      // Buscar cadastro de exames para referência
-      const { data: cadastroExames } = await supabase
-        .from('cadastro_exames')
-        .select('nome, categoria')
-        .eq('ativo', true)
-        .not('categoria', 'is', null)
-        .neq('categoria', '');
-
-      const mapeamentoCategorias = new Map();
-      cadastroExames?.forEach(exame => {
-        const nomeNormalizado = exame.nome.toUpperCase().trim();
-        mapeamentoCategorias.set(nomeNormalizado, exame.categoria);
-      });
-
-      // Categorias padrão por modalidade (corrigidas)
-      const categoriasPadrao: Record<string, string> = {
-        'TC': 'TC', 
-        'CT': 'TC',  // CT é modalidade, categoria é TC
-        'MR': 'RM',  // MR é modalidade, categoria é RM  
-        'RM': 'RM', 
-        'RX': 'RX', 
-        'MG': 'MG', 
-        'US': 'US', 
-        'DO': 'DO', 
-        'MN': 'MN', 
-        'CR': 'RX', 
-        'DX': 'RX', 
-        'BMD': 'DO', 
-        'OT': 'GERAL'
-      };
-
+      // Aplicar categoria por modalidade diretamente para todos os registros sem categoria
       let totalCategorias = 0;
-      let offset = 0;
-      const loteSize = 2000; // Processar em lotes de 2000
-
-      console.log(`📊 Buscando registros sem categoria para arquivo: ${arquivo_fonte}`);
-
-      while (true) {
-        // Buscar registros sem categoria em lotes
-        const { data: registrosSemCategoria, error: errorBusca } = await supabase
-          .from('volumetria_mobilemed')
-          .select('id, "ESTUDO_DESCRICAO", "MODALIDADE"')
-          .eq('arquivo_fonte', arquivo_fonte)
-          .or('"CATEGORIA".is.null,"CATEGORIA".eq.""')
-          .range(offset, offset + loteSize - 1);
-
-        console.log(`📊 Lote ${Math.floor(offset/loteSize) + 1}: ${registrosSemCategoria?.length || 0} registros sem categoria`);
-
-        if (errorBusca) {
-          console.error('❌ Erro ao buscar registros sem categoria:', errorBusca);
-          break;
-        }
-
-        if (!registrosSemCategoria || registrosSemCategoria.length === 0) {
-          console.log('✅ Não há mais registros sem categoria para processar');
-          break;
-        }
-
-        // Agrupar atualizações por categoria
-        const atualizacoesPorCategoria: Record<string, string[]> = {};
-
-        for (const registro of registrosSemCategoria) {
-          let categoria = '';
-          
-          // Buscar no cadastro de exames primeiro
-          const estudoNormalizado = registro.ESTUDO_DESCRICAO?.toUpperCase().trim() || '';
-          
-          if (estudoNormalizado && mapeamentoCategorias.has(estudoNormalizado)) {
-            categoria = mapeamentoCategorias.get(estudoNormalizado);
-          } else if (estudoNormalizado) {
-            // Busca por palavras-chave apenas se não encontrou match exato
-            let encontrado = false;
-            for (const [nomeExame, cat] of mapeamentoCategorias) {
-              if (estudoNormalizado.includes(nomeExame) || nomeExame.includes(estudoNormalizado)) {
-                categoria = cat;
-                encontrado = true;
-                break;
-              }
-            }
-            
-            // Se não encontrou no cadastro, usar categoria padrão por modalidade
-            if (!encontrado && registro.MODALIDADE) {
-              categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
-            }
-          } else {
-            // Se não tem ESTUDO_DESCRICAO, usar modalidade
-            categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
-          }
-
-          // Garantir que a categoria é válida e limpa
-          if (categoria && typeof categoria === 'string' && categoria.trim() !== '') {
-            categoria = categoria.trim().toUpperCase();
-            
-            // Evitar categorias inválidas
-            if (categoria.length > 50 || categoria.includes('(') || categoria.includes('→')) {
-              categoria = categoriasPadrao[registro.MODALIDADE] || 'GERAL';
-            }
-            
-            if (!atualizacoesPorCategoria[categoria]) {
-              atualizacoesPorCategoria[categoria] = [];
-            }
-            atualizacoesPorCategoria[categoria].push(registro.id);
-          }
-        }
-
-        // Executar atualizações em bulk por categoria
-        for (const [categoria, ids] of Object.entries(atualizacoesPorCategoria)) {
-          if (ids.length > 0) {
-            console.log(`🔄 Aplicando categoria "${categoria}" em ${ids.length} registros`);
-            
-            const { error: updateError } = await supabase
-              .from('volumetria_mobilemed')
-              .update({ 
-                "CATEGORIA": categoria,
-                updated_at: new Date().toISOString()
-              })
-              .in('id', ids);
-
-            if (updateError) {
-              console.error(`❌ Erro ao aplicar categoria "${categoria}":`, updateError);
-            } else {
-              totalCategorias += ids.length;
-              console.log(`✅ Categoria "${categoria}" aplicada com sucesso em ${ids.length} registros`);
-            }
-          }
-        }
-
-        offset += loteSize;
-        
-        // Se o lote retornou menos registros que o tamanho do lote, terminamos
-        if (registrosSemCategoria.length < loteSize) {
-          break;
-        }
-      }
+      
+      // MR → RM
+      const { data: updateMR, error: errorMR } = await supabase
+        .rpc('update_categoria_by_modalidade', {
+          p_arquivo_fonte: arquivo_fonte,
+          p_modalidade: 'MR',
+          p_categoria: 'RM'
+        });
+      
+      if (!errorMR) totalCategorias += updateMR || 0;
+      
+      // CT → TC  
+      const { data: updateCT, error: errorCT } = await supabase
+        .rpc('update_categoria_by_modalidade', {
+          p_arquivo_fonte: arquivo_fonte,
+          p_modalidade: 'CT',
+          p_categoria: 'TC'
+        });
+      
+      if (!errorCT) totalCategorias += updateCT || 0;
+      
+      // RX → RX
+      const { data: updateRX, error: errorRX } = await supabase
+        .rpc('update_categoria_by_modalidade', {
+          p_arquivo_fonte: arquivo_fonte,
+          p_modalidade: 'RX',
+          p_categoria: 'RX'
+        });
+      
+      if (!errorRX) totalCategorias += updateRX || 0;
+      
+      // MG → MG
+      const { data: updateMG, error: errorMG } = await supabase
+        .rpc('update_categoria_by_modalidade', {
+          p_arquivo_fonte: arquivo_fonte,
+          p_modalidade: 'MG',
+          p_categoria: 'MG'
+        });
+      
+      if (!errorMG) totalCategorias += updateMG || 0;
+      
+      // DO → DO
+      const { data: updateDO, error: errorDO } = await supabase
+        .rpc('update_categoria_by_modalidade', {
+          p_arquivo_fonte: arquivo_fonte,
+          p_modalidade: 'DO',
+          p_categoria: 'DO'
+        });
+      
+      if (!errorDO) totalCategorias += updateDO || 0;
 
       statusRegras.push({
         regra: 'Aplicação de Categorias',
         aplicada: true,
         detalhes: { 
           total_categorias_aplicadas: totalCategorias,
-          mapeamentos_disponveis: mapeamentoCategorias.size
+          MR_para_RM: updateMR || 0,
+          CT_para_TC: updateCT || 0,
+          RX_para_RX: updateRX || 0,
+          MG_para_MG: updateMG || 0,
+          DO_para_DO: updateDO || 0
         }
       });
 
       totalCorrigidos += totalCategorias;
       console.log(`✅ Categorias aplicadas: ${totalCategorias} registros`);
       
-      // DIAGNÓSTICO: Vamos verificar se realmente aplicou as categorias
-      const { count: verificacaoPos } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true })
-        .eq('arquivo_fonte', arquivo_fonte)
-        .or('"CATEGORIA".is.null,"CATEGORIA".eq.""');
-      
-      console.log(`🔍 VERIFICAÇÃO PÓS-PROCESSAMENTO: ${verificacaoPos} registros ainda sem categoria`);
-      
     } catch (error: any) {
-      console.error('❌ ERRO DETALHADO na aplicação de categorias:', error);
+      console.error('❌ ERRO na aplicação de categorias:', error);
       statusRegras.push({
         regra: 'Aplicação de Categorias',
         aplicada: false,

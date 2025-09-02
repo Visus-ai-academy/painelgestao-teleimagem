@@ -94,36 +94,6 @@ export function SistemaRegrasUnificado() {
     }
   };
 
-  const debugCategorias = async () => {
-    setLoading(true);
-    
-    try {
-      toast.info('Executando diagnóstico de categorias...', {
-        description: `Testando arquivo: ${arquivoSelecionado}`
-      });
-
-      const { data, error } = await supabase.functions.invoke('debug-categorias', {
-        body: { arquivo_fonte: arquivoSelecionado }
-      });
-
-      if (error) throw error;
-
-      toast.success('Diagnóstico concluído', {
-        description: `Diferença: ${data.diferenca} registros processados`
-      });
-
-      console.log('🔍 DEBUG RESULT:', data);
-
-    } catch (error: any) {
-      console.error('Erro no debug:', error);
-      toast.error('Erro no diagnóstico', {
-        description: error.message
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const validarRegras = async () => {
     setLoading(true);
     
@@ -225,17 +195,6 @@ export function SistemaRegrasUnificado() {
                 <Play className="h-4 w-4" />
               )}
               {loading ? 'Aplicando Regras...' : 'Aplicar Todas as Regras'}
-            </Button>
-
-            <Button 
-              onClick={debugCategorias}
-              disabled={loading}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              DEBUG: Testar Categorias
             </Button>
           </TabsContent>
 
