@@ -52,28 +52,21 @@ serve(async (req) => {
 
       const correcoesBMD = bmdRegistros?.length || 0;
 
-      // 1.2. CR/DX → RX (exceto mamografias)
-      const { data: rxRegistros, error: errorRX } = await supabase
-        .from('volumetria_mobilemed')
-        .update({ "MODALIDADE": 'RX', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo_fonte)
-        .in('MODALIDADE', ['CR', 'DX'])
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
-        .select('id');
+      // 1.2. CR/DX → RX (sem mamografias) - usando RPC para contornar problema do column
+      const { data: rxResult, error: errorRX } = await supabase
+        .rpc('update_modalidade_cr_dx_to_rx', {
+          p_arquivo_fonte: arquivo_fonte
+        });
 
-      const correcoesRX = rxRegistros?.length || 0;
+      const correcoesRX = rxResult || 0;
 
-      // 1.3. Mamografias CR/DX → MG
-      const { data: mgRegistros, error: errorMG } = await supabase
-        .from('volumetria_mobilemed')
-        .update({ "MODALIDADE": 'MG', updated_at: new Date().toISOString() })
-        .eq('arquivo_fonte', arquivo_fonte)
-        .in('MODALIDADE', ['CR', 'DX'])
-        .or('ESTUDO_DESCRICAO.ilike.%mamografia%,ESTUDO_DESCRICAO.ilike.%mamogra%')
-        .select('id');
+      // 1.3. Mamografias CR/DX → MG - usando RPC para contornar problema do column  
+      const { data: mgResult, error: errorMG } = await supabase
+        .rpc('update_modalidade_mamografia_to_mg', {
+          p_arquivo_fonte: arquivo_fonte
+        });
 
-      const correcoesMG = mgRegistros?.length || 0;
+      const correcoesMG = mgResult || 0;
       const totalModalidades = correcoesBMD + correcoesRX + correcoesMG;
 
       statusRegras.push({
