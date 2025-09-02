@@ -110,32 +110,41 @@ serve(async (req) => {
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
         .select('id');
 
-      // 2.2. CT → GERAL (CT não é especialidade, é modalidade)  
+      // 2.2. CT → MEDICINA INTERNA (CT não é especialidade, é modalidade)  
       const { data: ctCorrigidos, error: errorCT } = await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'GERAL', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo_fonte)
         .eq('ESPECIALIDADE', 'CT')
         .select('id');
 
-      // 2.3. Colunas → MUSCULOESQUELETICO
+      // 2.3. Colunas → MUSCULO ESQUELETICO
       const { data: colunasCorrigidos, error: errorColunas } = await supabase
         .from('volumetria_mobilemed')
-        .update({ "ESPECIALIDADE": 'MUSCULOESQUELETICO', updated_at: new Date().toISOString() })
+        .update({ "ESPECIALIDADE": 'MUSCULO ESQUELETICO', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo_fonte)
         .eq('ESPECIALIDADE', 'Colunas')
         .select('id');
 
-      const totalEspecialidades = (oncoCorrigidos?.length || 0) + (ctCorrigidos?.length || 0) + (colunasCorrigidos?.length || 0);
+      // 2.4. GERAL → MEDICINA INTERNA (GERAL não é especialidade válida)
+      const { data: geralCorrigidos, error: errorGeral } = await supabase
+        .from('volumetria_mobilemed')
+        .update({ "ESPECIALIDADE": 'MEDICINA INTERNA', updated_at: new Date().toISOString() })
+        .eq('arquivo_fonte', arquivo_fonte)
+        .eq('ESPECIALIDADE', 'GERAL')
+        .select('id');
+
+      const totalEspecialidades = (oncoCorrigidos?.length || 0) + (ctCorrigidos?.length || 0) + (colunasCorrigidos?.length || 0) + (geralCorrigidos?.length || 0);
 
       statusRegras.push({
         regra: 'Correção de Especialidades',
-        aplicada: !errorOnco && !errorCT && !errorColunas,
-        erro: errorOnco?.message || errorCT?.message || errorColunas?.message,
+        aplicada: !errorOnco && !errorCT && !errorColunas && !errorGeral,
+        erro: errorOnco?.message || errorCT?.message || errorColunas?.message || errorGeral?.message,
         detalhes: { 
           ONCO_MEDICINA_INTERNA: oncoCorrigidos?.length || 0,
-          CT_para_GERAL: ctCorrigidos?.length || 0,
-          Colunas_para_MUSCULO: colunasCorrigidos?.length || 0
+          CT_para_MEDICINA_INTERNA: ctCorrigidos?.length || 0,
+          Colunas_para_MUSCULO: colunasCorrigidos?.length || 0,
+          GERAL_para_MEDICINA_INTERNA: geralCorrigidos?.length || 0
         }
       });
 
