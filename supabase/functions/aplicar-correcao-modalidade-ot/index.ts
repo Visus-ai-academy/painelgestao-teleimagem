@@ -22,55 +22,55 @@ serve(async (req) => {
 
     console.log('📦 Dados recebidos:', requestBody);
 
-    if (!arquivo_fonte || arquivo_fonte === '') {
-      console.error('❌ ERRO: Parâmetro arquivo_fonte não fornecido');
-      return new Response(JSON.stringify({ 
-        sucesso: false, 
-        erro: 'Parâmetro arquivo_fonte é obrigatório',
-        dados_recebidos: requestBody,
-        exemplo_uso: { arquivo_fonte: 'volumetria_padrao' }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+    // Se arquivo_fonte for null, processar todos os arquivos
+    const processingAllFiles = !arquivo_fonte || arquivo_fonte === null || arquivo_fonte === '';
+    const targetFile = processingAllFiles ? 'TODOS' : arquivo_fonte;
+    
+    console.log(`📁 Processando: ${processingAllFiles ? 'TODOS OS ARQUIVOS' : arquivo_fonte}`);
+
+    // Validar arquivo_fonte apenas se não for processamento geral
+    if (!processingAllFiles) {
+      const arquivosValidos = [
+        'volumetria_padrao',
+        'volumetria_fora_padrao', 
+        'volumetria_padrao_retroativo',
+        'volumetria_fora_padrao_retroativo',
+        'volumetria_onco_padrao',
+        'arquivo_1_padrao',
+        'arquivo_2_padrao',
+        'arquivo_3_padrao', 
+        'arquivo_4_padrao',
+        'arquivo_5_padrao'
+      ];
+
+      if (!arquivosValidos.includes(arquivo_fonte)) {
+        throw new Error(`Arquivo fonte inválido: ${arquivo_fonte}. Deve ser um dos: ${arquivosValidos.join(', ')}`);
+      }
     }
 
-    // Validar arquivo_fonte
-    const arquivosValidos = [
-      'volumetria_padrao',
-      'volumetria_fora_padrao', 
-      'volumetria_padrao_retroativo',
-      'volumetria_fora_padrao_retroativo',
-      'volumetria_onco_padrao',
-      'arquivo_1_padrao',
-      'arquivo_2_padrao',
-      'arquivo_3_padrao', 
-      'arquivo_4_padrao',
-      'arquivo_5_padrao'
-    ];
-
-    if (!arquivosValidos.includes(arquivo_fonte)) {
-      throw new Error(`Arquivo fonte inválido: ${arquivo_fonte}. Deve ser um dos: ${arquivosValidos.join(', ')}`);
-    }
-
-    console.log(`Iniciando correção de modalidade OT para DO no arquivo: ${arquivo_fonte}`);
+    console.log(`Iniciando correção de modalidade OT para DO no arquivo: ${targetFile}`);
 
     // 1. Buscar registros que precisam ser corrigidos - USANDO COUNT PARA EFICIÊNCIA
-    const { count, error: errorCount } = await supabase
+    let query = supabase
       .from('volumetria_mobilemed')
       .select('id', { count: 'exact', head: true })
-      .eq('arquivo_fonte', arquivo_fonte)
       .eq('MODALIDADE', 'OT');
+    
+    if (!processingAllFiles) {
+      query = query.eq('arquivo_fonte', arquivo_fonte);
+    }
+    
+    const { count, error: errorCount } = await query;
 
     if (errorCount) {
       throw new Error(`Erro ao contar registros para correção: ${errorCount.message}`);
     }
 
     if (!count || count === 0) {
-      console.log(`Nenhum exame OT encontrado no arquivo: ${arquivo_fonte}`);
+      console.log(`Nenhum exame OT encontrado no arquivo: ${targetFile}`);
       return new Response(JSON.stringify({
         sucesso: true,
-        arquivo_fonte,
+        arquivo_fonte: targetFile,
         registros_encontrados: 0,
         registros_corrigidos: 0,
         mensagem: 'Nenhum exame OT encontrado para correção'
@@ -91,12 +91,17 @@ serve(async (req) => {
       console.log(`Processando lote ${Math.floor(offset/BATCH_SIZE) + 1}/${Math.ceil(count/BATCH_SIZE)}`);
       
       // Buscar IDs do lote atual
-      const { data: batchIds, error: errorBatch } = await supabase
+      let batchQuery = supabase
         .from('volumetria_mobilemed')
         .select('id')
-        .eq('arquivo_fonte', arquivo_fonte)
         .eq('MODALIDADE', 'OT')
         .range(offset, offset + BATCH_SIZE - 1);
+      
+      if (!processingAllFiles) {
+        batchQuery = batchQuery.eq('arquivo_fonte', arquivo_fonte);
+      }
+      
+      const { data: batchIds, error: errorBatch } = await batchQuery;
 
       if (errorBatch || !batchIds?.length) {
         console.log(`Fim dos registros no offset ${offset}`);

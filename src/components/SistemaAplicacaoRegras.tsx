@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Play, Search } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Play, Search, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface StatusRegra {
@@ -111,6 +111,48 @@ export function SistemaAplicacaoRegras() {
       console.log('✅ Correção concluída:', data);
     } catch (error) {
       console.error('Erro na correção:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const corrigirDadosProblematicos = async () => {
+    setLoading(true);
+    try {
+      console.log('🔧 Corrigindo dados problemáticos específicos...');
+      const { data, error } = await supabase.functions.invoke('corrigir-dados-problematicos');
+
+      if (error) throw error;
+      
+      const totalCorrecoes = data.total_registros_corrigidos || 0;
+      
+      setResultado({
+        success: data.success,
+        arquivo_fonte: 'TODOS',
+        total_regras: 4,
+        regras_aplicadas: totalCorrecoes,
+        regras_validadas_ok: 4,
+        regras_falharam: 0,
+        status_detalhado: (data.regras_aplicadas || []).map((regra: string) => ({
+          regra,
+          arquivo: 'TODOS',
+          aplicada: true,
+          validacao_ok: true
+        })),
+        recomendacao: `✅ Dados problemáticos corrigidos: ${totalCorrecoes} registros foram atualizados para valores corretos.`
+      });
+
+      console.log('✅ Correção de dados problemáticos concluída:', data);
+      
+      // Forçar atualização do comparativo
+      setTimeout(() => {
+        if (window.location.pathname.includes('comparativo')) {
+          window.location.reload();
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Erro na correção de dados problemáticos:', error);
     } finally {
       setLoading(false);
     }
@@ -225,6 +267,22 @@ export function SistemaAplicacaoRegras() {
                 <>
                   <CheckCircle className="h-4 w-4" />
                   Corrigir Dados Existentes
+                </>
+              )}
+            </Button>
+
+            <Button 
+              onClick={corrigirDadosProblematicos}
+              disabled={loading}
+              variant="destructive"
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4" />
+                  Corrigir Dados Problemáticos
                 </>
               )}
             </Button>

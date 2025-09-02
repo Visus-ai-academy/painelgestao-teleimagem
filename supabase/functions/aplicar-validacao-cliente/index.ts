@@ -19,10 +19,10 @@ serve(async (req) => {
     
     const { arquivo_fonte, lote_upload = 'auto-process' } = requestData;
     
-    if (!arquivo_fonte) {
-      throw new Error('Parâmetro obrigatório: arquivo_fonte');
-    }
-    console.log('🏷️ Arquivo fonte:', arquivo_fonte);
+    // Se arquivo_fonte for null, processar todos os arquivos
+    const processingAllFiles = !arquivo_fonte || arquivo_fonte === null;
+    const targetFile = processingAllFiles ? 'TODOS' : arquivo_fonte;
+    console.log('🏷️ Arquivo fonte:', targetFile);
     console.log('🏷️ Lote de upload:', lote_upload);
     
     const supabaseClient = createClient(
@@ -33,14 +33,19 @@ serve(async (req) => {
     console.log('✅ Cliente Supabase criado');
 
     // Validar clientes diretamente via query otimizada
-    console.log('🔍 Validando clientes do arquivo:', arquivo_fonte);
+    console.log('🔍 Validando clientes do arquivo:', targetFile);
     
-    // Buscar registros que precisam validação - USAR arquivo_fonte em vez de lote_upload
-    const { data: registros, error: errorRegistros } = await supabaseClient
+    // Buscar registros que precisam validação
+    let query = supabaseClient
       .from('volumetria_mobilemed')
       .select('id, EMPRESA')
-      .eq('arquivo_fonte', arquivo_fonte)
       .limit(1000); // Limite para evitar timeout
+    
+    if (!processingAllFiles) {
+      query = query.eq('arquivo_fonte', arquivo_fonte);
+    }
+    
+    const { data: registros, error: errorRegistros } = await query;
 
     if (errorRegistros) {
       throw new Error(`Erro ao buscar registros: ${errorRegistros.message}`);
