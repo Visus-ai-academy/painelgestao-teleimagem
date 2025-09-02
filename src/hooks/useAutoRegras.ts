@@ -158,9 +158,7 @@ export function useAutoRegras() {
       const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
         body: {
           arquivo_fonte: arquivoFonte,
-          lote_upload: loteUpload,
-          aplicar_todas_regras: true,
-          incluir_triggers: true
+          periodo_referencia: 'jun/25'
         }
       });
 
@@ -219,11 +217,11 @@ export function useAutoRegras() {
       toast.info('🚀 Aplicando TODAS as 27 regras em TODOS os dados existentes...');
       console.log('🚀 Executando aplicação completa das 27 regras nos dados existentes...');
       
-      // Usar aplicar-regras-lote para aplicar todas as 27 regras
+      // Usar aplicar-regras-lote para aplicar todas as regras em todos os arquivos
       const { data, error } = await supabase.functions.invoke('aplicar-regras-lote', {
         body: {
-          aplicar_em_todos_dados: true,
-          incluir_todas_27_regras: true
+          arquivo_fonte: null, // null = processar todos os arquivos
+          periodo_referencia: 'jun/25'
         }
       });
 
