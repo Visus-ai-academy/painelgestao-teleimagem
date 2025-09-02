@@ -142,6 +142,12 @@ Deno.serve(async (req) => {
         .update({ ESPECIALIDADE: 'Músculo Esquelético' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'Colunas')
+
+      // REGRA v007 continuação: ONCO MEDICINA INTERNA → MEDICINA INTERNA
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
       regrasAplicadasArquivo.add('v007')
 
       // REGRA v008: Normalização modalidade
