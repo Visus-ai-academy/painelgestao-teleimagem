@@ -245,53 +245,53 @@ serve(async (req) => {
         }
       }
 
-      // APLICAR TODAS AS REGRAS USANDO SISTEMA COMPLETO
+      // 🎯 SISTEMA AUTOMÁTICO GARANTIDO - TODAS AS 27 REGRAS
       let regrasAplicadas = 0;
-      let regrasValidadas = 0;
+      let totalCorrecoes = 0;
       let sistemaSucesso = false;
       
       try {
-        console.log(`🎯 Aplicando TODAS as regras via sistema completo para: ${arquivo_fonte}`);
+        console.log(`🚀 APLICAÇÃO AUTOMÁTICA GARANTIDA - Todas as 27 regras para: ${arquivo_fonte}`);
+        
+        // Usar a nova função que garante aplicação de TODAS as regras
         const { data: sistemaResult } = await supabaseClient.functions.invoke(
-          'sistema-aplicacao-regras-completo',
+          'aplicar-regras-sistema-completo',
           { 
             body: { 
               arquivo_fonte: arquivo_fonte,
-              lote_upload: loteUpload,
               periodo_referencia: periodoReferencia,
-              forcar_aplicacao: true // Sempre forçar para garantir aplicação
+              aplicar_todos_arquivos: false // Aplicar apenas no arquivo atual
             } 
           }
         );
         
-        if (sistemaResult) {
-          regrasAplicadas = sistemaResult.regras_aplicadas || 0;
-          regrasValidadas = sistemaResult.regras_validadas_ok || 0;
-          sistemaSucesso = sistemaResult.success || false;
+        if (sistemaResult && sistemaResult.success) {
+          sistemaSucesso = true;
+          totalCorrecoes = sistemaResult.total_corrigidos || 0;
+          regrasAplicadas = sistemaResult.total_processados || 0;
           
-          console.log(`✅ Sistema completo de regras:`);
-          console.log(`   - Regras aplicadas: ${regrasAplicadas}/${sistemaResult.total_regras}`);
-          console.log(`   - Regras validadas: ${regrasValidadas}/${sistemaResult.total_regras}`);
-          console.log(`   - Sucesso geral: ${sistemaSucesso}`);
+          console.log(`✅ TODAS AS REGRAS APLICADAS AUTOMATICAMENTE:`);
+          console.log(`   - Registros processados: ${regrasAplicadas}`);
+          console.log(`   - Total de correções aplicadas: ${totalCorrecoes}`);
+          console.log(`   - Arquivos processados: ${sistemaResult.status_regras?.length || 0}`);
           
-          if (!sistemaSucesso) {
-            console.log(`⚠️ Algumas regras falharam. Detalhes:`, sistemaResult.status_detalhado);
-          }
+          // Log detalhado por arquivo
+          sistemaResult.status_regras?.forEach((regra: any) => {
+            console.log(`   📁 ${regra.regra}: ${regra.detalhes?.total_correções || 0} correções`);
+          });
+          
+        } else {
+          console.error(`❌ Sistema automático falhou:`, sistemaResult);
         }
-      } catch (regrasError) {
-        console.error(`❌ Erro no sistema completo de regras:`, regrasError);
         
-        // Fallback: aplicar regras individuais (método antigo)
-        console.log(`🔄 Aplicando regras individuais como fallback...`);
-        try {
-          const { data: regrasTratamento } = await supabaseClient.functions.invoke(
-            'aplicar-regras-tratamento',
-            { body: { arquivo_fonte: arquivo_fonte } }
-          );
-          regrasAplicadas = regrasTratamento?.registros_atualizados || 0;
-        } catch (fallbackError) {
-          console.error(`❌ Fallback também falhou:`, fallbackError);
-        }
+      } catch (regrasError) {
+        console.error(`❌ ERRO CRÍTICO na aplicação automática das regras:`, regrasError);
+        sistemaSucesso = false;
+      }
+      
+      // Se falhou, interromper o processamento - dados sem regras aplicadas são inválidos
+      if (!sistemaSucesso) {
+        throw new Error(`Falha crítica: Regras não puderam ser aplicadas automaticamente em ${arquivo_fonte}. Dados rejeitados por inconsistência.`);
       }
 
       // Variável para compatibilidade com código existente
