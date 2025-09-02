@@ -152,15 +152,8 @@ Deno.serve(async (req) => {
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
       regrasAplicadasArquivo.add('v007')
 
-      // REGRA v008: Normalização modalidade US para D.O
-      console.log('  ⚡ Aplicando v008 - Normalização modalidade US')
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'D.O' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('MODALIDADE', 'US')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
-      regrasAplicadasArquivo.add('v008')
-
+      // REGRA v008: Removida - US não é modalidade válida
+      
       // REGRA v009: Aplicação prioridade padrão
       console.log('  ⚡ Aplicando v009 - Prioridade padrão')
       await supabase.from('volumetria_mobilemed')
