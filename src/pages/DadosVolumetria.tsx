@@ -14,6 +14,7 @@ import { VolumetriaExamesNaoIdentificados } from '@/components/volumetria/Volume
 import { VolumetriaStatusPanel } from '@/components/VolumetriaStatusPanel';
 import { AnaliseRegistrosExcluidos } from '@/components/AnaliseRegistrosExcluidos';
 import { AutoRegrasMaster } from '@/components/AutoRegrasMaster';
+import { TesteRegras27 } from '@/components/TesteRegras27';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
@@ -196,7 +197,11 @@ export default function DadosVolumetria() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="sistema-regras">
+          <TabsContent value="sistema-regras" className="space-y-6">
+            {/* Teste das 27 Regras Completas */}
+            <TesteRegras27 />
+            
+            {/* Sistema de Regras Original */}
             <AutoRegrasMaster />
           </TabsContent>
           
