@@ -193,28 +193,28 @@ Deno.serve(async (req) => {
         .or('CATEGORIA.is.null,CATEGORIA.eq.')
       regrasAplicadasArquivo.add('v011')
 
-      // REGRA v012: Aplicação especialidade automática RX para D.O
+      // REGRA v012: Aplicação especialidade automática por modalidade
       console.log('  ⚡ Aplicando v012 - Especialidade automática RX')
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'D.O' })
+        .update({ ESPECIALIDADE: 'RX' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'RX')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       regrasAplicadasArquivo.add('v012')
 
-      // REGRA v013: Especialidade automática CT para MEDICINA INTERNA
+      // REGRA v013: Especialidade automática CT
       console.log('  ⚡ Aplicando v013 - Especialidade automática CT')
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
+        .update({ ESPECIALIDADE: 'CT' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'CT')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       regrasAplicadasArquivo.add('v013')
 
-      // REGRA v014: Especialidade automática RM para NEURO
+      // REGRA v014: Especialidade automática RM
       console.log('  ⚡ Aplicando v014 - Especialidade automática RM')
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'NEURO' })
+        .update({ ESPECIALIDADE: 'RM' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'MR')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
