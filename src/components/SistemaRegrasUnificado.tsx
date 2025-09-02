@@ -152,23 +152,6 @@ export function SistemaRegrasUnificado() {
       </CardHeader>
       <CardContent className="space-y-6">
         
-        {/* Seleção de Arquivo */}
-        <div>
-          <label className="text-sm font-medium mb-2 block">Arquivo para Processar:</label>
-          <select 
-            value={arquivoSelecionado}
-            onChange={(e) => setArquivoSelecionado(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            disabled={loading}
-          >
-            {ARQUIVOS_VOLUMETRIA.map(arquivo => (
-              <option key={arquivo.value} value={arquivo.value}>
-                {arquivo.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Ações Principais */}
         <Tabs defaultValue="aplicar" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -194,7 +177,7 @@ export function SistemaRegrasUnificado() {
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              {loading ? 'Aplicando Regras...' : 'Aplicar Todas as Regras'}
+              {loading ? 'Aplicando Regras em Todos os Arquivos...' : 'Aplicar Todas as Regras (Todos os Arquivos)'}
             </Button>
           </TabsContent>
 

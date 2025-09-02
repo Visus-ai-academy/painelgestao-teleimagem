@@ -24,7 +24,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { arquivo_fonte, periodo_referencia = '2025-06', aplicar_todos_arquivos = false } = await req.json();
+    let body = {};
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      console.log('Corpo da requisição vazio ou inválido, usando defaults:', jsonError);
+    }
+
+    const { arquivo_fonte, periodo_referencia = '2025-06', aplicar_todos_arquivos = false } = body;
     
     // Se aplicar_todos_arquivos for true, processar todos os arquivos
     const arquivosParaProcessar = aplicar_todos_arquivos 
@@ -32,7 +39,16 @@ serve(async (req) => {
       : [arquivo_fonte];
     
     if (!aplicar_todos_arquivos && !arquivo_fonte) {
-      throw new Error('Parâmetro arquivo_fonte é obrigatório quando aplicar_todos_arquivos for false');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          erro: 'Parâmetro arquivo_fonte é obrigatório quando aplicar_todos_arquivos for false'
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     console.log(`🎯 Iniciando aplicação unificada de regras para: ${aplicar_todos_arquivos ? 'TODOS OS ARQUIVOS' : arquivo_fonte}`);
@@ -89,14 +105,13 @@ serve(async (req) => {
         const correcoesMG = mgResult || 0;
         const totalModalidades = correcoesBMD + correcoesRX + correcoesMG;
 
-        const arquivoModalidadeStatus = {
+        statusRegras.push({
           regra: `Correção de Modalidades - ${arquivo}`,
           aplicada: !errorBMD && !errorRX && !errorMG,
           erro: errorBMD?.message || errorRX?.message || errorMG?.message,
           detalhes: { BMD_para_DO: correcoesBMD, CRDX_para_RX: correcoesRX, CRDX_para_MG: correcoesMG }
-        };
+        });
 
-        statusRegras.push(arquivoModalidadeStatus);
         totalCorrigidos += totalModalidades;
         console.log(`✅ Modalidades corrigidas no ${arquivo}: ${totalModalidades} registros`);
       } catch (error: any) {
@@ -361,16 +376,18 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Erro no processamento unificado:', error);
+    console.error('❌ Erro na aplicação de regras unificadas:', error);
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        timestamp: new Date().toISOString()
+      JSON.stringify({
+        success: false,
+        erro: error.message,
+        detalhes: error.stack,
+        observacoes: 'Erro interno no processamento das regras'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      { 
         status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
