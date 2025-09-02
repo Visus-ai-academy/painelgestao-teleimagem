@@ -150,12 +150,6 @@ Deno.serve(async (req) => {
         .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
-
-      // CT (como especialidade) → GERAL (CT deveria ser modalidade, não especialidade)
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'GERAL' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'CT')
       regrasAplicadasArquivo.add('v007')
 
       // REGRA v008: Normalização modalidade
