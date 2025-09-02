@@ -41,7 +41,7 @@ export function SistemaRegrasUnificado() {
     
     try {
       toast.info('Iniciando aplicação completa de regras...', {
-        description: `Processando arquivo: ${arquivoSelecionado}`
+        description: 'Processando TODOS os arquivos de volumetria'
       });
 
       const inicioTempo = Date.now();
@@ -49,7 +49,7 @@ export function SistemaRegrasUnificado() {
       // Executar função unificada que aplica TODAS as regras corretamente
       const { data, error } = await supabase.functions.invoke('aplicar-regras-completo-unificado', {
         body: { 
-          arquivo_fonte: arquivoSelecionado,
+          aplicar_todos_arquivos: true,
           periodo_referencia: '2025-06'
         }
       });
@@ -179,7 +179,7 @@ export function SistemaRegrasUnificado() {
           <TabsContent value="aplicar" className="space-y-4">
             <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Aplicar Regras:</strong> Executa TODAS as regras necessárias automaticamente com processamento em lotes para evitar limitações.
+                <strong>Aplicar Regras:</strong> Executa TODAS as regras automaticamente em TODOS os arquivos de volumetria (Padrão, Fora do Padrão e Retroativo) com processamento otimizado.
               </p>
             </div>
             
