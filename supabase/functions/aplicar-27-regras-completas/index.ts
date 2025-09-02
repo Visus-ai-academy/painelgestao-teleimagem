@@ -136,18 +136,26 @@ Deno.serve(async (req) => {
         .eq('MODALIDADE', 'OT')
       regrasAplicadasArquivo.add('v005')
 
-      // REGRA v007: Colunas → Músculo Esquelético  
-      console.log('  ⚡ Aplicando v007 - Colunas → Músculo Esquelético')
+      // REGRA v007: Correções de especialidades problemáticas
+      console.log('  ⚡ Aplicando v007 - Correções especialidades problemáticas')
+      
+      // Colunas → Músculo Esquelético  
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'Músculo Esquelético' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'Colunas')
 
-      // REGRA v007 continuação: ONCO MEDICINA INTERNA → MEDICINA INTERNA
+      // ONCO MEDICINA INTERNA → MEDICINA INTERNA
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'MEDICINA INTERNA' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
+
+      // CT (como especialidade) → GERAL (CT deveria ser modalidade, não especialidade)
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'GERAL' })
+        .eq('arquivo_fonte', arquivoAtual)
+        .eq('ESPECIALIDADE', 'CT')
       regrasAplicadasArquivo.add('v007')
 
       // REGRA v008: Normalização modalidade
