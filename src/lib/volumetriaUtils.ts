@@ -635,52 +635,19 @@ export async function processVolumetriaOtimizado(
     console.log('🔧 Processamento inicial dos dados...');
     const result = await processVolumetriaFile(file, arquivoFonte as any, onProgress, periodo);
     
-    if (result.success) {
-      console.log('✅ DADOS INSERIDOS COM SUCESSO - Iniciando aplicação de regras...');
+    if (result.success && periodo) {
+      console.log('✅ DADOS INSERIDOS COM SUCESSO - Iniciando aplicação de regras prioritárias...');
       
-      // Aplicar TODAS as regras através da função de lote
-      console.log('🔧 Aplicando todas as regras de negócio via aplicar-regras-lote...');
-      try {
-        const periodoReferencia = periodo ? 
-          `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][periodo.mes-1]}/${periodo.ano.toString().slice(-2)}` : 
-          'jan/25'; // fallback para período atual
-        
-        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
-        
-        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
-          body: { 
-            arquivo_fonte: arquivoFonte,
-            periodo_referencia: periodoReferencia
-          }
-        });
-
-        if (errorRegras) {
-          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
-          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
-        } else {
-          console.log('✅ REGRAS APLICADAS COM SUCESSO!');
-          console.log('📊 Resultado completo:', resultRegras);
-          if (resultRegras?.resultados) {
-            console.log(`📋 Total de regras processadas: ${resultRegras.resultados.length}`);
-            const sucessos = resultRegras.resultados.filter((r: any) => r.sucesso).length;
-            const erros = resultRegras.resultados.filter((r: any) => !r.sucesso).length;
-            console.log(`✅ Sucessos: ${sucessos} | ❌ Erros: ${erros}`);
-          }
-        }
-      } catch (error) {
-        console.error('⚠️ Erro ao aplicar regras em lote:', error);
-        console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas');
-      }
-    }
-    
-    // Aplicar regras específicas pós-upload baseado no tipo de arquivo
-    if (periodo) {
       // Determinar período de referência dinamicamente
       const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
       const mesAbrev = meses[periodo.mes - 1];
       const anoAbrev = periodo.ano.toString().slice(-2);
       const periodoReferencia = `${mesAbrev}/${anoAbrev}`;
       console.log(`📅 Período de referência: ${periodoReferencia}`);
+      
+      // ========================================
+      // PRIMEIRA PRIORIDADE: Aplicar regras específicas por tipo de arquivo
+      // ========================================
       
       if (arquivoFonte.includes('retroativo')) {
         // PRIORIDADE MÁXIMA: Aplicar regras v002/v003 PRIMEIRO para arquivos retroativos
@@ -735,8 +702,42 @@ export async function processVolumetriaOtimizado(
         }
       }
       
-      // 5. Aplicar demais regras automáticas para todos os tipos de arquivo
-      console.log('🚀 Aplicando demais regras automáticas...');
+      // ========================================
+      // SEGUNDA PRIORIDADE: Aplicar todas as outras regras através do lote
+      // ========================================
+      console.log('🔧 Aplicando demais regras de negócio via aplicar-regras-lote...');
+      try {
+        console.log(`📂 Parâmetros: arquivo_fonte=${arquivoFonte}, periodo_referencia=${periodoReferencia}`);
+        
+        const { data: resultRegras, error: errorRegras } = await supabase.functions.invoke('aplicar-regras-lote', {
+          body: { 
+            arquivo_fonte: arquivoFonte,
+            periodo_referencia: periodoReferencia
+          }
+        });
+
+        if (errorRegras) {
+          console.error('⚠️ Erro ao aplicar regras em lote:', errorRegras);
+          console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas corretamente');
+        } else {
+          console.log('✅ REGRAS EM LOTE APLICADAS COM SUCESSO!');
+          console.log('📊 Resultado completo:', resultRegras);
+          if (resultRegras?.resultados) {
+            console.log(`📋 Total de regras processadas: ${resultRegras.resultados.length}`);
+            const sucessos = resultRegras.resultados.filter((r: any) => r.sucesso).length;
+            const erros = resultRegras.resultados.filter((r: any) => !r.sucesso).length;
+            console.log(`✅ Sucessos: ${sucessos} | ❌ Erros: ${erros}`);
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Erro ao aplicar regras em lote:', error);
+        console.warn('⚠️ Dados inseridos mas regras podem não ter sido aplicadas');
+      }
+      
+      // ========================================
+      // TERCEIRA PRIORIDADE: Aplicar regras automáticas complementares
+      // ========================================
+      console.log('🚀 Aplicando regras automáticas complementares...');
       
       try {
         const { data: regrasCompletas, error: errorRegrasCompletas } = await supabase.functions.invoke(
@@ -757,7 +758,7 @@ export async function processVolumetriaOtimizado(
         if (errorRegrasCompletas) {
           console.warn('⚠️ Aviso: Falha nas regras automáticas completas:', errorRegrasCompletas);
         } else {
-          console.log('✅ Regras automáticas completas aplicadas:', regrasCompletas);
+          console.log('✅ Regras automáticas complementares aplicadas:', regrasCompletas);
         }
       } catch (errorRegrasFull) {
         console.warn('⚠️ Erro ao aplicar regras automáticas completas:', errorRegrasFull);
