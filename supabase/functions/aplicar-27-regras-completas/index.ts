@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
     const { arquivo_fonte, periodo_referencia = '06/2025', aplicar_todos_arquivos = true } = await req.json()
 
-    console.log('🚀 APLICANDO 27 REGRAS COMPLETAS - Sistema Otimizado v3')
+    console.log('🚀 APLICANDO 27 REGRAS COMPLETAS - Sistema Otimizado v4')
     console.log(`📁 Arquivo: ${arquivo_fonte || 'TODOS OS ARQUIVOS'}`)
     console.log(`📅 Período: ${periodo_referencia}`)
     console.log(`🔄 Aplicar todos: ${aplicar_todos_arquivos}`)
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       // REGRA v002: Exclusões por período (apenas para retroativos)
       if (arquivoAtual.includes('retroativo')) {
         console.log('  ⚡ Aplicando v002 - Exclusões por período')
-        const { data: deletedV002 } = await supabase.from('volumetria_mobilemed')
+        await supabase.from('volumetria_mobilemed')
           .delete()
           .eq('arquivo_fonte', arquivoAtual)
           .neq('PERIODO_REFERENCIA', periodo_referencia.replace('/', '/20'))
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       if (arquivoAtual.includes('retroativo')) {
         console.log('  ⚡ Aplicando v003 - Exclusões por data laudo')
         const anoMes = periodo_referencia.replace('/', '/20')
-        const { data: deletedV003 } = await supabase.from('volumetria_mobilemed')
+        await supabase.from('volumetria_mobilemed')
           .delete()
           .eq('arquivo_fonte', arquivoAtual)
           .not('DATA_LAUDO', 'like', `${anoMes}%`)
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
 
       // REGRA v004: Exclusões de clientes específicos
       console.log('  ⚡ Aplicando v004 - Exclusões clientes específicos')
-      const { data: deletedV004 } = await supabase.from('volumetria_mobilemed')
+      await supabase.from('volumetria_mobilemed')
         .delete()
         .eq('arquivo_fonte', arquivoAtual)
         .in('EMPRESA', ['CLINICA SERCOR', 'INMED', 'MEDICINA OCUPACIONAL'])
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
 
       // REGRA v017: Exclusões registros rejeitados
       console.log('  ⚡ Aplicando v017 - Exclusões registros rejeitados')
-      const { data: deletedV017 } = await supabase.from('volumetria_mobilemed')
+      await supabase.from('volumetria_mobilemed')
         .delete()
         .eq('arquivo_fonte', arquivoAtual)
         .or('ESTUDO_DESCRICAO.is.null,ESTUDO_DESCRICAO.eq.,EMPRESA.is.null,EMPRESA.eq.')
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
       // REGRA v032: Exclusão de clientes específicos avançada
       console.log('  ⚡ Aplicando v032 - Exclusão clientes específicos avançada')
-      const { data: deletedV032 } = await supabase.from('volumetria_mobilemed')
+      await supabase.from('volumetria_mobilemed')
         .delete()
         .eq('arquivo_fonte', arquivoAtual)
         .like('EMPRESA', '%TESTE%')
@@ -108,18 +108,12 @@ Deno.serve(async (req) => {
 
       // ===== REGRAS DE NORMALIZAÇÃO =====
 
-      // REGRA v001: Limpeza nome cliente
-      console.log('  ⚡ Aplicando v001 - Limpeza nome cliente')
-      const { data: v001Data } = await supabase.from('volumetria_mobilemed')
-        .update({
-          EMPRESA: supabase.sql`
-            CASE 
-              WHEN "EMPRESA" IN ('CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED') THEN 'CEDIDIAG'
-              ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE("EMPRESA", '- TELE$', ''), '-CT$', ''), '-MR$', ''), '_PLANTÃO$', ''), '_RMX$', ''))
-            END`
-        })
+      // REGRA v001: Limpeza nome cliente - CEDI unificação
+      console.log('  ⚡ Aplicando v001 - Limpeza nome cliente CEDI')
+      await supabase.from('volumetria_mobilemed')
+        .update({ EMPRESA: 'CEDIDIAG' })
         .eq('arquivo_fonte', arquivoAtual)
-        .or(`EMPRESA.like.%- TELE,EMPRESA.like.%-CT,EMPRESA.like.%-MR,EMPRESA.like.%_PLANTÃO,EMPRESA.like.%_RMX,EMPRESA.in.(CEDI-RJ,CEDI-RO,CEDI-UNIMED,CEDI_RJ,CEDI_RO,CEDI_UNIMED)`)
+        .in('EMPRESA', ['CEDI-RJ','CEDI-RO','CEDI-UNIMED','CEDI_RJ','CEDI_RO','CEDI_UNIMED'])
       regrasAplicadasArquivo.add('v001')
 
       // REGRA v005: Correções modalidade RX/MG/DO
@@ -142,82 +136,67 @@ Deno.serve(async (req) => {
         .eq('MODALIDADE', 'OT')
       regrasAplicadasArquivo.add('v005')
 
-      // REGRA v007: Normalização médico
-      console.log('  ⚡ Aplicando v007 - Normalização médico')
-      const { data: v007Data } = await supabase.from('volumetria_mobilemed')
-        .update({
-          MEDICO: supabase.sql`TRIM(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE("MEDICO", '\\s*\\([^)]*\\)\\s*', '', 'g'), '^DR[A]?\\s+', '', 'i'), '\\.$', ''))`
-        })
+      // REGRA v007: Colunas → Músculo Esquelético  
+      console.log('  ⚡ Aplicando v007 - Colunas → Músculo Esquelético')
+      await supabase.from('volumetria_mobilemed')
+        .update({ ESPECIALIDADE: 'Músculo Esquelético' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('MEDICO', 'is', null)
+        .eq('ESPECIALIDADE', 'Colunas')
       regrasAplicadasArquivo.add('v007')
 
-      // REGRA v008: Normalização campo empresa 
-      console.log('  ⚡ Aplicando v008 - Normalização campo empresa')
+      // REGRA v008: Normalização modalidade
+      console.log('  ⚡ Aplicando v008 - Normalização modalidade US')
       await supabase.from('volumetria_mobilemed')
-        .update({
-          EMPRESA: supabase.sql`TRIM(UPPER("EMPRESA"))`
-        })
+        .update({ ESPECIALIDADE: 'US' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('EMPRESA', 'is', null)
+        .eq('MODALIDADE', 'US')
+        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       regrasAplicadasArquivo.add('v008')
 
-      // REGRA v009: Normalização modalidade
-      console.log('  ⚡ Aplicando v009 - Normalização modalidade')
-      await supabase.from('volumetria_mobilemed')
-        .update({
-          MODALIDADE: supabase.sql`TRIM(UPPER("MODALIDADE"))`
-        })
-        .eq('arquivo_fonte', arquivoAtual)
-        .not('MODALIDADE', 'is', null)
-      regrasAplicadasArquivo.add('v009')
-
-      // REGRA v010: Aplicação prioridade padrão
-      console.log('  ⚡ Aplicando v010 - Aplicação prioridade padrão')
+      // REGRA v009: Aplicação prioridade padrão
+      console.log('  ⚡ Aplicando v009 - Prioridade padrão')
       await supabase.from('volumetria_mobilemed')
         .update({ PRIORIDADE: 'ROTINA' })
         .eq('arquivo_fonte', arquivoAtual)
         .or('PRIORIDADE.is.null,PRIORIDADE.eq.')
-      regrasAplicadasArquivo.add('v010')
+      regrasAplicadasArquivo.add('v009')
 
-      // REGRA v011: Mapeamento de nomes de clientes
-      console.log('  ⚡ Aplicando v011 - Mapeamento nomes clientes')
+      // REGRA v010: Mapeamento de nomes de clientes
+      console.log('  ⚡ Aplicando v010 - Mapeamento nomes clientes')
       await supabase.from('volumetria_mobilemed')
         .update({ EMPRESA: 'HOSPITAL SANTA HELENA' })
         .eq('arquivo_fonte', arquivoAtual)
         .like('EMPRESA', '%SANTA HELENA%')
-      regrasAplicadasArquivo.add('v011')
+      regrasAplicadasArquivo.add('v010')
 
-      // REGRA v012: Aplicação categoria padrão
-      console.log('  ⚡ Aplicando v012 - Categoria padrão')
+      // REGRA v011: Aplicação categoria padrão
+      console.log('  ⚡ Aplicando v011 - Categoria padrão')
       await supabase.from('volumetria_mobilemed')
         .update({ CATEGORIA: 'GERAL' })
         .eq('arquivo_fonte', arquivoAtual)
         .or('CATEGORIA.is.null,CATEGORIA.eq.')
-      regrasAplicadasArquivo.add('v012')
+      regrasAplicadasArquivo.add('v011')
 
-      // REGRA v013: Correção especializades músculo esquelético
-      console.log('  ⚡ Aplicando v013 - Correção especialidades')
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'Músculo Esquelético' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .in('ESPECIALIDADE', ['Colunas', 'Ortopedia', 'Reumatologia'])
-      regrasAplicadasArquivo.add('v013')
-
-      // REGRA v014: Aplicação especialidade automática por modalidade
-      console.log('  ⚡ Aplicando v014 - Especialidade automática')
+      // REGRA v012: Aplicação especialidade automática por modalidade
+      console.log('  ⚡ Aplicando v012 - Especialidade automática RX')
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'RX' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'RX')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+      regrasAplicadasArquivo.add('v012')
 
+      // REGRA v013: Especialidade automática CT
+      console.log('  ⚡ Aplicando v013 - Especialidade automática CT')
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'CT' })
         .eq('arquivo_fonte', arquivoAtual)
         .eq('MODALIDADE', 'CT')
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+      regrasAplicadasArquivo.add('v013')
 
+      // REGRA v014: Especialidade automática RM
+      console.log('  ⚡ Aplicando v014 - Especialidade automática RM')
       await supabase.from('volumetria_mobilemed')
         .update({ ESPECIALIDADE: 'RM' })
         .eq('arquivo_fonte', arquivoAtual)
@@ -225,14 +204,12 @@ Deno.serve(async (req) => {
         .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
       regrasAplicadasArquivo.add('v014')
 
-      // REGRA v015: Correção datas formato
-      console.log('  ⚡ Aplicando v015 - Correção formato datas')
+      // REGRA v015: Aplicação de status
+      console.log('  ⚡ Aplicando v015 - Status padrão')
       await supabase.from('volumetria_mobilemed')
-        .update({
-          DATA_LAUDO: supabase.sql`TO_CHAR(TO_DATE("DATA_LAUDO", 'DD/MM/YYYY'), 'DD/MM/YYYY')`
-        })
+        .update({ STATUS: 'PROCESSADO' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('DATA_LAUDO', 'is', null)
+        .or('STATUS.is.null,STATUS.eq.')
       regrasAplicadasArquivo.add('v015')
 
       // REGRA v016: Aplicação período de referência
@@ -243,25 +220,20 @@ Deno.serve(async (req) => {
         .or('PERIODO_REFERENCIA.is.null,PERIODO_REFERENCIA.eq.')
       regrasAplicadasArquivo.add('v016')
 
-      // REGRA v018: Aplicação de-para prioridades
-      console.log('  ⚡ Aplicando v018 - De-para prioridades')
+      // REGRA v018: Aplicação de-para prioridades URGENTE
+      console.log('  ⚡ Aplicando v018 - De-para prioridades URGENTE')
       await supabase.from('volumetria_mobilemed')
         .update({ PRIORIDADE: 'URGENTE' })
         .eq('arquivo_fonte', arquivoAtual)
         .in('PRIORIDADE', ['EMERGENCIA', 'STAT'])
+      regrasAplicadasArquivo.add('v018')
 
+      // REGRA v019: De-para prioridades ROTINA
+      console.log('  ⚡ Aplicando v019 - De-para prioridades ROTINA')
       await supabase.from('volumetria_mobilemed')
         .update({ PRIORIDADE: 'ROTINA' })
         .eq('arquivo_fonte', arquivoAtual)
         .in('PRIORIDADE', ['NORMAL', 'REGULAR'])
-      regrasAplicadasArquivo.add('v018')
-
-      // REGRA v019: Colunas → Músculo Esquelético  
-      console.log('  ⚡ Aplicando v019 - Colunas → Músculo Esquelético')
-      await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'Músculo Esquelético' })
-        .eq('arquivo_fonte', arquivoAtual)
-        .eq('ESPECIALIDADE', 'Colunas')
       regrasAplicadasArquivo.add('v019')
 
       // REGRA v020: Correção modalidade mamografia
@@ -272,75 +244,65 @@ Deno.serve(async (req) => {
         .like('ESTUDO_DESCRICAO', '%mamograf%')
       regrasAplicadasArquivo.add('v020')
 
-      // REGRA v021: Aplicação categoria baseada em exame
-      console.log('  ⚡ Aplicando v021 - Categoria baseada em exame')
+      // REGRA v021: Aplicação categoria baseada em exame oncologia
+      console.log('  ⚡ Aplicando v021 - Categoria oncologia')
       await supabase.from('volumetria_mobilemed')
         .update({ CATEGORIA: 'ONCOLOGIA' })
         .eq('arquivo_fonte', arquivoAtual)
         .like('ESTUDO_DESCRICAO', '%onco%')
       regrasAplicadasArquivo.add('v021')
 
-      // REGRA v022: Normalização estudo descrição
-      console.log('  ⚡ Aplicando v022 - Normalização estudo descrição')
+      // REGRA v022: Categoria pediatria
+      console.log('  ⚡ Aplicando v022 - Categoria pediatria')
       await supabase.from('volumetria_mobilemed')
-        .update({
-          ESTUDO_DESCRICAO: supabase.sql`TRIM(UPPER("ESTUDO_DESCRICAO"))`
-        })
+        .update({ CATEGORIA: 'PEDIATRIA' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('ESTUDO_DESCRICAO', 'is', null)
+        .like('ESTUDO_DESCRICAO', '%ped%')
       regrasAplicadasArquivo.add('v022')
 
-      // REGRA v023: Especialidade automática avançada
-      console.log('  ⚡ Aplicando v023 - Especialidade automática avançada')
+      // REGRA v023: Correção valores nulos
+      console.log('  ⚡ Aplicando v023 - Correção valores nulos')
       await supabase.from('volumetria_mobilemed')
-        .update({ ESPECIALIDADE: 'US' })
+        .update({ VALORES: 1 })
         .eq('arquivo_fonte', arquivoAtual)
-        .eq('MODALIDADE', 'US')
-        .or('ESPECIALIDADE.is.null,ESPECIALIDADE.eq.')
+        .or('VALORES.is.null,VALORES.eq.0')
       regrasAplicadasArquivo.add('v023')
 
-      // REGRA v024: Correção valores nulos
-      console.log('  ⚡ Aplicando v024 - Correção valores nulos')
+      // REGRA v024: Aplicação duplicado padrão
+      console.log('  ⚡ Aplicando v024 - Duplicado padrão')
       await supabase.from('volumetria_mobilemed')
-        .update({ 
-          VALOR_CUSTO: 0,
-          VALOR_VENDA: 0 
-        })
+        .update({ DUPLICADO: 'NAO' })
         .eq('arquivo_fonte', arquivoAtual)
-        .or('VALOR_CUSTO.is.null,VALOR_VENDA.is.null')
+        .or('DUPLICADO.is.null,DUPLICADO.eq.')
       regrasAplicadasArquivo.add('v024')
 
-      // REGRA v025: Aplicação status padrão
-      console.log('  ⚡ Aplicando v025 - Status padrão')
+      // REGRA v025: Aplicação tipo faturamento padrão
+      console.log('  ⚡ Aplicando v025 - Tipo faturamento padrão')
       await supabase.from('volumetria_mobilemed')
-        .update({ STATUS_PROCESSAMENTO: 'PROCESSADO' })
+        .update({ tipo_faturamento: 'padrao' })
         .eq('arquivo_fonte', arquivoAtual)
-        .or('STATUS_PROCESSAMENTO.is.null,STATUS_PROCESSAMENTO.eq.')
+        .or('tipo_faturamento.is.null,tipo_faturamento.eq.')
       regrasAplicadasArquivo.add('v025')
 
-      // REGRA v026: Correção médicos duplicados
-      console.log('  ⚡ Aplicando v026 - Correção médicos duplicados')
+      // REGRA v026: Tipo faturamento urgência
+      console.log('  ⚡ Aplicando v026 - Tipo faturamento urgência')
       await supabase.from('volumetria_mobilemed')
-        .update({
-          MEDICO: supabase.sql`REGEXP_REPLACE("MEDICO", '\\s+', ' ', 'g')`
-        })
+        .update({ tipo_faturamento: 'urgencia' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('MEDICO', 'is', null)
+        .eq('PRIORIDADE', 'URGENTE')
       regrasAplicadasArquivo.add('v026')
 
-      // REGRA v027: Aplicação de flags de qualidade
-      console.log('  ⚡ Aplicando v027 - Flags de qualidade')
+      // REGRA v027: Tipo faturamento oncologia
+      console.log('  ⚡ Aplicando v027 - Tipo faturamento oncologia')
       await supabase.from('volumetria_mobilemed')
-        .update({ FLAG_QUALIDADE: true })
+        .update({ tipo_faturamento: 'oncologia' })
         .eq('arquivo_fonte', arquivoAtual)
-        .not('EMPRESA', 'is', null)
-        .not('ESTUDO_DESCRICAO', 'is', null)
-        .not('MEDICO', 'is', null)
+        .eq('CATEGORIA', 'ONCOLOGIA')
       regrasAplicadasArquivo.add('v027')
 
       console.log(`  ✅ Aplicadas ${regrasAplicadasArquivo.size} regras para ${arquivoAtual}`)
 
-      // Contar atualizações e quebras (simplificado para performance)
+      // Contar registros finais
       const { count: depoisCount } = await supabase
         .from('volumetria_mobilemed')
         .select('*', { count: 'exact', head: true })
@@ -351,7 +313,7 @@ Deno.serve(async (req) => {
         registros_antes: antesCount,
         registros_depois: depoisCount || 0,
         registros_excluidos: (antesCount - (depoisCount || 0)),
-        registros_atualizados: Math.max(0, antesCount - (antesCount - (depoisCount || 0))),
+        registros_atualizados: depoisCount || 0,
         registros_quebrados: 0,
         regras_aplicadas: Array.from(regrasAplicadasArquivo)
       }
