@@ -218,73 +218,52 @@ serve(async (req) => {
       }
 
       // ============================================================================
-      // ETAPA 4: APLICAÇÃO DE CATEGORIAS
+      // ETAPA 4: APLICAÇÃO DE CATEGORIAS BASEADAS NO CADASTRO DE EXAMES
       // ============================================================================
       
-      console.log(`🔄 [4/6] Aplicando categorias no ${arquivo}...`);
+      console.log(`🔄 [4/6] Aplicando categorias baseadas no cadastro de exames no ${arquivo}...`);
       try {
         let totalCategorias = 0;
         
-        // MR → RM
-        const { data: updateMR, error: errorMR } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'MR',
-            p_categoria: 'RM'
-          });
-        
-        if (!errorMR) totalCategorias += updateMR || 0;
-        
-        // CT → TC  
-        const { data: updateCT, error: errorCT } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'CT',
-            p_categoria: 'TC'
-          });
-        
-        if (!errorCT) totalCategorias += updateCT || 0;
-        
-        // RX → RX
-        const { data: updateRX, error: errorRX } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'RX',
-            p_categoria: 'RX'
-          });
-        
-        if (!errorRX) totalCategorias += updateRX || 0;
-        
-        // MG → MG
-        const { data: updateMG, error: errorMG } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'MG',
-            p_categoria: 'MG'
-          });
-        
-        if (!errorMG) totalCategorias += updateMG || 0;
-        
-        // DO → DO
-        const { data: updateDO, error: errorDO } = await supabase
-          .rpc('update_categoria_by_modalidade', {
-            p_arquivo_fonte: arquivo,
-            p_modalidade: 'DO',
-            p_categoria: 'DO'
-          });
-        
-        if (!errorDO) totalCategorias += updateDO || 0;
+        // Buscar registros sem categoria e aplicar baseado no cadastro de exames
+        const { data: registrosSemCategoria } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id, "ESTUDO_DESCRICAO"')
+          .eq('arquivo_fonte', arquivo)
+          .or('"CATEGORIA".is.null,"CATEGORIA".eq.""');
+
+        if (registrosSemCategoria && registrosSemCategoria.length > 0) {
+          for (const registro of registrosSemCategoria) {
+            // Buscar categoria no cadastro de exames
+            const { data: exame } = await supabase
+              .from('cadastro_exames')
+              .select('categoria')
+              .eq('nome', registro.ESTUDO_DESCRICAO)
+              .eq('ativo', true)
+              .not('categoria', 'is', null)
+              .neq('categoria', '')
+              .single();
+
+            const categoria = exame?.categoria || 'SC';
+            
+            // Atualizar registro
+            await supabase
+              .from('volumetria_mobilemed')
+              .update({ 
+                "CATEGORIA": categoria,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', registro.id);
+            
+            totalCategorias++;
+          }
+        }
 
         statusRegras.push({
           regra: `Aplicação de Categorias - ${arquivo}`,
           aplicada: true,
           detalhes: { 
-            total_categorias_aplicadas: totalCategorias,
-            MR_para_RM: updateMR || 0,
-            CT_para_TC: updateCT || 0,
-            RX_para_RX: updateRX || 0,
-            MG_para_MG: updateMG || 0,
-            DO_para_DO: updateDO || 0
+            total_categorias_aplicadas: totalCategorias
           }
         });
 
@@ -301,12 +280,71 @@ serve(async (req) => {
       }
 
       // ============================================================================
-      // ETAPA 5: TIPIFICAÇÃO DE FATURAMENTO
+      // ETAPA 5: APLICAÇÃO DE DE-PARA DE PRIORIDADES
       // ============================================================================
       
-      console.log(`🔄 [5/6] Aplicando tipificação de faturamento no ${arquivo}...`);
+      console.log(`🔄 [5/6] Aplicando de-para de prioridades no ${arquivo}...`);
       try {
-        // Alta complexidade
+        let totalPrioridadesAtualizadas = 0;
+        
+        // Buscar todos os registros e verificar se há de-para de prioridade
+        const { data: registros } = await supabase
+          .from('volumetria_mobilemed')
+          .select('id, "PRIORIDADE"')
+          .eq('arquivo_fonte', arquivo);
+
+        if (registros && registros.length > 0) {
+          for (const registro of registros) {
+            // Buscar de-para de prioridade
+            const { data: dePara } = await supabase
+              .from('valores_prioridade_de_para')
+              .select('nome_final')
+              .eq('prioridade_original', registro.PRIORIDADE)
+              .eq('ativo', true)
+              .single();
+
+            if (dePara && dePara.nome_final !== registro.PRIORIDADE) {
+              // Atualizar registro
+              await supabase
+                .from('volumetria_mobilemed')
+                .update({ 
+                  "PRIORIDADE": dePara.nome_final,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', registro.id);
+              
+              totalPrioridadesAtualizadas++;
+            }
+          }
+        }
+
+        statusRegras.push({
+          regra: `De-Para de Prioridades - ${arquivo}`,
+          aplicada: true,
+          detalhes: { 
+            total_prioridades_atualizadas: totalPrioridadesAtualizadas
+          }
+        });
+
+        totalCorrigidos += totalPrioridadesAtualizadas;
+        console.log(`✅ De-Para de prioridades aplicado no ${arquivo}: ${totalPrioridadesAtualizadas} registros`);
+        
+      } catch (error: any) {
+        console.error(`❌ ERRO no de-para de prioridades no ${arquivo}:`, error);
+        statusRegras.push({
+          regra: `De-Para de Prioridades - ${arquivo}`,
+          aplicada: false,
+          erro: error.message
+        });
+      }
+
+      // ============================================================================
+      // ETAPA 6: TIPIFICAÇÃO DE FATURAMENTO
+      // ============================================================================
+      
+      console.log(`🔄 [6/6] Aplicando tipificação de faturamento no ${arquivo}...`);
+      try {
+        // Alta complexidade (CT, MR, DO)
         const { error: errorAltaComplexidade } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -314,10 +352,10 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('arquivo_fonte', arquivo)
-          .in('MODALIDADE', ['TC', 'RM', 'DO'])
+          .in('MODALIDADE', ['CT', 'MR', 'DO'])
           .or('tipo_faturamento.is.null,tipo_faturamento.eq.""');
 
-        // Padrão
+        // Padrão (todas as outras modalidades)
         const { error: errorPadrao } = await supabase
           .from('volumetria_mobilemed')
           .update({ 
@@ -325,7 +363,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('arquivo_fonte', arquivo)
-          .not('MODALIDADE', 'in', '("TC","RM","DO")')
+          .not('MODALIDADE', 'in', '("CT","MR","DO")')
           .or('tipo_faturamento.is.null,tipo_faturamento.eq.""');
 
         statusRegras.push({
@@ -356,7 +394,7 @@ serve(async (req) => {
     // FINALIZAÇÃO
     // ============================================================================
     
-    console.log('🔄 [6/6] Finalizando processamento...');
+    console.log('🔄 Finalizando processamento...');
 
     const resultado = {
       success: statusRegras.every(r => r.aplicada),
