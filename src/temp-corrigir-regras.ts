@@ -8,7 +8,8 @@ async function corrigirRegrasFaltantes() {
   console.log('🔥 EXECUTANDO CORREÇÃO DAS REGRAS FALTANTES...');
   
   try {
-    const { data, error } = await supabase.functions.invoke('corrigir-regras-faltantes');
+    // Usar a função existente que aplica todas as 27 regras
+    const { data, error } = await supabase.functions.invoke('corrigir-todos-dados-existentes');
     
     if (error) {
       console.error('❌ Erro na correção:', error);
