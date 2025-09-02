@@ -152,9 +152,24 @@ Deno.serve(async (req) => {
         .eq('ESPECIALIDADE', 'ONCO MEDICINA INTERNA')
       regrasAplicadasArquivo.add('v007')
 
-      // REGRA v008: Removida - US não é modalidade válida
+      // REGRA v008: De-Para Prioridades
+      console.log('  ⚡ Aplicando v008 - De-Para Prioridades')
       
-      // REGRA v009: Aplicação prioridade padrão
+      // Aplicar mapeamento de prioridades usando tabela valores_prioridade_de_para
+      const { data: prioridadesDePara } = await supabase
+        .from('valores_prioridade_de_para')
+        .select('prioridade_original, nome_final')
+        .eq('ativo', true)
+      
+      if (prioridadesDePara && prioridadesDePara.length > 0) {
+        for (const mapeamento of prioridadesDePara) {
+          await supabase.from('volumetria_mobilemed')
+            .update({ PRIORIDADE: mapeamento.nome_final })
+            .eq('arquivo_fonte', arquivoAtual)
+            .eq('PRIORIDADE', mapeamento.prioridade_original)
+        }
+      }
+      regrasAplicadasArquivo.add('v008')
       console.log('  ⚡ Aplicando v009 - Prioridade padrão')
       await supabase.from('volumetria_mobilemed')
         .update({ PRIORIDADE: 'ROTINA' })
