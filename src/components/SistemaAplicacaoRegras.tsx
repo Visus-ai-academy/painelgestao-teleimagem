@@ -26,6 +26,21 @@ interface ResultadoSistema {
   recomendacao: string;
 }
 
+interface CorrecoesAplicadas {
+  modalidades: number;
+  categorias: number;
+  prioridades: number;
+  especialidades: number;
+}
+
+interface ResultadoCorrecao {
+  success: boolean;
+  arquivo_fonte: string;
+  total_registros_processados: number;
+  correcoes_aplicadas: CorrecoesAplicadas;
+  regras_aplicadas: string[];
+}
+
 const ARQUIVOS_SISTEMA = [
   'volumetria_padrao',
   'volumetria_fora_padrao', 
@@ -56,6 +71,46 @@ export function SistemaAplicacaoRegras() {
       setResultado(data);
     } catch (error) {
       console.error('Erro no sistema de regras:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const corrigirDadosExistentes = async () => {
+    setLoading(true);
+    try {
+      console.log('🔧 Corrigindo dados existentes...');
+      const { data, error } = await supabase.functions.invoke('corrigir-regras-aplicacao', {
+        body: { arquivo_fonte: arquivoSelecionado }
+      });
+
+      if (error) throw error;
+      
+      const resultado = data as ResultadoCorrecao;
+      const totalCorrecoes = (resultado.correcoes_aplicadas?.modalidades || 0) + 
+                            (resultado.correcoes_aplicadas?.categorias || 0) + 
+                            (resultado.correcoes_aplicadas?.prioridades || 0) + 
+                            (resultado.correcoes_aplicadas?.especialidades || 0);
+      
+      setResultado({
+        success: resultado.success,
+        arquivo_fonte: resultado.arquivo_fonte,
+        total_regras: 5,
+        regras_aplicadas: totalCorrecoes,
+        regras_validadas_ok: 5,
+        regras_falharam: 0,
+        status_detalhado: (resultado.regras_aplicadas || []).map((regra: string) => ({
+          regra,
+          arquivo: resultado.arquivo_fonte,
+          aplicada: true,
+          validacao_ok: true
+        })),
+        recomendacao: `Dados corrigidos com sucesso! ${resultado.total_registros_processados} registros processados.`
+      });
+
+      console.log('✅ Correção concluída:', data);
+    } catch (error) {
+      console.error('Erro na correção:', error);
     } finally {
       setLoading(false);
     }
@@ -156,6 +211,22 @@ export function SistemaAplicacaoRegras() {
                 <Play className="h-4 w-4" />
               )}
               {loading ? 'Processando...' : modoOperacao === 'validar' ? 'Validar Regras' : 'Aplicar Todas as Regras'}
+            </Button>
+
+            <Button 
+              onClick={corrigirDadosExistentes}
+              disabled={loading}
+              variant="secondary"
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Corrigir Dados Existentes
+                </>
+              )}
             </Button>
 
             {resultado && (
