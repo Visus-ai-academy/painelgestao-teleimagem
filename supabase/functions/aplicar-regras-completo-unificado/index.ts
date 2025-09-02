@@ -58,8 +58,8 @@ serve(async (req) => {
         .update({ "MODALIDADE": 'RX', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo_fonte)
         .in('MODALIDADE', ['CR', 'DX'])
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamografia%')
-        .not('ESTUDO_DESCRICAO', 'ilike', '%mamogra%')
+        .not('"ESTUDO_DESCRICAO"', 'ilike', '%mamografia%')
+        .not('"ESTUDO_DESCRICAO"', 'ilike', '%mamogra%')
         .select('id');
 
       const correcoesRX = rxRegistros?.length || 0;
@@ -70,7 +70,7 @@ serve(async (req) => {
         .update({ "MODALIDADE": 'MG', updated_at: new Date().toISOString() })
         .eq('arquivo_fonte', arquivo_fonte)
         .in('MODALIDADE', ['CR', 'DX'])
-        .or('ESTUDO_DESCRICAO.ilike.%mamografia%,ESTUDO_DESCRICAO.ilike.%mamogra%')
+        .or('"ESTUDO_DESCRICAO".ilike.%mamografia%,"ESTUDO_DESCRICAO".ilike.%mamogra%')
         .select('id');
 
       const correcoesMG = mgRegistros?.length || 0;
