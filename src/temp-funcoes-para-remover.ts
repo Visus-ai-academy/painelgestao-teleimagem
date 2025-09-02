@@ -1,5 +1,5 @@
 /**
- * FUNÇÕES A REMOVER - DUPLICADAS OU SUBSTITUÍDAS
+ * FUNÇÕES A REMOVER - DUPLICADAS OU SUBSTITUÍDAS 
  * 
  * A nova função 'aplicar-27-regras-completas' substitui todas estas:
  */
