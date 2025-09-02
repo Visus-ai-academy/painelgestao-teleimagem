@@ -25,7 +25,6 @@ const REGRAS_BATCH_2 = [
 
 const REGRAS_BATCH_3 = [
   'aplicar-quebras-automatico',
-  'aplicar-validacao-cliente',
   'aplicar-substituicao-especialidade-categoria',
   'aplicar-regra-colunas-musculo-neuro',
   'buscar-valor-onco'
