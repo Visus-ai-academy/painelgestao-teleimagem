@@ -155,10 +155,12 @@ serve(async (req) => {
           incluir_access_number: findColumnValue(row, COLUMN_MAPPING.incluirAccessNumber)?.toString().trim()?.toLowerCase() === 'sim',
           incluir_medico_solicitante: findColumnValue(row, COLUMN_MAPPING.incluirMedicoSolicitante)?.toString().trim()?.toLowerCase() === 'sim',
           
-          // Campos de controle (mantidos dos originais)
+  // Campos de controle (mantidos dos originais)
           periodicidade_reajuste: 'anual',
           indice_reajuste: 'IGP-M',
           percentual_reajuste_fixo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
+          dia_fechamento: findColumnValue(row, ['dia_fechamento', 'Dia Fechamento', 'DIA FECHAMENTO']) ? Number(findColumnValue(row, ['dia_fechamento', 'Dia Fechamento', 'DIA FECHAMENTO'])) : 7,
+          forma_cobranca: findColumnValue(row, ['forma_cobranca', 'Forma Cobrança', 'FORMA COBRANÇA', 'forma_pagamento', 'Forma Pagamento'])?.toString().trim() || 'mensal',
           ativo: true
         };
 

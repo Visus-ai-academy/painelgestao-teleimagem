@@ -700,19 +700,27 @@ export type Database = {
           considera_plantao: boolean
           created_at: string
           created_by: string | null
+          data_aniversario_contrato: string | null
           data_fim: string | null
           data_inicio: string
           desconto_percentual: number | null
+          dia_fechamento: number | null
           dia_vencimento: number | null
           especialidades: string[] | null
           faixas_volume: Json
           forma_pagamento: string | null
           id: string
+          impostos_ab_min: number | null
+          indice_reajuste: string | null
           modalidades: string[] | null
           numero_contrato: string
           observacoes: string | null
           observacoes_contratuais: string | null
+          percentual_iss: number | null
+          percentual_reajuste_fixo: number | null
+          periodicidade_reajuste: string | null
           servicos_contratados: Json | null
+          simples: boolean | null
           status: string
           tabela_precos: Json | null
           tem_parametros_configurados: boolean | null
@@ -730,19 +738,27 @@ export type Database = {
           considera_plantao?: boolean
           created_at?: string
           created_by?: string | null
+          data_aniversario_contrato?: string | null
           data_fim?: string | null
           data_inicio: string
           desconto_percentual?: number | null
+          dia_fechamento?: number | null
           dia_vencimento?: number | null
           especialidades?: string[] | null
           faixas_volume?: Json
           forma_pagamento?: string | null
           id?: string
+          impostos_ab_min?: number | null
+          indice_reajuste?: string | null
           modalidades?: string[] | null
           numero_contrato: string
           observacoes?: string | null
           observacoes_contratuais?: string | null
+          percentual_iss?: number | null
+          percentual_reajuste_fixo?: number | null
+          periodicidade_reajuste?: string | null
           servicos_contratados?: Json | null
+          simples?: boolean | null
           status?: string
           tabela_precos?: Json | null
           tem_parametros_configurados?: boolean | null
@@ -760,19 +776,27 @@ export type Database = {
           considera_plantao?: boolean
           created_at?: string
           created_by?: string | null
+          data_aniversario_contrato?: string | null
           data_fim?: string | null
           data_inicio?: string
           desconto_percentual?: number | null
+          dia_fechamento?: number | null
           dia_vencimento?: number | null
           especialidades?: string[] | null
           faixas_volume?: Json
           forma_pagamento?: string | null
           id?: string
+          impostos_ab_min?: number | null
+          indice_reajuste?: string | null
           modalidades?: string[] | null
           numero_contrato?: string
           observacoes?: string | null
           observacoes_contratuais?: string | null
+          percentual_iss?: number | null
+          percentual_reajuste_fixo?: number | null
+          periodicidade_reajuste?: string | null
           servicos_contratados?: Json | null
+          simples?: boolean | null
           status?: string
           tabela_precos?: Json | null
           tem_parametros_configurados?: boolean | null
@@ -2079,6 +2103,8 @@ export type Database = {
           data_aniversario_contrato: string | null
           data_inicio_integracao: string | null
           desconto_acrescimo: number | null
+          dia_fechamento: number | null
+          forma_cobranca: string | null
           frequencia_continua: boolean | null
           frequencia_por_volume: boolean | null
           id: string
@@ -2116,6 +2142,8 @@ export type Database = {
           data_aniversario_contrato?: string | null
           data_inicio_integracao?: string | null
           desconto_acrescimo?: number | null
+          dia_fechamento?: number | null
+          forma_cobranca?: string | null
           frequencia_continua?: boolean | null
           frequencia_por_volume?: boolean | null
           id?: string
@@ -2153,6 +2181,8 @@ export type Database = {
           data_aniversario_contrato?: string | null
           data_inicio_integracao?: string | null
           desconto_acrescimo?: number | null
+          dia_fechamento?: number | null
+          forma_cobranca?: string | null
           frequencia_continua?: boolean | null
           frequencia_por_volume?: boolean | null
           id?: string

@@ -131,7 +131,9 @@ export function SincronizarParametrosContratos() {
             percentual_reajuste_fixo: parametros.percentual_reajuste_fixo,
             impostos_ab_min: parametros.impostos_ab_min,
             percentual_iss: parametros.percentual_iss,
-            simples: parametros.simples
+            simples: parametros.simples,
+            dia_fechamento: parametros.dia_fechamento,
+            forma_cobranca: parametros.forma_cobranca
           };
 
           // 4. Atualizar contrato com parâmetros sincronizados
@@ -144,6 +146,15 @@ export function SincronizarParametrosContratos() {
               configuracoes_franquia: configuracoesFranquia,
               configuracoes_integracao: configuracoesIntegracao,
               observacoes_contratuais: `Parâmetros sincronizados em ${new Date().toLocaleDateString('pt-BR')} - ${parametros.indice_reajuste} - ${parametros.periodicidade_reajuste}`,
+              // Sincronizar campos diretos dos parâmetros
+              periodicidade_reajuste: parametros.periodicidade_reajuste,
+              indice_reajuste: parametros.indice_reajuste,
+              percentual_reajuste_fixo: parametros.percentual_reajuste_fixo,
+              data_aniversario_contrato: parametros.data_aniversario_contrato,
+              impostos_ab_min: parametros.impostos_ab_min,
+              percentual_iss: parametros.percentual_iss,
+              simples: parametros.simples,
+              dia_fechamento: parametros.dia_fechamento,
               // Adicionar configurações financeiras ao JSONB existente
               tabela_precos: {
                 ...((contrato as any).tabela_precos || {}),
