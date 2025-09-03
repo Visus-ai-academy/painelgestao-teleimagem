@@ -304,6 +304,7 @@ serve(async (req) => {
     }
     
     console.log(`✅ ${corrigidasParaNeuro} registros MUSCULO ESQUELETICO corrigidos para Neuro`);
+    totalCorrecoesNeuro += corrigidasParaNeuro;
 
     // 3. Corrigir ONCO MEDICINA INTERNA → MEDICINA INTERNA
     console.log('📋 Corrigindo especialidade ONCO MEDICINA INTERNA → MEDICINA INTERNA');
