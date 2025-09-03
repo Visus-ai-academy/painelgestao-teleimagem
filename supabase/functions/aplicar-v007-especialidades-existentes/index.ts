@@ -163,9 +163,19 @@ serve(async (req) => {
             const medico = registro.MEDICO;
             let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
             
+            // Debug: mostrar médico original e normalizado
+            const medicoNormalizado = normalizarNomeMedico(medico);
+            console.log(`🔍 Processando médico: "${medico}" → normalizado: "${medicoNormalizado}"`);
+            
             // Verificar se o médico está na lista de neurologistas
-            if (isMedicoNeuro(medico)) {
+            const isNeuro = isMedicoNeuro(medico);
+            console.log(`🧠 Médico ${medico} é neurologista? ${isNeuro}`);
+            
+            if (isNeuro) {
               novaEspecialidade = 'Neuro';
+              console.log(`✅ ALTERAÇÃO: ${medico} → Especialidade: NEURO`);
+            } else {
+              console.log(`➡️ MANTÉM: ${medico} → Especialidade: MUSCULO ESQUELETICO`);
             }
             
             // Preparar dados para atualização
