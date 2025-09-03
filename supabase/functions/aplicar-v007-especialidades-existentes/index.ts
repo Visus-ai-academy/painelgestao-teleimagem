@@ -134,16 +134,45 @@ serve(async (req) => {
     // 1. Processar registros com especialidade "COLUNAS"
     console.log('📋 Processando especialidade COLUNAS → Músculo Esquelético/Neuro baseado no médico');
     
-    // Buscar todos os registros com especialidade "COLUNAS"
-    const { data: registrosColunas, error: selectError } = await supabase
-      .from('volumetria_mobilemed')
-      .select('id, "ESTUDO_DESCRICAO", "ESPECIALIDADE", "CATEGORIA", "MEDICO"')
-      .eq('"ESPECIALIDADE"', 'COLUNAS');
+    // Buscar TODOS os registros com especialidade "COLUNAS" usando paginação
+    let registrosColunas = [];
+    let pagina = 0;
+    const tamanhoPagina = 1000;
+    let temMaisRegistros = true;
     
-    if (selectError) {
-      console.error('❌ Erro ao buscar registros COLUNAS:', selectError);
-      totalErros++;
-    } else if (registrosColunas && registrosColunas.length > 0) {
+    console.log('🔍 Buscando todos os registros COLUNAS (sem limite)...');
+    
+    while (temMaisRegistros) {
+      const { data: loteRegistros, error: selectError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id, "ESTUDO_DESCRICAO", "ESPECIALIDADE", "CATEGORIA", "MEDICO"')
+        .eq('"ESPECIALIDADE"', 'COLUNAS')
+        .range(pagina * tamanhoPagina, (pagina + 1) * tamanhoPagina - 1);
+      
+      if (selectError) {
+        console.error('❌ Erro ao buscar registros COLUNAS:', selectError);
+        totalErros++;
+        break;
+      }
+      
+      if (loteRegistros && loteRegistros.length > 0) {
+        registrosColunas.push(...loteRegistros);
+        console.log(`📄 Página ${pagina + 1}: ${loteRegistros.length} registros encontrados (total: ${registrosColunas.length})`);
+        
+        // Se o lote retornado tem menos que o tamanho da página, chegamos ao fim
+        if (loteRegistros.length < tamanhoPagina) {
+          temMaisRegistros = false;
+        } else {
+          pagina++;
+        }
+      } else {
+        temMaisRegistros = false;
+      }
+    }
+    
+    console.log(`✅ Total de registros COLUNAS encontrados: ${registrosColunas.length}`);
+    
+    if (registrosColunas && registrosColunas.length > 0) {
       // Buscar cadastro de exames para aplicar categorias
       const { data: cadastroExames } = await supabase
         .from('cadastro_exames')
@@ -157,52 +186,81 @@ serve(async (req) => {
         }
       });
 
-      for (const registro of registrosColunas) {
-        try {
-          const medico = registro.MEDICO;
-          let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
-          
-          // Verificar se o médico está na lista de neurologistas
-          for (const medicoNeuro of medicosNeuroDefault) {
-            if (nomesCoicidem(medicoNeuro, medico)) {
-              novaEspecialidade = 'Neuro';
-              break;
+      // Processar registros em lotes para melhor performance
+      const tamanhoBatch = 100;
+      let registrosProcessados = 0;
+      
+      for (let i = 0; i < registrosColunas.length; i += tamanhoBatch) {
+        const loteAtual = registrosColunas.slice(i, i + tamanhoBatch);
+        console.log(`🔄 Processando lote ${Math.floor(i / tamanhoBatch) + 1}/${Math.ceil(registrosColunas.length / tamanhoBatch)} (${loteAtual.length} registros)`);
+        
+        // Preparar todas as atualizações do lote
+        const atualizacoesBatch = [];
+        
+        for (const registro of loteAtual) {
+          try {
+            const medico = registro.MEDICO;
+            let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
+            
+            // Verificar se o médico está na lista de neurologistas
+            for (const medicoNeuro of medicosNeuroDefault) {
+              if (nomesCoicidem(medicoNeuro, medico)) {
+                novaEspecialidade = 'Neuro';
+                break;
+              }
             }
-          }
-          
-          // Preparar dados para atualização
-          const dadosAtualizacao: any = {
-            'ESPECIALIDADE': novaEspecialidade,
-            updated_at: new Date().toISOString()
-          };
-          
-          // Aplicar categoria do cadastro se disponível
-          const categoriaCadastro = mapaExames.get(registro.ESTUDO_DESCRICAO);
-          if (categoriaCadastro) {
-            dadosAtualizacao['CATEGORIA'] = categoriaCadastro;
-            totalCategoriasAplicadas++;
-          }
-          
-          // Atualizar registro
-          const { error: updateError } = await supabase
-            .from('volumetria_mobilemed')
-            .update(dadosAtualizacao)
-            .eq('id', registro.id);
-          
-          if (updateError) {
-            console.error(`❌ Erro ao atualizar registro ${registro.id}:`, updateError);
+            
+            // Preparar dados para atualização
+            const dadosAtualizacao: any = {
+              'ESPECIALIDADE': novaEspecialidade,
+              updated_at: new Date().toISOString()
+            };
+            
+            // Aplicar categoria do cadastro se disponível
+            const categoriaCadastro = mapaExames.get(registro.ESTUDO_DESCRICAO);
+            if (categoriaCadastro) {
+              dadosAtualizacao['CATEGORIA'] = categoriaCadastro;
+              totalCategoriasAplicadas++;
+            }
+            
+            atualizacoesBatch.push({
+              id: registro.id,
+              dados: dadosAtualizacao,
+              especialidade: novaEspecialidade
+            });
+            
+          } catch (error) {
+            console.error(`❌ Erro ao preparar atualização do registro ${registro.id}:`, error);
             totalErros++;
-          } else {
-            if (novaEspecialidade === 'Neuro') {
-              totalCorrecoesNeuro++;
-            } else {
-              totalCorrecoesColunas++;
-            }
           }
-        } catch (error) {
-          console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
-          totalErros++;
         }
+        
+        // Executar atualizações do lote
+        for (const atualizacao of atualizacoesBatch) {
+          try {
+            const { error: updateError } = await supabase
+              .from('volumetria_mobilemed')
+              .update(atualizacao.dados)
+              .eq('id', atualizacao.id);
+            
+            if (updateError) {
+              console.error(`❌ Erro ao atualizar registro ${atualizacao.id}:`, updateError);
+              totalErros++;
+            } else {
+              if (atualizacao.especialidade === 'Neuro') {
+                totalCorrecoesNeuro++;
+              } else {
+                totalCorrecoesColunas++;
+              }
+              registrosProcessados++;
+            }
+          } catch (error) {
+            console.error(`❌ Erro ao processar registro ${atualizacao.id}:`, error);
+            totalErros++;
+          }
+        }
+        
+        console.log(`✅ Lote processado: ${registrosProcessados}/${registrosColunas.length} registros concluídos`);
       }
       
       console.log(`✅ ${totalCorrecoesColunas} registros COLUNAS → MUSCULO ESQUELETICO`);
