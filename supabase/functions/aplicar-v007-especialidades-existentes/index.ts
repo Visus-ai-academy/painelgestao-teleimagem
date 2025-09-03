@@ -49,73 +49,31 @@ serve(async (req) => {
         .toUpperCase(); // Para comparação case-insensitive
     };
 
-    // Função avançada para verificar se nomes coincidem (incluindo abreviações)
-    const nomesCoicidem = (nomeCompleto: string, nomeBusca: string): boolean => {
-      const nomeCompletoNorm = normalizarNomeMedico(nomeCompleto);
-      const nomeBuscaNorm = normalizarNomeMedico(nomeBusca);
+    // Função para verificar se médico é neurologista
+    const isMedicoNeuro = (medicoNome: string): boolean => {
+      const medicoNormalizado = normalizarNomeMedico(medicoNome);
       
-      // Verificação exata
-      if (nomeCompletoNorm === nomeBuscaNorm) return true;
-      
-      const partesCompleto = nomeCompletoNorm.split(' ');
-      const partesBusca = nomeBuscaNorm.split(' ');
-      
-      // Se não há partes suficientes, não pode comparar
-      if (partesCompleto.length === 0 || partesBusca.length === 0) return false;
-      
-      // Estratégia 1: Primeiro nome + primeira letra do segundo nome
-      // Ex: "PAULO DE TARSO" vs "Paulo de T." ou "TIAGO OLIVEIRA LORDELO" vs "Tiago O."
-      if (partesCompleto.length >= 2 && partesBusca.length >= 2) {
-        const primeiroNomeCompleto = partesCompleto[0];
-        const segundoNomeCompleto = partesCompleto[1];
-        const primeiroNomeBusca = partesBusca[0];
-        const segundoNomeBusca = partesBusca[1];
+      for (const medicoNeuro of medicosNeuroDefault) {
+        const neuroNormalizado = normalizarNomeMedico(medicoNeuro);
         
-        // Primeiro nome deve coincidir exatamente
-        if (primeiroNomeCompleto === primeiroNomeBusca) {
-          // Segundo nome: ou coincide exato ou é primeira letra + ponto
-          if (segundoNomeCompleto === segundoNomeBusca || 
-              (segundoNomeBusca.length <= 2 && segundoNomeCompleto.startsWith(segundoNomeBusca.replace('.', '')))) {
-            return true;
-          }
+        // Comparação exata após normalização
+        if (medicoNormalizado === neuroNormalizado) {
+          return true;
         }
-      }
-      
-      // Estratégia 2: Comparação sequencial com abreviações
-      if (partesBusca.length <= partesCompleto.length) {
-        let match = true;
-        for (let i = 0; i < partesBusca.length; i++) {
-          const parteBusca = partesBusca[i].replace('.', ''); // Remove pontos
-          const parteCompleta = partesCompleto[i];
-          
-          // Se a parte da busca tem 1 caractere ou termina com ponto, verifica inicial
-          if (parteBusca.length === 1 || partesBusca[i].endsWith('.')) {
-            if (!parteCompleta.startsWith(parteBusca)) {
-              match = false;
-              break;
-            }
-          } else {
-            // Nome completo deve coincidir exatamente
-            if (parteBusca !== parteCompleta) {
-              match = false;
-              break;
-            }
-          }
-        }
-        if (match) return true;
-      }
-      
-      // Estratégia 3: Busca reversa - verificar se nome completo contém busca abreviada
-      if (partesCompleto.length > partesBusca.length) {
-        // Ex: "PAULO DE TARSO MARTINS RIBEIRO" vs "Paulo de T."
-        const primeiroCompleto = partesCompleto[0];
-        const primeiroBusca = partesBusca[0];
         
-        if (primeiroCompleto === primeiroBusca && partesBusca.length >= 2) {
-          // Verificar se alguma parte do nome completo começa com a abreviação
-          const abreviacao = partesBusca[1].replace('.', '');
-          for (let i = 1; i < partesCompleto.length; i++) {
-            if (partesCompleto[i].startsWith(abreviacao)) {
+        // Comparação com abreviações (ex: "Paulo de T." vs "PAULO DE TARSO")
+        const partesNormalizado = medicoNormalizado.split(' ');
+        const partesNeuro = neuroNormalizado.split(' ');
+        
+        if (partesNormalizado.length >= 2 && partesNeuro.length >= 2) {
+          // Primeiro nome deve coincidir
+          if (partesNormalizado[0] === partesNeuro[0]) {
+            // Verificar se é uma abreviação do segundo nome
+            const segundoNome = partesNormalizado[1];
+            const segundoNeuro = partesNeuro[1];
+            
+            // Ex: "T" vs "TARSO" ou "TARSO" vs "T"
+            if (segundoNome.startsWith(segundoNeuro) || segundoNeuro.startsWith(segundoNome)) {
               return true;
             }
           }
@@ -203,11 +161,8 @@ serve(async (req) => {
             let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
             
             // Verificar se o médico está na lista de neurologistas
-            for (const medicoNeuro of medicosNeuroDefault) {
-              if (nomesCoicidem(medicoNeuro, medico)) {
-                novaEspecialidade = 'Neuro';
-                break;
-              }
+            if (isMedicoNeuro(medico)) {
+              novaEspecialidade = 'Neuro';
             }
             
             // Preparar dados para atualização
@@ -267,7 +222,77 @@ serve(async (req) => {
       console.log(`✅ ${totalCorrecoesNeuro} registros COLUNAS → Neuro`);
     }
 
-    // 2. Corrigir ONCO MEDICINA INTERNA → MEDICINA INTERNA
+    // 2. Corrigir registros MUSCULO ESQUELETICO que deveriam ser Neuro
+    console.log('📋 Corrigindo registros MUSCULO ESQUELETICO → Neuro para médicos neurologistas');
+    
+    // Buscar registros MUSCULO ESQUELETICO que podem ter sido classificados incorretamente
+    let registrosMusculoEsqueletico = [];
+    pagina = 0;
+    temMaisRegistros = true;
+    
+    while (temMaisRegistros) {
+      const { data: loteRegistros, error: selectError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id, "MEDICO", "ESPECIALIDADE"')
+        .eq('"ESPECIALIDADE"', 'MUSCULO ESQUELETICO')
+        .range(pagina * tamanhoPagina, (pagina + 1) * tamanhoPagina - 1);
+      
+      if (selectError) {
+        console.error('❌ Erro ao buscar registros MUSCULO ESQUELETICO:', selectError);
+        totalErros++;
+        break;
+      }
+      
+      if (loteRegistros && loteRegistros.length > 0) {
+        registrosMusculoEsqueletico.push(...loteRegistros);
+        
+        if (loteRegistros.length < tamanhoPagina) {
+          temMaisRegistros = false;
+        } else {
+          pagina++;
+        }
+      } else {
+        temMaisRegistros = false;
+      }
+    }
+    
+    console.log(`📊 Verificando ${registrosMusculoEsqueletico.length} registros MUSCULO ESQUELETICO...`);
+    
+    let corrigidasParaNeuro = 0;
+    
+    // Processar em lotes
+    for (let i = 0; i < registrosMusculoEsqueletico.length; i += tamanhoBatch) {
+      const loteAtual = registrosMusculoEsqueletico.slice(i, i + tamanhoBatch);
+      
+      for (const registro of loteAtual) {
+        if (isMedicoNeuro(registro.MEDICO)) {
+          try {
+            const { error: updateError } = await supabase
+              .from('volumetria_mobilemed')
+              .update({ 
+                'ESPECIALIDADE': 'Neuro',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', registro.id);
+            
+            if (updateError) {
+              console.error(`❌ Erro ao corrigir registro ${registro.id}:`, updateError);
+              totalErros++;
+            } else {
+              corrigidasParaNeuro++;
+              totalCorrecoesNeuro++;
+            }
+          } catch (error) {
+            console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
+            totalErros++;
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ ${corrigidasParaNeuro} registros MUSCULO ESQUELETICO corrigidos para Neuro`);
+
+    // 3. Corrigir ONCO MEDICINA INTERNA → MEDICINA INTERNA
     console.log('📋 Corrigindo especialidade ONCO MEDICINA INTERNA → MEDICINA INTERNA');
     
     const { error: errorOncoMed } = await supabase
