@@ -88,6 +88,9 @@ serve(async (req) => {
     let totalCorrecoesOncoMedInt = 0;
     let totalCategoriasAplicadas = 0;
     let totalErros = 0;
+    
+    // Definir tamanho do batch no escopo da função
+    const tamanhoBatch = 100;
 
     // 1. Processar registros com especialidade "COLUNAS"
     console.log('📋 Processando especialidade COLUNAS → Músculo Esquelético/Neuro baseado no médico');
