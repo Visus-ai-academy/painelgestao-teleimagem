@@ -258,7 +258,6 @@ serve(async (req) => {
       
       if (loteRegistros && loteRegistros.length > 0) {
         registrosMusculoEsqueletico.push(...loteRegistros);
-        console.log(`📄 Página ${pagina + 1}: ${loteRegistros.length} registros MUSCULO ESQUELETICO encontrados (total: ${registrosMusculoEsqueletico.length})`);
         
         if (loteRegistros.length < tamanhoPagina) {
           temMaisRegistros = false;
@@ -277,19 +276,10 @@ serve(async (req) => {
     // Processar em lotes
     for (let i = 0; i < registrosMusculoEsqueletico.length; i += tamanhoBatch) {
       const loteAtual = registrosMusculoEsqueletico.slice(i, i + tamanhoBatch);
-      console.log(`🔄 Processando lote ${Math.floor(i / tamanhoBatch) + 1}/${Math.ceil(registrosMusculoEsqueletico.length / tamanhoBatch)} (${loteAtual.length} registros MUSCULO ESQUELETICO)`);
       
       for (const registro of loteAtual) {
-        const medico = registro.MEDICO;
-        const medicoNormalizado = normalizarNomeMedico(medico);
-        const isNeuro = isMedicoNeuro(medico);
-        
-        console.log(`🔍 Verificando médico: "${medico}" → normalizado: "${medicoNormalizado}" → é neuro? ${isNeuro}`);
-        
-        if (isNeuro) {
+        if (isMedicoNeuro(registro.MEDICO)) {
           try {
-            console.log(`✅ CORREÇÃO: ${medico} → MUSCULO ESQUELETICO para Neuro`);
-            
             const { error: updateError } = await supabase
               .from('volumetria_mobilemed')
               .update({ 
@@ -309,8 +299,6 @@ serve(async (req) => {
             console.error(`❌ Erro ao processar registro ${registro.id}:`, error);
             totalErros++;
           }
-        } else {
-          console.log(`➡️ MANTÉM: ${medico} → MUSCULO ESQUELETICO (não é neurologista)`);
         }
       }
     }
