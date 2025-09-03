@@ -9,7 +9,20 @@ import { Button } from "@/components/ui/button";
 interface ParametroFaturamento {
   id: string;
   cliente_id: string;
+  nome_mobilemed?: string;
+  nome_fantasia?: string;
+  numero_contrato?: string;
+  cnpj?: string;
+  razao_social?: string;
   tipo_cliente: string;
+  dia_faturamento?: number;
+  data_inicio_contrato?: string;
+  data_termino_contrato?: string;
+  criterio_emissao_nf?: string;
+  criterios_geracao_relatorio?: string;
+  criterios_aplicacao_parametros?: string;
+  criterios_aplicacao_franquias?: string;
+  tipo_faturamento?: string;
   aplicar_franquia: boolean;
   volume_franquia: number | null;
   valor_franquia: number | null;
@@ -20,18 +33,11 @@ interface ParametroFaturamento {
   valor_integracao: number | null;
   portal_laudos: boolean;
   incluir_medico_solicitante: boolean;
+  impostos_ab_min?: number | null;
   simples: boolean;
   ativo: boolean;
   clientes?: {
     nome: string;
-    nome_fantasia?: string;
-    nome_mobilemed?: string;
-    numero_contrato?: string;
-    cnpj?: string;
-    razao_social?: string;
-    dia_faturamento?: number;
-    data_inicio_contrato?: string;
-    data_termino_contrato?: string;
   };
 }
 
@@ -53,15 +59,7 @@ export function ParametrosFaturamentoList() {
           .select(`
             *,
             clientes (
-              nome,
-              nome_fantasia,
-              nome_mobilemed,
-              numero_contrato,
-              cnpj,
-              razao_social,
-              dia_faturamento,
-              data_inicio_contrato,
-              data_termino_contrato
+              nome
             )
           `)
           .order('created_at', { ascending: false });
@@ -81,8 +79,8 @@ export function ParametrosFaturamentoList() {
   // Filtrar e ordenar parâmetros
   const parametrosFiltrados = useMemo(() => {
     let filtered = parametros.filter(parametro => {
-      const clienteNome = parametro.clientes?.nome_fantasia || parametro.clientes?.nome || '';
-      const clienteMobilemed = parametro.clientes?.nome_mobilemed || '';
+      const clienteNome = parametro.nome_fantasia || parametro.clientes?.nome || '';
+      const clienteMobilemed = parametro.nome_mobilemed || '';
       return clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
              clienteMobilemed.toLowerCase().includes(searchTerm.toLowerCase()) ||
              parametro.tipo_cliente.toLowerCase().includes(searchTerm.toLowerCase());
@@ -95,40 +93,40 @@ export function ParametrosFaturamentoList() {
 
       switch (sortField) {
         case 'nome_mobilemed':
-          aValue = a.clientes?.nome_mobilemed || '';
-          bValue = b.clientes?.nome_mobilemed || '';
+          aValue = a.nome_mobilemed || '';
+          bValue = b.nome_mobilemed || '';
           break;
         case 'nome_fantasia':
-          aValue = a.clientes?.nome_fantasia || a.clientes?.nome || '';
-          bValue = b.clientes?.nome_fantasia || b.clientes?.nome || '';
+          aValue = a.nome_fantasia || a.clientes?.nome || '';
+          bValue = b.nome_fantasia || b.clientes?.nome || '';
           break;
         case 'contrato':
-          aValue = a.clientes?.numero_contrato || '';
-          bValue = b.clientes?.numero_contrato || '';
+          aValue = a.numero_contrato || '';
+          bValue = b.numero_contrato || '';
           break;
         case 'cnpj':
-          aValue = a.clientes?.cnpj || '';
-          bValue = b.clientes?.cnpj || '';
+          aValue = a.cnpj || '';
+          bValue = b.cnpj || '';
           break;
         case 'razao_social':
-          aValue = a.clientes?.razao_social || '';
-          bValue = b.clientes?.razao_social || '';
+          aValue = a.razao_social || '';
+          bValue = b.razao_social || '';
           break;
         case 'tipo_cliente':
           aValue = a.tipo_cliente;
           bValue = b.tipo_cliente;
           break;
         case 'dia_faturamento':
-          aValue = a.clientes?.dia_faturamento || 0;
-          bValue = b.clientes?.dia_faturamento || 0;
+          aValue = a.dia_faturamento || 0;
+          bValue = b.dia_faturamento || 0;
           break;
         case 'data_inicio':
-          aValue = a.clientes?.data_inicio_contrato || '';
-          bValue = b.clientes?.data_inicio_contrato || '';
+          aValue = a.data_inicio_contrato || '';
+          bValue = b.data_inicio_contrato || '';
           break;
         case 'data_termino':
-          aValue = a.clientes?.data_termino_contrato || '';
-          bValue = b.clientes?.data_termino_contrato || '';
+          aValue = a.data_termino_contrato || '';
+          bValue = b.data_termino_contrato || '';
           break;
         case 'status':
           aValue = a.ativo ? 1 : 0;
@@ -372,43 +370,53 @@ export function ParametrosFaturamentoList() {
               {parametrosFiltrados.map((parametro) => (
                 <TableRow key={parametro.id}>
                   <TableCell className="font-medium whitespace-nowrap">
-                    {parametro.clientes?.nome_mobilemed || 'N/A'}
+                    {parametro.nome_mobilemed || 'N/A'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {parametro.clientes?.nome_fantasia || parametro.clientes?.nome || 'N/A'}
+                    {parametro.nome_fantasia || parametro.clientes?.nome || 'N/A'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {parametro.clientes?.numero_contrato || '-'}
+                    {parametro.numero_contrato || '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {parametro.clientes?.cnpj || '-'}
+                    {parametro.cnpj || '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {parametro.clientes?.razao_social || '-'}
+                    {parametro.razao_social || '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Badge variant="outline">{parametro.tipo_cliente}</Badge>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {parametro.clientes?.dia_faturamento || '-'}
+                    {parametro.dia_faturamento || '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {formatDate(parametro.clientes?.data_inicio_contrato)}
+                    {formatDate(parametro.data_inicio_contrato || null)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {formatDate(parametro.clientes?.data_termino_contrato)}
+                    {formatDate(parametro.data_termino_contrato || null)}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {parametro.criterio_emissao_nf || '-'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {parametro.criterios_geracao_relatorio || '-'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {parametro.criterios_aplicacao_parametros || '-'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {parametro.criterios_aplicacao_franquias || '-'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {parametro.tipo_faturamento || '-'}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Badge variant={parametro.ativo ? "default" : "secondary"}>
                       {formatBoolean(parametro.ativo)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">-</TableCell>
+                  <TableCell className="whitespace-nowrap">{parametro.impostos_ab_min || '-'}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.simples || false)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.cobrar_integracao)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatBoolean(parametro.portal_laudos)}</TableCell>

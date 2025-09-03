@@ -109,9 +109,24 @@ serve(async (req) => {
           throw new Error('Campo "Nome Empresa" não encontrado. Verifique se a coluna existe no arquivo.');
         }
 
-        // Preparar dados do parâmetro usando mapeamento flexível - TODAS as colunas do template
+        // Preparar dados do parâmetro usando mapeamento flexível - TODOS os campos do Excel
         const parametroData = {
           cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()),
+          
+          // Campos diretamente do Excel
+          nome_mobilemed: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
+          nome_fantasia: findColumnValue(row, ['Nome_Fantasia', 'NOME FANTASIA', 'Nome Fantasia']),
+          numero_contrato: findColumnValue(row, ['Contrato', 'CONTRATO', 'Numero Contrato']),
+          cnpj: findColumnValue(row, ['CNPJ', 'cnpj']),
+          razao_social: findColumnValue(row, ['Razão Social', 'RAZÃO SOCIAL', 'razao social']),
+          dia_faturamento: findColumnValue(row, ['DIA_FATURAMENTO', 'Dia Faturamento']) ? Number(findColumnValue(row, ['DIA_FATURAMENTO', 'Dia Faturamento'])) : null,
+          data_inicio_contrato: findColumnValue(row, ['DATA_INICIO', 'Data Inicio']) ? new Date(findColumnValue(row, ['DATA_INICIO', 'Data Inicio'])).toISOString().split('T')[0] : null,
+          data_termino_contrato: findColumnValue(row, ['DATA_TERMINO', 'Data Termino']) ? new Date(findColumnValue(row, ['DATA_TERMINO', 'Data Termino'])).toISOString().split('T')[0] : null,
+          criterio_emissao_nf: findColumnValue(row, ['Criterio de Emissao de NF', 'CRITERIO DE EMISSAO DE NF']),
+          criterios_geracao_relatorio: findColumnValue(row, ['Criterios de geração do relatório', 'CRITERIOS DE GERACAO DO RELATORIO']),
+          criterios_aplicacao_parametros: findColumnValue(row, ['Criterios de aplicação dos parâmetros', 'CRITERIOS DE APLICACAO DOS PARAMETROS']),
+          criterios_aplicacao_franquias: findColumnValue(row, ['Criterios de aplicação das franquias', 'CRITERIOS DE APLICACAO DAS FRANQUIAS']),
+          tipo_faturamento: findColumnValue(row, ['TIPO FATURAMENTO ("CO-FT", "NC-FT", "NC-NF")', 'TIPO FATURAMENTO', 'Tipo Faturamento']),
           
           // Campos básicos
           cliente_consolidado: findColumnValue(row, ['Cliente Consolidado', 'CLIENTE CONSOLIDADO']),
