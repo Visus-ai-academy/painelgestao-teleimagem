@@ -316,30 +316,42 @@ serve(async (req) => {
     // 3. Corrigir ONCO MEDICINA INTERNA → MEDICINA INTERNA
     console.log('📋 Corrigindo especialidade ONCO MEDICINA INTERNA → MEDICINA INTERNA');
     
-    // Primeiro contar quantos registros serão atualizados
-    const { data: countOncoMed, error: countError } = await supabase
-      .from('volumetria_mobilemed')
-      .select('id', { count: 'exact', head: true })
-      .eq('"ESPECIALIDADE"', 'ONCO MEDICINA INTERNA');
+    try {
+      // Contar registros ONCO MEDICINA INTERNA
+      const { count: countOncoMed, error: countError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('*', { count: 'exact', head: true })
+        .eq('"ESPECIALIDADE"', 'ONCO MEDICINA INTERNA');
 
-    if (!countError && countOncoMed) {
-      totalCorrecoesOncoMedInt = countOncoMed.length || 0;
-    }
-    
-    const { error: errorOncoMed } = await supabase
-      .from('volumetria_mobilemed')
-      .update({ 
-        'ESPECIALIDADE': 'MEDICINA INTERNA',
-        updated_at: new Date().toISOString()
-      })
-      .eq('"ESPECIALIDADE"', 'ONCO MEDICINA INTERNA');
+      if (countError) {
+        console.error('❌ Erro ao contar registros ONCO MEDICINA INTERNA:', countError);
+        totalErros++;
+      } else {
+        totalCorrecoesOncoMedInt = countOncoMed || 0;
+        console.log(`📊 Encontrados ${totalCorrecoesOncoMedInt} registros ONCO MEDICINA INTERNA para correção`);
+        
+        if (totalCorrecoesOncoMedInt > 0) {
+          const { error: errorOncoMed } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ 
+              'ESPECIALIDADE': 'MEDICINA INTERNA',
+              updated_at: new Date().toISOString()
+            })
+            .eq('"ESPECIALIDADE"', 'ONCO MEDICINA INTERNA');
 
-    if (errorOncoMed) {
-      console.error('❌ Erro ao corrigir ONCO MEDICINA INTERNA:', errorOncoMed);
+          if (errorOncoMed) {
+            console.error('❌ Erro ao corrigir ONCO MEDICINA INTERNA:', errorOncoMed);
+            totalErros++;
+            totalCorrecoesOncoMedInt = 0;
+          } else {
+            console.log(`✅ ${totalCorrecoesOncoMedInt} correções ONCO MEDICINA INTERNA → MEDICINA INTERNA aplicadas`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro na correção ONCO MEDICINA INTERNA:', error);
       totalErros++;
-      totalCorrecoesOncoMedInt = 0; // Reset se deu erro
-    } else {
-      console.log(`✅ ${totalCorrecoesOncoMedInt} correções ONCO MEDICINA INTERNA → MEDICINA INTERNA aplicadas`);
+      totalCorrecoesOncoMedInt = 0;
     }
 
     // Verificar resultado final
