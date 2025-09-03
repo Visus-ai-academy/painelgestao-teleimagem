@@ -131,11 +131,11 @@ serve(async (req) => {
     let totalCategoriasAplicadas = 0;
     let totalErros = 0;
     
-    // Buscar todos os registros com especialidade "Colunas"
+    // Buscar todos os registros com especialidade "COLUNAS" (maiúsculo)
     const { data: registrosColunas, error: selectError } = await supabase
       .from('volumetria_mobilemed')
       .select('id, "ESTUDO_DESCRICAO", "ESPECIALIDADE", "CATEGORIA", "MEDICO"')
-      .eq('"ESPECIALIDADE"', 'Colunas')
+      .eq('"ESPECIALIDADE"', 'COLUNAS')
       .eq('arquivo_fonte', arquivo_fonte);
     
     if (selectError) {
