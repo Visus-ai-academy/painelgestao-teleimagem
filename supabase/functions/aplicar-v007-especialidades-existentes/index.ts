@@ -49,66 +49,52 @@ serve(async (req) => {
         .toUpperCase(); // Para comparação case-insensitive
     };
 
-    // Função para verificar se médico é neurologista
+    // Cache para melhorar performance
+    const medicosNeuroNormalizados = medicosNeuroDefault.map(normalizarNomeMedico);
+    const medicosNeuroSet = new Set(medicosNeuroNormalizados);
+    
+    // Função para verificar se médico é neurologista (otimizada)
     const isMedicoNeuro = (medicoNome: string): boolean => {
       if (!medicoNome) return false;
       
       const medicoNormalizado = normalizarNomeMedico(medicoNome);
-      console.log(`🔍 Verificando médico: "${medicoNome}" → normalizado: "${medicoNormalizado}"`);
       
-      for (const medicoNeuro of medicosNeuroDefault) {
-        const neuroNormalizado = normalizarNomeMedico(medicoNeuro);
-        
-        // 1. Comparação exata após normalização
-        if (medicoNormalizado === neuroNormalizado) {
-          console.log(`✅ MATCH EXATO: "${medicoNormalizado}" = "${neuroNormalizado}"`);
-          return true;
-        }
-        
-        // 2. Comparação ignorando acentos e case
-        const medicoSemAcento = medicoNormalizado.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // 1. Busca exata no Set (O(1))
+      if (medicosNeuroSet.has(medicoNormalizado)) {
+        return true;
+      }
+      
+      // 2. Busca com remoção de acentos
+      const medicoSemAcento = medicoNormalizado.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      for (const neuroNormalizado of medicosNeuroNormalizados) {
         const neuroSemAcento = neuroNormalizado.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         if (medicoSemAcento === neuroSemAcento) {
-          console.log(`✅ MATCH SEM ACENTOS: "${medicoSemAcento}" = "${neuroSemAcento}"`);
           return true;
         }
-        
-        // 3. Verificar se médico contém o nome completo do neuro
-        if (medicoNormalizado.includes(neuroNormalizado)) {
-          console.log(`✅ MATCH CONTÉM: "${medicoNormalizado}" contém "${neuroNormalizado}"`);
+      }
+      
+      // 3. Busca por substring (apenas para casos mais complexos)
+      for (const neuroNormalizado of medicosNeuroNormalizados) {
+        if (medicoNormalizado.includes(neuroNormalizado) || neuroNormalizado.includes(medicoNormalizado)) {
           return true;
         }
+      }
+      
+      // 4. Comparação por primeiro e último nome
+      const partesNormalizado = medicoNormalizado.split(' ').filter(p => p.length > 0);
+      if (partesNormalizado.length >= 2) {
+        const primeiroNome = partesNormalizado[0];
+        const ultimoNome = partesNormalizado[partesNormalizado.length - 1];
         
-        // 4. Verificar se neuro contém o nome do médico
-        if (neuroNormalizado.includes(medicoNormalizado)) {
-          console.log(`✅ MATCH CONTÉM REVERSO: "${neuroNormalizado}" contém "${medicoNormalizado}"`);
-          return true;
-        }
-        
-        // 5. Comparação por partes do nome (primeiro e último)
-        const partesNormalizado = medicoNormalizado.split(' ').filter(p => p.length > 0);
-        const partesNeuro = neuroNormalizado.split(' ').filter(p => p.length > 0);
-        
-        if (partesNormalizado.length >= 2 && partesNeuro.length >= 2) {
-          // Primeiro nome deve coincidir
-          const primeiroMatch = partesNormalizado[0] === partesNeuro[0];
-          // Último nome deve coincidir
-          const ultimoMatch = partesNormalizado[partesNormalizado.length - 1] === partesNeuro[partesNeuro.length - 1];
-          
-          if (primeiroMatch && ultimoMatch) {
-            console.log(`✅ MATCH PRIMEIRO+ÚLTIMO: "${partesNormalizado[0]} ... ${partesNormalizado[partesNormalizado.length - 1]}" = "${partesNeuro[0]} ... ${partesNeuro[partesNeuro.length - 1]}"`);
-            return true;
-          }
-        }
-        
-        // 6. Verificar abreviações no meio do nome (ex: "JAMES YARED" vs "JAMES HENRIQUE YARED")
-        if (partesNormalizado.length >= 2 && partesNeuro.length >= 2) {
-          const primeiroMatch = partesNormalizado[0] === partesNeuro[0];
-          const ultimoMatch = partesNormalizado[partesNormalizado.length - 1] === partesNeuro[partesNeuro.length - 1];
-          
-          if (primeiroMatch && ultimoMatch && Math.abs(partesNormalizado.length - partesNeuro.length) <= 2) {
-            console.log(`✅ MATCH COM ABREVIAÇÃO: "${medicoNormalizado}" ≈ "${neuroNormalizado}"`);
-            return true;
+        for (const neuroNormalizado of medicosNeuroNormalizados) {
+          const partesNeuro = neuroNormalizado.split(' ').filter(p => p.length > 0);
+          if (partesNeuro.length >= 2) {
+            const primeiroNeuro = partesNeuro[0];
+            const ultimoNeuro = partesNeuro[partesNeuro.length - 1];
+            
+            if (primeiroNome === primeiroNeuro && ultimoNome === ultimoNeuro) {
+              return true;
+            }
           }
         }
       }
@@ -122,8 +108,9 @@ serve(async (req) => {
     let totalCategoriasAplicadas = 0;
     let totalErros = 0;
     
-    // Definir tamanho do batch no escopo da função
-    const tamanhoBatch = 100;
+    // Definir tamanho do batch menor para evitar timeout
+    const tamanhoBatch = 50;
+    const tamanhoPagina = 500; // Reduzir tamanho das páginas
 
     // 1. Processar registros com especialidade "COLUNAS"
     console.log('📋 Processando especialidade COLUNAS → Músculo Esquelético/Neuro baseado no médico');
@@ -131,7 +118,6 @@ serve(async (req) => {
     // Buscar TODOS os registros com especialidade "COLUNAS" usando paginação
     let registrosColunas = [];
     let pagina = 0;
-    const tamanhoPagina = 1000;
     let temMaisRegistros = true;
     
     console.log('🔍 Buscando todos os registros COLUNAS (sem limite)...');
@@ -181,7 +167,6 @@ serve(async (req) => {
       });
 
       // Processar registros em lotes para melhor performance
-      const tamanhoBatch = 100;
       let registrosProcessados = 0;
       
       for (let i = 0; i < registrosColunas.length; i += tamanhoBatch) {
@@ -196,19 +181,9 @@ serve(async (req) => {
             const medico = registro.MEDICO;
             let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
             
-            // Debug: mostrar médico original e normalizado
-            const medicoNormalizado = normalizarNomeMedico(medico);
-            console.log(`🔍 Processando médico: "${medico}" → normalizado: "${medicoNormalizado}"`);
-            
             // Verificar se o médico está na lista de neurologistas
-            const isNeuro = isMedicoNeuro(medico);
-            console.log(`🧠 Médico ${medico} é neurologista? ${isNeuro}`);
-            
-            if (isNeuro) {
+            if (isMedicoNeuro(medico)) {
               novaEspecialidade = 'Neuro';
-              console.log(`✅ ALTERAÇÃO: ${medico} → Especialidade: NEURO`);
-            } else {
-              console.log(`➡️ MANTÉM: ${medico} → Especialidade: MUSCULO ESQUELETICO`);
             }
             
             // Preparar dados para atualização
@@ -341,6 +316,16 @@ serve(async (req) => {
     // 3. Corrigir ONCO MEDICINA INTERNA → MEDICINA INTERNA
     console.log('📋 Corrigindo especialidade ONCO MEDICINA INTERNA → MEDICINA INTERNA');
     
+    // Primeiro contar quantos registros serão atualizados
+    const { data: countOncoMed, error: countError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('id', { count: 'exact', head: true })
+      .eq('"ESPECIALIDADE"', 'ONCO MEDICINA INTERNA');
+
+    if (!countError && countOncoMed) {
+      totalCorrecoesOncoMedInt = countOncoMed.length || 0;
+    }
+    
     const { error: errorOncoMed } = await supabase
       .from('volumetria_mobilemed')
       .update({ 
@@ -352,8 +337,9 @@ serve(async (req) => {
     if (errorOncoMed) {
       console.error('❌ Erro ao corrigir ONCO MEDICINA INTERNA:', errorOncoMed);
       totalErros++;
+      totalCorrecoesOncoMedInt = 0; // Reset se deu erro
     } else {
-      console.log(`✅ Correção ONCO MEDICINA INTERNA → MEDICINA INTERNA aplicada`);
+      console.log(`✅ ${totalCorrecoesOncoMedInt} correções ONCO MEDICINA INTERNA → MEDICINA INTERNA aplicadas`);
     }
 
     // Verificar resultado final
