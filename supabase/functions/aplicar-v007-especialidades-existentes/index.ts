@@ -307,15 +307,7 @@ serve(async (req) => {
       console.error('❌ Erro ao corrigir ONCO MEDICINA INTERNA:', errorOncoMed);
       totalErros++;
     } else {
-      // Contar quantos foram atualizados
-      const { count } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*', { count: 'exact', head: true })
-        .eq('"ESPECIALIDADE"', 'MEDICINA INTERNA')
-        .gte('updated_at', new Date(Date.now() - 60000).toISOString()); // Últimos 60 segundos
-      
-      totalCorrecoesOncoMedInt = count || 0;
-      console.log(`✅ ${totalCorrecoesOncoMedInt} registros ONCO MEDICINA INTERNA corrigidos para MEDICINA INTERNA`);
+      console.log(`✅ Correção ONCO MEDICINA INTERNA → MEDICINA INTERNA aplicada`);
     }
 
     // Verificar resultado final
