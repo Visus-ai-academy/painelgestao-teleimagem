@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVolumetria } from "@/contexts/VolumetriaContext";
 import { Badge } from "@/components/ui/badge";
 import { ComparativoPeriodoSelector } from "@/components/volumetria/ComparativoPeriodoSelector";
+import VerificarRegistrosSemDataLaudo from "@/components/VerificarRegistrosSemDataLaudo";
 
 
 export default function Comparativo() {
