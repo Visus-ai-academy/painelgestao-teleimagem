@@ -49,28 +49,53 @@ serve(async (req) => {
         .toUpperCase(); // Para comparação case-insensitive
     };
 
-    // Função para verificar se nomes coincidem (incluindo abreviações)
+    // Função avançada para verificar se nomes coincidem (incluindo abreviações)
     const nomesCoicidem = (nomeCompleto: string, nomeBusca: string): boolean => {
       const nomeCompletoNorm = normalizarNomeMedico(nomeCompleto);
       const nomeBuscaNorm = normalizarNomeMedico(nomeBusca);
       
+      // Verificação exata
       if (nomeCompletoNorm === nomeBuscaNorm) return true;
       
       const partesCompleto = nomeCompletoNorm.split(' ');
       const partesBusca = nomeBuscaNorm.split(' ');
       
+      // Se não há partes suficientes, não pode comparar
+      if (partesCompleto.length === 0 || partesBusca.length === 0) return false;
+      
+      // Estratégia 1: Primeiro nome + primeira letra do segundo nome
+      // Ex: "PAULO DE TARSO" vs "Paulo de T." ou "TIAGO OLIVEIRA LORDELO" vs "Tiago O."
+      if (partesCompleto.length >= 2 && partesBusca.length >= 2) {
+        const primeiroNomeCompleto = partesCompleto[0];
+        const segundoNomeCompleto = partesCompleto[1];
+        const primeiroNomeBusca = partesBusca[0];
+        const segundoNomeBusca = partesBusca[1];
+        
+        // Primeiro nome deve coincidir exatamente
+        if (primeiroNomeCompleto === primeiroNomeBusca) {
+          // Segundo nome: ou coincide exato ou é primeira letra + ponto
+          if (segundoNomeCompleto === segundoNomeBusca || 
+              (segundoNomeBusca.length <= 2 && segundoNomeCompleto.startsWith(segundoNomeBusca.replace('.', '')))) {
+            return true;
+          }
+        }
+      }
+      
+      // Estratégia 2: Comparação sequencial com abreviações
       if (partesBusca.length <= partesCompleto.length) {
         let match = true;
         for (let i = 0; i < partesBusca.length; i++) {
-          const parteBusca = partesBusca[i];
+          const parteBusca = partesBusca[i].replace('.', ''); // Remove pontos
           const parteCompleta = partesCompleto[i];
           
-          if (parteBusca.length === 1) {
+          // Se a parte da busca tem 1 caractere ou termina com ponto, verifica inicial
+          if (parteBusca.length === 1 || partesBusca[i].endsWith('.')) {
             if (!parteCompleta.startsWith(parteBusca)) {
               match = false;
               break;
             }
           } else {
+            // Nome completo deve coincidir exatamente
             if (parteBusca !== parteCompleta) {
               match = false;
               break;
@@ -78,6 +103,23 @@ serve(async (req) => {
           }
         }
         if (match) return true;
+      }
+      
+      // Estratégia 3: Busca reversa - verificar se nome completo contém busca abreviada
+      if (partesCompleto.length > partesBusca.length) {
+        // Ex: "PAULO DE TARSO MARTINS RIBEIRO" vs "Paulo de T."
+        const primeiroCompleto = partesCompleto[0];
+        const primeiroBusca = partesBusca[0];
+        
+        if (primeiroCompleto === primeiroBusca && partesBusca.length >= 2) {
+          // Verificar se alguma parte do nome completo começa com a abreviação
+          const abreviacao = partesBusca[1].replace('.', '');
+          for (let i = 1; i < partesCompleto.length; i++) {
+            if (partesCompleto[i].startsWith(abreviacao)) {
+              return true;
+            }
+          }
+        }
       }
       
       return false;
