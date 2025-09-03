@@ -220,13 +220,13 @@ export function ControleRegrasNegocio() {
     },
     {
       id: 'v017',
-      nome: 'Normalização Nome Médico',
+      nome: 'Exclusões Registros Rejeitados',
       modulo: 'volumetria',
-      categoria: 'dados',
-      criterio: 'Remove códigos entre parênteses (E1, E2, E3), prefixos DR/DRA, pontos finais e limpa espaços extras dos nomes de médicos.',
+      categoria: 'exclusao',
+      criterio: 'Exclui registros com campos obrigatórios nulos ou vazios: ESTUDO_DESCRICAO ou EMPRESA.',
       status: 'ativa',
       implementadaEm: '2024-02-16',
-      observacoes: 'Função SQL: normalizar_medico() aplicada via trigger_aplicar_regras_completas()',
+      observacoes: 'Aplicada via aplicar-27-regras-completas. Remove registros inconsistentes.',
       ordem_execucao: 15,
       tipo_regra: 'negocio'
     },

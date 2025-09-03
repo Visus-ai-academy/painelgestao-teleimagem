@@ -59,10 +59,10 @@ const REGRAS_SISTEMA = [
   },
   {
     id: 'v007',
-    nome: 'Normalização Nome Médico',
+    nome: 'Correções de Especialidades Problemáticas',
     categoria: 'Dados',
-    criterio: 'Remove códigos entre parênteses (E1, E2, E3), prefixos DR/DRA, pontos finais e limpa espaços extras dos nomes de médicos.',
-    implementacao: 'Função SQL: normalizar_medico()'
+    criterio: 'Corrige especialidades inconsistentes: "Colunas" → "MUSCULO ESQUELETICO" e "ONCO MEDICINA INTERNA" → "MEDICINA INTERNA".',
+    implementacao: 'Edge function: aplicar-27-regras-completas'
   },
   {
     id: 'v008',
