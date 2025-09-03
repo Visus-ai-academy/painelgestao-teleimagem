@@ -58,6 +58,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBar } from "@/components/FilterBar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { SincronizarParametrosContratos } from '@/components/SincronizarParametrosContratos';
 
 interface ContratoCliente {
   id: string;
@@ -629,6 +630,9 @@ export default function ContratosClientes() {
 
   return (
     <div className="space-y-6">
+      {/* Seção de Sincronização de Parâmetros */}
+      <SincronizarParametrosContratos />
+      
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Contratos Clientes</h1>
         <p className="text-gray-600 mt-1">Gestão de contratos com clientes, serviços e faturamento</p>
