@@ -39,6 +39,11 @@ serve(async (req) => {
       'Yuri Aarão Amaral Serruya'
     ];
 
+    console.log(`📋 Lista de ${medicosNeuroDefault.length} médicos neurologistas carregada:`);
+    medicosNeuroDefault.forEach((medico, index) => {
+      console.log(`  ${index + 1}. "${medico}"`);
+    });
+
     // Função para normalizar nome do médico
     const normalizarNomeMedico = (nome: string): string => {
       if (!nome) return '';
@@ -51,35 +56,74 @@ serve(async (req) => {
 
     // Função para verificar se médico é neurologista
     const isMedicoNeuro = (medicoNome: string): boolean => {
+      if (!medicoNome) {
+        console.log('❌ Nome do médico está vazio ou null');
+        return false;
+      }
+      
       const medicoNormalizado = normalizarNomeMedico(medicoNome);
+      console.log(`🔍 Verificando se "${medicoNome}" → "${medicoNormalizado}" é neurologista`);
       
       for (const medicoNeuro of medicosNeuroDefault) {
         const neuroNormalizado = normalizarNomeMedico(medicoNeuro);
         
-        // Comparação exata após normalização
+        // 1. Comparação exata após normalização
         if (medicoNormalizado === neuroNormalizado) {
+          console.log(`✅ MATCH EXATO: "${medicoNormalizado}" = "${neuroNormalizado}"`);
           return true;
         }
         
-        // Comparação com abreviações (ex: "Paulo de T." vs "PAULO DE TARSO")
-        const partesNormalizado = medicoNormalizado.split(' ');
-        const partesNeuro = neuroNormalizado.split(' ');
+        // 2. Comparação por partes do nome (primeira parte + última parte)
+        const partesNormalizado = medicoNormalizado.split(' ').filter(p => p.length > 0);
+        const partesNeuro = neuroNormalizado.split(' ').filter(p => p.length > 0);
         
         if (partesNormalizado.length >= 2 && partesNeuro.length >= 2) {
-          // Primeiro nome deve coincidir
-          if (partesNormalizado[0] === partesNeuro[0]) {
-            // Verificar se é uma abreviação do segundo nome
-            const segundoNome = partesNormalizado[1];
-            const segundoNeuro = partesNeuro[1];
-            
-            // Ex: "T" vs "TARSO" ou "TARSO" vs "T"
-            if (segundoNome.startsWith(segundoNeuro) || segundoNeuro.startsWith(segundoNome)) {
+          const primeiroNome = partesNormalizado[0];
+          const ultimoNome = partesNormalizado[partesNormalizado.length - 1];
+          
+          const primeiroNeuro = partesNeuro[0];
+          const ultimoNeuro = partesNeuro[partesNeuro.length - 1];
+          
+          // Match por primeiro e último nome
+          if (primeiroNome === primeiroNeuro && ultimoNome === ultimoNeuro) {
+            console.log(`✅ MATCH NOME+SOBRENOME: "${primeiroNome} ${ultimoNome}" = "${primeiroNeuro} ${ultimoNeuro}"`);
+            return true;
+          }
+        }
+        
+        // 3. Comparação por substring (contém o nome)
+        if (medicoNormalizado.includes(neuroNormalizado) || neuroNormalizado.includes(medicoNormalizado)) {
+          // Só aceitar se a diferença de tamanho não for muito grande (evitar falsos positivos)
+          const diffSize = Math.abs(medicoNormalizado.length - neuroNormalizado.length);
+          if (diffSize <= 10) {
+            console.log(`✅ MATCH SUBSTRING: "${medicoNormalizado}" contém "${neuroNormalizado}"`);
+            return true;
+          }
+        }
+        
+        // 4. Comparação de abreviações comuns
+        if (partesNormalizado.length >= 2 && partesNeuro.length >= 2) {
+          const primeiroNormalizado = partesNormalizado[0];
+          const segundoNormalizado = partesNormalizado[1];
+          
+          const primeiroNeuro = partesNeuro[0];
+          const segundoNeuro = partesNeuro[1];
+          
+          // Primeiro nome deve coincidir E segundo nome ser abreviação ou vice-versa
+          if (primeiroNormalizado === primeiroNeuro) {
+            if (segundoNormalizado.length === 1 && segundoNeuro.startsWith(segundoNormalizado)) {
+              console.log(`✅ MATCH ABREVIAÇÃO: "${primeiroNormalizado} ${segundoNormalizado}" = "${primeiroNeuro} ${segundoNeuro.charAt(0)}"`);
+              return true;
+            }
+            if (segundoNeuro.length === 1 && segundoNormalizado.startsWith(segundoNeuro)) {
+              console.log(`✅ MATCH ABREVIAÇÃO: "${primeiroNormalizado} ${segundoNormalizado.charAt(0)}" = "${primeiroNeuro} ${segundoNeuro}"`);
               return true;
             }
           }
         }
       }
       
+      console.log(`❌ NÃO ENCONTRADO: "${medicoNormalizado}" não está na lista de neurologistas`);
       return false;
     };
     
