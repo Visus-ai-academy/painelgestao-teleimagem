@@ -2096,13 +2096,21 @@ export type Database = {
           ativo: boolean
           cliente_consolidado: string | null
           cliente_id: string | null
+          cnpj: string | null
           cobrar_integracao: boolean | null
           cobrar_urgencia_como_rotina: boolean | null
           created_at: string
           created_by: string | null
+          criterio_emissao_nf: string | null
+          criterios_aplicacao_franquias: string | null
+          criterios_aplicacao_parametros: string | null
+          criterios_geracao_relatorio: string | null
           data_aniversario_contrato: string | null
+          data_inicio_contrato: string | null
           data_inicio_integracao: string | null
+          data_termino_contrato: string | null
           desconto_acrescimo: number | null
+          dia_faturamento: number | null
           dia_fechamento: number | null
           forma_cobranca: string | null
           frequencia_continua: boolean | null
@@ -2113,14 +2121,19 @@ export type Database = {
           incluir_empresa_origem: boolean | null
           incluir_medico_solicitante: boolean | null
           indice_reajuste: string | null
+          nome_fantasia: string | null
+          nome_mobilemed: string | null
+          numero_contrato: string | null
           percentual_iss: number | null
           percentual_reajuste_fixo: number | null
           percentual_urgencia: number | null
           periodicidade_reajuste: string | null
           portal_laudos: boolean | null
+          razao_social: string | null
           simples: boolean | null
           tipo_cliente: string | null
           tipo_desconto_acrescimo: string | null
+          tipo_faturamento: string | null
           tipo_metrica_convenio: string | null
           tipo_metrica_urgencia: string | null
           updated_at: string
@@ -2135,13 +2148,21 @@ export type Database = {
           ativo?: boolean
           cliente_consolidado?: string | null
           cliente_id?: string | null
+          cnpj?: string | null
           cobrar_integracao?: boolean | null
           cobrar_urgencia_como_rotina?: boolean | null
           created_at?: string
           created_by?: string | null
+          criterio_emissao_nf?: string | null
+          criterios_aplicacao_franquias?: string | null
+          criterios_aplicacao_parametros?: string | null
+          criterios_geracao_relatorio?: string | null
           data_aniversario_contrato?: string | null
+          data_inicio_contrato?: string | null
           data_inicio_integracao?: string | null
+          data_termino_contrato?: string | null
           desconto_acrescimo?: number | null
+          dia_faturamento?: number | null
           dia_fechamento?: number | null
           forma_cobranca?: string | null
           frequencia_continua?: boolean | null
@@ -2152,14 +2173,19 @@ export type Database = {
           incluir_empresa_origem?: boolean | null
           incluir_medico_solicitante?: boolean | null
           indice_reajuste?: string | null
+          nome_fantasia?: string | null
+          nome_mobilemed?: string | null
+          numero_contrato?: string | null
           percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           percentual_urgencia?: number | null
           periodicidade_reajuste?: string | null
           portal_laudos?: boolean | null
+          razao_social?: string | null
           simples?: boolean | null
           tipo_cliente?: string | null
           tipo_desconto_acrescimo?: string | null
+          tipo_faturamento?: string | null
           tipo_metrica_convenio?: string | null
           tipo_metrica_urgencia?: string | null
           updated_at?: string
@@ -2174,13 +2200,21 @@ export type Database = {
           ativo?: boolean
           cliente_consolidado?: string | null
           cliente_id?: string | null
+          cnpj?: string | null
           cobrar_integracao?: boolean | null
           cobrar_urgencia_como_rotina?: boolean | null
           created_at?: string
           created_by?: string | null
+          criterio_emissao_nf?: string | null
+          criterios_aplicacao_franquias?: string | null
+          criterios_aplicacao_parametros?: string | null
+          criterios_geracao_relatorio?: string | null
           data_aniversario_contrato?: string | null
+          data_inicio_contrato?: string | null
           data_inicio_integracao?: string | null
+          data_termino_contrato?: string | null
           desconto_acrescimo?: number | null
+          dia_faturamento?: number | null
           dia_fechamento?: number | null
           forma_cobranca?: string | null
           frequencia_continua?: boolean | null
@@ -2191,14 +2225,19 @@ export type Database = {
           incluir_empresa_origem?: boolean | null
           incluir_medico_solicitante?: boolean | null
           indice_reajuste?: string | null
+          nome_fantasia?: string | null
+          nome_mobilemed?: string | null
+          numero_contrato?: string | null
           percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           percentual_urgencia?: number | null
           periodicidade_reajuste?: string | null
           portal_laudos?: boolean | null
+          razao_social?: string | null
           simples?: boolean | null
           tipo_cliente?: string | null
           tipo_desconto_acrescimo?: string | null
+          tipo_faturamento?: string | null
           tipo_metrica_convenio?: string | null
           tipo_metrica_urgencia?: string | null
           updated_at?: string
