@@ -161,12 +161,14 @@ serve(async (req) => {
           impostos_ab_min: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.impostosAbMin);
             if (!valor) return null;
-            // Se for 'S' ou 'N', converter para boolean e depois para número
+            // Se for 'S' ou 'N', converter para "Sim" e "Não"
             if (typeof valor === 'string') {
-              if (valor.trim().toLowerCase() === 's' || valor.trim().toLowerCase() === 'sim') return 1;
-              if (valor.trim().toLowerCase() === 'n' || valor.trim().toLowerCase() === 'não' || valor.trim().toLowerCase() === 'nao') return 0;
+              if (valor.trim().toLowerCase() === 's') return 'Sim';
+              if (valor.trim().toLowerCase() === 'n') return 'Não';
+              if (valor.trim().toLowerCase() === 'sim') return 'Sim';
+              if (valor.trim().toLowerCase() === 'não' || valor.trim().toLowerCase() === 'nao') return 'Não';
             }
-            return Number(valor) || null;
+            return valor?.toString() || null;
           })(),
           simples: (() => {
             const valor = findColumnValue(row, ['Simples', 'SIMPLES']);
