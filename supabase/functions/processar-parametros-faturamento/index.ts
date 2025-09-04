@@ -120,8 +120,30 @@ serve(async (req) => {
           cnpj: findColumnValue(row, ['CNPJ', 'cnpj']),
           razao_social: findColumnValue(row, ['Razão Social', 'RAZÃO SOCIAL', 'razao social']),
           dia_faturamento: findColumnValue(row, ['DIA_FATURAMENTO', 'Dia Faturamento']) ? Number(findColumnValue(row, ['DIA_FATURAMENTO', 'Dia Faturamento'])) : null,
-          data_inicio_contrato: findColumnValue(row, ['DATA_INICIO', 'Data Inicio']) ? new Date(findColumnValue(row, ['DATA_INICIO', 'Data Inicio'])).toISOString().split('T')[0] : null,
-          data_termino_contrato: findColumnValue(row, ['DATA_TERMINO', 'Data Termino']) ? new Date(findColumnValue(row, ['DATA_TERMINO', 'Data Termino'])).toISOString().split('T')[0] : null,
+          data_inicio_contrato: (() => {
+            const valor = findColumnValue(row, ['DATA_INICIO', 'Data Inicio', 'Data_Inicio']);
+            if (!valor) return null;
+            // Se for número (formato Excel), converter de número de série para data
+            if (typeof valor === 'number') {
+              const data = new Date((valor - 25569) * 86400 * 1000);
+              return data.toISOString().split('T')[0];
+            }
+            // Se for string, tentar converter normalmente
+            const data = new Date(valor);
+            return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
+          })(),
+          data_termino_contrato: (() => {
+            const valor = findColumnValue(row, ['DATA_TERMINO', 'Data Termino', 'Data_Termino']);
+            if (!valor) return null;
+            // Se for número (formato Excel), converter de número de série para data
+            if (typeof valor === 'number') {
+              const data = new Date((valor - 25569) * 86400 * 1000);
+              return data.toISOString().split('T')[0];
+            }
+            // Se for string, tentar converter normalmente
+            const data = new Date(valor);
+            return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
+          })(),
           criterio_emissao_nf: findColumnValue(row, ['Criterio de Emissao de NF', 'CRITERIO DE EMISSAO DE NF']),
           criterios_geracao_relatorio: findColumnValue(row, ['Criterios de geração do relatório', 'CRITERIOS DE GERACAO DO RELATORIO']),
           criterios_aplicacao_parametros: findColumnValue(row, ['Criterios de aplicação dos parâmetros', 'CRITERIOS DE APLICACAO DOS PARAMETROS']),
