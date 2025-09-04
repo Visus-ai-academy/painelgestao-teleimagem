@@ -20,7 +20,10 @@ const COLUMN_MAPPING = {
     'NOME_MOBILEMED', 'Nome_Fantasia', 'Razão Social', 'RAZÃO SOCIAL',
     'Nome Fantasia', 'NOME FANTASIA', 'razao social', 'Nome_fantasia'
   ],
-  status: ['Status', 'STATUS', 'status', 'Situação', 'SITUAÇÃO', 'situacao', 'STATUS (INATIVO OU ATIVO)'],
+  // Campo de status/tipo cliente (não confundir com "Status" que não existe na planilha)
+  tipoCliente: ['TIPO_CLIENTE ("CO" OU "NC"', 'TIPO_CLIENTE', 'STATUS (INATIVO OU ATIVO)'],
+  // Campo Impostos abMin da planilha
+  impostosAbMin: ['Impostos abMin', 'IMPOSTOS ABMIN', 'Impostos abMin'],
   tipoMetricaConvenio: ['Tipo métrica convênio', 'Tipo Métrica Convênio', 'TIPO MÉTRICA CONVÊNIO'],
   valorConvenio: ['Valor convênio', 'Valor Convênio', 'VALOR CONVÊNIO'],
   tipoMetricaUrgencia: ['Tipo métrica URGÊNCIA', 'Tipo Métrica URGÊNCIA', 'TIPO MÉTRICA URGÊNCIA', 'Tipo/Valor URGÊNCIA'],
@@ -30,7 +33,7 @@ const COLUMN_MAPPING = {
   integracao: ['Integração', 'INTEGRAÇÃO', 'integracao'],
   dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO', 'DATA_INICIO', 'DATA INICIO'],
   portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS', 'Portal de Laudos'],
-  percentualISS: ['% ISS', '%ISS', 'ISS', 'Impostos abMin'],
+  percentualISS: ['% ISS', '%ISS', 'ISS'],
   possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA', 'Franquia'],
   valorFranquia: ['Valor Franquia', 'VALOR FRANQUIA'],
   frequenciaContinua: ['Frequencia Contínua', 'FREQUENCIA CONTÍNUA', 'Frequência Contínua'],
@@ -152,11 +155,11 @@ serve(async (req) => {
           
           // Campos básicos
           cliente_consolidado: findColumnValue(row, ['Cliente Consolidado', 'CLIENTE CONSOLIDADO']),
-          tipo_cliente: findColumnValue(row, ['TIPO_CLIENTE ("CO" OU "NC"', 'TIPO_CLIENTE', 'STATUS (INATIVO OU ATIVO)'])?.toString().trim() || 'CO',
+          tipo_cliente: findColumnValue(row, COLUMN_MAPPING.tipoCliente)?.toString().trim() || 'CO',
           
-          // Impostos e Simples  
+          // Impostos e Simples - usando o mapeamento correto do campo "Impostos abMin"
           impostos_ab_min: (() => {
-            const valor = findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN', '% ISS', '%ISS', 'ISS']);
+            const valor = findColumnValue(row, COLUMN_MAPPING.impostosAbMin);
             if (!valor) return null;
             // Se for 'S' ou 'N', converter para boolean e depois para número
             if (typeof valor === 'string') {
