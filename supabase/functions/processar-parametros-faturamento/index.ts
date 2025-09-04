@@ -152,11 +152,25 @@ serve(async (req) => {
           
           // Campos básicos
           cliente_consolidado: findColumnValue(row, ['Cliente Consolidado', 'CLIENTE CONSOLIDADO']),
-          tipo_cliente: findColumnValue(row, COLUMN_MAPPING.status)?.toString().trim() || 'CO',
+          tipo_cliente: findColumnValue(row, ['TIPO_CLIENTE ("CO" OU "NC"', 'TIPO_CLIENTE', 'STATUS (INATIVO OU ATIVO)'])?.toString().trim() || 'CO',
           
-          // Impostos e Simples
-          impostos_ab_min: findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN']) ? Number(findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN'])) : null,
-          simples: findColumnValue(row, ['Simples', 'SIMPLES'])?.toString().trim()?.toLowerCase() === 'sim',
+          // Impostos e Simples  
+          impostos_ab_min: (() => {
+            const valor = findColumnValue(row, ['Impostos abMin', 'IMPOSTOS ABMIN', '% ISS', '%ISS', 'ISS']);
+            if (!valor) return null;
+            // Se for 'S' ou 'N', converter para boolean e depois para número
+            if (typeof valor === 'string') {
+              if (valor.trim().toLowerCase() === 's' || valor.trim().toLowerCase() === 'sim') return 1;
+              if (valor.trim().toLowerCase() === 'n' || valor.trim().toLowerCase() === 'não' || valor.trim().toLowerCase() === 'nao') return 0;
+            }
+            return Number(valor) || null;
+          })(),
+          simples: (() => {
+            const valor = findColumnValue(row, ['Simples', 'SIMPLES']);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           percentual_iss: findColumnValue(row, COLUMN_MAPPING.percentualISS) ? Number(findColumnValue(row, COLUMN_MAPPING.percentualISS)) : null,
           
           // Métrica e Valor Convênio
