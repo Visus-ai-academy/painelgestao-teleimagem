@@ -31,8 +31,12 @@ const COLUMN_MAPPING = {
   tipoDesconto: ['Tipo Desconto / Acréscimo', 'TIPO DESCONTO / ACRÉSCIMO', 'Desconto/Acréscimo'],
   descontoAcrescimo: ['Desconto / Acréscimo', 'DESCONTO / ACRÉSCIMO', 'Desconto/Acréscimo'],
   integracao: ['Integração', 'INTEGRAÇÃO', 'integracao'],
+  valorIntegracao: ['Valor Integração', 'VALOR INTEGRAÇÃO', 'Integração', 'INTEGRAÇÃO'],
+  cobrarIntegracao: ['Cobrar Integração', 'COBRAR INTEGRAÇÃO', 'Possui Integração', 'POSSUI INTEGRAÇÃO'],
   dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO', 'DATA_INICIO', 'DATA INICIO'],
   portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS', 'Portal de Laudos'],
+  valorPortalLaudos: ['Valor Portal Laudos', 'VALOR PORTAL LAUDOS', 'Portal de Laudos', 'PORTAL DE LAUDOS'],
+  possuiPortalLaudos: ['Possui Portal Laudos', 'POSSUI PORTAL LAUDOS', 'Tem Portal', 'TEM PORTAL'],
   percentualISS: ['% ISS', '%ISS', 'ISS'],
   possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA', 'Franquia'],
   valorFranquia: ['Valor Franquia', 'VALOR FRANQUIA'],
@@ -178,11 +182,11 @@ serve(async (req) => {
           })(),
           percentual_iss: findColumnValue(row, COLUMN_MAPPING.percentualISS) ? Number(findColumnValue(row, COLUMN_MAPPING.percentualISS)) : null,
           
-          // Métrica e Valor Convênio
+          // Métrica e Valor Convênio/Integração
           tipo_metrica_convenio: findColumnValue(row, COLUMN_MAPPING.tipoMetricaConvenio)?.toString().trim(),
-          valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorConvenio) ? Number(findColumnValue(row, COLUMN_MAPPING.valorConvenio)) : null,
+          valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorIntegracao) ? Number(findColumnValue(row, COLUMN_MAPPING.valorIntegracao)) : null,
           cobrar_integracao: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
+            const valor = findColumnValue(row, COLUMN_MAPPING.cobrarIntegracao);
             if (!valor) return false;
             const valorStr = valor.toString().trim().toLowerCase();
             return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
@@ -209,9 +213,9 @@ serve(async (req) => {
           tipo_desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.tipoDesconto)?.toString().trim(),
           desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
           
-          // Portal de Laudos
+          // Portal de Laudos - campo booleano existente na tabela
           portal_laudos: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.portalLaudos);
+            const valor = findColumnValue(row, COLUMN_MAPPING.possuiPortalLaudos);
             if (!valor) return false;
             const valorStr = valor.toString().trim().toLowerCase();
             return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
