@@ -181,35 +181,85 @@ serve(async (req) => {
           // Métrica e Valor Convênio
           tipo_metrica_convenio: findColumnValue(row, COLUMN_MAPPING.tipoMetricaConvenio)?.toString().trim(),
           valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorConvenio) ? Number(findColumnValue(row, COLUMN_MAPPING.valorConvenio)) : null,
-          cobrar_integracao: findColumnValue(row, COLUMN_MAPPING.integracao)?.toString().trim()?.toLowerCase() === 'sim',
+          cobrar_integracao: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           data_inicio_integracao: findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao)).toISOString().split('T')[0] : null,
           
           // Métrica e Valor Urgência
           tipo_metrica_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim(),
           percentual_urgencia: findColumnValue(row, COLUMN_MAPPING.valorUrgencia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorUrgencia)) : null,
-          aplicar_adicional_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim()?.toLowerCase() === 'percentual',
-          cobrar_urgencia_como_rotina: findColumnValue(row, COLUMN_MAPPING.cobrarUrgenciaRotina)?.toString().trim()?.toLowerCase() === 'sim',
+          aplicar_adicional_urgencia: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'percentual';
+          })(),
+          cobrar_urgencia_como_rotina: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.cobrarUrgenciaRotina);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           
           // Desconto/Acréscimo
           tipo_desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.tipoDesconto)?.toString().trim(),
           desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
           
           // Portal de Laudos
-          portal_laudos: findColumnValue(row, COLUMN_MAPPING.portalLaudos)?.toString().trim()?.toLowerCase() === 'sim',
+          portal_laudos: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.portalLaudos);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           
           // Franquia
-          aplicar_franquia: findColumnValue(row, COLUMN_MAPPING.possuiFranquia)?.toString().trim()?.toLowerCase() === 'sim',
+          aplicar_franquia: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.possuiFranquia);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           valor_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquia)) : null,
           volume_franquia: findColumnValue(row, COLUMN_MAPPING.volume) ? Number(findColumnValue(row, COLUMN_MAPPING.volume)) : null,
-          frequencia_continua: findColumnValue(row, COLUMN_MAPPING.frequenciaContinua)?.toString().trim()?.toLowerCase() === 'sim',
-          frequencia_por_volume: findColumnValue(row, COLUMN_MAPPING.frequenciaPorVolume)?.toString().trim()?.toLowerCase() === 'sim',
+          frequencia_continua: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.frequenciaContinua);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
+          frequencia_por_volume: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.frequenciaPorVolume);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           valor_acima_franquia: findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume) ? Number(findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume)) : null,
           data_aniversario_contrato: findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia)).toISOString().split('T')[0] : null,
           
           // Configurações de Faturamento
-          incluir_empresa_origem: findColumnValue(row, COLUMN_MAPPING.incluirEmpresaOrigem)?.toString().trim()?.toLowerCase() === 'sim',
-          incluir_access_number: findColumnValue(row, COLUMN_MAPPING.incluirAccessNumber)?.toString().trim()?.toLowerCase() === 'sim',
-          incluir_medico_solicitante: findColumnValue(row, COLUMN_MAPPING.incluirMedicoSolicitante)?.toString().trim()?.toLowerCase() === 'sim',
+          incluir_empresa_origem: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.incluirEmpresaOrigem);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
+          incluir_access_number: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.incluirAccessNumber);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
+          incluir_medico_solicitante: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.incluirMedicoSolicitante);
+            if (!valor) return false;
+            const valorStr = valor.toString().trim().toLowerCase();
+            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          })(),
           
   // Campos de controle (mantidos dos originais)
           periodicidade_reajuste: 'anual',
