@@ -426,15 +426,15 @@ export default function GerarFaturamento() {
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia"')
+        .select('"EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
-        .not('"Cliente_Nome_Fantasia"', 'is', null);
+        .not('"EMPRESA"', 'is', null);
 
       if (errorVolumetria) {
         throw new Error('Erro ao consultar volumetria: ' + errorVolumetria.message);
       }
 
-      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.Cliente_Nome_Fantasia).filter(Boolean) || [])];
+      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.EMPRESA).filter(Boolean) || [])];
       console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
 
       if (clientesUnicosVolumetria.length === 0) {
