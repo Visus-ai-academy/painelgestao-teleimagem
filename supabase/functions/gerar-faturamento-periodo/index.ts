@@ -105,10 +105,15 @@ serve(async (req) => {
     console.log(`[gerar-faturamento-periodo] Período normalizado: ${periodo} -> ${periodoFormatado}`);
     console.log(`[gerar-faturamento-periodo] Início=${inicio} Fim=${fim} RefMonYY=${periodoRefMonyy}`);
 
-    // Buscar TODOS os clientes ativos
+        // Buscar TODOS os clientes ativos com contratos
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
-      .select('id, nome, email, ativo, status')
+      .select(`
+        id, nome, nome_mobilemed, email, ativo, status,
+        contratos_clientes (
+          id, tem_precos_configurados, status
+        )
+      `)
       .eq('ativo', true)
       .eq('status', 'Ativo');
 
@@ -116,6 +121,17 @@ serve(async (req) => {
 
     const clientesAtivos = clientes || [];
     console.log(`[gerar-faturamento-periodo] Total de clientes ativos: ${clientesAtivos.length}`);
+
+    // Buscar mapeamentos de nomes
+    const { data: mapeamentos } = await supabase
+      .from('mapeamento_nomes_clientes')
+      .select('nome_arquivo, nome_sistema')
+      .eq('ativo', true);
+
+    const mapeamentosMap = new Map();
+    mapeamentos?.forEach(m => {
+      mapeamentosMap.set(m.nome_arquivo.toUpperCase().trim(), m.nome_sistema.toUpperCase().trim());
+    });
 
     // Retornar resposta imediata e processar em background
     const backgroundTask = async () => {
@@ -151,58 +167,94 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Clientes com volumetria no período: ${nomesClientesComVolumetria.length}`);
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
-        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
         // Buscar dados completos dos clientes na tabela usando nome_mobilemed - SEM LIMITAÇÃO
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status'); // REMOVER FILTROS para pegar TODOS
+          .select(`
+            id, nome, nome_fantasia, nome_mobilemed, email, ativo, status,
+            contratos_clientes (
+              id, tem_precos_configurados, status
+            )
+          `); // REMOVER FILTROS para pegar TODOS
         
         // Criar mapa usando nome_mobilemed para identificação (campo que mapeia com EMPRESA)
         const clientesMap = new Map();
         todosClientes?.forEach(cliente => {
           // Mapear por nome_mobilemed (que corresponde ao campo EMPRESA da volumetria)
           if (cliente.nome_mobilemed) {
-            clientesMap.set(cliente.nome_mobilemed, cliente);
+            clientesMap.set(cliente.nome_mobilemed.toUpperCase().trim(), cliente);
           }
           // Fallback para nome principal se não tiver nome_mobilemed
           else if (cliente.nome) {
-            clientesMap.set(cliente.nome, cliente);
+            clientesMap.set(cliente.nome.toUpperCase().trim(), cliente);
           }
         });
         
-        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (cadastrados ou não)
+        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA - separar entre COM PREÇOS e PENDENTES
+        const clientesComPrecos: any[] = [];
+        const clientesPendentes: any[] = [];
+        
         const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
-          // Buscar cliente usando qualquer um dos campos de nome
-          const clienteExistente = clientesMap.get(nomeEmpresa);
+          // Buscar cliente usando qualquer um dos campos de nome ou mapeamento
+          let clienteExistente = clientesMap.get(nomeEmpresa.toUpperCase().trim());
+          
+          // Se não encontrou, tentar com mapeamento
+          if (!clienteExistente) {
+            const nomeMapeado = mapeamentosMap.get(nomeEmpresa.toUpperCase().trim());
+            if (nomeMapeado) {
+              clienteExistente = clientesMap.get(nomeMapeado);
+              console.log(`[gerar-faturamento-periodo] Mapeamento aplicado: ${nomeEmpresa} -> ${nomeMapeado}`);
+            }
+          }
           
           if (clienteExistente) {
-            console.log(`[gerar-faturamento-periodo] Cliente encontrado: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
-            return {
+            // Verificar se tem contrato ativo com preços configurados
+            const contratoAtivo = clienteExistente.contratos_clientes?.find(c => 
+              c.status === 'ativo' && c.tem_precos_configurados === true
+            );
+            
+            const clienteProcessado = {
               ...clienteExistente,
               nome_mobilemed: nomeEmpresa // Preservar o nome usado na volumetria (campo EMPRESA)
             };
+            
+            if (contratoAtivo) {
+              console.log(`[gerar-faturamento-periodo] Cliente COM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
+              clientesComPrecos.push(clienteProcessado);
+            } else {
+              console.log(`[gerar-faturamento-periodo] Cliente SEM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
+              clientesPendentes.push(clienteProcessado);
+            }
+            
+            return clienteProcessado;
           } else {
-            // Criar cliente temporário para processamento
-            console.log(`[gerar-faturamento-periodo] Cliente não cadastrado: ${nomeEmpresa} - criando registro temporário`);
-            return {
+            // Cliente não cadastrado
+            console.log(`[gerar-faturamento-periodo] Cliente NÃO CADASTRADO: ${nomeEmpresa}`);
+            const clienteTemp = {
               id: `temp-${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
               nome: nomeEmpresa,
               nome_mobilemed: nomeEmpresa,
               email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.temporario.com`,
               ativo: true,
-              status: 'Ativo'
+              status: 'Ativo',
+              contratos_clientes: []
             };
+            clientesPendentes.push(clienteTemp);
+            return clienteTemp;
           }
         });
         
         console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
-        console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
-        console.log(`[gerar-faturamento-periodo] Clientes da volumetria vs cadastrados vs processados: ${nomesClientesComVolumetria.length} vs ${todosClientes?.length || 0} vs ${clientesParaProcessar.length}`);
+        console.log(`[gerar-faturamento-periodo] Clientes COM preços configurados: ${clientesComPrecos.length}`);
+        console.log(`[gerar-faturamento-periodo] Clientes PENDENTES (sem preços): ${clientesPendentes.length}`);
+        console.log(`[gerar-faturamento-periodo] Lista COM preços: ${clientesComPrecos.map(c => c.nome).join(', ')}`);
+        console.log(`[gerar-faturamento-periodo] Lista PENDENTES: ${clientesPendentes.map(c => c.nome).join(', ')}`);
         
-        // PROCESSAR TODOS OS CLIENTES - SEM LIMITAÇÃO DE LOTES
-        for (let i = 0; i < clientesParaProcessar.length; i++) {
+        // PROCESSAR APENAS CLIENTES COM PREÇOS CONFIGURADOS
+        for (let i = 0; i < clientesComPrecos.length; i++) {
+            const cliente = clientesComPrecos[i];
             try {
-              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${clientesParaProcessar.length})`);
+              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${clientesComPrecos.length})`);
             
               // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
               const { data: vm, error: vmErr } = await supabase
@@ -218,7 +270,7 @@ serve(async (req) => {
 
               const rows = vm || [];
               if (rows.length === 0) {
-                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} (${cliente.nome_fantasia_volumetria}) sem dados de volumetria no período ${periodoFormatado}`);
+                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período ${periodoFormatado}`);
                 continue;
               }
 
@@ -273,13 +325,12 @@ serve(async (req) => {
                   console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
                 }
 
-                const unit = Number(preco) || 0;
-                const valor = Number((unit * qtd).toFixed(2));
+                let valor = Number((unit * qtd).toFixed(2));
 
-                // PULAR ITENS SEM PREÇO CONFIGURADO (não usar preço padrão)
+                // Para clientes COM preços configurados, valor zero indica problema de configuração
                 if (valor <= 0) {
-                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO - INCLUINDO COM VALOR ZERO:`);
-                  console.log(`  Cliente: ${cliente.nome}`);
+                  console.log(`[gerar-faturamento-periodo] ⚠️ PROBLEMA NA CONFIGURAÇÃO DE PREÇOS:`);
+                  console.log(`  Cliente: ${cliente.nome} (tem contrato ativo com preços)`);
                   console.log(`  Paciente: ${paciente}`);
                   console.log(`  Exame: ${chave.estudo}`);
                   console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
@@ -287,9 +338,8 @@ serve(async (req) => {
                   console.log(`  Quantidade (qtd): ${qtd}`);
                   console.log(`  Preço unitário (unit): ${unit}`);
                   console.log(`  Volume total: ${volumeTotal}`);
-                  console.log(`  OBSERVAÇÃO: Cliente sem tabela de preços - incluindo item com valor zero para análise`);
-                  // NÃO fazer continue - incluir item com valor zero
-                  valor = 0; // Garantir valor zero para análise
+                  console.log(`  AÇÃO: Pulando item - verificar configuração de preços para esta combinação`);
+                  continue; // Pular este item - não deveria acontecer com clientes configurados
                 }
 
                 const hoje = new Date();
@@ -343,8 +393,18 @@ serve(async (req) => {
         console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {
           totalItens,
           clientesComDados,
-          clientesProcessados: clientesParaProcessar.length
+          clientesComPrecos: clientesComPrecos.length,
+          clientesPendentes: clientesPendentes.length,
+          clientesTotais: nomesClientesComVolumetria.length
         });
+
+        // Criar resumo das pendências
+        const resumoPendencias = clientesPendentes.map(cliente => ({
+          nome: cliente.nome,
+          motivo: cliente.id.startsWith('temp-') ? 'Cliente não cadastrado' : 'Cliente sem contrato ativo ou preços configurados'
+        }));
+
+        console.log('[gerar-faturamento-periodo] CLIENTES PENDENTES:', resumoPendencias);
 
       } catch (error: any) {
         console.error('[gerar-faturamento-periodo] Erro no background:', error);
