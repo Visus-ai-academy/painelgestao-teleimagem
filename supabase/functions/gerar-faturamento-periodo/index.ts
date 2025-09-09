@@ -16,13 +16,42 @@ type GrupoChave = {
 
 // Função auxiliar para normalizar período
 const formatPeriodoParaYYYYMM = (periodo: string): string => {
-  if (periodo.includes('-')) return periodo; // Já está no formato YYYY-MM
+  if (periodo.includes('-') && /^\d{4}-\d{2}$/.test(periodo)) return periodo; // Já está no formato YYYY-MM
   
-  // Converter jun/25 -> 2025-06
-  const [mes, ano] = periodo.split('/');
-  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-  const mesNum = meses.indexOf(mes.toLowerCase()) + 1;
-  const anoCompleto = `20${ano}`;
+  // Handles multiple formats:
+  // jun/25, jun/2025, junho/25, junho/2025 -> 2025-06
+  let mes: string, ano: string;
+  
+  if (periodo.includes('/')) {
+    [mes, ano] = periodo.split('/');
+  } else if (periodo.includes('-') && /^[a-zA-Zç]+/.test(periodo)) {
+    // jun-25 format
+    [mes, ano] = periodo.split('-');
+  } else {
+    return periodo; // Return as-is if format not recognized
+  }
+  
+  const mesesMap: { [key: string]: number } = {
+    'jan': 1, 'janeiro': 1,
+    'fev': 2, 'fevereiro': 2,
+    'mar': 3, 'março': 3, 'marco': 3,
+    'abr': 4, 'abril': 4,
+    'mai': 5, 'maio': 5,
+    'jun': 6, 'junho': 6,
+    'jul': 7, 'julho': 7,
+    'ago': 8, 'agosto': 8,
+    'set': 9, 'setembro': 9,
+    'out': 10, 'outubro': 10,
+    'nov': 11, 'novembro': 11,
+    'dez': 12, 'dezembro': 12
+  };
+  
+  const mesNum = mesesMap[mes.toLowerCase()];
+  if (!mesNum) return periodo; // Return as-is if month not found
+  
+  // Handle 2-digit and 4-digit years
+  const anoCompleto = ano.length === 2 ? `20${ano}` : ano;
+  
   return `${anoCompleto}-${mesNum.toString().padStart(2, '0')}`;
 };
 
@@ -171,9 +200,10 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Clientes da volumetria vs cadastrados vs processados: ${nomesClientesComVolumetria.length} vs ${todosClientes?.length || 0} vs ${clientesParaProcessar.length}`);
         
         // PROCESSAR TODOS OS CLIENTES - SEM LIMITAÇÃO DE LOTES
-        for (const cliente of clientesParaProcessar) {
+        for (let i = 0; i < clientesParaProcessar.length; i++) {
+            const cliente = clientesParaProcessar[i];
             try {
-              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
+              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${clientesParaProcessar.length})`);
             
               // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
               const { data: vm, error: vmErr } = await supabase
