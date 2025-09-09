@@ -215,7 +215,11 @@ serve(async (req) => {
         const clientesComPrecos: any[] = [];
         const clientesPendentes: any[] = [];
         
-        const clientesParaProcessar = nomesClientesComVolumetria.map(nomeEmpresa => {
+        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA - separar entre COM PREÇOS e PENDENTES
+        const clientesComPrecos: any[] = [];
+        const clientesPendentes: any[] = [];
+        
+        for (const nomeEmpresa of nomesClientesComVolumetria) {
           // Buscar cliente usando qualquer um dos campos de nome ou mapeamento
           let clienteExistente = clientesMap.get(nomeEmpresa.toUpperCase().trim());
           
@@ -258,8 +262,6 @@ serve(async (req) => {
               console.log(`[gerar-faturamento-periodo] Cliente SEM CONTRATO ATIVO: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
               clientesPendentes.push(clienteProcessado);
             }
-            
-            return clienteProcessado;
           } else {
             // Cliente não cadastrado
             console.log(`[gerar-faturamento-periodo] Cliente NÃO CADASTRADO: ${nomeEmpresa}`);
@@ -273,11 +275,10 @@ serve(async (req) => {
               contratos_clientes: []
             };
             clientesPendentes.push(clienteTemp);
-            return clienteTemp;
           }
-        });
+        }
         
-        console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesParaProcessar.length}`);
+        console.log(`[gerar-faturamento-periodo] Clientes para processar: ${clientesComPrecos.length + clientesPendentes.length}`);
         console.log(`[gerar-faturamento-periodo] Clientes COM preços configurados: ${clientesComPrecos.length}`);
         console.log(`[gerar-faturamento-periodo] Clientes PENDENTES (sem preços): ${clientesPendentes.length}`);
         console.log(`[gerar-faturamento-periodo] Lista COM preços: ${clientesComPrecos.map(c => c.nome).join(', ')}`);
