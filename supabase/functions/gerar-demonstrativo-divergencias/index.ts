@@ -6,6 +6,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Função auxiliar para normalizar período
+const formatPeriodoParaYYYYMM = (periodo: string): string => {
+  if (periodo.includes('-')) return periodo; // Já está no formato YYYY-MM
+  
+  // Converter jun/25 -> 2025-06
+  const [mes, ano] = periodo.split('/');
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const mesNum = meses.indexOf(mes.toLowerCase()) + 1;
+  const anoCompleto = `20${ano}`;
+  return `${anoCompleto}-${mesNum.toString().padStart(2, '0')}`;
+};
+
+// Função para converter período YYYY-MM para jun/25
+const formatPeriodoParaMonYY = (periodo: string): string => {
+  const [ano, mes] = periodo.split('-');
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const mesNome = meses[parseInt(mes) - 1];
+  return `${mesNome}/${ano.slice(2)}`;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +46,13 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
+
+    // Normalizar período para ambos os formatos
+    const periodoFormatado = formatPeriodoParaYYYYMM(periodo);
+    const periodoRefMonyy = formatPeriodoParaMonYY(periodoFormatado);
+    const formatosParaTentar = [periodoFormatado, periodoRefMonyy, periodo];
+    
+    console.log('[gerar-demonstrativo-divergencias] Formatos de período para buscar:', formatosParaTentar);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -49,32 +76,42 @@ serve(async (req) => {
       console.log('[gerar-demonstrativo-divergencias] Períodos disponíveis na base:', periodosDisponiveis);
     }
     
-    const { count: totalCount, error: countError } = await supabase
-      .from('volumetria_mobilemed')
-      .select('id', { count: 'exact', head: true })
-      .eq('periodo_referencia', periodo);
-
-    if (countError) {
-      console.error('[gerar-demonstrativo-divergencias] Erro ao contar dados:', countError);
-      throw countError;
-    }
-
-    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período ${periodo}: ${totalCount || 0}`);
-
-    if (!totalCount || totalCount === 0) {
-      // Tentar buscar com variações de formato para debug
-      const { count: countAlt1 } = await supabase
+    // Tentar encontrar dados com qualquer um dos formatos de período
+    let totalCount = 0;
+    let periodoEncontrado = null;
+    
+    for (const formatoPeriodo of formatosParaTentar) {
+      console.log(`[gerar-demonstrativo-divergencias] Tentando formato: ${formatoPeriodo}`);
+      
+      const { count, error: countError } = await supabase
         .from('volumetria_mobilemed')
         .select('id', { count: 'exact', head: true })
-        .ilike('periodo_referencia', `%${periodo}%`);
-        
-      console.log(`[gerar-demonstrativo-divergencias] Tentativa com LIKE %${periodo}%: ${countAlt1 || 0} registros`);
-      
+        .eq('periodo_referencia', formatoPeriodo);
+
+      if (countError) {
+        console.error(`[gerar-demonstrativo-divergencias] Erro ao contar dados para ${formatoPeriodo}:`, countError);
+        continue;
+      }
+
+      if (count && count > 0) {
+        totalCount = count;
+        periodoEncontrado = formatoPeriodo;
+        console.log(`[gerar-demonstrativo-divergencias] Dados encontrados no formato ${formatoPeriodo}: ${count} registros`);
+        break;
+      } else {
+        console.log(`[gerar-demonstrativo-divergencias] Nenhum dado encontrado para formato ${formatoPeriodo}`);
+      }
+    }
+
+    console.log(`[gerar-demonstrativo-divergencias] Total de registros encontrados: ${totalCount || 0}`);
+
+    if (!totalCount || totalCount === 0 || !periodoEncontrado) {
       return new Response(JSON.stringify({
         success: false,
-        error: `Dados não encontrados. Nenhum dado encontrado para ${periodo}. Verifique se há dados volumétricos carregados para este período.`,
+        error: `Dados não encontrados. Nenhum dado encontrado para os formatos testados: ${formatosParaTentar.join(', ')}. Verifique se há dados volumétricos carregados para este período.`,
         debug: {
-          periodo_buscado: periodo,
+          periodo_original: periodo,
+          formatos_testados: formatosParaTentar,
           registros_encontrados: totalCount || 0,
           periodos_disponiveis: todosRegistros?.map(r => r.periodo_referencia).slice(0, 10) || []
         }
@@ -84,11 +121,13 @@ serve(async (req) => {
       });
     }
 
+    console.log(`[gerar-demonstrativo-divergencias] Usando período: ${periodoEncontrado}`);
+
     // Buscar clientes únicos na volumetria
     const { data: clientesVolumetria, error: clientesError } = await supabase
       .from('volumetria_mobilemed')
       .select('"EMPRESA"')
-      .eq('periodo_referencia', periodo)
+      .eq('periodo_referencia', periodoEncontrado)
       .not('"EMPRESA"', 'is', null);
 
     if (clientesError) {
@@ -130,7 +169,7 @@ serve(async (req) => {
         "PRIORIDADE",
         "VALORES"
       `)
-      .eq('periodo_referencia', periodo)
+      .eq('periodo_referencia', periodoEncontrado)
       .not('"EMPRESA"', 'is', null)
       .not('"MODALIDADE"', 'is', null)
       .not('"ESPECIALIDADE"', 'is', null)
@@ -226,7 +265,8 @@ serve(async (req) => {
 
     // Gerar resumo otimizado
     const resumo = {
-      periodo,
+      periodo: periodoEncontrado,
+      periodo_original: periodo,
       total_divergencias: divergenciasDetalhadas.length,
       por_tipo: {
         sem_preco: divergenciasDetalhadas.filter(d => d.tipo === 'sem_preco').length,
@@ -244,7 +284,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      periodo,
+      periodo: periodoEncontrado,
+      periodo_original: periodo,
       resumo,
       divergencias: divergenciasDetalhadas,
       message: `Demonstrativo de divergências gerado: ${divergenciasDetalhadas.length} problemas encontrados`
