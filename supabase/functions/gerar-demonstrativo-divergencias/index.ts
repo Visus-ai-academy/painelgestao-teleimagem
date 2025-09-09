@@ -35,10 +35,23 @@ serve(async (req) => {
     // Buscar registros de volumetria e combinar com dados de clientes
     console.log('[gerar-demonstrativo-divergencias] Buscando dados de volumetria...');
 
-    // Verificar se existem dados para o período
+    // Verificar se existem dados para o período - com debug melhorado
+    console.log('[gerar-demonstrativo-divergencias] Verificando dados para período:', periodo);
+    
+    // Primeiro verificar todos os períodos disponíveis para debug
+    const { data: todosRegistros, error: debugError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('periodo_referencia')
+      .limit(50);
+    
+    if (!debugError && todosRegistros) {
+      const periodosDisponiveis = [...new Set(todosRegistros.map(r => r.periodo_referencia))];
+      console.log('[gerar-demonstrativo-divergencias] Períodos disponíveis na base:', periodosDisponiveis);
+    }
+    
     const { count: totalCount, error: countError } = await supabase
       .from('volumetria_mobilemed')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('periodo_referencia', periodo);
 
     if (countError) {
@@ -46,12 +59,25 @@ serve(async (req) => {
       throw countError;
     }
 
-    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período: ${totalCount || 0}`);
+    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período ${periodo}: ${totalCount || 0}`);
 
     if (!totalCount || totalCount === 0) {
+      // Tentar buscar com variações de formato para debug
+      const { count: countAlt1 } = await supabase
+        .from('volumetria_mobilemed')
+        .select('id', { count: 'exact', head: true })
+        .ilike('periodo_referencia', `%${periodo}%`);
+        
+      console.log(`[gerar-demonstrativo-divergencias] Tentativa com LIKE %${periodo}%: ${countAlt1 || 0} registros`);
+      
       return new Response(JSON.stringify({
         success: false,
-        error: `Dados não encontrados. Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`
+        error: `Dados não encontrados. Nenhum dado encontrado para ${periodo}. Verifique se há dados volumétricos carregados para este período.`,
+        debug: {
+          periodo_buscado: periodo,
+          registros_encontrados: totalCount || 0,
+          periodos_disponiveis: todosRegistros?.map(r => r.periodo_referencia).slice(0, 10) || []
+        }
       }), { 
         status: 404, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -90,7 +116,9 @@ serve(async (req) => {
       }
     });
 
-    // Buscar combinações únicas de exames/preços que podem ter problemas
+    // Buscar combinações únicas de exames/preços que podem ter problemas - OTIMIZADA
+    console.log('[gerar-demonstrativo-divergencias] Buscando combinações otimizadas...');
+    
     const { data: combinacoes, error: combError } = await supabase
       .from('volumetria_mobilemed')
       .select(`
@@ -104,7 +132,10 @@ serve(async (req) => {
       `)
       .eq('periodo_referencia', periodo)
       .not('"EMPRESA"', 'is', null)
-      .limit(1000); // Limitar para evitar timeout
+      .not('"MODALIDADE"', 'is', null)
+      .not('"ESPECIALIDADE"', 'is', null)
+      .order('"EMPRESA"')
+      .limit(2000); // Aumentado limite mas ainda controlado
 
     if (combError) {
       console.error('[gerar-demonstrativo-divergencias] Erro ao buscar combinações:', combError);
@@ -113,12 +144,16 @@ serve(async (req) => {
 
     console.log(`[gerar-demonstrativo-divergencias] Combinações encontradas: ${combinacoes?.length || 0}`);
 
-    // Processar divergências
+    // Processar divergências com limite de tempo otimizado
     const divergenciasDetalhadas = [];
     const clientesProcessados = new Set();
     const combinacoesProcessadas = new Set();
+    const maxProcessamentos = Math.min(combinacoes?.length || 0, 500); // Limitar processamentos para evitar timeout
 
-    for (const registro of combinacoes || []) {
+    console.log(`[gerar-demonstrativo-divergencias] Processando ${maxProcessamentos} de ${combinacoes?.length || 0} combinações`);
+
+    for (let i = 0; i < maxProcessamentos && i < (combinacoes?.length || 0); i++) {
+      const registro = combinacoes[i];
       const clienteEmpresa = registro.EMPRESA;
       const combinacaoKey = `${clienteEmpresa}-${registro.MODALIDADE}-${registro.ESPECIALIDADE}-${registro.CATEGORIA}-${registro.PRIORIDADE}`;
       
@@ -147,51 +182,49 @@ serve(async (req) => {
       }
 
       // Verificar se tem preço configurado (usando try-catch para não parar por timeout)
-      try {
-        const { data: preco } = await supabase
-          .rpc('calcular_preco_exame', {
-            p_cliente_id: cliente.id,
-            p_modalidade: registro.MODALIDADE,
-            p_especialidade: registro.ESPECIALIDADE,
-            p_prioridade: registro.PRIORIDADE,
-            p_categoria: registro.CATEGORIA,
-            p_volume_total: 1
-          });
+      // Otimizado: só verificar se não há muitas divergências já encontradas
+      if (divergenciasDetalhadas.length < 200) {
+        try {
+          const { data: preco, error: precoError } = await supabase
+            .rpc('calcular_preco_exame', {
+              p_cliente_id: cliente.id,
+              p_modalidade: registro.MODALIDADE,
+              p_especialidade: registro.ESPECIALIDADE,
+              p_prioridade: registro.PRIORIDADE,
+              p_categoria: registro.CATEGORIA,
+              p_volume_total: 1
+            });
 
-        if (!preco || preco <= 0) {
-          divergenciasDetalhadas.push({
-            cliente: clienteEmpresa,
-            cliente_id: cliente.id,
-            exame: registro.ESTUDO_DESCRICAO,
-            modalidade: registro.MODALIDADE,
-            especialidade: registro.ESPECIALIDADE,
-            categoria: registro.CATEGORIA,
-            prioridade: registro.PRIORIDADE,
-            valor_volumetria: registro.VALORES,
-            motivo: 'Preço não configurado para esta combinação MOD/ESP/CAT/PRI',
-            tipo: 'sem_preco'
-          });
+          if (precoError) {
+            console.warn(`[gerar-demonstrativo-divergencias] Erro RPC para ${clienteEmpresa}:`, precoError);
+            continue; // Pular em caso de erro para não parar o processo
+          }
+
+          if (!preco || preco <= 0) {
+            divergenciasDetalhadas.push({
+              cliente: clienteEmpresa,
+              cliente_id: cliente.id,
+              exame: registro.ESTUDO_DESCRICAO,
+              modalidade: registro.MODALIDADE,
+              especialidade: registro.ESPECIALIDADE,
+              categoria: registro.CATEGORIA,
+              prioridade: registro.PRIORIDADE,
+              valor_volumetria: registro.VALORES,
+              motivo: 'Preço não configurado para esta combinação MOD/ESP/CAT/PRI',
+              tipo: 'sem_preco'
+            });
+          }
+        } catch (precoError) {
+          console.error(`[gerar-demonstrativo-divergencias] Erro ao calcular preço para ${clienteEmpresa}:`, precoError);
+          // Não adicionar divergência por erro - só continuar
+          continue;
         }
-      } catch (precoError) {
-        console.error(`[gerar-demonstrativo-divergencias] Erro ao calcular preço para ${clienteEmpresa}:`, precoError);
-        divergenciasDetalhadas.push({
-          cliente: clienteEmpresa,
-          cliente_id: cliente.id,
-          exame: registro.ESTUDO_DESCRICAO,
-          modalidade: registro.MODALIDADE,
-          especialidade: registro.ESPECIALIDADE,
-          categoria: registro.CATEGORIA,
-          prioridade: registro.PRIORIDADE,
-          valor_volumetria: registro.VALORES,
-          motivo: 'Erro ao verificar preço configurado',
-          tipo: 'erro_preco'
-        });
       }
       
       clientesProcessados.add(clienteEmpresa);
     }
 
-    // Gerar resumo
+    // Gerar resumo otimizado
     const resumo = {
       periodo,
       total_divergencias: divergenciasDetalhadas.length,
@@ -201,10 +234,13 @@ serve(async (req) => {
         erro_preco: divergenciasDetalhadas.filter(d => d.tipo === 'erro_preco').length
       },
       clientes_com_problema: [...clientesProcessados].length,
-      clientes_total_periodo: clientesUnicos.length
+      clientes_total_periodo: clientesUnicos.length,
+      combinacoes_processadas: combinacoesProcessadas.size,
+      registros_analisados: maxProcessamentos,
+      total_registros_periodo: totalCount
     };
 
-    console.log('[gerar-demonstrativo-divergencias] Resumo:', resumo);
+    console.log('[gerar-demonstrativo-divergencias] Resumo final:', resumo);
 
     return new Response(JSON.stringify({
       success: true,

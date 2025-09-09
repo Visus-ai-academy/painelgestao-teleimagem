@@ -3,6 +3,9 @@ project_id = "atbvikgxdcohnznkmaus"
 # 🔒 SECURITY ENHANCED - All functions secured with JWT verification
 # Critical security fix: No public endpoints without explicit validation
 
+[functions.gerar-demonstrativo-divergencias]
+verify_jwt = true
+
 [functions.processar-exames]
 verify_jwt = true
 
@@ -141,4 +144,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.aplicar-27-regras-completas]
+verify_jwt = true
+
+[functions.gerar-faturamento-periodo]
 verify_jwt = true
