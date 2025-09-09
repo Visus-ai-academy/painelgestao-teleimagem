@@ -1365,11 +1365,13 @@ export type Database = {
       }
       faturamento: {
         Row: {
+          accession_number: string | null
           categoria: string | null
           cliente: string | null
           cliente_email: string | null
           cliente_id: string | null
           cliente_nome: string
+          cliente_nome_original: string | null
           controle_origem_id: string | null
           created_at: string
           data_emissao: string
@@ -1395,11 +1397,13 @@ export type Database = {
           valor_bruto: number | null
         }
         Insert: {
+          accession_number?: string | null
           categoria?: string | null
           cliente?: string | null
           cliente_email?: string | null
           cliente_id?: string | null
           cliente_nome: string
+          cliente_nome_original?: string | null
           controle_origem_id?: string | null
           created_at?: string
           data_emissao: string
@@ -1425,11 +1429,13 @@ export type Database = {
           valor_bruto?: number | null
         }
         Update: {
+          accession_number?: string | null
           categoria?: string | null
           cliente?: string | null
           cliente_email?: string | null
           cliente_id?: string | null
           cliente_nome?: string
+          cliente_nome_original?: string | null
           controle_origem_id?: string | null
           created_at?: string
           data_emissao?: string
