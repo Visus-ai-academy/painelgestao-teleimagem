@@ -321,8 +321,12 @@ serve(async (req) => {
                   p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
                 });
 
-                if (precoErr) {
-                  console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome} ->`, chave, precoErr.message);
+                const unit = preco || 0; // Usar resultado da RPC calcular_preco_exame
+                
+                if (precoErr || !unit || unit <= 0) {
+                  console.log(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}: ${precoErr?.message || 'Preço zerado ou inválido'}`);
+                  console.log(`[gerar-faturamento-periodo] Detalhes: modalidade=${chave.modalidade}, especialidade=${chave.especialidade}, categoria=${chave.categoria}, prioridade=${chave.prioridade}`);
+                  continue; // Pular este item se não conseguir calcular preço
                 }
 
                 let valor = Number((unit * qtd).toFixed(2));
