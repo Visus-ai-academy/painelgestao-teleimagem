@@ -201,7 +201,6 @@ serve(async (req) => {
         
         // PROCESSAR TODOS OS CLIENTES - SEM LIMITAÇÃO DE LOTES
         for (let i = 0; i < clientesParaProcessar.length; i++) {
-            const cliente = clientesParaProcessar[i];
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${clientesParaProcessar.length})`);
             
