@@ -215,10 +215,6 @@ serve(async (req) => {
         const clientesComPrecos: any[] = [];
         const clientesPendentes: any[] = [];
         
-        // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA - separar entre COM PREÇOS e PENDENTES
-        const clientesComPrecos: any[] = [];
-        const clientesPendentes: any[] = [];
-        
         for (const nomeEmpresa of nomesClientesComVolumetria) {
           // Buscar cliente usando qualquer um dos campos de nome ou mapeamento
           let clienteExistente = clientesMap.get(nomeEmpresa.toUpperCase().trim());
