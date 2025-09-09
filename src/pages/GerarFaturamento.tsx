@@ -176,9 +176,9 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Gerar (Status por Cliente)
   const resultadosFiltradosStatus = useMemo(() => {
-    // Primeiro, remover duplicatas por clienteId
+    // Primeiro, remover duplicatas por clienteNome (mais confiável que clienteId)
     const uniqueResults = resultados.filter((resultado, index, array) => 
-      array.findIndex(r => r.clienteId === resultado.clienteId) === index
+      array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
     );
     
     let filtrados = [...uniqueResults];
@@ -506,7 +506,7 @@ export default function GerarFaturamento() {
       console.log('🔍 [VERIFICACAO] Aguardando processamento em background...');
       
       let tentativas = 0;
-      const maxTentativas = 20; // 20 tentativas = até 60 segundos
+      const maxTentativas = 40; // 40 tentativas = até 2 minutos
       let clientesFaturamento: any[] = [];
       
       while (tentativas < maxTentativas) {
@@ -544,7 +544,7 @@ export default function GerarFaturamento() {
 
       if (clientesFaturamento.length === 0) {
         console.warn('⚠️ [TIMEOUT] Processamento não concluído dentro do tempo limite');
-        throw new Error('Timeout: O processamento está demorando mais que o esperado. Verifique se há dados de volumetria para o período.');
+        throw new Error('Timeout: O processamento demorou mais que 2 minutos. Verifique se há dados de volumetria para o período ou tente novamente.');
       }
 
       const clientesUnicosFaturamento = [...new Set(clientesFaturamento?.map(c => c.cliente_nome).filter(Boolean) || [])];
@@ -1300,8 +1300,8 @@ export default function GerarFaturamento() {
                       </tr>
                     </thead>
                     <tbody>
-                      {resultadosFiltradosStatus.map((resultado) => (
-                        <tr key={resultado.clienteId} className="border-b">
+                      {resultadosFiltradosStatus.map((resultado, index) => (
+                        <tr key={`${resultado.clienteNome}-${index}`} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
                           <td className="p-3 text-center">
                             {demonstrativoGerado ? (
