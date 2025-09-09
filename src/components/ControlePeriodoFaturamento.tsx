@@ -59,6 +59,18 @@ interface ControlePeriodoFaturamentoProps {
   onPeriodoChange?: (periodo: string) => void;
 }
 
+// Função auxiliar para formatar período YYYY-MM para formato abreviado
+const formatarPeriodoAbreviado = (periodo: string): string => {
+  try {
+    const [ano, mes] = periodo.split('-');
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const mesAbrev = meses[parseInt(mes) - 1] || mes;
+    return `${mesAbrev}/${ano.slice(2)}`;
+  } catch {
+    return periodo;
+  }
+};
+
 export function ControlePeriodoFaturamento({
   periodoSelecionado,
   setPeriodoSelecionado,
@@ -121,8 +133,8 @@ export function ControlePeriodoFaturamento({
                     disabled={mostrarApenasDisponiveis && !isDisponivel}
                   >
                     <div className="flex items-center gap-2">
-                      <span>{periodo}</span>
-                      <Badge 
+                      <span>{formatarPeriodoAbreviado(periodo)}</span>
+                      <Badge
                         variant={
                           status === 'concluido' ? 'default' :
                           status === 'pronto' ? 'default' :

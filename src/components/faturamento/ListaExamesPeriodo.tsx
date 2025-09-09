@@ -29,6 +29,18 @@ interface FaturamentoRow {
   numero_fatura?: string | null;
 }
 
+// Função auxiliar para formatar período YYYY-MM para formato abreviado
+const formatarPeriodoAbreviado = (periodo: string): string => {
+  try {
+    const [ano, mes] = periodo.split('-');
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const mesAbrev = meses[parseInt(mes) - 1] || mes;
+    return `${mesAbrev}/${ano.slice(2)}`;
+  } catch {
+    return periodo;
+  }
+};
+
 export default function ListaExamesPeriodo() {
   const { toast } = useToast();
   const [periodo, setPeriodo] = useState("2025-07");
@@ -128,10 +140,10 @@ export default function ListaExamesPeriodo() {
                 <SelectValue placeholder="Selecione o período" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2025-07">Julho/2025</SelectItem>
-                <SelectItem value="2025-06">Junho/2025</SelectItem>
-                <SelectItem value="2025-05">Maio/2025</SelectItem>
-                <SelectItem value="2025-04">Abril/2025</SelectItem>
+                <SelectItem value="2025-07">{formatarPeriodoAbreviado("2025-07")}</SelectItem>
+                <SelectItem value="2025-06">{formatarPeriodoAbreviado("2025-06")}</SelectItem>
+                <SelectItem value="2025-05">{formatarPeriodoAbreviado("2025-05")}</SelectItem>
+                <SelectItem value="2025-04">{formatarPeriodoAbreviado("2025-04")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
