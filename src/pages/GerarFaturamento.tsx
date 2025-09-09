@@ -347,8 +347,15 @@ export default function GerarFaturamento() {
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
         
         const clientesTemp: any[] = [];
+        const clientesJaProcessados = new Set();
         
         for (const nomeCliente of nomesUnicos) {
+          // Evitar processar o mesmo nome duas vezes
+          if (clientesJaProcessados.has(nomeCliente.trim().toUpperCase())) {
+            continue;
+          }
+          clientesJaProcessados.add(nomeCliente.trim().toUpperCase());
+          
           // Buscar cliente cadastrado para obter email (sem filtros de ativo/status)
           const { data: emailCliente } = await supabase
             .from('clientes')
@@ -356,8 +363,10 @@ export default function GerarFaturamento() {
             .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
             .limit(1);
 
+          const clienteId = emailCliente?.[0]?.id || `temp-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+          
           clientesTemp.push({
-            id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
+            id: clienteId,
             nome: nomeCliente,
             // Usar email do cliente cadastrado se encontrado, senão gerar email padrão
             email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
@@ -367,6 +376,8 @@ export default function GerarFaturamento() {
         // Remover duplicatas por clienteId (mesmo cliente pode ter nomes diferentes na volumetria)
         const clientesUnicos = new Map();
         clientesTemp.forEach(cliente => {
+          // Usar uma chave composta para garantir unicidade total
+          const chaveUnica = `${cliente.id}-${cliente.nome.trim().toUpperCase()}`;
           if (!clientesUnicos.has(cliente.id)) {
             clientesUnicos.set(cliente.id, cliente);
           }
