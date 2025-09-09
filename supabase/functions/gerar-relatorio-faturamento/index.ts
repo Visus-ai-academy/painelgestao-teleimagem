@@ -114,7 +114,7 @@ serve(async (req: Request) => {
     
     let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
-      .select('*')
+      .select('*, accession_number, cliente_nome_original')
       .eq('cliente_nome', cliente.nome_fantasia || cliente.nome) // Usar nome_fantasia prioritariamente
       .eq('periodo_referencia', periodo);
 
@@ -388,31 +388,35 @@ serve(async (req: Request) => {
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
         doc.setFillColor(0, 124, 186);
-        doc.rect(20, yPosition, 257, 8, 'F');
+        doc.rect(10, yPosition, 267, 8, 'F');
         
         if (isFaturamentoData) {
-          // Headers para dados de faturamento
-          doc.text('Data', 22, yPosition + 5);
-          doc.text('Paciente', 40, yPosition + 5);
-          doc.text('Médico', 80, yPosition + 5);
-          doc.text('Exame', 120, yPosition + 5);
-          doc.text('Modal.', 160, yPosition + 5);
-          doc.text('Espec.', 180, yPosition + 5);
-          doc.text('Categ.', 205, yPosition + 5);
-          doc.text('Prior.', 230, yPosition + 5);
-          doc.text('Qtd', 250, yPosition + 5);
-          doc.text('Valor Total', 260, yPosition + 5);
+          // Headers para dados de faturamento - incluindo novos campos
+          doc.text('Data', 15, yPosition + 5);
+          doc.text('Paciente', 35, yPosition + 5);
+          doc.text('Médico', 65, yPosition + 5);
+          doc.text('Exame', 95, yPosition + 5);
+          doc.text('Modal.', 125, yPosition + 5);
+          doc.text('Espec.', 140, yPosition + 5);
+          doc.text('Categ.', 160, yPosition + 5);
+          doc.text('Prior.', 180, yPosition + 5);
+          doc.text('Accession', 200, yPosition + 5);
+          doc.text('Origem', 220, yPosition + 5);
+          doc.text('Qtd', 245, yPosition + 5);
+          doc.text('Valor', 260, yPosition + 5);
         } else {
-          // Headers para dados de volumetria
-          doc.text('Data', 22, yPosition + 5);
-          doc.text('Paciente', 40, yPosition + 5);
-          doc.text('Médico', 80, yPosition + 5);
-          doc.text('Exame', 120, yPosition + 5);
-          doc.text('Modal.', 160, yPosition + 5);
-          doc.text('Espec.', 180, yPosition + 5);
-          doc.text('Categ.', 205, yPosition + 5);
-          doc.text('Prior.', 230, yPosition + 5);
-          doc.text('Qtd', 250, yPosition + 5);
+          // Headers para dados de volumetria - incluindo novos campos
+          doc.text('Data', 15, yPosition + 5);
+          doc.text('Paciente', 35, yPosition + 5);
+          doc.text('Médico', 65, yPosition + 5);
+          doc.text('Exame', 95, yPosition + 5);
+          doc.text('Modal.', 125, yPosition + 5);
+          doc.text('Espec.', 140, yPosition + 5);
+          doc.text('Categ.', 160, yPosition + 5);
+          doc.text('Prior.', 180, yPosition + 5);
+          doc.text('Accession', 200, yPosition + 5);
+          doc.text('Origem', 220, yPosition + 5);
+          doc.text('Qtd', 245, yPosition + 5);
           doc.text('Val.Ref', 260, yPosition + 5);
         }
         
@@ -431,7 +435,7 @@ serve(async (req: Request) => {
             doc.setFontSize(8);
             doc.setTextColor(255, 255, 255);
             doc.setFillColor(0, 124, 186);
-            doc.rect(20, yPosition, 257, 8, 'F');
+            doc.rect(10, yPosition, 267, 8, 'F');
             
             if (isFaturamentoData) {
               // Headers para dados de faturamento
@@ -466,38 +470,42 @@ serve(async (req: Request) => {
           // Alternar cores das linhas
           if (i % 2 === 1) {
             doc.setFillColor(240, 240, 240);
-            doc.rect(20, yPosition - 2, 257, 6, 'F');
+            doc.rect(10, yPosition - 2, 267, 6, 'F');
           }
           
           doc.setFontSize(7);
           
           if (isFaturamentoData) {
-            // Dados de faturamento - usar campos corretos
+            // Dados de faturamento - usar campos corretos incluindo novos campos
             const dataFormatada = item.data_exame ? 
               item.data_exame.split('T')[0].split('-').reverse().join('/') : '-';
-            doc.text(dataFormatada, 22, yPosition + 2);
-            doc.text((item.paciente || '-').substring(0, 20), 40, yPosition + 2);
-            doc.text((item.medico || '-').substring(0, 20), 80, yPosition + 2);
-            doc.text((item.nome_exame || '-').substring(0, 20), 120, yPosition + 2);
-            doc.text((item.modalidade || '-').substring(0, 12), 160, yPosition + 2);
-            doc.text((item.especialidade || '-').substring(0, 12), 180, yPosition + 2);
-            doc.text((item.categoria || '-').substring(0, 12), 205, yPosition + 2);
-            doc.text((item.prioridade || '-').substring(0, 12), 230, yPosition + 2);
-            doc.text((item.quantidade || '0').toString(), 250, yPosition + 2);
+            doc.text(dataFormatada, 15, yPosition + 2);
+            doc.text((item.paciente || '-').substring(0, 15), 35, yPosition + 2);
+            doc.text((item.medico || '-').substring(0, 15), 65, yPosition + 2);
+            doc.text((item.nome_exame || '-').substring(0, 15), 95, yPosition + 2);
+            doc.text((item.modalidade || '-').substring(0, 8), 125, yPosition + 2);
+            doc.text((item.especialidade || '-').substring(0, 10), 140, yPosition + 2);
+            doc.text((item.categoria || '-').substring(0, 8), 160, yPosition + 2);
+            doc.text((item.prioridade || '-').substring(0, 10), 180, yPosition + 2);
+            doc.text((item.accession_number || '-').substring(0, 10), 200, yPosition + 2);
+            doc.text((item.cliente_nome_original || '-').substring(0, 12), 220, yPosition + 2);
+            doc.text((item.quantidade || '0').toString(), 245, yPosition + 2);
             doc.text(`R$ ${parseFloat(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
           } else {
-            // Dados de volumetria - usar campos da volumetria
+            // Dados de volumetria - usar campos da volumetria incluindo novos campos
             const dataFormatada = item.DATA_REALIZACAO ? 
               item.DATA_REALIZACAO.split('T')[0].split('-').reverse().join('/') : '-';
-            doc.text(dataFormatada, 22, yPosition + 2);
-            doc.text((item.NOME_PACIENTE || '-').substring(0, 20), 40, yPosition + 2);
-            doc.text((item.MEDICO || '-').substring(0, 20), 80, yPosition + 2);
-            doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 20), 120, yPosition + 2);
-            doc.text((item.MODALIDADE || '-').substring(0, 12), 160, yPosition + 2);
-            doc.text((item.ESPECIALIDADE || '-').substring(0, 12), 180, yPosition + 2);
-            doc.text((item.CATEGORIA || '-').substring(0, 12), 205, yPosition + 2);
-            doc.text((item.PRIORIDADE || '-').substring(0, 12), 230, yPosition + 2);
-            doc.text((item.VALORES || '0').toString(), 250, yPosition + 2);
+            doc.text(dataFormatada, 15, yPosition + 2);
+            doc.text((item.NOME_PACIENTE || '-').substring(0, 15), 35, yPosition + 2);
+            doc.text((item.MEDICO || '-').substring(0, 15), 65, yPosition + 2);
+            doc.text((item.ESTUDO_DESCRICAO || '-').substring(0, 15), 95, yPosition + 2);
+            doc.text((item.MODALIDADE || '-').substring(0, 8), 125, yPosition + 2);
+            doc.text((item.ESPECIALIDADE || '-').substring(0, 10), 140, yPosition + 2);
+            doc.text((item.CATEGORIA || '-').substring(0, 8), 160, yPosition + 2);
+            doc.text((item.PRIORIDADE || '-').substring(0, 10), 180, yPosition + 2);
+            doc.text((item.ACCESSION_NUMBER || '-').substring(0, 10), 200, yPosition + 2);
+            doc.text((item.EMPRESA || '-').substring(0, 12), 220, yPosition + 2);
+            doc.text((item.VALORES || '0').toString(), 245, yPosition + 2);
             doc.text(`R$ ${parseFloat(item.VALORES || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
           }
           

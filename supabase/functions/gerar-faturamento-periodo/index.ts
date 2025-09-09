@@ -228,7 +228,7 @@ serve(async (req) => {
 
               const itensInserir: any[] = [];
 
-              for (const { chave, qtd, paciente, medico, dataExame } of grupos.values()) {
+              for (const { chave, qtd, paciente, medico, dataExame, accession } of grupos.values()) {
                 // Calcular preço unitário via RPC
                 const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
                   p_cliente_id: cliente.id,
@@ -271,6 +271,7 @@ serve(async (req) => {
                   numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
                   cliente_id: cliente.id,
                   cliente_nome: cliente.nome, // Nome fantasia já está sendo usado
+                  cliente_nome_original: cliente.nome_mobilemed, // Nome original da empresa (campo EMPRESA)
                   cliente_email: cliente.email || null,
                   paciente: paciente,
                   modalidade: chave.modalidade,
@@ -287,6 +288,7 @@ serve(async (req) => {
                   data_vencimento: vencimento,
                   periodo_referencia: periodoFormatado, // Usar formato YYYY-MM
                   tipo_dados: 'incremental',
+                  accession_number: accession, // Incluir ACCESSION_NUMBER
                 });
               }
 
