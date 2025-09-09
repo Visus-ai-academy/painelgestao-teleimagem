@@ -32,88 +32,163 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar registros de volumetria sem preço configurado (exames não localizados)
-    console.log('[gerar-demonstrativo-divergencias] Buscando divergências...');
+    // Buscar registros de volumetria e combinar com dados de clientes
+    console.log('[gerar-demonstrativo-divergencias] Buscando dados de volumetria...');
 
-    const { data: divergencias, error } = await supabase
+    // Verificar se existem dados para o período
+    const { data: countData, error: countError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('*', { count: 'exact', head: true })
+      .eq('periodo_referencia', periodo);
+
+    if (countError) {
+      console.error('[gerar-demonstrativo-divergencias] Erro ao contar dados:', countError);
+      throw countError;
+    }
+
+    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período: ${countData?.length || 0}`);
+
+    if (!countData || countData.length === 0) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Dados não encontrados. Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`
+      }), { 
+        status: 404, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Buscar clientes únicos na volumetria
+    const { data: clientesVolumetria, error: clientesError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"EMPRESA"')
+      .eq('periodo_referencia', periodo)
+      .not('"EMPRESA"', 'is', null);
+
+    if (clientesError) {
+      console.error('[gerar-demonstrativo-divergencias] Erro ao buscar clientes:', clientesError);
+      throw clientesError;
+    }
+
+    const clientesUnicos = [...new Set(clientesVolumetria?.map(c => c.EMPRESA).filter(Boolean) || [])];
+    console.log(`[gerar-demonstrativo-divergencias] Clientes únicos encontrados: ${clientesUnicos.length}`);
+
+    // Buscar todos os clientes cadastrados de uma vez
+    const { data: clientesCadastrados, error: cadastroError } = await supabase
+      .from('clientes')
+      .select('id, nome, nome_fantasia, nome_mobilemed')
+      .in('nome_mobilemed', clientesUnicos);
+
+    if (cadastroError) {
+      console.error('[gerar-demonstrativo-divergencias] Erro ao buscar cadastro de clientes:', cadastroError);
+    }
+
+    const mapaClientes = new Map();
+    clientesCadastrados?.forEach(cliente => {
+      if (cliente.nome_mobilemed) {
+        mapaClientes.set(cliente.nome_mobilemed, cliente);
+      }
+    });
+
+    // Buscar combinações únicas de exames/preços que podem ter problemas
+    const { data: combinacoes, error: combError } = await supabase
       .from('volumetria_mobilemed')
       .select(`
         "EMPRESA",
-        "Cliente_Nome_Fantasia",
         "ESTUDO_DESCRICAO",
         "MODALIDADE",
         "ESPECIALIDADE", 
         "CATEGORIA",
         "PRIORIDADE",
-        "VALORES",
-        COUNT(*) as quantidade
+        "VALORES"
       `)
       .eq('periodo_referencia', periodo)
-      .not('"Cliente_Nome_Fantasia"', 'is', null);
+      .not('"EMPRESA"', 'is', null)
+      .limit(1000); // Limitar para evitar timeout
 
-    if (error) {
-      console.error('[gerar-demonstrativo-divergencias] Erro ao buscar dados:', error);
-      throw error;
+    if (combError) {
+      console.error('[gerar-demonstrativo-divergencias] Erro ao buscar combinações:', combError);
+      throw combError;
     }
 
-    console.log(`[gerar-demonstrativo-divergencias] Total de registros encontrados: ${divergencias?.length || 0}`);
+    console.log(`[gerar-demonstrativo-divergencias] Combinações encontradas: ${combinacoes?.length || 0}`);
 
-    // Verificar preços para cada combinação
+    // Processar divergências
     const divergenciasDetalhadas = [];
     const clientesProcessados = new Set();
+    const combinacoesProcessadas = new Set();
 
-    for (const registro of divergencias || []) {
-      const clienteNome = registro.Cliente_Nome_Fantasia;
+    for (const registro of combinacoes || []) {
+      const clienteEmpresa = registro.EMPRESA;
+      const combinacaoKey = `${clienteEmpresa}-${registro.MODALIDADE}-${registro.ESPECIALIDADE}-${registro.CATEGORIA}-${registro.PRIORIDADE}`;
       
-      if (!clientesProcessados.has(clienteNome)) {
-        // Buscar cliente na tabela clientes
-        const { data: cliente } = await supabase
-          .from('clientes')
-          .select('id, nome_fantasia')
-          .eq('nome_fantasia', clienteNome)
-          .single();
+      // Evitar processar a mesma combinação duas vezes
+      if (combinacoesProcessadas.has(combinacaoKey)) {
+        continue;
+      }
+      combinacoesProcessadas.add(combinacaoKey);
 
-        if (cliente) {
-          // Verificar se tem preço configurado para esta combinação
-          const { data: preco } = await supabase
-            .rpc('calcular_preco_exame', {
-              p_cliente_id: cliente.id,
-              p_modalidade: registro.MODALIDADE,
-              p_especialidade: registro.ESPECIALIDADE,
-              p_prioridade: registro.PRIORIDADE,
-              p_categoria: registro.CATEGORIA,
-              p_volume_total: 1
-            });
+      const cliente = mapaClientes.get(clienteEmpresa);
+      
+      if (!cliente) {
+        divergenciasDetalhadas.push({
+          cliente: clienteEmpresa,
+          exame: registro.ESTUDO_DESCRICAO,
+          modalidade: registro.MODALIDADE,
+          especialidade: registro.ESPECIALIDADE,
+          categoria: registro.CATEGORIA,
+          prioridade: registro.PRIORIDADE,
+          valor_volumetria: registro.VALORES,
+          motivo: 'Cliente não encontrado no cadastro de clientes',
+          tipo: 'cliente_nao_encontrado'
+        });
+        clientesProcessados.add(clienteEmpresa);
+        continue;
+      }
 
-          if (!preco || preco <= 0) {
-            divergenciasDetalhadas.push({
-              cliente: clienteNome,
-              exame: registro.ESTUDO_DESCRICAO,
-              modalidade: registro.MODALIDADE,
-              especialidade: registro.ESPECIALIDADE,
-              categoria: registro.CATEGORIA,
-              prioridade: registro.PRIORIDADE,
-              valor_volumetria: registro.VALORES,
-              motivo: 'Preço não configurado para esta combinação',
-              tipo: 'sem_preco'
-            });
-          }
-        } else {
+      // Verificar se tem preço configurado (usando try-catch para não parar por timeout)
+      try {
+        const { data: preco } = await supabase
+          .rpc('calcular_preco_exame', {
+            p_cliente_id: cliente.id,
+            p_modalidade: registro.MODALIDADE,
+            p_especialidade: registro.ESPECIALIDADE,
+            p_prioridade: registro.PRIORIDADE,
+            p_categoria: registro.CATEGORIA,
+            p_volume_total: 1
+          });
+
+        if (!preco || preco <= 0) {
           divergenciasDetalhadas.push({
-            cliente: clienteNome,
+            cliente: clienteEmpresa,
+            cliente_id: cliente.id,
             exame: registro.ESTUDO_DESCRICAO,
             modalidade: registro.MODALIDADE,
             especialidade: registro.ESPECIALIDADE,
             categoria: registro.CATEGORIA,
             prioridade: registro.PRIORIDADE,
             valor_volumetria: registro.VALORES,
-            motivo: 'Cliente não encontrado no cadastro',
-            tipo: 'cliente_nao_encontrado'
+            motivo: 'Preço não configurado para esta combinação MOD/ESP/CAT/PRI',
+            tipo: 'sem_preco'
           });
         }
-        
-        clientesProcessados.add(clienteNome);
+      } catch (precoError) {
+        console.error(`[gerar-demonstrativo-divergencias] Erro ao calcular preço para ${clienteEmpresa}:`, precoError);
+        divergenciasDetalhadas.push({
+          cliente: clienteEmpresa,
+          cliente_id: cliente.id,
+          exame: registro.ESTUDO_DESCRICAO,
+          modalidade: registro.MODALIDADE,
+          especialidade: registro.ESPECIALIDADE,
+          categoria: registro.CATEGORIA,
+          prioridade: registro.PRIORIDADE,
+          valor_volumetria: registro.VALORES,
+          motivo: 'Erro ao verificar preço configurado',
+          tipo: 'erro_preco'
+        });
       }
+      
+      clientesProcessados.add(clienteEmpresa);
     }
 
     // Gerar resumo
@@ -122,9 +197,11 @@ serve(async (req) => {
       total_divergencias: divergenciasDetalhadas.length,
       por_tipo: {
         sem_preco: divergenciasDetalhadas.filter(d => d.tipo === 'sem_preco').length,
-        cliente_nao_encontrado: divergenciasDetalhadas.filter(d => d.tipo === 'cliente_nao_encontrado').length
+        cliente_nao_encontrado: divergenciasDetalhadas.filter(d => d.tipo === 'cliente_nao_encontrado').length,
+        erro_preco: divergenciasDetalhadas.filter(d => d.tipo === 'erro_preco').length
       },
-      clientes_com_problema: [...clientesProcessados].length
+      clientes_com_problema: [...clientesProcessados].length,
+      clientes_total_periodo: clientesUnicos.length
     };
 
     console.log('[gerar-demonstrativo-divergencias] Resumo:', resumo);
