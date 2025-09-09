@@ -346,6 +346,8 @@ export default function GerarFaturamento() {
         const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
         
+        const clientesTemp: any[] = [];
+        
         for (const nomeCliente of nomesUnicos) {
           // Buscar cliente cadastrado para obter email (sem filtros de ativo/status)
           const { data: emailCliente } = await supabase
@@ -354,13 +356,22 @@ export default function GerarFaturamento() {
             .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
             .limit(1);
 
-          clientesFinais.push({
+          clientesTemp.push({
             id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
             nome: nomeCliente,
             // Usar email do cliente cadastrado se encontrado, senão gerar email padrão
             email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
           });
         }
+        
+        // Remover duplicatas por clienteId (mesmo cliente pode ter nomes diferentes na volumetria)
+        const clientesUnicos = new Map();
+        clientesTemp.forEach(cliente => {
+          if (!clientesUnicos.has(cliente.id)) {
+            clientesUnicos.set(cliente.id, cliente);
+          }
+        });
+        clientesFinais = Array.from(clientesUnicos.values());
       } else {
         console.log('⚠️ Nenhum cliente encontrado na volumetria para o período:', periodoSelecionado);
         toast({
