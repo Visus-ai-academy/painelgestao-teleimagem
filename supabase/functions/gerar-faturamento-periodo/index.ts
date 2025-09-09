@@ -173,17 +173,34 @@ serve(async (req) => {
         // Buscar dados completos dos clientes na tabela usando nome_mobilemed - SEM LIMITAÇÃO
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select(`
-            id, nome, nome_fantasia, nome_mobilemed, email, ativo, status,
-            contratos_clientes (
-              id, tem_precos_configurados, status
-            )
-          `)
+          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status')
           .limit(50000); // Aumentar limite explicitamente para buscar TODOS os clientes
+        
+        // Buscar contratos separadamente para evitar filtros no JOIN
+        const { data: todosContratos } = await supabase
+          .from('contratos_clientes')
+          .select('id, cliente_id, tem_precos_configurados, status')
+          .eq('status', 'ativo')
+          .limit(50000);
+        
+        console.log(`[gerar-faturamento-periodo] Total de clientes encontrados: ${todosClientes?.length || 0}`);
+        console.log(`[gerar-faturamento-periodo] Total de contratos ativos encontrados: ${todosContratos?.length || 0}`);
+        
+        // Criar mapa de contratos por cliente_id
+        const contratosMap = new Map();
+        todosContratos?.forEach(contrato => {
+          if (!contratosMap.has(contrato.cliente_id)) {
+            contratosMap.set(contrato.cliente_id, []);
+          }
+          contratosMap.get(contrato.cliente_id).push(contrato);
+        });
         
         // Criar mapa usando nome_mobilemed para identificação (campo que mapeia com EMPRESA)
         const clientesMap = new Map();
         todosClientes?.forEach(cliente => {
+          // Adicionar contratos ao cliente
+          cliente.contratos_clientes = contratosMap.get(cliente.id) || [];
+          
           // Mapear por nome_mobilemed (que corresponde ao campo EMPRESA da volumetria)
           if (cliente.nome_mobilemed) {
             clientesMap.set(cliente.nome_mobilemed.toUpperCase().trim(), cliente);
@@ -254,11 +271,15 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista COM preços: ${clientesComPrecos.map(c => c.nome).join(', ')}`);
         console.log(`[gerar-faturamento-periodo] Lista PENDENTES: ${clientesPendentes.map(c => c.nome).join(', ')}`);
         
-        // PROCESSAR APENAS CLIENTES COM PREÇOS CONFIGURADOS
-        for (let i = 0; i < clientesComPrecos.length; i++) {
-            const cliente = clientesComPrecos[i];
+        // PROCESSAR TODOS OS CLIENTES (COM E SEM PREÇOS CONFIGURADOS)
+        const todosClientesParaProcessar = [...clientesComPrecos, ...clientesPendentes];
+        
+        for (let i = 0; i < todosClientesParaProcessar.length; i++) {
+            const cliente = todosClientesParaProcessar[i];
+            const tem_precos = clientesComPrecos.includes(cliente);
             try {
-              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${clientesComPrecos.length})`);
+              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${todosClientesParaProcessar.length})`);
+            
             
               // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
               const { data: vm, error: vmErr } = await supabase
@@ -315,29 +336,38 @@ serve(async (req) => {
               const itensInserir: any[] = [];
 
               for (const { chave, qtd, paciente, medico, dataExame, accession } of grupos.values()) {
-                // Calcular preço unitário via RPC
-                const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: cliente.id,
-                  p_modalidade: chave.modalidade,
-                  p_especialidade: chave.especialidade,
-                  p_prioridade: chave.prioridade,
-                  p_categoria: chave.categoria,
-                  p_volume_total: volumeTotal,
-                  p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
-                });
-
-                const unit = preco || 0; // Usar resultado da RPC calcular_preco_exame
+                let unit = 0; // Valor padrão
                 
-                if (precoErr || !unit || unit <= 0) {
-                  console.log(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}: ${precoErr?.message || 'Preço zerado ou inválido'}`);
-                  console.log(`[gerar-faturamento-periodo] Detalhes: modalidade=${chave.modalidade}, especialidade=${chave.especialidade}, categoria=${chave.categoria}, prioridade=${chave.prioridade}`);
-                  continue; // Pular este item se não conseguir calcular preço
+                if (tem_precos) {
+                  // Calcular preço unitário via RPC apenas para clientes com preços configurados
+                  const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
+                    p_cliente_id: cliente.id,
+                    p_modalidade: chave.modalidade,
+                    p_especialidade: chave.especialidade,
+                    p_prioridade: chave.prioridade,
+                    p_categoria: chave.categoria,
+                    p_volume_total: volumeTotal,
+                    p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
+                  });
+
+                  unit = preco || 0; // Usar resultado da RPC calcular_preco_exame
+                  
+                  if (precoErr || !unit || unit <= 0) {
+                    console.log(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}: ${precoErr?.message || 'Preço zerado ou inválido'}`);
+                    console.log(`[gerar-faturamento-periodo] Detalhes: modalidade=${chave.modalidade}, especialidade=${chave.especialidade}, categoria=${chave.categoria}, prioridade=${chave.prioridade}`);
+                    continue; // Pular este item se não conseguir calcular preço
+                  }
+                } else {
+                  // Cliente sem preços configurados - incluir com valor 0 para identificação
+                  console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome}: SEM PREÇOS CONFIGURADOS - incluindo com valor 0`);
+                  unit = 0; // Manter valor 0 para clientes sem preços
                 }
 
                 let valor = Number((unit * qtd).toFixed(2));
 
                 // Para clientes COM preços configurados, valor zero indica problema de configuração
-                if (valor <= 0) {
+                // Para clientes SEM preços configurados, valor zero é esperado
+                if (tem_precos && valor <= 0) {
                   console.log(`[gerar-faturamento-periodo] ⚠️ PROBLEMA NA CONFIGURAÇÃO DE PREÇOS:`);
                   console.log(`  Cliente: ${cliente.nome} (tem contrato ativo com preços)`);
                   console.log(`  Paciente: ${paciente}`);
@@ -348,7 +378,7 @@ serve(async (req) => {
                   console.log(`  Preço unitário (unit): ${unit}`);
                   console.log(`  Volume total: ${volumeTotal}`);
                   console.log(`  AÇÃO: Pulando item - verificar configuração de preços para esta combinação`);
-                  continue; // Pular este item - não deveria acontecer com clientes configurados
+                  continue; // Pular apenas se cliente tem preços mas o valor ficou zero
                 }
 
                 const hoje = new Date();
