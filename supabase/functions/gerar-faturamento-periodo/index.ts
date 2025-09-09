@@ -105,17 +105,17 @@ serve(async (req) => {
         const loteSize = 10; // Reduzir para evitar timeout
         console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
         
-        // Buscar clientes que realmente têm dados de volumetria no período - USANDO APENAS Cliente_Nome_Fantasia
+        // Buscar clientes que realmente têm dados de volumetria no período - USANDO CAMPO EMPRESA
         const { data: clientesComVolumetria } = await supabase
           .from('volumetria_mobilemed')
-          .select('"Cliente_Nome_Fantasia"')
+          .select('"EMPRESA"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
-          .not('"Cliente_Nome_Fantasia"', 'is', null);
+          .not('"EMPRESA"', 'is', null);
         
-        // Coletar APENAS nomes de Cliente_Nome_Fantasia
+        // Coletar APENAS nomes de EMPRESA
         const nomesClientesSet = new Set();
         clientesComVolumetria?.forEach(v => {
-          if (v.Cliente_Nome_Fantasia) nomesClientesSet.add(v.Cliente_Nome_Fantasia);
+          if (v.EMPRESA) nomesClientesSet.add(v.EMPRESA);
         });
         const nomesClientesComVolumetria = Array.from(nomesClientesSet);
         
@@ -123,21 +123,21 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
-        // Buscar dados completos dos clientes na tabela usando APENAS Cliente_Nome_Fantasia
+        // Buscar dados completos dos clientes na tabela usando nome_mobilemed
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select('id, nome, nome_fantasia, email, ativo, status')
+          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status')
           .eq('ativo', true)
           .eq('status', 'Ativo');
         
-        // Criar mapa usando APENAS Cliente_Nome_Fantasia para identificação
+        // Criar mapa usando nome_mobilemed para identificação (campo que mapeia com EMPRESA)
         const clientesMap = new Map();
         todosClientes?.forEach(cliente => {
-          // Mapear APENAS por nome fantasia (regra exclusiva Cliente_Nome_Fantasia)
-          if (cliente.nome_fantasia) {
-            clientesMap.set(cliente.nome_fantasia, cliente);
+          // Mapear por nome_mobilemed (que corresponde ao campo EMPRESA da volumetria)
+          if (cliente.nome_mobilemed) {
+            clientesMap.set(cliente.nome_mobilemed, cliente);
           }
-          // Fallback para nome principal se não tiver nome_fantasia
+          // Fallback para nome principal se não tiver nome_mobilemed
           else if (cliente.nome) {
             clientesMap.set(cliente.nome, cliente);
           }
@@ -152,7 +152,7 @@ serve(async (req) => {
             console.log(`[gerar-faturamento-periodo] Cliente encontrado: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
             return {
               ...clienteExistente,
-              nome_fantasia_volumetria: nomeEmpresa // Preservar o nome usado na volumetria
+              nome_mobilemed: nomeEmpresa // Preservar o nome usado na volumetria (campo EMPRESA)
             };
           } else {
             // Criar cliente temporário para processamento
@@ -160,7 +160,7 @@ serve(async (req) => {
             return {
               id: `temp-${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
               nome: nomeEmpresa,
-              nome_fantasia_volumetria: nomeEmpresa,
+              nome_mobilemed: nomeEmpresa,
               email: `${nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.temporario.com`,
               ativo: true,
               status: 'Ativo'
@@ -180,11 +180,11 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
-              // Buscar TODOS os dados de volumetria do cliente no período usando APENAS Cliente_Nome_Fantasia
+              // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
-                .select('"Cliente_Nome_Fantasia","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia_volumetria) // CORRIGIDO: usar nome_fantasia_volumetria
+                .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
+                .eq('"EMPRESA"', cliente.nome_mobilemed) // CORRIGIDO: usar nome_mobilemed que mapeia com EMPRESA
                 .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
 
               if (vmErr) {
