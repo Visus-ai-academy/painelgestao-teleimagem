@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { periodo_referencia = '06/2025', acao = 'verificar' } = await req.json()
+    const { periodo_referencia = '2025-06', acao = 'verificar' } = await req.json()
 
     console.log('🔍 VERIFICANDO REGISTROS SEM DATA_LAUDO')
     console.log(`📅 Período: ${periodo_referencia}`)

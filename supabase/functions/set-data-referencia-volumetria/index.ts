@@ -13,13 +13,11 @@ interface PeriodoFaturamento {
 
 /**
  * Converte o período de faturamento em data_referencia e periodo_referencia
- * Ex: {ano: 2025, mes: 6} -> data_referencia: '2025-06-01', periodo_referencia: 'jun/25'
+ * Ex: {ano: 2025, mes: 6} -> data_referencia: '2025-06-01', periodo_referencia: '2025-06'
  */
 function gerarDataReferencia(periodo: PeriodoFaturamento): { data_referencia: string; periodo_referencia: string } {
-  const mesNomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  
   const data_referencia = `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}-01`;
-  const periodo_referencia = `${mesNomes[periodo.mes - 1]}/${String(periodo.ano).slice(-2)}`;
+  const periodo_referencia = `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}`;
   
   return { data_referencia, periodo_referencia };
 }

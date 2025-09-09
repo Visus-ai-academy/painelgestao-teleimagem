@@ -55,7 +55,7 @@ export function TesteRegras27() {
       const { data, error } = await supabase.functions.invoke('aplicar-27-regras-completas', {
         body: {
           aplicar_todos_arquivos: true,
-          periodo_referencia: '06/2025'
+          periodo_referencia: '2025-06'
         }
       });
 

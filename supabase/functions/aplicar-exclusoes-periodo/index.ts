@@ -71,7 +71,7 @@ serve(async (req) => {
     let dataInicioJanelaLaudo: Date;
     let dataFimJanelaLaudo: Date;
     
-    if (periodo_referencia === 'jun/25') {
+    if (periodo_referencia === '2025-06') {
       dataLimiteRealizacao = new Date('2025-06-01'); // v003: excluir >= esta data
       dataInicioJanelaLaudo = new Date('2025-06-08'); // v002: janela válida início
       dataFimJanelaLaudo = new Date('2025-07-07');   // v002: janela válida fim
