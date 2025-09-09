@@ -91,7 +91,8 @@ export default function DemonstrativoFaturamento() {
         .from('volumetria_mobilemed')
         .select('"EMPRESA"')
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
-        .not('"EMPRESA"', 'is', null);
+        .not('"EMPRESA"', 'is', null)
+        .limit(50000); // Aumentar limite explicitamente
       
       console.log('📊 Clientes encontrados na volumetria (formato YYYY-MM):', clientesVolumetria?.length || 0);
       
@@ -120,7 +121,8 @@ export default function DemonstrativoFaturamento() {
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
         .not('cliente_nome', 'is', null) // Garantir que cliente_nome não seja nulo
-        .order('cliente_nome'); // REMOVIDO O LIMIT COMPLETAMENTE - sem limitação
+        .order('cliente_nome')
+        .limit(50000); // Aumentar limite explicitamente para garantir todos os dados
 
       console.log('📊 Dados de faturamento encontrados:', dadosFaturamento?.length || 0);
       console.log('🔍 Período usado na busca (direto YYYY-MM):', periodo);
@@ -165,7 +167,8 @@ export default function DemonstrativoFaturamento() {
             `)
             .eq('periodo_referencia', periodo)
             .not('Cliente_Nome_Fantasia', 'is', null)
-            .not('VALORES', 'is', null);
+            .not('VALORES', 'is', null)
+            .limit(50000); // Aumentar limite explicitamente
             
           if (errorVolumetria) {
             console.error('❌ Erro ao carregar volumetria:', errorVolumetria);

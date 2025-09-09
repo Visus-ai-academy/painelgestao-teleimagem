@@ -119,7 +119,7 @@ export function VolumetriaRetroativoRules() {
         .select('arquivo_fonte, data_referencia, periodo_referencia, created_at')
         .like('arquivo_fonte', '%retroativo%')
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .limit(10000); // Aumentar limite para garantir que todos os dados sejam processados
 
       if (error) {
         console.error('Erro ao carregar dados:', error);

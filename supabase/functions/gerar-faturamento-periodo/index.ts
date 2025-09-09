@@ -115,7 +115,8 @@ serve(async (req) => {
         )
       `)
       .eq('ativo', true)
-      .eq('status', 'Ativo');
+      .eq('status', 'Ativo')
+      .limit(50000); // Aumentar limite explicitamente
 
     if (clientesError) throw clientesError;
 
@@ -126,7 +127,8 @@ serve(async (req) => {
     const { data: mapeamentos } = await supabase
       .from('mapeamento_nomes_clientes')
       .select('nome_arquivo, nome_sistema')
-      .eq('ativo', true);
+      .eq('ativo', true)
+      .limit(50000); // Aumentar limite explicitamente
 
     const mapeamentosMap = new Map();
     mapeamentos?.forEach(m => {
@@ -155,7 +157,8 @@ serve(async (req) => {
           .from('volumetria_mobilemed')
           .select('"EMPRESA"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
-          .not('"EMPRESA"', 'is', null);
+          .not('"EMPRESA"', 'is', null)
+          .limit(50000); // Aumentar limite explicitamente para processar todos os clientes
         
         // Coletar APENAS nomes de EMPRESA
         const nomesClientesSet = new Set();
@@ -175,7 +178,8 @@ serve(async (req) => {
             contratos_clientes (
               id, tem_precos_configurados, status
             )
-          `); // REMOVER FILTROS para pegar TODOS
+          `)
+          .limit(50000); // Aumentar limite explicitamente para buscar TODOS os clientes
         
         // Criar mapa usando nome_mobilemed para identificação (campo que mapeia com EMPRESA)
         const clientesMap = new Map();
@@ -261,7 +265,8 @@ serve(async (req) => {
                 .from('volumetria_mobilemed')
                 .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
                 .eq('"EMPRESA"', cliente.nome_mobilemed) // CORRIGIDO: usar nome_mobilemed que mapeia com EMPRESA
-                .eq('periodo_referencia', periodoFormatado); // Usar período normalizado - SEM FILTRO DE VALORES
+                .eq('periodo_referencia', periodoFormatado) // Usar período normalizado - SEM FILTRO DE VALORES
+                .limit(50000); // Aumentar limite explicitamente para processar todos os registros do cliente
 
               if (vmErr) {
                 console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);

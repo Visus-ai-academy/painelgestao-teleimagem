@@ -42,7 +42,7 @@ export function VolumetriaExamesNaoIdentificados() {
         .from('volumetria_mobilemed')
         .select('ESTUDO_DESCRICAO, MODALIDADE, ESPECIALIDADE, arquivo_fonte, VALORES')
         .or('VALORES.eq.0,VALORES.is.null')
-        .limit(10000);
+        .limit(50000); // Aumentar limite para garantir que todos os exames zerados sejam analisados
 
       if (volumetriaError) {
         console.error('❌ Erro ao buscar volumetria:', volumetriaError);
