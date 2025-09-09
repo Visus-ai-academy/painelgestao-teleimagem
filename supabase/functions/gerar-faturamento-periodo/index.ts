@@ -123,12 +123,10 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista: ${nomesClientesComVolumetria.join(', ')}`);
         
         // PROCESSAR TODOS OS CLIENTES DA VOLUMETRIA (criar registros temporários se necessário)
-        // Buscar dados completos dos clientes na tabela usando nome_mobilemed
+        // Buscar dados completos dos clientes na tabela usando nome_mobilemed - SEM LIMITAÇÃO
         const { data: todosClientes } = await supabase
           .from('clientes')
-          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status')
-          .eq('ativo', true)
-          .eq('status', 'Ativo');
+          .select('id, nome, nome_fantasia, nome_mobilemed, email, ativo, status'); // REMOVER FILTROS para pegar TODOS
         
         // Criar mapa usando nome_mobilemed para identificação (campo que mapeia com EMPRESA)
         const clientesMap = new Map();
@@ -172,11 +170,8 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Primeiros 10 clientes: ${clientesParaProcessar.slice(0, 10).map(c => c.nome).join(', ')}`);
         console.log(`[gerar-faturamento-periodo] Clientes da volumetria vs cadastrados vs processados: ${nomesClientesComVolumetria.length} vs ${todosClientes?.length || 0} vs ${clientesParaProcessar.length}`);
         
-        for (let i = 0; i < clientesParaProcessar.length; i += loteSize) {
-          const loteClientes = clientesParaProcessar.slice(i, i + loteSize);
-          console.log(`[gerar-faturamento-periodo] Processando lote ${Math.floor(i/loteSize) + 1}/${Math.ceil(clientesParaProcessar.length/loteSize)}`);
-          
-          for (const cliente of loteClientes) {
+        // PROCESSAR TODOS OS CLIENTES - SEM LIMITAÇÃO DE LOTES
+        for (const cliente of clientesParaProcessar) {
             try {
               console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + loteClientes.indexOf(cliente) + 1}/${clientesParaProcessar.length})`);
             
@@ -296,27 +291,21 @@ serve(async (req) => {
               }
 
               if (itensInserir.length > 0) {
-                const batchSize = 50; // Reduzir tamanho do lote
-                for (let j = 0; j < itensInserir.length; j += batchSize) {
-                  const lote = itensInserir.slice(j, j + batchSize);
-                  const { error: insErr } = await supabase.from('faturamento').insert(lote);
-                  if (insErr) {
-                    console.log(`[gerar-faturamento-periodo] Erro ao inserir lote (${cliente.nome}):`, insErr.message);
-                  }
+                // INSERIR TODOS OS ITENS DE UMA VEZ - SEM LIMITAÇÃO DE LOTE
+                const { error: insErr } = await supabase.from('faturamento').insert(itensInserir);
+                if (insErr) {
+                  console.log(`[gerar-faturamento-periodo] Erro ao inserir itens (${cliente.nome}):`, insErr.message);
+                } else {
+                  totalItens += itensInserir.length;
+                  clientesComDados++;
+                  console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
                 }
-                totalItens += itensInserir.length;
-                clientesComDados++;
-                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
               }
             } catch (clienteError: any) {
               console.error(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}:`, clienteError.message);
               // Continuar com próximo cliente mesmo em caso de erro
               continue;
             }
-          }
-          
-          // Pausa pequena entre lotes para não sobrecarregar
-          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {

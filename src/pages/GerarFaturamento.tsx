@@ -92,15 +92,14 @@ export default function GerarFaturamento() {
     if (!periodoSelecionado) return;
     
     try {
-      const { data: dadosFaturamento } = await supabase
+      const { count } = await supabase
         .from('faturamento')
-        .select('cliente_nome')
-        .eq('periodo_referencia', periodoSelecionado)
-        .limit(1);
+        .select('cliente_nome', { count: 'exact', head: true })
+        .eq('periodo_referencia', periodoSelecionado);
       
-      const temDados = dadosFaturamento && dadosFaturamento.length > 0;
+      const temDados = count && count > 0;
       setDemonstrativoGerado(temDados);
-      console.log('🎯 Demonstrativo gerado:', temDados, 'para período:', periodoSelecionado);
+      console.log('🎯 Demonstrativo gerado:', temDados, 'registros:', count, 'para período:', periodoSelecionado);
     } catch (error) {
       console.error('Erro ao verificar demonstrativo:', error);
       setDemonstrativoGerado(false);
@@ -317,12 +316,12 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // CORRIGIDO: Buscar APENAS clientes únicos da volumetria do período usando Cliente_Nome_Fantasia
+      // BUSCAR TODOS os clientes únicos da volumetria do período usando EMPRESA (não Cliente_Nome_Fantasia)  
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia"')
+        .select('"EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM direto
-        .not('"Cliente_Nome_Fantasia"', 'is', null);
+        .not('"EMPRESA"', 'is', null);
 
       if (errorVolumetria) {
         console.error('❌ Erro na consulta volumetria:', errorVolumetria);
@@ -332,8 +331,8 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // Buscar apenas clientes únicos da volumetria por Cliente_Nome_Fantasia
-        const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia).filter(Boolean))];
+        // Buscar apenas clientes únicos da volumetria por EMPRESA
+        const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
         
         for (const nomeCliente of nomesUnicos) {

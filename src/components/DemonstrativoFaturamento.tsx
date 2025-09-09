@@ -74,12 +74,12 @@ export default function DemonstrativoFaturamento() {
       console.log('🔍 Buscando dados para período de referência:', periodoRef);
       console.log('💡 Período original selecionado:', periodo);
       
-      // PRIMEIRO: Verificar se há clientes com volumetria para este período no formato YYYY-MM
+      // BUSCAR TODOS os clientes únicos da volumetria do período usando EMPRESA  
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('EMPRESA')
-        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM para volumetria
-        .not('EMPRESA', 'is', null); // Remover limite completamente para capturar TODOS os registros
+        .select('"EMPRESA"')
+        .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
+        .not('"EMPRESA"', 'is', null);
       
       console.log('📊 Clientes encontrados na volumetria (formato YYYY-MM):', clientesVolumetria?.length || 0);
       
