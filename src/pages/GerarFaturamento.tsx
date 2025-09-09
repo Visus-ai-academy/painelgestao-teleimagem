@@ -153,7 +153,12 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Relatórios
   const resultadosFiltradosRelatorios = useMemo(() => {
-    let filtrados = [...resultados];
+    // Primeiro, remover duplicatas por clienteId
+    const uniqueResults = resultados.filter((resultado, index, array) => 
+      array.findIndex(r => r.clienteId === resultado.clienteId) === index
+    );
+    
+    let filtrados = [...uniqueResults];
     
     if (filtroClienteRelatorios) {
       filtrados = filtrados.filter(resultado => 
@@ -171,7 +176,12 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Gerar (Status por Cliente)
   const resultadosFiltradosStatus = useMemo(() => {
-    let filtrados = [...resultados];
+    // Primeiro, remover duplicatas por clienteId
+    const uniqueResults = resultados.filter((resultado, index, array) => 
+      array.findIndex(r => r.clienteId === resultado.clienteId) === index
+    );
+    
+    let filtrados = [...uniqueResults];
     
     if (filtroClienteStatus) {
       filtrados = filtrados.filter(resultado => 
@@ -321,7 +331,8 @@ export default function GerarFaturamento() {
         .from('volumetria_mobilemed')
         .select('"EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM direto
-        .not('"EMPRESA"', 'is', null);
+        .not('"EMPRESA"', 'is', null)
+        .not('"EMPRESA"', 'eq', '');
 
       if (errorVolumetria) {
         console.error('❌ Erro na consulta volumetria:', errorVolumetria);
@@ -331,24 +342,22 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // Buscar apenas clientes únicos da volumetria por EMPRESA
+        // Buscar apenas clientes únicos da volumetria por EMPRESA  
         const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
         
         for (const nomeCliente of nomesUnicos) {
-          // Buscar cliente cadastrado para obter email
+          // Buscar cliente cadastrado para obter email (sem filtros de ativo/status)
           const { data: emailCliente } = await supabase
             .from('clientes')
             .select('id, nome, email, nome_fantasia, nome_mobilemed')
             .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
-            .eq('ativo', true)
-            .eq('status', 'Ativo')
             .limit(1);
 
           clientesFinais.push({
             id: emailCliente?.[0]?.id || `temp-${nomeCliente}`,
             nome: nomeCliente,
-            // Usar email do cliente cadastrado se encontrado
+            // Usar email do cliente cadastrado se encontrado, senão gerar email padrão
             email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
           });
         }
@@ -375,13 +384,14 @@ export default function GerarFaturamento() {
       setClientesCarregados(clientesFinais);
       localStorage.setItem('clientesCarregados', JSON.stringify(clientesFinais));
       
-      // Inicializar resultados para todos os clientes
+      // Inicializar resultados para todos os clientes SEM erros padrão
       const novosResultados = clientesFinais.map(cliente => ({
         clienteId: cliente.id,
         clienteNome: cliente.nome,
         relatorioGerado: false,
         emailEnviado: false,
         emailDestino: cliente.email
+        // Não definir erro aqui - apenas se houver erro real
       }));
       
       setResultados(novosResultados);
@@ -944,12 +954,12 @@ export default function GerarFaturamento() {
                 </div>
 
                 {/* Erros */}
-                {resultados.filter(r => r.erro).length > 0 && (
+                {resultados.filter(r => r.erro && r.erro.trim()).length > 0 && (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-red-600">Erros</span>
                       <span className="text-sm font-bold text-red-600">
-                        {resultados.filter(r => r.erro).length} de {clientesCarregados.length}
+                        {resultados.filter(r => r.erro && r.erro.trim()).length} de {clientesCarregados.length}
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -957,7 +967,7 @@ export default function GerarFaturamento() {
                         className="h-full bg-gradient-to-r from-red-400 to-red-600 transition-all duration-1000 ease-out"
                         style={{ 
                           width: clientesCarregados.length > 0 
-                            ? `${Math.min(100, (resultados.filter(r => r.erro).length / clientesCarregados.length) * 100)}%` 
+                            ? `${Math.min(100, (resultados.filter(r => r.erro && r.erro.trim()).length / clientesCarregados.length) * 100)}%` 
                             : '0%' 
                         }}
                       />
@@ -1043,23 +1053,23 @@ export default function GerarFaturamento() {
               </div>
               
               {/* Mostrar erros se houver */}
-              {resultados.length > 0 && resultados.some(r => r.erro) && (
+              {resultados.length > 0 && resultados.some(r => r.erro && r.erro.trim()) && (
                 <div className="mt-4 space-y-2">
                   <h4 className="font-semibold text-red-600 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    Erros Encontrados ({resultados.filter(r => r.erro).length}):
+                    Erros Encontrados ({resultados.filter(r => r.erro && r.erro.trim()).length}):
                   </h4>
-                  {resultados.filter(r => r.erro).map(resultado => (
-                    <div key={resultado.clienteId} className="text-sm p-3 bg-red-50 border border-red-200 rounded">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <span className="font-medium text-red-800">{resultado.clienteNome}:</span>
-                          <p className="text-red-700 mt-1">{resultado.erro}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                   {resultados.filter(r => r.erro && r.erro.trim()).map(resultado => (
+                     <div key={resultado.clienteId} className="text-sm p-3 bg-red-50 border border-red-200 rounded">
+                       <div className="flex items-start gap-2">
+                         <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                         <div>
+                           <span className="font-medium text-red-800">{resultado.clienteNome}:</span>
+                           <p className="text-red-700 mt-1">{resultado.erro}</p>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
                 </div>
               )}
             </CardContent>
