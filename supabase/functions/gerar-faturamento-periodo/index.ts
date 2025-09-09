@@ -229,9 +229,9 @@ serve(async (req) => {
           }
           
           if (clienteExistente) {
-            // Verificar se tem contrato ativo com preços configurados
+            // Verificar se tem contrato ativo
             const contratoAtivo = clienteExistente.contratos_clientes?.find(c => 
-              c.status === 'ativo' && c.tem_precos_configurados === true
+              c.status === 'ativo'
             );
             
             const clienteProcessado = {
@@ -240,10 +240,22 @@ serve(async (req) => {
             };
             
             if (contratoAtivo) {
-              console.log(`[gerar-faturamento-periodo] Cliente COM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
-              clientesComPrecos.push(clienteProcessado);
+              // Verificar diretamente se existem preços configurados na tabela precos_servicos
+              const { data: precosExistem } = await supabase
+                .from('precos_servicos')
+                .select('id')
+                .eq('cliente_id', clienteExistente.id)
+                .limit(1);
+              
+              if (precosExistem && precosExistem.length > 0) {
+                console.log(`[gerar-faturamento-periodo] Cliente COM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
+                clientesComPrecos.push(clienteProcessado);
+              } else {
+                console.log(`[gerar-faturamento-periodo] Cliente SEM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome}) - sem registros em precos_servicos`);
+                clientesPendentes.push(clienteProcessado);
+              }
             } else {
-              console.log(`[gerar-faturamento-periodo] Cliente SEM PREÇOS: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
+              console.log(`[gerar-faturamento-periodo] Cliente SEM CONTRATO ATIVO: ${nomeEmpresa} -> ${clienteExistente.id} (${clienteExistente.nome})`);
               clientesPendentes.push(clienteProcessado);
             }
             
