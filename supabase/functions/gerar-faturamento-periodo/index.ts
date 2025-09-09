@@ -278,7 +278,7 @@ serve(async (req) => {
 
                 // PULAR ITENS SEM PREÇO CONFIGURADO (não usar preço padrão)
                 if (valor <= 0) {
-                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO - PULANDO ITEM:`);
+                  console.log(`[gerar-faturamento-periodo] PREÇO NÃO ENCONTRADO - INCLUINDO COM VALOR ZERO:`);
                   console.log(`  Cliente: ${cliente.nome}`);
                   console.log(`  Paciente: ${paciente}`);
                   console.log(`  Exame: ${chave.estudo}`);
@@ -287,8 +287,9 @@ serve(async (req) => {
                   console.log(`  Quantidade (qtd): ${qtd}`);
                   console.log(`  Preço unitário (unit): ${unit}`);
                   console.log(`  Volume total: ${volumeTotal}`);
-                  console.log(`  MOTIVO: Cliente sem tabela de preços configurada para esta combinação`);
-                  continue; // Pular este item
+                  console.log(`  OBSERVAÇÃO: Cliente sem tabela de preços - incluindo item com valor zero para análise`);
+                  // NÃO fazer continue - incluir item com valor zero
+                  valor = 0; // Garantir valor zero para análise
                 }
 
                 const hoje = new Date();
