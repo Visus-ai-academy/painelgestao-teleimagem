@@ -36,7 +36,7 @@ serve(async (req) => {
     console.log('[gerar-demonstrativo-divergencias] Buscando dados de volumetria...');
 
     // Verificar se existem dados para o período
-    const { data: countData, error: countError } = await supabase
+    const { count: totalCount, error: countError } = await supabase
       .from('volumetria_mobilemed')
       .select('*', { count: 'exact', head: true })
       .eq('periodo_referencia', periodo);
@@ -46,9 +46,9 @@ serve(async (req) => {
       throw countError;
     }
 
-    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período: ${countData?.length || 0}`);
+    console.log(`[gerar-demonstrativo-divergencias] Total de registros no período: ${totalCount || 0}`);
 
-    if (!countData || countData.length === 0) {
+    if (!totalCount || totalCount === 0) {
       return new Response(JSON.stringify({
         success: false,
         error: `Dados não encontrados. Nenhum dado encontrado para ${periodo}. Verifique se há dados de volumetria carregados para este período.`
