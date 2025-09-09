@@ -4,7 +4,7 @@ project_id = "atbvikgxdcohnznkmaus"
 # Critical security fix: No public endpoints without explicit validation
 
 [functions.gerar-demonstrativo-divergencias]
-verify_jwt = true
+verify_jwt = false
 
 [functions.processar-exames]
 verify_jwt = true
