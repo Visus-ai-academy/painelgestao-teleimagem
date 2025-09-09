@@ -135,18 +135,16 @@ serve(async (req) => {
       mapeamentosMap.set(m.nome_arquivo.toUpperCase().trim(), m.nome_sistema.toUpperCase().trim());
     });
 
-    // Retornar resposta imediata e processar em background
-    const backgroundTask = async () => {
-      try {
-        console.log('[gerar-faturamento-periodo] Iniciando processamento em background...');
-        
-        // 1. LIMPAR DADOS ANTERIORES DO PERÍODO (ambos os formatos)
-        console.log(`[gerar-faturamento-periodo] Limpando dados anteriores do período ${periodoFormatado} e ${periodoRefMonyy}`);
-        await supabase.from('faturamento').delete().eq('periodo_referencia', periodoFormatado);
-        await supabase.from('faturamento').delete().eq('periodo_referencia', periodoRefMonyy);
+    // Processar imediatamente (sem background task para evitar problemas com EdgeRuntime)
+    console.log('[gerar-faturamento-periodo] Iniciando processamento...');
+    
+    // 1. LIMPAR DADOS ANTERIORES DO PERÍODO (ambos os formatos)
+    console.log(`[gerar-faturamento-periodo] Limpando dados anteriores do período ${periodoFormatado} e ${periodoRefMonyy}`);
+    await supabase.from('faturamento').delete().eq('periodo_referencia', periodoFormatado);
+    await supabase.from('faturamento').delete().eq('periodo_referencia', periodoRefMonyy);
 
-        let totalItens = 0;
-        let clientesComDados = 0;
+    let totalItens = 0;
+    let clientesComDados = 0;
 
         // Processar TODOS os clientes que têm dados de volumetria
         const loteSize = 10; // Reduzir para evitar timeout
@@ -438,38 +436,34 @@ serve(async (req) => {
             }
         }
 
-        console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {
-          totalItens,
-          clientesComDados,
-          clientesComPrecos: clientesComPrecos.length,
-          clientesPendentes: clientesPendentes.length,
-          clientesTotais: nomesClientesComVolumetria.length
-        });
+    console.log('[gerar-faturamento-periodo] PROCESSAMENTO CONCLUÍDO:', {
+      totalItens,
+      clientesComDados,
+      clientesComPrecos: clientesComPrecos.length,
+      clientesPendentes: clientesPendentes.length,
+      clientesTotais: nomesClientesComVolumetria.length
+    });
 
-        // Criar resumo das pendências
-        const resumoPendencias = clientesPendentes.map(cliente => ({
-          nome: cliente.nome,
-          motivo: cliente.id.startsWith('temp-') ? 'Cliente não cadastrado' : 'Cliente sem contrato ativo ou preços configurados'
-        }));
+    // Criar resumo das pendências
+    const resumoPendencias = clientesPendentes.map(cliente => ({
+      nome: cliente.nome,
+      motivo: cliente.id.startsWith('temp-') ? 'Cliente não cadastrado' : 'Cliente sem contrato ativo ou preços configurados'
+    }));
 
-        console.log('[gerar-faturamento-periodo] CLIENTES PENDENTES:', resumoPendencias);
+    console.log('[gerar-faturamento-periodo] CLIENTES PENDENTES:', resumoPendencias);
 
-      } catch (error: any) {
-        console.error('[gerar-faturamento-periodo] Erro no background:', error);
-      }
-    };
-
-    // Iniciar tarefa em background
-    EdgeRuntime.waitUntil(backgroundTask());
-
-    // Retornar resposta imediata
+    // Retornar resposta com resultado do processamento
     return new Response(JSON.stringify({
       success: true,
       periodo: periodoFormatado,
       periodo_referencia: periodoRefMonyy,
-      clientes_processados: clientesAtivos.length,
-      message: 'Processamento iniciado em background - agora usa formato normalizado YYYY-MM',
-      status: 'processing'
+      total_itens: totalItens,
+      clientes_com_dados: clientesComDados,
+      clientes_com_precos: clientesComPrecos.length,
+      clientes_pendentes: clientesPendentes.length,
+      total_clientes: nomesClientesComVolumetria.length,
+      pendencias: resumoPendencias,
+      message: 'Processamento concluído com sucesso'
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
