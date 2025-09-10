@@ -81,20 +81,55 @@ serve(async (req) => {
 
     console.log(`Processando ${clientes.length} clientes...`);
 
+    // Agrupar clientes por nome_fantasia para evitar duplicatas (ex: PRN)
+    const clientesAgrupados = new Map();
+    
+    for (const cliente of clientes) {
+      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      if (!clientesAgrupados.has(nomeFantasia)) {
+        clientesAgrupados.set(nomeFantasia, {
+          id: cliente.id,
+          nome: cliente.nome,
+          nome_fantasia: nomeFantasia,
+          nomes_mobilemed: [cliente.nome], // Array para múltiplos nomes MobileMed
+          parametros_faturamento: cliente.parametros_faturamento
+        });
+      } else {
+        // Adicionar nome adicional para busca na volumetria
+        clientesAgrupados.get(nomeFantasia).nomes_mobilemed.push(cliente.nome);
+      }
+    }
+
+    console.log(`📋 ${clientesAgrupados.size} clientes únicos após agrupamento por nome fantasia`);
+
     const demonstrativos: DemonstrativoCliente[] = [];
     let processados = 0;
 
-    // Processar cada cliente
-    for (const cliente of clientes) {
+    // Processar cada cliente agrupado
+    for (const cliente of clientesAgrupados.values()) {
       try {
         console.log(`Processando cliente: ${cliente.nome}`);
 
-        // Buscar volumetria do período para calcular volume total
-        const { data: volumetria, error: volumetriaError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('VALORES, MODALIDADE, ESPECIALIDADE, PRIORIDADE, CATEGORIA, ESTUDO_DESCRICAO')
-          .ilike('EMPRESA', cliente.nome)
-          .eq('periodo_referencia', periodo);
+        // Buscar volumetria do período SEM LIMITAÇÃO usando função RPC
+        console.log(`🔍 Buscando TODOS os dados da volumetria para cliente: ${cliente.nome_fantasia}`);
+        
+        const { data: volumetriaTodos, error: volumetriaErroCompleto } = await supabase.rpc('get_volumetria_complete_data');
+        
+        if (volumetriaErroCompleto) {
+          console.error(`❌ Erro ao buscar volumetria completa:`, volumetriaErroCompleto);
+          continue;
+        }
+        
+        // Filtrar dados para TODOS os nomes MobileMed deste cliente (SEM LIMITAÇÃO)
+        const volumetria = volumetriaTodos?.filter(item => 
+          item.EMPRESA && 
+          item.periodo_referencia === periodo &&
+          cliente.nomes_mobilemed.some(nome => 
+            item.EMPRESA.toLowerCase().includes(nome.toLowerCase())
+          )
+        ) || [];
+        
+        console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria`);
 
         if (volumetriaError) {
           console.error(`Erro na volumetria para ${cliente.nome}:`, volumetriaError);
@@ -220,10 +255,10 @@ serve(async (req) => {
         demonstrativos.push(demonstrativo);
         processados++;
         
-        console.log(`Cliente ${cliente.nome} processado com sucesso - Total: R$ ${demonstrativo.valor_total.toFixed(2)}`);
+        console.log(`Cliente ${cliente.nome_fantasia} processado com sucesso - Total: R$ ${demonstrativo.valor_total.toFixed(2)} (${totalExames} exames)`);
 
       } catch (error) {
-        console.error(`Erro ao processar cliente ${cliente.nome}:`, error);
+        console.error(`Erro ao processar cliente ${cliente.nome_fantasia}:`, error);
         continue;
       }
     }
