@@ -82,22 +82,33 @@ serve(async (req) => {
 
     console.log(`Processando ${clientes.length} clientes...`);
 
-    // Agrupar clientes por nome_fantasia para evitar duplicatas (ex: PRN)
+    // Agrupar clientes por nome_fantasia para evitar duplicatas 
     const clientesAgrupados = new Map();
     
     for (const cliente of clientes) {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      
       if (!clientesAgrupados.has(nomeFantasia)) {
         clientesAgrupados.set(nomeFantasia, {
           id: cliente.id,
           nome: cliente.nome,
           nome_fantasia: nomeFantasia,
-          nomes_mobilemed: [cliente.nome], // Array para múltiplos nomes MobileMed
+          nomes_mobilemed: [
+            cliente.nome, // Nome principal
+            cliente.nome_mobilemed, // Nome MobileMed se existir
+            nomeFantasia // Nome fantasia
+          ].filter(Boolean), // Remove valores null/undefined
           parametros_faturamento: cliente.parametros_faturamento
         });
       } else {
-        // Adicionar nome adicional para busca na volumetria
-        clientesAgrupados.get(nomeFantasia).nomes_mobilemed.push(cliente.nome);
+        // Adicionar nomes adicionais para busca na volumetria
+        const clienteExistente = clientesAgrupados.get(nomeFantasia);
+        if (cliente.nome && !clienteExistente.nomes_mobilemed.includes(cliente.nome)) {
+          clienteExistente.nomes_mobilemed.push(cliente.nome);
+        }
+        if (cliente.nome_mobilemed && !clienteExistente.nomes_mobilemed.includes(cliente.nome_mobilemed)) {
+          clienteExistente.nomes_mobilemed.push(cliente.nome_mobilemed);
+        }
       }
     }
 
@@ -111,33 +122,34 @@ serve(async (req) => {
       try {
     console.log('Processando cliente:', cliente.nome_fantasia);
 
-    // Buscar volumetria do período SEM LIMITAÇÃO usando função RPC
-    console.log(`🔍 Buscando TODOS os dados da volumetria para cliente: ${cliente.nome_fantasia}`);
+    // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
+    console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
     
-    const { data: volumetriaTodos, error: volumetriaErroCompleto } = await supabase.rpc('get_volumetria_complete_data');
+    const { data: volumetria, error: volumetriaError } = await supabase
+      .from('volumetria_mobilemed')
+      .select(`
+        "EMPRESA",
+        "MODALIDADE", 
+        "ESPECIALIDADE",
+        "CATEGORIA",
+        "PRIORIDADE", 
+        "VALORES",
+        "MEDICO",
+        "DATA_LAUDO",
+        "DATA_PRAZO",
+        periodo_referencia
+      `)
+      .eq('periodo_referencia', periodo)
+      .in('"EMPRESA"', cliente.nomes_mobilemed)
+      .not('"VALORES"', 'is', null)
+      .limit(50000); // Limite alto para garantir que pega todos os dados
     
-    if (volumetriaErroCompleto) {
-      console.error(`❌ ERRO CRÍTICO - Falha ao buscar volumetria:`, volumetriaErroCompleto);
+    if (volumetriaError) {
+      console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
       continue;
     }
-
-    console.log(`📊 Total de registros na volumetria: ${volumetriaTodos?.length || 0}`);
     
-    // Filtrar dados para TODOS os nomes MobileMed deste cliente
-    const volumetria = volumetriaTodos?.filter(item => {
-      const matchPeriodo = item.periodo_referencia === periodo;
-      const matchCliente = item.EMPRESA && 
-        cliente.nomes_mobilemed.some(nome => 
-          item.EMPRESA.toLowerCase().includes(nome.toLowerCase()) ||
-          item.EMPRESA === nome
-        );
-      
-      console.log(`🔍 Verificando registro: EMPRESA=${item.EMPRESA}, periodo=${item.periodo_referencia}, match_periodo=${matchPeriodo}, match_cliente=${matchCliente}`);
-      
-      return matchPeriodo && matchCliente;
-    }) || [];
-    
-    console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria para período ${periodo}`);
+    console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria?.length || 0} registros encontrados na volumetria para período ${periodo}`);
     
     if (volumetria && volumetria.length > 0) {
       // Log uma amostra dos dados encontrados
@@ -152,11 +164,7 @@ serve(async (req) => {
       })));
     } else {
       console.warn(`⚠️ PROBLEMA: Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
-      console.log(`🔍 Verificando se cliente existe na volumetria:`, {
-        cliente: cliente.nome_fantasia,
-        nomes_mobilemed: cliente.nomes_mobilemed,
-        periodo_buscado: periodo
-      });
+      console.log(`🔍 Nomes MobileMed para busca:`, cliente.nomes_mobilemed);
     }
 
         const totalExames = volumetria?.length || 0;
@@ -219,10 +227,6 @@ serve(async (req) => {
                 erro: precoError?.message || 'nenhum'
               });
 
-              if (precoError) {
-                console.error(`❌ Erro na função calcular_preco_exame:`, precoError);
-              }
-
               if (!precoError && preco && preco > 0) {
                 grupo.valor_unitario = preco;
                 const valorGrupo = grupo.quantidade * preco;
@@ -230,42 +234,59 @@ serve(async (req) => {
                 
                 detalhesExames.push({
                   ...grupo,
-                  valor_total: valorGrupo
+                  valor_total: valorGrupo,
+                  status: 'preco_encontrado'
                 });
                 
                 console.log(`💰 Preço encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} = R$ ${preco.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               } else {
-                console.warn(`⚠️ Preço não encontrado/inválido para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames) - preco: ${preco}`);
-                
-                // Verificar se existem preços para este cliente
-                const { data: precosCliente, error: precosError } = await supabase
+                // Fallback 1: Buscar preço genérico para modalidade/especialidade (sem categoria específica)
+                const { data: precoGenerico, error: precoGenericoError } = await supabase
                   .from('precos_servicos')
-                  .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia')
+                  .select('valor_base, valor_urgencia')
                   .eq('cliente_id', cliente.id)
-                  .limit(10);
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .limit(1);
                 
-                if (precosError) {
-                  console.error(`❌ Erro ao buscar preços do cliente ${cliente.nome_fantasia}:`, precosError);
-                } else {
-                  console.log(`📋 Total de preços cadastrados para ${cliente.nome_fantasia}: ${precosCliente?.length || 0}`);
-                  if (precosCliente && precosCliente.length > 0) {
-                    console.log(`📋 Amostra de preços para ${cliente.nome_fantasia}:`, precosCliente.slice(0, 3));
+                let precoEncontrado = null;
+                
+                if (!precoGenericoError && precoGenerico && precoGenerico.length > 0) {
+                  const isUrgencia = grupo.prioridade && grupo.prioridade.toLowerCase().includes('urgencia');
+                  precoEncontrado = isUrgencia ? precoGenerico[0].valor_urgencia : precoGenerico[0].valor_base;
+                  precoEncontrado = precoEncontrado || precoGenerico[0].valor_base; // fallback
+                }
+                
+                // Fallback 2: Buscar qualquer preço para o cliente (última tentativa)
+                if (!precoEncontrado || precoEncontrado <= 0) {
+                  const { data: qualquerPreco, error: qualquerPrecoError } = await supabase
+                    .from('precos_servicos')
+                    .select('valor_base, valor_urgencia')
+                    .eq('cliente_id', cliente.id)
+                    .not('valor_base', 'is', null)
+                    .gt('valor_base', 0)
+                    .limit(1);
+                  
+                  if (!qualquerPrecoError && qualquerPreco && qualquerPreco.length > 0) {
+                    precoEncontrado = qualquerPreco[0].valor_base;
+                    console.log(`🔄 Usando preço genérico do cliente: R$ ${precoEncontrado.toFixed(2)}`);
                   }
                 }
                 
-                // Usar valor fallback se não encontrou preço
-                const valorFallback = 5.5; // Valor padrão
-                const valorGrupo = grupo.quantidade * valorFallback;
+                // Usar preço encontrado ou fallback final
+                const valorFinal = precoEncontrado && precoEncontrado > 0 ? Number(precoEncontrado) : 5.5;
+                const valorGrupo = grupo.quantidade * valorFinal;
                 valorExames += valorGrupo;
                 
                 detalhesExames.push({
                   ...grupo,
                   valor_total: valorGrupo,
-                  valor_unitario: valorFallback,
-                  problema: `Usando valor fallback de R$ ${valorFallback.toFixed(2)} - Preço não encontrado`
+                  valor_unitario: valorFinal,
+                  status: precoEncontrado ? 'preco_generico' : 'valor_fallback',
+                  problema: !precoEncontrado ? `Preço não encontrado - usando fallback R$ ${valorFinal.toFixed(2)}` : undefined
                 });
                 
-                console.log(`🔄 Usando valor fallback: ${grupo.modalidade}/${grupo.especialidade} = R$ ${valorFallback.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
+                console.log(`💰 Preço ${precoEncontrado ? 'genérico' : 'fallback'}: ${grupo.modalidade}/${grupo.especialidade} = R$ ${valorFinal.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               }
             } catch (error) {
               console.error(`❌ Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
