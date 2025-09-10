@@ -71,8 +71,11 @@ const COLUMN_MAPPING = {
   formaCobranca: ['Forma Cobrança', 'FORMA COBRANÇA']
 };
 
-function findColumnValue(row: ParametroRow, possibleNames: string[]): any {
-  for (const name of possibleNames) {
+function findColumnValue(row: ParametroRow, possibleNames: string[] | string): any {
+  // Se for string única, converte para array
+  const nameArray = Array.isArray(possibleNames) ? possibleNames : [possibleNames];
+  
+  for (const name of nameArray) {
     if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
       return row[name];
     }
@@ -149,7 +152,7 @@ serve(async (req) => {
           
           // Datas de contrato
           data_inicio_contrato: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.dataInicio);
+            const valor = findColumnValue(row, ['DATA_INICIO', 'Data Início']);
             if (!valor) return null;
             if (typeof valor === 'number') {
               const data = new Date((valor - 25569) * 86400 * 1000);
@@ -159,7 +162,7 @@ serve(async (req) => {
             return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
           })(),
           data_termino_contrato: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.dataTermino);
+            const valor = findColumnValue(row, ['DATA_TERMINO', 'Data Término']);
             if (!valor) return null;
             if (typeof valor === 'number') {
               const data = new Date((valor - 25569) * 86400 * 1000);
@@ -183,14 +186,14 @@ serve(async (req) => {
           })(),
           
           // Critérios de processamento
-          criterio_emissao_nf: findColumnValue(row, COLUMN_MAPPING.criterioEmissaoNF),
-          criterios_geracao_relatorio: findColumnValue(row, COLUMN_MAPPING.criteriosRelatorio),
-          criterios_aplicacao_parametros: findColumnValue(row, COLUMN_MAPPING.criteriosParametros),
-          criterios_aplicacao_franquias: findColumnValue(row, COLUMN_MAPPING.criteriosFranquias),
+          criterio_emissao_nf: findColumnValue(row, ['Criterio de Emissao de NF']),
+          criterios_geracao_relatorio: findColumnValue(row, ['Criterios de geração do relatório']),
+          criterios_aplicacao_parametros: findColumnValue(row, ['Criterios de aplicação dos parâmetros']),
+          criterios_aplicacao_franquias: findColumnValue(row, ['Criterios de aplicação das franquias']),
           
           // Faturamento e fechamento
           dia_faturamento: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.diaFaturamento);
+            const valor = findColumnValue(row, ['DIA_FATURAMENTO', 'Dia Faturamento']);
             return valor ? Number(valor) : null;
           })(),
           dia_fechamento: (() => {
@@ -274,7 +277,7 @@ serve(async (req) => {
             return valor ? Number(valor) : 0;
           })(),
           volume_franquia: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.volumeFranquia);
+            const valor = findColumnValue(row, ['Volume Franquia', 'Volume']);
             return valor ? Number(valor) : 0;
           })(),
           frequencia_continua: (() => {
@@ -290,7 +293,7 @@ serve(async (req) => {
             return valorStr === 'sim' || valorStr === 's';
           })(),
           valor_acima_franquia: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume);
+            const valor = findColumnValue(row, ['R$ Valor Franquia Acima Volume']);
             return valor ? Number(valor) : 0;
           })(),
           data_aniversario_contrato: (() => {
