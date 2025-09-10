@@ -13,11 +13,13 @@ interface ParametroRow {
 
 // Mapeamento flexível de colunas baseado no template atual
 const COLUMN_MAPPING = {
-  // Nomes da empresa
+  // Nomes da empresa (separados corretamente)
   nomeEmpresa: [
-    'Nome Empresa', 'NOME_MOBILEMED', 'Nome_Fantasia', 'Nome Fantasia',
-    'NOME EMPRESA', 'nome empresa', 'Nome_Empresa', 'NOME_EMPRESA', 
+    'NOME_MOBILEMED', 'Nome Empresa', 'NOME EMPRESA', 'nome empresa', 'Nome_Empresa', 'NOME_EMPRESA', 
     'Cliente', 'CLIENTE', 'cliente', 'Empresa', 'EMPRESA'
+  ],
+  nomeFantasia: [
+    'Nome_Fantasia', 'Nome Fantasia', 'NOME_FANTASIA', 'nome_fantasia', 'nome fantasia'
   ],
   // Identificação
   cnpj: ['CNPJ', 'cnpj'],
@@ -210,16 +212,28 @@ serve(async (req) => {
           console.log(`Cliente NÃO encontrado: ${nomeEmpresa} (normalizado: ${nomeEmpresaNormalizado})`);
         }
 
+        // Debug: mostrar dados sendo extraídos do arquivo
+        const nomeFantasiaArquivo = findColumnValue(row, COLUMN_MAPPING.nomeFantasia);
+        const cnpjArquivo = findColumnValue(row, COLUMN_MAPPING.cnpj);
+        const razaoSocialArquivo = findColumnValue(row, COLUMN_MAPPING.razaoSocial);
+        
+        console.log(`Dados extraídos do arquivo:`, {
+          nome_mobilemed: nomeEmpresa,
+          nome_fantasia: nomeFantasiaArquivo,
+          cnpj: cnpjArquivo,
+          razao_social: razaoSocialArquivo
+        });
+
         // Preparar dados do parâmetro com tipos corretos
         const parametroData = {
           cliente_id: cliente_id,
           
-          // Campos identificação
-          nome_mobilemed: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
-          nome_fantasia: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
+          // Campos identificação - TODOS do arquivo de upload
+          nome_mobilemed: nomeEmpresa,
+          nome_fantasia: nomeFantasiaArquivo,
           numero_contrato: findColumnValue(row, COLUMN_MAPPING.numeroContrato),
-          cnpj: formatarCNPJ(findColumnValue(row, COLUMN_MAPPING.cnpj)),
-          razao_social: findColumnValue(row, COLUMN_MAPPING.razaoSocial),
+          cnpj: formatarCNPJ(cnpjArquivo),
+          razao_social: razaoSocialArquivo,
           
           // Datas de contrato
           data_inicio_contrato: (() => {
