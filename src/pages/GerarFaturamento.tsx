@@ -928,33 +928,6 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
-          {/* Demonstrativo Completo (com franquias) */}
-          <div className="bg-muted/30 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold mb-3">📊 Demonstrativo Completo (com franquias)</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              ⚠️ Este é o botão correto para gerar demonstrativos. Use o botão "Gerar Demonstrativos" abaixo.
-            </p>
-            <DemonstrativoFaturamentoCompleto 
-              periodo={periodoSelecionado} 
-              onDemonstrativosGerados={(dados) => {
-                // Atualizar a lista de clientes para relatórios
-                setClientesCarregados(dados.demonstrativos.map(d => ({
-                  id: d.cliente_id,
-                  nome: d.cliente_nome,
-                  email: '' // Email será buscado conforme necessário
-                })));
-                setDemonstrativoGerado(true);
-                localStorage.setItem('demonstrativoGerado', 'true');
-                
-                toast({
-                  title: `${dados.resumo.clientes_processados} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
-                  description: "Vá para a aba 'Gerar' para continuar com os relatórios",
-                  variant: "default",
-                });
-              }}
-            />
-          </div>
-          <Separator />
           <div className="bg-muted/30 p-4 rounded-lg">
             <h3 className="text-lg font-semibold mb-3">Demonstrativo Padrão (sem franquias)</h3>
             <DemonstrativoFaturamento />
@@ -1199,19 +1172,40 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <div className="text-sm text-gray-600 mb-3">
+                <div className="text-sm text-gray-600 mb-4">
                   {demonstrativoGerado ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle className="h-4 w-4" />
                       ✅ Demonstrativo gerado com sucesso! Você pode prosseguir para a Etapa 2.
                     </div>
                   ) : (
-                    <div className="text-orange-600">
-                      <Clock className="h-4 w-4 inline mr-2" />
-                      Para continuar, acesse a aba "Demonstrativo" e clique em "Gerar Demonstrativos" no componente "Demonstrativo Completo (com franquias)".
+                    <div className="text-blue-700">
+                      <FileBarChart2 className="h-4 w-4 inline mr-2" />
+                      Generate o demonstrativo completo com franquias para todos os clientes do período selecionado.
                     </div>
                   )}
                 </div>
+
+                {/* Componente de geração de demonstrativos */}
+                <DemonstrativoFaturamentoCompleto 
+                  periodo={periodoSelecionado} 
+                  onDemonstrativosGerados={(dados) => {
+                    // Atualizar a lista de clientes para relatórios
+                    setClientesCarregados(dados.demonstrativos.map(d => ({
+                      id: d.cliente_id,
+                      nome: d.cliente_nome,
+                      email: '' // Email será buscado conforme necessário
+                    })));
+                    setDemonstrativoGerado(true);
+                    localStorage.setItem('demonstrativoGerado', 'true');
+                    
+                    toast({
+                      title: `${dados.resumo.clientes_processados} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+                      description: "Agora você pode prosseguir para a Etapa 2 - Gerar Relatórios",
+                      variant: "default",
+                    });
+                  }}
+                />
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}
