@@ -15,9 +15,17 @@ interface DemonstrativoCliente {
   valor_franquia: number;
   valor_portal_laudos: number;
   valor_integracao: number;
+  valor_bruto: number;
+  valor_impostos: number;
   valor_total: number;
   detalhes_franquia: any;
   detalhes_exames: any[];
+  detalhes_tributacao: {
+    simples_nacional: boolean;
+    percentual_iss?: number;
+    valor_iss?: number;
+    base_calculo?: number;
+  };
 }
 
 serve(async (req) => {
@@ -39,7 +47,7 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Buscar todos os clientes ativos com parâmetros
+    // Buscar todos os clientes ativos com parâmetros incluindo Simples Nacional
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
@@ -49,7 +57,9 @@ serve(async (req) => {
         parametros_faturamento!inner(
           status,
           aplicar_franquia,
-          valor_franquia
+          valor_franquia,
+          simples,
+          percentual_iss
         )
       `)
       .eq('ativo', true)
@@ -167,6 +177,23 @@ serve(async (req) => {
           continue;
         }
 
+        // Calcular tributação baseado no Simples Nacional
+        const parametros = cliente.parametros_faturamento[0];
+        const simplesNacional = parametros?.simples || false;
+        const percentualISS = parametros?.percentual_iss || 0;
+        
+        const valorBruto = valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0);
+        let valorImpostos = 0;
+        let valorISS = 0;
+        
+        // Se NÃO for Simples Nacional, calcular ISS
+        if (!simplesNacional && percentualISS > 0) {
+          valorISS = valorBruto * (percentualISS / 100);
+          valorImpostos = valorISS;
+        }
+        
+        const valorTotal = valorBruto - valorImpostos;
+
         // Montar demonstrativo
         const demonstrativo: DemonstrativoCliente = {
           cliente_id: cliente.id,
@@ -177,9 +204,17 @@ serve(async (req) => {
           valor_franquia: calculo.valor_franquia || 0,
           valor_portal_laudos: calculo.valor_portal_laudos || 0,
           valor_integracao: calculo.valor_integracao || 0,
-          valor_total: valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0),
+          valor_bruto: valorBruto,
+          valor_impostos: valorImpostos,
+          valor_total: valorTotal,
           detalhes_franquia: calculo.detalhes_franquia || {},
-          detalhes_exames: detalhesExames
+          detalhes_exames: detalhesExames,
+          detalhes_tributacao: {
+            simples_nacional: simplesNacional,
+            percentual_iss: percentualISS,
+            valor_iss: valorISS,
+            base_calculo: valorBruto
+          }
         };
 
         demonstrativos.push(demonstrativo);
@@ -199,11 +234,15 @@ serve(async (req) => {
     const resumo = {
       total_clientes: clientes.length,
       clientes_processados: processados,
+      valor_bruto_geral: demonstrativos.reduce((sum, d) => sum + d.valor_bruto, 0),
+      valor_impostos_geral: demonstrativos.reduce((sum, d) => sum + d.valor_impostos, 0),
       valor_total_geral: demonstrativos.reduce((sum, d) => sum + d.valor_total, 0),
       valor_exames_geral: demonstrativos.reduce((sum, d) => sum + d.valor_exames, 0),
       valor_franquias_geral: demonstrativos.reduce((sum, d) => sum + d.valor_franquia, 0),
       valor_portal_geral: demonstrativos.reduce((sum, d) => sum + d.valor_portal_laudos, 0),
-      valor_integracao_geral: demonstrativos.reduce((sum, d) => sum + d.valor_integracao, 0)
+      valor_integracao_geral: demonstrativos.reduce((sum, d) => sum + d.valor_integracao, 0),
+      clientes_simples_nacional: demonstrativos.filter(d => d.detalhes_tributacao.simples_nacional).length,
+      clientes_regime_normal: demonstrativos.filter(d => !d.detalhes_tributacao.simples_nacional).length
     };
 
     console.log('Demonstrativos gerados:', resumo);

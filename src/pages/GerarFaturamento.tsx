@@ -1145,33 +1145,16 @@ export default function GerarFaturamento() {
             </CardHeader>
             <CardContent className="space-y-6">
 
-              {/* Etapa 1: Gerar Demonstrativo */}
+              {/* Etapa 1: Use a aba "Demonstrativo" */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento
                 </h4>
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <Button 
-                    onClick={gerarDemonstrativoFaturamento}
-                    disabled={processandoTodos || !periodoSelecionado}
-                    size="lg"
-                    className="min-w-[280px] bg-blue-600 hover:bg-blue-700"
-                  >
-                    {processandoTodos && statusProcessamento.mensagem.includes('demonstrativo') ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <FileBarChart2 className="h-5 w-5 mr-2" />
-                        🧮 Gerar Demonstrativo do Período
-                      </>
-                    )}
-                  </Button>
                   <p className="text-sm text-blue-700">
-                    Processa os dados de volumetria e gera o demonstrativo financeiro
+                    Para gerar demonstrativos, use a aba "Demonstrativo" acima. 
+                    Lá você pode gerar demonstrativos completos com detalhamento de franquias, impostos e valores por modalidade.
                   </p>
                 </div>
               </div>

@@ -20,19 +20,31 @@ interface DemonstrativoCliente {
   valor_franquia: number;
   valor_portal_laudos: number;
   valor_integracao: number;
+  valor_bruto: number;
+  valor_impostos: number;
   valor_total: number;
   detalhes_franquia: any;
   detalhes_exames: any[];
+  detalhes_tributacao: {
+    simples_nacional: boolean;
+    percentual_iss?: number;
+    valor_iss?: number;
+    base_calculo?: number;
+  };
 }
 
 interface Resumo {
   total_clientes: number;
   clientes_processados: number;
+  valor_bruto_geral: number;
+  valor_impostos_geral: number;
   valor_total_geral: number;
   valor_exames_geral: number;
   valor_franquias_geral: number;
   valor_portal_geral: number;
   valor_integracao_geral: number;
+  clientes_simples_nacional: number;
+  clientes_regime_normal: number;
 }
 
 export function DemonstrativoFaturamentoCompleto() {
@@ -161,7 +173,7 @@ export function DemonstrativoFaturamentoCompleto() {
             <CardTitle>Resumo Geral - {periodo}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {resumo.clientes_processados}
@@ -181,10 +193,30 @@ export function DemonstrativoFaturamentoCompleto() {
                 <div className="text-sm text-muted-foreground">Adicionais</div>
               </div>
               <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {formatCurrency(resumo.valor_impostos_geral)}
+                </div>
+                <div className="text-sm text-muted-foreground">Impostos</div>
+              </div>
+              <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
                   {formatCurrency(resumo.valor_total_geral)}
                 </div>
-                <div className="text-sm text-muted-foreground">Total Geral</div>
+                <div className="text-sm text-muted-foreground">Líquido</div>
+              </div>
+            </div>
+            
+            {/* Informação sobre regime tributário */}
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex justify-center gap-6 text-sm">
+                <div className="text-center">
+                  <div className="font-medium text-blue-600">{resumo.clientes_simples_nacional}</div>
+                  <div className="text-muted-foreground">Simples Nacional</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-gray-600">{resumo.clientes_regime_normal}</div>
+                  <div className="text-muted-foreground">Regime Normal</div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -246,11 +278,19 @@ export function DemonstrativoFaturamentoCompleto() {
                           </div>
                           <div className="text-muted-foreground">Integração</div>
                         </div>
+                        {demo.valor_impostos > 0 && (
+                          <div className="text-center">
+                            <div className="font-medium text-red-600">
+                              -{formatCurrency(demo.valor_impostos)}
+                            </div>
+                            <div className="text-muted-foreground">Impostos</div>
+                          </div>
+                        )}
                         <div className="text-center">
                           <div className="font-bold text-lg">
                             {formatCurrency(demo.valor_total)}
                           </div>
-                          <div className="text-muted-foreground">Total</div>
+                          <div className="text-muted-foreground">Líquido</div>
                         </div>
                       </div>
                     </div>
@@ -276,6 +316,44 @@ export function DemonstrativoFaturamentoCompleto() {
                             {demo.detalhes_franquia.volume_atual !== undefined && (
                               <div className="text-sm">
                                 <strong>Volume:</strong> {demo.detalhes_franquia.volume_atual} exames
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Detalhes da Tributação */}
+                      {demo.detalhes_tributacao && (
+                        <div>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <DollarSign className="h-4 w-4" />
+                            Informações Tributárias
+                          </h4>
+                          <div className="bg-background p-3 rounded border space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">Regime Tributário:</span>
+                              <Badge variant={demo.detalhes_tributacao.simples_nacional ? "default" : "secondary"}>
+                                {demo.detalhes_tributacao.simples_nacional ? "Simples Nacional" : "Regime Normal"}
+                              </Badge>
+                            </div>
+                            
+                            {!demo.detalhes_tributacao.simples_nacional && demo.detalhes_tributacao.percentual_iss && (
+                              <>
+                                <div className="text-sm">
+                                  <strong>Base de Cálculo:</strong> {formatCurrency(demo.detalhes_tributacao.base_calculo || 0)}
+                                </div>
+                                <div className="text-sm">
+                                  <strong>ISS ({demo.detalhes_tributacao.percentual_iss}%):</strong> {formatCurrency(demo.detalhes_tributacao.valor_iss || 0)}
+                                </div>
+                                <div className="text-sm font-medium text-green-600">
+                                  <strong>Valor Líquido:</strong> {formatCurrency(demo.valor_total)}
+                                </div>
+                              </>
+                            )}
+                            
+                            {demo.detalhes_tributacao.simples_nacional && (
+                              <div className="text-sm text-blue-600">
+                                <strong>Obs:</strong> Empresa enquadrada no Simples Nacional - sem retenção de ISS
                               </div>
                             )}
                           </div>
