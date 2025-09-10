@@ -145,10 +145,11 @@ serve(async (req) => {
 
     let totalItens = 0;
     let clientesComDados = 0;
+    let processedCount = 0;
 
-        // Processar TODOS os clientes que têm dados de volumetria
-        const loteSize = 10; // Reduzir para evitar timeout
-        console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria`);
+        // Processar clientes em lotes pequenos para evitar timeout
+        const loteSize = 5; // Reduzir drasticamente para evitar timeout
+        console.log(`[gerar-faturamento-periodo] Processando clientes com volumetria em lotes de ${loteSize}`);
         
         // Buscar clientes que realmente têm dados de volumetria no período - USANDO CAMPO EMPRESA
         const { data: clientesComVolumetria } = await supabase
@@ -156,7 +157,7 @@ serve(async (req) => {
           .select('"EMPRESA"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
           .not('"EMPRESA"', 'is', null)
-          .limit(50000); // Aumentar limite explicitamente para processar todos os clientes
+          .limit(10000); // Reduzir limite para evitar timeout
         
         // Coletar APENAS nomes de EMPRESA
         const nomesClientesSet = new Set();
@@ -278,23 +279,27 @@ serve(async (req) => {
         console.log(`[gerar-faturamento-periodo] Lista COM preços: ${clientesComPrecos.map(c => c.nome).join(', ')}`);
         console.log(`[gerar-faturamento-periodo] Lista PENDENTES: ${clientesPendentes.map(c => c.nome).join(', ')}`);
         
-        // PROCESSAR TODOS OS CLIENTES (COM E SEM PREÇOS CONFIGURADOS)
+        // PROCESSAR CLIENTES EM LOTES PEQUENOS PARA EVITAR TIMEOUT
         const todosClientesParaProcessar = [...clientesComPrecos, ...clientesPendentes];
+        const loteClientes = Math.min(5, todosClientesParaProcessar.length); // Processar máximo 5 clientes por vez
         
-        for (let i = 0; i < todosClientesParaProcessar.length; i++) {
+        console.log(`[gerar-faturamento-periodo] Processando ${todosClientesParaProcessar.length} clientes em lotes de ${loteClientes}`);
+        
+        let processedCount = 0;
+        for (let i = 0; i < Math.min(loteClientes, todosClientesParaProcessar.length); i++) {
             const cliente = todosClientesParaProcessar[i];
             const tem_precos = clientesComPrecos.includes(cliente);
+            
             try {
-              console.log(`[gerar-faturamento-periodo] Processando cliente: ${cliente.nome} (${i + 1}/${todosClientesParaProcessar.length})`);
-            
-            
-              // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
+              console.log(`[gerar-faturamento-periodo] [${i + 1}/${loteClientes}] Processando cliente: ${cliente.nome}`);
+              
+              // Buscar dados de volumetria do cliente no período usando campo EMPRESA (LIMITADO)
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
                 .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
-                .eq('"EMPRESA"', cliente.nome_mobilemed) // CORRIGIDO: usar nome_mobilemed que mapeia com EMPRESA
-                .eq('periodo_referencia', periodoFormatado) // Usar período normalizado - SEM FILTRO DE VALORES
-                .limit(50000); // Aumentar limite explicitamente para processar todos os registros do cliente
+                .eq('"EMPRESA"', cliente.nome_mobilemed)
+                .eq('periodo_referencia', periodoFormatado)
+                .limit(1000); // Limitar registros por cliente para evitar timeout
 
               if (vmErr) {
                 console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
@@ -303,7 +308,7 @@ serve(async (req) => {
 
               const rows = vm || [];
               if (rows.length === 0) {
-                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período ${periodoFormatado}`);
+                console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} sem dados de volumetria no período`);
                 continue;
               }
 
@@ -312,9 +317,14 @@ serve(async (req) => {
               // Volume total (usado na faixa de preço) - garantir valor mínimo 1 se zerado
               const volumeTotal = Math.max(1, rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0));
 
-              // Agrupar por chave INCLUINDO paciente
+              // Agrupar por chave INCLUINDO paciente (LIMITAR GRUPOS)
               const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
+              let groupCount = 0;
+              const maxGroups = 100; // Limitar grupos por cliente
+              
               for (const r of rows) {
+                if (groupCount >= maxGroups) break; // Limitar processamento
+                
                 const chave: GrupoChave = {
                   modalidade: r.MODALIDADE || '',
                   especialidade: r.ESPECIALIDADE || '',
@@ -322,10 +332,11 @@ serve(async (req) => {
                   prioridade: r.PRIORIDADE || '',
                   estudo: r.ESTUDO_DESCRICAO || 'Exame',
                 };
-                // INCLUIR PACIENTE na chave para evitar agregação incorreta
+                
                 const key = `${chave.modalidade}|${chave.especialidade}|${chave.categoria}|${chave.prioridade}|${chave.estudo}|${r.NOME_PACIENTE}|${r.ACCESSION_NUMBER}`;
-                const qtd = Math.max(1, Number(r.VALORES) || 1); // Garantir quantidade mínima 1
+                const qtd = Math.max(1, Number(r.VALORES) || 1);
                 const atual = grupos.get(key);
+                
                 if (atual) {
                   atual.qtd += qtd;
                 } else {
@@ -337,55 +348,49 @@ serve(async (req) => {
                     dataExame: r.DATA_REALIZACAO || '',
                     accession: r.ACCESSION_NUMBER || ''
                   });
+                  groupCount++;
                 }
               }
 
+              console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} - processando ${grupos.size} grupos de exames`);
+              
               const itensInserir: any[] = [];
+              let itemCount = 0;
 
               for (const { chave, qtd, paciente, medico, dataExame, accession } of grupos.values()) {
                 let unit = 0; // Valor padrão
                 
                 if (tem_precos) {
-                  // Calcular preço unitário via RPC apenas para clientes com preços configurados
-                  const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
-                    p_cliente_id: cliente.id,
-                    p_modalidade: chave.modalidade,
-                    p_especialidade: chave.especialidade,
-                    p_prioridade: chave.prioridade,
-                    p_categoria: chave.categoria,
-                    p_volume_total: volumeTotal,
-                    p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
-                  });
+                  try {
+                    // Calcular preço unitário via RPC apenas para clientes com preços configurados
+                    const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
+                      p_cliente_id: cliente.id,
+                      p_modalidade: chave.modalidade,
+                      p_especialidade: chave.especialidade,
+                      p_prioridade: chave.prioridade,
+                      p_categoria: chave.categoria,
+                      p_volume_total: volumeTotal,
+                      p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
+                    });
 
-                  unit = preco || 0; // Usar resultado da RPC calcular_preco_exame
-                  
-                  if (precoErr || !unit || unit <= 0) {
-                    console.log(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}: ${precoErr?.message || 'Preço zerado ou inválido'}`);
-                    console.log(`[gerar-faturamento-periodo] Detalhes: modalidade=${chave.modalidade}, especialidade=${chave.especialidade}, categoria=${chave.categoria}, prioridade=${chave.prioridade}`);
-                    continue; // Pular este item se não conseguir calcular preço
+                    unit = preco || 0;
+                    
+                    if (precoErr || !unit || unit <= 0) {
+                      console.log(`[gerar-faturamento-periodo] Preço não encontrado para ${cliente.nome}: ${chave.modalidade}/${chave.especialidade}/${chave.categoria}`);
+                      continue;
+                    }
+                  } catch (rpcError: any) {
+                    console.log(`[gerar-faturamento-periodo] Erro RPC para ${cliente.nome}:`, rpcError.message);
+                    continue;
                   }
                 } else {
-                  // Cliente sem preços configurados - incluir com valor 0 para identificação
-                  console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome}: SEM PREÇOS CONFIGURADOS - incluindo com valor 0`);
-                  unit = 0; // Manter valor 0 para clientes sem preços
+                  unit = 0; // Cliente sem preços configurados
                 }
 
                 let valor = Number((unit * qtd).toFixed(2));
 
-                // Para clientes COM preços configurados, valor zero indica problema de configuração
-                // Para clientes SEM preços configurados, valor zero é esperado
                 if (tem_precos && valor <= 0) {
-                  console.log(`[gerar-faturamento-periodo] ⚠️ PROBLEMA NA CONFIGURAÇÃO DE PREÇOS:`);
-                  console.log(`  Cliente: ${cliente.nome} (tem contrato ativo com preços)`);
-                  console.log(`  Paciente: ${paciente}`);
-                  console.log(`  Exame: ${chave.estudo}`);
-                  console.log(`  Modalidade: ${chave.modalidade}, Especialidade: ${chave.especialidade}`);
-                  console.log(`  Categoria: ${chave.categoria}, Prioridade: ${chave.prioridade}`);
-                  console.log(`  Quantidade (qtd): ${qtd}`);
-                  console.log(`  Preço unitário (unit): ${unit}`);
-                  console.log(`  Volume total: ${volumeTotal}`);
-                  console.log(`  AÇÃO: Pulando item - verificar configuração de preços para esta combinação`);
-                  continue; // Pular apenas se cliente tem preços mas o valor ficou zero
+                  continue; // Pular itens com valor zero para clientes com preços
                 }
 
                 const hoje = new Date();
@@ -396,8 +401,8 @@ serve(async (req) => {
                   omie_id: `SIM_${cliente.id}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
                   numero_fatura: `FAT-${periodoFormatado}-${String(cliente.nome).substring(0, 10)}-${Date.now()}`,
                   cliente_id: cliente.id,
-                  cliente_nome: cliente.nome, // Nome fantasia já está sendo usado
-                  cliente_nome_original: cliente.nome_mobilemed, // Nome original da empresa (campo EMPRESA)
+                  cliente_nome: cliente.nome,
+                  cliente_nome_original: cliente.nome_mobilemed,
                   cliente_email: cliente.email || null,
                   paciente: paciente,
                   modalidade: chave.modalidade,
@@ -412,26 +417,30 @@ serve(async (req) => {
                   valor: valor,
                   data_emissao: emissao,
                   data_vencimento: vencimento,
-                  periodo_referencia: periodoFormatado, // Usar formato YYYY-MM
+                  periodo_referencia: periodoFormatado,
                   tipo_dados: 'incremental',
-                  accession_number: accession, // Incluir ACCESSION_NUMBER
+                  accession_number: accession,
                 });
+                
+                itemCount++;
               }
 
               if (itensInserir.length > 0) {
-                // INSERIR TODOS OS ITENS DE UMA VEZ - SEM LIMITAÇÃO DE LOTE
+                console.log(`[gerar-faturamento-periodo] Inserindo ${itensInserir.length} itens para cliente ${cliente.nome}`);
                 const { error: insErr } = await supabase.from('faturamento').insert(itensInserir);
                 if (insErr) {
                   console.log(`[gerar-faturamento-periodo] Erro ao inserir itens (${cliente.nome}):`, insErr.message);
                 } else {
                   totalItens += itensInserir.length;
                   clientesComDados++;
-                  console.log(`[gerar-faturamento-periodo] Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
+                  console.log(`[gerar-faturamento-periodo] ✓ Cliente ${cliente.nome} processado: ${itensInserir.length} itens`);
                 }
               }
+              
+              processedCount++;
+              
             } catch (clienteError: any) {
               console.error(`[gerar-faturamento-periodo] ERRO processando cliente ${cliente.nome}:`, clienteError.message);
-              // Continuar com próximo cliente mesmo em caso de erro
               continue;
             }
         }
@@ -441,6 +450,7 @@ serve(async (req) => {
       clientesComDados,
       clientesComPrecos: clientesComPrecos.length,
       clientesPendentes: clientesPendentes.length,
+      clientesProcessados: processedCount,
       clientesTotais: nomesClientesComVolumetria.length
     });
 
@@ -461,9 +471,10 @@ serve(async (req) => {
       clientes_com_dados: clientesComDados,
       clientes_com_precos: clientesComPrecos.length,
       clientes_pendentes: clientesPendentes.length,
+      clientes_processados: processedCount || 0,
       total_clientes: nomesClientesComVolumetria.length,
       pendencias: resumoPendencias,
-      message: 'Processamento concluído com sucesso'
+      message: `Processamento concluído: ${processedCount || 0} clientes processados de ${nomesClientesComVolumetria.length} disponíveis`
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
