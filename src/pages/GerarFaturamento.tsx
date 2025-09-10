@@ -930,7 +930,10 @@ export default function GerarFaturamento() {
         <TabsContent value="demonstrativo" className="space-y-6">
           {/* Demonstrativo Completo (com franquias) */}
           <div className="bg-muted/30 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold mb-3">Demonstrativo Completo (com franquias)</h3>
+            <h3 className="text-lg font-semibold mb-3">📊 Demonstrativo Completo (com franquias)</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              ⚠️ Este é o botão correto para gerar demonstrativos. Use o botão "Gerar Demonstrativos" abaixo.
+            </p>
             <DemonstrativoFaturamentoCompleto 
               periodo={periodoSelecionado} 
               onDemonstrativosGerados={(dados) => {
@@ -1200,23 +1203,15 @@ export default function GerarFaturamento() {
                   {demonstrativoGerado ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle className="h-4 w-4" />
-                      Demonstrativo gerado com sucesso! Vá para a aba "Demonstrativo" para visualizar.
+                      ✅ Demonstrativo gerado com sucesso! Você pode prosseguir para a Etapa 2.
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <Clock className="h-4 w-4" />
-                      Vá para a aba "Demonstrativo" para gerar o demonstrativo completo.
+                    <div className="text-orange-600">
+                      <Clock className="h-4 w-4 inline mr-2" />
+                      Para continuar, acesse a aba "Demonstrativo" e clique em "Gerar Demonstrativos" no componente "Demonstrativo Completo (com franquias)".
                     </div>
                   )}
                 </div>
-                <Button 
-                  onClick={() => setActiveTab('demonstrativo')} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  <FileBarChart2 className="mr-2 h-4 w-4" />
-                  Ir para aba Demonstrativo
-                </Button>
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}
