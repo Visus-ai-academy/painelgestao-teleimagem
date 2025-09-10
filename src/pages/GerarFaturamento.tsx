@@ -905,10 +905,8 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
-          <DemonstrativoFaturamentoCompleto />
-          <Separator />
           <div className="bg-muted/30 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold mb-3">Demonstrativo Anterior (sem franquias)</h3>
+            <h3 className="text-lg font-semibold mb-3">Demonstrativo Padrão (sem franquias)</h3>
             <DemonstrativoFaturamento />
           </div>
           <Separator />
@@ -1145,18 +1143,13 @@ export default function GerarFaturamento() {
             </CardHeader>
             <CardContent className="space-y-6">
 
-              {/* Etapa 1: Use a aba "Demonstrativo" */}
+              {/* Etapa 1: Gerar Demonstrativo Completo */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                   <FileBarChart2 className="h-4 w-4" />
-                  Etapa 1: Gerar Demonstrativo de Faturamento
+                  Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <p className="text-sm text-blue-700">
-                    Para gerar demonstrativos, use a aba "Demonstrativo" acima. 
-                    Lá você pode gerar demonstrativos completos com detalhamento de franquias, impostos e valores por modalidade.
-                  </p>
-                </div>
+                <DemonstrativoFaturamentoCompleto />
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}
