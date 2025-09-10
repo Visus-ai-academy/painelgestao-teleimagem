@@ -36,6 +36,7 @@ interface ParametroFaturamento {
   impostos_ab_min?: number | null;
   simples: boolean;
   ativo: boolean;
+  status: string; // Novo campo: "I", "A" ou "C"
   clientes?: {
     nome: string;
   };
@@ -129,8 +130,8 @@ export function ParametrosFaturamentoList() {
           bValue = b.data_termino_contrato || '';
           break;
         case 'status':
-          aValue = a.ativo ? 1 : 0;
-          bValue = b.ativo ? 1 : 0;
+          aValue = a.status || 'A';
+          bValue = b.status || 'A';
           break;
         case 'simples':
           aValue = a.simples ? 1 : 0;
@@ -215,6 +216,15 @@ export function ParametrosFaturamentoList() {
 
   const formatBoolean = (value: boolean) => {
     return value ? 'Sim' : 'Não';
+  };
+
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'A': return 'Ativo';
+      case 'I': return 'Inativo';
+      case 'C': return 'Cancelado';
+      default: return status || 'Ativo';
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -412,8 +422,8 @@ export function ParametrosFaturamentoList() {
                     {parametro.tipo_faturamento || '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    <Badge variant={parametro.ativo ? "default" : "secondary"}>
-                      {formatBoolean(parametro.ativo)}
+                    <Badge variant={parametro.status === 'A' ? "default" : "secondary"}>
+                      {formatStatus(parametro.status)}
                     </Badge>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{parametro.impostos_ab_min || '-'}</TableCell>
