@@ -148,3 +148,6 @@ verify_jwt = true
 
 [functions.gerar-faturamento-periodo]
 verify_jwt = true
+
+[functions.gerar-demonstrativos-faturamento]
+verify_jwt = true

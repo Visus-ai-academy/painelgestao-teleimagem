@@ -132,11 +132,6 @@ serve(async (req) => {
         
         console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria`);
 
-        if (volumetriaError) {
-          console.error(`Erro na volumetria para ${cliente.nome}:`, volumetriaError);
-          continue;
-        }
-
         const totalExames = volumetria?.length || 0;
         const volumeTotal = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
 
@@ -313,9 +308,9 @@ serve(async (req) => {
         }
 
         // Calcular tributação baseado no Simples Nacional
-        const parametros = cliente.parametros_faturamento[0];
-        const simplesNacional = parametros?.simples || false;
-        const percentualISS = parametros?.percentual_iss || 0;
+        const parametrosTrib = cliente.parametros_faturamento[0];
+        const simplesNacional = parametrosTrib?.simples || false;
+        const percentualISS = parametrosTrib?.percentual_iss || 0;
         
         const valorBruto = valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0);
         let valorImpostos = 0;
