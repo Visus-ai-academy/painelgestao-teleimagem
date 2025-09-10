@@ -71,6 +71,38 @@ const COLUMN_MAPPING = {
   formaCobranca: ['Forma Cobrança', 'FORMA COBRANÇA']
 };
 
+// Função para formatar CNPJ
+function formatarCNPJ(cnpj: string | number): string | null {
+  if (!cnpj) return null;
+  
+  const cnpjStr = cnpj.toString().replace(/\D/g, ''); // Remove não dígitos
+  if (cnpjStr.length !== 14) return cnpj.toString(); // Se não tem 14 dígitos, retorna como está
+  
+  return cnpjStr.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+// Função para formatar CPF
+function formatarCPF(cpf: string | number): string | null {
+  if (!cpf) return null;
+  
+  const cpfStr = cpf.toString().replace(/\D/g, ''); // Remove não dígitos
+  if (cpfStr.length !== 11) return cpf.toString(); // Se não tem 11 dígitos, retorna como está
+  
+  return cpfStr.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+}
+
+// Função para normalizar nome para busca (remove acentos, espaços extras, etc)
+function normalizarNome(nome: string): string {
+  if (!nome) return '';
+  return nome
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/\s+/g, ' '); // Remove espaços extras
+}
+
 function findColumnValue(row: ParametroRow, possibleNames: string[] | string): any {
   // Se for string única, converte para array
   const nameArray = Array.isArray(possibleNames) ? possibleNames : [possibleNames];
@@ -117,9 +149,29 @@ serve(async (req) => {
     let erros = 0;
     const detalhesErros: any[] = [];
 
-    // Buscar clientes
-    const { data: clientes } = await supabase.from('clientes').select('id, nome');
-    const clienteMap = new Map(clientes?.map(c => [c.nome.toLowerCase(), c.id]) || []);
+    // Buscar clientes e criar mapa normalizado
+    const { data: clientes } = await supabase.from('clientes').select('id, nome, nome_mobilemed, nome_fantasia');
+    const clienteMap = new Map();
+    
+    // Criar múltiplos mapeamentos para aumentar as chances de match
+    if (clientes) {
+      clientes.forEach(cliente => {
+        const nomes = [
+          cliente.nome,
+          cliente.nome_mobilemed,
+          cliente.nome_fantasia
+        ].filter(Boolean);
+        
+        nomes.forEach(nome => {
+          if (nome) {
+            // Mapeamento exato
+            clienteMap.set(nome.toLowerCase().trim(), cliente.id);
+            // Mapeamento normalizado
+            clienteMap.set(normalizarNome(nome), cliente.id);
+          }
+        });
+      });
+    }
 
     // Imprimir colunas disponíveis para debug
     if (jsonData.length > 0) {
@@ -139,15 +191,34 @@ serve(async (req) => {
           throw new Error('Campo "Nome Empresa" não encontrado. Verifique se a coluna existe no arquivo.');
         }
 
+        // Debug: mostrar dados do cliente sendo processado
+        console.log(`Processando linha ${i + 1}: Cliente "${nomeEmpresa}"`);
+
+        // Buscar cliente_id com múltiplas tentativas
+        let cliente_id = null;
+        const nomeEmpresaNormalizado = normalizarNome(nomeEmpresa.toString());
+        
+        // Tentar várias formas de buscar o cliente
+        cliente_id = clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()) ||
+                     clienteMap.get(nomeEmpresaNormalizado) ||
+                     clienteMap.get(nomeEmpresa.toString()) ||
+                     null;
+
+        if (cliente_id) {
+          console.log(`Cliente encontrado: ${nomeEmpresa} -> ID: ${cliente_id}`);
+        } else {
+          console.log(`Cliente NÃO encontrado: ${nomeEmpresa} (normalizado: ${nomeEmpresaNormalizado})`);
+        }
+
         // Preparar dados do parâmetro com tipos corretos
         const parametroData = {
-          cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()) || null,
+          cliente_id: cliente_id,
           
           // Campos identificação
           nome_mobilemed: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
           nome_fantasia: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
           numero_contrato: findColumnValue(row, COLUMN_MAPPING.numeroContrato),
-          cnpj: findColumnValue(row, COLUMN_MAPPING.cnpj),
+          cnpj: formatarCNPJ(findColumnValue(row, COLUMN_MAPPING.cnpj)),
           razao_social: findColumnValue(row, COLUMN_MAPPING.razaoSocial),
           
           // Datas de contrato
