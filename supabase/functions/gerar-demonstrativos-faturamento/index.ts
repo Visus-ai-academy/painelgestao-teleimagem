@@ -121,12 +121,13 @@ serve(async (req) => {
           continue;
         }
         
-        // Filtrar dados para TODOS os nomes MobileMed deste cliente (SEM LIMITAÇÃO)
+        // Filtrar dados para TODOS os nomes MobileMed deste cliente
         const volumetria = volumetriaTodos?.filter(item => 
           item.EMPRESA && 
           item.periodo_referencia === periodo &&
           cliente.nomes_mobilemed.some(nome => 
-            item.EMPRESA.toLowerCase().includes(nome.toLowerCase())
+            item.EMPRESA.toLowerCase().includes(nome.toLowerCase()) ||
+            item.EMPRESA === nome
           )
         ) || [];
         
@@ -139,7 +140,8 @@ serve(async (req) => {
             especialidade: v.ESPECIALIDADE,
             categoria: v.CATEGORIA,
             prioridade: v.PRIORIDADE,
-            valores: v.VALORES
+            valores: v.VALORES,
+            empresa: v.EMPRESA
           })));
         } else {
           console.warn(`⚠️ Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
@@ -159,7 +161,7 @@ serve(async (req) => {
           const grupos = new Map();
           
           for (const exame of volumetria) {
-            const chave = `${exame.MODALIDADE}_${exame.ESPECIALIDADE}_${exame.CATEGORIA}_${exame.PRIORIDADE}`;
+            const chave = `${exame.MODALIDADE}_${exame.ESPECIALIDADE}_${exame.CATEGORIA || 'SC'}_${exame.PRIORIDADE}`;
             if (!grupos.has(chave)) {
               grupos.set(chave, {
                 modalidade: exame.MODALIDADE,
@@ -170,7 +172,7 @@ serve(async (req) => {
                 valor_unitario: 0
               });
             }
-            grupos.get(chave).quantidade += (exame.VALORES || 0);
+            grupos.get(chave).quantidade += (exame.VALORES || 1);
           }
 
           // Calcular preço para cada grupo

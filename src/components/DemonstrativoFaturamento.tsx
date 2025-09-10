@@ -66,12 +66,15 @@ export default function DemonstrativoFaturamento() {
       const demonstrativosCompletos = localStorage.getItem(`demonstrativos_${periodo}`);
       if (demonstrativosCompletos) {
         try {
-          const { demonstrativos } = JSON.parse(demonstrativosCompletos);
-          if (demonstrativos && Array.isArray(demonstrativos) && demonstrativos.length > 0) {
-            console.log('📋 Demonstrativos completos encontrados no localStorage:', demonstrativos.length);
+          const dados = JSON.parse(demonstrativosCompletos);
+          console.log('📋 Dados encontrados no localStorage:', dados);
+          
+          // Verificar se temos demonstrativos válidos
+          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
+            console.log('📋 Demonstrativos completos encontrados no localStorage:', dados.demonstrativos.length);
             
             // Converter formato dos demonstrativos completos para o formato esperado
-            const clientesConvertidos: ClienteFaturamento[] = demonstrativos
+            const clientesConvertidos: ClienteFaturamento[] = dados.demonstrativos
               .filter((demo: any) => demo && demo.nome_cliente) // Filtrar apenas demonstrativos válidos
               .map((demo: any) => {
                 const nomeCliente = demo.nome_cliente || 'Cliente sem nome';
@@ -92,17 +95,19 @@ export default function DemonstrativoFaturamento() {
                 };
               });
             
-            setClientes(clientesConvertidos);
-            setClientesFiltrados(clientesConvertidos);
-            setCarregando(false);
-            
-            toast({
-              title: "Demonstrativos carregados",
-              description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
-              variant: "default",
-            });
-            
-            return;
+            if (clientesConvertidos.length > 0) {
+              setClientes(clientesConvertidos);
+              setClientesFiltrados(clientesConvertidos);
+              setCarregando(false);
+              
+              toast({
+                title: "Demonstrativos carregados",
+                description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
+                variant: "default",
+              });
+              
+              return;
+            }
           }
         } catch (error) {
           console.error('Erro ao processar demonstrativos do localStorage:', error);
