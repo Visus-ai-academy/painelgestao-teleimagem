@@ -4093,6 +4093,22 @@ export type Database = {
         Args: { p_dias?: number; p_medico_id: string }
         Returns: Json
       }
+      calcular_faturamento_completo: {
+        Args: {
+          p_cliente_id: string
+          p_periodo: string
+          p_volume_total?: number
+        }
+        Returns: {
+          detalhes_calculo: Json
+          detalhes_franquia: Json
+          valor_exames: number
+          valor_franquia: number
+          valor_integracao: number
+          valor_portal_laudos: number
+          valor_total: number
+        }[]
+      }
       calcular_preco_exame: {
         Args: {
           p_categoria: string
@@ -4697,6 +4713,10 @@ export type Database = {
           details: string
           status: string
         }[]
+      }
+      sincronizar_parametros_para_contratos: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       sincronizar_precos_servicos_contratos: {
         Args: Record<PropertyKey, never>

@@ -43,6 +43,7 @@ import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturame
 import LimparDadosCompleto from "@/components/LimparDadosCompleto";
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
+import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFaturamentoCompleto";
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
@@ -904,7 +905,12 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
-          <DemonstrativoFaturamento />
+          <DemonstrativoFaturamentoCompleto />
+          <Separator />
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3">Demonstrativo Anterior (sem franquias)</h3>
+            <DemonstrativoFaturamento />
+          </div>
           <Separator />
           <ListaExamesPeriodo />
         </TabsContent>
