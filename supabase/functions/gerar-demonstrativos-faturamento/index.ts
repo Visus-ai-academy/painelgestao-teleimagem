@@ -131,9 +131,24 @@ serve(async (req) => {
         ) || [];
         
         console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria`);
+        
+        if (volumetria && volumetria.length > 0) {
+          // Log uma amostra dos dados encontrados
+          console.log(`📋 Amostra volumetria ${cliente.nome_fantasia}:`, volumetria.slice(0, 3).map(v => ({
+            modalidade: v.MODALIDADE,
+            especialidade: v.ESPECIALIDADE,
+            categoria: v.CATEGORIA,
+            prioridade: v.PRIORIDADE,
+            valores: v.VALORES
+          })));
+        } else {
+          console.warn(`⚠️ Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
+        }
 
         const totalExames = volumetria?.length || 0;
         const volumeTotal = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+        
+        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${totalExames} registros, ${volumeTotal} volume total`);
 
         // Calcular valores dos exames baseado na tabela de preços
         let valorExames = 0;
@@ -161,6 +176,8 @@ serve(async (req) => {
           // Calcular preço para cada grupo
           for (const grupo of grupos.values()) {
             try {
+              console.log(`🔍 Buscando preço para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames)`);
+              
               const { data: preco, error: precoError } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente.id,
                 p_modalidade: grupo.modalidade,
@@ -170,6 +187,12 @@ serve(async (req) => {
                 p_volume_total: grupo.quantidade,
                 p_is_plantao: false
               });
+
+              if (precoError) {
+                console.error(`❌ Erro na função calcular_preco_exame:`, precoError);
+              }
+
+              console.log(`📊 Resultado busca preço: preco=${preco}, error=${precoError?.message || 'nenhum'}`);
 
               if (!precoError && preco && preco > 0) {
                 grupo.valor_unitario = preco;
@@ -183,7 +206,20 @@ serve(async (req) => {
                 
                 console.log(`💰 Preço encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} = R$ ${preco.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               } else {
-                console.warn(`⚠️ Preço não encontrado ou zerado para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames)`);
+                console.warn(`⚠️ Preço não encontrado ou zerado para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames) - preco retornado: ${preco}`);
+                
+                // Verificar se existem preços para este cliente
+                const { data: precosCliente, error: precosError } = await supabase
+                  .from('precos_servicos')
+                  .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia')
+                  .eq('cliente_id', cliente.id)
+                  .limit(5);
+                
+                if (precosError) {
+                  console.error(`❌ Erro ao buscar preços do cliente ${cliente.nome_fantasia}:`, precosError);
+                } else {
+                  console.log(`📋 Preços disponíveis para ${cliente.nome_fantasia}:`, precosCliente);
+                }
                 
                 // Adicionar nos detalhes mesmo sem preço para diagnóstico
                 detalhesExames.push({
@@ -193,7 +229,7 @@ serve(async (req) => {
                 });
               }
             } catch (error) {
-              console.error(`Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
+              console.error(`❌ Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
             }
           }
         }
