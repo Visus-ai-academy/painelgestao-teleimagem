@@ -2137,6 +2137,7 @@ export type Database = {
           portal_laudos: boolean | null
           razao_social: string | null
           simples: boolean | null
+          status: string | null
           tipo_cliente: string | null
           tipo_desconto_acrescimo: string | null
           tipo_faturamento: string | null
@@ -2189,6 +2190,7 @@ export type Database = {
           portal_laudos?: boolean | null
           razao_social?: string | null
           simples?: boolean | null
+          status?: string | null
           tipo_cliente?: string | null
           tipo_desconto_acrescimo?: string | null
           tipo_faturamento?: string | null
@@ -2241,6 +2243,7 @@ export type Database = {
           portal_laudos?: boolean | null
           razao_social?: string | null
           simples?: boolean | null
+          status?: string | null
           tipo_cliente?: string | null
           tipo_desconto_acrescimo?: string | null
           tipo_faturamento?: string | null
