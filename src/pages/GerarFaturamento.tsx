@@ -327,13 +327,22 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
+      // Primeiro, verificar quantos clientes estão cadastrados no total
+      const { count: totalClientesCadastrados } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true });
+      console.log(`📋 Total de clientes cadastrados no sistema: ${totalClientesCadastrados}`);
+      
       // BUSCAR TODOS os clientes únicos da volumetria do período usando EMPRESA (não Cliente_Nome_Fantasia)  
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('"EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM direto
         .not('"EMPRESA"', 'is', null)
-        .not('"EMPRESA"', 'eq', '');
+        .not('"EMPRESA"', 'eq', '')
+        .limit(10000); // Aumentar limite para garantir que todos os clientes sejam carregados
+
+      console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria?.length || 0} registros para período ${periodoSelecionado}`);
 
       if (errorVolumetria) {
         console.error('❌ Erro na consulta volumetria:', errorVolumetria);
@@ -345,7 +354,13 @@ export default function GerarFaturamento() {
       if (clientesVolumetria && clientesVolumetria.length > 0) {
         // Buscar apenas clientes únicos da volumetria por EMPRESA  
         const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
+        console.log(`📊 Total de registros na volumetria: ${clientesVolumetria.length}`);
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
+        
+        // Verificar se há algum limitador não intencional
+        if (nomesUnicos.length !== clientesVolumetria.length) {
+          console.log(`ℹ️ Diferença entre registros totais (${clientesVolumetria.length}) e clientes únicos (${nomesUnicos.length}) - isto é normal devido a duplicatas`);
+        }
         
         const clientesTemp: any[] = [];
         const clientesJaProcessados = new Set();
