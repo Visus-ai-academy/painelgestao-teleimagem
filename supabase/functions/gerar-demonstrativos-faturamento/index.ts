@@ -109,43 +109,55 @@ serve(async (req) => {
     // Processar cada cliente agrupado
     for (const cliente of clientesAgrupados.values()) {
       try {
-        console.log(`Processando cliente: ${cliente.nome}`);
+    console.log('Processando cliente:', cliente.nome_fantasia);
 
-        // Buscar volumetria do período SEM LIMITAÇÃO usando função RPC
-        console.log(`🔍 Buscando TODOS os dados da volumetria para cliente: ${cliente.nome_fantasia}`);
-        
-        const { data: volumetriaTodos, error: volumetriaErroCompleto } = await supabase.rpc('get_volumetria_complete_data');
-        
-        if (volumetriaErroCompleto) {
-          console.error(`❌ Erro ao buscar volumetria completa:`, volumetriaErroCompleto);
-          continue;
-        }
-        
-        // Filtrar dados para TODOS os nomes MobileMed deste cliente
-        const volumetria = volumetriaTodos?.filter(item => 
-          item.EMPRESA && 
-          item.periodo_referencia === periodo &&
-          cliente.nomes_mobilemed.some(nome => 
-            item.EMPRESA.toLowerCase().includes(nome.toLowerCase()) ||
-            item.EMPRESA === nome
-          )
-        ) || [];
-        
-        console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria`);
-        
-        if (volumetria && volumetria.length > 0) {
-          // Log uma amostra dos dados encontrados
-          console.log(`📋 Amostra volumetria ${cliente.nome_fantasia}:`, volumetria.slice(0, 3).map(v => ({
-            modalidade: v.MODALIDADE,
-            especialidade: v.ESPECIALIDADE,
-            categoria: v.CATEGORIA,
-            prioridade: v.PRIORIDADE,
-            valores: v.VALORES,
-            empresa: v.EMPRESA
-          })));
-        } else {
-          console.warn(`⚠️ Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
-        }
+    // Buscar volumetria do período SEM LIMITAÇÃO usando função RPC
+    console.log(`🔍 Buscando TODOS os dados da volumetria para cliente: ${cliente.nome_fantasia}`);
+    
+    const { data: volumetriaTodos, error: volumetriaErroCompleto } = await supabase.rpc('get_volumetria_complete_data');
+    
+    if (volumetriaErroCompleto) {
+      console.error(`❌ ERRO CRÍTICO - Falha ao buscar volumetria:`, volumetriaErroCompleto);
+      continue;
+    }
+
+    console.log(`📊 Total de registros na volumetria: ${volumetriaTodos?.length || 0}`);
+    
+    // Filtrar dados para TODOS os nomes MobileMed deste cliente
+    const volumetria = volumetriaTodos?.filter(item => {
+      const matchPeriodo = item.periodo_referencia === periodo;
+      const matchCliente = item.EMPRESA && 
+        cliente.nomes_mobilemed.some(nome => 
+          item.EMPRESA.toLowerCase().includes(nome.toLowerCase()) ||
+          item.EMPRESA === nome
+        );
+      
+      console.log(`🔍 Verificando registro: EMPRESA=${item.EMPRESA}, periodo=${item.periodo_referencia}, match_periodo=${matchPeriodo}, match_cliente=${matchCliente}`);
+      
+      return matchPeriodo && matchCliente;
+    }) || [];
+    
+    console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria.length} registros encontrados na volumetria para período ${periodo}`);
+    
+    if (volumetria && volumetria.length > 0) {
+      // Log uma amostra dos dados encontrados
+      console.log(`📋 Amostra volumetria ${cliente.nome_fantasia}:`, volumetria.slice(0, 3).map(v => ({
+        modalidade: v.MODALIDADE,
+        especialidade: v.ESPECIALIDADE,
+        categoria: v.CATEGORIA,
+        prioridade: v.PRIORIDADE,
+        valores: v.VALORES,
+        empresa: v.EMPRESA,
+        periodo: v.periodo_referencia
+      })));
+    } else {
+      console.warn(`⚠️ PROBLEMA: Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
+      console.log(`🔍 Verificando se cliente existe na volumetria:`, {
+        cliente: cliente.nome_fantasia,
+        nomes_mobilemed: cliente.nomes_mobilemed,
+        periodo_buscado: periodo
+      });
+    }
 
         const totalExames = volumetria?.length || 0;
         const volumeTotal = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
