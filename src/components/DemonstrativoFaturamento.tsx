@@ -136,6 +136,14 @@ export default function DemonstrativoFaturamento() {
         const clientesUnicos = [...new Set(dadosFaturamento.map(d => d.cliente_nome))];
         console.log('👥 Clientes únicos encontrados:', clientesUnicos.length, clientesUnicos);
         console.log('📋 Lista completa de clientes únicos:', clientesUnicos);
+        
+        // Log detalhado de cada cliente
+        clientesUnicos.forEach(clienteNome => {
+          const registrosCliente = dadosFaturamento.filter(d => d.cliente_nome === clienteNome);
+          const totalExames = registrosCliente.reduce((sum, r) => sum + (r.quantidade || 1), 0);
+          const totalValor = registrosCliente.reduce((sum, r) => sum + (Number(r.valor_bruto) || 0), 0);
+          console.log(`📊 ${clienteNome}: ${registrosCliente.length} registros, ${totalExames} exames, R$ ${totalValor.toFixed(2)}`);
+        });
       } else {
         console.warn('⚠️ Nenhum dado de faturamento retornado pela consulta');
         console.log('🔍 Detalhes do erro:', error);
