@@ -464,12 +464,24 @@ serve(async (req) => {
 
     console.log('Demonstrativos gerados:', resumo);
 
+    // Salvar dados no localStorage do cliente (via resposta)
+    const dadosParaSalvar = {
+      demonstrativos,
+      resumo,
+      periodo,
+      timestamp: new Date().toISOString()
+    };
+
     return new Response(
       JSON.stringify({
         success: true,
         periodo,
         resumo,
         demonstrativos,
+        salvar_localStorage: {
+          chave: `demonstrativos_completos_${periodo}`,
+          dados: dadosParaSalvar
+        },
         message: `Demonstrativos gerados para ${processados} clientes`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

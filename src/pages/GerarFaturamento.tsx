@@ -503,10 +503,10 @@ export default function GerarFaturamento() {
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-faturamento-periodo com período:', periodoSelecionado);
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento com período:', periodoSelecionado);
       
-      // Chamar edge function para gerar o faturamento
-      const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-faturamento-periodo', {
+      // Chamar edge function para gerar os demonstrativos completos
+      const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
         body: {
           periodo: periodoSelecionado
         }
@@ -518,7 +518,14 @@ export default function GerarFaturamento() {
 
       if (faturamentoError || !faturamentoData?.success) {
         console.log('❌ [ERRO] Erro na edge function:', faturamentoError?.message || faturamentoData?.error);
-        throw new Error(faturamentoError?.message || faturamentoData?.error || 'Erro ao gerar faturamento');
+        throw new Error(faturamentoError?.message || faturamentoData?.error || 'Erro ao gerar demonstrativos');
+      }
+
+      // Salvar dados no localStorage se fornecidos pela edge function
+      if (faturamentoData.salvar_localStorage) {
+        const { chave, dados } = faturamentoData.salvar_localStorage;
+        localStorage.setItem(chave, JSON.stringify(dados));
+        console.log(`💾 Dados salvos no localStorage com chave: ${chave}`);
       }
 
       setStatusProcessamento({
@@ -527,74 +534,46 @@ export default function GerarFaturamento() {
         progresso: 70
       });
 
-      // Aguardar e verificar o processamento com polling
-      console.log('🔍 [VERIFICACAO] Aguardando processamento em background...');
+      // Aguardar e verificar se demonstrativos foram salvos no localStorage
+      console.log('🔍 [VERIFICACAO] Aguardando geração dos demonstrativos...');
       
       let tentativas = 0;
-      const maxTentativas = 40; // 40 tentativas = até 2 minutos
-      let clientesFaturamento: any[] = [];
+      const maxTentativas = 20; // 20 tentativas = até 1 minuto
+      let demonstrativosSalvos = false;
       
-      while (tentativas < maxTentativas) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3 segundos entre tentativas
+      while (tentativas < maxTentativas && !demonstrativosSalvos) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3 segundos
         tentativas++;
         
         setStatusProcessamento({
           processando: true,
-          mensagem: `Verificando processamento... (${tentativas}/${maxTentativas})`,
-          progresso: 70 + ((tentativas / maxTentativas) * 20) // 70% a 90%
+          mensagem: `Verificando demonstrativos gerados... (${tentativas}/${maxTentativas})`,
+          progresso: 70 + ((tentativas / maxTentativas) * 20)
         });
 
-        console.log(`🔍 [VERIFICACAO] Tentativa ${tentativas}/${maxTentativas} - Verificando clientes processados...`);
-        const { data: dadosFaturamento, error: errorFaturamento } = await supabase
-          .from('faturamento')
-          .select('cliente_nome')
-          .eq('periodo_referencia', periodoSelecionado)
-          .not('cliente_nome', 'is', null);
-
-        if (errorFaturamento) {
-          console.warn('⚠️ [AVISO] Erro ao verificar faturamento:', errorFaturamento);
-          continue;
-        }
-
-        clientesFaturamento = dadosFaturamento || [];
+        console.log(`🔍 [VERIFICACAO] Tentativa ${tentativas}/${maxTentativas} - Verificando localStorage...`);
         
-        // Se encontrou dados, sair do loop
-        if (clientesFaturamento.length > 0) {
-          console.log(`✅ [SUCESSO] Encontrados ${clientesFaturamento.length} registros processados na tentativa ${tentativas}`);
-          break;
+        // Verificar se demonstrativos foram salvos no localStorage corretamente
+        const demonstrativosLocalStorage = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+        if (demonstrativosLocalStorage) {
+          try {
+            const dados = JSON.parse(demonstrativosLocalStorage);
+            if (dados.demonstrativos && dados.demonstrativos.length > 0) {
+              console.log(`✅ [SUCESSO] Demonstrativos encontrados no localStorage: ${dados.demonstrativos.length} clientes`);
+              demonstrativosSalvos = true;
+              break;
+            }
+          } catch (error) {
+            console.warn('⚠️ [AVISO] Erro ao verificar localStorage:', error);
+          }
         }
         
-        console.log(`⏳ [AGUARDANDO] Tentativa ${tentativas}: ainda sem dados processados, aguardando...`);
+        console.log(`⏳ [AGUARDANDO] Tentativa ${tentativas}: ainda sem demonstrativos salvos, aguardando...`);
       }
 
-      if (clientesFaturamento.length === 0) {
-        console.warn('⚠️ [TIMEOUT] Processamento não concluído dentro do tempo limite');
-        throw new Error('Timeout: O processamento demorou mais que 2 minutos. Verifique se há dados de volumetria para o período ou tente novamente.');
-      }
-
-      const clientesUnicosFaturamento = [...new Set(clientesFaturamento?.map(c => c.cliente_nome).filter(Boolean) || [])];
-      console.log('📊 [FATURAMENTO] Clientes processados no faturamento:', clientesUnicosFaturamento.length, clientesUnicosFaturamento);
-
-      setStatusProcessamento({
-        processando: true,
-        mensagem: `Processados ${clientesUnicosFaturamento.length} de ${clientesUnicosVolumetria.length} clientes`,
-        progresso: 90
-      });
-
-      // Verificar se todos os clientes foram processados
-      if (clientesUnicosFaturamento.length < clientesUnicosVolumetria.length) {
-        const clientesNaoProcessados = clientesUnicosVolumetria.filter(
-          cliente => !clientesUnicosFaturamento.includes(cliente)
-        );
-        console.warn('⚠️ [AVISO] Alguns clientes não foram processados:', clientesNaoProcessados);
-        
-        toast({
-          title: "Processamento parcial",
-          description: `${clientesUnicosFaturamento.length} de ${clientesUnicosVolumetria.length} clientes processados. Alguns clientes podem não ter preços configurados.`,
-          variant: "default",
-        });
-      } else {
-        console.log('✅ [SUCESSO] Todos os clientes foram processados');
+      if (!demonstrativosSalvos) {
+        console.warn('⚠️ [TIMEOUT] Geração de demonstrativos não concluída dentro do tempo limite');
+        throw new Error('Timeout: A geração dos demonstrativos demorou mais que 1 minuto. Tente novamente.');
       }
 
       // Marcar demonstrativo como gerado
@@ -603,13 +582,13 @@ export default function GerarFaturamento() {
 
       setStatusProcessamento({
         processando: false,
-        mensagem: `Demonstrativo gerado com sucesso (${clientesUnicosFaturamento.length} clientes)`,
+        mensagem: 'Demonstrativo gerado com sucesso!',
         progresso: 100
       });
 
       toast({
         title: "Demonstrativo gerado!",
-        description: `Faturamento do período ${periodoSelecionado} processado com ${clientesUnicosFaturamento.length} clientes`,
+        description: `Demonstrativos completos gerados com sucesso para o período ${periodoSelecionado}`,
         variant: "default",
       });
 
