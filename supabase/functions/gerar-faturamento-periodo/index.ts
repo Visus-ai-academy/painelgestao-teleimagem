@@ -157,7 +157,7 @@ serve(async (req) => {
           .select('"EMPRESA"')
           .eq('periodo_referencia', periodoFormatado) // Usar período normalizado YYYY-MM
           .not('"EMPRESA"', 'is', null)
-          .limit(10000); // Reduzir limite para evitar timeout
+          .limit(50000); // Buscar todos os clientes, mas processar em lotes pequenos
         
         // Coletar APENAS nomes de EMPRESA
         const nomesClientesSet = new Set();
@@ -281,7 +281,7 @@ serve(async (req) => {
         
         // PROCESSAR CLIENTES EM LOTES PEQUENOS PARA EVITAR TIMEOUT
         const todosClientesParaProcessar = [...clientesComPrecos, ...clientesPendentes];
-        const loteClientes = Math.min(5, todosClientesParaProcessar.length); // Processar máximo 5 clientes por vez
+        const loteClientes = Math.min(10, todosClientesParaProcessar.length); // Processar máximo 10 clientes por vez
         
         console.log(`[gerar-faturamento-periodo] Processando ${todosClientesParaProcessar.length} clientes em lotes de ${loteClientes}`);
         
@@ -293,13 +293,12 @@ serve(async (req) => {
             try {
               console.log(`[gerar-faturamento-periodo] [${i + 1}/${loteClientes}] Processando cliente: ${cliente.nome}`);
               
-              // Buscar dados de volumetria do cliente no período usando campo EMPRESA (LIMITADO)
+              // Buscar TODOS os dados de volumetria do cliente no período usando campo EMPRESA
               const { data: vm, error: vmErr } = await supabase
                 .from('volumetria_mobilemed')
                 .select('"EMPRESA","MODALIDADE","ESPECIALIDADE","CATEGORIA","PRIORIDADE","ESTUDO_DESCRICAO","VALORES","NOME_PACIENTE","DATA_REALIZACAO","MEDICO","ACCESSION_NUMBER"')
                 .eq('"EMPRESA"', cliente.nome_mobilemed)
-                .eq('periodo_referencia', periodoFormatado)
-                .limit(1000); // Limitar registros por cliente para evitar timeout
+                .eq('periodo_referencia', periodoFormatado); // SEM LIMITE - processar todos os registros
 
               if (vmErr) {
                 console.log(`[gerar-faturamento-periodo] Erro volumetria cliente ${cliente.nome}:`, vmErr.message);
@@ -317,14 +316,10 @@ serve(async (req) => {
               // Volume total (usado na faixa de preço) - garantir valor mínimo 1 se zerado
               const volumeTotal = Math.max(1, rows.reduce((acc: number, r: any) => acc + (Number(r.VALORES) || 0), 0));
 
-              // Agrupar por chave INCLUINDO paciente (LIMITAR GRUPOS)
+              // Agrupar por chave INCLUINDO paciente - PROCESSAR TODOS OS GRUPOS
               const grupos = new Map<string, { chave: GrupoChave; qtd: number; paciente: string; medico: string; dataExame: string; accession: string }>();
-              let groupCount = 0;
-              const maxGroups = 100; // Limitar grupos por cliente
               
               for (const r of rows) {
-                if (groupCount >= maxGroups) break; // Limitar processamento
-                
                 const chave: GrupoChave = {
                   modalidade: r.MODALIDADE || '',
                   especialidade: r.ESPECIALIDADE || '',
@@ -348,7 +343,6 @@ serve(async (req) => {
                     dataExame: r.DATA_REALIZACAO || '',
                     accession: r.ACCESSION_NUMBER || ''
                   });
-                  groupCount++;
                 }
               }
 
