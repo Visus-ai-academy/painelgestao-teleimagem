@@ -141,7 +141,7 @@ serve(async (req) => {
 
         // Preparar dados do parâmetro com tipos corretos
         const parametroData = {
-          cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()),
+          cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()) || null,
           
           // Campos identificação
           nome_mobilemed: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
@@ -333,23 +333,38 @@ serve(async (req) => {
           percentual_reajuste_fixo: 0
         };
 
-        if (!parametroData.cliente_id) {
-          throw new Error(`Cliente não encontrado: ${nomeEmpresa}`);
+        // Verificar se já existe baseado no cliente_id (se existir) ou nome_mobilemed
+        let existente;
+        if (parametroData.cliente_id) {
+          const { data } = await supabase
+            .from('parametros_faturamento')
+            .select('id')
+            .eq('cliente_id', parametroData.cliente_id)
+            .maybeSingle();
+          existente = data;
+        } else {
+          // Se não tem cliente_id, verifica por nome_mobilemed
+          const { data } = await supabase
+            .from('parametros_faturamento')
+            .select('id')
+            .eq('nome_mobilemed', parametroData.nome_mobilemed)
+            .maybeSingle();
+          existente = data;
         }
-
-        // Verificar se já existe
-        const { data: existente } = await supabase
-          .from('parametros_faturamento')
-          .select('id')
-          .eq('cliente_id', parametroData.cliente_id)
-          .maybeSingle();
 
         if (existente) {
           // Atualizar existente
-          const { error: updateError } = await supabase
+          let updateQuery = supabase
             .from('parametros_faturamento')
-            .update(parametroData)
-            .eq('id', existente.id);
+            .update(parametroData);
+          
+          if (parametroData.cliente_id) {
+            updateQuery = updateQuery.eq('cliente_id', parametroData.cliente_id);
+          } else {
+            updateQuery = updateQuery.eq('nome_mobilemed', parametroData.nome_mobilemed);
+          }
+          
+          const { error: updateError } = await updateQuery;
 
           if (updateError) throw updateError;
           atualizados++;
