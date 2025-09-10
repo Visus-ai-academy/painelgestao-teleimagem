@@ -1240,7 +1240,7 @@ export default function GerarFaturamento() {
                     ) : (
                       <>
                         <FileText className="h-5 w-5 mr-2" />
-                        📄 Gerar Relatórios ({clientesCarregados.length} clientes)
+                        📄 Gerar Relatórios
                       </>
                     )}
                   </Button>
