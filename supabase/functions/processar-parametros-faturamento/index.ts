@@ -304,12 +304,22 @@ serve(async (req) => {
           tipo_faturamento: findColumnValue(row, COLUMN_MAPPING.tipoFaturamento)?.toString().trim(),
           cliente_consolidado: findColumnValue(row, ['Cliente Consolidado']),
           
-          // Status ativo baseado no campo STATUS
-          ativo: (() => {
+          // Status conforme arquivo - "I", "A" ou "C"
+          status: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.status);
-            if (!valor) return true;
+            if (!valor) return 'A'; // Padrão ativo se não informado
             const valorStr = valor.toString().trim().toUpperCase();
-            return valorStr === 'A' || valorStr === 'ATIVO';
+            // Aceita os valores do arquivo: I (Inativo), A (Ativo), C (Cancelado)
+            if (['I', 'A', 'C'].includes(valorStr)) {
+              console.log(`Status encontrado: ${valorStr}`);
+              return valorStr;
+            }
+            // Se vier como texto, converte para código
+            if (valorStr === 'ATIVO') return 'A';
+            if (valorStr === 'INATIVO') return 'I';
+            if (valorStr === 'CANCELADO') return 'C';
+            console.log(`Status não reconhecido: ${valorStr}, assumindo Ativo`);
+            return 'A';
           })(),
           
           // Critérios de processamento
