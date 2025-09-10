@@ -136,12 +136,12 @@ export function SincronizarParametrosContratos() {
             forma_cobranca: parametros.forma_cobranca
           };
 
-          // 4. Atualizar contrato com parâmetros sincronizados
-          const { error: updateError } = await supabase
-            .from('contratos_clientes')
-            .update({
-              tem_parametros_configurados: true,
-              tipo_faturamento: parametros.tipo_cliente === 'CO' ? 'CO-FT' : 'NC-FT',
+           // 4. Atualizar contrato com parâmetros sincronizados
+           const { error: updateError } = await supabase
+             .from('contratos_clientes')
+             .update({
+               tem_parametros_configurados: true,
+               tipo_faturamento: parametros.tipo_faturamento || (parametros.tipo_cliente === 'CO' ? 'CO-FT' : 'NC-FT'),
               forma_pagamento: parametros.periodicidade_reajuste || 'mensal',
               configuracoes_franquia: configuracoesFranquia,
               configuracoes_integracao: configuracoesIntegracao,
