@@ -178,21 +178,36 @@ serve(async (req) => {
             try {
               console.log(`🔍 Buscando preço para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames)`);
               
+              // Verificar se temos todos os dados necessários
+              if (!grupo.modalidade || !grupo.especialidade) {
+                console.warn(`⚠️ Dados incompletos no grupo:`, grupo);
+                continue;
+              }
+
               const { data: preco, error: precoError } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente.id,
                 p_modalidade: grupo.modalidade,
                 p_especialidade: grupo.especialidade,
-                p_prioridade: grupo.prioridade,
-                p_categoria: grupo.categoria,
+                p_prioridade: grupo.prioridade || 'NORMAL',
+                p_categoria: grupo.categoria || 'SC',
                 p_volume_total: grupo.quantidade,
                 p_is_plantao: false
+              });
+
+              console.log(`📊 Resultado da função calcular_preco_exame:`, {
+                cliente: cliente.nome_fantasia,
+                modalidade: grupo.modalidade,
+                especialidade: grupo.especialidade,
+                prioridade: grupo.prioridade,
+                categoria: grupo.categoria,
+                quantidade: grupo.quantidade,
+                preco_retornado: preco,
+                erro: precoError?.message || 'nenhum'
               });
 
               if (precoError) {
                 console.error(`❌ Erro na função calcular_preco_exame:`, precoError);
               }
-
-              console.log(`📊 Resultado busca preço: preco=${preco}, error=${precoError?.message || 'nenhum'}`);
 
               if (!precoError && preco && preco > 0) {
                 grupo.valor_unitario = preco;
@@ -206,27 +221,37 @@ serve(async (req) => {
                 
                 console.log(`💰 Preço encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} = R$ ${preco.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               } else {
-                console.warn(`⚠️ Preço não encontrado ou zerado para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames) - preco retornado: ${preco}`);
+                console.warn(`⚠️ Preço não encontrado/inválido para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames) - preco: ${preco}`);
                 
                 // Verificar se existem preços para este cliente
                 const { data: precosCliente, error: precosError } = await supabase
                   .from('precos_servicos')
                   .select('modalidade, especialidade, categoria, prioridade, valor_base, valor_urgencia')
                   .eq('cliente_id', cliente.id)
-                  .limit(5);
+                  .limit(10);
                 
                 if (precosError) {
                   console.error(`❌ Erro ao buscar preços do cliente ${cliente.nome_fantasia}:`, precosError);
                 } else {
-                  console.log(`📋 Preços disponíveis para ${cliente.nome_fantasia}:`, precosCliente);
+                  console.log(`📋 Total de preços cadastrados para ${cliente.nome_fantasia}: ${precosCliente?.length || 0}`);
+                  if (precosCliente && precosCliente.length > 0) {
+                    console.log(`📋 Amostra de preços para ${cliente.nome_fantasia}:`, precosCliente.slice(0, 3));
+                  }
                 }
                 
-                // Adicionar nos detalhes mesmo sem preço para diagnóstico
+                // Usar valor fallback se não encontrou preço
+                const valorFallback = 5.5; // Valor padrão
+                const valorGrupo = grupo.quantidade * valorFallback;
+                valorExames += valorGrupo;
+                
                 detalhesExames.push({
                   ...grupo,
-                  valor_total: 0,
-                  problema: 'Preço não encontrado ou zerado'
+                  valor_total: valorGrupo,
+                  valor_unitario: valorFallback,
+                  problema: `Usando valor fallback de R$ ${valorFallback.toFixed(2)} - Preço não encontrado`
                 });
+                
+                console.log(`🔄 Usando valor fallback: ${grupo.modalidade}/${grupo.especialidade} = R$ ${valorFallback.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               }
             } catch (error) {
               console.error(`❌ Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
