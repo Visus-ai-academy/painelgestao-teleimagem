@@ -323,7 +323,7 @@ export default function GerarFaturamento() {
   const { toast } = useToast();
 
   // Função para carregar clientes da base de dados
-  const carregarClientes = async () => {
+  const carregarClientes = useCallback(async () => {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
@@ -443,7 +443,15 @@ export default function GerarFaturamento() {
         variant: "destructive",
       });
     }
-  };
+  }, [periodoSelecionado, toast]); // Dependências do useCallback
+
+  // Carregar clientes automaticamente quando período mudar
+  useEffect(() => {
+    if (periodoSelecionado) {
+      console.log('🔄 Período alterado para:', periodoSelecionado, '- carregando clientes automaticamente...');
+      carregarClientes();
+    }
+  }, [periodoSelecionado, carregarClientes]);
 
   // Função para gerar demonstrativo de faturamento
   const gerarDemonstrativoFaturamento = async () => {

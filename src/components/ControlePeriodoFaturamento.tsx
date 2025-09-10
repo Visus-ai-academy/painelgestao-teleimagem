@@ -86,19 +86,30 @@ export function ControlePeriodoFaturamento({
 
   // Memoizar os períodos para evitar recálculos constantes
   const periodos = useMemo(() => {
-    return Array.from({ length: 26 }, (_, i) => {
-      const date = new Date();
-      date.setMonth(date.getMonth() - 24 + i); // -24 a +2 meses
-      const periodo = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    // Começar do período base (jun/25) até 6 meses à frente
+    const periodoBase = new Date(2025, 5, 1); // jun/25 (mês 5 = junho)
+    const hoje = new Date();
+    const limiteInicial = periodoBase.getTime() > hoje.getTime() ? periodoBase : new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+    const limiteFinal = new Date(hoje.getFullYear(), hoje.getMonth() + 6, 1);
+    
+    const periodos = [];
+    const dataIteracao = new Date(limiteInicial);
+    
+    while (dataIteracao <= limiteFinal) {
+      const periodo = `${dataIteracao.getFullYear()}-${String(dataIteracao.getMonth() + 1).padStart(2, '0')}`;
       const status = getStatusPeriodoFaturamento(periodo);
       const isDisponivel = isPeriodoDisponivelFaturamento(periodo);
       
-      return {
+      periodos.push({
         periodo,
         status,
         isDisponivel
-      };
-    });
+      });
+      
+      dataIteracao.setMonth(dataIteracao.getMonth() + 1);
+    }
+    
+    return periodos;
   }, []); // Array vazio - só calcula uma vez na montagem
 
   // Memoizar o status do período selecionado
