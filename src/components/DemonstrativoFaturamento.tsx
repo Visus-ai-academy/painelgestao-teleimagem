@@ -101,7 +101,7 @@ export default function DemonstrativoFaturamento() {
         console.log('👥 Clientes únicos na volumetria:', clientesUnicos.length, clientesUnicos.slice(0, 5));
       }
       
-      // Buscar dados de faturamento do período - GARANTIR TODOS OS CLIENTES
+      // Buscar dados de faturamento do período - TODOS OS DADOS PRIMEIRO
       console.log('🔍 Iniciando busca na tabela faturamento...');
       console.log('🔍 Período de busca:', periodo);
       
@@ -116,7 +116,8 @@ export default function DemonstrativoFaturamento() {
           quantidade,
           data_emissao,
           data_vencimento,
-          periodo_referencia
+          periodo_referencia,
+          tipo_faturamento
         `)
         .eq('periodo_referencia', periodo) // Usar formato YYYY-MM direto
         .not('periodo_referencia', 'is', null) // Excluir registros sem período
@@ -189,11 +190,23 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-            // Buscar clientes cadastrados para obter IDs para cálculo de preços
+            // Buscar clientes cadastrados com contratos que precisam de demonstrativo
             const { data: clientesCadastrados } = await supabase
               .from('clientes')
-              .select('id, nome, nome_fantasia, nome_mobilemed, email')
-              .eq('ativo', true);
+              .select(`
+                id, 
+                nome, 
+                nome_fantasia, 
+                nome_mobilemed, 
+                email,
+                contratos_clientes!inner (
+                  tipo_faturamento
+                )
+              `)
+              .eq('ativo', true)
+              .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT']); // FILTRAR APENAS CLIENTES QUE PRECISAM DE DEMONSTRATIVO
+            
+            console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
             
             // Criar mapa de clientes por nome fantasia
             const clientesMapPorNome = new Map();
@@ -334,12 +347,53 @@ export default function DemonstrativoFaturamento() {
 
       console.log(`Dados encontrados: ${dadosFaturamento.length} registros para o período ${periodo}`);
 
-      // Agrupar por cliente - CORRIGIDO para usar mesma lógica da aba Gerar
+      // Buscar contratos dos clientes para filtrar por tipo de faturamento
+      const clientesNomes = [...new Set(dadosFaturamento.map(d => d.cliente_nome))];
+      console.log('🏢 Buscando contratos para clientes:', clientesNomes);
+      
+      const { data: clientesComContratos, error: errorContratos } = await supabase
+        .from('clientes')
+        .select(`
+          id,
+          nome,
+          nome_fantasia,
+          nome_mobilemed,
+          email,
+          contratos_clientes!inner (
+            tipo_faturamento
+          )
+        `)
+        .eq('ativo', true)
+        .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT']);
+      
+      if (errorContratos) {
+        console.error('❌ Erro ao buscar contratos:', errorContratos);
+      }
+      
+      // Criar mapa de clientes que precisam de demonstrativo
+      const clientesQueNecessitamDemonstrativo = new Set();
+      clientesComContratos?.forEach(cliente => {
+        if (cliente.nome_fantasia) clientesQueNecessitamDemonstrativo.add(cliente.nome_fantasia);
+        if (cliente.nome) clientesQueNecessitamDemonstrativo.add(cliente.nome);
+        if (cliente.nome_mobilemed) clientesQueNecessitamDemonstrativo.add(cliente.nome_mobilemed);
+      });
+      
+      console.log('📋 Clientes que precisam de demonstrativo:', Array.from(clientesQueNecessitamDemonstrativo));
+      
+      // Filtrar dados de faturamento apenas para clientes que precisam de demonstrativo
+      const dadosFaturamentoFiltrados = dadosFaturamento.filter(item => 
+        clientesQueNecessitamDemonstrativo.has(item.cliente_nome)
+      );
+      
+      console.log(`🔍 Dados filtrados: ${dadosFaturamentoFiltrados.length} registros (eram ${dadosFaturamento.length})`);
+      console.log('👥 Clientes filtrados únicos:', [...new Set(dadosFaturamentoFiltrados.map(d => d.cliente_nome))]);
+
+      // Agrupar por cliente - CORRIGIDO para usar dados filtrados
       const clientesMap = new Map<string, ClienteFaturamento>();
       
-      console.log('🔄 Processando', dadosFaturamento?.length || 0, 'registros de faturamento...');
+      console.log('🔄 Processando', dadosFaturamentoFiltrados?.length || 0, 'registros de faturamento filtrados...');
       
-      dadosFaturamento?.forEach((item, index) => {
+      dadosFaturamentoFiltrados?.forEach((item, index) => {
         const clienteNome = item.cliente_nome;
         
         if (index < 5) { // Log dos primeiros 5 registros para debug
