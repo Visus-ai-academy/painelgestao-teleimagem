@@ -77,34 +77,62 @@ const COLUMN_MAPPING = {
 function formatarCNPJ(cnpj: string | number): string | null {
   if (!cnpj && cnpj !== 0) return null;
   
-  // Converte para string preservando zeros à esquerda
-  let cnpjStr = cnpj.toString().replace(/\D/g, ''); // Remove não dígitos
+  // Converte para string e remove todos os caracteres não numéricos
+  let cnpjStr = cnpj.toString().replace(/\D/g, '');
   
-  // Se veio do Excel como número, pode ter perdido zeros à esquerda
+  // Se está vazio após limpeza, retorna null
+  if (!cnpjStr) return null;
+  
   // Preenche com zeros à esquerda para garantir 14 dígitos
   cnpjStr = cnpjStr.padStart(14, '0');
   
-  // Se ainda não tem 14 dígitos após padding, retorna como está
-  if (cnpjStr.length !== 14) return cnpj.toString();
+  // Se tem mais de 14 dígitos, algo está errado, retorna como veio
+  if (cnpjStr.length > 14) {
+    console.log(`CNPJ com mais de 14 dígitos: ${cnpj} -> ${cnpjStr}`);
+    return cnpj.toString();
+  }
   
-  return cnpjStr.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  // Se tem menos de 11 dígitos mesmo após padding, provavelmente é inválido
+  if (cnpjStr.length < 11) {
+    console.log(`CNPJ muito curto: ${cnpj} -> ${cnpjStr}`);
+    return cnpj.toString();
+  }
+  
+  // Aplica formatação padrão do CNPJ
+  const formatted = cnpjStr.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  console.log(`CNPJ formatado: ${cnpj} -> ${formatted}`);
+  return formatted;
 }
 
 // Função para formatar CPF
 function formatarCPF(cpf: string | number): string | null {
   if (!cpf && cpf !== 0) return null;
   
-  // Converte para string preservando zeros à esquerda
-  let cpfStr = cpf.toString().replace(/\D/g, ''); // Remove não dígitos
+  // Converte para string e remove todos os caracteres não numéricos
+  let cpfStr = cpf.toString().replace(/\D/g, '');
   
-  // Se veio do Excel como número, pode ter perdido zeros à esquerda
+  // Se está vazio após limpeza, retorna null
+  if (!cpfStr) return null;
+  
   // Preenche com zeros à esquerda para garantir 11 dígitos
   cpfStr = cpfStr.padStart(11, '0');
   
-  // Se ainda não tem 11 dígitos após padding, retorna como está
-  if (cpfStr.length !== 11) return cpf.toString();
+  // Se tem mais de 11 dígitos, algo está errado, retorna como veio
+  if (cpfStr.length > 11) {
+    console.log(`CPF com mais de 11 dígitos: ${cpf} -> ${cpfStr}`);
+    return cpf.toString();
+  }
   
-  return cpfStr.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  // Se tem menos de 10 dígitos mesmo após padding, provavelmente é inválido
+  if (cpfStr.length < 10) {
+    console.log(`CPF muito curto: ${cpf} -> ${cpfStr}`);
+    return cpf.toString();
+  }
+  
+  // Aplica formatação padrão do CPF
+  const formatted = cpfStr.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  console.log(`CPF formatado: ${cpf} -> ${formatted}`);
+  return formatted;
 }
 
 // Função para normalizar nome para busca (remove acentos, espaços extras, etc)
