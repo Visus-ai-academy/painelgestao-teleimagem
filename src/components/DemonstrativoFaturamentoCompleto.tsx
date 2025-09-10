@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,42 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  // Chave para localStorage baseada no período
+  const storageKey = `demonstrativos_${periodo}`;
+
+  // Carregar dados do localStorage ao montar o componente
+  useEffect(() => {
+    if (periodo) {
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData) {
+        try {
+          const { demonstrativos: savedDemonstrativos, resumo: savedResumo } = JSON.parse(savedData);
+          setDemonstrativos(savedDemonstrativos || []);
+          setResumo(savedResumo || null);
+        } catch (error) {
+          console.error('Erro ao carregar dados do localStorage:', error);
+        }
+      }
+    }
+  }, [periodo, storageKey]);
+
+  // Salvar dados no localStorage sempre que demonstrativos ou resumo mudarem
+  useEffect(() => {
+    if (periodo && (demonstrativos.length > 0 || resumo)) {
+      const dataToSave = { demonstrativos, resumo };
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    }
+  }, [demonstrativos, resumo, periodo, storageKey]);
+
+  // Limpar dados quando o período mudar
+  useEffect(() => {
+    if (periodo) {
+      setDemonstrativos([]);
+      setResumo(null);
+      setExpandedClients(new Set());
+    }
+  }, [periodo]);
 
   const handleGerarDemonstrativos = async () => {
     if (!periodo) {
