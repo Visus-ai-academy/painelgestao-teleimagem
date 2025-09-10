@@ -11,61 +11,64 @@ interface ParametroRow {
   [key: string]: any; // Permite qualquer nome de coluna
 }
 
-// Mapeamento flexível de colunas baseado no arquivo real
+// Mapeamento flexível de colunas baseado no template atual
 const COLUMN_MAPPING = {
   // Nomes da empresa
   nomeEmpresa: [
-    'NOME_MOBILEMED', 'Nome Empresa', 'Nome_Fantasia', 'NOME EMPRESA', 'nome empresa',
-    'Nome_Empresa', 'NOME_EMPRESA', 'Cliente', 'CLIENTE', 'cliente', 'Empresa', 'EMPRESA'
+    'Nome Empresa', 'NOME_MOBILEMED', 'Nome_Fantasia', 'Nome Fantasia',
+    'NOME EMPRESA', 'nome empresa', 'Nome_Empresa', 'NOME_EMPRESA', 
+    'Cliente', 'CLIENTE', 'cliente', 'Empresa', 'EMPRESA'
   ],
-  // Tipo de cliente
+  // Identificação
+  cnpj: ['CNPJ', 'cnpj'],
+  razaoSocial: ['Razão Social', 'RAZÃO SOCIAL', 'razao social'],
+  numeroContrato: ['Numero Contrato', 'Contrato', 'CONTRATO'],
+  
+  // Classificação
   tipoCliente: ['TIPO_CLIENTE ("CO" OU "NC"', 'TIPO_CLIENTE'],
-  // Status
-  status: ['STATUS (INATIVO OU ATIVO)', 'Status'],
-  // CNPJ
-  cnpj: ['CNPJ'],
-  // Razão Social
-  razaoSocial: ['Razão Social'],
-  // Contrato
-  numeroContrato: ['Contrato'],
-  // Tipo Faturamento
-  tipoFaturamento: ['TIPO FATURAMENTO ("CO-FT", "NC-FT", "NC-NF")', 'TIPO FATURAMENTO'],
-  // Datas
-  dataInicio: ['DATA_INICIO'],
-  dataTermino: ['DATA_TERMINO'],
-  // Dia faturamento
-  diaFaturamento: ['DIA_FATURAMENTO'],
-  // Impostos
-  impostosAbMin: ['Impostos abMin'],
-  simples: ['Simples'],
-  // Critérios
-  criterioEmissaoNF: ['Criterio de Emissao de NF'],
-  criteriosRelatorio: ['Criterios de geração do relatório'],
-  criteriosParametros: ['Criterios de aplicação dos parâmetros'],
-  criteriosFranquias: ['Criterios de aplicação das franquias'],
+  tipoFaturamento: ['TIPO FATURAMENTO', 'TIPO FATURAMENTO ("CO-FT", "NC-FT", "NC-NF")'],
+  status: ['Status', 'STATUS', 'STATUS (INATIVO OU ATIVO)'],
+  
+  // Impostos e tributação
+  impostosAbMin: ['Impostos abMin', 'IMPOSTOS ABMIN'],
+  simples: ['Simples', 'SIMPLES'],
+  percentualISS: ['% ISS', '%ISS', 'ISS'],
+  
+  // Métricas de convênio/urgência
+  tipoMetricaConvenio: ['Tipo métrica convênio', 'Tipo Métrica Convênio'],
+  valorConvenio: ['Valor convênio', 'Valor Convênio'],
+  tipoMetricaUrgencia: ['Tipo métrica URGÊNCIA', 'Tipo Métrica URGÊNCIA'],
+  valorUrgencia: ['Valor URGÊNCIA', 'VALOR URGÊNCIA', 'Valor Urgência'],
+  
+  // Desconto/Acréscimo
+  tipoDesconto: ['Tipo Desconto / Acréscimo', 'TIPO DESCONTO / ACRÉSCIMO'],
+  descontoAcrescimo: ['Desconto / Acréscimo', 'DESCONTO / ACRÉSCIMO'],
+  
   // Integração
-  integracao: ['Integração'],
+  integracao: ['Integração', 'INTEGRAÇÃO'],
+  dataInicioIntegracao: ['Data Início Integração', 'DATA INÍCIO INTEGRAÇÃO'],
+  
   // Portal
-  portalLaudos: ['Portal de Laudos'],
-  // ISS
-  percentualISS: ['% ISS'],
+  portalLaudos: ['Portal de Laudos', 'PORTAL DE LAUDOS'],
+  
   // Franquia
-  possuiFranquia: ['Possui Franquia'],
-  valorFranquia: ['Valor Franquia'],
-  volumeFranquia: ['Volume Franquia'],
-  frequenciaContinua: ['Frequencia Contínua'],
-  frequenciaPorVolume: ['Frequência por volume'],
-  valorFranquiaAcimaVolume: ['R$ Valor Franquia Acima Volume'],
-  dataInicioFranquia: ['Data Início Franquia'],
-  // Urgência
-  cobrarUrgenciaRotina: ['Cobrar URGÊNCIA como ROTINA'],
-  // Includes
-  incluirEmpresaOrigem: ['Incluir Empresa Origem'],
-  incluirAccessNumber: ['Incluir Acces Number'],
-  incluirMedicoSolicitante: ['INCLUIR MÉDICO SOLICITANTE'],
-  // Novos campos do template
-  diaFechamento: ['Dia Fechamento'],
-  formaCobranca: ['Forma Cobrança']
+  possuiFranquia: ['Possui Franquia', 'POSSUI FRANQUIA'],
+  valorFranquia: ['Valor Franquia', 'VALOR FRANQUIA'],
+  volumeFranquia: ['Volume Franquia', 'VOLUME FRANQUIA', 'Volume'],
+  frequenciaContinua: ['Frequencia Contínua', 'Frequência Contínua'],
+  frequenciaPorVolume: ['Frequência por volume', 'FREQUÊNCIA POR VOLUME'],
+  valorFranquiaAcimaVolume: ['R$ Valor Franquia Acima Volume', 'VALOR FRANQUIA ACIMA VOLUME'],
+  dataInicioFranquia: ['Data Início Franquia', 'DATA INÍCIO FRANQUIA'],
+  
+  // Configurações de cobrança
+  cobrarUrgenciaRotina: ['Cobrar URGÊNCIA como ROTINA', 'COBRAR URGÊNCIA COMO ROTINA'],
+  incluirEmpresaOrigem: ['Incluir Empresa Origem', 'INCLUIR EMPRESA ORIGEM'],
+  incluirAccessNumber: ['Incluir Acces Number', 'INCLUIR ACCES NUMBER'],
+  incluirMedicoSolicitante: ['INCLUIR MÉDICO SOLICITANTE', 'Incluir Médico Solicitante'],
+  
+  // Fechamento
+  diaFechamento: ['Dia Fechamento', 'DIA FECHAMENTO'],
+  formaCobranca: ['Forma Cobrança', 'FORMA COBRANÇA']
 };
 
 function findColumnValue(row: ParametroRow, possibleNames: string[]): any {
@@ -133,67 +136,78 @@ serve(async (req) => {
           throw new Error('Campo "Nome Empresa" não encontrado. Verifique se a coluna existe no arquivo.');
         }
 
-        // Preparar dados do parâmetro usando mapeamento flexível - TODOS os campos do Excel
+        // Preparar dados do parâmetro com tipos corretos
         const parametroData = {
           cliente_id: clienteMap.get(nomeEmpresa.toString().toLowerCase().trim()),
           
-          // Campos diretamente do Excel
+          // Campos identificação
           nome_mobilemed: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
-          nome_fantasia: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa), // Usar o mesmo campo
+          nome_fantasia: findColumnValue(row, COLUMN_MAPPING.nomeEmpresa),
           numero_contrato: findColumnValue(row, COLUMN_MAPPING.numeroContrato),
           cnpj: findColumnValue(row, COLUMN_MAPPING.cnpj),
           razao_social: findColumnValue(row, COLUMN_MAPPING.razaoSocial),
-          dia_faturamento: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.diaFaturamento);
-            return valor ? Number(valor) : null;
-          })(),
+          
+          // Datas de contrato
           data_inicio_contrato: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.dataInicio);
             if (!valor) return null;
-            // Se for número (formato Excel), converter de número de série para data
             if (typeof valor === 'number') {
               const data = new Date((valor - 25569) * 86400 * 1000);
               return data.toISOString().split('T')[0];
             }
-            // Se for string, tentar converter normalmente
             const data = new Date(valor);
             return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
           })(),
           data_termino_contrato: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.dataTermino);
             if (!valor) return null;
-            // Se for número (formato Excel), converter de número de série para data
             if (typeof valor === 'number') {
               const data = new Date((valor - 25569) * 86400 * 1000);
               return data.toISOString().split('T')[0];
             }
-            // Se for string, tentar converter normalmente
             const data = new Date(valor);
             return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
           })(),
+          
+          // Classificação básica
+          tipo_cliente: findColumnValue(row, COLUMN_MAPPING.tipoCliente)?.toString().trim() || 'CO',
+          tipo_faturamento: findColumnValue(row, COLUMN_MAPPING.tipoFaturamento)?.toString().trim(),
+          cliente_consolidado: findColumnValue(row, ['Cliente Consolidado']),
+          
+          // Status ativo baseado no campo STATUS
+          ativo: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.status);
+            if (!valor) return true;
+            const valorStr = valor.toString().trim().toUpperCase();
+            return valorStr === 'A' || valorStr === 'ATIVO';
+          })(),
+          
+          // Critérios de processamento
           criterio_emissao_nf: findColumnValue(row, COLUMN_MAPPING.criterioEmissaoNF),
           criterios_geracao_relatorio: findColumnValue(row, COLUMN_MAPPING.criteriosRelatorio),
           criterios_aplicacao_parametros: findColumnValue(row, COLUMN_MAPPING.criteriosParametros),
           criterios_aplicacao_franquias: findColumnValue(row, COLUMN_MAPPING.criteriosFranquias),
-          tipo_faturamento: findColumnValue(row, COLUMN_MAPPING.tipoFaturamento),
           
-          // Campos básicos
-          cliente_consolidado: findColumnValue(row, ['Cliente Consolidado']),
-          tipo_cliente: findColumnValue(row, COLUMN_MAPPING.tipoCliente)?.toString().trim() || 'CO',
-          
-          // Status
-          ativo: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.status);
-            if (!valor) return true;
-            return valor.toString().trim().toUpperCase() === 'A' || valor.toString().trim().toLowerCase() === 'ativo';
+          // Faturamento e fechamento
+          dia_faturamento: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.diaFaturamento);
+            return valor ? Number(valor) : null;
+          })(),
+          dia_fechamento: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.diaFechamento);
+            return valor ? Number(valor) : 7;
+          })(),
+          forma_cobranca: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.formaCobranca);
+            return valor ? valor.toString().trim().toLowerCase() : 'mensal';
           })(),
           
-          // Impostos e Simples - usando conversão correta para booleano
+          // Impostos - NUMERIC, não boolean
           impostos_ab_min: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.impostosAbMin);
-            if (!valor) return false;
+            if (!valor) return 0;
             const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 's' || valorStr === 'sim';
+            return (valorStr === 's' || valorStr === 'sim') ? 1 : 0;
           })(),
           simples: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.simples);
@@ -203,49 +217,52 @@ serve(async (req) => {
           })(),
           percentual_iss: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.percentualISS);
-            return valor ? Number(valor) : null;
+            return valor ? Number(valor) : 0;
           })(),
           
-          // Métrica e Valor Convênio/Integração
-          tipo_metrica_convenio: findColumnValue(row, COLUMN_MAPPING.tipoMetricaConvenio)?.toString().trim(),
-          valor_integracao: findColumnValue(row, COLUMN_MAPPING.valorIntegracao) ? Number(findColumnValue(row, COLUMN_MAPPING.valorIntegracao)) : null,
-          cobrar_integracao: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.cobrarIntegracao);
-            if (!valor) return false;
-            const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
-          })(),
-          data_inicio_integracao: findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioIntegracao)).toISOString().split('T')[0] : null,
-          
-          // Métrica e Valor Urgência
+          // Métricas de urgência - campos que faltavam
           tipo_metrica_urgencia: findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia)?.toString().trim(),
-          percentual_urgencia: findColumnValue(row, COLUMN_MAPPING.valorUrgencia) ? Number(findColumnValue(row, COLUMN_MAPPING.valorUrgencia)) : null,
+          percentual_urgencia: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.valorUrgencia);
+            return valor ? Number(valor) : 0;
+          })(),
           aplicar_adicional_urgencia: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.tipoMetricaUrgencia);
             if (!valor) return false;
             const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 's' || valorStr === 'sim' || valorStr === 'percentual';
+            return valorStr === 'percentual' || valorStr === 'sim' || valorStr === 's';
           })(),
           cobrar_urgencia_como_rotina: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.cobrarUrgenciaRotina);
             if (!valor) return false;
             const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+            return valorStr === 'sim' || valorStr === 's';
           })(),
           
           // Desconto/Acréscimo
           tipo_desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.tipoDesconto)?.toString().trim(),
-          desconto_acrescimo: findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo) ? Number(findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo)) : null,
-          
-          // Portal de Laudos - campo booleano existente na tabela
-          portal_laudos: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.possuiPortalLaudos);
-            if (!valor) return false;
-            const valorStr = valor.toString().trim().toLowerCase();
-            return valorStr === 's' || valorStr === 'sim' || valorStr === 'y' || valorStr === 'yes';
+          desconto_acrescimo: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.descontoAcrescimo);
+            return valor ? Number(valor) : 0;
           })(),
           
-          // Franquia
+          // Integração
+          valor_integracao: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
+            return valor ? Number(valor) : 0;
+          })(),
+          cobrar_integracao: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.integracao);
+            return valor ? Number(valor) > 0 : false;
+          })(),
+          
+          // Portal de Laudos
+          portal_laudos: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.portalLaudos);
+            return valor ? Number(valor) > 0 : false;
+          })(),
+          
+          // Franquia - todos os campos necessários
           aplicar_franquia: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.possuiFranquia);
             if (!valor) return false;
@@ -254,11 +271,11 @@ serve(async (req) => {
           })(),
           valor_franquia: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.valorFranquia);
-            return valor ? Number(valor) : null;
+            return valor ? Number(valor) : 0;
           })(),
           volume_franquia: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.volumeFranquia);
-            return valor ? Number(valor) : null;
+            return valor ? Number(valor) : 0;
           })(),
           frequencia_continua: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.frequenciaContinua);
@@ -274,11 +291,20 @@ serve(async (req) => {
           })(),
           valor_acima_franquia: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.valorFranquiaAcimaVolume);
-            return valor ? Number(valor) : null;
+            return valor ? Number(valor) : 0;
           })(),
-          data_aniversario_contrato: findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia) ? new Date(findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia)).toISOString().split('T')[0] : null,
+          data_aniversario_contrato: (() => {
+            const valor = findColumnValue(row, COLUMN_MAPPING.dataInicioFranquia);
+            if (!valor) return null;
+            if (typeof valor === 'number') {
+              const data = new Date((valor - 25569) * 86400 * 1000);
+              return data.toISOString().split('T')[0];
+            }
+            const data = new Date(valor);
+            return isNaN(data.getTime()) ? null : data.toISOString().split('T')[0];
+          })(),
           
-          // Configurações de Faturamento
+          // Configurações de inclusão no relatório
           incluir_empresa_origem: (() => {
             const valor = findColumnValue(row, COLUMN_MAPPING.incluirEmpresaOrigem);
             if (!valor) return false;
@@ -298,18 +324,10 @@ serve(async (req) => {
             return valorStr === 'sim' || valorStr === 's';
           })(),
           
-          // Campos de controle
+          // Campos de controle com valores padrão corretos
           periodicidade_reajuste: 'anual',
-          indice_reajuste: 'IGP-M',
-          percentual_reajuste_fixo: null,
-          dia_fechamento: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.diaFechamento);
-            return valor ? Number(valor) : 7;
-          })(),
-          forma_cobranca: (() => {
-            const valor = findColumnValue(row, COLUMN_MAPPING.formaCobranca);
-            return valor ? valor.toString().trim().toLowerCase() : 'mensal';
-          })()
+          indice_reajuste: 'IPCA',
+          percentual_reajuste_fixo: 0
         };
 
         if (!parametroData.cliente_id) {
@@ -394,17 +412,13 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Erro geral:', error);
-    return new Response(
-      JSON.stringify({ 
-        sucesso: false, 
-        erro: error.message,
-        detalhes: error.stack 
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+    console.error('Erro no processamento:', error);
+    return new Response(JSON.stringify({
+      sucesso: false,
+      erro: error.message
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });
