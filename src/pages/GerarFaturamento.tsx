@@ -1191,22 +1191,36 @@ export default function GerarFaturamento() {
                 <DemonstrativoFaturamentoCompleto 
                   periodo={periodoSelecionado} 
                   onDemonstrativosGerados={(dados) => {
+                    console.log('🔄 Callback onDemonstrativosGerados recebido:');
+                    console.log('📊 Dados completos:', dados);
+                    console.log('📋 Demonstrativos:', dados?.demonstrativos);
+                    console.log('📏 Quantidade:', dados?.demonstrativos?.length);
+                    
+                    if (!dados?.demonstrativos || !Array.isArray(dados.demonstrativos)) {
+                      console.error('❌ Demonstrativos não encontrados ou não é um array');
+                      return;
+                    }
+                    
                     // Atualizar a lista de clientes para relatórios
-                    setClientesCarregados(dados.demonstrativos.map(d => ({
+                    const clientesParaRelatorio = dados.demonstrativos.map(d => ({
                       id: d.cliente_id,
                       nome: d.cliente_nome,
                       email: '' // Email será buscado conforme necessário
-                    })));
+                    }));
+                    
+                    console.log('👥 Clientes para relatório:', clientesParaRelatorio);
+                    setClientesCarregados(clientesParaRelatorio);
                     
                     // Atualizar conjunto de clientes que tiveram demonstrativos gerados
                     const clientesProcessados = new Set(dados.demonstrativos.map(d => d.cliente_nome));
+                    console.log('✅ Clientes processados:', Array.from(clientesProcessados));
                     setDemonstrativosGeradosPorCliente(clientesProcessados);
                     
                     setDemonstrativoGerado(true);
                     localStorage.setItem('demonstrativoGerado', 'true');
                     
                     toast({
-                      title: `${dados.resumo.clientes_processados} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+                      title: `${dados.resumo?.clientes_processados || 0} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
                       description: "Agora você pode prosseguir para a Etapa 2 - Gerar Relatórios",
                       variant: "default",
                     });

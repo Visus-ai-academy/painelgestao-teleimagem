@@ -122,12 +122,28 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
       }
 
       if (data?.success) {
-        console.log('✅ Demonstrativos gerados com sucesso:', data.resumo);
-        setDemonstrativos(data.demonstrativos);
-        setResumo(data.resumo);
+        console.log('✅ Demonstrativos gerados com sucesso:');
+        console.log('📋 Data completa:', data);
+        console.log('📊 Resumo:', data.resumo);
+        console.log('📄 Demonstrativos array:', data.demonstrativos);
+        console.log('📏 Quantidade de demonstrativos:', data.demonstrativos?.length);
+        
+        // Verificar se demonstrativos foram retornados
+        if (data.demonstrativos && Array.isArray(data.demonstrativos)) {
+          setDemonstrativos(data.demonstrativos);
+          console.log(`✅ ${data.demonstrativos.length} demonstrativos carregados no estado`);
+        } else {
+          console.warn('⚠️ Nenhum demonstrativo retornado na resposta');
+          setDemonstrativos([]);
+        }
+        
+        if (data.resumo) {
+          setResumo(data.resumo);
+        }
         
         // Chamar callback se fornecido
         if (onDemonstrativosGerados) {
+          console.log('📤 Chamando callback onDemonstrativosGerados');
           onDemonstrativosGerados({ 
             demonstrativos: data.demonstrativos, 
             resumo: data.resumo 
@@ -136,7 +152,7 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
         
         toast({
           title: "Demonstrativos gerados com sucesso!",
-          description: `${data.resumo.clientes_processados} clientes processados`
+          description: `${data.resumo?.clientes_processados || 0} clientes processados`
         });
       } else {
         console.error('❌ Resposta sem sucesso:', data);
