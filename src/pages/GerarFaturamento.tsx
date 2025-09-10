@@ -928,6 +928,30 @@ export default function GerarFaturamento() {
         </TabsList>
 
         <TabsContent value="demonstrativo" className="space-y-6">
+          {/* Demonstrativo Completo (com franquias) */}
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3">Demonstrativo Completo (com franquias)</h3>
+            <DemonstrativoFaturamentoCompleto 
+              periodo={periodoSelecionado} 
+              onDemonstrativosGerados={(dados) => {
+                // Atualizar a lista de clientes para relatórios
+                setClientesCarregados(dados.demonstrativos.map(d => ({
+                  id: d.cliente_id,
+                  nome: d.cliente_nome,
+                  email: '' // Email será buscado conforme necessário
+                })));
+                setDemonstrativoGerado(true);
+                localStorage.setItem('demonstrativoGerado', 'true');
+                
+                toast({
+                  title: `${dados.resumo.clientes_processados} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+                  description: "Vá para a aba 'Gerar' para continuar com os relatórios",
+                  variant: "default",
+                });
+              }}
+            />
+          </div>
+          <Separator />
           <div className="bg-muted/30 p-4 rounded-lg">
             <h3 className="text-lg font-semibold mb-3">Demonstrativo Padrão (sem franquias)</h3>
             <DemonstrativoFaturamento />
@@ -1172,7 +1196,27 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <DemonstrativoFaturamentoCompleto periodo={periodoSelecionado} />
+                <div className="text-sm text-gray-600 mb-3">
+                  {demonstrativoGerado ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      Demonstrativo gerado com sucesso! Vá para a aba "Demonstrativo" para visualizar.
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-orange-600">
+                      <Clock className="h-4 w-4" />
+                      Vá para a aba "Demonstrativo" para gerar o demonstrativo completo.
+                    </div>
+                  )}
+                </div>
+                <Button 
+                  onClick={() => setActiveTab('demonstrativo')} 
+                  variant="outline"
+                  className="w-full"
+                >
+                  <FileBarChart2 className="mr-2 h-4 w-4" />
+                  Ir para aba Demonstrativo
+                </Button>
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}

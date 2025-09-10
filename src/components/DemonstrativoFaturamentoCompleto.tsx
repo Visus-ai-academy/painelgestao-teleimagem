@@ -49,9 +49,10 @@ interface Resumo {
 
 interface DemonstrativoFaturamentoCompletoProps {
   periodo: string;
+  onDemonstrativosGerados?: (dados: { demonstrativos: DemonstrativoCliente[], resumo: Resumo }) => void;
 }
 
-export function DemonstrativoFaturamentoCompleto({ periodo }: DemonstrativoFaturamentoCompletoProps) {
+export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGerados }: DemonstrativoFaturamentoCompletoProps) {
   const [loading, setLoading] = useState(false);
   const [demonstrativos, setDemonstrativos] = useState<DemonstrativoCliente[]>([]);
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -81,6 +82,15 @@ export function DemonstrativoFaturamentoCompleto({ periodo }: DemonstrativoFatur
       if (data.success) {
         setDemonstrativos(data.demonstrativos);
         setResumo(data.resumo);
+        
+        // Chamar callback se fornecido
+        if (onDemonstrativosGerados) {
+          onDemonstrativosGerados({ 
+            demonstrativos: data.demonstrativos, 
+            resumo: data.resumo 
+          });
+        }
+        
         toast({
           title: "Demonstrativos gerados",
           description: `${data.resumo.clientes_processados} clientes processados com sucesso`
