@@ -62,6 +62,45 @@ export default function DemonstrativoFaturamento() {
     try {
       console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
       
+      // PRIMEIRO: Verificar se existem demonstrativos completos já gerados
+      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_${periodo}`);
+      if (demonstrativosCompletos) {
+        try {
+          const { demonstrativos } = JSON.parse(demonstrativosCompletos);
+          if (demonstrativos && Array.isArray(demonstrativos) && demonstrativos.length > 0) {
+            console.log('📋 Demonstrativos completos encontrados no localStorage:', demonstrativos.length);
+            
+            // Converter formato dos demonstrativos completos para o formato esperado
+            const clientesConvertidos: ClienteFaturamento[] = demonstrativos.map((demo: any) => ({
+              id: demo.cliente_id || `temp-${demo.nome_cliente}`,
+              nome: demo.nome_cliente,
+              email: demo.email_cliente || `${demo.nome_cliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+              total_exames: demo.total_exames || 0,
+              valor_bruto: Number(demo.valor_total || 0),
+              valor_liquido: Number(demo.valor_total || 0),
+              periodo: periodo,
+              status_pagamento: 'pendente' as const,
+              data_vencimento: new Date().toISOString().split('T')[0],
+              observacoes: 'Demonstrativo completo com franquias'
+            }));
+            
+            setClientes(clientesConvertidos);
+            setClientesFiltrados(clientesConvertidos);
+            setCarregando(false);
+            
+            toast({
+              title: "Demonstrativos carregados",
+              description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
+              variant: "default",
+            });
+            
+            return;
+          }
+        } catch (error) {
+          console.error('Erro ao processar demonstrativos do localStorage:', error);
+        }
+      }
+      
       // Primeiro, verificar se há dados na tabela de faturamento
       const { data: todosFaturamento, error: erroTotal } = await supabase
         .from('faturamento')
