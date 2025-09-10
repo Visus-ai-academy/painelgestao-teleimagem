@@ -85,7 +85,8 @@ export default function GerarFaturamento() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Estado para controlar se o demonstrativo foi gerado - AGORA VERIFICA AUTOMATICAMENTE
+  // Estado para controlar se o demonstrativo foi gerado 
+  const [demonstrativosGeradosPorCliente, setDemonstrativosGeradosPorCliente] = useState<Set<string>>(new Set());
   const [demonstrativoGerado, setDemonstrativoGerado] = useState(false);
   
   // Verificar se há dados de faturamento processados para este período
@@ -1196,6 +1197,11 @@ export default function GerarFaturamento() {
                       nome: d.cliente_nome,
                       email: '' // Email será buscado conforme necessário
                     })));
+                    
+                    // Atualizar conjunto de clientes que tiveram demonstrativos gerados
+                    const clientesProcessados = new Set(dados.demonstrativos.map(d => d.cliente_nome));
+                    setDemonstrativosGeradosPorCliente(clientesProcessados);
+                    
                     setDemonstrativoGerado(true);
                     localStorage.setItem('demonstrativoGerado', 'true');
                     
@@ -1342,7 +1348,7 @@ export default function GerarFaturamento() {
                         <tr key={`${resultado.clienteNome}-${index}`} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
                           <td className="p-3 text-center">
-                            {demonstrativoGerado ? (
+                            {demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
                               <Badge variant="default" className="bg-green-600">
                                 Concluído
                               </Badge>

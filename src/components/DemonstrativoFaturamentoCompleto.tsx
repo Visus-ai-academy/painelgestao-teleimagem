@@ -108,15 +108,21 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
 
     setLoading(true);
     try {
+      console.log('🔄 Chamando edge function gerar-demonstrativos-faturamento para período:', periodo);
+      
       const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
         body: { periodo }
       });
 
+      console.log('📋 Resposta da edge function:', { data, error });
+
       if (error) {
-        throw error;
+        console.error('❌ Erro na edge function:', error);
+        throw new Error(`Erro na edge function: ${error.message || JSON.stringify(error)}`);
       }
 
-      if (data.success) {
+      if (data?.success) {
+        console.log('✅ Demonstrativos gerados com sucesso:', data.resumo);
         setDemonstrativos(data.demonstrativos);
         setResumo(data.resumo);
         
@@ -129,16 +135,18 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
         }
         
         toast({
-          title: "Demonstrativos gerados",
-          description: `${data.resumo.clientes_processados} clientes processados com sucesso`
+          title: "Demonstrativos gerados com sucesso!",
+          description: `${data.resumo.clientes_processados} clientes processados`
         });
       } else {
-        throw new Error(data.message || 'Erro desconhecido');
+        console.error('❌ Resposta sem sucesso:', data);
+        throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
       }
     } catch (error: any) {
+      console.error('❌ Erro completo:', error);
       toast({
         title: "Erro ao gerar demonstrativos",
-        description: error.message,
+        description: `${error.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`,
         variant: "destructive"
       });
     } finally {
