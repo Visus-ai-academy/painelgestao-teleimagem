@@ -1149,7 +1149,7 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <DemonstrativoFaturamentoCompleto />
+                <DemonstrativoFaturamentoCompleto periodo={periodoSelecionado} />
               </div>
 
               {/* Etapa 2: Gerar Relatórios */}

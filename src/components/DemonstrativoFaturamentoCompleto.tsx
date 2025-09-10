@@ -47,8 +47,11 @@ interface Resumo {
   clientes_regime_normal: number;
 }
 
-export function DemonstrativoFaturamentoCompleto() {
-  const [periodo, setPeriodo] = useState('');
+interface DemonstrativoFaturamentoCompletoProps {
+  periodo: string;
+}
+
+export function DemonstrativoFaturamentoCompleto({ periodo }: DemonstrativoFaturamentoCompletoProps) {
   const [loading, setLoading] = useState(false);
   const [demonstrativos, setDemonstrativos] = useState<DemonstrativoCliente[]>([]);
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -138,18 +141,14 @@ export function DemonstrativoFaturamentoCompleto() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <Label htmlFor="periodo">Período (YYYY-MM)</Label>
-              <Input
-                id="periodo"
-                placeholder="2024-01"
-                value={periodo}
-                onChange={(e) => setPeriodo(e.target.value)}
-              />
+              <div className="text-sm text-muted-foreground">
+                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
+              </div>
             </div>
             <Button 
               onClick={handleGerarDemonstrativos}
-              disabled={loading}
-              className="mt-6"
+              disabled={loading || !periodo}
+              className="bg-blue-600 hover:bg-blue-700"
             >
               {loading ? (
                 <>
