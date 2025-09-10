@@ -75,20 +75,34 @@ const COLUMN_MAPPING = {
 
 // Função para formatar CNPJ
 function formatarCNPJ(cnpj: string | number): string | null {
-  if (!cnpj) return null;
+  if (!cnpj && cnpj !== 0) return null;
   
-  const cnpjStr = cnpj.toString().replace(/\D/g, ''); // Remove não dígitos
-  if (cnpjStr.length !== 14) return cnpj.toString(); // Se não tem 14 dígitos, retorna como está
+  // Converte para string preservando zeros à esquerda
+  let cnpjStr = cnpj.toString().replace(/\D/g, ''); // Remove não dígitos
+  
+  // Se veio do Excel como número, pode ter perdido zeros à esquerda
+  // Preenche com zeros à esquerda para garantir 14 dígitos
+  cnpjStr = cnpjStr.padStart(14, '0');
+  
+  // Se ainda não tem 14 dígitos após padding, retorna como está
+  if (cnpjStr.length !== 14) return cnpj.toString();
   
   return cnpjStr.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 
 // Função para formatar CPF
 function formatarCPF(cpf: string | number): string | null {
-  if (!cpf) return null;
+  if (!cpf && cpf !== 0) return null;
   
-  const cpfStr = cpf.toString().replace(/\D/g, ''); // Remove não dígitos
-  if (cpfStr.length !== 11) return cpf.toString(); // Se não tem 11 dígitos, retorna como está
+  // Converte para string preservando zeros à esquerda
+  let cpfStr = cpf.toString().replace(/\D/g, ''); // Remove não dígitos
+  
+  // Se veio do Excel como número, pode ter perdido zeros à esquerda
+  // Preenche com zeros à esquerda para garantir 11 dígitos
+  cpfStr = cpfStr.padStart(11, '0');
+  
+  // Se ainda não tem 11 dígitos após padding, retorna como está
+  if (cpfStr.length !== 11) return cpf.toString();
   
   return cpfStr.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
 }
