@@ -31,6 +31,7 @@ interface DemonstrativoCliente {
     valor_iss?: number;
     base_calculo?: number;
   };
+  alertas?: string[]; // Alertas de problemas
 }
 
 interface Resumo {
@@ -255,7 +256,16 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
                           <ChevronRight className="h-4 w-4" />
                         }
                         <Building className="h-4 w-4" />
-                        <span className="font-medium">{demo.cliente_nome}</span>
+                         <span className="font-medium">{demo.cliente_nome}</span>
+                         {demo.alertas && demo.alertas.length > 0 && (
+                           <div className="flex flex-col gap-1 ml-2">
+                             {demo.alertas.map((alerta, alertaIndex) => (
+                               <span key={alertaIndex} className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                                 {alerta}
+                               </span>
+                             ))}
+                           </div>
+                         )}
                       </div>
                       
                       <div className="flex items-center gap-6 text-sm">

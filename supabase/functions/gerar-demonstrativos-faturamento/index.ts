@@ -26,6 +26,7 @@ interface DemonstrativoCliente {
     valor_iss?: number;
     base_calculo?: number;
   };
+  alertas?: string[]; // ✅ Novo campo para alertas de problemas
 }
 
 serve(async (req) => {
@@ -175,7 +176,7 @@ serve(async (req) => {
                 p_is_plantao: false
               });
 
-              if (!precoError && preco) {
+              if (!precoError && preco && preco > 0) {
                 grupo.valor_unitario = preco;
                 const valorGrupo = grupo.quantidade * preco;
                 valorExames += valorGrupo;
@@ -184,31 +185,130 @@ serve(async (req) => {
                   ...grupo,
                   valor_total: valorGrupo
                 });
+                
+                console.log(`💰 Preço encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} = R$ ${preco.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
+              } else {
+                console.warn(`⚠️ Preço não encontrado ou zerado para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames)`);
+                
+                // Adicionar nos detalhes mesmo sem preço para diagnóstico
+                detalhesExames.push({
+                  ...grupo,
+                  valor_total: 0,
+                  problema: 'Preço não encontrado ou zerado'
+                });
               }
             } catch (error) {
-              console.error(`Erro ao calcular preço para ${cliente.nome}:`, error);
+              console.error(`Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
             }
           }
         }
 
-        // Calcular franquia, portal e integração
-        const { data: calculoCompleto, error: calculoError } = await supabase.rpc(
-          'calcular_faturamento_completo',
-          {
-            p_cliente_id: cliente.id,
-            p_periodo: periodo,
-            p_volume_total: volumeTotal
-          }
-        );
+        // Calcular franquia, portal e integração usando lógica corrigida
+        console.log(`💰 Calculando faturamento para ${cliente.nome_fantasia} - Volume: ${volumeTotal}`);
+        
+        // Buscar parâmetros de faturamento
+        const { data: parametrosFaturamento, error: paramsError } = await supabase
+          .from('parametros_faturamento')
+          .select('*')
+          .eq('cliente_id', cliente.id)
+          .eq('status', 'A')
+          .order('updated_at', { ascending: false })
+          .limit(1);
 
-        if (calculoError) {
-          console.error(`Erro no cálculo completo para ${cliente.nome}:`, calculoError);
-          continue;
+        const parametros = parametrosFaturamento?.[0];
+        let valorFranquia = 0;
+        let valorPortal = 0;
+        let valorIntegracao = 0;
+        let detalhesFranquia = {};
+
+        // LÓGICA CORRIGIDA DA FRANQUIA
+        if (parametros?.aplicar_franquia) {
+          if (parametros.frequencia_continua) {
+            // Frequência contínua = SIM: sempre cobra franquia
+            if (parametros.frequencia_por_volume && volumeTotal > (parametros.volume_franquia || 0)) {
+              valorFranquia = parametros.valor_acima_franquia || parametros.valor_franquia || 0;
+              detalhesFranquia = {
+                tipo: 'continua_com_volume',
+                volume_base: parametros.volume_franquia,
+                volume_atual: volumeTotal,
+                valor_aplicado: valorFranquia,
+                motivo: 'Frequência contínua + volume acima da franquia'
+              };
+            } else {
+              valorFranquia = parametros.valor_franquia || 0;
+              detalhesFranquia = {
+                tipo: 'continua_normal', 
+                volume_atual: volumeTotal,
+                valor_aplicado: valorFranquia,
+                motivo: 'Frequência contínua - valor base'
+              };
+            }
+          } else {
+            // Frequência contínua = NÃO: só cobra se houver volume
+            if (volumeTotal > 0) {
+              if (parametros.frequencia_por_volume && volumeTotal > (parametros.volume_franquia || 0)) {
+                valorFranquia = parametros.valor_acima_franquia || parametros.valor_franquia || 0;
+                detalhesFranquia = {
+                  tipo: 'volume_acima',
+                  volume_base: parametros.volume_franquia,
+                  volume_atual: volumeTotal,
+                  valor_aplicado: valorFranquia,
+                  motivo: 'Volume acima da franquia'
+                };
+              } else {
+                valorFranquia = parametros.valor_franquia || 0;
+                detalhesFranquia = {
+                  tipo: 'volume_normal',
+                  volume_atual: volumeTotal,
+                  valor_aplicado: valorFranquia,
+                  motivo: 'Volume dentro da franquia'
+                };
+              }
+            } else {
+              // ✅ CORREÇÃO: Volume = 0 e frequência contínua = NÃO → Não cobra franquia
+              valorFranquia = 0;
+              detalhesFranquia = {
+                tipo: 'sem_volume',
+                volume_atual: 0,
+                valor_aplicado: 0,
+                motivo: '✅ Sem volume de exames e frequência não contínua - franquia NÃO aplicada'
+              };
+            }
+          }
+        } else {
+          detalhesFranquia = {
+            tipo: 'nao_aplica',
+            valor_aplicado: 0,
+            motivo: 'Cliente não possui franquia configurada'
+          };
+        }
+
+        // Portal de Laudos
+        if (parametros?.portal_laudos) {
+          valorPortal = parametros.valor_integracao || 0;
+        }
+
+        // Integração
+        if (parametros?.cobrar_integracao) {
+          valorIntegracao = parametros.valor_integracao || 0;
+        }
+
+        const calculoCompleto = [{
+          valor_franquia: valorFranquia,
+          valor_portal_laudos: valorPortal,
+          valor_integracao: valorIntegracao,
+          detalhes_franquia: detalhesFranquia
+        }];
+
+        console.log(`📊 Cliente ${cliente.nome_fantasia}: Franquia R$ ${valorFranquia.toFixed(2)} | Portal R$ ${valorPortal.toFixed(2)} | Integração R$ ${valorIntegracao.toFixed(2)}`);
+        
+        if (valorExames === 0 && volumeTotal > 0) {
+          console.log(`⚠️ PROBLEMA: Cliente ${cliente.nome_fantasia} tem ${volumeTotal} exames na volumetria mas valor calculado = R$ 0,00`);
         }
 
         const calculo = calculoCompleto?.[0];
         if (!calculo) {
-          console.warn(`Nenhum resultado de cálculo para ${cliente.nome}`);
+          console.warn(`Nenhum resultado de cálculo para ${cliente.nome_fantasia}`);
           continue;
         }
 
@@ -229,20 +329,23 @@ serve(async (req) => {
         
         const valorTotal = valorBruto - valorImpostos;
 
-        // Montar demonstrativo
+        // Montar demonstrativo com alertas para problemas
+        const temProblemas = valorExames === 0 && totalExames > 0;
+        const temFranquiaProblema = valorFranquia > 0 && volumeTotal === 0 && !parametros?.frequencia_continua;
+        
         const demonstrativo: DemonstrativoCliente = {
           cliente_id: cliente.id,
           cliente_nome: cliente.nome_fantasia || cliente.nome,
           periodo,
           total_exames: totalExames,
           valor_exames: valorExames,
-          valor_franquia: calculo.valor_franquia || 0,
-          valor_portal_laudos: calculo.valor_portal_laudos || 0,
-          valor_integracao: calculo.valor_integracao || 0,
+          valor_franquia: valorFranquia,
+          valor_portal_laudos: valorPortal,
+          valor_integracao: valorIntegracao,
           valor_bruto: valorBruto,
           valor_impostos: valorImpostos,
           valor_total: valorTotal,
-          detalhes_franquia: calculo.detalhes_franquia || {},
+          detalhes_franquia: detalhesFranquia || {},
           detalhes_exames: detalhesExames,
           detalhes_tributacao: {
             simples_nacional: simplesNacional,
@@ -251,6 +354,15 @@ serve(async (req) => {
             base_calculo: valorBruto
           }
         };
+
+        // Adicionar alertas se houver problemas
+        if (temProblemas) {
+          demonstrativo.alertas = [`⚠️ Cliente tem ${totalExames} exames mas valor R$ 0,00 - verificar tabela de preços`];
+        }
+        if (temFranquiaProblema) {
+          demonstrativo.alertas = demonstrativo.alertas || [];
+          demonstrativo.alertas.push(`⚠️ Franquia cobrada sem volume (freq. contínua = false)`);
+        }
 
         demonstrativos.push(demonstrativo);
         processados++;
