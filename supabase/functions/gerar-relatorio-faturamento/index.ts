@@ -199,39 +199,50 @@ serve(async (req: Request) => {
       console.log('Propriedades disponíveis:', Object.keys(finalData[0]));
     }
     
-    let valorBrutoTotal, totalLaudos;
+    let valorBrutoTotal: number, totalLaudos: number;
+    let valorFranquia = 0;
+    let valorPortal = 0;
+    let valorIntegracao = 0;
+    let totalImpostos = 0;
+    let valorAPagar = 0;
     
-    if (isFaturamentoData) {
-      // Dados de faturamento - usar campos corretos
-      valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
-      totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
+    if (demonstrativoData) {
+      // ✅ Usar exatamente os valores do demonstrativo unificado
+      totalLaudos = Number(demonstrativoData.total_exames || 0);
+      valorBrutoTotal = Number(demonstrativoData.valor_bruto ?? demonstrativoData.valor_exames ?? 0);
+      valorFranquia = Number(demonstrativoData.valor_franquia || 0);
+      valorPortal = Number(demonstrativoData.valor_portal_laudos || 0);
+      valorIntegracao = Number(demonstrativoData.valor_integracao || 0);
+      totalImpostos = Number(demonstrativoData.valor_impostos || 0);
+      valorAPagar = Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos));
     } else {
-      // Dados de volumetria - usar VALORES como quantidade
-      valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
-      totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
+      // Calcular resumo usando dados de faturamento ou volumetria
+      const isFaturamentoData = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
+      if (isFaturamentoData) {
+        // Dados de faturamento - usar campos corretos
+        valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
+        totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
+      } else {
+        // Dados de volumetria - usar VALORES como quantidade
+        valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
+        totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
+      }
+      // Impostos padrão
+      const baseCalculoImpostos = valorBrutoTotal;
+      const percentualPIS = 0.65; // 0.65%
+      const percentualCOFINS = 3.0; // 3%
+      const percentualCSLL = 1.0; // 1.0%
+      const percentualIRRF = 1.5; // 1.5%
+      const valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+      const valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+      const valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+      const valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+      if (!demonstrativoData) {
+        totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
+      }
+      valorAPagar = valorBrutoTotal - totalImpostos;
     }
-    
-    // Valores de franquia e ajustes (podem ser zero por enquanto - configuráveis)
-    const franquia = 0;
-    const ajustes = 0;
-    
-    // Base de cálculo para impostos: Valor Bruto + Franquia + Ajustes
-    const baseCalculoImpostos = valorBrutoTotal + franquia + ajustes;
-    
-    // Calcular impostos (percentuais conforme solicitado)
-    const percentualPIS = 0.65; // 0.65%
-    const percentualCOFINS = 3.0; // 3%
-    const percentualCSLL = 1.0; // 1.0%
-    const percentualIRRF = 1.5; // 1.5%
-    
-    const valorPIS = parseFloat((baseCalculoImpostos * (percentualPIS / 100)).toFixed(2));
-    const valorCOFINS = parseFloat((baseCalculoImpostos * (percentualCOFINS / 100)).toFixed(2));
-    const valorCSLL = parseFloat((baseCalculoImpostos * (percentualCSLL / 100)).toFixed(2));
-    const valorIRRF = parseFloat((baseCalculoImpostos * (percentualIRRF / 100)).toFixed(2));
-    
-    // Cálculo do Valor a Pagar: valor Bruto + Franquia + ajustes - impostos
-    const totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-    const valorAPagar = valorBrutoTotal + franquia + ajustes - totalImpostos;
+
 
     // Gerar PDF sempre (mesmo sem dados)
     let pdfUrl = null;
@@ -332,7 +343,7 @@ serve(async (req: Request) => {
       // Caixa do resumo (mais larga para paisagem)
       doc.setDrawColor(0, 124, 186);
       doc.setLineWidth(0.5);
-      doc.rect(20, yQuadro1 + 5, 257, 55);
+      doc.rect(20, yQuadro1 + 5, 257, 70);
       
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
@@ -345,10 +356,13 @@ serve(async (req: Request) => {
       doc.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
       yLine += 8;
-      doc.text(`Franquia: R$ ${franquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
+      doc.text(`Franquia: R$ ${valorFranquia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
       yLine += 8;
-      doc.text(`Ajustes: R$ ${ajustes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
+      doc.text(`Portal de Laudos: R$ ${valorPortal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
+      
+      yLine += 8;
+      doc.text(`Integração: R$ ${valorIntegracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 25, yLine);
       
       // Impostos na coluna da direita
       yLine = yQuadro1 + 15;

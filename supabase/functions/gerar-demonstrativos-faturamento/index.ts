@@ -241,15 +241,25 @@ serve(async (req) => {
                 continue;
               }
 
-              const { data: preco, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente.id,
-                p_modalidade: grupo.modalidade,
-                p_especialidade: grupo.especialidade,
-                p_prioridade: grupo.prioridade,
-                p_categoria: grupo.categoria || 'SC',
-                p_volume_total: volumeTotal, // ✅ CORREÇÃO: Usar volume total do cliente, não do grupo
-                p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
-              });
+              // Primeira tentativa: prioridade informada
+              let preco: number | null = null;
+              let precoError: any = null;
+
+              try {
+                const rpc1 = await supabase.rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: grupo.modalidade,
+                  p_especialidade: grupo.especialidade,
+                  p_prioridade: grupo.prioridade,
+                  p_categoria: grupo.categoria || 'SC',
+                  p_volume_total: volumeTotal, // ✅ Usar volume total do cliente
+                  p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
+                });
+                preco = rpc1.data as number | null;
+                precoError = rpc1.error;
+              } catch (e) {
+                precoError = e;
+              }
 
               console.log(`📊 Resultado da função calcular_preco_exame:`, {
                 cliente: cliente.nome_fantasia,
@@ -262,7 +272,39 @@ serve(async (req) => {
                 erro: precoError?.message || 'nenhum'
               });
 
-              if (!precoError && preco && preco > 0) {
+              // Fallback 1: se não encontrou, tentar com prioridade ROTINA
+              if ((!preco || preco <= 0) && !precoError) {
+                const rpc2 = await supabase.rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: grupo.modalidade,
+                  p_especialidade: grupo.especialidade,
+                  p_prioridade: 'ROTINA',
+                  p_categoria: grupo.categoria || 'SC',
+                  p_volume_total: volumeTotal,
+                  p_is_plantao: false
+                });
+                if (!rpc2.error && rpc2.data) {
+                  preco = rpc2.data as number;
+                }
+              }
+
+              // Fallback 2: se ainda não encontrou e categoria != SC, tentar com SC
+              if ((!preco || preco <= 0) && (grupo.categoria || 'SC') !== 'SC') {
+                const rpc3 = await supabase.rpc('calcular_preco_exame', {
+                  p_cliente_id: cliente.id,
+                  p_modalidade: grupo.modalidade,
+                  p_especialidade: grupo.especialidade,
+                  p_prioridade: grupo.prioridade,
+                  p_categoria: 'SC',
+                  p_volume_total: volumeTotal,
+                  p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
+                });
+                if (!rpc3.error && rpc3.data) {
+                  preco = rpc3.data as number;
+                }
+              }
+
+              if (preco && preco > 0) {
                 grupo.valor_unitario = preco;
                 const valorGrupo = grupo.quantidade * preco;
                 valorExames += valorGrupo;
