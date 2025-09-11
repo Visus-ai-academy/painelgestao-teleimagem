@@ -281,12 +281,12 @@ serve(async (req) => {
         
         // PROCESSAR CLIENTES EM LOTES PEQUENOS PARA EVITAR TIMEOUT
         const todosClientesParaProcessar = [...clientesComPrecos, ...clientesPendentes];
-        const loteClientes = Math.min(10, todosClientesParaProcessar.length); // Processar máximo 10 clientes por vez
+        const loteClientes = todosClientesParaProcessar.length; // Processar TODOS os clientes
         
-        console.log(`[gerar-faturamento-periodo] Processando ${todosClientesParaProcessar.length} clientes em lotes de ${loteClientes}`);
+        console.log(`[gerar-faturamento-periodo] Processando ${todosClientesParaProcessar.length} clientes em lotes de ${Math.min(10, todosClientesParaProcessar.length)}`);
         
         let processedCount = 0;
-        for (let i = 0; i < Math.min(loteClientes, todosClientesParaProcessar.length); i++) {
+        for (let i = 0; i < todosClientesParaProcessar.length; i++) {
             const cliente = todosClientesParaProcessar[i];
             const tem_precos = clientesComPrecos.includes(cliente);
             
@@ -354,17 +354,26 @@ serve(async (req) => {
               for (const { chave, qtd, paciente, medico, dataExame, accession } of grupos.values()) {
                 let unit = 0; // Valor padrão
                 
+                // Normalização para precificação
+                const modalidadeNorm = (chave.modalidade || '').toUpperCase().trim();
+                const categoriaNorm = (chave.categoria || 'SC').toUpperCase().trim();
+                const prioridadeNorm = (chave.prioridade || '').toUpperCase().trim();
+                let especialidadeNorm = (chave.especialidade || '').toUpperCase().trim();
+                if (categoriaNorm === 'COLUNAS') {
+                  especialidadeNorm = 'MUSCULO ESQUELETICO';
+                }
+                
                 if (tem_precos) {
                   try {
                     // Calcular preço unitário via RPC apenas para clientes com preços configurados
                     const { data: preco, error: precoErr } = await supabase.rpc('calcular_preco_exame', {
                       p_cliente_id: cliente.id,
-                      p_modalidade: chave.modalidade,
-                      p_especialidade: chave.especialidade,
-                      p_prioridade: chave.prioridade,
-                      p_categoria: chave.categoria,
+                      p_modalidade: modalidadeNorm,
+                      p_especialidade: especialidadeNorm,
+                      p_prioridade: prioridadeNorm,
+                      p_categoria: categoriaNorm,
                       p_volume_total: volumeTotal,
-                      p_is_plantao: (chave.prioridade || '').toUpperCase().includes('PLANT')
+                      p_is_plantao: prioridadeNorm.includes('PLANT')
                     });
 
                     unit = preco || 0;
@@ -399,10 +408,10 @@ serve(async (req) => {
                   cliente_nome_original: cliente.nome_mobilemed,
                   cliente_email: cliente.email || null,
                   paciente: paciente,
-                  modalidade: chave.modalidade,
-                  especialidade: chave.especialidade,
-                  categoria: chave.categoria,
-                  prioridade: chave.prioridade,
+                  modalidade: modalidadeNorm,
+                  especialidade: especialidadeNorm,
+                  categoria: categoriaNorm,
+                  prioridade: prioridadeNorm,
                   nome_exame: chave.estudo,
                   medico: medico,
                   data_exame: dataExame || emissao,

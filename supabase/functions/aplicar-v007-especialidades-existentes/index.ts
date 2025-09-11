@@ -179,12 +179,9 @@ serve(async (req) => {
         for (const registro of loteAtual) {
           try {
             const medico = registro.MEDICO;
-            let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Padrão
-            
-            // Verificar se o médico está na lista de neurologistas
-            if (isMedicoNeuro(medico)) {
-              novaEspecialidade = 'Neuro';
-            }
+            // Regra: para registros com ESPECIALIDADE = 'COLUNAS', SEMPRE usar 'MUSCULO ESQUELETICO'
+            let novaEspecialidade = 'MUSCULO ESQUELETICO'; // Fix v007
+            // Não mover para NEURO quando categoria/coluna estiver envolvida
             
             // Preparar dados para atualização
             const dadosAtualizacao: any = {
@@ -254,7 +251,7 @@ serve(async (req) => {
     while (temMaisRegistros) {
       const { data: loteRegistros, error: selectError } = await supabase
         .from('volumetria_mobilemed')
-        .select('id, "MEDICO", "ESPECIALIDADE"')
+        .select('id, "MEDICO", "ESPECIALIDADE", "CATEGORIA"')
         .eq('"ESPECIALIDADE"', 'MUSCULO ESQUELETICO')
         .range(pagina * tamanhoPagina, (pagina + 1) * tamanhoPagina - 1);
       
@@ -286,15 +283,16 @@ serve(async (req) => {
       const loteAtual = registrosMusculoEsqueletico.slice(i, i + tamanhoBatch);
       
       for (const registro of loteAtual) {
-        if (isMedicoNeuro(registro.MEDICO)) {
+        if (isMedicoNeuro(registro.MEDICO) && registro.CATEGORIA !== 'COLUNAS') {
           try {
             const { error: updateError } = await supabase
               .from('volumetria_mobilemed')
               .update({ 
-                'ESPECIALIDADE': 'Neuro',
+                'ESPECIALIDADE': 'NEURO',
                 updated_at: new Date().toISOString()
               })
               .eq('id', registro.id);
+
             
             if (updateError) {
               console.error(`❌ Erro ao corrigir registro ${registro.id}:`, updateError);

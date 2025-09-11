@@ -75,10 +75,10 @@ export default function DemonstrativoFaturamento() {
             
             // Converter formato dos demonstrativos completos para o formato esperado
             const clientesConvertidos: ClienteFaturamento[] = dados.demonstrativos
-              .filter((demo: any) => demo && demo.nome_cliente) // Filtrar apenas demonstrativos válidos
+              .filter((demo: any) => demo && (demo.cliente_nome || demo.nome_cliente)) // aceitar ambos
               .map((demo: any) => {
-                const nomeCliente = demo.nome_cliente || 'Cliente sem nome';
-                const emailCliente = demo.email_cliente || 
+                const nomeCliente = demo.cliente_nome || demo.nome_cliente || 'Cliente sem nome';
+                const emailCliente = demo.cliente_email || demo.email_cliente || 
                   `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
                 
                 return {
@@ -86,12 +86,12 @@ export default function DemonstrativoFaturamento() {
                   nome: nomeCliente,
                   email: emailCliente,
                   total_exames: demo.total_exames || 0,
-                  valor_bruto: Number(demo.valor_exames || demo.valor_total || 0),
-                  valor_liquido: Number(demo.valor_liquido || demo.valor_total || 0),
+                  valor_bruto: Number(demo.valor_exames ?? demo.valor_total ?? 0),
+                  valor_liquido: Number(demo.valor_liquido ?? demo.valor_total ?? 0),
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Demonstrativo: ${demo.total_exames || 0} exames, Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)}, Portal: R$ ${(demo.valor_portal || 0).toFixed(2)}, Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)}`
+                  observacoes: `Demonstrativo: ${demo.total_exames || 0} exames, Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)}, Portal: R$ ${(demo.valor_portal_laudos || demo.valor_portal || 0).toFixed(2)}, Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)}`
                 };
               });
             

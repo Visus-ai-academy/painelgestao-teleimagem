@@ -181,13 +181,21 @@ serve(async (req) => {
           const grupos = new Map();
           
           for (const exame of volumetria) {
-            const chave = `${exame.MODALIDADE}_${exame.ESPECIALIDADE}_${exame.CATEGORIA || 'SC'}_${exame.PRIORIDADE}`;
+            const modalidade = (exame.MODALIDADE || '').toUpperCase().trim();
+            const categoriaRaw = (exame.CATEGORIA || 'SC').toUpperCase().trim();
+            const prioridade = (exame.PRIORIDADE || '').toUpperCase().trim();
+            let especialidade = (exame.ESPECIALIDADE || '').toUpperCase().trim();
+            // Regra: COLUNAS sempre MUSCULO ESQUELETICO
+            if (categoriaRaw === 'COLUNAS') {
+              especialidade = 'MUSCULO ESQUELETICO';
+            }
+            const chave = `${modalidade}_${especialidade}_${categoriaRaw}_${prioridade}`;
             if (!grupos.has(chave)) {
               grupos.set(chave, {
-                modalidade: exame.MODALIDADE,
-                especialidade: exame.ESPECIALIDADE,
-                categoria: exame.CATEGORIA || 'SC',
-                prioridade: exame.PRIORIDADE,
+                modalidade,
+                especialidade,
+                categoria: categoriaRaw,
+                prioridade,
                 quantidade: 0,
                 valor_unitario: 0
               });
