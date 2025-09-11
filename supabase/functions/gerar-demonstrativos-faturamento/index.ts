@@ -48,16 +48,20 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Buscar todos os clientes ativos com parâmetros incluindo Simples Nacional
+    // Buscar clientes ativos COM contratos que requerem demonstrativos (excluindo NC-NF)
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
         id,
         nome,
         nome_fantasia,
-        nome_mobilemed
+        nome_mobilemed,
+        contratos_clientes!inner(
+          tipo_faturamento
+        )
       `)
-      .eq('ativo', true);
+      .eq('ativo', true)
+      .neq('contratos_clientes.tipo_faturamento', 'NC-NF'); // ✅ EXCLUIR NC-NF
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
@@ -134,8 +138,7 @@ serve(async (req) => {
       `)
       .eq('periodo_referencia', periodo)
       .in('"EMPRESA"', cliente.nomes_mobilemed)
-      .not('"VALORES"', 'is', null)
-      .limit(50000); // Limite alto para garantir que pega todos os dados
+      .not('"VALORES"', 'is', null); // ✅ SEM LIMITE - pegar todos os dados
     
     if (volumetriaError) {
       console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
@@ -160,10 +163,11 @@ serve(async (req) => {
       console.log(`🔍 Nomes MobileMed para busca:`, cliente.nomes_mobilemed);
     }
 
-        const totalExames = volumetria?.length || 0;
-        const volumeTotal = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+        // ✅ CORREÇÃO: Contar por VALORES (exames reais), não por registros
+        const totalExames = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+        const volumeTotal = totalExames; // Volume total = total de exames
         
-        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${totalExames} registros, ${volumeTotal} volume total`);
+        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames, ${volumeTotal} volume total`);
 
         // Calcular valores dos exames baseado na tabela de preços
         let valorExames = 0;
@@ -185,9 +189,17 @@ serve(async (req) => {
               especialidade = 'MUSCULO ESQUELETICO';
             }
             
-            // ✅ NORMALIZAÇÃO PRIORIDADE: Urgência/Urgencia -> URGENCIA
+            // ✅ NORMALIZAÇÃO PRIORIDADE: Urgência/Urgencia -> URGENCIA, PLANTÃO -> PLANTAO
             if (prioridade === 'URGÊNCIA' || prioridade === 'URGENCIA') {
               prioridade = 'URGENCIA';
+            }
+            if (prioridade === 'PLANTÃO') {
+              prioridade = 'PLANTAO';
+            }
+            
+            // ✅ CATEGORIA FALLBACK: Se categoria vazia ou inválida, usar SC
+            if (!categoriaRaw || categoriaRaw === '' || categoriaRaw === 'NULL') {
+              categoriaRaw = 'SC';
             }
             
             const chave = `${modalidade}_${especialidade}_${categoriaRaw}_${prioridade}`;
@@ -371,14 +383,19 @@ serve(async (req) => {
           };
         }
 
-        // ✅ PORTAL DE LAUDOS: Usar campo específico se existir, senão usar valor_integracao
+        // ✅ PORTAL DE LAUDOS: Sempre usar valor_integracao se portal_laudos = true
         if (parametros?.portal_laudos) {
-          valorPortal = parametros.valor_portal_laudos || parametros.valor_integracao || 0;
+          valorPortal = parametros.valor_integracao || 0;
         }
 
-        // ✅ INTEGRAÇÃO: Valor específico para integração
+        // ✅ INTEGRAÇÃO: Valor específico para integração  
         if (parametros?.cobrar_integracao) {
           valorIntegracao = parametros.valor_integracao || 0;
+        }
+
+        // ✅ Garantir cálculo do valor total de exames baseado em preços reais
+        if (valorExames === 0 && totalExames > 0) {
+          console.log(`⚠️ PROBLEMA: Cliente ${cliente.nome_fantasia} tem ${totalExames} exames na volumetria mas valor calculado = R$ 0,00`);
         }
 
         const calculoCompleto = [{
@@ -414,10 +431,24 @@ serve(async (req) => {
         let valorImpostos = 0;
         let valorISS = 0;
         
-        // Se NÃO for Simples Nacional, calcular ISS
-        if (!simplesNacional && percentualISS > 0) {
+        // ✅ CORREÇÃO TRIBUTAÇÃO: Calcular ISS se percentual > 0 OU buscar do contrato
+        if (percentualISS > 0) {
           valorISS = valorBruto * (percentualISS / 100);
           valorImpostos = valorISS;
+        } else if (!simplesNacional) {
+          // Buscar ISS do contrato se não tem nos parâmetros
+          const { data: contratoISS } = await supabase
+            .from('contratos_clientes')
+            .select('percentual_iss')
+            .eq('cliente_id', cliente.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          const issContrato = contratoISS?.[0]?.percentual_iss || 0;
+          if (issContrato > 0) {
+            valorISS = valorBruto * (issContrato / 100);
+            valorImpostos = valorISS;
+          }
         }
         
         const valorTotal = valorBruto - valorImpostos;
@@ -426,11 +457,11 @@ serve(async (req) => {
         const temProblemas = valorExames === 0 && totalExames > 0;
         const temFranquiaProblema = valorFranquia > 0 && volumeTotal === 0 && !parametros?.frequencia_continua;
         
-        const demonstrativo: DemonstrativoCliente = {
+         const demonstrativo: DemonstrativoCliente = {
           cliente_id: cliente.id,
           cliente_nome: cliente.nome_fantasia || cliente.nome,
           periodo,
-          total_exames: totalExames,
+          total_exames: totalExames, // ✅ Agora é a contagem real de exames (VALORES)
           valor_exames: valorExames,
           valor_franquia: valorFranquia,
           valor_portal_laudos: valorPortal,

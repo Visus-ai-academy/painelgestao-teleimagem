@@ -62,9 +62,8 @@ export default function DemonstrativoFaturamento() {
     try {
       console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
       
-      // PRIMEIRO: Verificar se existem demonstrativos completos já gerados
-      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`)
-        || localStorage.getItem(`demonstrativos_${periodo}`); // fallback
+      // ✅ CARREGAR SOMENTE de demonstrativos_completos (unificação)
+      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
       if (demonstrativosCompletos) {
         try {
           const dados = JSON.parse(demonstrativosCompletos);
@@ -87,12 +86,12 @@ export default function DemonstrativoFaturamento() {
                   nome: nomeCliente,
                   email: emailCliente,
                   total_exames: demo.total_exames || 0,
-                  valor_bruto: Number(demo.valor_exames ?? demo.valor_total ?? 0),
-                  valor_liquido: Number(demo.valor_liquido ?? demo.valor_total ?? 0),
+                  valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
+                  valor_liquido: Number(demo.valor_total ?? demo.valor_liquido ?? 0),
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Demonstrativo: ${demo.total_exames || 0} exames, Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)}, Portal: R$ ${(demo.valor_portal_laudos || demo.valor_portal || 0).toFixed(2)}, Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)}`
+                  observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`
                 };
               });
             
@@ -621,6 +620,63 @@ export default function DemonstrativoFaturamento() {
         <h2 className="text-2xl font-bold text-gray-900">Demonstrativo de Faturamento</h2>
         <p className="text-gray-600 mt-1">Visualize e analise o faturamento por cliente</p>
       </div>
+
+      {/* ✅ RESUMO GERAL - Agora na aba correta */}
+      {clientes.length > 0 && (() => {
+        const resumoCalculado = {
+          clientes_processados: clientes.length,
+          valor_exames_geral: clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0),
+          valor_franquias_geral: 0, // TODO: Extrair dos detalhes das observações
+          valor_portal_geral: 0,     // TODO: Extrair dos detalhes das observações
+          valor_integracao_geral: 0, // TODO: Extrair dos detalhes das observações
+          valor_impostos_geral: 0,   // TODO: Extrair dos detalhes das observações
+          valor_total_geral: clientes.reduce((sum, c) => sum + (c.valor_liquido || 0), 0),
+          clientes_simples_nacional: 0, // TODO: Extrair dos detalhes
+          clientes_regime_normal: clientes.length
+        };
+        
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumo Geral - {periodo}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {resumoCalculado.clientes_processados}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Clientes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_exames_geral)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Exames</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_franquias_geral + resumoCalculado.valor_portal_geral + resumoCalculado.valor_integracao_geral)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Adicionais</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_impostos_geral)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Impostos</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_total_geral)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Líquido</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Controles e Filtros */}
       <Card>

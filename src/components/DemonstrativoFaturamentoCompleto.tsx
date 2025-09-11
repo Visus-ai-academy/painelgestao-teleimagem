@@ -251,7 +251,8 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
         </CardContent>
       </Card>
 
-      {resumo && (
+      {/* ✅ MOVER PARA ABA DEMONSTRATIVOS: Remover daqui */}
+      {false && resumo && (
         <Card>
           <CardHeader>
             <CardTitle>Resumo Geral - {periodo}</CardTitle>
@@ -307,7 +308,8 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
         </Card>
       )}
 
-      {demonstrativos.length > 0 && (
+      {/* ✅ MOVER PARA ABA DEMONSTRATIVOS: Remover daqui */}
+      {false && demonstrativos.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Demonstrativos por Cliente</CardTitle>
