@@ -210,7 +210,7 @@ serve(async (req) => {
                 p_cliente_id: cliente.id,
                 p_modalidade: grupo.modalidade,
                 p_especialidade: grupo.especialidade,
-                p_prioridade: grupo.prioridade || 'NORMAL',
+                p_prioridade: grupo.prioridade,
                 p_categoria: grupo.categoria || 'SC',
                 p_volume_total: grupo.quantidade,
                 p_is_plantao: false
@@ -240,53 +240,15 @@ serve(async (req) => {
                 
                 console.log(`💰 Preço encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} = R$ ${preco.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
               } else {
-                // Fallback 1: Buscar preço genérico para modalidade/especialidade (sem categoria específica)
-                const { data: precoGenerico, error: precoGenericoError } = await supabase
-                  .from('precos_servicos')
-                  .select('valor_base, valor_urgencia')
-                  .eq('cliente_id', cliente.id)
-                  .eq('modalidade', grupo.modalidade)
-                  .eq('especialidade', grupo.especialidade)
-                  .limit(1);
-                
-                let precoEncontrado = null;
-                
-                if (!precoGenericoError && precoGenerico && precoGenerico.length > 0) {
-                  const isUrgencia = grupo.prioridade && grupo.prioridade.toLowerCase().includes('urgencia');
-                  precoEncontrado = isUrgencia ? precoGenerico[0].valor_urgencia : precoGenerico[0].valor_base;
-                  precoEncontrado = precoEncontrado || precoGenerico[0].valor_base; // fallback
-                }
-                
-                // Fallback 2: Buscar qualquer preço para o cliente (última tentativa)
-                if (!precoEncontrado || precoEncontrado <= 0) {
-                  const { data: qualquerPreco, error: qualquerPrecoError } = await supabase
-                    .from('precos_servicos')
-                    .select('valor_base, valor_urgencia')
-                    .eq('cliente_id', cliente.id)
-                    .not('valor_base', 'is', null)
-                    .gt('valor_base', 0)
-                    .limit(1);
-                  
-                  if (!qualquerPrecoError && qualquerPreco && qualquerPreco.length > 0) {
-                    precoEncontrado = qualquerPreco[0].valor_base;
-                    console.log(`🔄 Usando preço genérico do cliente: R$ ${precoEncontrado.toFixed(2)}`);
-                  }
-                }
-                
-                // Usar preço encontrado ou fallback final
-                const valorFinal = precoEncontrado && precoEncontrado > 0 ? Number(precoEncontrado) : 5.5;
-                const valorGrupo = grupo.quantidade * valorFinal;
-                valorExames += valorGrupo;
-                
+                // Sem fallback: respeitar regras existentes e não aplicar valores artificiais
                 detalhesExames.push({
                   ...grupo,
-                  valor_total: valorGrupo,
-                  valor_unitario: valorFinal,
-                  status: precoEncontrado ? 'preco_generico' : 'valor_fallback',
-                  problema: !precoEncontrado ? `Preço não encontrado - usando fallback R$ ${valorFinal.toFixed(2)}` : undefined
+                  valor_total: 0,
+                  valor_unitario: 0,
+                  status: 'preco_nao_encontrado',
+                  problema: `Preço não encontrado para ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade}`
                 });
-                
-                console.log(`💰 Preço ${precoEncontrado ? 'genérico' : 'fallback'}: ${grupo.modalidade}/${grupo.especialidade} = R$ ${valorFinal.toFixed(2)} x ${grupo.quantidade} = R$ ${valorGrupo.toFixed(2)}`);
+                console.warn(`⚠️ Preço NÃO encontrado: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade}`);
               }
             } catch (error) {
               console.error(`❌ Erro ao calcular preço para ${cliente.nome_fantasia}:`, error);
