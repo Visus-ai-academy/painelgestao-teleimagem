@@ -122,27 +122,41 @@ serve(async (req) => {
     // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
     console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
     
-    const { data: volumetria, error: volumetriaError } = await supabase
-      .from('volumetria_mobilemed')
-      .select(`
-        "EMPRESA",
-        "MODALIDADE", 
-        "ESPECIALIDADE",
-        "CATEGORIA",
-        "PRIORIDADE", 
-        "VALORES",
-        "MEDICO",
-        "DATA_LAUDO",
-        "DATA_PRAZO",
-        periodo_referencia
-      `)
-      .eq('periodo_referencia', periodo)
-      .in('"EMPRESA"', cliente.nomes_mobilemed)
-      .not('"VALORES"', 'is', null); // ✅ SEM LIMITE - pegar todos os dados
-    
-    if (volumetriaError) {
-      console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
-      continue;
+    // Paginação para evitar limite de 1000 registros
+    let volumetria: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data: page, error: volumetriaError } = await supabase
+        .from('volumetria_mobilemed')
+        .select(`
+          "EMPRESA",
+          "MODALIDADE", 
+          "ESPECIALIDADE",
+          "CATEGORIA",
+          "PRIORIDADE", 
+          "VALORES",
+          "MEDICO",
+          "DATA_LAUDO",
+          "DATA_PRAZO",
+          periodo_referencia
+        `)
+        .eq('periodo_referencia', periodo)
+        .in('"EMPRESA"', cliente.nomes_mobilemed)
+        .not('"VALORES"', 'is', null)
+        .range(from, from + pageSize - 1);
+
+      if (volumetriaError) {
+        console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
+        break;
+      }
+
+      if (!page || page.length === 0) break;
+
+      volumetria.push(...page);
+
+      if (page.length < pageSize) break; // última página
+      from += pageSize;
     }
     
     console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria?.length || 0} registros encontrados na volumetria para período ${periodo}`);
