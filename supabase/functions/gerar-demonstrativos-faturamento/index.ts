@@ -181,14 +181,22 @@ serve(async (req) => {
           const grupos = new Map();
           
           for (const exame of volumetria) {
-            const modalidade = (exame.MODALIDADE || '').toUpperCase().trim();
-            const categoriaRaw = (exame.CATEGORIA || 'SC').toUpperCase().trim();
-            const prioridade = (exame.PRIORIDADE || '').toUpperCase().trim();
+            // ✅ NORMALIZAÇÃO COMPLETA: Aplicar todas as regras antes do agrupamento
+            let modalidade = (exame.MODALIDADE || '').toUpperCase().trim();
+            let categoriaRaw = (exame.CATEGORIA || 'SC').toUpperCase().trim();
+            let prioridade = (exame.PRIORIDADE || '').toUpperCase().trim();
             let especialidade = (exame.ESPECIALIDADE || '').toUpperCase().trim();
-            // Regra: COLUNAS sempre MUSCULO ESQUELETICO
+            
+            // ✅ REGRA CRÍTICA: COLUNAS sempre MUSCULO ESQUELETICO
             if (categoriaRaw === 'COLUNAS') {
               especialidade = 'MUSCULO ESQUELETICO';
             }
+            
+            // ✅ NORMALIZAÇÃO PRIORIDADE: Urgência/Urgencia -> URGENCIA
+            if (prioridade === 'URGÊNCIA' || prioridade === 'URGENCIA') {
+              prioridade = 'URGENCIA';
+            }
+            
             const chave = `${modalidade}_${especialidade}_${categoriaRaw}_${prioridade}`;
             if (!grupos.has(chave)) {
               grupos.set(chave, {
@@ -267,16 +275,43 @@ serve(async (req) => {
         // Calcular franquia, portal e integração usando lógica corrigida
         console.log(`💰 Calculando faturamento para ${cliente.nome_fantasia} - Volume: ${volumeTotal}`);
         
-        // Buscar parâmetros de faturamento
+        // ✅ BUSCAR PARÂMETROS DE FATURAMENTO COMPLETOS
         const { data: parametrosFaturamento, error: paramsError } = await supabase
           .from('parametros_faturamento')
-          .select('*')
+          .select(`
+            aplicar_franquia,
+            valor_franquia,
+            volume_franquia,
+            frequencia_continua,
+            frequencia_por_volume,
+            valor_acima_franquia,
+            valor_integracao,
+            valor_portal_laudos,
+            portal_laudos,
+            cobrar_integracao,
+            simples,
+            percentual_iss
+          `)
           .eq('cliente_id', cliente.id)
           .eq('status', 'A')
           .order('updated_at', { ascending: false })
           .limit(1);
 
         const parametros = parametrosFaturamento?.[0];
+        
+        if (paramsError) {
+          console.error(`❌ Erro ao buscar parâmetros para ${cliente.nome_fantasia}:`, paramsError);
+        }
+        
+        console.log(`🔧 Parâmetros ${cliente.nome_fantasia}:`, {
+          tem_parametros: !!parametros,
+          aplicar_franquia: parametros?.aplicar_franquia,
+          valor_franquia: parametros?.valor_franquia,
+          portal_laudos: parametros?.portal_laudos,
+          cobrar_integracao: parametros?.cobrar_integracao,
+          simples: parametros?.simples,
+          percentual_iss: parametros?.percentual_iss
+        });
         let valorFranquia = 0;
         let valorPortal = 0;
         let valorIntegracao = 0;
@@ -344,12 +379,12 @@ serve(async (req) => {
           };
         }
 
-        // Portal de Laudos
+        // ✅ PORTAL DE LAUDOS: Usar campo específico se existir, senão usar valor_integracao
         if (parametros?.portal_laudos) {
-          valorPortal = parametros.valor_integracao || 0;
+          valorPortal = parametros.valor_portal_laudos || parametros.valor_integracao || 0;
         }
 
-        // Integração
+        // ✅ INTEGRAÇÃO: Valor específico para integração
         if (parametros?.cobrar_integracao) {
           valorIntegracao = parametros.valor_integracao || 0;
         }
@@ -373,10 +408,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Calcular tributação baseado no Simples Nacional
-        const parametrosTrib = cliente.parametros_faturamento[0];
-        const simplesNacional = parametrosTrib?.simples || false;
-        const percentualISS = parametrosTrib?.percentual_iss || 0;
+        // ✅ CALCULAR TRIBUTAÇÃO: Usar os mesmos parâmetros já buscados
+        const simplesNacional = parametros?.simples || false;
+        const percentualISS = parametros?.percentual_iss || 0;
+        
+        console.log(`💰 Tributação ${cliente.nome_fantasia}:`, {
+          simples_nacional: simplesNacional,
+          percentual_iss: percentualISS,
+          valor_bruto: valorBruto
+        });
         
         const valorBruto = valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0);
         let valorImpostos = 0;
