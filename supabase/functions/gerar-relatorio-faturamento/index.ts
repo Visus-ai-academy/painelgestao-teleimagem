@@ -31,6 +31,7 @@ serve(async (req: Request) => {
     console.log('Função iniciada');
     
     const body = await req.json();
+    const demonstrativoData = body?.demonstrativo_data || null;
     console.log('Body recebido:', JSON.stringify(body));
     
     const { cliente_id, periodo } = body;
