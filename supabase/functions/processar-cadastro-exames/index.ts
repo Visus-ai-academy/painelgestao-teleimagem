@@ -54,6 +54,7 @@ serve(async (req) => {
     let atualizados = 0;
     let erros = 0;
     const detalhesErros: any[] = [];
+    const registrosParaInserir: any[] = [];
 
     // Buscar IDs das entidades relacionadas para validação
     const { data: modalidades } = await supabase.from('modalidades').select('id, nome');
@@ -66,6 +67,9 @@ serve(async (req) => {
     const categoriaMap = new Map(categorias?.map(c => [c.nome.toLowerCase(), c.id]) || []);
     const prioridadeMap = new Map(prioridades?.map(p => [p.nome.toLowerCase(), p.id]) || []);
 
+    console.log(`🔄 Processando ${jsonData.length} registros em lotes para otimizar performance...`);
+
+    // Processar todos os registros e validar antes de inserir
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
       processados++;
@@ -75,7 +79,7 @@ serve(async (req) => {
         const nomeExame = row.EXAME || row.nome;
         const modalidade = row.MODALIDADE || row.modalidade;
         const especialidade = row.ESPECIALIDADE || row.especialidade;
-        const categoria = row.CATEGORIA || row.categoria; // Deixar em branco se não informada
+        const categoria = row.CATEGORIA || row.categoria;
         const prioridade = row.PRIORIDADE || row.prioridade;
         
         if (!nomeExame || !modalidade || !especialidade) {
@@ -88,11 +92,11 @@ serve(async (req) => {
           descricao: (row.DESCRICAO || row.descricao)?.trim() || null,
           modalidade: modalidade.trim(),
           especialidade: especialidade.trim(),
-          categoria: categoria?.trim() || null, // Deixar null se não informada
+          categoria: categoria?.trim() || null,
           prioridade: prioridade?.trim() || 'Rotina',
           modalidade_id: modalidadeMap.get(modalidade.toLowerCase().trim()),
           especialidade_id: especialidadeMap.get(especialidade.toLowerCase().trim()),
-          categoria_id: categoria ? categoriaMap.get(categoria.toLowerCase().trim()) : null, // Só buscar ID se categoria existe
+          categoria_id: categoria ? categoriaMap.get(categoria.toLowerCase().trim()) : null,
           prioridade_id: prioridadeMap.get((prioridade || 'Rotina').toLowerCase().trim()),
           codigo_exame: (row.CODIGO_EXAME || row.codigo_exame)?.trim() || null,
           permite_quebra: (row.PERMITE_QUEBRA || row.permite_quebra) === true || (row.PERMITE_QUEBRA || row.permite_quebra) === 'true' || (row.PERMITE_QUEBRA || row.permite_quebra) === 'SIM',
@@ -101,19 +105,12 @@ serve(async (req) => {
           ativo: true
         };
 
-        // IMPORTANTE: Como a base foi limpa, todos são novos registros
-        // Verificar duplicatas apenas dentro do próprio arquivo sendo processado
-        console.log(`Linha ${i + 1}: ${exameData.nome} - SEMPRE INSERIR (base limpa)`);
+        registrosParaInserir.push(exameData);
 
-        // Inserir novo registro (não verificar duplicatas pois base foi limpa)
-        const { error: insertError } = await supabase
-          .from('cadastro_exames')
-          .insert(exameData);
-
-        if (insertError) throw insertError;
-        inseridos++;
-
-        console.log(`Linha ${i + 1}: Processada com sucesso - ${exameData.nome}`);
+        // Log de progresso a cada 500 registros
+        if ((i + 1) % 500 === 0) {
+          console.log(`📋 Validados ${i + 1}/${jsonData.length} registros...`);
+        }
 
       } catch (error: any) {
         erros++;
@@ -123,7 +120,63 @@ serve(async (req) => {
           erro: error.message
         };
         detalhesErros.push(detalheErro);
-        console.error(`Erro na linha ${i + 1}:`, error.message);
+        console.error(`❌ Erro na linha ${i + 1}:`, error.message);
+      }
+    }
+
+    console.log(`✅ Validação concluída: ${registrosParaInserir.length} registros válidos para inserção`);
+
+    // Inserir em lotes de 1000 registros para otimizar performance
+    const batchSize = 1000;
+    let totalInserido = 0;
+    
+    for (let i = 0; i < registrosParaInserir.length; i += batchSize) {
+      const batch = registrosParaInserir.slice(i, i + batchSize);
+      
+      console.log(`🚀 Inserindo lote ${Math.floor(i/batchSize) + 1}: registros ${i + 1} a ${Math.min(i + batchSize, registrosParaInserir.length)}`);
+      
+      try {
+        const { error: batchError } = await supabase
+          .from('cadastro_exames')
+          .insert(batch);
+
+        if (batchError) {
+          throw new Error(`Erro no lote: ${batchError.message}`);
+        }
+
+        totalInserido += batch.length;
+        inseridos = totalInserido;
+        console.log(`✅ Lote inserido com sucesso! Total inserido até agora: ${totalInserido}`);
+        
+      } catch (batchError: any) {
+        console.error(`❌ Erro ao inserir lote:`, batchError);
+        // Tentar inserir registros individualmente neste lote
+        for (const registro of batch) {
+          try {
+            const { error: individualError } = await supabase
+              .from('cadastro_exames')
+              .insert(registro);
+            
+            if (!individualError) {
+              totalInserido++;
+              inseridos = totalInserido;
+            } else {
+              erros++;
+              detalhesErros.push({
+                linha: 'lote_individual',
+                dados: registro,
+                erro: individualError.message
+              });
+            }
+          } catch (individualErr: any) {
+            erros++;
+            detalhesErros.push({
+              linha: 'lote_individual', 
+              dados: registro,
+              erro: individualErr.message
+            });
+          }
+        }
       }
     }
 
