@@ -203,11 +203,11 @@ serve(async (req) => {
               especialidade = 'MUSCULO ESQUELETICO';
             }
             
-            // ✅ NORMALIZAÇÃO PRIORIDADE: Urgência/Urgencia -> URGENCIA, PLANTÃO -> PLANTAO
-            if (prioridade === 'URGÊNCIA' || prioridade === 'URGENCIA') {
+            // ✅ NORMALIZAÇÃO PRIORIDADE COMPLETA: Múltiplas variações
+            if (prioridade === 'URGÊNCIA' || prioridade === 'URGENCIA' || prioridade === 'URGENTE') {
               prioridade = 'URGENCIA';
             }
-            if (prioridade === 'PLANTÃO') {
+            if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
               prioridade = 'PLANTAO';
             }
             
@@ -247,8 +247,8 @@ serve(async (req) => {
                 p_especialidade: grupo.especialidade,
                 p_prioridade: grupo.prioridade,
                 p_categoria: grupo.categoria || 'SC',
-                p_volume_total: grupo.quantidade,
-                p_is_plantao: false
+                p_volume_total: volumeTotal, // ✅ CORREÇÃO: Usar volume total do cliente, não do grupo
+                p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
               });
 
               console.log(`📊 Resultado da função calcular_preco_exame:`, {
@@ -493,6 +493,9 @@ serve(async (req) => {
           }
         };
 
+        // ✅ ADICIONAR DETALHES DOS EXAMES PARA INTERFACE
+        demonstrativo.detalhes_exames = detalhesExames;
+        
         // Adicionar alertas se houver problemas
         if (temProblemas) {
           demonstrativo.alertas = [`⚠️ Cliente tem ${totalExames} exames mas valor R$ 0,00 - verificar tabela de preços`];
@@ -519,6 +522,7 @@ serve(async (req) => {
     const resumo = {
       total_clientes: clientes.length,
       clientes_processados: processados,
+      total_exames_geral: demonstrativos.reduce((sum, d) => sum + d.total_exames, 0), // ✅ ADICIONAR TOTAL EXAMES
       valor_bruto_geral: demonstrativos.reduce((sum, d) => sum + d.valor_bruto, 0),
       valor_impostos_geral: demonstrativos.reduce((sum, d) => sum + d.valor_impostos, 0),
       valor_total_geral: demonstrativos.reduce((sum, d) => sum + d.valor_total, 0),

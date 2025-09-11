@@ -328,20 +328,36 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Primeiro, verificar quantos clientes estão cadastrados no total
-      const { count: totalClientesCadastrados } = await supabase
-        .from('clientes')
-        .select('*', { count: 'exact', head: true });
-      console.log(`📋 Total de clientes cadastrados no sistema: ${totalClientesCadastrados}`);
+      // ✅ PRIORIZAR DADOS DOS DEMONSTRATIVOS SALVOS
+      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+      if (demonstrativosCompletos) {
+        try {
+          const dados = JSON.parse(demonstrativosCompletos);
+          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
+            const clientesDoDemonstrativo = dados.demonstrativos.map((demo: any) => ({
+              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
+              nome: demo.cliente_nome || demo.nome_cliente,
+              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
+            }));
+            
+            console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
+            setClientesCarregados(clientesDoDemonstrativo);
+            localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
+            return;
+          }
+        } catch (error) {
+          console.error('Erro ao processar demonstrativos do localStorage:', error);
+        }
+      }
       
-      // BUSCAR TODOS os clientes únicos da volumetria do período usando EMPRESA (não Cliente_Nome_Fantasia)  
+      // Fallback: Buscar da volumetria se não há demonstrativos
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('"EMPRESA"')
-        .eq('periodo_referencia', periodoSelecionado) // Usar formato YYYY-MM direto
+        .eq('periodo_referencia', periodoSelecionado)
         .not('"EMPRESA"', 'is', null)
         .not('"EMPRESA"', 'eq', '')
-        .limit(10000); // Aumentar limite para garantir que todos os clientes sejam carregados
+        .limit(50000); // Aumentar limite explicitamente
 
       console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria?.length || 0} registros para período ${periodoSelecionado}`);
 
@@ -353,27 +369,18 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // Buscar apenas clientes únicos da volumetria por EMPRESA  
         const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
-        console.log(`📊 Total de registros na volumetria: ${clientesVolumetria.length}`);
-        console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`, nomesUnicos);
-        
-        // Verificar se há algum limitador não intencional
-        if (nomesUnicos.length !== clientesVolumetria.length) {
-          console.log(`ℹ️ Diferença entre registros totais (${clientesVolumetria.length}) e clientes únicos (${nomesUnicos.length}) - isto é normal devido a duplicatas`);
-        }
+        console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`);
         
         const clientesTemp: any[] = [];
         const clientesJaProcessados = new Set();
         
         for (const nomeCliente of nomesUnicos) {
-          // Evitar processar o mesmo nome duas vezes
           if (clientesJaProcessados.has(nomeCliente.trim().toUpperCase())) {
             continue;
           }
           clientesJaProcessados.add(nomeCliente.trim().toUpperCase());
           
-          // Buscar cliente cadastrado para obter email (sem filtros de ativo/status)
           const { data: emailCliente } = await supabase
             .from('clientes')
             .select('id, nome, email, nome_fantasia, nome_mobilemed')
@@ -385,16 +392,12 @@ export default function GerarFaturamento() {
           clientesTemp.push({
             id: clienteId,
             nome: nomeCliente,
-            // Usar email do cliente cadastrado se encontrado, senão gerar email padrão
             email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
           });
         }
         
-        // Remover duplicatas por clienteId (mesmo cliente pode ter nomes diferentes na volumetria)
         const clientesUnicos = new Map();
         clientesTemp.forEach(cliente => {
-          // Usar uma chave composta para garantir unicidade total
-          const chaveUnica = `${cliente.id}-${cliente.nome.trim().toUpperCase()}`;
           if (!clientesUnicos.has(cliente.id)) {
             clientesUnicos.set(cliente.id, cliente);
           }
@@ -756,10 +759,32 @@ export default function GerarFaturamento() {
 
   // Função para gerar todos os relatórios (nova aba "Relatórios")
   const gerarTodosRelatorios = async () => {
-    if (clientesCarregados.length === 0) {
+    // ✅ USAR CLIENTES DOS DEMONSTRATIVOS SALVOS
+    let clientesParaProcessar = clientesCarregados;
+    
+    // Tentar carregar clientes dos demonstrativos salvos primeiro
+    const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+    if (demonstrativosCompletos) {
+      try {
+        const dados = JSON.parse(demonstrativosCompletos);
+        if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
+          clientesParaProcessar = dados.demonstrativos.map((demo: any) => ({
+            id: demo.cliente_id || `temp-${demo.cliente_nome}`,
+            nome: demo.cliente_nome || demo.nome_cliente,
+            email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+            demonstrativo: demo // ✅ Incluir dados do demonstrativo para usar no relatório
+          }));
+          console.log(`✅ Usando ${clientesParaProcessar.length} clientes dos demonstrativos para gerar relatórios`);
+        }
+      } catch (error) {
+        console.error('Erro ao processar demonstrativos:', error);
+      }
+    }
+    
+    if (clientesParaProcessar.length === 0) {
       toast({
         title: "Nenhum cliente encontrado",
-        description: "Certifique-se de que há clientes com faturamento no período selecionado",
+        description: "Certifique-se de que há clientes com demonstrativo gerado no período selecionado",
         variant: "destructive",
       });
       return;
@@ -773,12 +798,12 @@ export default function GerarFaturamento() {
     });
 
     try {
-      const total = clientesCarregados.length;
+      const total = clientesParaProcessar.length;
       let gerados = 0;
       let errors = 0;
 
-      for (let i = 0; i < clientesCarregados.length; i++) {
-        const cliente = clientesCarregados[i];
+      for (let i = 0; i < clientesParaProcessar.length; i++) {
+        const cliente = clientesParaProcessar[i];
         
         setStatusProcessamento({
           processando: true,
@@ -787,12 +812,19 @@ export default function GerarFaturamento() {
         });
 
         try {
-          // Gerar relatório para o cliente
+          // ✅ GERAR RELATÓRIO COM DADOS DO DEMONSTRATIVO
+          const bodyData: any = {
+            cliente_id: cliente.id,
+            periodo: periodoSelecionado
+          };
+          
+          // Se temos dados do demonstrativo, incluir para gerar PDF completo
+          if ((cliente as any).demonstrativo) {
+            bodyData.demonstrativo_data = (cliente as any).demonstrativo;
+          }
+          
           const { data: relatorioData, error: relatorioError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
-            body: {
-              cliente_id: cliente.id,
-              periodo: periodoSelecionado
-            }
+            body: bodyData
           });
 
           if (relatorioError || !relatorioData?.success) {
@@ -932,8 +964,22 @@ export default function GerarFaturamento() {
                 {/* Clientes Cadastrados */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Clientes Cadastrados</span>
-                    <span className="text-sm font-bold">{clientesCarregados.length}</span>
+                    <span className="text-sm font-medium">Clientes com Demonstrativo</span>
+                    <span className="text-sm font-bold">
+                      {(() => {
+                        // ✅ UNIFICAR CONTAGEM: Usar dados dos demonstrativos salvos
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            return dados.demonstrativos?.length || 0;
+                          } catch {
+                            return clientesCarregados.length;
+                          }
+                        }
+                        return clientesCarregados.length;
+                      })()}
+                    </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div 

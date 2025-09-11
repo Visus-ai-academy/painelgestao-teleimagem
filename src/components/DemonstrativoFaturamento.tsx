@@ -32,6 +32,16 @@ interface ClienteFaturamento {
   status_pagamento: 'pendente' | 'pago' | 'vencido';
   data_vencimento: string;
   observacoes?: string;
+  detalhes_exames?: Array<{
+    modalidade: string;
+    especialidade: string;
+    categoria: string;
+    prioridade: string;
+    quantidade: number;
+    valor_unitario: number;
+    valor_total: number;
+    status: string;
+  }>;
 }
 
 // Função auxiliar para formatar período YYYY-MM para formato abreviado
@@ -55,6 +65,7 @@ export default function DemonstrativoFaturamento() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
   // Carregar dados de faturamento
   const carregarDados = async () => {
@@ -91,7 +102,8 @@ export default function DemonstrativoFaturamento() {
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`
+                  observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
+                  detalhes_exames: demo.detalhes_exames || [] // ✅ INCLUIR DETALHES DOS EXAMES
                 };
               });
             
@@ -623,15 +635,29 @@ export default function DemonstrativoFaturamento() {
 
       {/* ✅ RESUMO GERAL - Agora na aba correta */}
       {clientes.length > 0 && (() => {
-        const resumoCalculado = {
+        // ✅ EXTRAIR VALORES REAIS DOS DEMONSTRATIVOS SALVOS
+        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
+        let resumoReal = null;
+        
+        if (demonstrativosCompletos) {
+          try {
+            const dados = JSON.parse(demonstrativosCompletos);
+            resumoReal = dados.resumo;
+          } catch (error) {
+            console.error('Erro ao processar resumo do localStorage:', error);
+          }
+        }
+        
+        const resumoCalculado = resumoReal || {
           clientes_processados: clientes.length,
+          total_exames_geral: clientes.reduce((sum, c) => sum + (c.total_exames || 0), 0),
           valor_exames_geral: clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0),
-          valor_franquias_geral: 0, // TODO: Extrair dos detalhes das observações
-          valor_portal_geral: 0,     // TODO: Extrair dos detalhes das observações
-          valor_integracao_geral: 0, // TODO: Extrair dos detalhes das observações
-          valor_impostos_geral: 0,   // TODO: Extrair dos detalhes das observações
+          valor_franquias_geral: 0, // Fallback se não houver dados completos
+          valor_portal_geral: 0,     
+          valor_integracao_geral: 0, 
+          valor_impostos_geral: 0,   
           valor_total_geral: clientes.reduce((sum, c) => sum + (c.valor_liquido || 0), 0),
-          clientes_simples_nacional: 0, // TODO: Extrair dos detalhes
+          clientes_simples_nacional: 0,
           clientes_regime_normal: clientes.length
         };
         
@@ -656,13 +682,13 @@ export default function DemonstrativoFaturamento() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_franquias_geral + resumoCalculado.valor_portal_geral + resumoCalculado.valor_integracao_geral)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((resumoCalculado.valor_franquias_geral || 0) + (resumoCalculado.valor_portal_geral || 0) + (resumoCalculado.valor_integracao_geral || 0))}
                   </div>
                   <div className="text-sm text-muted-foreground">Adicionais</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-red-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_impostos_geral)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_impostos_geral || 0)}
                   </div>
                   <div className="text-sm text-muted-foreground">Impostos</div>
                 </div>
@@ -907,22 +933,79 @@ export default function DemonstrativoFaturamento() {
                 </thead>
                 <tbody>
                   {clientesFiltrados.map((cliente, index) => (
-                    <tr key={`${cliente.nome}-${index}`} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                      <td className="py-3 px-4 font-medium">{cliente.nome}</td>
-                      <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="py-3 px-4 text-center">
-                        <Badge 
-                          variant={
-                            cliente.status_pagamento === 'pago' ? 'default' :
-                            cliente.status_pagamento === 'vencido' ? 'destructive' : 'secondary'
+                    <>
+                      <tr 
+                        key={`${cliente.nome}-${index}`} 
+                        className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-blue-50 transition-colors`}
+                        onClick={() => {
+                          const newExpanded = new Set(expandedClients);
+                          if (newExpanded.has(cliente.id)) {
+                            newExpanded.delete(cliente.id);
+                          } else {
+                            newExpanded.add(cliente.id);
                           }
-                        >
-                          {cliente.status_pagamento}
-                        </Badge>
-                      </td>
-                    </tr>
+                          setExpandedClients(newExpanded);
+                        }}
+                      >
+                        <td className="py-3 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            {expandedClients.has(cliente.id) ? '▼' : '▶'}
+                            {cliente.nome}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Badge 
+                            variant={
+                              cliente.status_pagamento === 'pago' ? 'default' :
+                              cliente.status_pagamento === 'vencido' ? 'destructive' : 'secondary'
+                            }
+                          >
+                            {cliente.status_pagamento}
+                          </Badge>
+                        </td>
+                      </tr>
+                      {/* ✅ LINHA DE DETALHAMENTO EXPANDIDO */}
+                      {expandedClients.has(cliente.id) && cliente.detalhes_exames && (
+                        <tr key={`${cliente.nome}-details-${index}`} className="bg-blue-50">
+                          <td colSpan={5} className="px-8 py-4">
+                            <div className="space-y-3">
+                              <h4 className="font-semibold text-sm text-gray-700">Detalhamento por Modalidade/Especialidade</h4>
+                              <div className="max-h-40 overflow-y-auto">
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="border-b border-gray-300">
+                                      <th className="text-left py-1">Modalidade</th>
+                                      <th className="text-left py-1">Especialidade</th>
+                                      <th className="text-left py-1">Categoria</th>
+                                      <th className="text-left py-1">Prioridade</th>
+                                      <th className="text-right py-1">Qtd</th>
+                                      <th className="text-right py-1">Valor Unit.</th>
+                                      <th className="text-right py-1">Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {cliente.detalhes_exames.map((detalhe, idx) => (
+                                      <tr key={idx} className="border-b border-gray-200">
+                                        <td className="py-1">{detalhe.modalidade}</td>
+                                        <td className="py-1">{detalhe.especialidade}</td>
+                                        <td className="py-1">{detalhe.categoria}</td>
+                                        <td className="py-1">{detalhe.prioridade}</td>
+                                        <td className="py-1 text-right">{detalhe.quantidade}</td>
+                                        <td className="py-1 text-right">R$ {detalhe.valor_unitario.toFixed(2)}</td>
+                                        <td className="py-1 text-right font-medium">R$ {detalhe.valor_total.toFixed(2)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
