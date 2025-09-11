@@ -141,6 +141,20 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
           setResumo(data.resumo);
         }
         
+        // Persistir também para a aba "Demonstrativos"
+        try {
+          const dadosParaSalvar = {
+            demonstrativos: data.demonstrativos,
+            resumo: data.resumo,
+            periodo,
+            timestamp: new Date().toISOString()
+          };
+          localStorage.setItem(`demonstrativos_completos_${periodo}`, JSON.stringify(dadosParaSalvar));
+          console.log('💾 demonstrativos_completos salvos no localStorage');
+        } catch (e) {
+          console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
+        }
+        
         // Chamar callback se fornecido
         if (onDemonstrativosGerados) {
           console.log('📤 Chamando callback onDemonstrativosGerados');

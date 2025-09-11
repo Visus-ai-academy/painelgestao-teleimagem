@@ -55,16 +55,9 @@ serve(async (req) => {
         id,
         nome,
         nome_fantasia,
-        parametros_faturamento!inner(
-          status,
-          aplicar_franquia,
-          valor_franquia,
-          simples,
-          percentual_iss
-        )
+        nome_mobilemed
       `)
-      .eq('ativo', true)
-      .eq('parametros_faturamento.status', 'A');
+      .eq('ativo', true);
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
@@ -286,7 +279,6 @@ serve(async (req) => {
             frequencia_por_volume,
             valor_acima_franquia,
             valor_integracao,
-            valor_portal_laudos,
             portal_laudos,
             cobrar_integracao,
             simples,
@@ -412,13 +404,13 @@ serve(async (req) => {
         const simplesNacional = parametros?.simples || false;
         const percentualISS = parametros?.percentual_iss || 0;
         
+        
+        const valorBruto = valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0);
         console.log(`💰 Tributação ${cliente.nome_fantasia}:`, {
           simples_nacional: simplesNacional,
           percentual_iss: percentualISS,
           valor_bruto: valorBruto
         });
-        
-        const valorBruto = valorExames + (calculo.valor_franquia || 0) + (calculo.valor_portal_laudos || 0) + (calculo.valor_integracao || 0);
         let valorImpostos = 0;
         let valorISS = 0;
         

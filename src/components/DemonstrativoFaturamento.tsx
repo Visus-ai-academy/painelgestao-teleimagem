@@ -63,7 +63,8 @@ export default function DemonstrativoFaturamento() {
       console.log('🔍 Carregando demonstrativo de faturamento para período:', periodo);
       
       // PRIMEIRO: Verificar se existem demonstrativos completos já gerados
-      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
+      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`)
+        || localStorage.getItem(`demonstrativos_${periodo}`); // fallback
       if (demonstrativosCompletos) {
         try {
           const dados = JSON.parse(demonstrativosCompletos);
