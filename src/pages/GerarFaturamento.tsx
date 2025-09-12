@@ -675,6 +675,17 @@ export default function GerarFaturamento() {
         variant: "default",
       });
 
+      // ✅ Mostrar alertas se houver clientes inativos com volumetria
+      if (faturamentoData.alertas && faturamentoData.alertas.length > 0) {
+        setTimeout(() => {
+          toast({
+            title: "⚠️ Alertas de Segurança",
+            description: `${faturamentoData.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes no demonstrativo.`,
+            variant: "destructive",
+          });
+        }, 1000);
+      }
+
       // Recarregar dados
       setTimeout(() => {
         verificarDemonstrativoGerado();

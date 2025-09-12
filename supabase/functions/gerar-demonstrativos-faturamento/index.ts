@@ -49,15 +49,16 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Buscar clientes COM contratos que requerem demonstrativos (excluindo NC-NF)
-    // INCLUIR status do parâmetro para verificar clientes inativos/cancelados
-    const { data: clientes, error: clientesError } = await supabase
+    // Primeiro, buscar TODOS os clientes com parâmetros (ativos e inativos)
+    const { data: todosClientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
         id,
         nome,
         nome_fantasia,
         nome_mobilemed,
+        ativo,
+        status,
         contratos_clientes!inner(
           tipo_faturamento
         ),
@@ -67,36 +68,85 @@ serve(async (req) => {
           updated_at
         )
       `)
-      .eq('ativo', true)
-      .neq('contratos_clientes.tipo_faturamento', 'NC-NF') // ✅ EXCLUIR NC-NF
-      .in('parametros_faturamento.status', ['A', 'I', 'C']); // Incluir Ativos, Inativos, Cancelados para análise
+      .neq('contratos_clientes.tipo_faturamento', 'NC-NF'); // ✅ EXCLUIR NC-NF
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
     }
 
-    if (!clientes || clientes.length === 0) {
+    if (!todosClientes || todosClientes.length === 0) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Nenhum cliente com parâmetros ativos encontrado'
+          message: 'Nenhum cliente encontrado'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Processando ${clientes.length} clientes...`);
+    console.log(`Total de clientes encontrados: ${todosClientes.length}`);
 
     // ✅ SEPARAR clientes ativos dos inativos/cancelados
-    const clientesAtivos = clientes.filter(c => c.parametros_faturamento?.[0]?.status === 'A');
-    const clientesInativos = clientes.filter(c => ['I', 'C'].includes(c.parametros_faturamento?.[0]?.status));
+    const clientesAtivos = todosClientes.filter(c => 
+      c.ativo && 
+      c.status !== 'Cancelado' && 
+      c.status !== 'Inativo' &&
+      c.parametros_faturamento?.[0]?.status === 'A'
+    );
+    
+    const clientesInativos = todosClientes.filter(c => 
+      !c.ativo || 
+      c.status === 'Cancelado' || 
+      c.status === 'Inativo'
+    );
     
     console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
 
-    // Agrupar clientes ATIVOS por nome_fantasia para evitar duplicatas 
+    // ✅ VERIFICAR quais clientes inativos têm volumetria no período
+    const clientesInativosComVolumetria = [];
+    const alertasClientes: string[] = [];
+    
+    if (clientesInativos.length > 0) {
+      for (const clienteInativo of clientesInativos) {
+        const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
+        const nomesMobilemed = [
+          clienteInativo.nome,
+          clienteInativo.nome_mobilemed,
+          nomeFantasia
+        ].filter(Boolean);
+        
+        // Verificar se tem volumetria no período
+        const { data: volumetriaInativo, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('count', { count: 'exact' })
+          .eq('periodo_referencia', periodo)
+          .in('"EMPRESA"', nomesMobilemed)
+          .not('"VALORES"', 'is', null)
+          .limit(1);
+        
+        if (!error && volumetriaInativo && volumetriaInativo.length > 0) {
+          // Cliente inativo COM volumetria - adicionar na lista e gerar alerta
+          clientesInativosComVolumetria.push(clienteInativo);
+          const status = !clienteInativo.ativo ? 'INATIVO' : 
+                       clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
+          alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
+        }
+      }
+    }
+
+    // ✅ LISTA FINAL: clientes ativos + clientes inativos com volumetria
+    const clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
+    
+    console.log(`📋 Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.length} inativos com volumetria)`);
+    
+    if (alertasClientes.length > 0) {
+      console.log(`⚠️ Alertas de clientes inativos com volumetria:`, alertasClientes);
+    }
+
+    // Agrupar clientes para demonstrativo por nome_fantasia para evitar duplicatas 
     const clientesAgrupados = new Map();
     
-    for (const cliente of clientesAtivos) {
+    for (const cliente of clientes) {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
@@ -646,6 +696,7 @@ serve(async (req) => {
         periodo,
         resumo,
         demonstrativos,
+        alertas: alertasClientes, // ✅ INCLUIR ALERTAS de clientes inativos com volumetria
         salvar_localStorage: {
           chave: `demonstrativos_completos_${periodo}`,
           dados: dadosParaSalvar

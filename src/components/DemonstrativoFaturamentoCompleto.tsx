@@ -168,6 +168,17 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
           title: "Demonstrativos gerados com sucesso!",
           description: `${data.resumo?.clientes_processados || 0} clientes processados`
         });
+
+        // ✅ Mostrar alertas se houver clientes inativos com volumetria
+        if (data.alertas && data.alertas.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: "⚠️ Alertas de Segurança",
+              description: `${data.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes.`,
+              variant: "destructive",
+            });
+          }, 1000);
+        }
       } else {
         console.error('❌ Resposta sem sucesso:', data);
         throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
