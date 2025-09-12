@@ -147,9 +147,31 @@ serve(async (req: Request) => {
 
     let finalData = dataFaturamento || [];
     
-    // Caso não haja dados, seguir com a geração do relatório "sem dados"
+    // Se não há dados, não gerar PDF
     if (finalData.length === 0) {
-      console.log('ℹ️ Nenhum dado encontrado: gerando relatório com demonstrativo fornecido (ou zerado).');
+      console.log('❌ DADOS NÃO ENCONTRADOS - Cliente precisa de verificação no cadastro');
+      console.log(`🔍 Tentando buscar por nome fantasia: ${cliente.nome_fantasia || cliente.nome}`);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Nenhum dado encontrado para o cliente no período",
+        cliente: cliente.nome,
+        periodo: periodo,
+        totalRegistros: 0,
+        dadosEncontrados: false,
+        dados: [],
+        arquivos: [],
+        resumo: {
+          total_laudos: 0,
+          valor_bruto_total: 0,
+          valor_a_pagar: 0,
+          total_impostos: 0
+        },
+        timestamp: new Date().toISOString()
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
@@ -217,7 +239,7 @@ serve(async (req: Request) => {
       valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
     }
 
-    // Gerar PDF sempre (mesmo sem dados)
+    // Gerar PDF apenas se houver dados
     let pdfUrl = null;
     try {
       console.log('Gerando relatório PDF...');
