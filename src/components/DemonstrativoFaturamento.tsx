@@ -188,6 +188,56 @@ export default function DemonstrativoFaturamento() {
     }
   };
 
+  const corrigirCategoriasTC = async () => {
+    try {
+      const response = await supabase.functions.invoke('corrigir-categoria-tc', {
+        body: { periodo_referencia: periodo }
+      });
+
+      if (response.error) {
+        toast({
+          title: "Erro ao corrigir categorias TC",
+          description: response.error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const resultado = response.data;
+      if (resultado.sucesso) {
+        toast({
+          title: "Categorias TC corrigidas",
+          description: `${resultado.registros_atualizados} registros corrigidos`,
+          variant: "default",
+        });
+        // Recarregar dados para refletir correções
+        carregarDados();
+        verificarDiscrepancias();
+      }
+    } catch (error) {
+      console.error('Erro ao corrigir categorias TC:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao corrigir categorias TC",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Verificar e corrigir automaticamente categorias TC ao carregar
+  useEffect(() => {
+    if (clientes.length > 0) {
+      const temCategoriaTC = clientes.some(cliente => 
+        cliente.detalhes_exames?.some((detalhe: any) => detalhe.categoria === 'TC')
+      );
+      
+      if (temCategoriaTC) {
+        console.log('Detectada categoria TC inválida - corrigindo automaticamente...');
+        corrigirCategoriasTC();
+      }
+    }
+  }, [clientes]);
+
   useEffect(() => {
     verificarDiscrepancias();
   }, [periodo]);
@@ -840,56 +890,6 @@ export default function DemonstrativoFaturamento() {
         </CardContent>
       </Card>
 
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Clientes</p>
-                <p className="text-2xl font-bold">{clientesFiltrados.length}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Exames</p>
-                <p className="text-2xl font-bold">{totais.exames.toLocaleString()}</p>
-              </div>
-              <FileText className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Bruto</p>
-                <p className="text-2xl font-bold">R$ {totais.valorBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Líquido</p>
-                <p className="text-2xl font-bold">R$ {totais.valorLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* ✅ RESUMO GERAL - Agora na aba correta */}
       {clientes.length > 0 && (() => {
@@ -925,12 +925,18 @@ export default function DemonstrativoFaturamento() {
               <CardTitle>Resumo Geral - {periodo}</CardTitle>
             </CardHeader>
             <CardContent>
-               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {resumoCalculado.clientes_processados}
                   </div>
                   <div className="text-sm text-muted-foreground">Clientes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-800">
+                    {resumoCalculado.total_exames_geral.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Exames</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
@@ -1016,21 +1022,6 @@ export default function DemonstrativoFaturamento() {
                       </table>
                     </div>
 
-                    {/* Alerta sobre categoria TC */}
-                    {Object.values(resumoConsolidado).some((detalhe: any) => detalhe.categoria === 'TC') && (
-                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="h-5 w-5 text-red-600" />
-                          <div className="text-sm">
-                            <div className="font-semibold text-red-800">Categoria Inválida Encontrada</div>
-                            <div className="text-red-700 mt-1">
-                              Foram encontrados exames com categoria "TC" que não existe. 
-                              Esses exames devem ser corrigidos para a categoria adequada.
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Alerta sobre discrepância */}
                     <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
