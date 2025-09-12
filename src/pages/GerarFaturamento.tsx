@@ -69,7 +69,6 @@ export default function GerarFaturamento() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
-  const [isCorrigindoCategoriaTC, setIsCorrigindoCategoriaTC] = useState(false);
   
   // Controle de período para volumetria retroativa
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
@@ -375,39 +374,6 @@ export default function GerarFaturamento() {
     return undefined;
   }, []);
 
-
-  // Função para corrigir categoria TC
-  const handleCorrigirCategoriaTC = async () => {
-    try {
-      setIsCorrigindoCategoriaTC(true);
-      toast({
-        title: "Iniciando correção",
-        description: "Corrigindo categoria TC para SCORE...",
-      });
-
-      const { data, error } = await supabase.functions.invoke('corrigir-categoria-tc');
-      
-      if (error) throw error;
-
-      toast({
-        title: "Correção concluída!",
-        description: `${data.registros_corrigidos} registros corrigidos de TC para SCORE`,
-      });
-      
-      // Recarregar dados se necessário
-      window.location.reload();
-      
-    } catch (error: any) {
-      console.error('Erro ao corrigir categoria TC:', error);
-      toast({
-        title: "Erro na correção",
-        description: error.message || "Erro ao corrigir categoria TC",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCorrigindoCategoriaTC(false);
-    }
-  };
 
   // Função para carregar clientes da base de dados
   const carregarClientes = useCallback(async () => {
@@ -1680,21 +1646,57 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="analise" className="space-y-6">
+          {/* Verificação de Dados - Movido da aba Demonstrativo */}
           <Card>
             <CardHeader>
-              <CardTitle>Correções de Dados</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                Verificação de Dados
+              </CardTitle>
               <CardDescription>
-                Ferramentas para corrigir inconsistências nos dados de volumetria
+                Análise de consistência entre volumetria e demonstrativos
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Button 
-                onClick={handleCorrigirCategoriaTC}
-                disabled={isCorrigindoCategoriaTC}
-                className="w-full">
-                {isCorrigindoCategoriaTC && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Corrigir Categoria TC → SCORE
-              </Button>
+            <CardContent>
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-sm">
+                  <div className="text-yellow-700">
+                    <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
+                    <div>Total nos Demonstrativos: <span className="font-medium">
+                      {(() => {
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            const total = dados.resumo?.total_exames_geral || 0;
+                            return total.toLocaleString('pt-BR');
+                          } catch {
+                            return '0';
+                          }
+                        }
+                        return '0';
+                      })()} exames
+                    </span></div>
+                    {(() => {
+                      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                      if (demonstrativosCompletos) {
+                        try {
+                          const dados = JSON.parse(demonstrativosCompletos);
+                          const totalDemonstrativos = dados.resumo?.total_exames_geral || 0;
+                          if (totalDemonstrativos !== 38528) {
+                            return (
+                              <div className="text-red-600 font-medium mt-1">
+                                ⚠️ Discrepância encontrada: {Math.abs(38528 - totalDemonstrativos).toLocaleString('pt-BR')} exames de diferença
+                              </div>
+                            );
+                          }
+                        } catch {}
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
           

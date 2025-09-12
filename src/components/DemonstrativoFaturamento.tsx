@@ -1079,24 +1079,6 @@ export default function DemonstrativoFaturamento() {
                     </div>
 
 
-                    {/* Alerta sobre discrepância */}
-                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                        <div className="text-sm">
-                          <div className="font-semibold text-yellow-800">Verificação de Dados</div>
-                          <div className="text-yellow-700 mt-1">
-                            <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
-                            <div>Total nos Demonstrativos: <span className="font-medium">{resumoCalculado.total_exames_geral} exames</span></div>
-                            {resumoCalculado.total_exames_geral !== 38528 && (
-                              <div className="text-red-600 font-medium mt-1">
-                                ⚠️ Discrepância encontrada: {Math.abs(38528 - resumoCalculado.total_exames_geral)} exames de diferença
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 );
               })()}
