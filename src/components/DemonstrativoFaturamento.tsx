@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +67,7 @@ export default function DemonstrativoFaturamento() {
   const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const hasShownInitialToast = useRef(false);
 
   // Discrepâncias Volumetria x Demonstrativos
   type DiscrepanciasResumo = {
@@ -205,12 +206,7 @@ export default function DemonstrativoFaturamento() {
 
       const resultado = response.data;
       if (resultado.sucesso) {
-        toast({
-          title: "Categorias TC corrigidas",
-          description: `${resultado.registros_atualizados} registros corrigidos`,
-          variant: "default",
-        });
-        // Recarregar dados para refletir correções
+        // Recarregar dados para refletir correções (sem toast para evitar loop)
         carregarDados();
         verificarDiscrepancias();
       }
@@ -287,11 +283,15 @@ export default function DemonstrativoFaturamento() {
               setClientesFiltrados(clientesConvertidos);
               setCarregando(false);
               
-              toast({
-                title: "Demonstrativos carregados",
-                description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
-                variant: "default",
-              });
+              // Mostrar toast apenas na primeira carga para evitar loop
+              if (!hasShownInitialToast.current) {
+                toast({
+                  title: "Demonstrativos carregados",
+                  description: `${clientesConvertidos.length} demonstrativos completos encontrados para ${periodo}`,
+                  variant: "default",
+                });
+                hasShownInitialToast.current = true;
+              }
               
               return;
             }
@@ -563,11 +563,15 @@ export default function DemonstrativoFaturamento() {
             setClientes(clientesArray);
             setClientesFiltrados(clientesArray);
             
-            toast({
-              title: "Demonstrativo carregado da volumetria",
-              description: `${clientesArray.length} clientes carregados diretamente dos dados de volumetria para ${periodo}.`,
-              variant: "default",
-            });
+            // Mostrar toast apenas na primeira carga para evitar loop
+            if (!hasShownInitialToast.current) {
+              toast({
+                title: "Demonstrativo carregado da volumetria",
+                description: `${clientesArray.length} clientes carregados diretamente dos dados de volumetria para ${periodo}.`,
+                variant: "default",
+              });
+              hasShownInitialToast.current = true;
+            }
             
             return;
           } else {
@@ -729,6 +733,7 @@ export default function DemonstrativoFaturamento() {
 
   // Carregar dados ao montar o componente
   useEffect(() => {
+    hasShownInitialToast.current = false; // Reset flag when period changes
     carregarDados();
   }, [periodo]);
 
@@ -744,12 +749,8 @@ export default function DemonstrativoFaturamento() {
         }, 
         (payload) => {
           console.log('Mudança detectada na tabela faturamento:', payload);
-          // Recarregar dados automaticamente quando houver mudanças
+          // Recarregar dados automaticamente quando houver mudanças (sem toast para evitar spam)
           carregarDados();
-          toast({
-            title: "Dados atualizados",
-            description: "O demonstrativo foi atualizado automaticamente",
-          });
         }
       )
       .subscribe();
