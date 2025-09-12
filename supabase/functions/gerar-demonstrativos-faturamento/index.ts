@@ -204,11 +204,13 @@ serve(async (req) => {
             }
             
             // ✅ NORMALIZAÇÃO PRIORIDADE COMPLETA: Múltiplas variações
-            if (prioridade === 'URGÊNCIA' || prioridade === 'URGENCIA' || prioridade === 'URGENTE') {
-              prioridade = 'URGENCIA';
+            // IMPORTANTE: Manter consistência com o cadastro de preços
+            let prioridadeNormalizada = prioridade;
+            if (prioridade === 'URGENCIA' || prioridade === 'URGENTE') {
+              prioridadeNormalizada = 'URGÊNCIA'; // ✅ MANTER COM ACENTO
             }
-            if (prioridade === 'PLANTÃO' || prioridade === 'PLANTAO') {
-              prioridade = 'PLANTAO';
+            if (prioridade === 'PLANTAO') {
+              prioridadeNormalizada = 'PLANTÃO'; // ✅ MANTER COM ACENTO
             }
             
             // ✅ CATEGORIA FALLBACK: Se categoria vazia ou inválida, usar SC
@@ -216,13 +218,13 @@ serve(async (req) => {
               categoriaRaw = 'SC';
             }
             
-            const chave = `${modalidade}_${especialidade}_${categoriaRaw}_${prioridade}`;
+            const chave = `${modalidade}_${especialidade}_${categoriaRaw}_${prioridadeNormalizada}`;
             if (!grupos.has(chave)) {
               grupos.set(chave, {
                 modalidade,
                 especialidade,
                 categoria: categoriaRaw,
-                prioridade,
+                prioridade: prioridadeNormalizada, // ✅ USAR PRIORIDADE NORMALIZADA
                 quantidade: 0,
                 valor_unitario: 0
               });
@@ -244,6 +246,17 @@ serve(async (req) => {
               // Primeira tentativa: prioridade informada
               let preco: number | null = null;
               let precoError: any = null;
+
+              // ✅ LOGS DETALHADOS PARA DEBUG
+              console.log(`🔍 DEBUG: Calculando preço para ${cliente.nome_fantasia}:`, {
+                modalidade: grupo.modalidade,
+                especialidade: grupo.especialidade, 
+                categoria: grupo.categoria || 'SC',
+                prioridade: grupo.prioridade,
+                quantidade: grupo.quantidade,
+                volume_total: volumeTotal,
+                is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
+              });
 
               try {
                 const rpc1 = await supabase.rpc('calcular_preco_exame', {
@@ -269,7 +282,8 @@ serve(async (req) => {
                 categoria: grupo.categoria,
                 quantidade: grupo.quantidade,
                 preco_retornado: preco,
-                erro: precoError?.message || 'nenhum'
+                erro: precoError?.message || precoError || 'nenhum',
+                rpc_error: precoError ? true : false
               });
 
               // Fallback 1: se não encontrou, tentar com prioridade ROTINA
