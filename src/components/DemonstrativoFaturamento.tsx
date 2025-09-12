@@ -68,6 +68,130 @@ export default function DemonstrativoFaturamento() {
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
+  // Discrepâncias Volumetria x Demonstrativos
+  type DiscrepanciasResumo = {
+    volumetriaSemNCNF: number;
+    volumetriaNCNF: number;
+    demonstrativos: number;
+    diferencaReal: number;
+    porCliente: Array<{
+      cliente: string;
+      volumetriaSemNCNF: number;
+      demonstrativos: number;
+      diff: number;
+      combosFaltantes?: Array<{
+        modalidade: string;
+        especialidade: string;
+        categoria: string;
+        prioridade: string;
+        quantidade: number;
+      }>;
+    }>
+  };
+  const [discrepancias, setDiscrepancias] = useState<DiscrepanciasResumo | null>(null);
+
+  const verificarDiscrepancias = async () => {
+    try {
+      // Carregar volumetria do período (para análise, não para UI)
+      const { data: vmData, error: vmErr } = await supabase
+        .from('volumetria_mobilemed')
+        .select('\"Cliente_Nome_Fantasia\", tipo_faturamento, \"VALORES\", \"MODALIDADE\", \"ESPECIALIDADE\", \"CATEGORIA\", \"PRIORIDADE\"')
+        .eq('periodo_referencia', periodo)
+        .limit(50000);
+      if (vmErr) console.warn('Erro volumetria para discrepâncias:', vmErr);
+
+      // Carregar demonstrativos (faturamento) do período
+      const { data: fatData, error: fatErr } = await supabase
+        .from('faturamento')
+        .select('cliente_nome, quantidade, modalidade, especialidade, categoria, prioridade, periodo_referencia, tipo_faturamento')
+        .eq('periodo_referencia', periodo)
+        .limit(50000);
+      if (fatErr) console.warn('Erro faturamento para discrepâncias:', fatErr);
+
+      const norm = (s?: string | null) => (s || '').toString().trim().toUpperCase();
+
+      // Mapas agregados
+      const vmPorCliente: Record<string, number> = {};
+      const vmPorClienteCombos: Record<string, Record<string, number>> = {};
+      let totalSemNCNF = 0;
+      let totalNCNF = 0;
+
+      (vmData || []).forEach((r: any) => {
+        const cliente = norm(r.Cliente_Nome_Fantasia || r.EMPRESA);
+        const qtd = Number(r.VALORES || 0);
+        const tipo = norm(r.tipo_faturamento);
+        if (tipo === 'NC-NF') {
+          totalNCNF += qtd;
+          return; // ignora no cálculo de diferença real
+        }
+        totalSemNCNF += qtd;
+        vmPorCliente[cliente] = (vmPorCliente[cliente] || 0) + qtd;
+        const chaveCombo = `${norm(r.MODALIDADE)}|${norm(r.ESPECIALIDADE)}|${norm(r.CATEGORIA)}|${norm(r.PRIORIDADE)}`;
+        vmPorClienteCombos[cliente] = vmPorClienteCombos[cliente] || {};
+        vmPorClienteCombos[cliente][chaveCombo] = (vmPorClienteCombos[cliente][chaveCombo] || 0) + qtd;
+      });
+
+      const fatPorCliente: Record<string, number> = {};
+      const fatPorClienteCombos: Record<string, Record<string, number>> = {};
+      let totalFat = 0;
+      (fatData || []).forEach((r: any) => {
+        const cliente = norm(r.cliente_nome);
+        const qtd = Number(r.quantidade || 0);
+        totalFat += qtd;
+        fatPorCliente[cliente] = (fatPorCliente[cliente] || 0) + qtd;
+        const chaveCombo = `${norm(r.modalidade)}|${norm(r.especialidade)}|${norm(r.categoria)}|${norm(r.prioridade)}`;
+        fatPorClienteCombos[cliente] = fatPorClienteCombos[cliente] || {};
+        fatPorClienteCombos[cliente][chaveCombo] = (fatPorClienteCombos[cliente][chaveCombo] || 0) + qtd;
+      });
+
+      // Construir diferenças por cliente (somente não-NC-NF)
+      const clientesSet = new Set([...Object.keys(vmPorCliente), ...Object.keys(fatPorCliente)]);
+      const porCliente = Array.from(clientesSet).map((cliente) => {
+        const vm = vmPorCliente[cliente] || 0;
+        const ft = fatPorCliente[cliente] || 0;
+        let combosFaltantes: any[] | undefined;
+        if (vm > ft) {
+          const faltantes: any[] = [];
+          const vmCombos = vmPorClienteCombos[cliente] || {};
+          const ftCombos = fatPorClienteCombos[cliente] || {};
+          Object.entries(vmCombos).forEach(([combo, qtdVm]) => {
+            const qtdFt = ftCombos[combo] || 0;
+            const diff = (qtdVm as number) - qtdFt;
+            if (diff > 0) {
+              const [modalidade, especialidade, categoria, prioridade] = combo.split('|');
+              faltantes.push({ modalidade, especialidade, categoria, prioridade, quantidade: diff });
+            }
+          });
+          combosFaltantes = faltantes.sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+        }
+        return {
+          cliente,
+          volumetriaSemNCNF: vm,
+          demonstrativos: ft,
+          diff: vm - ft,
+          combosFaltantes,
+        };
+      }).filter(c => c.volumetriaSemNCNF > 0);
+
+      setDiscrepancias({
+        volumetriaSemNCNF: totalSemNCNF,
+        volumetriaNCNF: totalNCNF,
+        demonstrativos: totalFat,
+        diferencaReal: totalSemNCNF - totalFat,
+        porCliente: porCliente
+          .filter(c => c.diff !== 0)
+          .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+          .slice(0, 20),
+      });
+    } catch (e) {
+      console.error('Erro ao verificar discrepâncias:', e);
+    }
+  };
+
+  useEffect(() => {
+    verificarDiscrepancias();
+  }, [periodo]);
+
   // Carregar dados de faturamento
   const carregarDados = async () => {
     setCarregando(true);
