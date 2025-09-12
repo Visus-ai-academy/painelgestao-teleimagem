@@ -69,6 +69,7 @@ export default function GerarFaturamento() {
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
+  const [isCorrigindoCategoriaTC, setIsCorrigindoCategoriaTC] = useState(false);
   
   // Controle de período para volumetria retroativa
   const [periodoFaturamentoVolumetria, setPeriodoFaturamentoVolumetria] = useState<{ ano: number; mes: number } | null>(null);
@@ -323,6 +324,39 @@ export default function GerarFaturamento() {
   }, [periodoSelecionado]);
   
   const { toast } = useToast();
+
+  // Função para corrigir categoria TC
+  const handleCorrigirCategoriaTC = async () => {
+    try {
+      setIsCorrigindoCategoriaTC(true);
+      toast({
+        title: "Iniciando correção",
+        description: "Corrigindo categoria TC para SCORE...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('corrigir-categoria-tc');
+      
+      if (error) throw error;
+
+      toast({
+        title: "Correção concluída!",
+        description: `${data.registros_corrigidos} registros corrigidos de TC para SCORE`,
+      });
+      
+      // Recarregar dados se necessário
+      window.location.reload();
+      
+    } catch (error: any) {
+      console.error('Erro ao corrigir categoria TC:', error);
+      toast({
+        title: "Erro na correção",
+        description: error.message || "Erro ao corrigir categoria TC",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCorrigindoCategoriaTC(false);
+    }
+  };
 
   // Função para carregar clientes da base de dados
   const carregarClientes = useCallback(async () => {
@@ -1565,6 +1599,24 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="analise" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Correções de Dados</CardTitle>
+              <CardDescription>
+                Ferramentas para corrigir inconsistências nos dados de volumetria
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={handleCorrigirCategoriaTC}
+                disabled={isCorrigindoCategoriaTC}
+                className="w-full">
+                {isCorrigindoCategoriaTC && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                Corrigir Categoria TC → SCORE
+              </Button>
+            </CardContent>
+          </Card>
+          
           <ExamesValoresZerados />
         </TabsContent>
 
