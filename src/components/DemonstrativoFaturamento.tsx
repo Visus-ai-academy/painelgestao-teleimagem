@@ -68,6 +68,7 @@ export default function DemonstrativoFaturamento() {
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const hasShownInitialToast = useRef(false);
+  const tcCorrectionTried = useRef<Set<string>>(new Set());
 
   // Discrepâncias Volumetria x Demonstrativos
   type DiscrepanciasResumo = {
@@ -220,19 +221,21 @@ export default function DemonstrativoFaturamento() {
     }
   };
 
-  // Verificar e corrigir automaticamente categorias TC ao carregar
+  // Verificar e corrigir automaticamente categorias TC ao carregar (apenas uma vez por período)
   useEffect(() => {
-    if (clientes.length > 0) {
-      const temCategoriaTC = clientes.some(cliente => 
-        cliente.detalhes_exames?.some((detalhe: any) => detalhe.categoria === 'TC')
-      );
-      
-      if (temCategoriaTC) {
-        console.log('Detectada categoria TC inválida - corrigindo automaticamente...');
-        corrigirCategoriasTC();
-      }
+    if (clientes.length === 0) return;
+    if (tcCorrectionTried.current.has(periodo)) return;
+
+    const temCategoriaTC = clientes.some(cliente => 
+      cliente.detalhes_exames?.some((detalhe: any) => detalhe.categoria === 'TC')
+    );
+
+    if (temCategoriaTC) {
+      tcCorrectionTried.current.add(periodo);
+      console.log('Detectada categoria TC inválida - corrigindo automaticamente (uma vez por período)...');
+      corrigirCategoriasTC();
     }
-  }, [clientes]);
+  }, [clientes, periodo]);
 
   useEffect(() => {
     verificarDiscrepancias();
