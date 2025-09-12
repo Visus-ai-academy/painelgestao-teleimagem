@@ -16,7 +16,8 @@ import {
   DollarSign,
   Users,
   Calendar,
-  FileText
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -667,7 +668,7 @@ export default function DemonstrativoFaturamento() {
               <CardTitle>Resumo Geral - {periodo}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {resumoCalculado.clientes_processados}
@@ -693,6 +694,141 @@ export default function DemonstrativoFaturamento() {
                   <div className="text-sm text-muted-foreground">Valor Bruto</div>
                 </div>
               </div>
+
+              <Separator className="my-6" />
+
+              {/* Consolidado por Categoria */}
+              {(() => {
+                const resumoConsolidado = clientes.reduce((acc, cliente) => {
+                  if (cliente.detalhes_exames && Array.isArray(cliente.detalhes_exames)) {
+                    cliente.detalhes_exames.forEach((detalhe: any) => {
+                      // Modalidade
+                      if (!acc.modalidades[detalhe.modalidade]) {
+                        acc.modalidades[detalhe.modalidade] = { quantidade: 0, valor: 0 };
+                      }
+                      acc.modalidades[detalhe.modalidade].quantidade += detalhe.quantidade || 0;
+                      acc.modalidades[detalhe.modalidade].valor += detalhe.valor_total || 0;
+
+                      // Especialidade
+                      if (!acc.especialidades[detalhe.especialidade]) {
+                        acc.especialidades[detalhe.especialidade] = { quantidade: 0, valor: 0 };
+                      }
+                      acc.especialidades[detalhe.especialidade].quantidade += detalhe.quantidade || 0;
+                      acc.especialidades[detalhe.especialidade].valor += detalhe.valor_total || 0;
+
+                      // Categoria
+                      if (!acc.categorias[detalhe.categoria]) {
+                        acc.categorias[detalhe.categoria] = { quantidade: 0, valor: 0 };
+                      }
+                      acc.categorias[detalhe.categoria].quantidade += detalhe.quantidade || 0;
+                      acc.categorias[detalhe.categoria].valor += detalhe.valor_total || 0;
+
+                      // Prioridade
+                      if (!acc.prioridades[detalhe.prioridade]) {
+                        acc.prioridades[detalhe.prioridade] = { quantidade: 0, valor: 0 };
+                      }
+                      acc.prioridades[detalhe.prioridade].quantidade += detalhe.quantidade || 0;
+                      acc.prioridades[detalhe.prioridade].valor += detalhe.valor_total || 0;
+                    });
+                  }
+                  return acc;
+                }, { modalidades: {}, especialidades: {}, categorias: {}, prioridades: {} });
+
+                return (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Resumo Consolidado por Categoria</h3>
+                      
+                      {/* Modalidades */}
+                      <div className="mb-6">
+                        <h4 className="text-md font-medium mb-3 text-blue-700">Por Modalidade</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {Object.entries(resumoConsolidado.modalidades)
+                            .sort(([,a], [,b]) => (b as any).quantidade - (a as any).quantidade)
+                            .map(([modalidade, dados]: [string, any]) => (
+                            <div key={modalidade} className="bg-blue-50 p-3 rounded-lg">
+                              <div className="font-medium text-blue-800">{modalidade}</div>
+                              <div className="text-sm text-blue-600">
+                                {dados.quantidade} exames - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dados.valor)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Especialidades */}
+                      <div className="mb-6">
+                        <h4 className="text-md font-medium mb-3 text-green-700">Por Especialidade</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {Object.entries(resumoConsolidado.especialidades)
+                            .sort(([,a], [,b]) => (b as any).quantidade - (a as any).quantidade)
+                            .map(([especialidade, dados]: [string, any]) => (
+                            <div key={especialidade} className="bg-green-50 p-3 rounded-lg">
+                              <div className="font-medium text-green-800">{especialidade}</div>
+                              <div className="text-sm text-green-600">
+                                {dados.quantidade} exames - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dados.valor)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Categorias */}
+                      <div className="mb-6">
+                        <h4 className="text-md font-medium mb-3 text-purple-700">Por Categoria</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {Object.entries(resumoConsolidado.categorias)
+                            .sort(([,a], [,b]) => (b as any).quantidade - (a as any).quantidade)
+                            .map(([categoria, dados]: [string, any]) => (
+                            <div key={categoria} className="bg-purple-50 p-3 rounded-lg">
+                              <div className="font-medium text-purple-800">{categoria}</div>
+                              <div className="text-sm text-purple-600">
+                                {dados.quantidade} exames - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dados.valor)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Prioridades */}
+                      <div className="mb-6">
+                        <h4 className="text-md font-medium mb-3 text-orange-700">Por Prioridade</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {Object.entries(resumoConsolidado.prioridades)
+                            .sort(([,a], [,b]) => (b as any).quantidade - (a as any).quantidade)
+                            .map(([prioridade, dados]: [string, any]) => (
+                            <div key={prioridade} className="bg-orange-50 p-3 rounded-lg">
+                              <div className="font-medium text-orange-800">{prioridade}</div>
+                              <div className="text-sm text-orange-600">
+                                {dados.quantidade} exames - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dados.valor)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Alerta sobre discrepância */}
+                      <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                          <div className="text-sm">
+                            <div className="font-semibold text-yellow-800">Verificação de Dados</div>
+                            <div className="text-yellow-700 mt-1">
+                              <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
+                              <div>Total nos Demonstrativos: <span className="font-medium">{resumoCalculado.total_exames_geral} exames</span></div>
+                              {resumoCalculado.total_exames_geral !== 38528 && (
+                                <div className="text-red-600 font-medium mt-1">
+                                  ⚠️ Discrepância encontrada: {Math.abs(38528 - resumoCalculado.total_exames_geral)} exames de diferença
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         );
