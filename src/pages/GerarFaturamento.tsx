@@ -235,9 +235,10 @@ export default function GerarFaturamento() {
       const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
       sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
       
-      // Atualizar contadores e persistir no localStorage
-      const relatoriosGerados = novosResultados.filter(r => r.relatorioGerado).length;
-      const emailsEnviados = novosResultados.filter(r => r.emailEnviado).length;
+      // Atualizar contadores (deduplicados por cliente) e persistir no localStorage
+      const resultadosUnicos = Array.from(new Map(novosResultados.map(r => [(r.clienteId || r.clienteNome), r])).values());
+      const relatoriosGerados = resultadosUnicos.filter(r => r.relatorioGerado).length;
+      const emailsEnviados = resultadosUnicos.filter(r => r.emailEnviado).length;
       setRelatoriosGerados(relatoriosGerados);
       setEmailsEnviados(emailsEnviados);
       localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
@@ -305,8 +306,9 @@ export default function GerarFaturamento() {
         const resultadosCarregados = JSON.parse(saved);
         setResultados(resultadosCarregados);
         
-        const relatoriosGerados = resultadosCarregados.filter((r: any) => r.relatorioGerado).length;
-        const emailsEnviados = resultadosCarregados.filter((r: any) => r.emailEnviado).length;
+        const resultadosUnicos = Array.from(new Map(resultadosCarregados.map((r: any) => [(r.clienteId || r.clienteNome), r])).values());
+        const relatoriosGerados = resultadosUnicos.filter((r: any) => r.relatorioGerado).length;
+        const emailsEnviados = resultadosUnicos.filter((r: any) => r.emailEnviado).length;
         setRelatoriosGerados(relatoriosGerados);
         setEmailsEnviados(emailsEnviados);
         
@@ -1104,20 +1106,7 @@ export default function GerarFaturamento() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Relatórios Gerados</span>
                     <span className="text-sm font-bold">
-                      {(() => {
-                        // ✅ USAR DEMONSTRATIVOS SALVOS COMO BASE
-                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                        if (demonstrativosCompletos) {
-                          try {
-                            const dados = JSON.parse(demonstrativosCompletos);
-                            return dados.demonstrativos?.length || 0;
-                          } catch {
-                            return 0;
-                          }
-                        }
-                        return 0;
-                      })()} de {(() => {
-                        // ✅ USAR DEMONSTRATIVOS SALVOS COMO TOTAL
+                      {relatoriosGerados} de {(() => {
                         const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
                         if (demonstrativosCompletos) {
                           try {
@@ -1160,7 +1149,18 @@ export default function GerarFaturamento() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">E-mails Enviados</span>
                     <span className="text-sm font-bold">
-                      {emailsEnviados} de {clientesCarregados.length}
+                      {emailsEnviados} de {(() => {
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            return dados.demonstrativos?.length || 0;
+                          } catch {
+                            return 0;
+                          }
+                        }
+                        return 0;
+                      })()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -1188,13 +1188,15 @@ export default function GerarFaturamento() {
                 </div>
 
                 {/* Erros */}
-                {resultados.filter(r => r.erro && r.erro.trim()).length > 0 && (
+                {(() => {
+                  const errosSet = new Set(resultados.filter(r => r.erro && r.erro.trim()).map(r => r.clienteId || r.clienteNome));
+                  return errosSet.size > 0;
+                })() && (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-red-600">Erros</span>
                       <span className="text-sm font-bold text-red-600">
-                        {resultados.filter(r => r.erro && r.erro.trim()).length} de {(() => {
-                          // ✅ USAR DEMONSTRATIVOS SALVOS COMO TOTAL
+                        {(() => { const s = new Set(resultados.filter(r => r.erro && r.erro.trim()).map(r => r.clienteId || r.clienteNome)); return s.size; })()} de {(() => {
                           const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
                           if (demonstrativosCompletos) {
                             try {
@@ -1218,7 +1220,7 @@ export default function GerarFaturamento() {
                             try {
                               const dados = JSON.parse(demonstrativosCompletos);
                               const totalClientes = dados.demonstrativos?.length || 0;
-                              const totalErros = resultados.filter(r => r.erro && r.erro.trim()).length;
+                              const totalErros = new Set(resultados.filter(r => r.erro && r.erro.trim()).map(r => r.clienteId || r.clienteNome)).size;
                               return totalClientes > 0 
                                 ? `${Math.min(100, (totalErros / totalClientes) * 100)}%` 
                                 : '0%';
