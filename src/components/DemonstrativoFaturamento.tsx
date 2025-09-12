@@ -33,6 +33,8 @@ interface ClienteFaturamento {
   status_pagamento: 'pendente' | 'pago' | 'vencido';
   data_vencimento: string;
   observacoes?: string;
+  tipo_faturamento?: string; // ✅ ADICIONAR tipo_faturamento
+  alertas?: string[]; // ✅ ADICIONAR alertas
   detalhes_exames?: Array<{
     modalidade: string;
     especialidade: string;
@@ -1149,6 +1151,7 @@ export default function DemonstrativoFaturamento() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4">Cliente</th>
+                    <th className="text-center py-3 px-4">Tipo Faturamento</th>
                     <th className="text-right py-3 px-4">Exames</th>
                     <th className="text-right py-3 px-4">Valor Bruto</th>
                     <th className="text-right py-3 px-4">Valor Líquido</th>
@@ -1175,7 +1178,18 @@ export default function DemonstrativoFaturamento() {
                           <div className="flex items-center gap-2">
                             {expandedClients.has(cliente.id) ? '▼' : '▶'}
                             {cliente.nome}
+                            {cliente.alertas && cliente.alertas.length > 0 && (
+                              <Badge variant="destructive" className="ml-2">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Alerta
+                              </Badge>
+                            )}
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <Badge variant="outline">
+                            {cliente.tipo_faturamento || 'CO-FT'}
+                          </Badge>
                         </td>
                         <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
                         <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
@@ -1194,8 +1208,20 @@ export default function DemonstrativoFaturamento() {
                       {/* ✅ LINHA DE DETALHAMENTO EXPANDIDO */}
                       {expandedClients.has(cliente.id) && cliente.detalhes_exames && (
                         <tr key={`${cliente.nome}-details-${index}`} className="bg-blue-50">
-                          <td colSpan={5} className="px-8 py-4">
+                          <td colSpan={6} className="px-8 py-4">
                             <div className="space-y-3">
+                              {/* ✅ MOSTRAR ALERTAS SE HOUVER */}
+                              {cliente.alertas && cliente.alertas.length > 0 && (
+                                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                  <div className="flex items-center gap-2 text-red-800 font-medium mb-2">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    Alertas de Segurança
+                                  </div>
+                                  {cliente.alertas.map((alerta, idx) => (
+                                    <p key={idx} className="text-red-700 text-sm">• {alerta}</p>
+                                  ))}
+                                </div>
+                              )}
                               <h4 className="font-semibold text-sm text-gray-700">Detalhamento por Modalidade/Especialidade</h4>
                               <div className="max-h-40 overflow-y-auto">
                                 <table className="w-full text-xs">

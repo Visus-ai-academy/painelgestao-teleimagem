@@ -4714,6 +4714,10 @@ export type Database = {
           status: string
         }[]
       }
+      sincronizar_parametros_completos_contratos: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       sincronizar_parametros_para_contratos: {
         Args: Record<PropertyKey, never>
         Returns: number

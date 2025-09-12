@@ -26,6 +26,7 @@ interface DemonstrativoCliente {
     valor_iss?: number;
     base_calculo?: number;
   };
+  tipo_faturamento?: string; // ✅ ADICIONAR tipo_faturamento
   alertas?: string[]; // ✅ Novo campo para alertas de problemas
 }
 
@@ -48,7 +49,8 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Buscar clientes ativos COM contratos que requerem demonstrativos (excluindo NC-NF)
+    // Buscar clientes COM contratos que requerem demonstrativos (excluindo NC-NF)
+    // INCLUIR status do parâmetro para verificar clientes inativos/cancelados
     const { data: clientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
@@ -58,10 +60,15 @@ serve(async (req) => {
         nome_mobilemed,
         contratos_clientes!inner(
           tipo_faturamento
+        ),
+        parametros_faturamento!inner(
+          status,
+          tipo_faturamento
         )
       `)
       .eq('ativo', true)
-      .neq('contratos_clientes.tipo_faturamento', 'NC-NF'); // ✅ EXCLUIR NC-NF
+      .neq('contratos_clientes.tipo_faturamento', 'NC-NF') // ✅ EXCLUIR NC-NF
+      .in('parametros_faturamento.status', ['A', 'I', 'C']); // Incluir Ativos, Inativos, Cancelados para análise
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
@@ -79,10 +86,16 @@ serve(async (req) => {
 
     console.log(`Processando ${clientes.length} clientes...`);
 
-    // Agrupar clientes por nome_fantasia para evitar duplicatas 
+    // ✅ SEPARAR clientes ativos dos inativos/cancelados
+    const clientesAtivos = clientes.filter(c => c.parametros_faturamento?.[0]?.status === 'A');
+    const clientesInativos = clientes.filter(c => ['I', 'C'].includes(c.parametros_faturamento?.[0]?.status));
+    
+    console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
+
+    // Agrupar clientes ATIVOS por nome_fantasia para evitar duplicatas 
     const clientesAgrupados = new Map();
     
-    for (const cliente of clientes) {
+    for (const cliente of clientesAtivos) {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
@@ -95,7 +108,8 @@ serve(async (req) => {
             cliente.nome_mobilemed, // Nome MobileMed se existir
             nomeFantasia // Nome fantasia
           ].filter(Boolean), // Remove valores null/undefined
-          parametros_faturamento: cliente.parametros_faturamento
+          parametros_faturamento: cliente.parametros_faturamento,
+          tipo_faturamento: cliente.parametros_faturamento?.[0]?.tipo_faturamento || 'CO-FT' // ✅ ADICIONAR tipo_faturamento
         });
       } else {
         // Adicionar nomes adicionais para busca na volumetria
@@ -110,6 +124,31 @@ serve(async (req) => {
     }
 
     console.log(`📋 ${clientesAgrupados.size} clientes únicos após agrupamento por nome fantasia`);
+
+    // ✅ VERIFICAR ALERTAS para clientes inativos/cancelados com volumetria
+    const alertasClientes: string[] = [];
+    
+    for (const clienteInativo of clientesInativos) {
+      const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
+      const nomesMobilemed = [
+        clienteInativo.nome,
+        clienteInativo.nome_mobilemed,
+        nomeFantasia
+      ].filter(Boolean);
+      
+      // Verificar se tem volumetria no período
+      const { data: volumetriaInativo, error } = await supabase
+        .from('volumetria_mobilemed')
+        .select('count', { count: 'exact' })
+        .eq('periodo_referencia', periodo)
+        .in('"EMPRESA"', nomesMobilemed)
+        .not('"VALORES"', 'is', null);
+      
+      if (!error && volumetriaInativo && volumetriaInativo.length > 0) {
+        const status = clienteInativo.parametros_faturamento?.[0]?.status === 'I' ? 'INATIVO' : 'CANCELADO';
+        alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
+      }
+    }
 
     const demonstrativos: DemonstrativoCliente[] = [];
     let processados = 0;
