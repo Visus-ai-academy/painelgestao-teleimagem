@@ -325,6 +325,38 @@ export default function GerarFaturamento() {
   
   const { toast } = useToast();
 
+  // Resolver cliente_id válido a partir do nome quando necessário
+  const resolveClienteId = useCallback(async (idAtual: string | undefined, nomeCliente: string): Promise<string | undefined> => {
+    const isUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
+    if (isUuid(idAtual)) return idAtual as string;
+    try {
+      let { data: c1 } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('nome', nomeCliente)
+        .maybeSingle();
+      if (c1?.id) return c1.id as string;
+
+      let { data: c2 } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('nome_fantasia', nomeCliente)
+        .maybeSingle();
+      if (c2?.id) return c2.id as string;
+
+      let { data: c3 } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('nome_mobilemed', nomeCliente)
+        .maybeSingle();
+      if (c3?.id) return c3.id as string;
+    } catch (e) {
+      console.warn('Falha ao resolver cliente_id para', nomeCliente, e);
+    }
+    return undefined;
+  }, []);
+
+
   // Função para corrigir categoria TC
   const handleCorrigirCategoriaTC = async () => {
     try {
@@ -859,8 +891,13 @@ export default function GerarFaturamento() {
 
         try {
           // ✅ GERAR RELATÓRIO COM DADOS DO DEMONSTRATIVO
+          const clienteIdReal = await resolveClienteId(cliente.id, cliente.nome);
+          if (!clienteIdReal) {
+            throw new Error('Cliente não encontrado no cadastro (ID inválido).');
+          }
+
           const bodyData: any = {
-            cliente_id: cliente.id,
+            cliente_id: clienteIdReal,
             periodo: periodoSelecionado
           };
           
@@ -875,6 +912,11 @@ export default function GerarFaturamento() {
 
           if (relatorioError || !relatorioData?.success) {
             throw new Error(relatorioError?.message || relatorioData?.error || 'Erro ao gerar relatório');
+          }
+
+          const pdfUrl = relatorioData.arquivos?.[0]?.url;
+          if (!pdfUrl) {
+            throw new Error('Relatório gerado sem PDF público.');
           }
 
           // Atualizar resultado do cliente
