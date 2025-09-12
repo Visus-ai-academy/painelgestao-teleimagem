@@ -1022,9 +1022,11 @@ export default function DemonstrativoFaturamento() {
                                 {detalhe.categoria === 'TC' && <span className="text-red-600 ml-1">⚠️</span>}
                               </td>
                               <td className="py-1 px-3 border-b">{detalhe.prioridade}</td>
-                              <td className="py-1 px-3 text-right border-b">{detalhe.quantidade}</td>
+                              <td className="py-1 px-3 text-right border-b">
+                                {detalhe.quantidade.toLocaleString('pt-BR')}
+                              </td>
                               <td className="py-1 px-3 text-right font-medium border-b">
-                                R$ {detalhe.valor_total.toFixed(2)}
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(detalhe.valor_total)}
                               </td>
                             </tr>
                           ))}
