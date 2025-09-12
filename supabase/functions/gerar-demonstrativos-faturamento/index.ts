@@ -513,7 +513,17 @@ serve(async (req) => {
                   volume_base: parametros.volume_franquia,
                   volume_atual: volumeTotal,
                   valor_aplicado: valorFranquia,
-                  motivo: 'Volume acima da franquia'
+                  motivo: 'Volume acima da franquia (regra por volume)'
+                };
+              } else if (!parametros.frequencia_por_volume && (parametros.volume_franquia || 0) > 0 && volumeTotal > (parametros.volume_franquia || 0)) {
+                // Novo: sem regra por volume e volume acima do limite → NÃO cobra franquia
+                valorFranquia = 0;
+                detalhesFranquia = {
+                  tipo: 'acima_volume_sem_regra',
+                  volume_base: parametros.volume_franquia,
+                  volume_atual: volumeTotal,
+                  valor_aplicado: 0,
+                  motivo: 'Volume acima da franquia e frequencia_por_volume = false - franquia NÃO aplicada'
                 };
               } else {
                 valorFranquia = parametros.valor_franquia || 0;
@@ -525,13 +535,13 @@ serve(async (req) => {
                 };
               }
             } else {
-              // ✅ CORREÇÃO: Volume = 0 e frequência contínua = NÃO → Não cobra franquia
+              // Volume = 0 e frequência contínua = NÃO → Não cobra franquia
               valorFranquia = 0;
               detalhesFranquia = {
                 tipo: 'sem_volume',
                 volume_atual: 0,
                 valor_aplicado: 0,
-                motivo: '✅ Sem volume de exames e frequência não contínua - franquia NÃO aplicada'
+                motivo: 'Sem volume de exames e frequência não contínua - franquia NÃO aplicada'
               };
             }
           }
