@@ -859,12 +859,17 @@ export default function GerarFaturamento() {
       try {
         const dados = JSON.parse(demonstrativosCompletos);
         if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
-          clientesParaProcessar = dados.demonstrativos.map((demo: any) => ({
-            id: demo.cliente_id || `temp-${demo.cliente_nome}`,
-            nome: demo.cliente_nome || demo.nome_cliente,
-            email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
-            demonstrativo: demo // ✅ Incluir dados do demonstrativo para usar no relatório
-          }));
+          clientesParaProcessar = dados.demonstrativos
+            .filter((demo: any) => {
+              const total = Number(demo.total_exames ?? demo.total_laudos ?? demo.volume_total ?? 0);
+              return total > 0; // ✅ Somente clientes com volumetria
+            })
+            .map((demo: any) => ({
+              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
+              nome: demo.cliente_nome || demo.nome_cliente,
+              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+              demonstrativo: demo // ✅ Incluir dados do demonstrativo para usar no relatório
+            }));
           console.log(`✅ Usando ${clientesParaProcessar.length} clientes dos demonstrativos para gerar relatórios`);
         }
       } catch (error) {
@@ -929,7 +934,11 @@ export default function GerarFaturamento() {
 
           const pdfUrl = relatorioData.arquivos?.[0]?.url;
           if (!pdfUrl) {
-            throw new Error('Relatório gerado sem PDF público.');
+            if (relatorioData?.dadosEncontrados === false || relatorioData?.totalRegistros === 0) {
+              console.log('↪️ Sem volumetria para este cliente, relatório não gerado. Pulando.');
+            } else {
+              throw new Error('Relatório gerado sem PDF público.');
+            }
           }
 
           // Atualizar resultado do cliente
