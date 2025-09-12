@@ -68,6 +68,9 @@ export default function DemonstrativoFaturamento() {
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const hasShownInitialToast = useRef(false);
+  // Evita correções em loop: registra tentativas por período e status de execução
+  const tcCorrectionTried = useRef<Set<string>>(new Set());
+  const tcCorrectionRunning = useRef(false);
 
   // Discrepâncias Volumetria x Demonstrativos
   type DiscrepanciasResumo = {
@@ -220,19 +223,25 @@ export default function DemonstrativoFaturamento() {
     }
   };
 
-  // Verificar e corrigir automaticamente categorias TC ao carregar
+  // Verificar e corrigir automaticamente categorias TC ao carregar (apenas 1x por período)
   useEffect(() => {
-    if (clientes.length > 0) {
-      const temCategoriaTC = clientes.some(cliente => 
-        cliente.detalhes_exames?.some((detalhe: any) => detalhe.categoria === 'TC')
-      );
-      
-      if (temCategoriaTC) {
-        console.log('Detectada categoria TC inválida - corrigindo automaticamente...');
-        corrigirCategoriasTC();
-      }
-    }
-  }, [clientes]);
+    if (clientes.length === 0) return;
+    const hasTC = clientes.some((cliente) =>
+      cliente.detalhes_exames?.some((detalhe: any) => detalhe.categoria === 'TC')
+    );
+    if (!hasTC) return;
+
+    if (tcCorrectionTried.current.has(periodo) || tcCorrectionRunning.current) return;
+
+    tcCorrectionRunning.current = true;
+    console.log('Detectada categoria TC inválida - corrigindo automaticamente (uma vez) para período:', periodo);
+    corrigirCategoriasTC()
+      .catch((e) => console.warn('Correção TC falhou:', e))
+      .finally(() => {
+        tcCorrectionTried.current.add(periodo);
+        tcCorrectionRunning.current = false;
+      });
+  }, [clientes, periodo]);
 
   useEffect(() => {
     verificarDiscrepancias();
