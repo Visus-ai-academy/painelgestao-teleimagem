@@ -63,7 +63,8 @@ serve(async (req) => {
         ),
         parametros_faturamento!inner(
           status,
-          tipo_faturamento
+          tipo_faturamento,
+          updated_at
         )
       `)
       .eq('ativo', true)
