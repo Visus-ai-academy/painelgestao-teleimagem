@@ -911,23 +911,63 @@ export default function DemonstrativoFaturamento() {
           try {
             const dados = JSON.parse(demonstrativosCompletos);
             resumoReal = dados.resumo;
+            console.log('✅ Resumo carregado do localStorage:', resumoReal);
           } catch (error) {
-            console.error('Erro ao processar resumo do localStorage:', error);
+            console.error('❌ Erro ao processar resumo do localStorage:', error);
           }
+        } else {
+          console.warn('⚠️ Não há demonstrativos_completos no localStorage para período:', periodo);
         }
         
-        const resumoCalculado = resumoReal || {
-          clientes_processados: clientes.length,
-          total_exames_geral: clientes.reduce((sum, c) => sum + (c.total_exames || 0), 0),
-          valor_exames_geral: clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0),
-          valor_franquias_geral: 0, // Fallback se não houver dados completos
-          valor_portal_geral: 0,     
-          valor_integracao_geral: 0, 
-          valor_impostos_geral: 0,   
-          valor_total_geral: clientes.reduce((sum, c) => sum + (c.valor_liquido || 0), 0),
-          clientes_simples_nacional: 0,
-          clientes_regime_normal: clientes.length
-        };
+        const resumoCalculado = resumoReal || (() => {
+          // 🔧 CALCULAR VALORES COMPLETOS a partir das observações dos clientes
+          console.log('⚠️ FALLBACK: Calculando resumo a partir dos dados dos clientes');
+          
+          let valorFranquiasTotal = 0;
+          let valorPortalTotal = 0;
+          let valorIntegracaoTotal = 0;
+          let valorImpostosTotal = 0;
+          
+          // Extrair valores das observações de cada cliente
+          clientes.forEach(cliente => {
+            if (cliente.observacoes) {
+              const franquiaMatch = cliente.observacoes.match(/Franquia: R\$ ([\d.,]+)/);
+              const portalMatch = cliente.observacoes.match(/Portal: R\$ ([\d.,]+)/);
+              const integracaoMatch = cliente.observacoes.match(/Integração: R\$ ([\d.,]+)/);
+              const impostosMatch = cliente.observacoes.match(/Impostos: R\$ ([\d.,]+)/);
+              
+              if (franquiaMatch) valorFranquiasTotal += parseFloat(franquiaMatch[1].replace(',', '.')) || 0;
+              if (portalMatch) valorPortalTotal += parseFloat(portalMatch[1].replace(',', '.')) || 0;
+              if (integracaoMatch) valorIntegracaoTotal += parseFloat(integracaoMatch[1].replace(',', '.')) || 0;
+              if (impostosMatch) valorImpostosTotal += parseFloat(impostosMatch[1].replace(',', '.')) || 0;
+            }
+          });
+          
+          const valorExamesGeral = clientes.reduce((sum, c) => sum + (c.valor_bruto || 0), 0);
+          const valorTotalGeral = valorExamesGeral + valorFranquiasTotal + valorPortalTotal + valorIntegracaoTotal;
+          
+          console.log('🧮 Resumo calculado via fallback:', {
+            valorExamesGeral,
+            valorFranquiasTotal,
+            valorPortalTotal, 
+            valorIntegracaoTotal,
+            valorImpostosTotal,
+            valorTotalGeral
+          });
+          
+          return {
+            clientes_processados: clientes.length,
+            total_exames_geral: clientes.reduce((sum, c) => sum + (c.total_exames || 0), 0),
+            valor_exames_geral: valorExamesGeral,
+            valor_franquias_geral: valorFranquiasTotal,
+            valor_portal_geral: valorPortalTotal,     
+            valor_integracao_geral: valorIntegracaoTotal, 
+            valor_impostos_geral: valorImpostosTotal,   
+            valor_total_geral: valorTotalGeral,
+            clientes_simples_nacional: 0,
+            clientes_regime_normal: clientes.length
+          };
+        })();
         
         return (
           <Card>
