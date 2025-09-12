@@ -55,7 +55,7 @@ serve(async (req: Request) => {
     // Buscar dados do cliente
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
-      .select('nome, cnpj')
+      .select('nome, nome_fantasia, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
 
@@ -134,57 +134,22 @@ serve(async (req: Request) => {
       const { data: dataVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('"Cliente_Nome_Fantasia"', cliente.nome) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
+        .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia || cliente.nome) // Buscar por Nome Fantasia ou Nome
         .eq('periodo_referencia', periodo);
-        
       if (dataVolumetria && dataVolumetria.length > 0) {
         console.log(`📊 Dados de volumetria encontrados: ${dataVolumetria.length}`);
         // Usar dados de volumetria como fallback
         dataFaturamento = dataVolumetria;
       } else {
-        console.log('🔍 Tentando buscar pelo nome fantasia do cliente...');
-        
-        // Buscar cliente pelo nome fantasia
-        const { data: clienteData } = await supabase
-          .from('clientes')
-          .select('nome, nome_fantasia')
-          .eq('id', cliente_id);
-          
-        if (clienteData && clienteData[0] && clienteData[0].nome_fantasia) {
-          const nomeFantasia = clienteData[0].nome_fantasia;
-          console.log(`🔍 Tentando buscar por nome fantasia: ${nomeFantasia}`);
-          
-          const { data: dataAlt } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('"Cliente_Nome_Fantasia"', nomeFantasia) // Buscar EXCLUSIVAMENTE por Cliente_Nome_Fantasia
-            .eq('periodo_referencia', periodo);
-            
-          if (dataAlt && dataAlt.length > 0) {
-            console.log(`✅ Dados encontrados com nome fantasia: ${dataAlt.length} registros`);
-            dataFaturamento = dataAlt;
-          }
-        }
+        console.log('⚠️ Nenhum dado encontrado por nome fantasia; mantendo finalData vazio para gerar relatório sem dados.');
       }
     }
 
     let finalData = dataFaturamento || [];
     
-    // Se não encontrou dados no faturamento, retornar erro informativo
+    // Caso não haja dados, seguir com a geração do relatório "sem dados"
     if (finalData.length === 0) {
-      console.log('❌ DADOS NÃO ENCONTRADOS - Cliente precisa de verificação no cadastro');
-      
-      return new Response(JSON.stringify({
-        success: false,
-        error: `Dados de faturamento não encontrados para o cliente "${cliente.nome}" no período ${periodo}. Favor verificar o cadastro do cliente.`,
-        cliente: cliente.nome,
-        periodo: periodo,
-        motivo: 'cliente_nao_encontrado_no_faturamento',
-        acao_requerida: 'Verificar se o nome fantasia do cliente está correto no sistema e se há dados de faturamento processados para este período.'
-      }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      console.log('ℹ️ Nenhum dado encontrado: gerando relatório com demonstrativo fornecido (ou zerado).');
     }
 
     console.log('Total de dados únicos encontrados:', finalData.length);
@@ -206,8 +171,16 @@ serve(async (req: Request) => {
     let totalImpostos = 0;
     let valorAPagar = 0;
     
+    // Percentuais fixos para exibição dos tributos
+    const percentualPIS = 0.65; // 0.65%
+    const percentualCOFINS = 3.0; // 3%
+    const percentualCSLL = 1.0; // 1.0%
+    const percentualIRRF = 1.5; // 1.5%
+
+    let valorPIS = 0, valorCOFINS = 0, valorCSLL = 0, valorIRRF = 0;
+    
     if (demonstrativoData) {
-      // ✅ Usar exatamente os valores do demonstrativo unificado
+      // Usar exatamente os valores do demonstrativo unificado
       totalLaudos = Number(demonstrativoData.total_exames || 0);
       valorBrutoTotal = Number(demonstrativoData.valor_bruto ?? demonstrativoData.valor_exames ?? 0);
       valorFranquia = Number(demonstrativoData.valor_franquia || 0);
@@ -217,8 +190,8 @@ serve(async (req: Request) => {
       valorAPagar = Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos));
     } else {
       // Calcular resumo usando dados de faturamento ou volumetria
-      const isFaturamentoData = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
-      if (isFaturamentoData) {
+      const isFaturamentoDataLocal = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
+      if (isFaturamentoDataLocal) {
         // Dados de faturamento - usar campos corretos
         valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.valor) || 0), 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
@@ -227,22 +200,22 @@ serve(async (req: Request) => {
         valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
       }
-      // Impostos padrão
-      const baseCalculoImpostos = valorBrutoTotal;
-      const percentualPIS = 0.65; // 0.65%
-      const percentualCOFINS = 3.0; // 3%
-      const percentualCSLL = 1.0; // 1.0%
-      const percentualIRRF = 1.5; // 1.5%
-      const valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-      const valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-      const valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-      const valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-      if (!demonstrativoData) {
-        totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-      }
+      // Impostos padrão (calculados para exibição)
+      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+      totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
       valorAPagar = valorBrutoTotal - totalImpostos;
     }
 
+    // Mesmo quando vem do demonstrativo, calcular valores individuais para exibição
+    if (demonstrativoData) {
+      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+    }
 
     // Gerar PDF sempre (mesmo sem dados)
     let pdfUrl = null;
@@ -548,6 +521,19 @@ serve(async (req: Request) => {
       
       // Salvar PDF no storage
       const fileName = `relatorio_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.pdf`;
+
+      // Garantir que o bucket exista e seja público
+      try {
+        const bucketName = 'relatorios-faturamento';
+        const { data: existingBucket } = await supabase.storage.getBucket(bucketName);
+        if (!existingBucket) {
+          await supabase.storage.createBucket(bucketName, { public: true });
+          console.log(`Bucket ${bucketName} criado`);
+        }
+      } catch (bErr) {
+        console.log('Aviso: não foi possível verificar/criar bucket:', bErr?.message || bErr);
+      }
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('relatorios-faturamento')
         .upload(fileName, new Uint8Array(pdfBuffer), {
