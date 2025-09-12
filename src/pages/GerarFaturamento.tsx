@@ -46,6 +46,7 @@ import DemonstrativoFaturamento from "@/components/DemonstrativoFaturamento";
 import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFaturamentoCompleto";
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
+import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Período atual - onde estão os dados carregados (junho/2025)
@@ -947,7 +948,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
@@ -959,6 +960,10 @@ export default function GerarFaturamento() {
           <TabsTrigger value="relatorios" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Relatórios
+          </TabsTrigger>
+          <TabsTrigger value="analise" className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Análise
           </TabsTrigger>
           <TabsTrigger value="fechamento" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -1023,16 +1028,52 @@ export default function GerarFaturamento() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Relatórios Gerados</span>
                     <span className="text-sm font-bold">
-                      {relatoriosGerados} de {clientesCarregados.length}
+                      {(() => {
+                        // ✅ USAR DEMONSTRATIVOS SALVOS COMO BASE
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            return dados.demonstrativos?.length || 0;
+                          } catch {
+                            return 0;
+                          }
+                        }
+                        return 0;
+                      })()} de {(() => {
+                        // ✅ USAR DEMONSTRATIVOS SALVOS COMO TOTAL
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            return dados.demonstrativos?.length || 0;
+                          } catch {
+                            return 0;
+                          }
+                        }
+                        return 0;
+                      })()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
                       style={{ 
-                        width: clientesCarregados.length > 0 
-                          ? `${Math.min(100, (relatoriosGerados / clientesCarregados.length) * 100)}%` 
-                          : '0%' 
+                        width: (() => {
+                          const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                          if (demonstrativosCompletos) {
+                            try {
+                              const dados = JSON.parse(demonstrativosCompletos);
+                              const totalClientes = dados.demonstrativos?.length || 0;
+                              return totalClientes > 0 
+                                ? `${Math.min(100, (relatoriosGerados / totalClientes) * 100)}%` 
+                                : '0%';
+                            } catch {
+                              return '0%';
+                            }
+                          }
+                          return '0%';
+                        })()
                       }}
                     />
                   </div>
@@ -1050,9 +1091,21 @@ export default function GerarFaturamento() {
                     <div 
                       className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-out"
                       style={{ 
-                        width: clientesCarregados.length > 0 
-                          ? `${Math.min(100, (emailsEnviados / clientesCarregados.length) * 100)}%` 
-                          : '0%' 
+                        width: (() => {
+                          const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                          if (demonstrativosCompletos) {
+                            try {
+                              const dados = JSON.parse(demonstrativosCompletos);
+                              const totalClientes = dados.demonstrativos?.length || 0;
+                              return totalClientes > 0 
+                                ? `${Math.min(100, (emailsEnviados / totalClientes) * 100)}%` 
+                                : '0%';
+                            } catch {
+                              return '0%';
+                            }
+                          }
+                          return '0%';
+                        })()
                       }}
                     />
                   </div>
@@ -1064,17 +1117,42 @@ export default function GerarFaturamento() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-red-600">Erros</span>
                       <span className="text-sm font-bold text-red-600">
-                        {resultados.filter(r => r.erro && r.erro.trim()).length} de {clientesCarregados.length}
+                        {resultados.filter(r => r.erro && r.erro.trim()).length} de {(() => {
+                          // ✅ USAR DEMONSTRATIVOS SALVOS COMO TOTAL
+                          const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                          if (demonstrativosCompletos) {
+                            try {
+                              const dados = JSON.parse(demonstrativosCompletos);
+                              return dados.demonstrativos?.length || 0;
+                            } catch {
+                              return 0;
+                            }
+                          }
+                          return 0;
+                        })()}
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-red-400 to-red-600 transition-all duration-1000 ease-out"
-                        style={{ 
-                          width: clientesCarregados.length > 0 
-                            ? `${Math.min(100, (resultados.filter(r => r.erro && r.erro.trim()).length / clientesCarregados.length) * 100)}%` 
-                            : '0%' 
-                        }}
+                      style={{ 
+                        width: (() => {
+                          const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                          if (demonstrativosCompletos) {
+                            try {
+                              const dados = JSON.parse(demonstrativosCompletos);
+                              const totalClientes = dados.demonstrativos?.length || 0;
+                              const totalErros = resultados.filter(r => r.erro && r.erro.trim()).length;
+                              return totalClientes > 0 
+                                ? `${Math.min(100, (totalErros / totalClientes) * 100)}%` 
+                                : '0%';
+                            } catch {
+                              return '0%';
+                            }
+                          }
+                          return '0%';
+                        })()
+                      }}
                       />
                     </div>
                   </div>
@@ -1484,6 +1562,10 @@ export default function GerarFaturamento() {
             </Card>
           )}
 
+        </TabsContent>
+
+        <TabsContent value="analise" className="space-y-6">
+          <ExamesValoresZerados />
         </TabsContent>
 
       </Tabs>

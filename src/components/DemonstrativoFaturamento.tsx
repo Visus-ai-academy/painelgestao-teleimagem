@@ -667,7 +667,7 @@ export default function DemonstrativoFaturamento() {
               <CardTitle>Resumo Geral - {periodo}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {resumoCalculado.clientes_processados}
@@ -687,16 +687,10 @@ export default function DemonstrativoFaturamento() {
                   <div className="text-sm text-muted-foreground">Adicionais</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_impostos_geral || 0)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Impostos</div>
-                </div>
-                <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_total_geral)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoCalculado.valor_exames_geral + ((resumoCalculado.valor_franquias_geral || 0) + (resumoCalculado.valor_portal_geral || 0) + (resumoCalculado.valor_integracao_geral || 0)))}
                   </div>
-                  <div className="text-sm text-muted-foreground">Líquido</div>
+                  <div className="text-sm text-muted-foreground">Valor Bruto</div>
                 </div>
               </div>
             </CardContent>
