@@ -274,19 +274,21 @@ export default function DemonstrativoFaturamento() {
                 const emailCliente = demo.cliente_email || demo.email_cliente || 
                   `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
                 
-                return {
-                  id: demo.cliente_id || `temp-${nomeCliente}`,
-                  nome: nomeCliente,
-                  email: emailCliente,
-                  total_exames: demo.total_exames || 0,
-                  valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
-                  valor_liquido: Number(demo.valor_total ?? demo.valor_liquido ?? 0),
-                  periodo: periodo,
-                  status_pagamento: 'pendente' as const,
-                  data_vencimento: new Date().toISOString().split('T')[0],
-                  observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
-                  detalhes_exames: demo.detalhes_exames || [] // ✅ INCLUIR DETALHES DOS EXAMES
-                };
+                 return {
+                   id: demo.cliente_id || `temp-${nomeCliente}`,
+                   nome: nomeCliente,
+                   email: emailCliente,
+                   total_exames: demo.total_exames || 0,
+                   valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
+                   valor_liquido: Number(demo.valor_total ?? demo.valor_liquido ?? 0),
+                   periodo: periodo,
+                   status_pagamento: 'pendente' as const,
+                   data_vencimento: new Date().toISOString().split('T')[0],
+                   tipo_faturamento: demo.tipo_faturamento || 'CO-FT', // ✅ ADICIONAR tipo_faturamento
+                   alertas: demo.alertas || [], // ✅ ADICIONAR alertas
+                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
+                   detalhes_exames: demo.detalhes_exames || [] // ✅ INCLUIR DETALHES DOS EXAMES
+                 };
               });
             
             if (clientesConvertidos.length > 0) {
