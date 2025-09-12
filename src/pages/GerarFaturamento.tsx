@@ -95,17 +95,34 @@ export default function GerarFaturamento() {
   const verificarDemonstrativoGerado = useCallback(async () => {
     if (!periodoSelecionado) return;
     
+    // 1) Verificar demonstrativos salvos no localStorage
+    try {
+      const saved = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+      if (saved) {
+        const dados = JSON.parse(saved);
+        const temLocal = Array.isArray(dados?.demonstrativos) && dados.demonstrativos.length > 0;
+        if (temLocal) {
+          setDemonstrativoGerado(true);
+          console.log('🎯 Demonstrativo encontrado no localStorage para', periodoSelecionado);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Falha ao ler demonstrativos do localStorage:', e);
+    }
+    
+    // 2) Fallback: verificar na tabela de faturamento (DB)
     try {
       const { count } = await supabase
         .from('faturamento')
         .select('cliente_nome', { count: 'exact', head: true })
         .eq('periodo_referencia', periodoSelecionado);
       
-      const temDados = count && count > 0;
+      const temDados = !!count && count > 0;
       setDemonstrativoGerado(temDados);
-      console.log('🎯 Demonstrativo gerado:', temDados, 'registros:', count, 'para período:', periodoSelecionado);
+      console.log('🎯 Demonstrativo (DB) gerado:', temDados, 'registros:', count, 'período:', periodoSelecionado);
     } catch (error) {
-      console.error('Erro ao verificar demonstrativo:', error);
+      console.error('Erro ao verificar demonstrativo (DB):', error);
       setDemonstrativoGerado(false);
     }
   }, [periodoSelecionado]);

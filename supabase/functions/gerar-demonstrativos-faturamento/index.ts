@@ -86,18 +86,20 @@ serve(async (req) => {
 
     console.log(`Total de clientes encontrados: ${todosClientes.length}`);
 
-    // ✅ SEPARAR clientes ativos dos inativos/cancelados
+    // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
+    const isStatusInativoOuCancelado = (status?: string) => {
+      const s = (status || '').toString().toLowerCase();
+      return s.startsWith('cancel') || s.startsWith('inativ');
+    };
+
     const clientesAtivos = todosClientes.filter(c => 
       c.ativo && 
-      c.status !== 'Cancelado' && 
-      c.status !== 'Inativo' &&
+      !isStatusInativoOuCancelado(c.status) &&
       c.parametros_faturamento?.[0]?.status === 'A'
     );
     
     const clientesInativos = todosClientes.filter(c => 
-      !c.ativo || 
-      c.status === 'Cancelado' || 
-      c.status === 'Inativo'
+      !c.ativo || isStatusInativoOuCancelado(c.status)
     );
     
     console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
@@ -176,30 +178,8 @@ serve(async (req) => {
 
     console.log(`📋 ${clientesAgrupados.size} clientes únicos após agrupamento por nome fantasia`);
 
-    // ✅ VERIFICAR ALERTAS para clientes inativos/cancelados com volumetria
-    const alertasClientes: string[] = [];
-    
-    for (const clienteInativo of clientesInativos) {
-      const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
-      const nomesMobilemed = [
-        clienteInativo.nome,
-        clienteInativo.nome_mobilemed,
-        nomeFantasia
-      ].filter(Boolean);
-      
-      // Verificar se tem volumetria no período
-      const { data: volumetriaInativo, error } = await supabase
-        .from('volumetria_mobilemed')
-        .select('count', { count: 'exact' })
-        .eq('periodo_referencia', periodo)
-        .in('"EMPRESA"', nomesMobilemed)
-        .not('"VALORES"', 'is', null);
-      
-      if (!error && volumetriaInativo && volumetriaInativo.length > 0) {
-        const status = clienteInativo.parametros_faturamento?.[0]?.status === 'I' ? 'INATIVO' : 'CANCELADO';
-        alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
-      }
-    }
+    // Alertas já populados ao identificar clientes inativos com volumetria acima.
+
 
     const demonstrativos: DemonstrativoCliente[] = [];
     let processados = 0;
