@@ -343,6 +343,17 @@ export default function GerarFaturamento() {
             console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
             setClientesCarregados(clientesDoDemonstrativo);
             localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
+
+            // Inicializar resultados base para todos os clientes dos demonstrativos
+            const resultadosBase = clientesDoDemonstrativo.map((cliente: any) => ({
+              clienteId: cliente.id,
+              clienteNome: cliente.nome,
+              relatorioGerado: false,
+              emailEnviado: false,
+              emailDestino: cliente.email
+            }));
+            setResultados(resultadosBase);
+            salvarResultadosDB(resultadosBase);
             return;
           }
         } catch (error) {
@@ -447,7 +458,7 @@ export default function GerarFaturamento() {
         variant: "destructive",
       });
     }
-  }, [periodoSelecionado, toast]); // Dependências do useCallback
+  }, [periodoSelecionado, toast, salvarResultadosDB]); // Dependências do useCallback
 
   // Carregar clientes automaticamente quando período mudar
   useEffect(() => {
@@ -833,19 +844,35 @@ export default function GerarFaturamento() {
 
           // Atualizar resultado do cliente
           setResultados(prev => {
-            const novosResultados = prev.map(resultado => 
-              resultado.clienteId === cliente.id 
-                ? {
-                    ...resultado,
+            const existe = prev.some(r => r.clienteId === cliente.id);
+            const novosResultados = existe
+              ? prev.map(resultado => 
+                  resultado.clienteId === cliente.id 
+                    ? {
+                        ...resultado,
+                        relatorioGerado: true,
+                        linkRelatorio: relatorioData.arquivos?.[0]?.url,
+                        arquivos: relatorioData.arquivos,
+                        dataProcessamento: new Date().toLocaleString('pt-BR'),
+                        relatorioData: relatorioData,
+                        erro: undefined
+                      }
+                    : resultado
+                )
+              : [
+                  ...prev,
+                  {
+                    clienteId: cliente.id,
+                    clienteNome: cliente.nome,
                     relatorioGerado: true,
+                    emailEnviado: false,
+                    emailDestino: cliente.email,
                     linkRelatorio: relatorioData.arquivos?.[0]?.url,
                     arquivos: relatorioData.arquivos,
                     dataProcessamento: new Date().toLocaleString('pt-BR'),
-                    relatorioData: relatorioData,
-                    erro: undefined
+                    relatorioData: relatorioData
                   }
-                : resultado
-            );
+                ];
             
             // Salvar no banco de dados
             salvarResultadosDB(novosResultados);
