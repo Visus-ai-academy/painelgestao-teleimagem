@@ -18,9 +18,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🔍 Iniciando correção de categoria TC...');
+    console.log('🔍 Iniciando correção de categoria TC baseada no cadastro de exames...');
 
-    // Buscar registros com categoria TC
+    // 1. Primeiro, corrigir o cadastro de exames que tem categoria NULL
+    const { error: errorUpdateCadastro } = await supabaseClient
+      .from('cadastro_exames')
+      .update({ categoria: 'SCORE' })
+      .eq('nome', 'ANGIOTC ARTERIAS CORONARIAS COM SCORE DE CALCIO')
+      .is('categoria', null);
+
+    if (errorUpdateCadastro) {
+      console.error('❌ Erro ao atualizar cadastro de exames:', errorUpdateCadastro);
+    } else {
+      console.log('✅ Cadastro de exames atualizado com categoria SCORE');
+    }
+
+    // 2. Buscar registros com categoria TC na volumetria
     const { data: registrosTC, error: errorSelect } = await supabaseClient
       .from('volumetria_mobilemed')
       .select('id, "CATEGORIA", "ESTUDO_DESCRICAO", "ESPECIALIDADE"')
@@ -36,10 +49,20 @@ serve(async (req) => {
     let corrigidos = 0;
     
     if (registrosTC && registrosTC.length > 0) {
-      // Corrigir categoria de TC para SCORE (baseado na descrição dos exames encontrados)
+      // 3. Buscar a categoria correta no cadastro de exames
+      const { data: categoriaCadastro } = await supabaseClient
+        .from('cadastro_exames')
+        .select('categoria')
+        .eq('nome', 'ANGIOTC ARTERIAS CORONARIAS COM SCORE DE CALCIO')
+        .single();
+
+      const categoriaCorreta = categoriaCadastro?.categoria || 'SCORE';
+      console.log(`🎯 Categoria correta encontrada no cadastro: ${categoriaCorreta}`);
+
+      // 4. Aplicar a categoria correta na volumetria
       const { data, error: errorUpdate } = await supabaseClient
         .from('volumetria_mobilemed')
-        .update({ 'CATEGORIA': 'SCORE' })
+        .update({ 'CATEGORIA': categoriaCorreta })
         .eq('CATEGORIA', 'TC')
         .select('id');
 
@@ -49,19 +72,20 @@ serve(async (req) => {
       }
 
       corrigidos = data?.length || 0;
-      console.log(`✅ Corrigidos ${corrigidos} registros de TC para SCORE`);
+      console.log(`✅ Corrigidos ${corrigidos} registros de TC para ${categoriaCorreta}`);
 
-      // Log da operação
+      // 5. Log da operação
       await supabaseClient
         .from('audit_logs')
         .insert({
           table_name: 'volumetria_mobilemed',
-          operation: 'CORRECAO_CATEGORIA_TC',
+          operation: 'CORRECAO_CATEGORIA_TC_CADASTRO',
           record_id: 'bulk_update',
           new_data: {
             categoria_antiga: 'TC',
-            categoria_nova: 'SCORE',
+            categoria_nova: categoriaCorreta,
             registros_corrigidos: corrigidos,
+            baseado_cadastro: true,
             timestamp: new Date().toISOString()
           },
           user_email: 'system',
@@ -73,13 +97,14 @@ serve(async (req) => {
       sucesso: true,
       registros_encontrados: registrosTC?.length || 0,
       registros_corrigidos: corrigidos,
+      categoria_aplicada: 'SCORE',
       detalhes: registrosTC?.map(r => ({
         estudo: r.ESTUDO_DESCRICAO,
         especialidade: r.ESPECIALIDADE,
         categoria_anterior: 'TC',
         categoria_nova: 'SCORE'
       })) || [],
-      mensagem: `Correção concluída: ${corrigidos} registros atualizados de TC para SCORE`
+      mensagem: `Correção concluída baseada no cadastro: ${corrigidos} registros atualizados de TC para SCORE`
     };
 
     console.log('🎉 Correção de categoria TC concluída:', resultado);
@@ -98,7 +123,7 @@ serve(async (req) => {
       JSON.stringify({ 
         sucesso: false, 
         erro: error.message,
-        detalhes: 'Erro ao corrigir categoria TC para SCORE'
+        detalhes: 'Erro ao corrigir categoria TC baseada no cadastro de exames'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
