@@ -207,12 +207,12 @@ serve(async (req) => {
           status: 'Ativo',
           parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
         }));
-        console.log(`✅ Fallback aplicado: ${clientes.length} clientes adicionados a partir da volumetria.`);
+        console.log(`Fallback aplicado: ${clientes.length} clientes adicionados a partir da volumetria.`);
       }
     }
 
     if (alertasClientes.length > 0) {
-      console.log(`⚠️ Alertas de clientes inativos com volumetria:`, alertasClientes);
+      console.log(`ALERTA - Clientes inativos com volumetria:`, alertasClientes);
     }
 
     // Agrupar clientes para demonstrativo por nome_fantasia para evitar duplicatas 
