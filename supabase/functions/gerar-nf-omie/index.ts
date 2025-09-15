@@ -275,6 +275,7 @@ serve(async (req) => {
           informacoes_adicionais: {
             enviar_email: 'N',
             consumidor_final: 'N',
+            codigo_categoria: String(codigoCategoria),
           },
           lista_parcelas: {
             parcela: [
