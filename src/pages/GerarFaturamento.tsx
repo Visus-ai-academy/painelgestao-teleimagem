@@ -1053,6 +1053,8 @@ export default function GerarFaturamento() {
     } finally {
       setGerandoNFOmie(false);
     }
+  };
+
   // Função para selecionar/deselecionar cliente para NF
   const toggleClienteNF = (clienteNome: string) => {
     setClientesSelecionadosNF(prev => {
