@@ -348,12 +348,42 @@ serve(async (req) => {
     // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
     console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
     
+    // Buscar contrato ativo para aplicar filtros de faturamento (especialidades/modalidades) e condição de volume
+    let contratoAtivo: any = null;
+    if (clienteIdValido) {
+      const { data: contratosCli, error: contratoErr } = await supabase
+        .from('contratos_clientes')
+        .select('especialidades, modalidades, status, cond_volume')
+        .eq('cliente_id', clienteIdValido)
+        .eq('status', 'ativo')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (!contratoErr && contratosCli && contratosCli.length > 0) {
+        contratoAtivo = contratosCli[0];
+      }
+    }
+
+    // Determinar filtros permitidos
+    let allowedEspecialidades: string[] | null = Array.isArray(contratoAtivo?.especialidades) && contratoAtivo.especialidades.length > 0
+      ? contratoAtivo.especialidades.map((e: string) => (e || '').toUpperCase().trim())
+      : null;
+    let allowedModalidades: string[] | null = Array.isArray(contratoAtivo?.modalidades) && contratoAtivo.modalidades.length > 0
+      ? contratoAtivo.modalidades.map((m: string) => (m || '').toUpperCase().trim())
+      : null;
+
+    // Regra específica conhecida: CBU só fatura Medicina Interna
+    const nomeFantasiaUpper = (cliente.nome_fantasia || cliente.nome || '').toUpperCase();
+    if (nomeFantasiaUpper.includes('CBU')) {
+      allowedEspecialidades = ['MEDICINA INTERNA'];
+    }
+
     // Paginação para evitar limite de 1000 registros
     let volumetria: any[] = [];
     const pageSize = 1000;
     let from = 0;
     while (true) {
-      const { data: page, error: volumetriaError } = await supabase
+      // Montar query base com filtros principais
+      let query = supabase
         .from('volumetria_mobilemed')
         .select(`
           "EMPRESA",
@@ -371,9 +401,19 @@ serve(async (req) => {
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
+        .neq('tipo_faturamento', 'NC-NF'); // Excluir exames não faturáveis
+
+      // Aplicar filtros contratuais quando existirem
+      if (allowedEspecialidades && allowedEspecialidades.length > 0) {
+        query = query.in('"ESPECIALIDADE"', allowedEspecialidades);
+      }
+      if (allowedModalidades && allowedModalidades.length > 0) {
+        query = query.in('"MODALIDADE"', allowedModalidades);
+      }
+
+      const { data: page, error: volumetriaError } = await query
         .range(from, from + pageSize - 1);
 
-      if (volumetriaError) {
         console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
         break;
       }
@@ -541,7 +581,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: grupo.quantidade, // ✅ Usar quantidade do grupo para faixa (ex.: 113 -> 101-250)
+                  p_volume_total: volumeEspecifico, // ✅ Usar quantidade do grupo para faixa (ex.: 113 -> 101-250)
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 preco = rpc1.data as number | null;
@@ -571,7 +611,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: 'ROTINA',
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: grupo.quantidade,
+                   p_volume_total: volumeEspecifico, // ✅ Usar volume condicional para faixa
                   p_is_plantao: false
                 });
                 if (!rpc2.error && rpc2.data) {
@@ -587,7 +627,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: 'SC',
-                  p_volume_total: grupo.quantidade,
+                   p_volume_total: volumeEspecifico,
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 if (!rpc3.error && rpc3.data) {
