@@ -89,18 +89,19 @@ serve(async (req) => {
     const { data: clientesData } = await supabase
       .from('clientes')
       .select(`
-        id, nome, cnpj, email, endereco, cidade, estado, cep, telefone, email_envio_nf,
+        id, nome, cnpj, email, endereco, cidade, estado, cep, telefone, email_envio_nf, cod_cliente,
         contratos_clientes!inner(
           id,
           numero_contrato,
           tipo_faturamento,
           status,
-          ativo,
-          codigo_omie
+          simples,
+          percentual_iss,
+          configuracoes_integracao
         )
       `)
       .in('id', clienteIds)
-      .eq('contratos_clientes.ativo', true);
+      .eq('contratos_clientes.status', 'ativo');
 
     const resultados = [];
     let sucessos = 0;
@@ -137,10 +138,12 @@ serve(async (req) => {
 
         // Obter contrato ativo (cliente já cadastrado no OMIE)
         const contratoAtivo = clienteData.contratos_clientes[0];
-        const codigoClienteOmie = contratoAtivo.codigo_omie;
+        const codigoClienteOmie = (contratoAtivo as any)?.codigo_omie
+          || (clienteData as any)?.cod_cliente
+          || (contratoAtivo as any)?.configuracoes_integracao?.codigo_omie;
 
         if (!codigoClienteOmie) {
-          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado no contrato`);
+          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado (cliente.cod_cliente ou contrato.configuracoes_integracao.codigo_omie)`);
         }
 
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE: ${codigoClienteOmie} | Contrato: ${contratoAtivo.numero_contrato}`);
