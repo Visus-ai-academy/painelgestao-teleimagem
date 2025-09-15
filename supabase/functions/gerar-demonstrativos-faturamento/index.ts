@@ -124,17 +124,8 @@ serve(async (req) => {
       return s.startsWith('cancel') || s.startsWith('inativ');
     };
 
-    // ✅ Filtrar clientes que têm parâmetros de faturamento válidos OU são do fallback
-    const clientesComParametros = todosClientesFinal.filter(c => 
-      // Clientes do cadastro devem ter parâmetros válidos
-      (c.parametros_faturamento && 
-       c.parametros_faturamento.length > 0 && 
-       c.parametros_faturamento[0]?.status === 'A') ||
-      // OU clientes do fallback (criados da volumetria)
-      c.id.toString().startsWith('temp-')
-    );
-
-    const clientesAtivos = clientesComParametros.filter(c => 
+    // ✅ Considerar TODOS os clientes ativos, mesmo sem parâmetros cadastrados
+    const clientesAtivos = todosClientesFinal.filter(c => 
       c.ativo && 
       !isStatusInativoOuCancelado(c.status)
     );
@@ -255,7 +246,36 @@ serve(async (req) => {
     // Processar cada cliente agrupado
     for (const cliente of clientesAgrupados.values()) {
       try {
-    console.log('Processando cliente:', cliente.nome_fantasia);
+        console.log('Processando cliente:', cliente.nome_fantasia);
+        
+        // ✅ Resolver cliente_id válido (UUID) antes de cálculos
+        const isUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
+        let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
+        if (!clienteIdValido) {
+          // Tentar resolver por nome exato nas 3 colunas
+          const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
+          let resolved: { id: string } | null = null;
+          // Buscar por nome
+          if (!resolved) {
+            const resp = await supabase.from('clientes').select('id').in('nome', nomesBusca).limit(1);
+            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
+          }
+          // Buscar por nome_fantasia
+          if (!resolved) {
+            const resp = await supabase.from('clientes').select('id').in('nome_fantasia', nomesBusca).limit(1);
+            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
+          }
+          // Buscar por nome_mobilemed
+          if (!resolved) {
+            const resp = await supabase.from('clientes').select('id').in('nome_mobilemed', nomesBusca).limit(1);
+            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
+          }
+          clienteIdValido = resolved?.id || null;
+        }
+        
+        if (!clienteIdValido) {
+          console.warn(`⚠️ Cliente sem ID válido no cadastro: ${cliente.nome_fantasia}. Preços/Parâmetros não serão aplicados.`);
+        }
 
     // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
     console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
