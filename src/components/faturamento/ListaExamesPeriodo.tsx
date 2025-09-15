@@ -59,7 +59,8 @@ export default function ListaExamesPeriodo() {
         )
         .like("periodo_referencia", `%${periodo}%`)
         .order("cliente_nome", { ascending: true })
-        .order("nome_exame", { ascending: true });
+        .order("nome_exame", { ascending: true })
+        .limit(50000);
 
       if (error) throw error;
       setRows(data || []);

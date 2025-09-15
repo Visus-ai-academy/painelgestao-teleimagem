@@ -66,6 +66,8 @@ export default function GerarFaturamento() {
   });
   
   const [processandoTodos, setProcessandoTodos] = useState(false);
+  const [gerandoRelatorios, setGerandoRelatorios] = useState(false);
+  const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
