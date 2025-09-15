@@ -67,9 +67,10 @@ serve(async (req) => {
       .eq('periodo', periodo)
       .eq('relatorio_gerado', true);
 
-    // Se clientes específicos foram informados, filtrar
+    // Se clientes específicos foram informados, filtrar (usando ILIKE para case insensitive)
     if (clientes && clientes.length > 0) {
-      query = query.in('cliente_nome', clientes);
+      const clientesCondition = clientes.map(nome => `cliente_nome.ilike.${nome}`).join(',');
+      query = query.or(clientesCondition);
     }
 
     const { data: demonstrativos, error: demoError } = await query;
@@ -166,13 +167,14 @@ serve(async (req) => {
         const contratoAtivo = clienteData.contratos_clientes[0];
         const parametroCliente = parametrosData?.find(p => p.cliente_id === demo.cliente_id);
         
-        // Buscar código OMIE real do cliente (priorizar códigos já sincronizados)
+        // Buscar código OMIE real do cliente - IGNORAR códigos fictícios do Supabase
         let codigoClienteOmie = clienteData.omie_codigo_cliente || 
                                contratoAtivo.omie_codigo_cliente;
         
-        // Se não tem código real do Omie, buscar no Omie via CNPJ
-        if (!codigoClienteOmie && clienteData.cnpj) {
-          console.log(`🔍 Código real do Omie não encontrado para ${demo.cliente_nome}. Buscando no Omie via CNPJ: ${clienteData.cnpj}`);
+        // Se não tem código real do Omie OU tem código fictício, buscar no Omie via CNPJ
+        const temCodigoFicticio = clienteData.cod_cliente?.startsWith('CLI');
+        if ((!codigoClienteOmie || temCodigoFicticio) && clienteData.cnpj) {
+          console.log(`🔍 Código real do Omie necessário para ${demo.cliente_nome}. Buscando no Omie via CNPJ: ${clienteData.cnpj}`);
           
           try {
             const buscaOmieResponse = await supabase.functions.invoke('buscar-codigo-cliente-omie', {
