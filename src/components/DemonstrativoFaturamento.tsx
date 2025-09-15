@@ -250,6 +250,39 @@ export default function DemonstrativoFaturamento() {
   }, [periodo]);
 
   // Carregar dados de faturamento
+  // Função para buscar tipo de faturamento do cliente
+  const buscarTipoFaturamento = async (clienteNome: string): Promise<string> => {
+    try {
+      // Buscar no contrato do cliente
+      const { data: clienteContrato } = await supabase
+        .from('clientes')
+        .select(`
+          contratos_clientes (
+            tipo_faturamento
+          )
+        `)
+        .or(`nome.eq.${clienteNome},nome_fantasia.eq.${clienteNome},nome_mobilemed.eq.${clienteNome}`)
+        .limit(1)
+        .maybeSingle();
+      
+      if (clienteContrato?.contratos_clientes?.[0]?.tipo_faturamento) {
+        return clienteContrato.contratos_clientes[0].tipo_faturamento;
+      }
+      
+      // Fallback: determinar por lista conhecida
+      const nomeUpper = clienteNome.toUpperCase();
+      const clientesNC = [
+        'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
+        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
+      ];
+      
+      return clientesNC.some(nc => nomeUpper.includes(nc)) ? 'NC-FT' : 'CO-FT';
+    } catch (error) {
+      console.error('Erro ao buscar tipo de faturamento:', error);
+      return 'CO-FT'; // Default fallback
+    }
+  };
+
   const carregarDados = async () => {
     setCarregando(true);
     try {
@@ -743,7 +776,7 @@ export default function DemonstrativoFaturamento() {
       
       console.log('🔄 Processando', dadosFaturamentoFiltrados?.length || 0, 'registros de faturamento filtrados...');
       
-      dadosFaturamentoFiltrados?.forEach((item, index) => {
+      dadosFaturamentoFiltrados?.forEach(async (item, index) => {
         const clienteNome = item.cliente_nome;
         
         if (index < 5) { // Log dos primeiros 5 registros para debug
@@ -760,8 +793,8 @@ export default function DemonstrativoFaturamento() {
           cliente.total_exames += item.quantidade || 1; 
           cliente.valor_bruto += Number(item.valor_bruto || 0);
           cliente.valor_liquido += Number(item.valor || 0);
+          // Usar tipo de faturamento disponível nos dados
           if (!cliente.tipo_faturamento && item.tipo_faturamento) {
-            // Preencher tipo de faturamento quando disponível
             (cliente as any).tipo_faturamento = item.tipo_faturamento;
           }
         } else {
@@ -786,12 +819,25 @@ export default function DemonstrativoFaturamento() {
             periodo: item.periodo_referencia || periodo,
             status_pagamento: status,
             data_vencimento: item.data_vencimento,
-            tipo_faturamento: item.tipo_faturamento || undefined,
+            tipo_faturamento: item.tipo_faturamento || 'CO-FT', // Default para CO-FT
           });
         }
       });
 
       const clientesArray = Array.from(clientesMap.values());
+      
+      // Buscar tipos de faturamento para clientes que não possuem
+      for (const cliente of clientesArray) {
+        if (!cliente.tipo_faturamento) {
+          try {
+            cliente.tipo_faturamento = await buscarTipoFaturamento(cliente.nome);
+          } catch (error) {
+            console.warn(`Erro ao buscar tipo faturamento para ${cliente.nome}:`, error);
+            cliente.tipo_faturamento = 'CO-FT'; // fallback
+          }
+        }
+      }
+      
       console.log('📊 Clientes processados finais:', clientesArray.length);
       console.log('📋 Nomes dos clientes processados:', clientesArray.map(c => c.nome));
       

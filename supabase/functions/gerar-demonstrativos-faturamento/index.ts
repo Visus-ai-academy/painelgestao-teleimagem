@@ -159,34 +159,42 @@ serve(async (req) => {
     
     console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
 
-    // ✅ VERIFICAR quais clientes inativos têm volumetria no período
+    // ✅ OTIMIZAÇÃO: Buscar clientes inativos com volumetria de forma mais eficiente
     const clientesInativosComVolumetria = [];
     const alertasClientes: string[] = [];
     
     if (clientesInativos.length > 0) {
-      for (const clienteInativo of clientesInativos) {
-        const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
-        const nomesMobilemed = [
-          clienteInativo.nome,
-          clienteInativo.nome_mobilemed,
-          nomeFantasia
-        ].filter(Boolean);
-        
-        // Verificar se tem volumetria no período E se NÃO é NC-NF
-        const { data: volumetriaInativo, error } = await supabase
+      // Buscar volumetria em batch para todos os nomes de clientes inativos
+      const nomesInativosParaBuscar = clientesInativos
+        .filter(c => !isNCNF(c))
+        .map(c => [c.nome, c.nome_mobilemed, c.nome_fantasia])
+        .flat()
+        .filter(Boolean);
+      
+      if (nomesInativosParaBuscar.length > 0) {
+        const { data: volumetriaInativos } = await supabase
           .from('volumetria_mobilemed')
-          .select('count', { count: 'exact' })
+          .select('"EMPRESA"')
           .eq('periodo_referencia', periodo)
-          .in('"EMPRESA"', nomesMobilemed)
-          .not('"VALORES"', 'is', null)
-          .limit(1);
+          .in('"EMPRESA"', nomesInativosParaBuscar)
+          .not('"VALORES"', 'is', null);
         
-        if (!error && volumetriaInativo && volumetriaInativo.length > 0 && !isNCNF(clienteInativo)) {
-          // Cliente inativo COM volumetria E não é NC-NF - adicionar na lista e gerar alerta
-          clientesInativosComVolumetria.push(clienteInativo);
-          const status = !clienteInativo.ativo ? 'INATIVO' : 
-                       clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
-          alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
+        if (volumetriaInativos && volumetriaInativos.length > 0) {
+          const empresasComVolumetria = new Set(volumetriaInativos.map(v => v.EMPRESA));
+          
+          for (const clienteInativo of clientesInativos) {
+            if (isNCNF(clienteInativo)) continue;
+            
+            const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
+            const nomes = [clienteInativo.nome, clienteInativo.nome_mobilemed, nomeFantasia].filter(Boolean);
+            
+            if (nomes.some(nome => empresasComVolumetria.has(nome))) {
+              clientesInativosComVolumetria.push(clienteInativo);
+              const status = !clienteInativo.ativo ? 'INATIVO' : 
+                           clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
+              alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
+            }
+          }
         }
       }
     }
