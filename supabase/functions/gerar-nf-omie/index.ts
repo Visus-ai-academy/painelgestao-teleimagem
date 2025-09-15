@@ -286,14 +286,27 @@ serve(async (req) => {
         const hoje = new Date();
         const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-        // Garantir que temos o código do contrato do Omie; se ausente, tentar sincronizar agora
-        if (!contratoAtivo.omie_codigo_contrato) {
-          console.warn(`Contrato OMIE ausente para ${demo.cliente_nome}. Sincronizando...`);
+        // Garantir que temos o código do contrato do Omie; se ausente ou inválido (igual ao código do cliente), sincronizar agora
+        const codContratoDigits = String(contratoAtivo.omie_codigo_contrato || '').replace(/\D/g, '');
+        const codClienteDigits = String(codigoClienteOmie || '').replace(/\D/g, '');
+        const contratoInvalido = !codContratoDigits || (codContratoDigits && codClienteDigits && codContratoDigits === codClienteDigits);
+        if (contratoInvalido) {
+          console.warn(`Contrato OMIE ausente/inválido para ${demo.cliente_nome}. Sincronizando pelo número do OMIE (se disponível)...`);
           const sync = await supabase.functions.invoke('buscar-contrato-omie', {
-            body: { cliente_id: demo.cliente_id, cliente_nome: demo.cliente_nome, numero_contrato: contratoAtivo.numero_contrato }
+            body: {
+              cliente_id: demo.cliente_id,
+              cliente_nome: demo.cliente_nome,
+              numero_contrato: parametroCliente?.numero_contrato // Ex.: 2023/00170
+            }
           });
           if (sync.data?.sucesso && sync.data?.codigo_contrato) {
-            contratoAtivo.omie_codigo_contrato = String(sync.data.codigo_contrato);
+            const novoCod = String(sync.data.codigo_contrato);
+            // Persistir no contrato ativo, mesmo que já houvesse um código incorreto
+            await supabase
+              .from('contratos_clientes')
+              .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: new Date().toISOString() })
+              .eq('id', contratoAtivo.id);
+            contratoAtivo.omie_codigo_contrato = novoCod;
           }
         }
         if (!contratoAtivo.omie_codigo_contrato) {
