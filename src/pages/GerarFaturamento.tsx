@@ -1714,9 +1714,6 @@ export default function GerarFaturamento() {
                     size="lg"
                     className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
                   >
-                    size="lg"
-                    className="min-w-[280px] bg-orange-600 hover:bg-orange-700"
-                  >
                     {enviandoEmails ? (
                       <>
                         <RefreshCw className="h-5 w-5 mr-2 animate-spin" />

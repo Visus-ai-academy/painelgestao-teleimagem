@@ -410,8 +410,8 @@ serve(async (req) => {
         
         console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames total`);
 
-        // ✅ BUSCAR CONDIÇÃO DE VOLUME DO CONTRATO
-        const condVolume = cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT';
+        // ✅ USAR CONDIÇÃO DE VOLUME CORRIGIDA DO CLIENTE
+        const condVolume = cliente.cond_volume || 'MOD/ESP/CAT';
         console.log(`📋 Condição de Volume para ${cliente.nome_fantasia}: ${condVolume}`);
 
         // Função para calcular volume baseado na condição
