@@ -335,16 +335,40 @@ export default function GerarFaturamento() {
   // Função para carregar resultados do banco de dados
   const carregarResultadosDB = useCallback(async () => {
     try {
+        // Primeira consulta: buscar relatorios com JOIN para filtrar clientes ativos
         const { data, error } = await supabase
         .from('relatorios_faturamento_status')
-        .select('*')
+        .select(`
+          *,
+          clientes!inner(id, nome)
+        `)
         .eq('periodo', periodoSelecionado)
         .order('cliente_nome');
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const resultadosCarregados = data.map(item => ({
+        // Segunda consulta: buscar parâmetros para filtrar clientes inativos/cancelados
+        const clienteIds = data.map(item => item.cliente_id).filter(Boolean);
+        const { data: parametrosData } = await supabase
+          .from('parametros_faturamento')
+          .select('cliente_id, status')
+          .in('cliente_id', clienteIds);
+
+        // Filtrar clientes que NÃO têm status Inativo (I) ou Cancelado (C) nos parâmetros
+        const dataFiltrada = data.filter(item => {
+          const parametros = parametrosData?.filter(p => p.cliente_id === item.cliente_id);
+          if (!parametros || parametros.length === 0) return true; // Se não tem parâmetros, incluir
+          
+          // Se tem parâmetros, excluir apenas se TODOS são Inativos ou Cancelados
+          const todosInativos = parametros.every((p: any) => 
+            p.status === 'I' || p.status === 'C'
+          );
+          
+          return !todosInativos;
+        });
+
+        const resultadosCarregados = dataFiltrada.map(item => ({
           clienteId: item.cliente_id,
           clienteNome: item.cliente_nome,
           relatorioGerado: item.relatorio_gerado,
