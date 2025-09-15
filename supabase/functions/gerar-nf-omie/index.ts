@@ -115,22 +115,32 @@ serve(async (req) => {
         console.log(`Processando NF para cliente: ${demo.cliente_nome}`);
 
         const clienteData = clientesData?.find(c => c.id === demo.cliente_id);
-        const detalhes = typeof demo.detalhes_relatorio === 'string' 
-          ? JSON.parse(demo.detalhes_relatorio) 
+        const detalhes = typeof demo.detalhes_relatorio === 'string'
+          ? JSON.parse(demo.detalhes_relatorio)
           : demo.detalhes_relatorio;
 
-        if (!detalhes || (!detalhes.valor_total && !detalhes.resumo?.valor_a_pagar)) {
-          throw new Error('Dados de faturamento incompletos');
+        // Aceitar relatórios que tenham ao menos valor_bruto OU valor_total em qualquer estrutura
+        const toNumber = (v: any) => {
+          const n = typeof v === 'number' ? v : Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const brutoDetalhe = toNumber(detalhes?.valor_bruto) || toNumber(detalhes?.resumo?.valor_bruto_total);
+        const totalDetalhe = toNumber(detalhes?.valor_total) || toNumber(detalhes?.resumo?.valor_a_pagar) || toNumber(detalhes?.resumo?.valor_total);
+
+        // Preferência: usar valor_bruto para emissão da NF
+        const clienteNomeUpper = String(demo.cliente_nome || '').toUpperCase();
+        const usarBrutoSempre = ['COT', 'CORTREL'].includes(clienteNomeUpper);
+        const valorParaNF = usarBrutoSempre ? brutoDetalhe : (brutoDetalhe || totalDetalhe);
+
+        if (!detalhes || valorParaNF <= 0) {
+          throw new Error('Dados de faturamento incompletos ou sem valor válido (valor_bruto/valor_total)');
         }
 
         // ✅ EXTRAIR VALORES da estrutura do relatório
-        valorTotal = detalhes.valor_total || detalhes.resumo?.valor_a_pagar || 0;
-        totalLaudos = detalhes.total_laudos || detalhes.resumo?.total_laudos || 0;
-        valorBruto = detalhes.valor_bruto || detalhes.resumo?.valor_bruto_total || valorTotal;
-
-        if (valorTotal <= 0) {
-          throw new Error(`Valor total inválido: R$ ${valorTotal}`);
-        }
+        valorTotal = valorParaNF; // usar este como base para NF
+        totalLaudos = toNumber(detalhes?.total_laudos) || toNumber(detalhes?.resumo?.total_laudos);
+        valorBruto = brutoDetalhe || valorParaNF;
 
         if (!clienteData || !clienteData.contratos_clientes || clienteData.contratos_clientes.length === 0) {
           throw new Error(`Cliente não possui contrato ativo: ${demo.cliente_nome}`);
