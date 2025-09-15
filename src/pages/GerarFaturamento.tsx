@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -65,6 +66,9 @@ export default function GerarFaturamento() {
       setActiveTab("gerar"); // fallback to default
     }
   };
+
+  // Estado para controlar clientes selecionados para NF
+  const [clientesSelecionadosNF, setClientesSelecionadosNF] = useState<Set<string>>(new Set());
   // Estados persistentes que não devem zerar ao trocar de aba
   const [relatoriosGerados, setRelatoriosGerados] = useState(() => {
     const saved = localStorage.getItem('relatoriosGerados');
@@ -917,10 +921,35 @@ export default function GerarFaturamento() {
   const gerarNFOmie = async () => {
     if (gerandoNFOmie) return;
     
+    // Verificar se há clientes selecionados
+    if (clientesSelecionadosNF.size === 0) {
+      toast({
+        title: "Nenhum cliente selecionado",
+        description: "Selecione pelo menos um cliente para gerar a NF",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // ✅ CLIENTES PERMITIDOS PARA TESTE DE EMISSÃO DE NF
     const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
     
-    const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.omieNFGerada);
+    // Filtrar apenas clientes selecionados que têm relatório gerado e não têm NF
+    const clientesSelecionadosArray = Array.from(clientesSelecionadosNF);
+    const clientesComRelatorio = resultados.filter(r => 
+      clientesSelecionadosArray.includes(r.clienteNome) && 
+      r.relatorioGerado && 
+      !r.omieNFGerada
+    );
+    
+    if (clientesComRelatorio.length === 0) {
+      toast({
+        title: "Nenhum cliente válido selecionado",
+        description: "Os clientes selecionados não possuem relatório gerado ou já têm NF emitida",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // ✅ FILTRAR APENAS OS CLIENTES PERMITIDOS PARA TESTE
     const clientesParaNF = clientesComRelatorio.filter(cliente => {
@@ -930,20 +959,11 @@ export default function GerarFaturamento() {
       );
     });
     
-    if (clientesComRelatorio.length === 0) {
-      toast({
-        title: "Nenhuma NF para gerar",
-        description: "Não há relatórios gerados sem NF no Omie ou todas já foram processadas",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (clientesParaNF.length === 0) {
       const clientesExcluidos = clientesComRelatorio.length;
       toast({
-        title: "Modo de Teste - NF Omie",
-        description: `A emissão de NF está limitada para teste apenas aos clientes: ${clientesPermitidosParaTeste.join(', ')}. ${clientesExcluidos} cliente(s) foram ignorados.`,
+        title: "Clientes não autorizados para teste",
+        description: `A emissão de NF está limitada para teste apenas aos clientes: ${clientesPermitidosParaTeste.join(', ')}. ${clientesExcluidos} cliente(s) selecionado(s) foram ignorados.`,
         variant: "destructive",
       });
       return;
@@ -952,11 +972,13 @@ export default function GerarFaturamento() {
     if (clientesParaNF.length < clientesComRelatorio.length) {
       const totalExcluidos = clientesComRelatorio.length - clientesParaNF.length;
       toast({
-        title: "Modo de Teste - Processamento Limitado",
+        title: "Processamento Parcial - Modo de Teste",
         description: `Processando ${clientesParaNF.length} cliente(s) de teste. ${totalExcluidos} cliente(s) foram ignorados (limitação de teste).`,
         variant: "default",
       });
     }
+
+    console.log(`🚀 Gerando NFs para ${clientesParaNF.length} clientes selecionados:`, clientesParaNF.map(c => c.clienteNome));
 
     setGerandoNFOmie(true);
 
@@ -966,7 +988,7 @@ export default function GerarFaturamento() {
       const response = await supabase.functions.invoke('gerar-nf-omie', {
         body: {
           periodo: periodoSelecionado,
-          clientes: clientesParaNF.map(c => c.clienteNome) // ✅ Usar apenas clientes permitidos
+          clientes: clientesParaNF.map(c => c.clienteNome) // ✅ Usar apenas clientes selecionados e permitidos
         }
       });
 
@@ -1001,119 +1023,20 @@ export default function GerarFaturamento() {
         return novosResultados;
       });
 
+      // Limpar seleção dos clientes processados com sucesso
+      const clientesProcessados = data.resultados.filter((nf: any) => nf.sucesso).map((nf: any) => nf.cliente);
+      setClientesSelecionadosNF(prev => {
+        const novaSelecao = new Set(prev);
+        clientesProcessados.forEach((cliente: string) => novaSelecao.delete(cliente));
+        return novaSelecao;
+      });
+
       setNfsGeradas(prev => prev + data.sucessos);
       localStorage.setItem('nfsGeradas', (nfsGeradas + data.sucessos).toString());
 
       toast({
         title: "NFs geradas no Omie!",
         description: `${data.sucessos} NFs geradas com sucesso${data.erros > 0 ? `, ${data.erros} com erro` : ''}`,
-        variant: data.sucessos > 0 ? "default" : "destructive",
-      });
-
-      console.log('Resultado geração NF Omie:', data);
-
-    } catch (error) {
-      console.error('Erro ao gerar NF no Omie:', error);
-      
-      toast({
-        title: "Erro na geração de NF",
-        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração das NFs no Omie",
-        variant: "destructive",
-      });
-    } finally {
-      setGerandoNFOmie(false);
-    }
-  };
-
-  // Função para gerar NF no Omie para cliente específico (INDIVIDUAL)
-  const gerarNFOmieCliente = async (clienteNome: string) => {
-    if (gerandoNFOmie) return;
-    
-    console.log('🔄 Iniciando geração de NF individual para cliente:', clienteNome);
-    
-    const clienteResultado = resultados.find(r => r.clienteNome === clienteNome);
-    
-    if (!clienteResultado?.relatorioGerado || clienteResultado.omieNFGerada) {
-      toast({
-        title: "Não é possível gerar NF",
-        description: "Cliente não possui relatório gerado ou NF já foi emitida",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // ✅ VERIFICAR SE CLIENTE ESTÁ NA LISTA DE TESTE
-    const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
-    const nomeClienteUpper = clienteNome.toUpperCase().trim();
-    const clientePermitido = clientesPermitidosParaTeste.some(permitido => 
-      nomeClienteUpper.includes(permitido.toUpperCase())
-    );
-
-    if (!clientePermitido) {
-      toast({
-        title: "Cliente não autorizado para teste",
-        description: `Apenas os seguintes clientes estão autorizados para teste: ${clientesPermitidosParaTeste.join(', ')}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setGerandoNFOmie(true);
-
-    try {
-      console.log('🚀 Gerando NF no Omie para cliente:', clienteNome, 'período:', periodoSelecionado);
-
-      const response = await supabase.functions.invoke('gerar-nf-omie', {
-        body: {
-          periodo: periodoSelecionado,
-          clientes: [clienteNome]
-        }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Erro na chamada da função');
-      }
-
-      const { data } = response;
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Erro no processamento da NF');
-      }
-
-      // Atualizar resultado específico do cliente
-      setResultados(prev => {
-        const novosResultados = prev.map(resultado => {
-          if (resultado.clienteNome === clienteNome) {
-            const nfInfo = data.resultados.find((nf: any) => nf.cliente === clienteNome);
-            if (nfInfo?.sucesso) {
-              return {
-                ...resultado,
-                omieNFGerada: true,
-                omieCodigoPedido: nfInfo.codigo_pedido_omie,
-                omieNumeroPedido: nfInfo.numero_pedido_omie,
-                dataGeracaoNFOmie: new Date().toLocaleString('pt-BR')
-              };
-            }
-          }
-          return resultado;
-        });
-        
-        // Salvar no banco de dados
-        salvarResultadosDB(novosResultados);
-        return novosResultados;
-      });
-
-      // Atualizar contador
-      if (data.sucessos > 0) {
-        setNfsGeradas(prev => prev + 1);
-        localStorage.setItem('nfsGeradas', String(nfsGeradas + 1));
-      }
-
-      toast({
-        title: data.sucessos > 0 ? "✅ NF gerada com sucesso!" : "❌ Erro na geração da NF",
-        description: data.sucessos > 0 
-          ? `NF emitida para ${clienteNome} no Omie` 
-          : `Erro ao gerar NF para ${clienteNome}: ${data.detalhes}`,
         variant: data.sucessos > 0 ? "default" : "destructive",
       });
 
@@ -1124,12 +1047,37 @@ export default function GerarFaturamento() {
       
       toast({
         title: "Erro na geração de NF",
-        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração da NF no Omie",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração das NFs no Omie",
         variant: "destructive",
       });
     } finally {
       setGerandoNFOmie(false);
     }
+  // Função para selecionar/deselecionar cliente para NF
+  const toggleClienteNF = (clienteNome: string) => {
+    setClientesSelecionadosNF(prev => {
+      const novaSelecao = new Set(prev);
+      if (novaSelecao.has(clienteNome)) {
+        novaSelecao.delete(clienteNome);
+      } else {
+        novaSelecao.add(clienteNome);
+      }
+      return novaSelecao;
+    });
+  };
+
+  // Função para selecionar todos os clientes elegíveis para NF
+  const selecionarTodosClientesNF = () => {
+    const clientesElegiveis = resultados
+      .filter(r => r.relatorioGerado && !r.omieNFGerada)
+      .map(r => r.clienteNome);
+    
+    setClientesSelecionadosNF(new Set(clientesElegiveis));
+  };
+
+  // Função para limpar seleção de NF
+  const limparSelecaoNF = () => {
+    setClientesSelecionadosNF(new Set());
   };
 
   // Estado para controlar o período anterior (para detectar mudanças reais)
@@ -1880,20 +1828,28 @@ export default function GerarFaturamento() {
                 </div>
               </div>
 
-              {/* Etapa 4: Gerar NF no Omie - EMISSÃO INDIVIDUAL */}
+              {/* Etapa 4: Gerar NF no Omie - SELEÇÃO MÚLTIPLA */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
                   <FileBarChart2 className="h-4 w-4" />
-                  Etapa 4: Gerar NF no Omie (Emissão Individual)
+                  Etapa 4: Gerar NF no Omie
                 </h4>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                   <div className="text-center p-3 bg-white rounded-lg border border-purple-200">
                     <div className="text-xl font-bold text-purple-600">
+                      {clientesSelecionadosNF.size}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Selecionados
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="text-xl font-bold text-blue-600">
                       {resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Prontos para NF
+                      Disponíveis
                     </div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border border-green-200">
@@ -1909,21 +1865,61 @@ export default function GerarFaturamento() {
                       {resultados.filter(r => !r.relatorioGerado).length}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Aguardando Relatório
+                      Aguardando
                     </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                  <Button 
+                    onClick={gerarNFOmie}
+                    disabled={gerandoNFOmie || clientesSelecionadosNF.size === 0}
+                    size="lg"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                  >
+                    {gerandoNFOmie ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                        Gerando NFs...
+                      </>
+                    ) : (
+                      <>
+                        <FileBarChart2 className="h-5 w-5 mr-2" />
+                        🧾 Gerar NFs Selecionadas ({clientesSelecionadosNF.size})
+                      </>
+                    )}
+                  </Button>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={selecionarTodosClientesNF}
+                      variant="outline"
+                      size="sm"
+                      disabled={resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length === 0}
+                    >
+                      Selecionar Todos
+                    </Button>
+                    <Button
+                      onClick={limparSelecaoNF}
+                      variant="outline"
+                      size="sm"
+                      disabled={clientesSelecionadosNF.size === 0}
+                    >
+                      Limpar Seleção
+                    </Button>
                   </div>
                 </div>
                 
                 <div className="bg-white p-4 rounded-lg border border-purple-200">
                   <div className="flex items-center gap-2 text-purple-800 mb-2">
                     <Zap className="h-4 w-4" />
-                    <span className="font-semibold text-sm">📋 Como emitir NF individual:</span>
+                    <span className="font-semibold text-sm">📋 Como usar:</span>
                   </div>
                   <div className="space-y-1 text-sm text-gray-700">
-                    <p>• Use os botões <strong>"Gerar NF"</strong> na coluna <strong>"Status NF Omie"</strong> da tabela abaixo</p>
-                    <p>• Cada NF é emitida individualmente para maior segurança</p>
-                    <p>• Apenas clientes com relatório gerado podem emitir NF</p>
-                    <p>• 🧪 <strong>MODO TESTE:</strong> Limitado aos clientes: COT, CORTREL, IMDBATATAIS, BROOKLIN</p>
+                    <p>1. <strong>Selecione</strong> os clientes usando os checkboxes na coluna "Status NF Omie"</p>
+                    <p>2. <strong>Clique</strong> no botão "Gerar NFs Selecionadas" acima</p>
+                    <p>3. Apenas clientes com relatório gerado podem ser selecionados</p>
+                    <p>4. 🧪 <strong>MODO TESTE:</strong> Limitado aos clientes: COT, CORTREL, IMDBATATAIS, BROOKLIN</p>
                   </div>
                 </div>
               </div>
@@ -1985,7 +1981,21 @@ export default function GerarFaturamento() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-3">Cliente</th>
+                        <th className="text-left p-3">
+                          <div className="flex items-center gap-2">
+                            Cliente
+                            {resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length > 0 && (
+                              <Button
+                                onClick={clientesSelecionadosNF.size === resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length ? limparSelecaoNF : selecionarTodosClientesNF}
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs p-1 h-6"
+                              >
+                                {clientesSelecionadosNF.size === resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length ? 'Desmarcar' : 'Marcar Todos'}
+                              </Button>
+                            )}
+                          </div>
+                        </th>
                         <th className="text-center p-3">Status Demonstrativo</th>
                         <th className="text-center p-3">Status Relatório</th>
                         <th className="text-center p-3">Status E-mail</th>
@@ -2044,27 +2054,22 @@ export default function GerarFaturamento() {
                               </div>
                             ) : resultado.relatorioGerado ? (
                               <div className="flex flex-col items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => gerarNFOmieCliente(resultado.clienteNome)}
-                                  disabled={gerandoNFOmie}
-                                  className="text-xs px-2 py-1"
-                                >
-                                  {gerandoNFOmie ? (
-                                    <>
-                                      <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                                      Gerando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <FileBarChart2 className="h-3 w-3 mr-1" />
-                                      Gerar NF
-                                    </>
-                                  )}
-                                </Button>
-                                <Badge variant="outline" className="text-xs">
-                                  Pronto para NF
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={clientesSelecionadosNF.has(resultado.clienteNome)}
+                                    onChange={() => toggleClienteNF(resultado.clienteNome)}
+                                    className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                                  />
+                                  <Badge variant="outline" className="text-xs">
+                                    Selecionar para NF
+                                  </Badge>
+                                </div>
+                                {clientesSelecionadosNF.has(resultado.clienteNome) && (
+                                  <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs">
+                                    ✓ Selecionado
+                                  </Badge>
+                                )}
                               </div>
                             ) : (
                               <div className="flex flex-col items-center gap-1">
