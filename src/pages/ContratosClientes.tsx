@@ -347,10 +347,10 @@ export default function ContratosClientes() {
         };
       });
 
-      // Remover duplicatas com chave robusta (id ou combinação cliente+numero+vigência)
+      // Remover duplicatas por chave de negócio (cliente + contrato + vigência)
       const uniqueMap = new Map<string, ContratoCliente>();
       for (const c of contratosFormatados) {
-        const key = c.id || `${c.clienteId}:${c.numeroContrato || ''}:${c.dataInicio}:${c.dataFim}`;
+        const key = `${c.clienteId}|${c.numeroContrato || ''}|${c.dataInicio}|${c.dataFim}|${c.tipoFaturamento || ''}`;
         if (!uniqueMap.has(key)) uniqueMap.set(key, c);
       }
       const uniqueContratos = Array.from(uniqueMap.values());
