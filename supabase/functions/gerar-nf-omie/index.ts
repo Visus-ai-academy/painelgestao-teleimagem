@@ -255,89 +255,45 @@ serve(async (req) => {
         const hoje = new Date();
         const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-        // Obter códigos de produto/serviço do contrato quando disponíveis
-        const cfg = (contratoAtivo as any)?.configuracoes_integracao || {};
-        const codigoProduto = cfg.codigo_produto || 'TELEIMAGEM';
-        const codigoItemIntegracao = cfg.codigo_item_integracao || 'TELE-SERV';
-        const codigoCategoria = cfg.codigo_categoria || '999'; // Categoria financeira exigida pelo Omie
+        // Usar API de Faturamento de Contratos de Serviço do Omie
+        const codigoContratoOmie = contratoAtivo.omie_codigo_contrato || codigoClienteNumerico;
+        
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
-        // Montar Pedido de Venda (API produtos/pedido -> IncluirPedido)
-        const nfData = {
-          cabecalho: {
-            codigo_cliente: codigoClienteNumerico,
-            codigo_pedido_integracao: `FAT-${periodo}-${demo.cliente_nome.replace(/[^A-Z0-9]/g, '')}`,
-            data_previsao: formatDateBR(hoje),
-            etapa: '50', // Faturar
-            codigo_parcela: '999', // Parcela customizada
-            qtde_parcelas: 1,
-            codigo_categoria: String(codigoCategoria), // Obrigatório no Omie
-          },
-          informacoes_adicionais: {
-            enviar_email: 'N',
-            consumidor_final: 'N',
-            codigo_categoria: String(codigoCategoria),
-          },
-          lista_parcelas: {
-            parcela: [
-              {
-                data_vencimento: formatDateBR(venc),
-                numero_parcela: 1,
-                percentual: 100,
-                valor: valorTotal,
-                nao_gerar_boleto: 'S',
-              },
-            ],
-          },
-          det: [
-            {
-              ide: {
-                codigo_item_integracao: String(codigoItemIntegracao),
-                simples_nacional: contratoAtivo.simples ? 'S' : 'N',
-              },
-              produto: {
-                codigo_produto: String(codigoProduto),
-                descricao: `Serviços de Telemedicina - ${periodo} (${contratoAtivo.tipo_faturamento})`,
-                unidade: 'SV',
-                quantidade: 1,
-                valor_unitario: valorTotal,
-              },
-            },
-          ],
-        };
-
-        console.log(`Usando codigo_categoria='${String(codigoCategoria)}' para ${demo.cliente_nome}`);
-        // Criar NF no Omie
-        const criarNFReq: OmieApiRequest = {
-          call: "IncluirPedido",
+        // Faturar Contrato de Serviço (API servicos/contrato -> FaturarCtr)
+        const faturarContratoReq: OmieApiRequest = {
+          call: "FaturarCtr",
           app_key: omieAppKey,
           app_secret: omieAppSecret,
-          param: [nfData]
+          param: [{
+            nCodCtr: Number(codigoContratoOmie)
+          }]
         };
 
         // Log seguro (sem expor credenciais)
         console.log(
-          `Criando NF no Omie (IncluirPedido) para ${demo.cliente_nome}:`,
-          JSON.stringify({ call: criarNFReq.call, param: criarNFReq.param }, null, 2)
+          `Faturando Contrato no Omie (FaturarCtr) para ${demo.cliente_nome}:`,
+          JSON.stringify({ call: faturarContratoReq.call, param: faturarContratoReq.param }, null, 2)
         );
 
-        const nfResponse = await fetch("https://app.omie.com.br/api/v1/produtos/pedido/", {
+        const nfResponse = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(criarNFReq)
+          body: JSON.stringify(faturarContratoReq)
         });
 
         const nfResult = await nfResponse.json();
 
-        if (nfResult.codigo_pedido) {
-          console.log(`NF criada com sucesso no Omie: ${nfResult.codigo_pedido}`);
+        if (nfResult.nCodOS) {
+          console.log(`Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
           
-          // Salvar referência da NF no banco
+          // Salvar referência da OS no banco
           await supabase
             .from('relatorios_faturamento_status')
             .update({
               omie_nf_gerada: true,
-              omie_codigo_pedido: nfResult.codigo_pedido,
-              omie_numero_pedido: nfResult.numero_pedido || null,
+              omie_codigo_pedido: nfResult.nCodOS,
+              omie_numero_pedido: nfResult.nCodCtr || null,
               data_geracao_nf_omie: new Date().toISOString(),
               omie_detalhes: nfResult
             })
@@ -347,13 +303,14 @@ serve(async (req) => {
           resultados.push({
             cliente: demo.cliente_nome,
             sucesso: true,
-            codigo_pedido_omie: nfResult.codigo_pedido,
-            numero_pedido_omie: nfResult.numero_pedido,
+            codigo_ordem_servico: nfResult.nCodOS,
+            codigo_contrato: nfResult.nCodCtr,
+            status: nfResult.cDescStatus,
             valor_total: valorTotal
           });
           sucessos++;
         } else {
-          throw new Error(`Erro na resposta do Omie: ${JSON.stringify(nfResult)}`);
+          throw new Error(`Erro no faturamento do contrato Omie: ${JSON.stringify(nfResult)}`);
         }
 
       } catch (error) {
