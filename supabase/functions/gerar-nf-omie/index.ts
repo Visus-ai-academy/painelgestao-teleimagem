@@ -54,7 +54,7 @@ serve(async (req) => {
 
     console.log(`Iniciando geração de NF no Omie para período: ${periodo}`);
 
-    // Buscar demonstrativos de faturamento gerados
+    // Buscar demonstrativos de faturamento do período (não exigir flag relatorio_gerado)
     let query = supabase
       .from('relatorios_faturamento_status')
       .select(`
@@ -64,8 +64,7 @@ serve(async (req) => {
         relatorio_gerado,
         detalhes_relatorio
       `)
-      .eq('periodo', periodo)
-      .eq('relatorio_gerado', true);
+      .eq('periodo', periodo);
 
     // Se clientes específicos foram informados, filtrar (usando ILIKE para case insensitive)
     if (clientes && clientes.length > 0) {
@@ -148,15 +147,47 @@ serve(async (req) => {
         // Preferência: usar valor_bruto para emissão da NF
         const clienteNomeUpper = String(demo.cliente_nome || '').toUpperCase();
         const usarBrutoSempre = ['COT', 'CORTREL'].includes(clienteNomeUpper);
-        const valorParaNF = usarBrutoSempre ? brutoDetalhe : (brutoDetalhe || totalDetalhe);
+        let valorParaNF = usarBrutoSempre ? brutoDetalhe : (brutoDetalhe || totalDetalhe);
 
-        if (!detalhes || valorParaNF <= 0) {
-          throw new Error('Dados de faturamento incompletos ou sem valor válido (valor_bruto/valor_total)');
+        // 🔄 Fallback: se não houver valor no relatório, calcular via RPC
+        if (valorParaNF <= 0) {
+          const volume = toNumber(detalhes?.totalRegistros) || toNumber(detalhes?.total_laudos) || 0;
+          const { data: calc, error: calcError } = await supabase.rpc('calcular_faturamento_completo', {
+            p_cliente_id: demo.cliente_id,
+            p_periodo: periodo,
+            p_volume_total: volume
+          });
+          if (calcError) {
+            console.error('Erro RPC calcular_faturamento_completo:', calcError);
+          }
+          const calcRow = Array.isArray(calc) ? calc[0] : null;
+          const valorCalc = toNumber(calcRow?.valor_total) || toNumber(calcRow?.valor_exames);
+          if (valorCalc > 0) {
+            valorParaNF = valorCalc;
+            // Enriquecer detalhes com resumo mínimo (não bloqueante)
+            try {
+              const resumoCalc = {
+                origem: 'rpc_calcular_faturamento_completo',
+                valor_exames: toNumber(calcRow?.valor_exames),
+                valor_franquia: toNumber(calcRow?.valor_franquia),
+                valor_portal_laudos: toNumber(calcRow?.valor_portal_laudos),
+                valor_integracao: toNumber(calcRow?.valor_integracao),
+                valor_total: valorCalc
+              };
+              if (detalhes && typeof detalhes === 'object') {
+                detalhes.resumo = detalhes.resumo || resumoCalc;
+              }
+            } catch (_) { /* noop */ }
+          }
+        }
+
+        if (valorParaNF <= 0) {
+          console.warn('⚠️ Dados de faturamento sem valor. Prosseguindo: Omie calculará a OS com base no contrato.');
         }
 
         // ✅ EXTRAIR VALORES da estrutura do relatório
-        valorTotal = valorParaNF; // usar este como base para NF
-        totalLaudos = toNumber(detalhes?.total_laudos) || toNumber(detalhes?.resumo?.total_laudos);
+        valorTotal = valorParaNF; // usar este como base para NF (pode ser 0 se contrato definir)
+        totalLaudos = toNumber(detalhes?.total_laudos) || toNumber(detalhes?.resumo?.total_laudos) || 0;
         valorBruto = brutoDetalhe || valorParaNF;
 
         if (!clienteData || !clienteData.contratos_clientes || clienteData.contratos_clientes.length === 0) {
