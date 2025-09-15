@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
+import * as XLSX from "xlsx";
 interface ClienteFaturamento {
   id: string;
   nome: string;
@@ -931,33 +931,40 @@ export default function DemonstrativoFaturamento() {
     vencido: clientesFiltrados.filter(c => c.status_pagamento === 'vencido').length,
   };
 
-  const exportarCSV = () => {
-    const headers = ['Cliente', 'Total Exames', 'Valor Bruto', 'Valor Líquido', 'Status'];
-    const csvContent = [
-      headers.join(','),
-      ...clientesFiltrados.map(cliente => [
-        `"${cliente.nome}"`,
-        cliente.total_exames,
-        cliente.valor_bruto.toFixed(2),
-        cliente.valor_liquido.toFixed(2),
-        cliente.status_pagamento
-      ].join(','))
-    ].join('\n');
+  const exportarExcel = () => {
+    if (clientesFiltrados.length === 0) {
+      toast({ title: "Sem dados", description: "Nenhum cliente para exportar.", variant: "destructive" });
+      return;
+    }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `demonstrativo_faturamento_${periodo}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const dados = clientesFiltrados.map((c) => ({
+      Cliente: c.nome,
+      "Total Exames": c.total_exames,
+      "Valor Bruto": Number(c.valor_bruto || 0),
+      "Valor Líquido": Number(c.valor_liquido || 0),
+      Status: c.status_pagamento,
+      Período: c.periodo,
+    }));
 
-    toast({
-      title: "Arquivo exportado",
-      description: "Demonstrativo de faturamento exportado com sucesso",
-    });
+    const ws = XLSX.utils.json_to_sheet(dados);
+    // Formatar cabeçalhos e números
+    const colWidths = [
+      { wch: 40 }, // Cliente
+      { wch: 14 }, // Total Exames
+      { wch: 16 }, // Valor Bruto
+      { wch: 16 }, // Valor Líquido
+      { wch: 12 }, // Status
+      { wch: 10 }, // Período
+    ];
+    (ws as any)["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Demonstrativo");
+
+    const fileName = `demonstrativo_faturamento_${periodo}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({ title: "Exportado", description: "Arquivo Excel gerado com sucesso." });
   };
 
   return (
@@ -1036,12 +1043,12 @@ export default function DemonstrativoFaturamento() {
                   {carregando ? 'Carregando...' : 'Atualizar'}
                 </Button>
                 <Button 
-                  onClick={exportarCSV}
+                  onClick={exportarExcel}
                   variant="outline"
                   size="sm"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar
+                  Exportar Excel
                 </Button>
               </div>
             </div>

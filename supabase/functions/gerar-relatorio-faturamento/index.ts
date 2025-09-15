@@ -111,17 +111,31 @@ serve(async (req: Request) => {
     if (!dataFaturamento || dataFaturamento.length === 0) {
       console.log('⚠️ Nenhum dado de faturamento encontrado, tentando volumetria...');
       
-      // Buscar dados de volumetria como fallback
-      const { data: dataVolumetria, error: errorVolumetria } = await supabase
+      // Buscar dados de volumetria como fallback (cliente_nome_fantasia)
+      const { data: dataVolumetriaFantasia } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
+        .eq('periodo_referencia', periodo)
         .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia || cliente.nome)
-        .eq('periodo_referencia', periodo);
+        .neq('tipo_faturamento', 'NC-NF');
       
-      console.log(`📊 Volumetria encontrada: ${dataVolumetria?.length || 0} registros`);
+      console.log(`📊 Volumetria (Cliente_Nome_Fantasia) encontrada: ${dataVolumetriaFantasia?.length || 0} registros`);
       
-      if (dataVolumetria && dataVolumetria.length > 0) {
-        dataFaturamento = dataVolumetria;
+      if (dataVolumetriaFantasia && dataVolumetriaFantasia.length > 0) {
+        dataFaturamento = dataVolumetriaFantasia;
+      } else {
+        // Fallback adicional: buscar por EMPRESA com múltiplos candidatos
+        const candidatos = [cliente.nome_fantasia, cliente.nome].filter(Boolean);
+        const { data: dataVolumetriaEmpresa } = await supabase
+          .from('volumetria_mobilemed')
+          .select('*')
+          .eq('periodo_referencia', periodo)
+          .in('"EMPRESA"', candidatos as string[])
+          .neq('tipo_faturamento', 'NC-NF');
+        console.log(`📊 Volumetria (EMPRESA) encontrada: ${dataVolumetriaEmpresa?.length || 0} registros`);
+        if (dataVolumetriaEmpresa && dataVolumetriaEmpresa.length > 0) {
+          dataFaturamento = dataVolumetriaEmpresa;
+        }
       }
     }
 

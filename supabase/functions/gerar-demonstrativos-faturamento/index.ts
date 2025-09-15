@@ -414,6 +414,7 @@ serve(async (req) => {
       const { data: page, error: volumetriaError } = await query
         .range(from, from + pageSize - 1);
 
+      if (volumetriaError) {
         console.error(`❌ ERRO ao buscar volumetria para ${cliente.nome_fantasia}:`, volumetriaError);
         break;
       }
@@ -854,6 +855,11 @@ serve(async (req) => {
         
         const valorTotal = valorBruto - valorImpostos;
 
+        // Calcular total de exames efetivamente faturados (com preço)
+        const totalExamesComPreco = detalhesExames
+          .filter((d: any) => d.status === 'preco_encontrado' && (d.valor_unitario || 0) > 0)
+          .reduce((sum: number, d: any) => sum + (d.quantidade || 0), 0);
+
         // Montar demonstrativo com alertas para problemas
         const temProblemas = valorExames === 0 && totalExames > 0;
         const temFranquiaProblema = valorFranquia > 0 && totalExames === 0 && !parametros?.frequencia_continua;
@@ -862,7 +868,7 @@ serve(async (req) => {
           cliente_id: cliente.id,
           cliente_nome: cliente.nome_fantasia || cliente.nome,
           periodo,
-          total_exames: totalExames, // ✅ Agora é a contagem real de exames (VALORES)
+          total_exames: totalExamesComPreco, // Somente exames com preço aplicado
           valor_exames: valorExames,
           valor_franquia: valorFranquia,
           valor_portal_laudos: valorPortal,
