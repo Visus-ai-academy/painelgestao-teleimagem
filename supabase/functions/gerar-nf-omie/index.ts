@@ -259,6 +259,7 @@ serve(async (req) => {
         const cfg = (contratoAtivo as any)?.configuracoes_integracao || {};
         const codigoProduto = cfg.codigo_produto || 'TELEIMAGEM';
         const codigoItemIntegracao = cfg.codigo_item_integracao || 'TELE-SERV';
+        const codigoCategoria = cfg.codigo_categoria || '999'; // Categoria financeira exigida pelo Omie
 
         // Montar Pedido de Venda (API produtos/pedido -> IncluirPedido)
         const nfData = {
@@ -269,6 +270,7 @@ serve(async (req) => {
             etapa: '50', // Faturar
             codigo_parcela: '999', // Parcela customizada
             qtde_parcelas: 1,
+            codigo_categoria: String(codigoCategoria), // Obrigatório no Omie
           },
           informacoes_adicionais: {
             enviar_email: 'N',
@@ -302,6 +304,7 @@ serve(async (req) => {
           ],
         };
 
+        console.log(`Usando codigo_categoria='${String(codigoCategoria)}' para ${demo.cliente_nome}`);
         // Criar NF no Omie
         const criarNFReq: OmieApiRequest = {
           call: "IncluirPedido",
