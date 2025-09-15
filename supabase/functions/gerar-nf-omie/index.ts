@@ -84,12 +84,23 @@ serve(async (req) => {
 
     console.log(`Encontrados ${demonstrativos.length} demonstrativos para processar`);
 
-    // Buscar dados dos clientes para informações complementares
+    // Buscar dados dos clientes e contratos ativos
     const clienteIds = demonstrativos.map(d => d.cliente_id).filter(Boolean);
     const { data: clientesData } = await supabase
       .from('clientes')
-      .select('id, nome, cnpj, email, endereco, cidade, estado, cep, telefone, email_envio_nf')
-      .in('id', clienteIds);
+      .select(`
+        id, nome, cnpj, email, endereco, cidade, estado, cep, telefone, email_envio_nf,
+        contratos_clientes!inner(
+          id,
+          numero_contrato,
+          tipo_faturamento,
+          status,
+          ativo,
+          codigo_omie
+        )
+      `)
+      .in('id', clienteIds)
+      .eq('contratos_clientes.ativo', true);
 
     const resultados = [];
     let sucessos = 0;
@@ -108,15 +119,29 @@ serve(async (req) => {
           throw new Error('Dados de faturamento incompletos');
         }
 
-        // Preparar dados para criação da NF no Omie
+        if (!clienteData || !clienteData.contratos_clientes || clienteData.contratos_clientes.length === 0) {
+          throw new Error(`Cliente não possui contrato ativo: ${demo.cliente_nome}`);
+        }
+
+        // Obter contrato ativo (cliente já cadastrado no OMIE)
+        const contratoAtivo = clienteData.contratos_clientes[0];
+        const codigoClienteOmie = contratoAtivo.codigo_omie;
+
+        if (!codigoClienteOmie) {
+          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado no contrato`);
+        }
+
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE: ${codigoClienteOmie} | Contrato: ${contratoAtivo.numero_contrato}`);
+
+        // Preparar dados para criação da NF no Omie baseado no contrato ativo
         const nfData = {
           // Cabeçalho da NF
           cabecalho: {
-            codigo_cliente_omie: "", // Será necessário mapear ou cadastrar cliente no Omie
+            codigo_cliente_omie: codigoClienteOmie,
             codigo_pedido: `FAT-${periodo}-${demo.cliente_nome.replace(/[^A-Z0-9]/g, '')}`,
             data_emissao: new Date().toISOString().split('T')[0],
             data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-            numero_pedido: `${periodo}-${demo.cliente_nome}`,
+            numero_pedido: `${periodo}-${contratoAtivo.numero_contrato}`,
             quantidade_itens: 1,
             codigo_parcela: "000",
             qtde_parcelas: 1
@@ -124,103 +149,34 @@ serve(async (req) => {
           // Informações do cliente
           informacoes_adicionais: {
             categoria: "Faturamento Teleimagem",
-            obs_internas: `Faturamento período ${periodo} - ${detalhes.total_laudos || 0} laudos processados`,
-            obs_venda: `Serviços de telemedicina - período ${periodo}`
+            obs_internas: `Período ${periodo} - ${detalhes.total_exames || 0} exames | Contrato: ${contratoAtivo.numero_contrato}`,
+            obs_venda: `Serviços de telemedicina - período ${periodo} | ${contratoAtivo.tipo_faturamento}`
           },
-          // Itens da NF
+          // Itens da NF baseados no contrato
           det: [
             {
               ide: {
                 codigo_item_omie: "", // Código do serviço de telemedicina no Omie
-                simples_nacional: "S",
-                codigo_produto: "TELEIMAGEM-01"
+                simples_nacional: contratoAtivo.simples ? "S" : "N",
+                codigo_produto: "TELEIMAGEM-SERVICOS"
               },
               produto: {
                 codigo: "TELEIMAGEM",
-                descricao: `Serviços de Telemedicina - ${periodo}`,
-                unidade: "UN",
-                quantidade: detalhes.total_laudos || 1,
-                valor_unitario: detalhes.valor_total / (detalhes.total_laudos || 1),
+                descricao: `Serviços de Telemedicina - ${periodo} (${contratoAtivo.tipo_faturamento})`,
+                unidade: "SV",
+                quantidade: 1,
+                valor_unitario: detalhes.valor_total,
                 valor_total: detalhes.valor_total
               },
               imposto: {
                 cofins_aliquota: 3.00,
                 pis_aliquota: 0.65,
-                iss_aliquota: 5.00,
+                iss_aliquota: contratoAtivo.percentual_iss || 5.00,
                 codigo_beneficio_fiscal: ""
               }
             }
           ]
         };
-
-        // Tentar localizar cliente no Omie pelo CNPJ/Nome
-        let codigoClienteOmie = "";
-        if (clienteData?.cnpj) {
-          const buscarClienteReq: OmieApiRequest = {
-            call: "ListarClientes",
-            app_key: omieAppKey,
-            app_secret: omieAppSecret,
-            param: [{
-              pagina: 1,
-              registros_por_pagina: 50,
-              apenas_importado_api: "N",
-              cnpj_cpf: clienteData.cnpj.replace(/[^0-9]/g, '')
-            }]
-          };
-
-          const clienteResponse = await fetch("https://app.omie.com.br/api/v1/geral/clientes/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buscarClienteReq)
-          });
-
-          const clienteResult = await clienteResponse.json();
-          
-          if (clienteResult.clientes_cadastro?.length > 0) {
-            codigoClienteOmie = clienteResult.clientes_cadastro[0].codigo_cliente_omie;
-            console.log(`Cliente encontrado no Omie: ${codigoClienteOmie}`);
-          } else {
-            // Cliente não existe, cadastrar no Omie
-            console.log(`Cadastrando novo cliente no Omie: ${demo.cliente_nome}`);
-            
-            const novoClienteReq: OmieApiRequest = {
-              call: "IncluirCliente",
-              app_key: omieAppKey,
-              app_secret: omieAppSecret,
-              param: [{
-                razao_social: demo.cliente_nome,
-                nome_fantasia: demo.cliente_nome,
-                cnpj_cpf: clienteData.cnpj?.replace(/[^0-9]/g, '') || "",
-                email: clienteData.email_envio_nf || clienteData.email || "",
-                endereco: clienteData.endereco || "",
-                cidade: clienteData.cidade || "",
-                estado: clienteData.estado || "",
-                cep: clienteData.cep?.replace(/[^0-9]/g, '') || "",
-                telefone1_ddd: clienteData.telefone?.substring(0, 2) || "11",
-                telefone1_numero: clienteData.telefone?.substring(2) || "",
-                pessoa_fisica: "N"
-              }]
-            };
-
-            const novoClienteResponse = await fetch("https://app.omie.com.br/api/v1/geral/clientes/", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(novoClienteReq)
-            });
-
-            const novoClienteResult = await novoClienteResponse.json();
-            
-            if (novoClienteResult.codigo_cliente_omie) {
-              codigoClienteOmie = novoClienteResult.codigo_cliente_omie;
-              console.log(`Cliente cadastrado com sucesso: ${codigoClienteOmie}`);
-            } else {
-              throw new Error(`Erro ao cadastrar cliente: ${JSON.stringify(novoClienteResult)}`);
-            }
-          }
-        }
-
-        // Atualizar código do cliente na NF
-        nfData.cabecalho.codigo_cliente_omie = codigoClienteOmie;
 
         // Criar NF no Omie
         const criarNFReq: OmieApiRequest = {
