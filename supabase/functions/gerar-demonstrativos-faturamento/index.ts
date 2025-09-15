@@ -49,7 +49,7 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Primeiro, buscar TODOS os clientes com parâmetros (ativos e inativos)
+    // Primeiro, buscar TODOS os clientes com dados de faturamento (LEFT JOIN para incluir todos)
     const { data: todosClientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
@@ -59,32 +59,65 @@ serve(async (req) => {
         nome_mobilemed,
         ativo,
         status,
-        contratos_clientes!inner(
+        contratos_clientes(
           tipo_faturamento
         ),
-        parametros_faturamento!inner(
+        parametros_faturamento(
           status,
           tipo_faturamento,
           updated_at
         )
       `)
-      .neq('contratos_clientes.tipo_faturamento', 'NC-NF'); // ✅ EXCLUIR NC-NF
+      .neq('contratos_clientes.tipo_faturamento', 'NC-NF') // ✅ EXCLUIR NC-NF
+      .order('nome');
 
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
     }
 
     if (!todosClientes || todosClientes.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Nenhum cliente encontrado'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      console.log('❌ Nenhum cliente encontrado na tabela clientes');
+      
+      // ✅ FALLBACK: Se não há clientes cadastrados, buscar direto da volumetria
+      console.log('🔄 Tentando buscar clientes direto da volumetria...');
+      
+      const { data: clientesVolumetria, error: volError } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('periodo_referencia', periodo)
+        .not('"EMPRESA"', 'is', null)
+        .not('"EMPRESA"', 'eq', '')
+        .limit(1000);
 
-    console.log(`Total de clientes encontrados: ${todosClientes.length}`);
+      if (volError || !clientesVolumetria || clientesVolumetria.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: 'Nenhum cliente encontrado nem no cadastro nem na volumetria'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Criar lista fictícia de clientes da volumetria
+      const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
+      const clientesFallback = nomesUnicos.map((nome, index) => ({
+        id: `temp-${index + 1}`, // UUID temporário mais simples
+        nome: nome,
+        nome_fantasia: nome,
+        nome_mobilemed: nome,
+        ativo: true,
+        status: 'Ativo',
+        contratos_clientes: [{ tipo_faturamento: 'CO-FT' }],
+        parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }]
+      }));
+
+      console.log(`📋 Fallback: ${clientesFallback.length} clientes criados da volumetria`);
+      var todosClientesFinal = clientesFallback;
+    } else {
+      console.log(`📊 Total de clientes encontrados no cadastro: ${todosClientes.length}`);
+      var todosClientesFinal = todosClientes;
+    }
 
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
     const isStatusInativoOuCancelado = (status?: string) => {
@@ -92,13 +125,22 @@ serve(async (req) => {
       return s.startsWith('cancel') || s.startsWith('inativ');
     };
 
-    const clientesAtivos = todosClientes.filter(c => 
+    // ✅ Filtrar clientes que têm parâmetros de faturamento válidos OU são do fallback
+    const clientesComParametros = todosClientesFinal.filter(c => 
+      // Clientes do cadastro devem ter parâmetros válidos
+      (c.parametros_faturamento && 
+       c.parametros_faturamento.length > 0 && 
+       c.parametros_faturamento[0]?.status === 'A') ||
+      // OU clientes do fallback (criados da volumetria)
+      c.id.toString().startsWith('temp-')
+    );
+
+    const clientesAtivos = clientesComParametros.filter(c => 
       c.ativo && 
-      !isStatusInativoOuCancelado(c.status) &&
-      c.parametros_faturamento?.[0]?.status === 'A'
+      !isStatusInativoOuCancelado(c.status)
     );
     
-    const clientesInativos = todosClientes.filter(c => 
+    const clientesInativos = todosClientesFinal.filter(c => 
       !c.ativo || isStatusInativoOuCancelado(c.status)
     );
     

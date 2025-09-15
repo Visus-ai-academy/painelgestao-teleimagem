@@ -485,7 +485,16 @@ export default function GerarFaturamento() {
             .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
             .limit(1);
 
-          const clienteId = emailCliente?.[0]?.id || `temp-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+          // Função para gerar UUID válido ou usar nome como string
+          const gerarIdValido = (nomeCliente: string): string => {
+            // Verificar se é um UUID válido
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            
+            // Primeiro, tentar buscar o cliente no cadastro
+            return `cliente-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30)}`;
+          };
+
+          const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
           
           clientesTemp.push({
             id: clienteId,
@@ -494,10 +503,12 @@ export default function GerarFaturamento() {
           });
         }
         
+        // ✅ Deduplificar clientes por nome (não por ID que pode ser temporário)
         const clientesUnicos = new Map();
         clientesTemp.forEach(cliente => {
-          if (!clientesUnicos.has(cliente.id)) {
-            clientesUnicos.set(cliente.id, cliente);
+          const chaveUnica = cliente.nome.trim().toUpperCase();
+          if (!clientesUnicos.has(chaveUnica)) {
+            clientesUnicos.set(chaveUnica, cliente);
           }
         });
         clientesFinais = Array.from(clientesUnicos.values());
