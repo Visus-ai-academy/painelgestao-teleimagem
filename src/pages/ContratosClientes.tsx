@@ -234,22 +234,6 @@ export default function ContratosClientes() {
             contato,
             status,
             ativo
-          ),
-          parametros_faturamento (
-            aplicar_franquia,
-            valor_franquia,
-            volume_franquia,
-            valor_acima_franquia,
-            frequencia_continua,
-            frequencia_por_volume,
-            valor_integracao,
-            portal_laudos,
-            tipo_faturamento,
-            impostos_ab_min,
-            simples,
-            status,
-            data_inicio_franquia,
-            data_aniversario_contrato
           )
         `)
         .eq('clientes.ativo', true);
@@ -267,9 +251,6 @@ export default function ContratosClientes() {
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
-        const parametros = Array.isArray(contrato.parametros_faturamento) 
-          ? contrato.parametros_faturamento[0] 
-          : contrato.parametros_faturamento;
         
         const hoje = new Date();
         const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
@@ -282,23 +263,23 @@ export default function ContratosClientes() {
           status = "A Vencer";
         }
 
-        // Calcular valor estimado baseado nos serviços contratados e parâmetros
+        // Calcular valor estimado baseado nos serviços contratados e configurações
         let valorEstimado = 0;
         const servicosContratados = Array.isArray(contrato.servicos_contratados) ? contrato.servicos_contratados : [];
         
-        // Usar dados dos parâmetros quando disponíveis, senão usar configurações JSONB legadas
+        // Usar configurações JSONB disponíveis no contrato
         const configuracoesFranquia = (typeof contrato.configuracoes_franquia === 'object' && contrato.configuracoes_franquia) ? contrato.configuracoes_franquia as any : {};
         const configuracoesIntegracao = (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
 
-        // Valor da franquia - priorizar parâmetros sobre configurações JSONB
-        const aplicarFranquia = parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia;
-        const valorFranquia = parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia;
+        // Valor da franquia
+        const aplicarFranquia = configuracoesFranquia.tem_franquia;
+        const valorFranquia = configuracoesFranquia.valor_franquia;
         if (aplicarFranquia && valorFranquia) {
           valorEstimado += Number(valorFranquia);
         }
 
-        // Valor da integração - priorizar parâmetros sobre configurações JSONB
-        const valorIntegracao = parametros?.valor_integracao ?? configuracoesIntegracao.valor_integracao;
+        // Valor da integração
+        const valorIntegracao = configuracoesIntegracao.valor_integracao;
         if (valorIntegracao) {
           valorEstimado += Number(valorIntegracao);
         }
@@ -327,8 +308,8 @@ export default function ContratosClientes() {
           emailFinanceiro: cliente?.email || '',
           emailOperacional: cliente?.email || '',
           responsavel: cliente?.contato || '',
-          cobrancaIntegracao: Boolean(parametros?.valor_integracao ?? configuracoesIntegracao.cobra_integracao),
-          valorIntegracao: Number(parametros?.valor_integracao ?? configuracoesIntegracao.valor_integracao ?? 0),
+          cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
+          valorIntegracao: Number(configuracoesIntegracao.valor_integracao ?? 0),
           cobrancaSuporte: false,
           // Novos campos
           consideraPlantao: Boolean(contrato.considera_plantao),
@@ -344,18 +325,18 @@ export default function ContratosClientes() {
           // Novos campos para exibição na tabela
           numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
           razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado',
-          // Campos dos parâmetros de faturamento
-          aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
-          valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
-          volumeFranquia: Number(parametros?.volume_franquia ?? 0),
-          valorAcimaFranquia: Number(parametros?.valor_acima_franquia ?? 0),
-          frequenciaContinua: Boolean(parametros?.frequencia_continua ?? false),
-          frequenciaPorVolume: Boolean(parametros?.frequencia_por_volume ?? false),
-          portalLaudos: Boolean(parametros?.portal_laudos ?? false),
-          tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
-          impostosAbMin: Number(parametros?.impostos_ab_min ?? 0),
-          simples: Boolean(parametros?.simples ?? false),
-          parametrosStatus: parametros?.status ?? 'Não configurado'
+          // Campos baseados nas configurações JSONB do contrato
+          aplicarFranquia: configuracoesFranquia.tem_franquia ?? false,
+          valorFranquia: Number(configuracoesFranquia.valor_franquia ?? 0),
+          volumeFranquia: Number(configuracoesFranquia.volume_franquia ?? 0),
+          valorAcimaFranquia: Number(configuracoesFranquia.valor_acima_franquia ?? 0),
+          frequenciaContinua: Boolean(configuracoesFranquia.frequencia_continua ?? false),
+          frequenciaPorVolume: Boolean(configuracoesFranquia.frequencia_por_volume ?? false),
+          portalLaudos: Boolean(configuracoesIntegracao.portal_laudos ?? false),
+          tipoFaturamento: contrato.tipo_faturamento ?? 'CO-FT',
+          impostosAbMin: Number(contrato.impostos_ab_min ?? 0),
+          simples: Boolean(contrato.simples ?? false),
+          parametrosStatus: 'Configurado via JSONB'
         };
       });
 
@@ -479,10 +460,10 @@ export default function ContratosClientes() {
           .from('parametros_faturamento')
           .select('*')
           .eq('cliente_id', cliente.id)
-          .eq('ativo', true)
-          .single();
+          .eq('status', 'A')
+          .maybeSingle();
 
-        if (parametrosError && parametrosError.code !== 'PGRST116') {
+        if (parametrosError) {
           console.error(`Erro ao buscar parâmetros para cliente ${cliente.nome}:`, parametrosError);
         }
         
@@ -540,16 +521,16 @@ export default function ContratosClientes() {
               tem_parametros_configurados: parametrosCliente ? true : false,
               considera_plantao: false,
               cond_volume: 'MOD/ESP/CAT',
-              dia_vencimento: parametrosCliente?.periodicidade_reajuste === 'mensal' ? 10 : 30,
+              dia_vencimento: parametrosCliente?.forma_cobranca === 'Mensal' ? 10 : 30,
               desconto_percentual: 0,
               acrescimo_percentual: 0,
               faixas_volume: [],
               configuracoes_franquia: configuracoesFranquia,
               configuracoes_integracao: configuracoesIntegracao,
               // Campos adicionais dos parâmetros
-              tipo_faturamento: parametrosCliente?.tipo_cliente === 'CO' ? 'CO-FT' : 'NC-FT',
-              forma_pagamento: parametrosCliente?.periodicidade_reajuste || 'mensal',
-              observacoes_contratuais: parametrosCliente ? `Parâmetros configurados: ${parametrosCliente.indice_reajuste} - ${parametrosCliente.periodicidade_reajuste}` : null
+              tipo_faturamento: parametrosCliente?.tipo_faturamento || 'CO-FT',
+              forma_pagamento: parametrosCliente?.forma_cobranca || 'Mensal',
+              observacoes_contratuais: parametrosCliente ? `Parâmetros: ${parametrosCliente.tipo_faturamento || 'CO-FT'}` : 'Sem parâmetros configurados'
             });
           
           if (contratoError) {
