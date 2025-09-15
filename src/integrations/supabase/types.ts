@@ -456,6 +456,8 @@ export type Database = {
           nome_fantasia: string | null
           nome_mobilemed: string | null
           numero_contrato: string | null
+          omie_codigo_cliente: string | null
+          omie_data_sincronizacao: string | null
           portal_laudos: boolean | null
           possui_franquia: boolean | null
           razao_social: string | null
@@ -495,6 +497,8 @@ export type Database = {
           nome_fantasia?: string | null
           nome_mobilemed?: string | null
           numero_contrato?: string | null
+          omie_codigo_cliente?: string | null
+          omie_data_sincronizacao?: string | null
           portal_laudos?: boolean | null
           possui_franquia?: boolean | null
           razao_social?: string | null
@@ -534,6 +538,8 @@ export type Database = {
           nome_fantasia?: string | null
           nome_mobilemed?: string | null
           numero_contrato?: string | null
+          omie_codigo_cliente?: string | null
+          omie_data_sincronizacao?: string | null
           portal_laudos?: boolean | null
           possui_franquia?: boolean | null
           razao_social?: string | null
@@ -716,6 +722,9 @@ export type Database = {
           numero_contrato: string
           observacoes: string | null
           observacoes_contratuais: string | null
+          omie_codigo_cliente: string | null
+          omie_codigo_contrato: string | null
+          omie_data_sincronizacao: string | null
           percentual_iss: number | null
           percentual_reajuste_fixo: number | null
           periodicidade_reajuste: string | null
@@ -754,6 +763,9 @@ export type Database = {
           numero_contrato: string
           observacoes?: string | null
           observacoes_contratuais?: string | null
+          omie_codigo_cliente?: string | null
+          omie_codigo_contrato?: string | null
+          omie_data_sincronizacao?: string | null
           percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           periodicidade_reajuste?: string | null
@@ -792,6 +804,9 @@ export type Database = {
           numero_contrato?: string
           observacoes?: string | null
           observacoes_contratuais?: string | null
+          omie_codigo_cliente?: string | null
+          omie_codigo_contrato?: string | null
+          omie_data_sincronizacao?: string | null
           percentual_iss?: number | null
           percentual_reajuste_fixo?: number | null
           periodicidade_reajuste?: string | null
