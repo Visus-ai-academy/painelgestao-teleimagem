@@ -163,13 +163,55 @@ serve(async (req) => {
         const parametroCliente = parametrosData?.find(p => p.cliente_id === demo.cliente_id);
         
         // Buscar código OMIE em múltiplas fontes
-        const codigoClienteOmie = (contratoAtivo as any)?.codigo_omie
+        let codigoClienteOmie = (contratoAtivo as any)?.codigo_omie
           || (clienteData as any)?.cod_cliente
           || (contratoAtivo as any)?.configuracoes_integracao?.codigo_omie
           || (parametroCliente as any)?.numero_contrato;
 
+        // Se não encontrou código localmente, buscar automaticamente no Omie via CNPJ
+        if (!codigoClienteOmie && clienteData.cnpj) {
+          console.log(`🔍 Código Omie não encontrado localmente para ${demo.cliente_nome}. Buscando no Omie via CNPJ: ${clienteData.cnpj}`);
+          
+          try {
+            const buscaOmieResponse = await supabase.functions.invoke('buscar-codigo-cliente-omie', {
+              body: {
+                cnpj: clienteData.cnpj,
+                nome_cliente: demo.cliente_nome
+              }
+            });
+
+            if (buscaOmieResponse.error) {
+              console.error(`Erro ao buscar cliente no Omie:`, buscaOmieResponse.error);
+            } else if (buscaOmieResponse.data?.sucesso && buscaOmieResponse.data.cliente_encontrado) {
+              const clienteOmie = buscaOmieResponse.data.cliente_encontrado;
+              codigoClienteOmie = clienteOmie.codigo_omie;
+              
+              console.log(`✅ Cliente encontrado no Omie: ${clienteOmie.razao_social} - Código: ${codigoClienteOmie}`);
+              
+              // Salvar código encontrado na tabela clientes para futuras consultas
+              const { error: updateError } = await supabase
+                .from('clientes')
+                .update({ 
+                  cod_cliente: String(codigoClienteOmie),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', demo.cliente_id);
+
+              if (updateError) {
+                console.error(`Erro ao salvar código Omie no cliente:`, updateError);
+              } else {
+                console.log(`💾 Código Omie ${codigoClienteOmie} salvo para cliente ${demo.cliente_nome}`);
+              }
+            } else {
+              console.log(`❌ Cliente ${demo.cliente_nome} não encontrado no Omie`);
+            }
+          } catch (buscaError) {
+            console.error(`Erro na busca automática no Omie para ${demo.cliente_nome}:`, buscaError);
+          }
+        }
+
         if (!codigoClienteOmie) {
-          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado (cliente.cod_cliente, contrato.configuracoes_integracao.codigo_omie ou parametros.numero_contrato)`);
+          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado e não foi encontrado automaticamente no Omie via CNPJ ${clienteData.cnpj || 'N/A'}`);
         }
 
         // Converter para o formato numérico exigido pela API (remove qualquer prefixo como "CLI" ou "2023/")
