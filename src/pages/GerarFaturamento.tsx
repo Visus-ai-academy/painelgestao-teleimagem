@@ -808,7 +808,15 @@ export default function GerarFaturamento() {
 
   // Função para enviar emails
   const enviarTodosEmails = async () => {
-    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado);
+    if (gerandoRelatorios) {
+      toast({
+        title: "Aguarde a geração dos relatórios",
+        description: "Finalize a Etapa 2 antes de enviar os e-mails (Etapa 3)",
+        variant: "destructive",
+      });
+      return;
+    }
+    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado); 
     
     if (relatóriosParaEnviar.length === 0) {
       toast({
@@ -1128,6 +1136,7 @@ export default function GerarFaturamento() {
           }
 
           // Atualizar resultado do cliente
+          const hasPdf = !!pdfUrl;
           setResultados(prev => {
             const existe = prev.some(r => r.clienteId === cliente.id);
             const novosResultados = existe
@@ -1135,12 +1144,12 @@ export default function GerarFaturamento() {
                   resultado.clienteId === cliente.id 
                     ? {
                         ...resultado,
-                        relatorioGerado: true,
+                        relatorioGerado: hasPdf,
                         linkRelatorio: relatorioData.arquivos?.[0]?.url,
                         arquivos: relatorioData.arquivos,
                         dataProcessamento: new Date().toLocaleString('pt-BR'),
                         relatorioData: relatorioData,
-                        erro: undefined
+                        erro: hasPdf ? undefined : (relatorioData?.dadosEncontrados === false ? 'Sem volumetria no período' : 'Relatório sem PDF público')
                       }
                     : resultado
                 )
@@ -1149,13 +1158,14 @@ export default function GerarFaturamento() {
                   {
                     clienteId: cliente.id,
                     clienteNome: cliente.nome,
-                    relatorioGerado: true,
+                    relatorioGerado: hasPdf,
                     emailEnviado: false,
                     emailDestino: cliente.email,
                     linkRelatorio: relatorioData.arquivos?.[0]?.url,
                     arquivos: relatorioData.arquivos,
                     dataProcessamento: new Date().toLocaleString('pt-BR'),
-                    relatorioData: relatorioData
+                    relatorioData: relatorioData,
+                    erro: hasPdf ? undefined : (relatorioData?.dadosEncontrados === false ? 'Sem volumetria no período' : 'Relatório sem PDF público')
                   }
                 ];
             
@@ -1164,7 +1174,9 @@ export default function GerarFaturamento() {
             return novosResultados;
           });
 
-          gerados++;
+          if (hasPdf) {
+            gerados++;
+          }
           
         } catch (error) {
           console.error(`Erro ao gerar relatório para ${cliente.nome}:`, error);
@@ -1688,7 +1700,7 @@ export default function GerarFaturamento() {
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
                   <Button 
                     onClick={enviarTodosEmails}
-                    disabled={enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
+                    disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
                     size="lg"
                     className="min-w-[280px] bg-orange-600 hover:bg-orange-700"
                   >
