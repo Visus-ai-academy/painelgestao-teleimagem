@@ -47,6 +47,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { BuscarCodigoOmie } from "@/components/BuscarCodigoOmie";
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
 // Período atual - onde estão os dados carregados (junho/2025)
@@ -1284,7 +1285,7 @@ export default function GerarFaturamento() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
             Gerar
@@ -1300,6 +1301,10 @@ export default function GerarFaturamento() {
           <TabsTrigger value="analise" className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             Análise
+          </TabsTrigger>
+          <TabsTrigger value="omie" className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4" />
+            OMIE
           </TabsTrigger>
           <TabsTrigger value="fechamento" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -1597,6 +1602,53 @@ export default function GerarFaturamento() {
 
         <TabsContent value="fechamento" className="space-y-6 mt-6">
           <ControleFechamentoFaturamento />
+        </TabsContent>
+
+        <TabsContent value="omie" className="space-y-6 mt-6">
+          <div className="space-y-6">
+            <div className="bg-muted/30 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3">Integração OMIE</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Busque o código de clientes no sistema OMIE para configurar a integração corretamente
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <BuscarCodigoOmie 
+                onCodigoEncontrado={(codigo, cliente) => {
+                  console.log('Cliente OMIE encontrado:', { codigo, cliente });
+                  // Aqui você pode adicionar lógica para salvar o código no sistema
+                  // Por exemplo, atualizar o campo cod_cliente ou configuracoes_integracao
+                }}
+              />
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Como usar</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">1</div>
+                  <div>
+                    <strong>Busque o cliente:</strong> Use o CNPJ ou nome do cliente para encontrar no OMIE
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">2</div>
+                  <div>
+                    <strong>Copie o código:</strong> Use o botão de cópia para copiar o código OMIE
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center text-xs font-semibold">3</div>
+                  <div>
+                    <strong>Configure no sistema:</strong> Atualize o campo <code className="bg-muted px-1 rounded">cod_cliente</code> na tabela clientes ou configure em <code className="bg-muted px-1 rounded">configuracoes_integracao</code> do contrato
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="gerar" className="space-y-6 mt-6">

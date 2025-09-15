@@ -151,3 +151,9 @@ verify_jwt = true
 
 [functions.gerar-demonstrativos-faturamento]
 verify_jwt = true
+
+[functions.gerar-nf-omie]
+verify_jwt = true
+
+[functions.buscar-codigo-cliente-omie]
+verify_jwt = true
