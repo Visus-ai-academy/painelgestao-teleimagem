@@ -286,7 +286,16 @@ serve(async (req) => {
         const hoje = new Date();
         const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-        // Usar API de Faturamento de Contratos de Serviço do Omie
+        // Garantir que temos o código do contrato do Omie; se ausente, tentar sincronizar agora
+        if (!contratoAtivo.omie_codigo_contrato) {
+          console.warn(`Contrato OMIE ausente para ${demo.cliente_nome}. Sincronizando...`);
+          const sync = await supabase.functions.invoke('buscar-contrato-omie', {
+            body: { cliente_id: demo.cliente_id, cliente_nome: demo.cliente_nome }
+          });
+          if (sync.data?.sucesso && sync.data?.codigo_contrato) {
+            contratoAtivo.omie_codigo_contrato = String(sync.data.codigo_contrato);
+          }
+        }
         if (!contratoAtivo.omie_codigo_contrato) {
           throw new Error(`Contrato Omie não sincronizado para ${demo.cliente_nome} (omie_codigo_contrato ausente no contrato ${contratoAtivo.numero_contrato})`);
         }
