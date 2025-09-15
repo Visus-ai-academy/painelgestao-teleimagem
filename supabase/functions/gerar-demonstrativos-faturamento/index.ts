@@ -371,7 +371,6 @@ serve(async (req) => {
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
-        .in('tipo_faturamento', ['CO-FT', 'NC-FT'])
         .range(from, from + pageSize - 1);
 
       if (volumetriaError) {
