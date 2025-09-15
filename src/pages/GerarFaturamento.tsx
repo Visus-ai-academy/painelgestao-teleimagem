@@ -1106,9 +1106,19 @@ export default function GerarFaturamento() {
             bodyData.demonstrativo_data = (cliente as any).demonstrativo;
           }
           
-          const { data: relatorioData, error: relatorioError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
-            body: bodyData
-          });
+          let relatorioData: any = null;
+          let relatorioError: any = null;
+          for (let tentativa = 1; tentativa <= 3; tentativa++) {
+            const { data, error } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
+              body: bodyData
+            });
+            relatorioData = data;
+            relatorioError = error;
+            const pdfTentar = relatorioData?.arquivos?.[0]?.url;
+            if (!relatorioError && relatorioData?.success && pdfTentar) break;
+            // Aguarda com backoff (1s, 2s)
+            await new Promise(res => setTimeout(res, 1000 * tentativa));
+          }
 
           if (relatorioError) {
             // Se é erro de timeout, mostrar mensagem específica
@@ -1701,6 +1711,9 @@ export default function GerarFaturamento() {
                   <Button 
                     onClick={enviarTodosEmails}
                     disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
+                    size="lg"
+                    className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                  >
                     size="lg"
                     className="min-w-[280px] bg-orange-600 hover:bg-orange-700"
                   >

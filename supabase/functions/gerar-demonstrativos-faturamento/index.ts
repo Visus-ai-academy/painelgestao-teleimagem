@@ -145,38 +145,22 @@ serve(async (req) => {
 
     const resolveTipoFaturamento = (c: any) => {
       const pfAtivo = getParametroAtivo(c.parametros_faturamento);
-      if (pfAtivo?.tipo_faturamento) return pfAtivo.tipo_faturamento;
-      const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento;
-      if (tipoContrato) return tipoContrato;
-      // Fallback: lista conhecida (NC) ou CO-FT
-      const nomeCliente = (c.nome_fantasia || c.nome || '').toUpperCase();
-      const clientesNC = [
-        'CDICARDIO','CDIGOIAS','CISP','CLIRAM','CRWANDERLEY','DIAGMAX-PR','GOLD','PRODIMAGEM','TRANSDUSON','ZANELLO','CEMVALENCA','RMPADUA','RADI-IMAGEM'
-      ];
-      return clientesNC.some((nc) => nomeCliente.includes(nc)) ? 'NC-FT' : 'CO-FT';
+      return (pfAtivo?.tipo_faturamento || 'CO-FT').toUpperCase();
     };
 
-    // Helper: identificar clientes NC-NF (via parâmetros ou contrato ou fallback)
+    // Helper: identificar clientes NC-NF exclusivamente pelos Parâmetros
     const isNCNF = (c: any) => {
       const pfAtivo = getParametroAtivo(c.parametros_faturamento);
       const tipoParam = pfAtivo?.tipo_faturamento?.toUpperCase?.();
-      if (tipoParam === 'NC-NF') return true;
-      const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento?.toUpperCase?.();
-      if (tipoContrato === 'NC-NF') return true;
-      const nomeCliente = (c.nome_fantasia || c.nome || '').toUpperCase();
-      const clientesNC = [
-        'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
-        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
-      ];
-      return clientesNC.some(nc => nomeCliente.includes(nc));
+      return tipoParam === 'NC-NF';
     };
 
-    // ✅ Considerar APENAS clientes ativos e com parâmetro ATIVO (se existir) e NÃO NC-NF
+    // ✅ Considerar APENAS clientes com Parâmetros ATIVOS e NÃO NC-NF
     const clientesAtivos = todosClientesFinal.filter(c => {
       const pfAtivo = getParametroAtivo(c.parametros_faturamento);
-      const paramStatusOk = pfAtivo ? !isStatusInativoOuCancelado(pfAtivo.status) : true;
+      const paramStatusOk = !!pfAtivo && !isStatusInativoOuCancelado(pfAtivo.status);
       return (
-        c.ativo && !isStatusInativoOuCancelado(c.status) && paramStatusOk && !isNCNF(c)
+        paramStatusOk && !isNCNF(c)
       );
     });
     
@@ -296,7 +280,7 @@ serve(async (req) => {
             cliente.nome_mobilemed, // Nome MobileMed se existir
             nomeFantasia // Nome fantasia
           ].filter(Boolean), // Remove valores null/undefined
-          cond_volume: cliente.contratos_clientes?.[0]?.cond_volume || null,
+          cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: (getParametroAtivo(cliente.parametros_faturamento)?.tipo_faturamento)
             || cliente.contratos_clientes?.[0]?.tipo_faturamento
