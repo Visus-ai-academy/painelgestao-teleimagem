@@ -485,7 +485,7 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-            // Buscar clientes cadastrados com contratos que precisam de demonstrativo
+            // Buscar clientes cadastrados ATIVOS com contratos que precisam de demonstrativo (excluir NC-NF)
             const { data: clientesCadastrados } = await supabase
               .from('clientes')
               .select(`
@@ -494,12 +494,14 @@ export default function DemonstrativoFaturamento() {
                 nome_fantasia, 
                 nome_mobilemed, 
                 email,
+                ativo,
+                status,
                 contratos_clientes!inner (
                   tipo_faturamento
                 )
               `)
-              .eq('ativo', true)
-              .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT']); // FILTRAR APENAS CLIENTES QUE PRECISAM DE DEMONSTRATIVO
+              .eq('ativo', true) // APENAS clientes ativos
+              .not('contratos_clientes.tipo_faturamento', 'eq', 'NC-NF'); // EXCLUIR NC-NF
             
             console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
             

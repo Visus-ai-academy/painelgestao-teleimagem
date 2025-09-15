@@ -49,7 +49,7 @@ serve(async (req) => {
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
-    // Primeiro, buscar TODOS os clientes com dados de faturamento (LEFT JOIN para incluir todos)
+    // Primeiro, buscar TODOS os clientes para fazer filtragem adequada
     const { data: todosClientes, error: clientesError } = await supabase
       .from('clientes')
       .select(`
@@ -61,7 +61,8 @@ serve(async (req) => {
         status,
         contratos_clientes(
           tipo_faturamento,
-          cond_volume
+          cond_volume,
+          status
         ),
         parametros_faturamento(
           status,
@@ -127,18 +128,31 @@ serve(async (req) => {
 
     // Helper: identificar clientes NC-NF (via parâmetros ou contrato)
     const isNCNF = (c: any) => {
+      // Verificar em parâmetros primeiro (prioridade)
       const tipoParam = c.parametros_faturamento?.[0]?.tipo_faturamento?.toUpperCase?.();
+      if (tipoParam === 'NC-NF') return true;
+      
+      // Verificar em contratos
       const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento?.toUpperCase?.();
-      return tipoParam === 'NC-NF' || tipoContrato === 'NC-NF';
+      if (tipoContrato === 'NC-NF') return true;
+      
+      // Verificar se é cliente conhecido como NC-NF através de lista hard-coded (fallback)
+      const nomeCliente = (c.nome_fantasia || c.nome || '').toUpperCase();
+      const clientesNC = [
+        'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
+        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
+      ];
+      return clientesNC.some(nc => nomeCliente.includes(nc));
     };
 
-    // ✅ Considerar TODOS os clientes ativos, mas excluir NC-NF do demonstrativo
+    // ✅ Considerar APENAS clientes ativos e NÃO NC-NF
     const clientesAtivos = todosClientesFinal.filter(c => 
       c.ativo && 
       !isStatusInativoOuCancelado(c.status) &&
       !isNCNF(c)
     );
     
+    // Clientes inativos/cancelados (para verificação de volumetria)
     const clientesInativos = todosClientesFinal.filter(c => 
       !c.ativo || isStatusInativoOuCancelado(c.status)
     );
@@ -158,7 +172,7 @@ serve(async (req) => {
           nomeFantasia
         ].filter(Boolean);
         
-        // Verificar se tem volumetria no período
+        // Verificar se tem volumetria no período E se NÃO é NC-NF
         const { data: volumetriaInativo, error } = await supabase
           .from('volumetria_mobilemed')
           .select('count', { count: 'exact' })
@@ -167,11 +181,9 @@ serve(async (req) => {
           .not('"VALORES"', 'is', null)
           .limit(1);
         
-        if (!error && volumetriaInativo && volumetriaInativo.length > 0) {
-          // Cliente inativo COM volumetria - adicionar na lista e gerar alerta
-          if (!isNCNF(clienteInativo)) {
-            clientesInativosComVolumetria.push(clienteInativo);
-          }
+        if (!error && volumetriaInativo && volumetriaInativo.length > 0 && !isNCNF(clienteInativo)) {
+          // Cliente inativo COM volumetria E não é NC-NF - adicionar na lista e gerar alerta
+          clientesInativosComVolumetria.push(clienteInativo);
           const status = !clienteInativo.ativo ? 'INATIVO' : 
                        clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
           alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
@@ -179,10 +191,10 @@ serve(async (req) => {
       }
     }
 
-    // ✅ LISTA FINAL: clientes ativos (já sem NC-NF) + inativos com volumetria (também excluir NC-NF)
-    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria.filter(c => !isNCNF(c))];
+    // ✅ LISTA FINAL: apenas clientes ativos (já sem NC-NF) + inativos com volumetria (já filtrado NC-NF)
+    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
     
-    console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.filter(c => !isNCNF(c)).length + ' inativos com volumetria)');
+    console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.length + ' inativos com volumetria)');
     
     if (clientes.length === 0) {
       console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
@@ -198,16 +210,33 @@ serve(async (req) => {
         console.error('❌ Erro ao buscar volumetria para fallback:', volAllErr);
       } else {
         const nomesUnicos = [...new Set((clientesVolumetriaAll || []).map(c => c.EMPRESA).filter(Boolean))];
-        clientes = nomesUnicos.map((nome, index) => ({
-          id: 'temp-' + (index + 1),
-          nome,
-          nome_fantasia: nome,
-          nome_mobilemed: nome,
-          ativo: true,
-          status: 'Ativo',
-          parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
-        }));
-        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria.');
+        
+        // FILTRAR clientes NC-NF também no fallback
+        const clientesFallbackFiltrados = [];
+        for (const nome of nomesUnicos) {
+          // Verificar se é cliente NC conhecido
+          const nomeUpper = nome.toUpperCase();
+          const clientesNC = [
+            'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
+            'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
+          ];
+          const isClienteNC = clientesNC.some(nc => nomeUpper.includes(nc));
+          
+          if (!isClienteNC) { // Só incluir se NÃO for NC
+            clientesFallbackFiltrados.push({
+              id: 'temp-' + (clientesFallbackFiltrados.length + 1),
+              nome,
+              nome_fantasia: nome,
+              nome_mobilemed: nome,
+              ativo: true,
+              status: 'Ativo',
+              parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
+            });
+          }
+        }
+        
+        clientes = clientesFallbackFiltrados;
+        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria (excluindo NC).');
       }
     }
 
