@@ -115,8 +115,17 @@ serve(async (req) => {
           ? JSON.parse(demo.detalhes_relatorio) 
           : demo.detalhes_relatorio;
 
-        if (!detalhes || !detalhes.valor_total) {
+        if (!detalhes || (!detalhes.valor_total && !detalhes.resumo?.valor_a_pagar)) {
           throw new Error('Dados de faturamento incompletos');
+        }
+
+        // ✅ EXTRAIR VALORES da estrutura do relatório
+        const valorTotal = detalhes.valor_total || detalhes.resumo?.valor_a_pagar || 0;
+        const totalLaudos = detalhes.total_laudos || detalhes.resumo?.total_laudos || 0;
+        const valorBruto = detalhes.valor_bruto || detalhes.resumo?.valor_bruto_total || valorTotal;
+
+        if (valorTotal <= 0) {
+          throw new Error(`Valor total inválido: R$ ${valorTotal}`);
         }
 
         if (!clienteData || !clienteData.contratos_clientes || clienteData.contratos_clientes.length === 0) {
@@ -149,7 +158,7 @@ serve(async (req) => {
           // Informações do cliente
           informacoes_adicionais: {
             categoria: "Faturamento Teleimagem",
-            obs_internas: `Período ${periodo} - ${detalhes.total_exames || 0} exames | Contrato: ${contratoAtivo.numero_contrato}`,
+            obs_internas: `Período ${periodo} - ${totalLaudos} laudos | Contrato: ${contratoAtivo.numero_contrato}`,
             obs_venda: `Serviços de telemedicina - período ${periodo} | ${contratoAtivo.tipo_faturamento}`
           },
           // Itens da NF baseados no contrato
@@ -165,8 +174,8 @@ serve(async (req) => {
                 descricao: `Serviços de Telemedicina - ${periodo} (${contratoAtivo.tipo_faturamento})`,
                 unidade: "SV",
                 quantidade: 1,
-                valor_unitario: detalhes.valor_total,
-                valor_total: detalhes.valor_total
+                valor_unitario: valorTotal,
+                valor_total: valorTotal
               },
               imposto: {
                 cofins_aliquota: 3.00,
@@ -217,7 +226,7 @@ serve(async (req) => {
             sucesso: true,
             codigo_pedido_omie: nfResult.codigo_pedido,
             numero_pedido_omie: nfResult.numero_pedido,
-            valor_total: detalhes.valor_total
+            valor_total: valorTotal
           });
           sucessos++;
         } else {
@@ -232,7 +241,7 @@ serve(async (req) => {
           cliente: demo.cliente_nome,
           sucesso: false,
           erro: error.message,
-          valor_total: demo.detalhes_relatorio?.valor_total || 0
+          valor_total: valorTotal
         });
       }
     }

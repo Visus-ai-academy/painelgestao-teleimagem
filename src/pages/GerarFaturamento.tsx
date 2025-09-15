@@ -280,7 +280,7 @@ export default function GerarFaturamento() {
         data_processamento: converterDataSegura(resultado.dataProcessamento),
         data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
         data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
-        detalhes_relatorio: resultado.detalhesRelatorio ? JSON.stringify(resultado.detalhesRelatorio) : null
+        detalhes_relatorio: resultado.relatorioData ? JSON.stringify(resultado.relatorioData) : null
       }));
 
       // Usar upsert para inserir ou atualizar registros
