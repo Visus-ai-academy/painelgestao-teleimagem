@@ -211,8 +211,6 @@ export default function ContratosClientes() {
   
   // Estado para sincronização Omie
   const [sincronizandoOmie, setSincronizandoOmie] = useState(false);
-  // Estado para limpeza de contratos
-  const [isCleaningContracts, setIsCleaningContracts] = useState(false);
   
   const { toast } = useToast();
 
@@ -666,7 +664,7 @@ export default function ContratosClientes() {
       const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
         body: {
           apenas_sem_codigo: true, // sincronizar apenas clientes sem código Omie
-          limite: 100
+          limite: 1000
         }
       });
 
@@ -699,45 +697,7 @@ export default function ContratosClientes() {
       setSincronizandoOmie(false);
     }
   };
-
-  // Função para limpar contratos e preços
-  const limparContratos = async () => {
-    try {
-      if (!window.confirm('Tem certeza que deseja limpar TODOS os contratos e preços? Esta ação não pode ser desfeita.')) {
-        return;
-      }
-      setIsCleaningContracts(true);
-
-      toast({
-        title: 'Iniciando limpeza',
-        description: 'Removendo contratos e preços configurados...',
-      });
-
-      const { data, error } = await supabase.functions.invoke('limpar-contratos-e-precos', { body: {} });
-      if (error) throw new Error(error.message);
-
-      if (data?.sucesso) {
-        toast({
-          title: 'Limpeza concluída',
-          description: `Contratos removidos: ${data.resultado?.contratos_removidos ?? 0}. Preços removidos: ${data.resultado?.precos_removidos ?? 0}.`,
-        });
-        // Esvaziar a lista local e recarregar
-        setContratos([]);
-        setContratosOriginal([]);
-      } else {
-        throw new Error(data?.erro || 'Erro desconhecido na limpeza');
-      }
-    } catch (e: any) {
-      console.error('Erro ao limpar contratos:', e);
-      toast({
-        title: 'Erro na limpeza',
-        description: e.message || 'Erro desconhecido',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCleaningContracts(false);
-    }
-  };
+  
   // Filtros e ordenação
   useEffect(() => {
     let contratosFiltrados = [...contratosOriginal];
@@ -913,24 +873,6 @@ export default function ContratosClientes() {
             <>
               <CheckCircle className="h-4 w-4 mr-2" />
               Sincronizar Códigos Omie
-            </>
-          )}
-        </Button>
-
-        <Button 
-          onClick={limparContratos}
-          disabled={isCleaningContracts}
-          variant="destructive"
-        >
-          {isCleaningContracts ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Limpando...
-            </>
-          ) : (
-            <>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Limpar Contratos
             </>
           )}
         </Button>

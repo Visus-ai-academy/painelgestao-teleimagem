@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,82 @@ interface SyncRequest {
   limite?: number;          // limite de clientes no modo sem filtro
 }
 
+interface OmieApiRequest {
+  call: string;
+  app_key: string;
+  app_secret: string;
+  param: any[];
+}
+
+// Função para buscar cliente no OMIE diretamente
+async function buscarClienteOmie(cnpj: string, nomeCliente: string) {
+  const omieAppKey = Deno.env.get('OMIE_APP_KEY');
+  const omieAppSecret = Deno.env.get('OMIE_APP_SECRET');
+
+  if (!omieAppKey || !omieAppSecret) {
+    throw new Error('Credenciais do OMIE não configuradas');
+  }
+
+  console.log(`Buscando cliente no OMIE - CNPJ: ${cnpj}, Nome: ${nomeCliente}`);
+
+  const buscarClienteReq: OmieApiRequest = {
+    call: "ListarClientes",
+    app_key: omieAppKey,
+    app_secret: omieAppSecret,
+    param: [{
+      pagina: 1,
+      registros_por_pagina: 100
+    }]
+  };
+
+  console.log('Consultando API OMIE - ListarClientes...');
+  
+  const response = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(buscarClienteReq),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro na API do OMIE: ${response.status} - ${response.statusText}`);
+  }
+
+  const dados = await response.json();
+  console.log(`API OMIE retornou ${dados.clientes_cadastro?.length || 0} clientes`);
+
+  if (!dados.clientes_cadastro || dados.clientes_cadastro.length === 0) {
+    return null;
+  }
+
+  // Buscar por CNPJ exato primeiro
+  let clienteEncontrado = dados.clientes_cadastro.find((cliente: any) => 
+    cliente.cnpj_cpf === cnpj
+  );
+
+  // Se não encontrou por CNPJ, buscar por nome (case-insensitive)
+  if (!clienteEncontrado && nomeCliente) {
+    const nomeNormalizado = nomeCliente.toLowerCase().trim();
+    clienteEncontrado = dados.clientes_cadastro.find((cliente: any) => 
+      cliente.razao_social?.toLowerCase().includes(nomeNormalizado) ||
+      cliente.nome_fantasia?.toLowerCase().includes(nomeNormalizado)
+    );
+  }
+
+  if (clienteEncontrado) {
+    console.log(`Cliente encontrado no OMIE: ${clienteEncontrado.razao_social} - Código: ${clienteEncontrado.codigo_cliente_omie}`);
+    return {
+      codigo_omie: clienteEncontrado.codigo_cliente_omie,
+      razao_social: clienteEncontrado.razao_social,
+      nome_fantasia: clienteEncontrado.nome_fantasia,
+      cnpj: clienteEncontrado.cnpj_cpf
+    };
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,7 +103,7 @@ serve(async (req) => {
     );
 
     const body: SyncRequest = await req.json().catch(() => ({}));
-    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = true, limite = 200 } = body || {};
+    const { clientes, cliente_ids, cnpjs, apenas_sem_codigo = true, limite = 1000 } = body || {};
 
     console.log('Iniciando sincronização de códigos Omie (cliente) com parâmetros:', body);
 
@@ -82,20 +159,10 @@ serve(async (req) => {
           continue;
         }
 
-        // Buscar no Omie via função existente
-        const busca = await supabase.functions.invoke('buscar-codigo-cliente-omie', {
-          body: { cnpj: c.cnpj, nome_cliente: c.nome }
-        });
-
-        if (busca.error) {
-          console.error('Erro invocando buscar-codigo-cliente-omie:', busca.error);
-          resultados.push({ cliente: c.nome, cnpj: c.cnpj, sucesso: false, erro: 'Falha na invocação da busca no Omie' });
-          erros++;
-          continue;
-        }
-
-        const encontrado = busca.data?.cliente_encontrado;
-        if (!busca.data?.sucesso || !encontrado?.codigo_omie) {
+        // Buscar no Omie diretamente
+        const encontrado = await buscarClienteOmie(c.cnpj, c.nome);
+        
+        if (!encontrado?.codigo_omie) {
           resultados.push({ cliente: c.nome, cnpj: c.cnpj, sucesso: false, erro: 'Cliente não encontrado no Omie' });
           naoEncontrados++;
           continue;
