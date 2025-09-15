@@ -207,6 +207,9 @@ export default function ContratosClientes() {
   const [sortField, setSortField] = useState<string>("cliente");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   
+  // Estado para sincronização Omie
+  const [sincronizandoOmie, setSincronizandoOmie] = useState(false);
+  
   const { toast } = useToast();
 
   // Carregar dados dos contratos do Supabase
@@ -631,6 +634,53 @@ export default function ContratosClientes() {
     }
   };
 
+  // Função para sincronizar códigos Omie
+  const sincronizarCodigosOmie = async () => {
+    try {
+      setSincronizandoOmie(true);
+      
+      toast({
+        title: "Iniciando sincronização",
+        description: "Buscando códigos reais dos clientes no Omie...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('sincronizar-codigo-cliente-omie', {
+        body: {
+          apenas_sem_codigo: true, // sincronizar apenas clientes sem código Omie
+          limite: 100
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const resultado = data;
+      
+      if (resultado.success) {
+        toast({
+          title: "Sincronização concluída",
+          description: `${resultado.atualizados} códigos Omie sincronizados com sucesso. ${resultado.nao_encontrados} não encontrados no Omie.`,
+        });
+
+        // Recarregar contratos para exibir os códigos atualizados
+        await carregarContratos();
+      } else {
+        throw new Error(resultado.error || 'Erro desconhecido na sincronização');
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao sincronizar códigos Omie:', error);
+      toast({
+        title: "Erro na sincronização",
+        description: error.message || 'Erro desconhecido',
+        variant: "destructive",
+      });
+    } finally {
+      setSincronizandoOmie(false);
+    }
+  };
+
   // Filtros e ordenação
   useEffect(() => {
     let contratosFiltrados = [...contratosOriginal];
@@ -748,7 +798,7 @@ export default function ContratosClientes() {
       </div>
 
       {/* Ações Principais */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <Button 
           onClick={gerarContratosAutomaticos}
           disabled={isCreatingContracts}
@@ -763,6 +813,24 @@ export default function ContratosClientes() {
             <>
               <Plus className="h-4 w-4 mr-2" />
               Gerar Contratos
+            </>
+          )}
+        </Button>
+
+        <Button 
+          onClick={sincronizarCodigosOmie}
+          disabled={sincronizandoOmie}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          {sincronizandoOmie ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Sincronizando...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Sincronizar Códigos Omie
             </>
           )}
         </Button>
