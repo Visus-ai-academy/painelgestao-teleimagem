@@ -469,7 +469,8 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
+        // ✅ USAR Cliente_Nome_Fantasia quando disponível, senão EMPRESA
+        const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria: ${nomesUnicos.length}`);
         
         const clientesTemp: any[] = [];
@@ -596,7 +597,7 @@ export default function GerarFaturamento() {
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
+        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
         .not('"EMPRESA"', 'is', null);
 
@@ -604,7 +605,7 @@ export default function GerarFaturamento() {
         throw new Error('Erro ao consultar volumetria: ' + errorVolumetria.message);
       }
 
-      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.EMPRESA).filter(Boolean) || [])];
+      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean) || [])];
       console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
 
       if (clientesUnicosVolumetria.length === 0) {
@@ -830,7 +831,7 @@ export default function GerarFaturamento() {
         variant: "destructive",
       });
     } finally {
-      setProcessandoTodos(false);
+      setEnviandoEmails(false);
     }
   };
 
@@ -1077,7 +1078,7 @@ export default function GerarFaturamento() {
         variant: "destructive",
       });
     } finally {
-      setProcessandoTodos(false);
+      setGerandoRelatorios(false);
     }
   };
 
@@ -1511,11 +1512,11 @@ export default function GerarFaturamento() {
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
                   <Button 
                     onClick={gerarTodosRelatorios}
-                    disabled={processandoTodos || clientesCarregados.length === 0 || !demonstrativoGerado}
+                    disabled={gerandoRelatorios || clientesCarregados.length === 0 || !demonstrativoGerado}
                     size="lg"
                     className="min-w-[280px] bg-green-600 hover:bg-green-700"
                   >
-                    {processandoTodos && statusProcessamento.mensagem.includes('relatório') ? (
+                    {gerandoRelatorios ? (
                       <>
                         <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
                         Gerando Relatórios...
@@ -1545,11 +1546,11 @@ export default function GerarFaturamento() {
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
                   <Button 
                     onClick={enviarTodosEmails}
-                    disabled={processandoTodos || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
+                    disabled={enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
                     size="lg"
                     className="min-w-[280px] bg-orange-600 hover:bg-orange-700"
                   >
-                    {processandoTodos && statusProcessamento.mensagem.includes('email') ? (
+                    {enviandoEmails ? (
                       <>
                         <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
                         Enviando E-mails...
