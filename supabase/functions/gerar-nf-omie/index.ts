@@ -295,7 +295,7 @@ serve(async (req) => {
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
         // Tentar faturar Contrato de Serviço no Omie
-        const tentarFaturar = async (metodo: string) => {
+        const tentarFaturarEm = async (endpoint: string, metodo: string) => {
           const reqBody: OmieApiRequest = {
             call: metodo,
             app_key: omieAppKey,
@@ -303,10 +303,10 @@ serve(async (req) => {
             param: [{ nCodCtr: Number(codigoContratoOmie) }]
           };
           console.log(
-            `Faturando Contrato no Omie (${metodo}) para ${demo.cliente_nome}:`,
+            `Faturando Contrato no Omie (${metodo}) [${endpoint}] para ${demo.cliente_nome}:`,
             JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
           );
-          const resp = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
+          const resp = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(reqBody)
@@ -315,15 +315,19 @@ serve(async (req) => {
           return json;
         };
 
-        // Primeiro tenta com FaturarContrato (documentação recente). Se falhar, tenta FaturarCtr (legado)
-        let nfResult = await tentarFaturar('FaturarContrato');
+        // Sequência de tentativas: contratofat/FaturarContrato -> contratofat/FaturarCtr -> contrato/FaturarCtr
+        const endpointFat = "https://app.omie.com.br/api/v1/servicos/contratofat/";
+        const endpointCtr = "https://app.omie.com.br/api/v1/servicos/contrato/";
+        let nfResult = await tentarFaturarEm(endpointFat, 'FaturarContrato');
         if (!nfResult?.nCodOS) {
-          const erroMsg = typeof nfResult === 'object' ? JSON.stringify(nfResult) : String(nfResult);
-          console.warn(`Falha no método FaturarContrato, tentando FaturarCtr. Resposta: ${erroMsg}`);
-          const tentativaLegado = await tentarFaturar('FaturarCtr');
-          if (tentativaLegado?.nCodOS) {
-            nfResult = tentativaLegado;
-          }
+          const erroMsg1 = typeof nfResult === 'object' ? JSON.stringify(nfResult) : String(nfResult);
+          console.warn(`Falha contratofat/FaturarContrato: ${erroMsg1}`);
+          nfResult = await tentarFaturarEm(endpointFat, 'FaturarCtr');
+        }
+        if (!nfResult?.nCodOS) {
+          const erroMsg2 = typeof nfResult === 'object' ? JSON.stringify(nfResult) : String(nfResult);
+          console.warn(`Falha contratofat/FaturarCtr: ${erroMsg2}`);
+          nfResult = await tentarFaturarEm(endpointCtr, 'FaturarCtr');
         }
 
         if (nfResult?.nCodOS) {
