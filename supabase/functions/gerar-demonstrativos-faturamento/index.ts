@@ -124,10 +124,18 @@ serve(async (req) => {
       return s.startsWith('cancel') || s.startsWith('inativ');
     };
 
-    // ✅ Considerar TODOS os clientes ativos, mesmo sem parâmetros cadastrados
+    // Helper: identificar clientes NC-NF (via parâmetros ou contrato)
+    const isNCNF = (c: any) => {
+      const tipoParam = c.parametros_faturamento?.[0]?.tipo_faturamento?.toUpperCase?.();
+      const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento?.toUpperCase?.();
+      return tipoParam === 'NC-NF' || tipoContrato === 'NC-NF';
+    };
+
+    // ✅ Considerar TODOS os clientes ativos, mas excluir NC-NF do demonstrativo
     const clientesAtivos = todosClientesFinal.filter(c => 
       c.ativo && 
-      !isStatusInativoOuCancelado(c.status)
+      !isStatusInativoOuCancelado(c.status) &&
+      !isNCNF(c)
     );
     
     const clientesInativos = todosClientesFinal.filter(c => 
@@ -160,7 +168,9 @@ serve(async (req) => {
         
         if (!error && volumetriaInativo && volumetriaInativo.length > 0) {
           // Cliente inativo COM volumetria - adicionar na lista e gerar alerta
-          clientesInativosComVolumetria.push(clienteInativo);
+          if (!isNCNF(clienteInativo)) {
+            clientesInativosComVolumetria.push(clienteInativo);
+          }
           const status = !clienteInativo.ativo ? 'INATIVO' : 
                        clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
           alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
@@ -168,10 +178,10 @@ serve(async (req) => {
       }
     }
 
-    // ✅ LISTA FINAL: clientes ativos + clientes inativos com volumetria
-    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
+    // ✅ LISTA FINAL: clientes ativos (já sem NC-NF) + inativos com volumetria (também excluir NC-NF)
+    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria.filter(c => !isNCNF(c))];
     
-    console.log(`📋 Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.length} inativos com volumetria)`);
+    console.log(`📋 Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.filter(c => !isNCNF(c)).length} inativos com volumetria)');
     
     if (clientes.length === 0) {
       console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
@@ -418,7 +428,7 @@ serve(async (req) => {
 
               try {
                 const rpc1 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: cliente.id,
+                  p_cliente_id: clienteIdValido,
                   p_modalidade: grupo.modalidade,
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
@@ -447,7 +457,7 @@ serve(async (req) => {
               // Fallback 1: se não encontrou, tentar com prioridade ROTINA
               if ((!preco || preco <= 0) && !precoError) {
                 const rpc2 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: cliente.id,
+                  p_cliente_id: clienteIdValido,
                   p_modalidade: grupo.modalidade,
                   p_especialidade: grupo.especialidade,
                   p_prioridade: 'ROTINA',
@@ -463,7 +473,7 @@ serve(async (req) => {
               // Fallback 2: se ainda não encontrou e categoria != SC, tentar com SC
               if ((!preco || preco <= 0) && (grupo.categoria || 'SC') !== 'SC') {
                 const rpc3 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: cliente.id,
+                  p_cliente_id: clienteIdValido,
                   p_modalidade: grupo.modalidade,
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
@@ -508,28 +518,32 @@ serve(async (req) => {
         // Calcular franquia, portal e integração usando lógica corrigida
         console.log(`💰 Calculando faturamento para ${cliente.nome_fantasia} - Volume: ${volumeTotal}`);
         
-        // ✅ BUSCAR PARÂMETROS DE FATURAMENTO COMPLETOS
-        const { data: parametrosFaturamento, error: paramsError } = await supabase
-          .from('parametros_faturamento')
-          .select(`
-            aplicar_franquia,
-            valor_franquia,
-            volume_franquia,
-            frequencia_continua,
-            frequencia_por_volume,
-            valor_acima_franquia,
-            valor_integracao,
-            portal_laudos,
-            cobrar_integracao,
-            simples,
-            percentual_iss
-          `)
-          .eq('cliente_id', cliente.id)
-          .eq('status', 'A')
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
-        const parametros = parametrosFaturamento?.[0];
+        // ✅ BUSCAR PARÂMETROS DE FATURAMENTO COMPLETOS (somente se houver clienteId válido)
+        let parametros: any = undefined;
+        let paramsError: any = null;
+        if (clienteIdValido) {
+          const { data: parametrosFaturamento, error: err } = await supabase
+            .from('parametros_faturamento')
+            .select(`
+              aplicar_franquia,
+              valor_franquia,
+              volume_franquia,
+              frequencia_continua,
+              frequencia_por_volume,
+              valor_acima_franquia,
+              valor_integracao,
+              portal_laudos,
+              cobrar_integracao,
+              simples,
+              percentual_iss
+            `)
+            .eq('cliente_id', clienteIdValido)
+            .eq('status', 'A')
+            .order('updated_at', { ascending: false })
+            .limit(1);
+          parametros = parametrosFaturamento?.[0];
+          paramsError = err;
+        }
         
         if (paramsError) {
           console.error(`❌ Erro ao buscar parâmetros para ${cliente.nome_fantasia}:`, paramsError);
