@@ -107,6 +107,9 @@ serve(async (req) => {
     let erros = 0;
 
     for (const demo of demonstrativos) {
+      let valorTotal = 0;
+      let totalLaudos = 0;
+      let valorBruto = 0;
       try {
         console.log(`Processando NF para cliente: ${demo.cliente_nome}`);
 
@@ -120,9 +123,9 @@ serve(async (req) => {
         }
 
         // ✅ EXTRAIR VALORES da estrutura do relatório
-        const valorTotal = detalhes.valor_total || detalhes.resumo?.valor_a_pagar || 0;
-        const totalLaudos = detalhes.total_laudos || detalhes.resumo?.total_laudos || 0;
-        const valorBruto = detalhes.valor_bruto || detalhes.resumo?.valor_bruto_total || valorTotal;
+        valorTotal = detalhes.valor_total || detalhes.resumo?.valor_a_pagar || 0;
+        totalLaudos = detalhes.total_laudos || detalhes.resumo?.total_laudos || 0;
+        valorBruto = detalhes.valor_bruto || detalhes.resumo?.valor_bruto_total || valorTotal;
 
         if (valorTotal <= 0) {
           throw new Error(`Valor total inválido: R$ ${valorTotal}`);
