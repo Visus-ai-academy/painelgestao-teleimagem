@@ -284,19 +284,62 @@ export default function DemonstrativoFaturamento() {
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
-                   tipo_faturamento: demo.tipo_faturamento || 'CO-FT', // ✅ ADICIONAR tipo_faturamento
-                   alertas: demo.alertas || [], // ✅ ADICIONAR alertas
+                   // Não assumir CO-FT por padrão; vamos enriquecer com dados do banco abaixo
+                   tipo_faturamento: demo.tipo_faturamento || undefined,
+                   alertas: demo.alertas || [],
                    observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
-                   detalhes_exames: demo.detalhes_exames || [] // ✅ INCLUIR DETALHES DOS EXAMES
+                   detalhes_exames: demo.detalhes_exames || []
                  };
               });
             
             if (clientesConvertidos.length > 0) {
-              setClientes(clientesConvertidos);
-              setClientesFiltrados(clientesConvertidos);
+              // Enriquecer tipo_faturamento a partir da tabela faturamento (prioritário) e, se necessário, dos contratos ativos
+              try {
+                const nomes = [...new Set(clientesConvertidos.map((c) => c.nome))];
+                const { data: tiposFat } = await supabase
+                  .from('faturamento')
+                  .select('cliente_nome, tipo_faturamento')
+                  .eq('periodo_referencia', periodo)
+                  .in('cliente_nome', nomes)
+                  .not('tipo_faturamento', 'is', null)
+                  .limit(50000);
+                const mapTipos = new Map<string, string>();
+                (tiposFat || []).forEach((r: any) => {
+                  if (r.cliente_nome && r.tipo_faturamento) mapTipos.set(r.cliente_nome, r.tipo_faturamento);
+                });
+                let enriquecidos = clientesConvertidos.map((c) => ({
+                  ...c,
+                  tipo_faturamento: c.tipo_faturamento || mapTipos.get(c.nome)
+                }));
+                // Fallback: buscar contratos para preencher ausentes
+                const faltantes = enriquecidos.filter((c) => !c.tipo_faturamento).map((c) => c.nome);
+                if (faltantes.length > 0) {
+                  const { data: contratos } = await supabase
+                    .from('clientes')
+                    .select('nome, nome_fantasia, nome_mobilemed, contratos_clientes!inner(tipo_faturamento)')
+                    .eq('ativo', true);
+                  const mapContratoTipos = new Map<string, string>();
+                  (contratos || []).forEach((cli: any) => {
+                    const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
+                    if (!tipo) return;
+                    [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
+                      if (nm) mapContratoTipos.set(nm, tipo);
+                    });
+                  });
+                  enriquecidos = enriquecidos.map((c) => ({
+                    ...c,
+                    tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
+                  }));
+                }
+                setClientes(enriquecidos);
+                setClientesFiltrados(enriquecidos);
+              } catch (e) {
+                console.warn('Não foi possível enriquecer tipo_faturamento dos demonstrativos locais:', e);
+                setClientes(clientesConvertidos);
+                setClientesFiltrados(clientesConvertidos);
+              }
               setCarregando(false);
               
-              // Mostrar toast apenas na primeira carga para evitar loop
               if (!hasShownInitialToast.current) {
                 toast({
                   title: "Demonstrativos carregados",
@@ -524,17 +567,66 @@ export default function DemonstrativoFaturamento() {
               
               let valorTotalCliente = 0;
               let temPrecoConfigurado = false;
+
+              // Obter como o volume deve ser considerado para este cliente
+              let condVolume: string | null = null;
+              try {
+                const { data: contratoCfg } = await supabase
+                  .from('contratos_clientes')
+                  .select('cond_volume')
+                  .eq('cliente_id', dadosCliente.cliente.id)
+                  .eq('status', 'ativo')
+                  .maybeSingle();
+                condVolume = (contratoCfg?.cond_volume || 'MOD/ESP/CAT') as string;
+              } catch (e) {
+                condVolume = 'MOD/ESP/CAT';
+              }
+
+              // Pré-calcular volumes por nível
+              const totalPorModalidade = new Map<string, number>();
+              const totalPorModEsp = new Map<string, number>();
+              const totalPorModEspCat = new Map<string, number>();
+              for (const [, comb] of dadosCliente.combinacoes) {
+                const mod = (comb.config.modalidade || '').toString();
+                const esp = (comb.config.especialidade || '').toString();
+                const cat = (comb.config.categoria || '').toString();
+                totalPorModalidade.set(mod, (totalPorModalidade.get(mod) || 0) + comb.quantidade);
+                const kME = `${mod}|${esp}`;
+                totalPorModEsp.set(kME, (totalPorModEsp.get(kME) || 0) + comb.quantidade);
+                const kMEC = `${mod}|${esp}|${cat}`;
+                totalPorModEspCat.set(kMEC, (totalPorModEspCat.get(kMEC) || 0) + comb.quantidade);
+              }
               
               // Processar cada combinação única do cliente
               for (const [chave, combinacao] of dadosCliente.combinacoes) {
                 try {
+                  // Definir volume de referência conforme a regra do contrato
+                  const mod = (combinacao.config.modalidade || '').toString();
+                  const esp = (combinacao.config.especialidade || '').toString();
+                  const cat = (combinacao.config.categoria || '').toString();
+                  let volumeRef = dadosCliente.total_exames; // fallback
+                  switch ((condVolume || '').toUpperCase()) {
+                    case 'MOD':
+                      volumeRef = totalPorModalidade.get(mod) || combinacao.quantidade;
+                      break;
+                    case 'MOD/ESP':
+                      volumeRef = totalPorModEsp.get(`${mod}|${esp}`) || combinacao.quantidade;
+                      break;
+                    case 'MOD/ESP/CAT':
+                      volumeRef = totalPorModEspCat.get(`${mod}|${esp}|${cat}`) || combinacao.quantidade;
+                      break;
+                    case 'GERAL':
+                    default:
+                      volumeRef = dadosCliente.total_exames;
+                  }
+
                   const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
                     p_cliente_id: dadosCliente.cliente.id,
                     p_modalidade: combinacao.config.modalidade,
                     p_especialidade: combinacao.config.especialidade,
                     p_prioridade: combinacao.config.prioridade,
                     p_categoria: combinacao.config.categoria,
-                    p_volume_total: dadosCliente.total_exames,
+                    p_volume_total: volumeRef,
                     p_is_plantao: combinacao.config.is_plantao
                   });
                   
@@ -666,6 +758,10 @@ export default function DemonstrativoFaturamento() {
           cliente.total_exames += item.quantidade || 1; 
           cliente.valor_bruto += Number(item.valor_bruto || 0);
           cliente.valor_liquido += Number(item.valor || 0);
+          if (!cliente.tipo_faturamento && item.tipo_faturamento) {
+            // Preencher tipo de faturamento quando disponível
+            (cliente as any).tipo_faturamento = item.tipo_faturamento;
+          }
         } else {
           console.log(`🆕 Novo cliente encontrado: ${clienteNome}`);
           
@@ -688,6 +784,7 @@ export default function DemonstrativoFaturamento() {
             periodo: item.periodo_referencia || periodo,
             status_pagamento: status,
             data_vencimento: item.data_vencimento,
+            tipo_faturamento: item.tipo_faturamento || undefined,
           });
         }
       });
@@ -1172,7 +1269,7 @@ export default function DemonstrativoFaturamento() {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <Badge variant="outline">
-                            {cliente.tipo_faturamento || 'CO-FT'}
+                            {cliente.tipo_faturamento || 'Não definido'}
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
