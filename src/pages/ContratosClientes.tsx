@@ -101,6 +101,18 @@ interface ContratoCliente {
   // Campos adicionais para exibição
   numeroContrato?: string;
   razaoSocial?: string;
+  // Campos dos parâmetros de faturamento
+  aplicarFranquia?: boolean;
+  valorFranquia?: number;
+  volumeFranquia?: number;
+  valorAcimaFranquia?: number;
+  frequenciaContinua?: boolean;
+  frequenciaPorVolume?: boolean;
+  portalLaudos?: boolean;
+  tipoFaturamento?: string;
+  impostosAbMin?: number;
+  simples?: boolean;
+  parametrosStatus?: string;
 }
 
 interface DocumentoCliente {
@@ -202,7 +214,7 @@ export default function ContratosClientes() {
     try {
       setLoading(true);
       
-      // Buscar contratos com dados dos clientes
+      // Buscar contratos com dados dos clientes e parâmetros de faturamento
       const { data: contratosData, error } = await supabase
         .from('contratos_clientes')
         .select(`
@@ -219,6 +231,22 @@ export default function ContratosClientes() {
             contato,
             status,
             ativo
+          ),
+          parametros_faturamento (
+            aplicar_franquia,
+            valor_franquia,
+            volume_franquia,
+            valor_acima_franquia,
+            frequencia_continua,
+            frequencia_por_volume,
+            valor_integracao,
+            portal_laudos,
+            tipo_faturamento,
+            impostos_ab_min,
+            simples,
+            status,
+            data_inicio_franquia,
+            data_aniversario_contrato
           )
         `)
         .eq('clientes.ativo', true);
@@ -236,6 +264,10 @@ export default function ContratosClientes() {
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
+        const parametros = Array.isArray(contrato.parametros_faturamento) 
+          ? contrato.parametros_faturamento[0] 
+          : contrato.parametros_faturamento;
+        
         const hoje = new Date();
         const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
         const diasParaVencer = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
@@ -247,20 +279,25 @@ export default function ContratosClientes() {
           status = "A Vencer";
         }
 
-        // Calcular valor estimado baseado nos serviços contratados (se houver)
+        // Calcular valor estimado baseado nos serviços contratados e parâmetros
         let valorEstimado = 0;
         const servicosContratados = Array.isArray(contrato.servicos_contratados) ? contrato.servicos_contratados : [];
+        
+        // Usar dados dos parâmetros quando disponíveis, senão usar configurações JSONB legadas
         const configuracoesFranquia = (typeof contrato.configuracoes_franquia === 'object' && contrato.configuracoes_franquia) ? contrato.configuracoes_franquia as any : {};
         const configuracoesIntegracao = (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
 
-        // Valor da franquia (se configurada)
-        if (configuracoesFranquia.tem_franquia) {
-          valorEstimado += Number(configuracoesFranquia.valor_franquia || 0);
+        // Valor da franquia - priorizar parâmetros sobre configurações JSONB
+        const aplicarFranquia = parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia;
+        const valorFranquia = parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia;
+        if (aplicarFranquia && valorFranquia) {
+          valorEstimado += Number(valorFranquia);
         }
 
-        // Valor da integração (se configurada)
-        if (configuracoesIntegracao.cobra_integracao) {
-          valorEstimado += Number(configuracoesIntegracao.valor_integracao || 0);
+        // Valor da integração - priorizar parâmetros sobre configurações JSONB
+        const valorIntegracao = parametros?.valor_integracao ?? configuracoesIntegracao.valor_integracao;
+        if (valorIntegracao) {
+          valorEstimado += Number(valorIntegracao);
         }
 
         return {
@@ -287,8 +324,8 @@ export default function ContratosClientes() {
           emailFinanceiro: cliente?.email || '',
           emailOperacional: cliente?.email || '',
           responsavel: cliente?.contato || '',
-          cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
-          valorIntegracao: Number(configuracoesIntegracao.valor_integracao || 0),
+          cobrancaIntegracao: Boolean(parametros?.valor_integracao ?? configuracoesIntegracao.cobra_integracao),
+          valorIntegracao: Number(parametros?.valor_integracao ?? configuracoesIntegracao.valor_integracao ?? 0),
           cobrancaSuporte: false,
           // Novos campos
           consideraPlantao: Boolean(contrato.considera_plantao),
@@ -303,7 +340,19 @@ export default function ContratosClientes() {
           documentos: [],
           // Novos campos para exibição na tabela
           numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
-          razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado'
+          razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado',
+          // Campos dos parâmetros de faturamento
+          aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
+          valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
+          volumeFranquia: Number(parametros?.volume_franquia ?? 0),
+          valorAcimaFranquia: Number(parametros?.valor_acima_franquia ?? 0),
+          frequenciaContinua: Boolean(parametros?.frequencia_continua ?? false),
+          frequenciaPorVolume: Boolean(parametros?.frequencia_por_volume ?? false),
+          portalLaudos: Boolean(parametros?.portal_laudos ?? false),
+          tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
+          impostosAbMin: Number(parametros?.impostos_ab_min ?? 0),
+          simples: Boolean(parametros?.simples ?? false),
+          parametrosStatus: parametros?.status ?? 'Não configurado'
         };
       });
 
@@ -591,7 +640,10 @@ export default function ContratosClientes() {
       contratosFiltrados = contratosFiltrados.filter(contrato =>
         contrato.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contrato.cnpj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contrato.responsavel?.toLowerCase().includes(searchTerm.toLowerCase())
+        contrato.responsavel?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.tipoFaturamento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.numeroContrato?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contrato.razaoSocial?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -780,6 +832,12 @@ export default function ContratosClientes() {
                   <SelectItem value="dataFim-desc">Data Fim (Recente)</SelectItem>
                   <SelectItem value="diasParaVencer-asc">Menos dias p/ vencer</SelectItem>
                   <SelectItem value="diasParaVencer-desc">Mais dias p/ vencer</SelectItem>
+                  <SelectItem value="tipoFaturamento-asc">Tipo Faturamento (A-Z)</SelectItem>
+                  <SelectItem value="tipoFaturamento-desc">Tipo Faturamento (Z-A)</SelectItem>
+                  <SelectItem value="valorFranquia-asc">Valor Franquia (Menor)</SelectItem>
+                  <SelectItem value="valorFranquia-desc">Valor Franquia (Maior)</SelectItem>
+                  <SelectItem value="parametrosStatus-asc">Status Parâmetros (A-Z)</SelectItem>
+                  <SelectItem value="parametrosStatus-desc">Status Parâmetros (Z-A)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -810,6 +868,12 @@ export default function ContratosClientes() {
                   <TableHead>Status</TableHead>
                   <TableHead>Data Início</TableHead>
                   <TableHead>Data Fim</TableHead>
+                  <TableHead>Tipo Faturamento</TableHead>
+                  <TableHead>Valor Franquia</TableHead>
+                  <TableHead>Freq. Contínua</TableHead>
+                  <TableHead>Portal Laudos</TableHead>
+                  <TableHead>Valor Integração</TableHead>
+                  <TableHead>Status Parâmetros</TableHead>
                   <TableHead>Dias p/ Vencer</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -827,6 +891,38 @@ export default function ContratosClientes() {
                     </TableCell>
                     <TableCell>{new Date(contrato.dataInicio).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell>{new Date(contrato.dataFim).toLocaleDateString('pt-BR')}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {contrato.tipoFaturamento || 'CO-FT'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {contrato.valorFranquia ? 
+                        `R$ ${Number(contrato.valorFranquia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
+                        '-'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={contrato.frequenciaContinua ? 'default' : 'secondary'}>
+                        {contrato.frequenciaContinua ? 'Sim' : 'Não'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={contrato.portalLaudos ? 'default' : 'secondary'}>
+                        {contrato.portalLaudos ? 'Sim' : 'Não'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {contrato.valorIntegracao ? 
+                        `R$ ${Number(contrato.valorIntegracao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
+                        '-'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={contrato.parametrosStatus === 'A' ? 'default' : 'destructive'}>
+                        {contrato.parametrosStatus === 'A' ? 'Ativo' : contrato.parametrosStatus === 'Não configurado' ? 'Sem Param.' : contrato.parametrosStatus}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <span className={contrato.diasParaVencer < 0 ? 'text-red-600' : contrato.diasParaVencer <= 60 ? 'text-yellow-600' : 'text-green-600'}>
                         {contrato.diasParaVencer} dias
