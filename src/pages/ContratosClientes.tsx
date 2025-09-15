@@ -234,10 +234,28 @@ export default function ContratosClientes() {
             contato,
             status,
             ativo
+          ),
+          parametros_faturamento!left (
+            id,
+            cliente_id,
+            aplicar_franquia,
+            valor_franquia,
+            volume_franquia,
+            valor_acima_franquia,
+            frequencia_continua,
+            frequencia_por_volume,
+            portal_laudos,
+            cobrar_integracao,
+            valor_integracao,
+            tipo_faturamento,
+            impostos_ab_min,
+            simples,
+            status
           )
         `)
         .eq('clientes.ativo', true)
-        .eq('status', 'ativo');
+        .eq('status', 'ativo')
+        .eq('parametros_faturamento.status', 'A');
 
       if (error) {
         console.error('Erro ao carregar contratos:', error);
@@ -252,6 +270,9 @@ export default function ContratosClientes() {
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
+        const parametros = Array.isArray(contrato.parametros_faturamento) && contrato.parametros_faturamento.length > 0 
+          ? contrato.parametros_faturamento[0] 
+          : null;
         
         const hoje = new Date();
         const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
@@ -268,12 +289,24 @@ export default function ContratosClientes() {
         let valorEstimado = 0;
         const servicosContratados = Array.isArray(contrato.servicos_contratados) ? contrato.servicos_contratados : [];
         
-        // Usar configurações JSONB disponíveis no contrato
-        const configuracoesFranquia = (typeof contrato.configuracoes_franquia === 'object' && contrato.configuracoes_franquia) ? contrato.configuracoes_franquia as any : {};
-        const configuracoesIntegracao = (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
+        // Usar parâmetros de faturamento vindos do JOIN ou fallback para JSONB
+        const configuracoesFranquia = parametros ? {
+          tem_franquia: parametros.aplicar_franquia,
+          valor_franquia: parametros.valor_franquia,
+          volume_franquia: parametros.volume_franquia,
+          frequencia_continua: parametros.frequencia_continua,
+          frequencia_por_volume: parametros.frequencia_por_volume,
+          valor_acima_franquia: parametros.valor_acima_franquia
+        } : (typeof contrato.configuracoes_franquia === 'object' && contrato.configuracoes_franquia) ? contrato.configuracoes_franquia as any : {};
+        
+        const configuracoesIntegracao = parametros ? {
+          cobra_integracao: parametros.cobrar_integracao,
+          valor_integracao: parametros.valor_integracao,
+          portal_laudos: parametros.portal_laudos
+        } : (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
 
         // Valor da franquia
-        const aplicarFranquia = configuracoesFranquia.tem_franquia;
+        const aplicarFranquia = configuracoesFranquia.tem_franquia || configuracoesFranquia.aplicar_franquia;
         const valorFranquia = configuracoesFranquia.valor_franquia;
         if (aplicarFranquia && valorFranquia) {
           valorEstimado += Number(valorFranquia);
@@ -326,18 +359,18 @@ export default function ContratosClientes() {
           // Novos campos para exibição na tabela
           numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
           razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado',
-          // Campos baseados nas configurações JSONB do contrato
-          aplicarFranquia: configuracoesFranquia.tem_franquia ?? false,
-          valorFranquia: Number(configuracoesFranquia.valor_franquia ?? 0),
-          volumeFranquia: Number(configuracoesFranquia.volume_franquia ?? 0),
-          valorAcimaFranquia: Number(configuracoesFranquia.valor_acima_franquia ?? 0),
-          frequenciaContinua: Boolean(configuracoesFranquia.frequencia_continua ?? false),
-          frequenciaPorVolume: Boolean(configuracoesFranquia.frequencia_por_volume ?? false),
-          portalLaudos: Boolean(configuracoesIntegracao.portal_laudos ?? false),
-          tipoFaturamento: contrato.tipo_faturamento ?? 'CO-FT',
-          impostosAbMin: Number(contrato.impostos_ab_min ?? 0),
-          simples: Boolean(contrato.simples ?? false),
-          parametrosStatus: 'Configurado via JSONB'
+          // Campos baseados nos parâmetros de faturamento vindos do JOIN
+          aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
+          valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
+          volumeFranquia: Number(parametros?.volume_franquia ?? configuracoesFranquia.volume_franquia ?? 0),
+          valorAcimaFranquia: Number(parametros?.valor_acima_franquia ?? configuracoesFranquia.valor_acima_franquia ?? 0),
+          frequenciaContinua: Boolean(parametros?.frequencia_continua ?? configuracoesFranquia.frequencia_continua ?? false),
+          frequenciaPorVolume: Boolean(parametros?.frequencia_por_volume ?? configuracoesFranquia.frequencia_por_volume ?? false),
+          portalLaudos: Boolean(parametros?.portal_laudos ?? configuracoesIntegracao.portal_laudos ?? false),
+          tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
+          impostosAbMin: Number(parametros?.impostos_ab_min ?? contrato.impostos_ab_min ?? 0),
+          simples: Boolean(parametros?.simples ?? contrato.simples ?? false),
+          parametrosStatus: parametros ? 'Configurado via Parâmetros' : 'Não configurado'
         };
       });
 
