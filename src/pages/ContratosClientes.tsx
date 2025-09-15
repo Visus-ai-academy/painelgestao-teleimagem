@@ -222,7 +222,7 @@ export default function ContratosClientes() {
         .from('contratos_clientes')
         .select(`
           *,
-          clientes (
+          clientes!inner (
             id,
             nome,
             nome_fantasia,
@@ -236,7 +236,8 @@ export default function ContratosClientes() {
             ativo
           )
         `)
-        .eq('clientes.ativo', true);
+        .eq('clientes.ativo', true)
+        .eq('status', 'ativo');
 
       if (error) {
         console.error('Erro ao carregar contratos:', error);
@@ -732,9 +733,6 @@ export default function ContratosClientes() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{contratosAtivos.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Valor Total: R$ {valorTotalAtivos.toLocaleString('pt-BR')}
-            </p>
           </CardContent>
         </Card>
 
