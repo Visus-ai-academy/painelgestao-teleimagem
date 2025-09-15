@@ -239,7 +239,7 @@ export default function ContratosClientes() {
           )
         `)
         .eq('clientes.ativo', true)
-        .eq('status', 'ativo');
+        .in('status', ['ativo', 'vencido']);
 
       if (error) {
         console.error('Erro ao carregar contratos:', error);

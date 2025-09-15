@@ -45,18 +45,18 @@ export function SincronizarParametrosContratos() {
             nome_mobilemed
           )
         `)
-        .eq('status', 'ativo');
+        .in('status', ['ativo', 'vencido']);
 
       if (contratosError) {
         throw new Error(`Erro ao buscar contratos: ${contratosError.message}`);
       }
 
       if (!contratos || contratos.length === 0) {
-        toast.error('❌ Nenhum contrato ativo encontrado');
+        toast.error('❌ Nenhum contrato ativo ou vencido encontrado');
         return;
       }
 
-      console.log(`🔍 Encontrados ${contratos.length} contratos ativos para sincronização`);
+      console.log(`🔍 Encontrados ${contratos.length} contratos ativos e vencidos para sincronização`);
 
       const resultado: ResultadoSincronizacao = {
         sucesso: true,

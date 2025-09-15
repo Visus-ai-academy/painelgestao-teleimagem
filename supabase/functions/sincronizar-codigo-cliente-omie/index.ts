@@ -179,12 +179,12 @@ serve(async (req) => {
 
         if (updClienteError) throw updClienteError;
 
-        // Atualizar todos os contratos ativos deste cliente
+        // Atualizar todos os contratos ativos e vencidos deste cliente
         const { error: updContratosError } = await supabase
           .from('contratos_clientes')
           .update({ omie_codigo_cliente: codigoOmie, omie_data_sincronizacao: agora })
           .eq('cliente_id', c.id)
-          .eq('status', 'ativo');
+          .in('status', ['ativo', 'vencido']);
 
         if (updContratosError) throw updContratosError;
 
