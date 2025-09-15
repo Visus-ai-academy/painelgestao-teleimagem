@@ -841,7 +841,7 @@ serve(async (req) => {
           const { data: contratoISS } = await supabase
             .from('contratos_clientes')
             .select('percentual_iss')
-            .eq('cliente_id', cliente.id)
+            .eq('cliente_id', clienteIdValido)
             .order('created_at', { ascending: false })
             .limit(1);
           
