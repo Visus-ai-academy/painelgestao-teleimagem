@@ -1025,6 +1025,113 @@ export default function GerarFaturamento() {
     }
   };
 
+  // Função para gerar NF no Omie para cliente específico (INDIVIDUAL)
+  const gerarNFOmieCliente = async (clienteNome: string) => {
+    if (gerandoNFOmie) return;
+    
+    console.log('🔄 Iniciando geração de NF individual para cliente:', clienteNome);
+    
+    const clienteResultado = resultados.find(r => r.clienteNome === clienteNome);
+    
+    if (!clienteResultado?.relatorioGerado || clienteResultado.omieNFGerada) {
+      toast({
+        title: "Não é possível gerar NF",
+        description: "Cliente não possui relatório gerado ou NF já foi emitida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // ✅ VERIFICAR SE CLIENTE ESTÁ NA LISTA DE TESTE
+    const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
+    const nomeClienteUpper = clienteNome.toUpperCase().trim();
+    const clientePermitido = clientesPermitidosParaTeste.some(permitido => 
+      nomeClienteUpper.includes(permitido.toUpperCase())
+    );
+
+    if (!clientePermitido) {
+      toast({
+        title: "Cliente não autorizado para teste",
+        description: `Apenas os seguintes clientes estão autorizados para teste: ${clientesPermitidosParaTeste.join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGerandoNFOmie(true);
+
+    try {
+      console.log('🚀 Gerando NF no Omie para cliente:', clienteNome, 'período:', periodoSelecionado);
+
+      const response = await supabase.functions.invoke('gerar-nf-omie', {
+        body: {
+          periodo: periodoSelecionado,
+          clientes: [clienteNome]
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro na chamada da função');
+      }
+
+      const { data } = response;
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Erro no processamento da NF');
+      }
+
+      // Atualizar resultado específico do cliente
+      setResultados(prev => {
+        const novosResultados = prev.map(resultado => {
+          if (resultado.clienteNome === clienteNome) {
+            const nfInfo = data.resultados.find((nf: any) => nf.cliente === clienteNome);
+            if (nfInfo?.sucesso) {
+              return {
+                ...resultado,
+                omieNFGerada: true,
+                omieCodigoPedido: nfInfo.codigo_pedido_omie,
+                omieNumeroPedido: nfInfo.numero_pedido_omie,
+                dataGeracaoNFOmie: new Date().toLocaleString('pt-BR')
+              };
+            }
+          }
+          return resultado;
+        });
+        
+        // Salvar no banco de dados
+        salvarResultadosDB(novosResultados);
+        return novosResultados;
+      });
+
+      // Atualizar contador
+      if (data.sucessos > 0) {
+        setNfsGeradas(prev => prev + 1);
+        localStorage.setItem('nfsGeradas', String(nfsGeradas + 1));
+      }
+
+      toast({
+        title: data.sucessos > 0 ? "✅ NF gerada com sucesso!" : "❌ Erro na geração da NF",
+        description: data.sucessos > 0 
+          ? `NF emitida para ${clienteNome} no Omie` 
+          : `Erro ao gerar NF para ${clienteNome}: ${data.detalhes}`,
+        variant: data.sucessos > 0 ? "default" : "destructive",
+      });
+
+      console.log('✅ Resultado geração NF Omie:', data);
+
+    } catch (error) {
+      console.error('❌ Erro ao gerar NF no Omie:', error);
+      
+      toast({
+        title: "Erro na geração de NF",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração da NF no Omie",
+        variant: "destructive",
+      });
+    } finally {
+      setGerandoNFOmie(false);
+    }
+  };
+
   // Estado para controlar o período anterior (para detectar mudanças reais)
   const [periodoAnterior, setPeriodoAnterior] = useState<string | null>(null);
 
@@ -1773,34 +1880,51 @@ export default function GerarFaturamento() {
                 </div>
               </div>
 
-              {/* Etapa 4: Gerar NF no Omie */}
+              {/* Etapa 4: Gerar NF no Omie - EMISSÃO INDIVIDUAL */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
                   <FileBarChart2 className="h-4 w-4" />
-                  Etapa 4: Gerar NF no Omie
+                  Etapa 4: Gerar NF no Omie (Emissão Individual)
                 </h4>
-                <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <Button 
-                    onClick={gerarNFOmie}
-                    disabled={gerandoNFOmie || resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length === 0}
-                    size="lg"
-                    className="min-w-[280px] bg-purple-600 hover:bg-purple-700"
-                  >
-                    {gerandoNFOmie ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                        Gerando NFs no Omie...
-                      </>
-                    ) : (
-                      <>
-                        <FileBarChart2 className="h-5 w-5 mr-2" />
-                        🧾 Gerar NFs no Omie ({resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length})
-                      </>
-                    )}
-                  </Button>
-                   <p className="text-sm text-purple-700">
-                     🧪 MODO TESTE: Gera NF apenas para COT, CORTREL, IMDBATATAIS, BROOKLIN
-                   </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-3 bg-white rounded-lg border border-purple-200">
+                    <div className="text-xl font-bold text-purple-600">
+                      {resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Prontos para NF
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                    <div className="text-xl font-bold text-green-600">
+                      {resultados.filter(r => r.omieNFGerada).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      NFs Emitidas
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg border border-orange-200">
+                    <div className="text-xl font-bold text-orange-600">
+                      {resultados.filter(r => !r.relatorioGerado).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Aguardando Relatório
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 text-purple-800 mb-2">
+                    <Zap className="h-4 w-4" />
+                    <span className="font-semibold text-sm">📋 Como emitir NF individual:</span>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p>• Use os botões <strong>"Gerar NF"</strong> na coluna <strong>"Status NF Omie"</strong> da tabela abaixo</p>
+                    <p>• Cada NF é emitida individualmente para maior segurança</p>
+                    <p>• Apenas clientes com relatório gerado podem emitir NF</p>
+                    <p>• 🧪 <strong>MODO TESTE:</strong> Limitado aos clientes: COT, CORTREL, IMDBATATAIS, BROOKLIN</p>
+                  </div>
                 </div>
               </div>
 
@@ -1908,13 +2032,49 @@ export default function GerarFaturamento() {
                           </td>
                           <td className="p-3 text-center">
                             {resultado.omieNFGerada ? (
-                              <Badge variant="default" className="bg-purple-600">
-                                NF Gerada
-                              </Badge>
+                              <div className="flex flex-col items-center gap-1">
+                                <Badge variant="default" className="bg-purple-600">
+                                  ✅ Emitida
+                                </Badge>
+                                {resultado.dataGeracaoNFOmie && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {resultado.dataGeracaoNFOmie}
+                                  </span>
+                                )}
+                              </div>
+                            ) : resultado.relatorioGerado ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => gerarNFOmieCliente(resultado.clienteNome)}
+                                  disabled={gerandoNFOmie}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  {gerandoNFOmie ? (
+                                    <>
+                                      <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                      Gerando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FileBarChart2 className="h-3 w-3 mr-1" />
+                                      Gerar NF
+                                    </>
+                                  )}
+                                </Button>
+                                <Badge variant="outline" className="text-xs">
+                                  Pronto para NF
+                                </Badge>
+                              </div>
                             ) : (
-                              <Badge variant="outline">
-                                Pendente
-                              </Badge>
+                              <div className="flex flex-col items-center gap-1">
+                                <Badge variant="secondary" className="bg-gray-100">
+                                  Aguardando
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Relatório pendente
+                                </span>
+                              </div>
                             )}
                           </td>
                           <td className="p-3">
