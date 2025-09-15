@@ -294,7 +294,9 @@ serve(async (req) => {
             nomeFantasia // Nome fantasia
           ].filter(Boolean), // Remove valores null/undefined
           parametros_faturamento: cliente.parametros_faturamento,
-          tipo_faturamento: cliente.parametros_faturamento?.[0]?.tipo_faturamento || 'CO-FT' // ✅ ADICIONAR tipo_faturamento
+          tipo_faturamento: (getParametroAtivo(cliente.parametros_faturamento)?.tipo_faturamento)
+            || cliente.contratos_clientes?.[0]?.tipo_faturamento
+            || 'CO-FT'
         });
       } else {
         // Adicionar nomes adicionais para busca na volumetria
@@ -917,10 +919,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: (error as any)?.message || 'Erro inesperado ao gerar demonstrativos',
       }),
       { 
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
