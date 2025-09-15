@@ -13,22 +13,28 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Função para formatar CNPJ
-  const formatarCNPJ = (cnpj: string): string => {
-    if (!cnpj) return '';
-    
-    // Remove caracteres não numéricos
-    const somenteNumeros = cnpj.replace(/\D/g, '');
-    
-    // Se não tem 14 dígitos, retorna como está
-    if (somenteNumeros.length !== 14) return cnpj;
-    
-    // Aplica a formatação: 00.000.000/0000-00
-    return somenteNumeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  };
+  // Adicionar timeout de 25 segundos (limite do Supabase é 30s)
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Timeout: Processamento excedeu 25 segundos')), 25000);
+  });
 
-  try {
-    console.log('Função iniciada');
+  const processRequest = async () => {
+    // Função para formatar CNPJ
+    const formatarCNPJ = (cnpj: string): string => {
+      if (!cnpj) return '';
+      
+      // Remove caracteres não numéricos
+      const somenteNumeros = cnpj.replace(/\D/g, '');
+      
+      // Se não tem 14 dígitos, retorna como está
+      if (somenteNumeros.length !== 14) return cnpj;
+      
+      // Aplica a formatação: 00.000.000/0000-00
+      return somenteNumeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    };
+
+    try {
+      console.log('Função iniciada');
     
     const body = await req.json();
     const demonstrativoData = body?.demonstrativo_data || null;
@@ -89,29 +95,10 @@ serve(async (req: Request) => {
     const proximoAno = parseInt(mes) === 12 ? parseInt(ano) + 1 : parseInt(ano);
     const dataFim = `${proximoAno}-${proximoMes.toString().padStart(2, '0')}-01`;
 
-    console.log(`Buscando dados para cliente: ${cliente.nome}, período: ${dataInicio} a ${dataFim}`);
+    console.log(`🔍 Buscando dados para: Cliente=${cliente.nome} | NomeFantasia=${cliente.nome_fantasia} | Período=${dataInicio} a ${dataFim}`);
     
-    // DEBUG: Verificar se há dados na tabela volumetria_mobilemed
-    const { data: totalCount, error: countError } = await supabase
-      .from('volumetria_mobilemed')
-      .select('*', { count: 'exact', head: true });
-    
-    console.log(`DEBUG: Total de registros na tabela volumetria_mobilemed: ${totalCount?.length || 'N/A'}`);
-    if (countError) console.log('DEBUG: Erro ao contar registros:', countError);
-    
-    // DEBUG: Buscar alguns registros para ver estrutura
-    const { data: sampleData, error: sampleError } = await supabase
-      .from('volumetria_mobilemed')
-      .select('"EMPRESA", data_referencia')
-      .limit(5);
-    
-    console.log('DEBUG: Amostra de dados na tabela:', JSON.stringify(sampleData));
-    if (sampleError) console.log('DEBUG: Erro ao buscar amostra:', sampleError);
-    
-    console.log(`Buscando no campo correto. Cliente da tabela clientes: ${cliente.nome}`);
-    
-    // Buscar dados de faturamento usando NOME FANTASIA do cliente
-    console.log('Buscando dados de faturamento pelo nome fantasia...');
+    // Buscar dados de faturamento usando NOME FANTASIA do cliente prioritariamente
+    console.log('📊 Buscando dados de faturamento pelo nome fantasia...');
     
     let { data: dataFaturamento, error: errorFaturamento } = await supabase
       .from('faturamento')
@@ -119,29 +106,22 @@ serve(async (req: Request) => {
       .eq('cliente_nome', cliente.nome_fantasia || cliente.nome) // Usar nome_fantasia prioritariamente
       .eq('periodo_referencia', periodo);
 
-    console.log(`Dados de faturamento encontrados: ${dataFaturamento?.length || 0}`);
-    console.log('🔍 AMOSTRA DOS DADOS ENCONTRADOS:');
-    if (dataFaturamento && dataFaturamento.length > 0) {
-      console.log('Primeiros 2 registros:', JSON.stringify(dataFaturamento.slice(0, 2), null, 2));
-      console.log('Tem campo "valor"?', dataFaturamento[0].hasOwnProperty('valor'));
-      console.log('Valor do primeiro registro:', dataFaturamento[0].valor);
-    } else {
-      console.log('⚠️ NENHUM DADO DE FATURAMENTO ENCONTRADO PARA O NOME FANTASIA:', cliente.nome);
+    console.log(`📊 Faturamento encontrado: ${dataFaturamento?.length || 0} registros`);
+    
+    if (!dataFaturamento || dataFaturamento.length === 0) {
+      console.log('⚠️ Nenhum dado de faturamento encontrado, tentando volumetria...');
       
-      // Se não encontrar, tentar buscar usando APENAS Cliente_Nome_Fantasia nos dados de volumetria
-      console.log('🔄 Tentando buscar dados da volumetria usando APENAS Cliente_Nome_Fantasia...');
-      
+      // Buscar dados de volumetria como fallback
       const { data: dataVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
-        .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia || cliente.nome) // Buscar por Nome Fantasia ou Nome
+        .eq('"Cliente_Nome_Fantasia"', cliente.nome_fantasia || cliente.nome)
         .eq('periodo_referencia', periodo);
+      
+      console.log(`📊 Volumetria encontrada: ${dataVolumetria?.length || 0} registros`);
+      
       if (dataVolumetria && dataVolumetria.length > 0) {
-        console.log(`📊 Dados de volumetria encontrados: ${dataVolumetria.length}`);
-        // Usar dados de volumetria como fallback
         dataFaturamento = dataVolumetria;
-      } else {
-        console.log('⚠️ Nenhum dado encontrado por nome fantasia; mantendo finalData vazio para gerar relatório sem dados.');
       }
     }
 
@@ -182,8 +162,17 @@ serve(async (req: Request) => {
     console.log('Total de registros finalData:', finalData.length);
     console.log('É dados de faturamento?', isFaturamentoData);
     if (finalData.length > 0) {
-      console.log('Primeiro registro completo:', JSON.stringify(finalData[0], null, 2));
-      console.log('Propriedades disponíveis:', Object.keys(finalData[0]));
+      console.log('Primeiros 3 registros (resumo):', JSON.stringify(finalData.slice(0, 3).map(item => ({
+        // Mostrar campos principais apenas para debug mais limpo
+        tipo: isFaturamentoData ? 'faturamento' : 'volumetria',
+        paciente: isFaturamentoData ? item.paciente : item.NOME_PACIENTE,
+        exame: isFaturamentoData ? item.nome_exame : item.ESTUDO_DESCRICAO,
+        valor: isFaturamentoData ? item.valor : item.VALORES,
+        quantidade: isFaturamentoData ? item.quantidade : 1
+      })), null, 2));
+      console.log('Total de registros únicos por paciente:', new Set(finalData.map(item => 
+        isFaturamentoData ? item.paciente : item.NOME_PACIENTE
+      )).size);
     }
     
     let valorBrutoTotal: number, totalLaudos: number;
@@ -335,10 +324,10 @@ serve(async (req: Request) => {
       doc.setTextColor(0, 124, 186);
       doc.text('QUADRO 1 - RESUMO', 20, yQuadro1);
       
-      // Caixa do resumo (mais larga para paisagem)
+      // Caixa do resumo (mais alta para acomodar melhor os textos)
       doc.setDrawColor(0, 124, 186);
       doc.setLineWidth(0.5);
-      doc.rect(20, yQuadro1 + 5, 257, 70);
+      doc.rect(20, yQuadro1 + 5, 257, 80);
       
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
@@ -372,15 +361,15 @@ serve(async (req: Request) => {
       yLine += 8;
       doc.text(`IRRF (${percentualIRRF}%): R$ ${valorIRRF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 150, yLine);
       
-      // Linha separadora antes do Valor a Pagar
+      // Linha separadora antes do Valor a Pagar (movida para baixo)
       doc.setDrawColor(0, 124, 186);
       doc.setLineWidth(1);
-      doc.line(25, yQuadro1 + 45, 270, yQuadro1 + 45);
+      doc.line(25, yQuadro1 + 50, 270, yQuadro1 + 50);
       
-      // Valor a Pagar destacado
+      // Valor a Pagar destacado (movido para baixo para não sobrepor)
       doc.setFontSize(16);
       doc.setTextColor(0, 0, 0); // Cor preta em vez de verde
-      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 55, { align: 'center' });
+      doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 62, { align: 'center' });
       
       // === NOVA PÁGINA PARA QUADRO 2 ===
       doc.addPage('landscape');
@@ -610,6 +599,22 @@ serve(async (req: Request) => {
       stack: error.stack
     }), {
       status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  }; // Fim da função processRequest
+
+  // Executar com timeout
+  try {
+    return await Promise.race([processRequest(), timeoutPromise]);
+  } catch (error) {
+    console.error('Erro com timeout:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'Timeout ou erro interno',
+      timeout: error.message.includes('Timeout')
+    }), {
+      status: error.message.includes('Timeout') ? 408 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

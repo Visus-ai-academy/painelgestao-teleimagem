@@ -220,6 +220,41 @@ export default function GerarFaturamento() {
   // Função para salvar resultados no banco de dados
   const salvarResultadosDB = useCallback(async (novosResultados: typeof resultados) => {
     try {
+      // Função para validar e converter data
+      const converterDataSegura = (dataStr: any): string | null => {
+        if (!dataStr) return null;
+        
+        try {
+          // Se já é uma string de data ISO, usar direto
+          if (typeof dataStr === 'string' && dataStr.includes('T')) {
+            const date = new Date(dataStr);
+            return isNaN(date.getTime()) ? null : date.toISOString();
+          }
+          
+          // Se é uma string de data brasileira, converter
+          if (typeof dataStr === 'string' && dataStr.includes('/')) {
+            const [datePart, timePart] = dataStr.split(',').map(s => s.trim());
+            const [day, month, year] = datePart.split('/');
+            const dateISO = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            
+            if (timePart) {
+              const date = new Date(`${dateISO}T${timePart}`);
+              return isNaN(date.getTime()) ? null : date.toISOString();
+            } else {
+              const date = new Date(dateISO);
+              return isNaN(date.getTime()) ? null : date.toISOString();
+            }
+          }
+          
+          // Tentar converter diretamente
+          const date = new Date(dataStr);
+          return isNaN(date.getTime()) ? null : date.toISOString();
+        } catch (error) {
+          console.warn('Erro ao converter data:', dataStr, error);
+          return null;
+        }
+      };
+
       // Preparar dados para inserção/atualização no banco
       const dadosParaDB = novosResultados.map(resultado => ({
         cliente_id: resultado.clienteId,
@@ -231,7 +266,7 @@ export default function GerarFaturamento() {
         link_relatorio: resultado.linkRelatorio || null,
         erro: resultado.erro || null,
         erro_email: resultado.erroEmail || null,
-        data_processamento: resultado.dataProcessamento ? new Date(resultado.dataProcessamento).toISOString() : null,
+        data_processamento: converterDataSegura(resultado.dataProcessamento),
         data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
         data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
         detalhes_relatorio: resultado.detalhesRelatorio ? JSON.stringify(resultado.detalhesRelatorio) : null
@@ -911,8 +946,20 @@ export default function GerarFaturamento() {
             body: bodyData
           });
 
-          if (relatorioError || !relatorioData?.success) {
-            throw new Error(relatorioError?.message || relatorioData?.error || 'Erro ao gerar relatório');
+          if (relatorioError) {
+            // Se é erro de timeout, mostrar mensagem específica
+            if (relatorioError.message?.includes('timeout') || relatorioError.message?.includes('Timeout')) {
+              throw new Error('Timeout: Geração do relatório demorou muito. Tente novamente.');
+            }
+            throw new Error(relatorioError.message || 'Erro na chamada da função');
+          }
+
+          if (!relatorioData?.success) {
+            // Verificar se é erro de timeout no response
+            if (relatorioData?.timeout) {
+              throw new Error('Timeout: Geração do relatório demorou muito. Tente novamente.');
+            }
+            throw new Error(relatorioData?.error || 'Erro ao gerar relatório');
           }
 
           const pdfUrl = relatorioData.arquivos?.[0]?.url;
