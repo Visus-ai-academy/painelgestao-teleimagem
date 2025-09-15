@@ -146,51 +146,70 @@ serve(async (req) => {
           throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado (cliente.cod_cliente ou contrato.configuracoes_integracao.codigo_omie)`);
         }
 
-        console.log(`Cliente ${demo.cliente_nome} - Código OMIE: ${codigoClienteOmie} | Contrato: ${contratoAtivo.numero_contrato}`);
+        // Converter para o formato numérico exigido pela API (remove qualquer prefixo como "CLI")
+        const codigoClienteNumerico = Number(String(codigoClienteOmie).replace(/\D/g, ''));
+        if (!codigoClienteNumerico) {
+          throw new Error(`Código OMIE inválido para ${demo.cliente_nome}: ${codigoClienteOmie}`);
+        }
 
-        // Preparar dados para criação da NF no Omie baseado no contrato ativo
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE numérico: ${codigoClienteNumerico} | Contrato: ${contratoAtivo.numero_contrato}`);
+
+        // Utilidades de data no formato dd/MM/yyyy exigido pelo Omie
+        const formatDateBR = (d: Date) => {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        };
+
+        const hoje = new Date();
+        const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+        // Obter códigos de produto/serviço do contrato quando disponíveis
+        const cfg = (contratoAtivo as any)?.configuracoes_integracao || {};
+        const codigoProduto = cfg.codigo_produto || 'TELEIMAGEM';
+        const codigoItemIntegracao = cfg.codigo_item_integracao || 'TELE-SERV';
+
+        // Montar Pedido de Venda (API produtos/pedido -> IncluirPedido)
         const nfData = {
-          // Cabeçalho da NF
           cabecalho: {
-            codigo_cliente_omie: codigoClienteOmie,
-            codigo_pedido: `FAT-${periodo}-${demo.cliente_nome.replace(/[^A-Z0-9]/g, '')}`,
-            data_emissao: new Date().toISOString().split('T')[0],
-            data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-            numero_pedido: `${periodo}-${contratoAtivo.numero_contrato}`,
-            quantidade_itens: 1,
-            codigo_parcela: "000",
-            qtde_parcelas: 1
+            codigo_cliente: codigoClienteNumerico,
+            codigo_pedido_integracao: `FAT-${periodo}-${demo.cliente_nome.replace(/[^A-Z0-9]/g, '')}`,
+            data_previsao: formatDateBR(hoje),
+            etapa: '50', // Faturar
+            codigo_parcela: '999', // Parcela customizada
+            qtde_parcelas: 1,
           },
-          // Informações do cliente
           informacoes_adicionais: {
-            categoria: "Faturamento Teleimagem",
-            obs_internas: `Período ${periodo} - ${totalLaudos} laudos | Contrato: ${contratoAtivo.numero_contrato}`,
-            obs_venda: `Serviços de telemedicina - período ${periodo} | ${contratoAtivo.tipo_faturamento}`
+            enviar_email: 'N',
+            consumidor_final: 'N',
           },
-          // Itens da NF baseados no contrato
+          lista_parcelas: {
+            parcela: [
+              {
+                data_vencimento: formatDateBR(venc),
+                numero_parcela: 1,
+                percentual: 100,
+                valor: valorTotal,
+                nao_gerar_boleto: 'S',
+              },
+            ],
+          },
           det: [
             {
               ide: {
-                codigo_item_omie: "", // Código do serviço de telemedicina no Omie
-                simples_nacional: contratoAtivo.simples ? "S" : "N",
-                codigo_produto: "TELEIMAGEM-SERVICOS"
+                codigo_item_integracao: String(codigoItemIntegracao),
+                simples_nacional: contratoAtivo.simples ? 'S' : 'N',
               },
               produto: {
-                codigo: "TELEIMAGEM",
+                codigo_produto: String(codigoProduto),
                 descricao: `Serviços de Telemedicina - ${periodo} (${contratoAtivo.tipo_faturamento})`,
-                unidade: "SV",
+                unidade: 'SV',
                 quantidade: 1,
                 valor_unitario: valorTotal,
-                valor_total: valorTotal
               },
-              imposto: {
-                cofins_aliquota: 3.00,
-                pis_aliquota: 0.65,
-                iss_aliquota: contratoAtivo.percentual_iss || 5.00,
-                codigo_beneficio_fiscal: ""
-              }
-            }
-          ]
+            },
+          ],
         };
 
         // Criar NF no Omie
@@ -201,7 +220,11 @@ serve(async (req) => {
           param: [nfData]
         };
 
-        console.log(`Criando NF no Omie:`, JSON.stringify(criarNFReq, null, 2));
+        // Log seguro (sem expor credenciais)
+        console.log(
+          `Criando NF no Omie (IncluirPedido) para ${demo.cliente_nome}:`,
+          JSON.stringify({ call: criarNFReq.call, param: criarNFReq.param }, null, 2)
+        );
 
         const nfResponse = await fetch("https://app.omie.com.br/api/v1/produtos/pedido/", {
           method: "POST",
