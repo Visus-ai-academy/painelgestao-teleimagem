@@ -68,7 +68,7 @@ serve(async (req) => {
 
     // Se clientes específicos foram informados, filtrar (usando ILIKE para case insensitive)
     if (clientes && clientes.length > 0) {
-      const clientesCondition = clientes.map(nome => `cliente_nome.ilike.${nome}`).join(',');
+      const clientesCondition = clientes.map(nome => `cliente_nome.eq.${nome}`).join(',');
       query = query.or(clientesCondition);
     }
 
@@ -383,11 +383,17 @@ serve(async (req) => {
       } catch (error) {
         console.error(`Erro ao processar NF para ${demo.cliente_nome}:`, error);
         erros++;
-        
+        const erroMsg = (error as any)?.message || String(error);
+        // Persistir erro no registro do relatório para facilitar diagnóstico
+        await supabase
+          .from('relatorios_faturamento_status')
+          .update({ erro: erroMsg, omie_nf_gerada: false, updated_at: new Date().toISOString() })
+          .eq('cliente_id', demo.cliente_id)
+          .eq('periodo', periodo);
         resultados.push({
           cliente: demo.cliente_nome,
           sucesso: false,
-          erro: error.message,
+          erro: erroMsg,
           valor_total: valorTotal
         });
       }

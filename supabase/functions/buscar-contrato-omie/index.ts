@@ -113,6 +113,34 @@ serve(async (req) => {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Cliente não possui código OMIE' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Se temos o número do contrato, tentar consulta direta para obter nCodCtr
+    if (numeroContratoDesejado) {
+      const consultaReq: OmieRequest = {
+        call: 'ConsultarContrato',
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{ cNumCtr: numeroContratoDesejado }]
+      };
+      console.log('Consultando contrato por número no Omie:', JSON.stringify({ call: consultaReq.call, param: consultaReq.param }, null, 2));
+      const consultaResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(consultaReq)
+      });
+      const consultaJson = await consultaResp.json();
+      const codDireto = consultaJson?.nCodCtr || consultaJson?.nCodContrato || consultaJson?.codigo;
+      if (codDireto) {
+        await supabase
+          .from('contratos_clientes')
+          .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
+          .eq('cliente_id', clienteRow.id)
+          .eq('status', 'ativo')
+          .is('omie_codigo_contrato', null);
+        return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(codDireto), detalhes: consultaJson }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      console.warn('Consulta por número não retornou nCodCtr. Caindo para listagem...');
+    }
+
     // Listar contratos no Omie por cliente
     const listReq: OmieRequest = {
       call: 'ListarContratos',
