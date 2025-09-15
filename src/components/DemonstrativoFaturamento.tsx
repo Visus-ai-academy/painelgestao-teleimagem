@@ -299,8 +299,8 @@ export default function DemonstrativoFaturamento() {
           if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
             console.log('📋 Demonstrativos completos encontrados no localStorage:', dados.demonstrativos.length);
             
-            // Converter formato dos demonstrativos completos para o formato esperado
-            const clientesConvertidos: ClienteFaturamento[] = dados.demonstrativos
+            // ✅ Converter formato dos demonstrativos completos para o formato esperado
+            const clientesRaw: ClienteFaturamento[] = dados.demonstrativos
               .filter((demo: any) => demo && (demo.cliente_nome || demo.nome_cliente)) // aceitar ambos
               .map((demo: any) => {
                 const nomeCliente = demo.cliente_nome || demo.nome_cliente || 'Cliente sem nome';
@@ -323,7 +323,20 @@ export default function DemonstrativoFaturamento() {
                    observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
                    detalhes_exames: demo.detalhes_exames || []
                  };
-              });
+               });
+
+            // ✅ DEDUPLICAR CLIENTES POR NOME (corrige problema de duplicação)
+            const clientesMap = new Map<string, ClienteFaturamento>();
+            clientesRaw.forEach(cliente => {
+              const existing = clientesMap.get(cliente.nome);
+              if (!existing || cliente.valor_liquido > existing.valor_liquido) {
+                // Manter o cliente com maior valor ou o primeiro se valores iguais
+                clientesMap.set(cliente.nome, cliente);
+              }
+            });
+            
+            const clientesConvertidos = Array.from(clientesMap.values());
+            console.log(`✅ Deduplicação: ${clientesRaw.length} registros → ${clientesConvertidos.length} clientes únicos`);
             
             if (clientesConvertidos.length > 0) {
               // Enriquecer tipo_faturamento a partir da tabela faturamento (prioritário) e, se necessário, dos contratos ativos
