@@ -1010,8 +1010,6 @@ export default function ContratosClientes() {
                   <SelectItem value="volumeFranquia-desc">Volume Franquia (Maior)</SelectItem>
                   <SelectItem value="valorIntegracao-asc">Valor Integração (Menor)</SelectItem>
                   <SelectItem value="valorIntegracao-desc">Valor Integração (Maior)</SelectItem>
-                  <SelectItem value="diaFechamento-asc">Dia Fechamento (Menor)</SelectItem>
-                  <SelectItem value="diaFechamento-desc">Dia Fechamento (Maior)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1047,8 +1045,6 @@ export default function ContratosClientes() {
                   <TableHead>Volume Franquia</TableHead>
                   <TableHead>Integração</TableHead>
                   <TableHead>Portal Laudos</TableHead>
-                  <TableHead>Dia Fechamento</TableHead>
-                  <TableHead>Forma Cobrança</TableHead>
                   <TableHead>Dias p/ Vencer</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -1126,17 +1122,6 @@ export default function ContratosClientes() {
                     <TableCell>
                       <Badge variant={contrato.portalLaudos ? 'default' : 'secondary'}>
                         {contrato.portalLaudos ? 'Sim' : 'Não'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Dia {contrato.diaFechamento || 7}</span>
-                        <span className="text-xs text-muted-foreground">do mês</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {(contrato.formaCobranca || 'mensal').charAt(0).toUpperCase() + (contrato.formaCobranca || 'mensal').slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell>
