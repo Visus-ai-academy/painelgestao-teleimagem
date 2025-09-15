@@ -908,7 +908,7 @@ export default function GerarFaturamento() {
     if (gerandoNFOmie) return;
     
     // ✅ CLIENTES PERMITIDOS PARA TESTE DE EMISSÃO DE NF
-    const clientesPermitidosParaTeste = ['COT', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
+    const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
     
     const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.omieNFGerada);
     
@@ -1788,7 +1788,7 @@ export default function GerarFaturamento() {
                     )}
                   </Button>
                    <p className="text-sm text-purple-700">
-                     🧪 MODO TESTE: Gera NF apenas para COT, CORREL, IMDBATATAIS, BROOKLIN
+                     🧪 MODO TESTE: Gera NF apenas para COT, CORTREL, IMDBATATAIS, BROOKLIN
                    </p>
                 </div>
               </div>
