@@ -126,17 +126,39 @@ serve(async (req) => {
       return s.startsWith('cancel') || s.startsWith('inativ');
     };
 
-    // Helper: identificar clientes NC-NF (via parâmetros ou contrato)
+    // Helpers de parâmetros/contratos
+    const getParametroAtivo = (pfList?: any[]) => {
+      if (!pfList || pfList.length === 0) return null;
+      const ativos = pfList.filter((pf) => {
+        const st = (pf.status || '').toString().toUpperCase();
+        return st === 'A' || st === 'ATIVO';
+      });
+      if (ativos.length === 0) return null;
+      // Mais recente primeiro
+      ativos.sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
+      return ativos[0];
+    };
+
+    const resolveTipoFaturamento = (c: any) => {
+      const pfAtivo = getParametroAtivo(c.parametros_faturamento);
+      if (pfAtivo?.tipo_faturamento) return pfAtivo.tipo_faturamento;
+      const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento;
+      if (tipoContrato) return tipoContrato;
+      // Fallback: lista conhecida (NC) ou CO-FT
+      const nomeCliente = (c.nome_fantasia || c.nome || '').toUpperCase();
+      const clientesNC = [
+        'CDICARDIO','CDIGOIAS','CISP','CLIRAM','CRWANDERLEY','DIAGMAX-PR','GOLD','PRODIMAGEM','TRANSDUSON','ZANELLO','CEMVALENCA','RMPADUA','RADI-IMAGEM'
+      ];
+      return clientesNC.some((nc) => nomeCliente.includes(nc)) ? 'NC-FT' : 'CO-FT';
+    };
+
+    // Helper: identificar clientes NC-NF (via parâmetros ou contrato ou fallback)
     const isNCNF = (c: any) => {
-      // Verificar em parâmetros primeiro (prioridade)
-      const tipoParam = c.parametros_faturamento?.[0]?.tipo_faturamento?.toUpperCase?.();
+      const pfAtivo = getParametroAtivo(c.parametros_faturamento);
+      const tipoParam = pfAtivo?.tipo_faturamento?.toUpperCase?.();
       if (tipoParam === 'NC-NF') return true;
-      
-      // Verificar em contratos
       const tipoContrato = c.contratos_clientes?.[0]?.tipo_faturamento?.toUpperCase?.();
       if (tipoContrato === 'NC-NF') return true;
-      
-      // Verificar se é cliente conhecido como NC-NF através de lista hard-coded (fallback)
       const nomeCliente = (c.nome_fantasia || c.nome || '').toUpperCase();
       const clientesNC = [
         'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
@@ -145,16 +167,18 @@ serve(async (req) => {
       return clientesNC.some(nc => nomeCliente.includes(nc));
     };
 
-    // ✅ Considerar APENAS clientes ativos e NÃO NC-NF
-    const clientesAtivos = todosClientesFinal.filter(c => 
-      c.ativo && 
-      !isStatusInativoOuCancelado(c.status) &&
-      !isNCNF(c)
-    );
+    // ✅ Considerar APENAS clientes ativos e com parâmetro ATIVO (se existir) e NÃO NC-NF
+    const clientesAtivos = todosClientesFinal.filter(c => {
+      const pfAtivo = getParametroAtivo(c.parametros_faturamento);
+      const paramStatusOk = pfAtivo ? !isStatusInativoOuCancelado(pfAtivo.status) : true;
+      return (
+        c.ativo && !isStatusInativoOuCancelado(c.status) && paramStatusOk && !isNCNF(c)
+      );
+    });
     
-    // Clientes inativos/cancelados (para verificação de volumetria)
+    // Clientes inativos/cancelados (para verificação de volumetria) – NÃO incluir no demonstrativo
     const clientesInativos = todosClientesFinal.filter(c => 
-      !c.ativo || isStatusInativoOuCancelado(c.status)
+      !c.ativo || isStatusInativoOuCancelado(c.status) || isStatusInativoOuCancelado(getParametroAtivo(c.parametros_faturamento)?.status)
     );
     
     console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
