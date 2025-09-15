@@ -182,7 +182,7 @@ serve(async (req) => {
     // ✅ LISTA FINAL: clientes ativos (já sem NC-NF) + inativos com volumetria (também excluir NC-NF)
     let clientes = [...clientesAtivos, ...clientesInativosComVolumetria.filter(c => !isNCNF(c))];
     
-    console.log(`📋 Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.filter(c => !isNCNF(c)).length} inativos com volumetria)');
+    console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.filter(c => !isNCNF(c)).length + ' inativos com volumetria)');
     
     if (clientes.length === 0) {
       console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
@@ -207,7 +207,7 @@ serve(async (req) => {
           status: 'Ativo',
           parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
         }));
-        console.log(`Fallback aplicado: ${clientes.length} clientes adicionados a partir da volumetria.`);
+        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria.');
       }
     }
 
