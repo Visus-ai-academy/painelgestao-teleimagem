@@ -256,13 +256,16 @@ serve(async (req) => {
         const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
         // Usar API de Faturamento de Contratos de Serviço do Omie
-        const codigoContratoOmie = contratoAtivo.omie_codigo_contrato || codigoClienteNumerico;
+        if (!contratoAtivo.omie_codigo_contrato) {
+          throw new Error(`Contrato Omie não sincronizado para ${demo.cliente_nome} (omie_codigo_contrato ausente no contrato ${contratoAtivo.numero_contrato})`);
+        }
+        const codigoContratoOmie = Number(String(contratoAtivo.omie_codigo_contrato).replace(/\D/g, ''));
         
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
         // Faturar Contrato de Serviço (API servicos/contrato -> FaturarCtr)
         const faturarContratoReq: OmieApiRequest = {
-          call: "FaturarCtr",
+          call: "FaturarContrato",
           app_key: omieAppKey,
           app_secret: omieAppSecret,
           param: [{
@@ -272,11 +275,11 @@ serve(async (req) => {
 
         // Log seguro (sem expor credenciais)
         console.log(
-          `Faturando Contrato no Omie (FaturarCtr) para ${demo.cliente_nome}:`,
+          `Faturando Contrato no Omie (FaturarContrato) para ${demo.cliente_nome}:`,
           JSON.stringify({ call: faturarContratoReq.call, param: faturarContratoReq.param }, null, 2)
         );
 
-        const nfResponse = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
+        const nfResponse = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(faturarContratoReq)
