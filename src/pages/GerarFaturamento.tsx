@@ -516,13 +516,13 @@ export default function GerarFaturamento() {
 
         // Preparar arrays auxiliares
         const clientesTemp: any[] = [];
-        const clientesJaProcessados = new Set<string>();
+        const clientesProcessadosSet = new Set<string>();
         
         for (const nomeCliente of nomesUnicos) {
-          if (clientesJaProcessados.has(nomeCliente.trim().toUpperCase())) {
+          if (clientesProcessadosSet.has(nomeCliente.trim().toUpperCase())) {
             continue;
           }
-          clientesJaProcessados.add(nomeCliente.trim().toUpperCase());
+          clientesProcessadosSet.add(nomeCliente.trim().toUpperCase());
           
           const { data: emailCliente } = await supabase
             .from('clientes')
