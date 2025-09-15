@@ -127,9 +127,10 @@ serve(async (req) => {
     };
 
     // Helpers de parâmetros/contratos
-    const getParametroAtivo = (pfList?: any[]) => {
-      if (!pfList || pfList.length === 0) return null;
-      const ativos = pfList.filter((pf) => {
+    const getParametroAtivo = (pfList?: any) => {
+      const list: any[] = Array.isArray(pfList) ? pfList : (pfList ? [pfList] : []);
+      if (!list || list.length === 0) return null;
+      const ativos = list.filter((pf) => {
         const st = (pf.status || '').toString().toUpperCase();
         return st === 'A' || st === 'ATIVO';
       });
