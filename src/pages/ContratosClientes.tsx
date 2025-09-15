@@ -278,10 +278,12 @@ export default function ContratosClientes() {
         const parametros = parametrosPorCliente[contrato.cliente_id] || null;
         
         const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0); // Normalizar para início do dia
         const dataFim = new Date(parametros?.data_termino_contrato || contrato.data_fim || contrato.data_inicio);
+        dataFim.setHours(0, 0, 0, 0); // Normalizar para início do dia
         const diasParaVencer = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
-        // Status calculado por data (fallback)
+        // Status calculado SEMPRE por data primeiro (prioridade)
         let statusCalculado: "Ativo" | "Vencido" | "A Vencer" = "Ativo";
         if (diasParaVencer < 0) {
           statusCalculado = "Vencido";
@@ -289,16 +291,16 @@ export default function ContratosClientes() {
           statusCalculado = "A Vencer";
         }
 
-        // Status dos parâmetros (se existir), mapeado para exibição
+        // Status dos parâmetros sobrescreve APENAS se for Inativo ou Cancelado
         const statusFromParams = (() => {
           const s = parametros?.status;
           if (!s) return null;
-          if (s === 'A' || s?.toLowerCase() === 'ativo') return 'Ativo';
           if (s === 'I' || s?.toLowerCase() === 'inativo') return 'Inativo';
           if (s === 'C' || s?.toLowerCase() === 'cancelado') return 'Cancelado';
-          return 'Ativo';
+          return null; // Não sobrescrever status de data para "Ativo"
         })();
 
+        // Usar status dos parâmetros apenas para Inativo/Cancelado, senão usar calculado por data
         const status: "Ativo" | "Vencido" | "A Vencer" | "Inativo" | "Cancelado" = (statusFromParams as any) || statusCalculado;
 
         // Usar parâmetros de faturamento da consulta separada ou fallback para JSONB
@@ -1048,7 +1050,14 @@ export default function ContratosClientes() {
               </TableHeader>
               <TableBody>
                 {contratos.map((contrato) => (
-                  <TableRow key={contrato.id}>
+                  <TableRow 
+                    key={contrato.id}
+                    className={
+                      contrato.status === 'Vencido' ? 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100' :
+                      contrato.status === 'A Vencer' ? 'bg-yellow-50 border-l-4 border-yellow-500 hover:bg-yellow-100' :
+                      'hover:bg-muted/50'
+                    }
+                  >
                     <TableCell className="font-medium">{contrato.cliente}</TableCell>
                     <TableCell>{contrato.numeroContrato || 'Não informado'}</TableCell>
                     <TableCell>{contrato.razaoSocial}</TableCell>
@@ -1056,10 +1065,17 @@ export default function ContratosClientes() {
                       <Badge variant={
                         contrato.status === 'Ativo' ? 'default' : 
                         contrato.status === 'A Vencer' ? 'secondary' : 
+                        contrato.status === 'Vencido' ? 'destructive' :
                         contrato.status === 'Inativo' ? 'outline' :
                         contrato.status === 'Cancelado' ? 'destructive' :
                         'destructive'
-                      }>
+                      }
+                      className={
+                        contrato.status === 'Vencido' ? 'bg-red-600 text-white hover:bg-red-700' :
+                        contrato.status === 'A Vencer' ? 'bg-yellow-600 text-white hover:bg-yellow-700' :
+                        ''
+                      }
+                      >
                         {contrato.status}
                       </Badge>
                     </TableCell>
@@ -1098,7 +1114,11 @@ export default function ContratosClientes() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className={contrato.diasParaVencer < 0 ? 'text-red-600' : contrato.diasParaVencer <= 60 ? 'text-yellow-600' : 'text-green-600'}>
+                      <span className={
+                        contrato.diasParaVencer < 0 ? 'text-red-600 font-semibold bg-red-100 px-2 py-1 rounded' : 
+                        contrato.diasParaVencer <= 60 ? 'text-yellow-700 font-semibold bg-yellow-100 px-2 py-1 rounded' : 
+                        'text-green-600 font-medium'
+                      }>
                         {contrato.diasParaVencer} dias
                       </span>
                     </TableCell>
@@ -1245,10 +1265,17 @@ export default function ContratosClientes() {
                       <Badge variant={
                         (contratoVisualizando || contratoEditando)?.status === 'Ativo' ? 'default' : 
                         (contratoVisualizando || contratoEditando)?.status === 'A Vencer' ? 'secondary' : 
+                        (contratoVisualizando || contratoEditando)?.status === 'Vencido' ? 'destructive' :
                         (contratoVisualizando || contratoEditando)?.status === 'Inativo' ? 'outline' :
                         (contratoVisualizando || contratoEditando)?.status === 'Cancelado' ? 'destructive' :
                         'destructive'
-                      }>
+                      }
+                      className={
+                        (contratoVisualizando || contratoEditando)?.status === 'Vencido' ? 'bg-red-600 text-white hover:bg-red-700' :
+                        (contratoVisualizando || contratoEditando)?.status === 'A Vencer' ? 'bg-yellow-600 text-white hover:bg-yellow-700' :
+                        ''
+                      }
+                      >
                         {(contratoVisualizando || contratoEditando)?.status}
                       </Badge>
                     </div>
