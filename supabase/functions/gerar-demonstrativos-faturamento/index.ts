@@ -355,6 +355,11 @@ serve(async (req) => {
         if (!clienteIdValido) {
           console.warn(`⚠️ Cliente sem ID válido no cadastro: ${cliente.nome_fantasia}. Preços/Parâmetros não serão aplicados.`);
         }
+        // Regras de exclusão: NC-NF não gera demonstrativo nem relatório
+        if ((cliente.tipo_faturamento || '').toUpperCase() === 'NC-NF') {
+          console.log(`⏭️ Ignorando cliente NC-NF: ${cliente.nome_fantasia}`);
+          continue;
+        }
 
     // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
     console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
@@ -376,11 +381,13 @@ serve(async (req) => {
           "MEDICO",
           "DATA_LAUDO",
           "DATA_PRAZO",
-          periodo_referencia
+          periodo_referencia,
+          tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
+        .in('tipo_faturamento', ['CO-FT', 'NC-FT'])
         .range(from, from + pageSize - 1);
 
       if (volumetriaError) {
@@ -551,7 +558,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: volumeEspecifico, // ✅ Usar volume específico baseado na condição
+                  p_volume_total: grupo.quantidade, // ✅ Usar quantidade do grupo para faixa (ex.: 113 -> 101-250)
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 preco = rpc1.data as number | null;
@@ -581,7 +588,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: 'ROTINA',
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: volumeEspecifico,
+                  p_volume_total: grupo.quantidade,
                   p_is_plantao: false
                 });
                 if (!rpc2.error && rpc2.data) {
@@ -597,7 +604,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: 'SC',
-                  p_volume_total: volumeEspecifico,
+                  p_volume_total: grupo.quantidade,
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 if (!rpc3.error && rpc3.data) {
