@@ -103,6 +103,18 @@ serve(async (req) => {
       .in('id', clienteIds)
       .eq('contratos_clientes.status', 'ativo');
 
+    // Buscar também nos parâmetros de faturamento para códigos OMIE adicionais
+    const { data: parametrosData } = await supabase
+      .from('parametros_faturamento')
+      .select(`
+        cliente_id,
+        numero_contrato,
+        nome_fantasia,
+        nome_mobilemed
+      `)
+      .in('cliente_id', clienteIds)
+      .eq('status', 'A');
+
     const resultados = [];
     let sucessos = 0;
     let erros = 0;
@@ -148,21 +160,25 @@ serve(async (req) => {
 
         // Obter contrato ativo (cliente já cadastrado no OMIE)
         const contratoAtivo = clienteData.contratos_clientes[0];
+        const parametroCliente = parametrosData?.find(p => p.cliente_id === demo.cliente_id);
+        
+        // Buscar código OMIE em múltiplas fontes
         const codigoClienteOmie = (contratoAtivo as any)?.codigo_omie
           || (clienteData as any)?.cod_cliente
-          || (contratoAtivo as any)?.configuracoes_integracao?.codigo_omie;
+          || (contratoAtivo as any)?.configuracoes_integracao?.codigo_omie
+          || (parametroCliente as any)?.numero_contrato;
 
         if (!codigoClienteOmie) {
-          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado (cliente.cod_cliente ou contrato.configuracoes_integracao.codigo_omie)`);
+          throw new Error(`Cliente ${demo.cliente_nome} não possui código OMIE configurado (cliente.cod_cliente, contrato.configuracoes_integracao.codigo_omie ou parametros.numero_contrato)`);
         }
 
-        // Converter para o formato numérico exigido pela API (remove qualquer prefixo como "CLI")
+        // Converter para o formato numérico exigido pela API (remove qualquer prefixo como "CLI" ou "2023/")
         const codigoClienteNumerico = Number(String(codigoClienteOmie).replace(/\D/g, ''));
         if (!codigoClienteNumerico) {
           throw new Error(`Código OMIE inválido para ${demo.cliente_nome}: ${codigoClienteOmie}`);
         }
 
-        console.log(`Cliente ${demo.cliente_nome} - Código OMIE numérico: ${codigoClienteNumerico} | Contrato: ${contratoAtivo.numero_contrato}`);
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE original: ${codigoClienteOmie} | Código numérico: ${codigoClienteNumerico} | Contrato: ${contratoAtivo.numero_contrato || parametroCliente?.numero_contrato}`);
 
         // Utilidades de data no formato dd/MM/yyyy exigido pelo Omie
         const formatDateBR = (d: Date) => {
