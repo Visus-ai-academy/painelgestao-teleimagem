@@ -102,7 +102,7 @@ serve(async (req) => {
       // Criar lista fictícia de clientes da volumetria
       const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
       const clientesFallback = nomesUnicos.map((nome, index) => ({
-        id: `temp-${index + 1}`, // UUID temporário mais simples
+        id: 'temp-' + (index + 1), // UUID temporário mais simples
         nome: nome,
         nome_fantasia: nome,
         nome_mobilemed: nome,
@@ -199,7 +199,7 @@ serve(async (req) => {
       } else {
         const nomesUnicos = [...new Set((clientesVolumetriaAll || []).map(c => c.EMPRESA).filter(Boolean))];
         clientes = nomesUnicos.map((nome, index) => ({
-          id: `temp-${index + 1}`,
+          id: 'temp-' + (index + 1),
           nome,
           nome_fantasia: nome,
           nome_mobilemed: nome,
