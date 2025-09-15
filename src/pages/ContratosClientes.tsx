@@ -71,7 +71,7 @@ interface ContratoCliente {
   valorTotal: number;
   diasParaVencer: number;
   indiceReajuste: "IPCA" | "IGP-M" | "INPC" | "CDI";
-  // Dados do cliente
+  // Dados do cliente - priorizando parâmetros
   cnpj?: string;
   endereco?: string;
   telefone?: string;
@@ -81,12 +81,15 @@ interface ContratoCliente {
   responsavel?: string;
   telefoneResponsavel?: string;
   emailResponsavel?: string;
+  // Número do contrato dos parâmetros
+  numeroContrato?: string;
+  razaoSocial?: string;
   // Configurações de cobrança
   cobrancaIntegracao: boolean;
   valorIntegracao?: number;
   cobrancaSuporte: boolean;
   valorSuporte?: number;
-  // Regras e condições de preço
+  // Regras e condições de preço dos parâmetros
   consideraPlantao?: boolean;
   condVolume?: string;
   diaVencimento?: number;
@@ -95,13 +98,7 @@ interface ContratoCliente {
   faixasVolume?: any[];
   configuracoesFranquia?: any;
   configuracoesIntegracao?: any;
-  // Histórico de alterações
-  termosAditivos?: TermoAditivo[];
-  documentos?: DocumentoCliente[];
-  // Campos adicionais para exibição
-  numeroContrato?: string;
-  razaoSocial?: string;
-  // Campos dos parâmetros de faturamento
+  // Campos sincronizados dos parâmetros de faturamento
   aplicarFranquia?: boolean;
   valorFranquia?: number;
   volumeFranquia?: number;
@@ -112,7 +109,12 @@ interface ContratoCliente {
   tipoFaturamento?: string;
   impostosAbMin?: number;
   simples?: boolean;
+  diaFechamento?: number;
+  formaCobranca?: string;
   parametrosStatus?: string;
+  // Histórico de alterações
+  termosAditivos?: TermoAditivo[];
+  documentos?: DocumentoCliente[];
 }
 
 interface DocumentoCliente {
@@ -307,9 +309,10 @@ export default function ContratosClientes() {
           id: contrato.id,
           clienteId: cliente?.id || '',
           cliente: cliente?.nome_fantasia || cliente?.nome || 'Cliente não encontrado',
-          cnpj: cliente?.cnpj || '',
-          dataInicio: contrato.data_inicio || '',
-          dataFim: contrato.data_fim || contrato.data_inicio || '',
+          cnpj: parametros?.cnpj || cliente?.cnpj || '',
+          // Priorizar dados dos parâmetros de faturamento para sincronização
+          dataInicio: parametros?.data_inicio_contrato ? new Date(parametros.data_inicio_contrato).toISOString().split('T')[0] : contrato.data_inicio || '',
+          dataFim: parametros?.data_termino_contrato ? new Date(parametros.data_termino_contrato).toISOString().split('T')[0] : contrato.data_fim || contrato.data_inicio || '',
           status,
           servicos: [],
           valorTotal: 0,
@@ -333,8 +336,9 @@ export default function ContratosClientes() {
           configuracoesIntegracao: configuracoesIntegracao,
           termosAditivos: [],
           documentos: [],
-          numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
-          razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado',
+          // Usar dados dos parâmetros de faturamento para sincronização
+          numeroContrato: parametros?.numero_contrato || contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
+          razaoSocial: parametros?.razao_social || cliente?.razao_social || cliente?.nome || 'Não informado',
           aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
           valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
           volumeFranquia: Number(parametros?.volume_franquia ?? configuracoesFranquia.volume_franquia ?? 0),
@@ -345,6 +349,9 @@ export default function ContratosClientes() {
           tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
           impostosAbMin: Number(parametros?.impostos_ab_min ?? contrato.impostos_ab_min ?? 0),
           simples: Boolean(parametros?.simples ?? contrato.simples ?? false),
+          // Campos adicionais dos parâmetros
+          diaFechamento: parametros?.dia_fechamento ?? contrato.dia_fechamento ?? 7,
+          formaCobranca: parametros?.forma_cobranca ?? 'mensal',
           parametrosStatus: parametros ? 'Configurado' : 'Não configurado'
         };
       });
