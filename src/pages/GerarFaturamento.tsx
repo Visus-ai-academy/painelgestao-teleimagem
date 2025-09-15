@@ -453,7 +453,7 @@ export default function GerarFaturamento() {
       // Fallback: Buscar da volumetria se não há demonstrativos
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
+        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
         .not('"EMPRESA"', 'is', null)
         .not('"EMPRESA"', 'eq', '')
@@ -758,7 +758,7 @@ export default function GerarFaturamento() {
       return;
     }
 
-    setProcessandoTodos(true);
+    setEnviandoEmails(true);
     let enviados = 0;
     let errors = 0;
 
@@ -917,7 +917,7 @@ export default function GerarFaturamento() {
       return;
     }
 
-    setProcessandoTodos(true);
+    setGerandoRelatorios(true);
     setStatusProcessamento({
       processando: true,
       mensagem: 'Iniciando geração de relatórios...',

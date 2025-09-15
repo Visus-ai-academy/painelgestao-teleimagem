@@ -68,7 +68,6 @@ serve(async (req) => {
           updated_at
         )
       `)
-      .neq('contratos_clientes.tipo_faturamento', 'NC-NF') // ✅ EXCLUIR NC-NF
       .order('nome');
 
     if (clientesError) {
@@ -87,7 +86,7 @@ serve(async (req) => {
         .eq('periodo_referencia', periodo)
         .not('"EMPRESA"', 'is', null)
         .not('"EMPRESA"', 'eq', '')
-        .limit(1000);
+        .limit(50000);
 
       if (volError || !clientesVolumetria || clientesVolumetria.length === 0) {
         return new Response(
@@ -179,10 +178,37 @@ serve(async (req) => {
     }
 
     // ✅ LISTA FINAL: clientes ativos + clientes inativos com volumetria
-    const clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
+    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
     
     console.log(`📋 Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.length} inativos com volumetria)`);
     
+    if (clientes.length === 0) {
+      console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
+      const { data: clientesVolumetriaAll, error: volAllErr } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"EMPRESA"')
+        .eq('periodo_referencia', periodo)
+        .not('"EMPRESA"', 'is', null)
+        .not('"EMPRESA"', 'eq', '')
+        .limit(50000);
+
+      if (volAllErr) {
+        console.error('❌ Erro ao buscar volumetria para fallback:', volAllErr);
+      } else {
+        const nomesUnicos = [...new Set((clientesVolumetriaAll || []).map(c => c.EMPRESA).filter(Boolean))];
+        clientes = nomesUnicos.map((nome, index) => ({
+          id: `temp-${index + 1}`,
+          nome,
+          nome_fantasia: nome,
+          nome_mobilemed: nome,
+          ativo: true,
+          status: 'Ativo',
+          parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
+        }));
+        console.log(`✅ Fallback aplicado: ${clientes.length} clientes adicionados a partir da volumetria.`);
+      }
+    }
+
     if (alertasClientes.length > 0) {
       console.log(`⚠️ Alertas de clientes inativos com volumetria:`, alertasClientes);
     }
