@@ -209,8 +209,9 @@ export default function ContratosClientes() {
   const [sortField, setSortField] = useState<string>("cliente");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   
-  // Estado para sincronização Omie
+  // Estado para sincronização Omie e correção de duplicatas
   const [sincronizandoOmie, setSincronizandoOmie] = useState(false);
+  const [corrigindoDuplicatas, setCorrigindoDuplicatas] = useState(false);
   
   const { toast } = useToast();
 
@@ -697,6 +698,49 @@ export default function ContratosClientes() {
       setSincronizandoOmie(false);
     }
   };
+
+  // Função para corrigir duplicatas de contratos
+  const corrigirDuplicatas = async () => {
+    try {
+      setCorrigindoDuplicatas(true);
+      
+      toast({
+        title: "Corrigindo duplicatas",
+        description: "Unificando dados de clientes duplicados...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('corrigir-duplicatas-contratos', {
+        body: {}
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const resultado = data;
+      if (resultado.success) {
+        toast({
+          title: "✅ Duplicatas corrigidas!",
+          description: `${resultado.total_correcoes} contratos corrigidos com números corretos`,
+        });
+
+        // Recarregar contratos para exibir os números corretos
+        await carregarContratos();
+      } else {
+        throw new Error(resultado.error || 'Erro desconhecido na correção');
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao corrigir duplicatas:', error);
+      toast({
+        title: "Erro na correção",
+        description: error.message || 'Erro desconhecido',
+        variant: "destructive",
+      });
+    } finally {
+      setCorrigindoDuplicatas(false);
+    }
+  };
   
   // Filtros e ordenação
   useEffect(() => {
@@ -855,6 +899,24 @@ export default function ContratosClientes() {
             <>
               <Plus className="h-4 w-4 mr-2" />
               Gerar Contratos
+            </>
+          )}
+        </Button>
+
+        <Button 
+          onClick={corrigirDuplicatas}
+          disabled={corrigindoDuplicatas}
+          className="bg-yellow-600 hover:bg-yellow-700 text-white"
+        >
+          {corrigindoDuplicatas ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Corrigindo...
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Corrigir Duplicatas
             </>
           )}
         </Button>
