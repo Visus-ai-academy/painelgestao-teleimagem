@@ -66,7 +66,7 @@ interface ContratoCliente {
   cliente: string;
   dataInicio: string;
   dataFim: string;
-  status: "Ativo" | "Vencido" | "A Vencer";
+  status: "Ativo" | "Vencido" | "A Vencer" | "Inativo";
   servicos: ServicoContratado[];
   valorTotal: number;
   diasParaVencer: number;
@@ -261,8 +261,7 @@ export default function ContratosClientes() {
         const { data: parametrosData } = await supabase
           .from('parametros_faturamento')
           .select('*')
-          .in('cliente_id', clienteIds)
-          .eq('status', 'A');
+          .in('cliente_id', clienteIds);
         
         // Organizar parâmetros por cliente_id (pegar o mais recente para cada cliente)
         parametrosData?.forEach(param => {
@@ -279,15 +278,27 @@ export default function ContratosClientes() {
         const parametros = parametrosPorCliente[contrato.cliente_id] || null;
         
         const hoje = new Date();
-        const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
+        const dataFim = new Date(parametros?.data_termino_contrato || contrato.data_fim || contrato.data_inicio);
         const diasParaVencer = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-        
-        let status: "Ativo" | "Vencido" | "A Vencer" = "Ativo";
+
+        // Status calculado por data (fallback)
+        let statusCalculado: "Ativo" | "Vencido" | "A Vencer" = "Ativo";
         if (diasParaVencer < 0) {
-          status = "Vencido";
+          statusCalculado = "Vencido";
         } else if (diasParaVencer <= 60) {
-          status = "A Vencer";
+          statusCalculado = "A Vencer";
         }
+
+        // Status dos parâmetros (se existir), mapeado para exibição
+        const statusFromParams = (() => {
+          const s = parametros?.status;
+          if (!s) return null;
+          if (s === 'A' || s?.toLowerCase() === 'ativo') return 'Ativo';
+          if (s === 'I' || s?.toLowerCase() === 'inativo') return 'Inativo';
+          return 'Ativo';
+        })();
+
+        const status: "Ativo" | "Vencido" | "A Vencer" | "Inativo" = (statusFromParams as any) || statusCalculado;
 
         // Usar parâmetros de faturamento da consulta separada ou fallback para JSONB
         const configuracoesFranquia = parametros ? {
