@@ -903,11 +903,22 @@ export default function GerarFaturamento() {
     }
   };
 
-  // Função para gerar NF no Omie
+  // Função para gerar NF no Omie (LIMITADA PARA TESTE)
   const gerarNFOmie = async () => {
     if (gerandoNFOmie) return;
     
+    // ✅ CLIENTES PERMITIDOS PARA TESTE DE EMISSÃO DE NF
+    const clientesPermitidosParaTeste = ['COT', 'CORTEL', 'IMDBATATAIS', 'BROOKLIN'];
+    
     const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.omieNFGerada);
+    
+    // ✅ FILTRAR APENAS OS CLIENTES PERMITIDOS PARA TESTE
+    const clientesParaNF = clientesComRelatorio.filter(cliente => {
+      const nomeClienteUpper = cliente.clienteNome.toUpperCase().trim();
+      return clientesPermitidosParaTeste.some(permitido => 
+        nomeClienteUpper.includes(permitido.toUpperCase())
+      );
+    });
     
     if (clientesComRelatorio.length === 0) {
       toast({
@@ -916,6 +927,25 @@ export default function GerarFaturamento() {
         variant: "destructive",
       });
       return;
+    }
+    
+    if (clientesParaNF.length === 0) {
+      const clientesExcluidos = clientesComRelatorio.length;
+      toast({
+        title: "Modo de Teste - NF Omie",
+        description: `A emissão de NF está limitada para teste apenas aos clientes: ${clientesPermitidosParaTeste.join(', ')}. ${clientesExcluidos} cliente(s) foram ignorados.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (clientesParaNF.length < clientesComRelatorio.length) {
+      const totalExcluidos = clientesComRelatorio.length - clientesParaNF.length;
+      toast({
+        title: "Modo de Teste - Processamento Limitado",
+        description: `Processando ${clientesParaNF.length} cliente(s) de teste. ${totalExcluidos} cliente(s) foram ignorados (limitação de teste).`,
+        variant: "default",
+      });
     }
 
     setGerandoNFOmie(true);
@@ -926,7 +956,7 @@ export default function GerarFaturamento() {
       const response = await supabase.functions.invoke('gerar-nf-omie', {
         body: {
           periodo: periodoSelecionado,
-          clientes: clientesComRelatorio.map(c => c.clienteNome)
+          clientes: clientesParaNF.map(c => c.clienteNome) // ✅ Usar apenas clientes permitidos
         }
       });
 
@@ -1757,12 +1787,9 @@ export default function GerarFaturamento() {
                       </>
                     )}
                   </Button>
-                  <p className="text-sm text-purple-700">
-                    {resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length === 0 
-                      ? "Todas as NFs já foram geradas no Omie"
-                      : "Gera as notas fiscais automaticamente no sistema Omie"
-                    }
-                  </p>
+                   <p className="text-sm text-purple-700">
+                     🧪 MODO TESTE: Gera NF apenas para COT, CORREL, IMDBATATAIS, BROOKLIN
+                   </p>
                 </div>
               </div>
 
