@@ -518,8 +518,6 @@ export default function GerarFaturamento() {
         const clientesTemp: any[] = [];
         const clientesJaProcessados = new Set<string>();
         
-        const clientesJaProcessados = new Set();
-        
         for (const nomeCliente of nomesUnicos) {
           if (clientesJaProcessados.has(nomeCliente.trim().toUpperCase())) {
             continue;
