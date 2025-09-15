@@ -290,7 +290,7 @@ serve(async (req) => {
         if (!contratoAtivo.omie_codigo_contrato) {
           console.warn(`Contrato OMIE ausente para ${demo.cliente_nome}. Sincronizando...`);
           const sync = await supabase.functions.invoke('buscar-contrato-omie', {
-            body: { cliente_id: demo.cliente_id, cliente_nome: demo.cliente_nome }
+            body: { cliente_id: demo.cliente_id, cliente_nome: demo.cliente_nome, numero_contrato: contratoAtivo.numero_contrato }
           });
           if (sync.data?.sucesso && sync.data?.codigo_contrato) {
             contratoAtivo.omie_codigo_contrato = String(sync.data.codigo_contrato);

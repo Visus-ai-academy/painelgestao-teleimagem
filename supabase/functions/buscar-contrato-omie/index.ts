@@ -24,7 +24,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { cliente_id, cliente_nome, cnpj } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const { cliente_id, cliente_nome, cnpj, numero_contrato } = body;
 
     const appKey = Deno.env.get('OMIE_APP_KEY');
     const appSecret = Deno.env.get('OMIE_APP_SECRET');
@@ -36,7 +37,7 @@ serve(async (req) => {
       throw new Error('Informe cliente_id, cliente_nome ou cnpj');
     }
 
-    // Buscar cliente no Supabase
+    // Buscar cliente e número de contrato no Supabase
     let clienteRow: any = null;
     if (cliente_id) {
       const { data } = await supabase
@@ -65,6 +66,30 @@ serve(async (req) => {
 
     if (!clienteRow) {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Cliente não encontrado no banco' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Número do contrato desejado: prioridade body.numero_contrato -> contratos_clientes -> parametros_faturamento
+    let numeroContratoDesejado: string | null = numero_contrato || null;
+    if (!numeroContratoDesejado) {
+      const { data: contratoAtivo } = await supabase
+        .from('contratos_clientes')
+        .select('numero_contrato')
+        .eq('cliente_id', clienteRow.id)
+        .eq('status', 'ativo')
+        .limit(1)
+        .maybeSingle();
+      numeroContratoDesejado = contratoAtivo?.numero_contrato || null;
+    }
+    if (!numeroContratoDesejado) {
+      const { data: paramAtivo } = await supabase
+        .from('parametros_faturamento')
+        .select('numero_contrato, status')
+        .eq('cliente_id', clienteRow.id)
+        .in('status', ['A', 'ATIVO'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      numeroContratoDesejado = paramAtivo?.numero_contrato || null;
     }
 
     let codigoClienteOmie = clienteRow.omie_codigo_cliente;
@@ -96,7 +121,7 @@ serve(async (req) => {
       param: [{ pagina: 1, registros_por_pagina: 200, nCodCli: Number(String(codigoClienteOmie).replace(/\D/g, '')) }]
     };
 
-    console.log('Consultando contratos no Omie:', JSON.stringify({ call: listReq.call, param: listReq.param }, null, 2));
+    console.log('Consultando contratos no Omie:', JSON.stringify({ call: listReq.call, param: listReq.param, numeroContratoDesejado }, null, 2));
 
     const listResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
       method: 'POST',
@@ -112,34 +137,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Nenhum contrato encontrado no Omie para este cliente', resposta: listJson }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Escolher contrato ativo. Procurar flags comuns
-    const normaliza = (v: any) => (v || '').toString().trim().toUpperCase();
-    const contratoAtivo = contratos.find((c) => {
-      const s1 = normaliza(c.status);
-      const s2 = normaliza(c.cCodStatus);
-      const s3 = normaliza(c.cDescStatus);
-      // Considerar ativo/vigente
-      return s1 === 'ATIVO' || s2 === 'A' || s3.includes('VIGENTE') || s3.includes('ATIVO');
-    }) || contratos[0];
+    const normalize = (v: any) => (v ?? '').toString().trim();
 
-    const codigoContrato = contratoAtivo?.nCodCtr || contratoAtivo?.nCodContrato || contratoAtivo?.codigo || contratoAtivo?.id;
-
-    if (!codigoContrato) {
-      return new Response(JSON.stringify({ sucesso: false, erro: 'Não foi possível identificar o código do contrato no Omie', contrato: contratoAtivo }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Preferir match exato pelo número de contrato (ex.: 2023/00170)
+    let contratoEscolhido: any = null;
+    if (numeroContratoDesejado) {
+      const alvo = normalize(numeroContratoDesejado).toUpperCase();
+      contratoEscolhido = contratos.find((c) => {
+        const cNum = normalize(c.cNumCtr || c.cNumero || c.cNumContrato || c.numero);
+        return cNum && cNum.toUpperCase() === alvo;
+      }) || null;
     }
 
-    // Atualizar todos contratos ativos deste cliente na nossa base com o código encontrado (se não tiverem)
-    const { error: upErr } = await supabase
+    // Se não achou por número, escolher ativo/vigente
+    if (!contratoEscolhido) {
+      const normalizaUp = (v: any) => (v || '').toString().trim().toUpperCase();
+      contratoEscolhido = contratos.find((c) => {
+        const s1 = normalizaUp(c.status);
+        const s2 = normalizaUp(c.cCodStatus);
+        const s3 = normalizaUp(c.cDescStatus);
+        return s1 === 'ATIVO' || s2 === 'A' || s3.includes('VIGENTE') || s3.includes('ATIVO');
+      }) || contratos[0];
+    }
+
+    const nCodCtr = contratoEscolhido?.nCodCtr || contratoEscolhido?.nCodContrato || contratoEscolhido?.codigo || contratoEscolhido?.id;
+
+    if (!nCodCtr) {
+      return new Response(JSON.stringify({ sucesso: false, erro: 'Não foi possível identificar o código do contrato no Omie', contrato: contratoEscolhido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Atualizar contratos locais sem código
+    await supabase
       .from('contratos_clientes')
-      .update({ omie_codigo_contrato: String(codigoContrato), omie_data_sincronizacao: new Date().toISOString() })
+      .update({ omie_codigo_contrato: String(nCodCtr), omie_data_sincronizacao: new Date().toISOString() })
       .eq('cliente_id', clienteRow.id)
       .eq('status', 'ativo')
       .is('omie_codigo_contrato', null);
-    if (upErr) {
-      console.warn('Falha ao atualizar contratos locais:', upErr.message);
-    }
 
-    return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(codigoContrato), detalhes: contratoAtivo }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(nCodCtr), detalhes: contratoEscolhido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e: any) {
     console.error('Erro em buscar-contrato-omie:', e);
     return new Response(JSON.stringify({ sucesso: false, erro: e?.message || 'Erro desconhecido' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
