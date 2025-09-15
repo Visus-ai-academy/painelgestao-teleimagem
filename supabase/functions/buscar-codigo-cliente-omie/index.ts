@@ -49,9 +49,7 @@ serve(async (req) => {
       app_secret: omieAppSecret,
       param: [{
         pagina: 1,
-        registros_por_pagina: 100,
-        apenas_estatisticas: "N",
-        filtrar_apenas_clientes_especificos: "N"
+        registros_por_pagina: 100
       }]
     };
 
