@@ -1006,8 +1006,12 @@ export default function ContratosClientes() {
                   <SelectItem value="tipoFaturamento-desc">Tipo Faturamento (Z-A)</SelectItem>
                   <SelectItem value="valorFranquia-asc">Valor Franquia (Menor)</SelectItem>
                   <SelectItem value="valorFranquia-desc">Valor Franquia (Maior)</SelectItem>
-                  <SelectItem value="parametrosStatus-asc">Status Parâmetros (A-Z)</SelectItem>
-                  <SelectItem value="parametrosStatus-desc">Status Parâmetros (Z-A)</SelectItem>
+                  <SelectItem value="volumeFranquia-asc">Volume Franquia (Menor)</SelectItem>
+                  <SelectItem value="volumeFranquia-desc">Volume Franquia (Maior)</SelectItem>
+                  <SelectItem value="valorIntegracao-asc">Valor Integração (Menor)</SelectItem>
+                  <SelectItem value="valorIntegracao-desc">Valor Integração (Maior)</SelectItem>
+                  <SelectItem value="diaFechamento-asc">Dia Fechamento (Menor)</SelectItem>
+                  <SelectItem value="diaFechamento-desc">Dia Fechamento (Maior)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1039,11 +1043,12 @@ export default function ContratosClientes() {
                   <TableHead>Data Início</TableHead>
                   <TableHead>Data Fim</TableHead>
                   <TableHead>Tipo Faturamento</TableHead>
-                  <TableHead>Valor Franquia</TableHead>
-                  <TableHead>Freq. Contínua</TableHead>
+                  <TableHead>Franquia</TableHead>
+                  <TableHead>Volume Franquia</TableHead>
+                  <TableHead>Integração</TableHead>
                   <TableHead>Portal Laudos</TableHead>
-                  <TableHead>Valor Integração</TableHead>
-                  <TableHead>Status Parâmetros</TableHead>
+                  <TableHead>Dia Fechamento</TableHead>
+                  <TableHead>Forma Cobrança</TableHead>
                   <TableHead>Dias p/ Vencer</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -1087,15 +1092,36 @@ export default function ContratosClientes() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {contrato.valorFranquia ? 
-                        `R$ ${Number(contrato.valorFranquia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
-                        '-'
-                      }
+                      {contrato.aplicarFranquia ? (
+                        <div className="flex flex-col">
+                          <Badge variant="default" className="mb-1">Sim</Badge>
+                          <span className="text-xs">
+                            R$ {Number(contrato.valorFranquia || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary">Não</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={contrato.frequenciaContinua ? 'default' : 'secondary'}>
-                        {contrato.frequenciaContinua ? 'Sim' : 'Não'}
-                      </Badge>
+                      {contrato.aplicarFranquia ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium">{contrato.volumeFranquia || 0}</span>
+                          <span className="text-xs text-muted-foreground">exames</span>
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {contrato.cobrancaIntegracao ? (
+                        <div className="flex flex-col">
+                          <Badge variant="default" className="mb-1">Sim</Badge>
+                          <span className="text-xs">
+                            R$ {Number(contrato.valorIntegracao || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary">Não</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={contrato.portalLaudos ? 'default' : 'secondary'}>
@@ -1103,14 +1129,14 @@ export default function ContratosClientes() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {contrato.valorIntegracao ? 
-                        `R$ ${Number(contrato.valorIntegracao).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
-                        '-'
-                      }
+                      <div className="flex flex-col">
+                        <span className="font-medium">Dia {contrato.diaFechamento || 7}</span>
+                        <span className="text-xs text-muted-foreground">do mês</span>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={contrato.parametrosStatus === 'A' ? 'default' : 'destructive'}>
-                        {contrato.parametrosStatus === 'A' ? 'Ativo' : contrato.parametrosStatus === 'Não configurado' ? 'Sem Param.' : contrato.parametrosStatus}
+                      <Badge variant="outline">
+                        {(contrato.formaCobranca || 'mensal').charAt(0).toUpperCase() + (contrato.formaCobranca || 'mensal').slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell>
