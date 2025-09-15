@@ -66,7 +66,7 @@ interface ContratoCliente {
   cliente: string;
   dataInicio: string;
   dataFim: string;
-  status: "Ativo" | "Vencido" | "A Vencer" | "Inativo";
+  status: "Ativo" | "Vencido" | "A Vencer" | "Inativo" | "Cancelado";
   servicos: ServicoContratado[];
   valorTotal: number;
   diasParaVencer: number;
@@ -295,10 +295,11 @@ export default function ContratosClientes() {
           if (!s) return null;
           if (s === 'A' || s?.toLowerCase() === 'ativo') return 'Ativo';
           if (s === 'I' || s?.toLowerCase() === 'inativo') return 'Inativo';
+          if (s === 'C' || s?.toLowerCase() === 'cancelado') return 'Cancelado';
           return 'Ativo';
         })();
 
-        const status: "Ativo" | "Vencido" | "A Vencer" | "Inativo" = (statusFromParams as any) || statusCalculado;
+        const status: "Ativo" | "Vencido" | "A Vencer" | "Inativo" | "Cancelado" = (statusFromParams as any) || statusCalculado;
 
         // Usar parâmetros de faturamento da consulta separada ou fallback para JSONB
         const configuracoesFranquia = parametros ? {
@@ -782,6 +783,8 @@ export default function ContratosClientes() {
   const contratosAtivos = contratos.filter(c => c.status === "Ativo");
   const contratosVencidos = contratos.filter(c => c.status === "Vencido");
   const contratosAVencer = contratos.filter(c => c.status === "A Vencer");
+  const contratosInativos = contratos.filter(c => c.status === "Inativo");
+  const contratosCancelados = contratos.filter(c => c.status === "Cancelado");
   const valorTotalAtivos = contratosAtivos.reduce((sum, c) => sum + c.valorTotal, 0);
 
   return (
@@ -797,7 +800,7 @@ export default function ContratosClientes() {
       <FilterBar />
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
@@ -830,6 +833,32 @@ export default function ContratosClientes() {
             <div className="text-2xl font-bold text-red-600">{contratosVencidos.length}</div>
             <p className="text-xs text-muted-foreground">
               Necessitam renovação urgente
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inativos</CardTitle>
+            <Clock className="h-4 w-4 text-gray-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">{contratosInativos.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Contratos em status inativo
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cancelados</CardTitle>
+            <X className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{contratosCancelados.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Contratos cancelados
             </p>
           </CardContent>
         </Card>
@@ -945,6 +974,8 @@ export default function ContratosClientes() {
                   <SelectItem value="ativo">Ativo</SelectItem>
                   <SelectItem value="a vencer">A Vencer</SelectItem>
                   <SelectItem value="vencido">Vencido</SelectItem>
+                  <SelectItem value="inativo">Inativo</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1022,7 +1053,13 @@ export default function ContratosClientes() {
                     <TableCell>{contrato.numeroContrato || 'Não informado'}</TableCell>
                     <TableCell>{contrato.razaoSocial}</TableCell>
                     <TableCell>
-                      <Badge variant={contrato.status === 'Ativo' ? 'default' : contrato.status === 'A Vencer' ? 'secondary' : 'destructive'}>
+                      <Badge variant={
+                        contrato.status === 'Ativo' ? 'default' : 
+                        contrato.status === 'A Vencer' ? 'secondary' : 
+                        contrato.status === 'Inativo' ? 'outline' :
+                        contrato.status === 'Cancelado' ? 'destructive' :
+                        'destructive'
+                      }>
                         {contrato.status}
                       </Badge>
                     </TableCell>
@@ -1205,7 +1242,13 @@ export default function ContratosClientes() {
                     </div>
                     <div>
                       <Label className="text-sm font-medium">Status</Label>
-                      <Badge variant={(contratoVisualizando || contratoEditando)?.status === 'Ativo' ? 'default' : (contratoVisualizando || contratoEditando)?.status === 'A Vencer' ? 'secondary' : 'destructive'}>
+                      <Badge variant={
+                        (contratoVisualizando || contratoEditando)?.status === 'Ativo' ? 'default' : 
+                        (contratoVisualizando || contratoEditando)?.status === 'A Vencer' ? 'secondary' : 
+                        (contratoVisualizando || contratoEditando)?.status === 'Inativo' ? 'outline' :
+                        (contratoVisualizando || contratoEditando)?.status === 'Cancelado' ? 'destructive' :
+                        'destructive'
+                      }>
                         {(contratoVisualizando || contratoEditando)?.status}
                       </Badge>
                     </div>
