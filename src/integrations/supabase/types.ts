@@ -3032,6 +3032,7 @@ export type Database = {
           cliente_nome: string
           created_at: string
           data_envio_email: string | null
+          data_geracao_nf_omie: string | null
           data_geracao_relatorio: string | null
           data_processamento: string | null
           detalhes_relatorio: Json | null
@@ -3041,6 +3042,10 @@ export type Database = {
           erro_email: string | null
           id: string
           link_relatorio: string | null
+          omie_codigo_pedido: string | null
+          omie_detalhes: Json | null
+          omie_nf_gerada: boolean | null
+          omie_numero_pedido: string | null
           periodo: string
           relatorio_gerado: boolean | null
           updated_at: string
@@ -3050,6 +3055,7 @@ export type Database = {
           cliente_nome: string
           created_at?: string
           data_envio_email?: string | null
+          data_geracao_nf_omie?: string | null
           data_geracao_relatorio?: string | null
           data_processamento?: string | null
           detalhes_relatorio?: Json | null
@@ -3059,6 +3065,10 @@ export type Database = {
           erro_email?: string | null
           id?: string
           link_relatorio?: string | null
+          omie_codigo_pedido?: string | null
+          omie_detalhes?: Json | null
+          omie_nf_gerada?: boolean | null
+          omie_numero_pedido?: string | null
           periodo: string
           relatorio_gerado?: boolean | null
           updated_at?: string
@@ -3068,6 +3078,7 @@ export type Database = {
           cliente_nome?: string
           created_at?: string
           data_envio_email?: string | null
+          data_geracao_nf_omie?: string | null
           data_geracao_relatorio?: string | null
           data_processamento?: string | null
           detalhes_relatorio?: Json | null
@@ -3077,6 +3088,10 @@ export type Database = {
           erro_email?: string | null
           id?: string
           link_relatorio?: string | null
+          omie_codigo_pedido?: string | null
+          omie_detalhes?: Json | null
+          omie_nf_gerada?: boolean | null
+          omie_numero_pedido?: string | null
           periodo?: string
           relatorio_gerado?: boolean | null
           updated_at?: string

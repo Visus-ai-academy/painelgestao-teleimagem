@@ -64,10 +64,15 @@ export default function GerarFaturamento() {
     const saved = localStorage.getItem('emailsEnviados');
     return saved ? parseInt(saved) : 0;
   });
+  const [nfsGeradas, setNfsGeradas] = useState(() => {
+    const saved = localStorage.getItem('nfsGeradas');
+    return saved ? parseInt(saved) : 0;
+  });
   
   const [processandoTodos, setProcessandoTodos] = useState(false);
   const [gerandoRelatorios, setGerandoRelatorios] = useState(false);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
+  const [gerandoNFOmie, setGerandoNFOmie] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
@@ -162,6 +167,10 @@ export default function GerarFaturamento() {
       total_laudos: number;
       valor_total: number;
     };
+    omieNFGerada?: boolean;
+    omieCodigoPedido?: string;
+    omieNumeroPedido?: string;
+    dataGeracaoNFOmie?: string;
   }>>(() => {
     const saved = sessionStorage.getItem('resultadosFaturamento');
     return saved ? JSON.parse(saved) : [];
@@ -312,7 +321,7 @@ export default function GerarFaturamento() {
   // Função para carregar resultados do banco de dados
   const carregarResultadosDB = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('relatorios_faturamento_status')
         .select('*')
         .eq('periodo', periodoSelecionado)
@@ -331,7 +340,11 @@ export default function GerarFaturamento() {
           erro: item.erro || undefined,
           erroEmail: item.erro_email || undefined,
           dataProcessamento: item.data_processamento ? new Date(item.data_processamento).toLocaleString('pt-BR') : undefined,
-          detalhesRelatorio: item.detalhes_relatorio ? (typeof item.detalhes_relatorio === 'string' ? JSON.parse(item.detalhes_relatorio) : item.detalhes_relatorio) : undefined
+          detalhesRelatorio: item.detalhes_relatorio ? (typeof item.detalhes_relatorio === 'string' ? JSON.parse(item.detalhes_relatorio) : item.detalhes_relatorio) : undefined,
+          omieNFGerada: item.omie_nf_gerada || false,
+          omieCodigoPedido: item.omie_codigo_pedido || undefined,
+          omieNumeroPedido: item.omie_numero_pedido || undefined,
+          dataGeracaoNFOmie: item.data_geracao_nf_omie ? new Date(item.data_geracao_nf_omie).toLocaleString('pt-BR') : undefined
         }));
 
         setResultados(resultadosCarregados);
@@ -344,7 +357,12 @@ export default function GerarFaturamento() {
         
         // Persistir contadores no localStorage
         localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
-        localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+          localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+          
+          // Atualizar contador de NFs geradas
+          const nfsGeradas = resultadosCarregados.filter(r => r.omieNFGerada).length;
+          setNfsGeradas(nfsGeradas);
+          localStorage.setItem('nfsGeradas', nfsGeradas.toString());
         
         return true; // Indica que dados foram carregados do DB
       }
@@ -874,6 +892,88 @@ export default function GerarFaturamento() {
       });
     } finally {
       setEnviandoEmails(false);
+    }
+  };
+
+  // Função para gerar NF no Omie
+  const gerarNFOmie = async () => {
+    if (gerandoNFOmie) return;
+    
+    const clientesComRelatorio = resultados.filter(r => r.relatorioGerado && !r.omieNFGerada);
+    
+    if (clientesComRelatorio.length === 0) {
+      toast({
+        title: "Nenhuma NF para gerar",
+        description: "Não há relatórios gerados sem NF no Omie ou todas já foram processadas",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGerandoNFOmie(true);
+
+    try {
+      console.log('Gerando NFs no Omie para período:', periodoSelecionado);
+
+      const response = await supabase.functions.invoke('gerar-nf-omie', {
+        body: {
+          periodo: periodoSelecionado,
+          clientes: clientesComRelatorio.map(c => c.clienteNome)
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro na chamada da função');
+      }
+
+      const { data } = response;
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Erro no processamento das NFs');
+      }
+
+      // Atualizar resultados locais com informações das NFs geradas
+      setResultados(prev => {
+        const novosResultados = prev.map(resultado => {
+          const nfInfo = data.resultados.find((nf: any) => nf.cliente === resultado.clienteNome);
+          if (nfInfo?.sucesso) {
+            return {
+              ...resultado,
+              omieNFGerada: true,
+              omieCodigoPedido: nfInfo.codigo_pedido_omie,
+              omieNumeroPedido: nfInfo.numero_pedido_omie,
+              dataGeracaoNFOmie: new Date().toLocaleString('pt-BR')
+            };
+          }
+          return resultado;
+        });
+        
+        // Salvar no banco de dados
+        salvarResultadosDB(novosResultados);
+        return novosResultados;
+      });
+
+      setNfsGeradas(prev => prev + data.sucessos);
+      localStorage.setItem('nfsGeradas', (nfsGeradas + data.sucessos).toString());
+
+      toast({
+        title: "NFs geradas no Omie!",
+        description: `${data.sucessos} NFs geradas com sucesso${data.erros > 0 ? `, ${data.erros} com erro` : ''}`,
+        variant: data.sucessos > 0 ? "default" : "destructive",
+      });
+
+      console.log('Resultado geração NF Omie:', data);
+
+    } catch (error) {
+      console.error('Erro ao gerar NF no Omie:', error);
+      
+      toast({
+        title: "Erro na geração de NF",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a geração das NFs no Omie",
+        variant: "destructive",
+      });
+    } finally {
+      setGerandoNFOmie(false);
     }
   };
 
@@ -1610,6 +1710,40 @@ export default function GerarFaturamento() {
                 </div>
               </div>
 
+              {/* Etapa 4: Gerar NF no Omie */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                  <FileBarChart2 className="h-4 w-4" />
+                  Etapa 4: Gerar NF no Omie
+                </h4>
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <Button 
+                    onClick={gerarNFOmie}
+                    disabled={gerandoNFOmie || resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length === 0}
+                    size="lg"
+                    className="min-w-[280px] bg-purple-600 hover:bg-purple-700"
+                  >
+                    {gerandoNFOmie ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                        Gerando NFs no Omie...
+                      </>
+                    ) : (
+                      <>
+                        <FileBarChart2 className="h-5 w-5 mr-2" />
+                        🧾 Gerar NFs no Omie ({resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length})
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-sm text-purple-700">
+                    {resultados.filter(r => r.relatorioGerado && !r.omieNFGerada).length === 0 
+                      ? "Todas as NFs já foram geradas no Omie"
+                      : "Gera as notas fiscais automaticamente no sistema Omie"
+                    }
+                  </p>
+                </div>
+              </div>
+
             </CardContent>
           </Card>
 
@@ -1671,6 +1805,7 @@ export default function GerarFaturamento() {
                         <th className="text-center p-3">Status Demonstrativo</th>
                         <th className="text-center p-3">Status Relatório</th>
                         <th className="text-center p-3">Status E-mail</th>
+                        <th className="text-center p-3">Status NF Omie</th>
                         <th className="text-left p-3">Link PDF</th>
                       </tr>
                     </thead>
@@ -1704,6 +1839,17 @@ export default function GerarFaturamento() {
                             {resultado.emailEnviado ? (
                               <Badge variant="default" className="bg-green-600">
                                 Concluído
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                Pendente
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {resultado.omieNFGerada ? (
+                              <Badge variant="default" className="bg-purple-600">
+                                NF Gerada
                               </Badge>
                             ) : (
                               <Badge variant="outline">
