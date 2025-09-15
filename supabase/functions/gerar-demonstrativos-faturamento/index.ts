@@ -60,7 +60,8 @@ serve(async (req) => {
         ativo,
         status,
         contratos_clientes(
-          tipo_faturamento
+          tipo_faturamento,
+          cond_volume
         ),
         parametros_faturamento(
           status,
@@ -347,9 +348,50 @@ serve(async (req) => {
 
         // ✅ CORREÇÃO: Contar por VALORES (exames reais), não por registros
         const totalExames = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
-        const volumeTotal = totalExames; // Volume total = total de exames
         
-        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames, ${volumeTotal} volume total`);
+        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames total`);
+
+        // ✅ BUSCAR CONDIÇÃO DE VOLUME DO CONTRATO
+        const condVolume = cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT';
+        console.log(`📋 Condição de Volume para ${cliente.nome_fantasia}: ${condVolume}`);
+
+        // Função para calcular volume baseado na condição
+        const calcularVolumeCondicional = (modalidade: string, especialidade: string, categoria: string): number => {
+          if (!volumetria || volumetria.length === 0) return 0;
+          
+          let volumeCalculado = 0;
+          
+          switch (condVolume) {
+            case 'MOD/ESP':
+              // Somar apenas exames da modalidade + especialidade específica
+              volumeCalculado = volumetria
+                .filter(v => 
+                  v.MODALIDADE?.toUpperCase().trim() === modalidade.toUpperCase().trim() &&
+                  v.ESPECIALIDADE?.toUpperCase().trim() === especialidade.toUpperCase().trim()
+                )
+                .reduce((sum, item) => sum + (item.VALORES || 0), 0);
+              break;
+              
+            case 'MOD/ESP/CAT':
+              // Somar apenas exames da modalidade + especialidade + categoria específica
+              volumeCalculado = volumetria
+                .filter(v => 
+                  v.MODALIDADE?.toUpperCase().trim() === modalidade.toUpperCase().trim() &&
+                  v.ESPECIALIDADE?.toUpperCase().trim() === especialidade.toUpperCase().trim() &&
+                  (v.CATEGORIA || 'SC').toUpperCase().trim() === categoria.toUpperCase().trim()
+                )
+                .reduce((sum, item) => sum + (item.VALORES || 0), 0);
+              break;
+              
+            default:
+              // Fallback para volume total
+              volumeCalculado = totalExames;
+              break;
+          }
+          
+          console.log(`📊 Volume calculado para ${modalidade}/${especialidade}/${categoria}: ${volumeCalculado} (condição: ${condVolume})`);
+          return volumeCalculado;
+        };
 
         // Calcular valores dos exames baseado na tabela de preços
         let valorExames = 0;
@@ -411,6 +453,13 @@ serve(async (req) => {
                 continue;
               }
 
+              // ✅ CALCULAR VOLUME BASEADO NA CONDIÇÃO DO CONTRATO
+              const volumeEspecifico = calcularVolumeCondicional(
+                grupo.modalidade, 
+                grupo.especialidade, 
+                grupo.categoria || 'SC'
+              );
+
               // Primeira tentativa: prioridade informada
               let preco: number | null = null;
               let precoError: any = null;
@@ -422,7 +471,8 @@ serve(async (req) => {
                 categoria: grupo.categoria || 'SC',
                 prioridade: grupo.prioridade,
                 quantidade: grupo.quantidade,
-                volume_total: volumeTotal,
+                volume_especifico: volumeEspecifico, // ✅ Usar volume específico da condição
+                condicao_volume: condVolume,
                 is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
               });
 
@@ -433,7 +483,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: volumeTotal, // ✅ Usar volume total do cliente
+                  p_volume_total: volumeEspecifico, // ✅ Usar volume específico baseado na condição
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 preco = rpc1.data as number | null;
@@ -449,6 +499,7 @@ serve(async (req) => {
                 prioridade: grupo.prioridade,
                 categoria: grupo.categoria,
                 quantidade: grupo.quantidade,
+                volume_usado: volumeEspecifico,
                 preco_retornado: preco,
                 erro: precoError?.message || precoError || 'nenhum',
                 rpc_error: precoError ? true : false
@@ -462,7 +513,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: 'ROTINA',
                   p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: volumeTotal,
+                  p_volume_total: volumeEspecifico,
                   p_is_plantao: false
                 });
                 if (!rpc2.error && rpc2.data) {
@@ -478,7 +529,7 @@ serve(async (req) => {
                   p_especialidade: grupo.especialidade,
                   p_prioridade: grupo.prioridade,
                   p_categoria: 'SC',
-                  p_volume_total: volumeTotal,
+                  p_volume_total: volumeEspecifico,
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 if (!rpc3.error && rpc3.data) {
@@ -516,7 +567,7 @@ serve(async (req) => {
         }
 
         // Calcular franquia, portal e integração usando lógica corrigida
-        console.log(`💰 Calculando faturamento para ${cliente.nome_fantasia} - Volume: ${volumeTotal}`);
+        console.log(`💰 Calculando faturamento para ${cliente.nome_fantasia} - Volume: ${totalExames}`);
         
         // ✅ BUSCAR PARÂMETROS DE FATURAMENTO COMPLETOS (somente se houver clienteId válido)
         let parametros: any = undefined;
@@ -567,12 +618,12 @@ serve(async (req) => {
         if (parametros?.aplicar_franquia) {
           if (parametros.frequencia_continua) {
             // Frequência contínua = SIM: sempre cobra franquia
-            if (parametros.frequencia_por_volume && volumeTotal > (parametros.volume_franquia || 0)) {
+            if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
               valorFranquia = parametros.valor_acima_franquia || parametros.valor_franquia || 0;
               detalhesFranquia = {
                 tipo: 'continua_com_volume',
                 volume_base: parametros.volume_franquia,
-                volume_atual: volumeTotal,
+                volume_atual: totalExames,
                 valor_aplicado: valorFranquia,
                 motivo: 'Frequência contínua + volume acima da franquia'
               };
@@ -580,30 +631,30 @@ serve(async (req) => {
               valorFranquia = parametros.valor_franquia || 0;
               detalhesFranquia = {
                 tipo: 'continua_normal', 
-                volume_atual: volumeTotal,
+                volume_atual: totalExames,
                 valor_aplicado: valorFranquia,
                 motivo: 'Frequência contínua - valor base'
               };
             }
           } else {
             // Frequência contínua = NÃO: só cobra se houver volume
-            if (volumeTotal > 0) {
-              if (parametros.frequencia_por_volume && volumeTotal > (parametros.volume_franquia || 0)) {
+            if (totalExames > 0) {
+              if (parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)) {
                 valorFranquia = parametros.valor_acima_franquia || parametros.valor_franquia || 0;
                 detalhesFranquia = {
                   tipo: 'volume_acima',
                   volume_base: parametros.volume_franquia,
-                  volume_atual: volumeTotal,
+                  volume_atual: totalExames,
                   valor_aplicado: valorFranquia,
                   motivo: 'Volume acima da franquia (regra por volume)'
                 };
-              } else if (!parametros.frequencia_por_volume && (parametros.volume_franquia || 0) > 0 && volumeTotal > (parametros.volume_franquia || 0)) {
+              } else if (!parametros.frequencia_por_volume && (parametros.volume_franquia || 0) > 0 && totalExames > (parametros.volume_franquia || 0)) {
                 // Novo: sem regra por volume e volume acima do limite → NÃO cobra franquia
                 valorFranquia = 0;
                 detalhesFranquia = {
                   tipo: 'acima_volume_sem_regra',
                   volume_base: parametros.volume_franquia,
-                  volume_atual: volumeTotal,
+                  volume_atual: totalExames,
                   valor_aplicado: 0,
                   motivo: 'Volume acima da franquia e frequencia_por_volume = false - franquia NÃO aplicada'
                 };
@@ -611,7 +662,7 @@ serve(async (req) => {
                 valorFranquia = parametros.valor_franquia || 0;
                 detalhesFranquia = {
                   tipo: 'volume_normal',
-                  volume_atual: volumeTotal,
+                  volume_atual: totalExames,
                   valor_aplicado: valorFranquia,
                   motivo: 'Volume dentro da franquia'
                 };
@@ -659,8 +710,8 @@ serve(async (req) => {
 
         console.log(`📊 Cliente ${cliente.nome_fantasia}: Franquia R$ ${valorFranquia.toFixed(2)} | Portal R$ ${valorPortal.toFixed(2)} | Integração R$ ${valorIntegracao.toFixed(2)}`);
         
-        if (valorExames === 0 && volumeTotal > 0) {
-          console.log(`⚠️ PROBLEMA: Cliente ${cliente.nome_fantasia} tem ${volumeTotal} exames na volumetria mas valor calculado = R$ 0,00`);
+        if (valorExames === 0 && totalExames > 0) {
+          console.log(`⚠️ PROBLEMA: Cliente ${cliente.nome_fantasia} tem ${totalExames} exames na volumetria mas valor calculado = R$ 0,00`);
         }
 
         const calculo = calculoCompleto?.[0];
@@ -707,7 +758,7 @@ serve(async (req) => {
 
         // Montar demonstrativo com alertas para problemas
         const temProblemas = valorExames === 0 && totalExames > 0;
-        const temFranquiaProblema = valorFranquia > 0 && volumeTotal === 0 && !parametros?.frequencia_continua;
+        const temFranquiaProblema = valorFranquia > 0 && totalExames === 0 && !parametros?.frequencia_continua;
         
          const demonstrativo: DemonstrativoCliente = {
           cliente_id: cliente.id,
