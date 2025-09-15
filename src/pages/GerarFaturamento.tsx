@@ -56,6 +56,15 @@ const PERIODO_ATUAL = "2025-06";
 export default function GerarFaturamento() {
   const [activeTab, setActiveTab] = useState("gerar");
   
+  // Ensure activeTab never gets set to removed values
+  const safeSetActiveTab = (value: string) => {
+    const validTabs = ["gerar", "demonstrativo", "relatorios", "analise", "fechamento"];
+    if (validTabs.includes(value)) {
+      setActiveTab(value);
+    } else {
+      setActiveTab("gerar"); // fallback to default
+    }
+  };
   // Estados persistentes que não devem zerar ao trocar de aba
   const [relatoriosGerados, setRelatoriosGerados] = useState(() => {
     const saved = localStorage.getItem('relatoriosGerados');
@@ -1284,7 +1293,7 @@ export default function GerarFaturamento() {
         <p className="text-gray-600 mt-1">Geração e envio automático de relatórios de faturamento para todos os clientes</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={safeSetActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="gerar" className="flex items-center gap-2">
             <Send className="h-4 w-4" />
