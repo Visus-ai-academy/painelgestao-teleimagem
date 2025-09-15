@@ -122,10 +122,13 @@ serve(async (req) => {
 
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
     const isStatusInativoOuCancelado = (status?: string) => {
-      const s = (status || '').toString().toLowerCase();
-      return s.startsWith('cancel') || s.startsWith('inativ');
+      if (!status) return false;
+      const s = status.toString().trim().toUpperCase();
+      // Códigos e descrições comuns
+      if (s === 'I' || s.startsWith('INAT')) return true; // INATIVO, INATIVADO, I
+      if (s === 'C' || s.startsWith('CANCEL')) return true; // CANCELADO, CANCELADA, C
+      return false;
     };
-
     // Helpers de parâmetros/contratos
     const getParametroAtivo = (pfList?: any) => {
       const list: any[] = Array.isArray(pfList) ? pfList : (pfList ? [pfList] : []);
@@ -293,6 +296,7 @@ serve(async (req) => {
             cliente.nome_mobilemed, // Nome MobileMed se existir
             nomeFantasia // Nome fantasia
           ].filter(Boolean), // Remove valores null/undefined
+          cond_volume: cliente.contratos_clientes?.[0]?.cond_volume || null,
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: (getParametroAtivo(cliente.parametros_faturamento)?.tipo_faturamento)
             || cliente.contratos_clientes?.[0]?.tipo_faturamento
