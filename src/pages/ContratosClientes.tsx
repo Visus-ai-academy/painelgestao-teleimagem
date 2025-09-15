@@ -217,7 +217,7 @@ export default function ContratosClientes() {
     try {
       setLoading(true);
       
-      // Buscar contratos com dados dos clientes e parâmetros de faturamento
+      // Buscar contratos com dados dos clientes
       const { data: contratosData, error } = await supabase
         .from('contratos_clientes')
         .select(`
@@ -234,28 +234,10 @@ export default function ContratosClientes() {
             contato,
             status,
             ativo
-          ),
-          parametros_faturamento!left (
-            id,
-            cliente_id,
-            aplicar_franquia,
-            valor_franquia,
-            volume_franquia,
-            valor_acima_franquia,
-            frequencia_continua,
-            frequencia_por_volume,
-            portal_laudos,
-            cobrar_integracao,
-            valor_integracao,
-            tipo_faturamento,
-            impostos_ab_min,
-            simples,
-            status
           )
         `)
         .eq('clientes.ativo', true)
-        .eq('status', 'ativo')
-        .eq('parametros_faturamento.status', 'A');
+        .eq('status', 'ativo');
 
       if (error) {
         console.error('Erro ao carregar contratos:', error);
@@ -267,12 +249,30 @@ export default function ContratosClientes() {
         return;
       }
 
+      // Buscar parâmetros de faturamento separadamente para evitar duplicatas
+      const clienteIds = contratosData?.map(c => c.cliente_id) || [];
+      let parametrosPorCliente: Record<string, any> = {};
+      
+      if (clienteIds.length > 0) {
+        const { data: parametrosData } = await supabase
+          .from('parametros_faturamento')
+          .select('*')
+          .in('cliente_id', clienteIds)
+          .eq('status', 'A');
+        
+        // Organizar parâmetros por cliente_id (pegar o mais recente para cada cliente)
+        parametrosData?.forEach(param => {
+          if (!parametrosPorCliente[param.cliente_id] || 
+              parametrosPorCliente[param.cliente_id].updated_at < param.updated_at) {
+            parametrosPorCliente[param.cliente_id] = param;
+          }
+        });
+      }
+
       // Transformar dados do Supabase para o formato da interface
       const contratosFormatados: ContratoCliente[] = (contratosData || []).map(contrato => {
         const cliente = contrato.clientes;
-        const parametros = Array.isArray(contrato.parametros_faturamento) && contrato.parametros_faturamento.length > 0 
-          ? contrato.parametros_faturamento[0] 
-          : null;
+        const parametros = parametrosPorCliente[contrato.cliente_id] || null;
         
         const hoje = new Date();
         const dataFim = new Date(contrato.data_fim || contrato.data_inicio);
@@ -285,11 +285,7 @@ export default function ContratosClientes() {
           status = "A Vencer";
         }
 
-        // Calcular valor estimado baseado nos serviços contratados e configurações
-        let valorEstimado = 0;
-        const servicosContratados = Array.isArray(contrato.servicos_contratados) ? contrato.servicos_contratados : [];
-        
-        // Usar parâmetros de faturamento vindos do JOIN ou fallback para JSONB
+        // Usar parâmetros de faturamento da consulta separada ou fallback para JSONB
         const configuracoesFranquia = parametros ? {
           tem_franquia: parametros.aplicar_franquia,
           valor_franquia: parametros.valor_franquia,
@@ -305,19 +301,6 @@ export default function ContratosClientes() {
           portal_laudos: parametros.portal_laudos
         } : (typeof contrato.configuracoes_integracao === 'object' && contrato.configuracoes_integracao) ? contrato.configuracoes_integracao as any : {};
 
-        // Valor da franquia
-        const aplicarFranquia = configuracoesFranquia.tem_franquia || configuracoesFranquia.aplicar_franquia;
-        const valorFranquia = configuracoesFranquia.valor_franquia;
-        if (aplicarFranquia && valorFranquia) {
-          valorEstimado += Number(valorFranquia);
-        }
-
-        // Valor da integração
-        const valorIntegracao = configuracoesIntegracao.valor_integracao;
-        if (valorIntegracao) {
-          valorEstimado += Number(valorIntegracao);
-        }
-
         return {
           id: contrato.id,
           clienteId: cliente?.id || '',
@@ -326,15 +309,8 @@ export default function ContratosClientes() {
           dataInicio: contrato.data_inicio || '',
           dataFim: contrato.data_fim || contrato.data_inicio || '',
           status,
-          servicos: servicosContratados.map((s: any) => ({
-            id: s.id,
-            modalidade: s.modalidade,
-            especialidade: s.especialidade,
-            categoria: s.categoria,
-            prioridade: s.prioridade,
-            valor: Number(s.valor || 0)
-          })) as ServicoContratado[],
-          valorTotal: valorEstimado,
+          servicos: [],
+          valorTotal: 0,
           diasParaVencer,
           indiceReajuste: "IPCA" as const,
           endereco: cliente?.endereco || '',
@@ -345,7 +321,6 @@ export default function ContratosClientes() {
           cobrancaIntegracao: Boolean(configuracoesIntegracao.cobra_integracao),
           valorIntegracao: Number(configuracoesIntegracao.valor_integracao ?? 0),
           cobrancaSuporte: false,
-          // Novos campos
           consideraPlantao: Boolean(contrato.considera_plantao),
           condVolume: contrato.cond_volume || 'MOD/ESP/CAT',
           diaVencimento: Number(contrato.dia_vencimento || 10),
@@ -356,10 +331,8 @@ export default function ContratosClientes() {
           configuracoesIntegracao: configuracoesIntegracao,
           termosAditivos: [],
           documentos: [],
-          // Novos campos para exibição na tabela
           numeroContrato: contrato.numero_contrato || `CT-${contrato.id.slice(-8)}`,
           razaoSocial: cliente?.razao_social || cliente?.nome || 'Não informado',
-          // Campos baseados nos parâmetros de faturamento vindos do JOIN
           aplicarFranquia: parametros?.aplicar_franquia ?? configuracoesFranquia.tem_franquia ?? false,
           valorFranquia: Number(parametros?.valor_franquia ?? configuracoesFranquia.valor_franquia ?? 0),
           volumeFranquia: Number(parametros?.volume_franquia ?? configuracoesFranquia.volume_franquia ?? 0),
@@ -370,7 +343,7 @@ export default function ContratosClientes() {
           tipoFaturamento: parametros?.tipo_faturamento ?? contrato.tipo_faturamento ?? 'CO-FT',
           impostosAbMin: Number(parametros?.impostos_ab_min ?? contrato.impostos_ab_min ?? 0),
           simples: Boolean(parametros?.simples ?? contrato.simples ?? false),
-          parametrosStatus: parametros ? 'Configurado via Parâmetros' : 'Não configurado'
+          parametrosStatus: parametros ? 'Configurado' : 'Não configurado'
         };
       });
 
