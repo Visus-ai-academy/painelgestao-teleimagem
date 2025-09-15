@@ -347,8 +347,16 @@ export default function ContratosClientes() {
         };
       });
 
-      setContratos(contratosFormatados);
-      setContratosOriginal(contratosFormatados);
+      // Remover duplicatas com chave robusta (id ou combinação cliente+numero+vigência)
+      const uniqueMap = new Map<string, ContratoCliente>();
+      for (const c of contratosFormatados) {
+        const key = c.id || `${c.clienteId}:${c.numeroContrato || ''}:${c.dataInicio}:${c.dataFim}`;
+        if (!uniqueMap.has(key)) uniqueMap.set(key, c);
+      }
+      const uniqueContratos = Array.from(uniqueMap.values());
+
+      setContratos(uniqueContratos);
+      setContratosOriginal(uniqueContratos);
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
       toast({
