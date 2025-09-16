@@ -293,42 +293,91 @@ serve(async (req) => {
         const codClienteDigits = String(codigoClienteOmie || '').replace(/\D/g, '');
         const contratoInvalido = !codContratoDigits || (codContratoDigits && codClienteDigits && codContratoDigits === codClienteDigits);
         if (contratoInvalido) {
-          console.warn(`Contrato OMIE ausente/inválido para ${demo.cliente_nome}. Sincronizando pelo número do OMIE (se disponível)...`);
-          const sync = await supabase.functions.invoke('buscar-contrato-omie', {
-            body: {
-              cliente_id: demo.cliente_id,
-              cliente_nome: demo.cliente_nome,
-              numero_contrato: numeroContratoAlvo || contratoAtivo.numero_contrato // Ex.: 2023/00170
-            }
-          });
-          if (sync.data?.sucesso && sync.data?.codigo_contrato) {
-            const novoCod = String(sync.data.codigo_contrato);
-            const novoCodDigits = novoCod.replace(/\D/g, '');
-            if (novoCodDigits && novoCodDigits !== codClienteDigits) {
-              const agoraISO = new Date().toISOString();
-              let updateQuery = supabase
-                .from('contratos_clientes')
-                .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
-                .eq('cliente_id', demo.cliente_id)
-                .eq('status', 'ativo');
-              const numeroFiltro = numeroContratoAlvo || contratoAtivo.numero_contrato;
-              if (numeroFiltro) {
-                updateQuery = updateQuery.eq('numero_contrato', numeroFiltro);
-              }
-              const { error: updErr } = await updateQuery;
-              if (updErr) {
-                // Fallback por ID do contrato em memória
-                await supabase
+          console.warn(`Contrato OMIE ausente/inválido para ${demo.cliente_nome}. Tentando ConsultarContrato com número ${numeroContratoAlvo || contratoAtivo.numero_contrato}...`);
+          const numeroConsulta = (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim();
+          if (numeroConsulta) {
+            try {
+              const consultaReq: OmieApiRequest = {
+                call: 'ConsultarContrato',
+                app_key: omieAppKey,
+                app_secret: omieAppSecret,
+                param: [{ cNumCtr: numeroConsulta }]
+              };
+              const consultaResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(consultaReq)
+              });
+              const consultaJson = await consultaResp.json();
+              const findCode = (o: any): any => {
+                if (!o || typeof o !== 'object') return null;
+                if (o.nCodCtr != null) return o.nCodCtr;
+                if (o.nCodContrato != null) return o.nCodContrato;
+                if (o.codigo != null && /^\d+$/.test(String(o.codigo))) return o.codigo;
+                for (const v of Object.values(o)) {
+                  const r = findCode(v);
+                  if (r != null) return r;
+                }
+                return null;
+              };
+              const codDireto = findCode(consultaJson);
+              const codDiretoDigits = String(codDireto || '').replace(/\D/g, '');
+              if (codDiretoDigits && codDiretoDigits !== codClienteDigits) {
+                const agoraISO = new Date().toISOString();
+                let updateQuery = supabase
                   .from('contratos_clientes')
-                  .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
-                  .eq('id', contratoAtivo.id);
+                  .update({ omie_codigo_contrato: String(codDiretoDigits), omie_data_sincronizacao: agoraISO })
+                  .eq('cliente_id', demo.cliente_id)
+                  .eq('status', 'ativo');
+                updateQuery = updateQuery.eq('numero_contrato', numeroConsulta);
+                const { error: updErr } = await updateQuery;
+                if (updErr) {
+                  await supabase
+                    .from('contratos_clientes')
+                    .update({ omie_codigo_contrato: String(codDiretoDigits), omie_data_sincronizacao: agoraISO })
+                    .eq('id', contratoAtivo.id);
+                }
+                contratoAtivo.omie_codigo_contrato = String(codDiretoDigits);
+              } else {
+                console.warn('ConsultarContrato não retornou nCodCtr válido (ou igual ao código do cliente). Tentando função auxiliar...');
+                const sync = await supabase.functions.invoke('buscar-contrato-omie', {
+                  body: {
+                    cliente_id: demo.cliente_id,
+                    cliente_nome: demo.cliente_nome,
+                    numero_contrato: numeroConsulta
+                  }
+                });
+                if (sync.data?.sucesso && sync.data?.codigo_contrato) {
+                  const novoCod = String(sync.data.codigo_contrato);
+                  const novoCodDigits = novoCod.replace(/\D/g, '');
+                  if (novoCodDigits && novoCodDigits !== codClienteDigits) {
+                    const agoraISO = new Date().toISOString();
+                    let updateQuery2 = supabase
+                      .from('contratos_clientes')
+                      .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
+                      .eq('cliente_id', demo.cliente_id)
+                      .eq('status', 'ativo')
+                      .eq('numero_contrato', numeroConsulta);
+                    const { error: updErr2 } = await updateQuery2;
+                    if (updErr2) {
+                      await supabase
+                        .from('contratos_clientes')
+                        .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
+                        .eq('id', contratoAtivo.id);
+                    }
+                    contratoAtivo.omie_codigo_contrato = novoCod;
+                  } else {
+                    console.warn('Código de contrato retornado é igual ao código do cliente ou inválido. Ignorando atualização.');
+                  }
+                } else {
+                  console.warn(`Sincronização de contrato Omie não retornou código para ${demo.cliente_nome}. Detalhes: ${JSON.stringify(sync.error || sync.data)}`);
+                }
               }
-              contratoAtivo.omie_codigo_contrato = novoCod;
-            } else {
-              console.warn('Código de contrato retornado é igual ao código do cliente ou inválido. Ignorando atualização.');
+            } catch (e) {
+              console.warn('Falha ao consultar contrato diretamente no Omie:', e);
             }
           } else {
-            console.warn(`Sincronização de contrato Omie não retornou código para ${demo.cliente_nome}. Detalhes: ${JSON.stringify(sync.error || sync.data)}`);
+            console.warn('Não há número de contrato disponível para consulta.');
           }
         }
         // Revalidar após tentativa de sincronização
