@@ -42,92 +42,89 @@ serve(async (req) => {
 
     console.log(`Buscando cliente no OMIE - CNPJ: ${cnpj || 'N/A'}, Nome: ${nome_cliente || 'N/A'}`);
 
-    // Buscar cliente na API do OMIE
-    const buscarClienteReq: OmieApiRequest = {
-      call: "ListarClientes",
-      app_key: omieAppKey,
-      app_secret: omieAppSecret,
-      param: [{
-        pagina: 1,
-        registros_por_pagina: 100
-      }]
-    };
+    // Buscar cliente na API do OMIE com paginação e filtros básicos
+    const registrosPorPagina = 500;
+    let pagina = 1;
+    let totalPaginas = 1;
+    let clienteEncontrado: any = null;
 
-    console.log('Consultando API OMIE - ListarClientes...');
+    // Normalizar critérios de busca
+    const cnpjLimpo = cnpj ? String(cnpj).replace(/[^\d]/g, '') : null;
+    const nomeClienteUpper = nome_cliente ? String(nome_cliente).toUpperCase().trim() : null;
 
-    const omieResponse = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(buscarClienteReq)
-    });
+    while (pagina <= totalPaginas && !clienteEncontrado) {
+      const reqBody: OmieApiRequest = {
+        call: "ListarClientes",
+        app_key: omieAppKey,
+        app_secret: omieAppSecret,
+        param: [{
+          pagina,
+          registros_por_pagina: registrosPorPagina
+        }]
+      };
 
-    if (!omieResponse.ok) {
-      const errorText = await omieResponse.text();
-      throw new Error(`Erro na API OMIE: ${omieResponse.status} - ${errorText}`);
-    }
+      console.log(`Consultando API OMIE - ListarClientes (página ${pagina})...`);
 
-    const omieData = await omieResponse.json();
-    console.log(`API OMIE retornou ${omieData.clientes_cadastro?.length || 0} clientes`);
-
-    if (!omieData.clientes_cadastro || omieData.clientes_cadastro.length === 0) {
-      return new Response(JSON.stringify({
-        sucesso: false,
-        erro: 'Nenhum cliente encontrado no OMIE',
-        total_clientes: 0
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      const omieResponse = await fetch('https://app.omie.com.br/api/v1/geral/clientes/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reqBody)
       });
+
+      if (!omieResponse.ok) {
+        const errorText = await omieResponse.text();
+        throw new Error(`Erro na API OMIE: ${omieResponse.status} - ${errorText}`);
+      }
+
+      const omieData = await omieResponse.json();
+      const lista = omieData.clientes_cadastro || [];
+      console.log(`API OMIE retornou ${lista.length} clientes na página ${pagina}`);
+
+      // Atualizar total de páginas se disponível
+      if (typeof omieData.total_de_paginas === 'number' && omieData.total_de_paginas > 0) {
+        totalPaginas = omieData.total_de_paginas;
+      } else if (lista.length < registrosPorPagina) {
+        totalPaginas = pagina; // última página
+      } else {
+        totalPaginas = pagina + 1; // assume próxima
+      }
+
+      // Buscar por CNPJ exato primeiro
+      if (cnpjLimpo) {
+        clienteEncontrado = lista.find((cliente: any) => {
+          const cnpjOmie = cliente.cnpj_cpf?.replace(/[^\d]/g, '') || '';
+          return cnpjOmie === cnpjLimpo;
+        }) || null;
+      }
+
+      // Se não achou por CNPJ, tentar por nome (contains, bidirecional)
+      if (!clienteEncontrado && nomeClienteUpper) {
+        clienteEncontrado = lista.find((cliente: any) => {
+          const razaoSocial = cliente.razao_social?.toUpperCase().trim() || '';
+          const nomeFantasia = cliente.nome_fantasia?.toUpperCase().trim() || '';
+          return razaoSocial.includes(nomeClienteUpper) || 
+                 nomeFantasia.includes(nomeClienteUpper) ||
+                 nomeClienteUpper.includes(razaoSocial) ||
+                 nomeClienteUpper.includes(nomeFantasia);
+        }) || null;
+      }
+
+      pagina++;
     }
 
-    // Filtrar cliente por CNPJ ou nome
-    let clienteEncontrado = null;
-
-    if (cnpj) {
-      // Limpar CNPJ para comparação (remover caracteres especiais)
-      const cnpjLimpo = cnpj.replace(/[^\d]/g, '');
-      
-      clienteEncontrado = omieData.clientes_cadastro.find((cliente: any) => {
-        const cnpjOmie = cliente.cnpj_cpf?.replace(/[^\d]/g, '') || '';
-        return cnpjOmie === cnpjLimpo;
-      });
-    }
-
-    // Se não encontrou por CNPJ, tentar por nome
-    if (!clienteEncontrado && nome_cliente) {
-      const nomeCliente = nome_cliente.toUpperCase().trim();
-      
-      clienteEncontrado = omieData.clientes_cadastro.find((cliente: any) => {
-        const razaoSocial = cliente.razao_social?.toUpperCase().trim() || '';
-        const nomeFantasia = cliente.nome_fantasia?.toUpperCase().trim() || '';
-        
-        return razaoSocial.includes(nomeCliente) || 
-               nomeFantasia.includes(nomeCliente) ||
-               nomeCliente.includes(razaoSocial) ||
-               nomeCliente.includes(nomeFantasia);
-      });
-    }
-
+    // Se nenhuma página trouxe resultados
     if (!clienteEncontrado) {
-      // Listar primeiros 10 clientes para referência
-      const clientesReferencia = omieData.clientes_cadastro.slice(0, 10).map((cliente: any) => ({
-        codigo: cliente.codigo_cliente_omie,
-        razao_social: cliente.razao_social,
-        nome_fantasia: cliente.nome_fantasia,
-        cnpj: cliente.cnpj_cpf
-      }));
-
       return new Response(JSON.stringify({
         sucesso: false,
-        erro: `Cliente não encontrado no OMIE`,
-        busca_realizada: { cnpj, nome_cliente },
-        total_clientes: omieData.clientes_cadastro.length,
-        clientes_referencia: clientesReferencia
+        erro: 'Cliente não encontrado no OMIE',
+        busca_realizada: { cnpj, nome_cliente }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
 
     // Cliente encontrado!
     const resultado = {
