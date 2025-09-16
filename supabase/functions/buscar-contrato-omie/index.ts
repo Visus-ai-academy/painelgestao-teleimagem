@@ -119,63 +119,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Cliente não possui código OMIE' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Se temos o número do contrato, tentar consulta direta para obter nCodCtr
-    if (numeroContratoDesejado) {
-      const consultaReq: OmieRequest = {
-        call: 'ConsultarContrato',
-        app_key: appKey,
-        app_secret: appSecret,
-        param: [{ cNumCtr: numeroContratoDesejado }]
-      };
-      console.log('Consultando contrato por número no Omie:', JSON.stringify({ call: consultaReq.call, param: consultaReq.param }, null, 2));
-      const consultaResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(consultaReq)
-      });
-      const consultaJson = await consultaResp.json();
-      // Extrair código do contrato de forma robusta (campos aninhados)
-      const findCode = (o: any): any => {
-        if (!o || typeof o !== 'object') return null;
-        if (o.nCodCtr != null) return o.nCodCtr;
-        if (o.nCodContrato != null) return o.nCodContrato;
-        if (o.codigo != null && /^\d+$/.test(String(o.codigo))) return o.codigo;
-        for (const v of Object.values(o)) {
-          const r = findCode(v);
-          if (r != null) return r;
-        }
-        return null;
-      };
-      const codDireto = findCode(consultaJson);
-      if (codDireto) {
-        // Evitar salvar código de CONTRATO igual ao código do CLIENTE
-        const cliDigits = Number(String(codigoClienteOmie).replace(/\D/g, ''));
-        const ctrDigits = Number(String(codDireto).replace(/\D/g, ''));
-        if (cliDigits && ctrDigits && cliDigits === ctrDigits) {
-          console.warn('Código de contrato retornado é igual ao código do cliente. Ignorando.');
-          return new Response(
-            JSON.stringify({ sucesso: false, erro: 'Código de contrato retornado é igual ao código do cliente', resposta: consultaJson }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        if (numeroContratoDesejado) {
-          await supabase
-            .from('contratos_clientes')
-            .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
-            .eq('cliente_id', clienteRow.id)
-            .eq('status', 'ativo')
-            .eq('numero_contrato', numeroContratoDesejado);
-        } else {
-          await supabase
-            .from('contratos_clientes')
-            .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
-            .eq('cliente_id', clienteRow.id)
-            .eq('status', 'ativo');
-        }
-        return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(codDireto), detalhes: consultaJson }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      console.warn('Consulta por número não retornou nCodCtr. Caindo para listagem...');
-    }
+    // Preparar filtros para listagem por cliente (mais confiável que consultar por número diretamente)
+    const omieCliDigits = Number(String(codigoClienteOmie || '').replace(/\D/g, '')) || undefined;
+    const cnpjDigits = String(clienteRow.cnpj || '').replace(/\D/g, '') || undefined;
+    const numeroContratoAlvo = numeroContratoDesejado ? String(numeroContratoDesejado).trim() : undefined;
+    console.log('Sincronização por listagem - filtros:', { omieCliDigits, cnpjDigits, numeroContratoAlvo });
+
 
     // Listar contratos no Omie com paginação (sem nCodCli para evitar erro NCODCLI)
     const contratos: any[] = [];
@@ -183,11 +132,15 @@ serve(async (req) => {
     let totalPaginas = 1;
 
     while (pagina <= totalPaginas) {
+      const listParams: any = { pagina, registros_por_pagina: 200 };
+      if (cnpjDigits) listParams.filtrar_cnpj_cpf = cnpjDigits;
+      if (omieCliDigits) listParams.filtrar_cliente = omieCliDigits;
+
       const listReq: OmieRequest = {
         call: 'ListarContratos',
         app_key: appKey,
         app_secret: appSecret,
-        param: [{ nPagina: pagina, nRegsPorPagina: 200 }]
+        param: [listParams]
       };
 
       console.log('Consultando contratos no Omie (paginado):', JSON.stringify({ call: listReq.call, param: listReq.param, numeroContratoDesejado }, null, 2));
@@ -199,8 +152,8 @@ serve(async (req) => {
       });
       const listJson = await listResp.json();
 
-      const pageContratos: any[] = listJson?.lista_contratos || listJson?.contratos || listJson?.lista || [];
-      const totPaginas = Number(listJson?.nTotPaginas || listJson?.total_de_paginas || totalPaginas);
+      const pageContratos: any[] = listJson?.contratoCadastro || listJson?.contratos || listJson?.lista || [];
+      const totPaginas = Number(listJson?.total_de_paginas || listJson?.nTotPaginas || totalPaginas);
       if (Array.isArray(pageContratos) && pageContratos.length > 0) {
         contratos.push(...pageContratos);
       }
@@ -213,7 +166,7 @@ serve(async (req) => {
         const normalize = (v: any) => (v ?? '').toString().trim();
         const alvo = normalize(numeroContratoDesejado).toUpperCase();
         const found = pageContratos.find((c) => {
-          const cNum = normalize(c.cNumCtr || c.cNumero || c.cNumContrato || c.numero);
+          const cNum = normalize(c.cNumCtr || c.cNumero || c.cNumContrato || c.numero || c?.cabecalho?.cNumCtr);
           return cNum && cNum.toUpperCase() === alvo;
         });
         if (found) {
@@ -255,7 +208,7 @@ serve(async (req) => {
       }) || contratos[0];
     }
 
-    const nCodCtr = contratoEscolhido?.nCodCtr || contratoEscolhido?.nCodContrato || contratoEscolhido?.codigo || contratoEscolhido?.id;
+    const nCodCtr = contratoEscolhido?.nCodCtr || contratoEscolhido?.nCodContrato || contratoEscolhido?.cabecalho?.nCodCtr;
 
     if (!nCodCtr) {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Não foi possível identificar o código do contrato no Omie', contrato: contratoEscolhido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

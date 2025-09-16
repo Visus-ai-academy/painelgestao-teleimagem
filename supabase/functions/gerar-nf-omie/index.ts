@@ -309,18 +309,17 @@ serve(async (req) => {
                 body: JSON.stringify(consultaReq)
               });
               const consultaJson = await consultaResp.json();
-              const findCode = (o: any): any => {
+              const findNCodCtr = (o: any): any => {
                 if (!o || typeof o !== 'object') return null;
-                if (o.nCodCtr != null) return o.nCodCtr;
-                if (o.nCodContrato != null) return o.nCodContrato;
-                if (o.codigo != null && /^\d+$/.test(String(o.codigo))) return o.codigo;
+                if (Object.prototype.hasOwnProperty.call(o, 'nCodCtr')) return o.nCodCtr;
+                if (Object.prototype.hasOwnProperty.call(o, 'nCodContrato')) return o.nCodContrato;
                 for (const v of Object.values(o)) {
-                  const r = findCode(v);
+                  const r = findNCodCtr(v);
                   if (r != null) return r;
                 }
                 return null;
               };
-              const codDireto = findCode(consultaJson);
+              const codDireto = findNCodCtr(consultaJson);
               const codDiretoDigits = String(codDireto || '').replace(/\D/g, '');
               if (codDiretoDigits && codDiretoDigits !== codClienteDigits) {
                 const agoraISO = new Date().toISOString();
