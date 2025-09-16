@@ -381,15 +381,111 @@ serve(async (req) => {
         }
         // Revalidar após tentativa de sincronização
         codContratoDigits = String(contratoAtivo.omie_codigo_contrato || '').replace(/\D/g, '');
-        if (!codContratoDigits) {
-          throw new Error(`Contrato Omie não sincronizado para ${demo.cliente_nome} (omie_codigo_contrato ausente no contrato ${contratoAtivo.numero_contrato || 'N/A'})`);
+
+        // Helper: criar OS direta no Omie (sem contrato)
+        const criarOSDireta = async () => {
+          const cfgInt: any = contratoAtivo?.configuracoes_integracao || {};
+          const cCodParc = (cfgInt.condicao_pagamento || '000').toString();
+          const nQtdeParc = Number(cfgInt.n_parcelas || 1);
+          const destinatario = clienteData?.email_envio_nf || clienteData?.email || undefined;
+
+          // Montagem do item de serviço
+          const servico: any = {
+            cDescServ: `Serviços de Telerradiologia - ${periodo}`,
+            nQtde: 1,
+            nValUnit: Math.max(0, valorParaNF || 0),
+            cRetemISS: 'N',
+            cTribServ: (cfgInt.trib_serv || '01').toString(),
+            impostos: {}
+          };
+          if (cfgInt.nCodServico) servico.nCodServico = Number(String(cfgInt.nCodServico).replace(/\D/g, ''));
+          if (cfgInt.cod_serv_lc116) servico.cCodServLC116 = cfgInt.cod_serv_lc116;
+          if (cfgInt.cod_serv_municipal) servico.cCodServMun = cfgInt.cod_serv_municipal;
+          if (contratoAtivo?.percentual_iss) servico.impostos.nAliqISS = Number(contratoAtivo.percentual_iss) || undefined;
+
+          // Validar campos mínimos para inclusão
+          const temServicoMinimo = !!servico.nCodServico || (!!servico.cCodServLC116 && !!servico.cCodServMun);
+          if (!temServicoMinimo) {
+            throw new Error('Configurações de integração insuficientes para IncluirOS: informe nCodServico ou (cCodServLC116 e cCodServMun) em contratos_clientes.configuracoes_integracao.');
+          }
+
+          const osPayload: any = {
+            Cabecalho: {
+              nCodCli: codigoClienteNumerico,
+              cCodParc,
+              nQtdeParc,
+              dDtPrevisao: formatDateBR(venc),
+              cEtapa: '50' // Faturar
+            },
+            ServicosPrestados: [servico]
+          };
+
+          // Email é opcional
+          if (destinatario) {
+            osPayload.Email = { cEnvLink: 'S', cEnviarPara: destinatario };
+          }
+
+          // Informações adicionais (opcionais)
+          const infAdic: any = {};
+          if (cfgInt.categoria) infAdic.cCodCateg = cfgInt.categoria;
+          if (cfgInt.conta_corrente) infAdic.nCodCC = Number(String(cfgInt.conta_corrente).replace(/\D/g, ''));
+          if (contratoAtivo?.numero_contrato) infAdic.cNumContrato = String(contratoAtivo.numero_contrato);
+          if (Object.keys(infAdic).length > 0) osPayload.InformacoesAdicionais = infAdic;
+
+          const reqBodyOS = {
+            call: 'IncluirOS',
+            app_key: omieAppKey,
+            app_secret: omieAppSecret,
+            param: [osPayload]
+          };
+
+          console.log('Incluindo OS direta (fallback) no Omie:', JSON.stringify({ Cabecalho: osPayload.Cabecalho, Servicos: 1 }, null, 2));
+          const respOS = await fetch('https://app.omie.com.br/api/v1/servicos/os/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reqBodyOS)
+          });
+          const osResult = await respOS.json();
+          return osResult;
+        };
+
+        let usarFallbackOS = false;
+        if (!codContratoDigits || (codContratoDigits && codClienteDigits && codContratoDigits === codClienteDigits)) {
+          usarFallbackOS = true;
+          console.warn(`Contrato OMIE ausente/inválido para ${demo.cliente_nome}. Vamos tentar criar OS direta via API (sem contrato).`);
         }
-        if (codContratoDigits === codClienteDigits) {
-          throw new Error(`Contrato Omie inválido para ${demo.cliente_nome}: código do contrato (${codContratoDigits}) igual ao código do cliente. Crie/sincronize o contrato no Omie (ex.: 2023/00170) ou informe o código correto em contratos_clientes.omie_codigo_contrato.`);
+
+        if (usarFallbackOS) {
+          const osResult = await criarOSDireta();
+          if (osResult?.nCodOS) {
+            console.log(`✅ OS criada no Omie (fallback) para ${demo.cliente_nome}: ${osResult.nCodOS} | Status: ${osResult.cDescStatus}`);
+            await supabase
+              .from('relatorios_faturamento_status')
+              .update({
+                omie_nf_gerada: true,
+                omie_codigo_pedido: osResult.nCodOS,
+                data_geracao_nf_omie: new Date().toISOString(),
+                omie_detalhes: osResult
+              })
+              .eq('cliente_id', demo.cliente_id)
+              .eq('periodo', periodo);
+
+            resultados.push({
+              cliente: demo.cliente_nome,
+              sucesso: true,
+              codigo_ordem_servico: osResult.nCodOS,
+              status: osResult.cDescStatus,
+              valor_total: valorTotal
+            });
+            sucessos++;
+            continue; // passa p/ próximo cliente
+          } else {
+            const detalhe = JSON.stringify(osResult);
+            throw new Error(`Falha ao incluir OS via fallback: ${detalhe}`);
+          }
         }
 
         const codigoContratoOmie = Number(codContratoDigits);
-        
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
         // Faturar Contrato de Serviço no Omie (método correto)
