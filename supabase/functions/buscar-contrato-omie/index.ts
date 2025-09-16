@@ -177,28 +177,59 @@ serve(async (req) => {
       console.warn('Consulta por número não retornou nCodCtr. Caindo para listagem...');
     }
 
-    // Listar contratos no Omie por cliente
-    const listReq: OmieRequest = {
-      call: 'ListarContratos',
-      app_key: appKey,
-      app_secret: appSecret,
-      param: [{ nPagina: 1, nRegsPorPagina: 200, nCodCli: Number(String(codigoClienteOmie).replace(/\D/g, '')) }]
-    };
+    // Listar contratos no Omie com paginação (sem nCodCli para evitar erro NCODCLI)
+    const contratos: any[] = [];
+    let pagina = 1;
+    let totalPaginas = 1;
 
-    console.log('Consultando contratos no Omie:', JSON.stringify({ call: listReq.call, param: listReq.param, numeroContratoDesejado }, null, 2));
+    while (pagina <= totalPaginas) {
+      const listReq: OmieRequest = {
+        call: 'ListarContratos',
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{ nPagina: pagina, nRegsPorPagina: 200 }]
+      };
 
-    const listResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(listReq)
-    });
-    const listJson = await listResp.json();
+      console.log('Consultando contratos no Omie (paginado):', JSON.stringify({ call: listReq.call, param: listReq.param, numeroContratoDesejado }, null, 2));
 
-    // Tentar detectar lista de contratos em diferentes formatos
-    const contratos: any[] = listJson?.lista_contratos || listJson?.contratos || listJson?.lista || [];
+      const listResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(listReq)
+      });
+      const listJson = await listResp.json();
+
+      const pageContratos: any[] = listJson?.lista_contratos || listJson?.contratos || listJson?.lista || [];
+      const totPaginas = Number(listJson?.nTotPaginas || listJson?.total_de_paginas || totalPaginas);
+      if (Array.isArray(pageContratos) && pageContratos.length > 0) {
+        contratos.push(...pageContratos);
+      }
+
+      totalPaginas = Number.isFinite(totPaginas) && totPaginas > 0 ? totPaginas : totalPaginas;
+      console.log(`Página ${pagina}/${totalPaginas} - Acumulados: ${contratos.length}`);
+
+      // Se já acharmos pelo número, podemos parar cedo
+      if (numeroContratoDesejado) {
+        const normalize = (v: any) => (v ?? '').toString().trim();
+        const alvo = normalize(numeroContratoDesejado).toUpperCase();
+        const found = pageContratos.find((c) => {
+          const cNum = normalize(c.cNumCtr || c.cNumero || c.cNumContrato || c.numero);
+          return cNum && cNum.toUpperCase() === alvo;
+        });
+        if (found) {
+          contratos.push(found);
+          totalPaginas = pagina; // força saída
+        }
+      }
+
+      pagina += 1;
+    }
 
     if (!Array.isArray(contratos) || contratos.length === 0) {
-      return new Response(JSON.stringify({ sucesso: false, erro: 'Nenhum contrato encontrado no Omie para este cliente', resposta: listJson }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ sucesso: false, erro: 'Nenhum contrato encontrado no Omie (listagem vazia)', resposta: null }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const normalize = (v: any) => (v ?? '').toString().trim();
