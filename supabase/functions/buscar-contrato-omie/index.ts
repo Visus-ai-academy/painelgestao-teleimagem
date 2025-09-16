@@ -146,12 +146,20 @@ serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        await supabase
-          .from('contratos_clientes')
-          .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
-          .eq('cliente_id', clienteRow.id)
-          .eq('status', 'ativo')
-          .is('omie_codigo_contrato', null);
+        if (numeroContratoDesejado) {
+          await supabase
+            .from('contratos_clientes')
+            .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
+            .eq('cliente_id', clienteRow.id)
+            .eq('status', 'ativo')
+            .eq('numero_contrato', numeroContratoDesejado);
+        } else {
+          await supabase
+            .from('contratos_clientes')
+            .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
+            .eq('cliente_id', clienteRow.id)
+            .eq('status', 'ativo');
+        }
         return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(codDireto), detalhes: consultaJson }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       console.warn('Consulta por número não retornou nCodCtr. Caindo para listagem...');
@@ -220,15 +228,21 @@ serve(async (req) => {
       );
     }
 
-    // Atualizar contratos locais sem código
-    await supabase
-      .from('contratos_clientes')
-      .update({ omie_codigo_contrato: String(nCodCtr), omie_data_sincronizacao: new Date().toISOString() })
-      .eq('cliente_id', clienteRow.id)
-      .eq('status', 'ativo')
-      .is('omie_codigo_contrato', null);
-
-    return new Response(JSON.stringify({ sucesso: true, codigo_contrato: String(nCodCtr), detalhes: contratoEscolhido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Atualizar contratos locais: preferir atualizar o contrato com o número informado; senão, atualizar ativo(s)
+    if (numeroContratoDesejado) {
+      await supabase
+        .from('contratos_clientes')
+        .update({ omie_codigo_contrato: String(nCodCtr), omie_data_sincronizacao: new Date().toISOString() })
+        .eq('cliente_id', clienteRow.id)
+        .eq('status', 'ativo')
+        .eq('numero_contrato', numeroContratoDesejado);
+    } else {
+      await supabase
+        .from('contratos_clientes')
+        .update({ omie_codigo_contrato: String(nCodCtr), omie_data_sincronizacao: new Date().toISOString() })
+        .eq('cliente_id', clienteRow.id)
+        .eq('status', 'ativo');
+    }
   } catch (e: any) {
     console.error('Erro em buscar-contrato-omie:', e);
     return new Response(JSON.stringify({ sucesso: false, erro: e?.message || 'Erro desconhecido' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
