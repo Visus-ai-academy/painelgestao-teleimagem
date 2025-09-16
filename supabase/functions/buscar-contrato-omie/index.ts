@@ -134,7 +134,19 @@ serve(async (req) => {
         body: JSON.stringify(consultaReq)
       });
       const consultaJson = await consultaResp.json();
-      const codDireto = consultaJson?.nCodCtr || consultaJson?.nCodContrato || consultaJson?.codigo;
+      // Extrair código do contrato de forma robusta (campos aninhados)
+      const findCode = (o: any): any => {
+        if (!o || typeof o !== 'object') return null;
+        if (o.nCodCtr != null) return o.nCodCtr;
+        if (o.nCodContrato != null) return o.nCodContrato;
+        if (o.codigo != null && /^\d+$/.test(String(o.codigo))) return o.codigo;
+        for (const v of Object.values(o)) {
+          const r = findCode(v);
+          if (r != null) return r;
+        }
+        return null;
+      };
+      const codDireto = findCode(consultaJson);
       if (codDireto) {
         // Evitar salvar código de CONTRATO igual ao código do CLIENTE
         const cliDigits = Number(String(codigoClienteOmie).replace(/\D/g, ''));
