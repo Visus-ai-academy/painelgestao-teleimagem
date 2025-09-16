@@ -210,7 +210,7 @@ serve(async (req) => {
           try {
             const buscaOmieResponse = await supabase.functions.invoke('buscar-codigo-cliente-omie', {
               body: {
-                cnpj: clienteData.cnpj,
+                cnpj: String(clienteData.cnpj || '').replace(/\D/g, ''),
                 nome_cliente: demo.cliente_nome
               }
             });
@@ -316,41 +316,23 @@ serve(async (req) => {
         
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
-        // Tentar faturar Contrato de Serviço no Omie
-        const tentarFaturarEm = async (endpoint: string, metodo: string) => {
-          const reqBody: OmieApiRequest = {
-            call: metodo,
-            app_key: omieAppKey,
-            app_secret: omieAppSecret,
-            param: [{ nCodCtr: Number(codigoContratoOmie) }]
-          };
-          console.log(
-            `Faturando Contrato no Omie (${metodo}) [${endpoint}] para ${demo.cliente_nome}:`,
-            JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
-          );
-          const resp = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(reqBody)
-          });
-          const json = await resp.json();
-          return json;
+        // Faturar Contrato de Serviço no Omie (método correto)
+        const reqBody: OmieApiRequest = {
+          call: 'FaturarContrato',
+          app_key: omieAppKey,
+          app_secret: omieAppSecret,
+          param: [{ nCodCtr: Number(codigoContratoOmie) }]
         };
-
-        // Sequência de tentativas: contratofat/FaturarContrato -> contratofat/FaturarCtr -> contrato/FaturarCtr
-        const endpointFat = "https://app.omie.com.br/api/v1/servicos/contratofat/";
-        const endpointCtr = "https://app.omie.com.br/api/v1/servicos/contrato/";
-        let nfResult = await tentarFaturarEm(endpointFat, 'FaturarContrato');
-        if (!nfResult?.nCodOS) {
-          const erroMsg1 = typeof nfResult === 'object' ? JSON.stringify(nfResult) : String(nfResult);
-          console.warn(`Falha contratofat/FaturarContrato: ${erroMsg1}`);
-          nfResult = await tentarFaturarEm(endpointFat, 'FaturarCtr');
-        }
-        if (!nfResult?.nCodOS) {
-          const erroMsg2 = typeof nfResult === 'object' ? JSON.stringify(nfResult) : String(nfResult);
-          console.warn(`Falha contratofat/FaturarCtr: ${erroMsg2}`);
-          nfResult = await tentarFaturarEm(endpointCtr, 'FaturarCtr');
-        }
+        console.log(
+          `Faturando Contrato no Omie (FaturarContrato) [https://app.omie.com.br/api/v1/servicos/contratofat/] para ${demo.cliente_nome}:`,
+          JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
+        );
+        const resp = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(reqBody)
+        });
+        const nfResult = await resp.json();
 
         if (nfResult?.nCodOS) {
           console.log(`Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
