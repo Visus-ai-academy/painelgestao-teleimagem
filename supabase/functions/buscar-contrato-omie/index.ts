@@ -130,6 +130,16 @@ serve(async (req) => {
       const consultaJson = await consultaResp.json();
       const codDireto = consultaJson?.nCodCtr || consultaJson?.nCodContrato || consultaJson?.codigo;
       if (codDireto) {
+        // Evitar salvar código de CONTRATO igual ao código do CLIENTE
+        const cliDigits = Number(String(codigoClienteOmie).replace(/\D/g, ''));
+        const ctrDigits = Number(String(codDireto).replace(/\D/g, ''));
+        if (cliDigits && ctrDigits && cliDigits === ctrDigits) {
+          console.warn('Código de contrato retornado é igual ao código do cliente. Ignorando.');
+          return new Response(
+            JSON.stringify({ sucesso: false, erro: 'Código de contrato retornado é igual ao código do cliente', resposta: consultaJson }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         await supabase
           .from('contratos_clientes')
           .update({ omie_codigo_contrato: String(codDireto), omie_data_sincronizacao: new Date().toISOString() })
@@ -192,6 +202,16 @@ serve(async (req) => {
 
     if (!nCodCtr) {
       return new Response(JSON.stringify({ sucesso: false, erro: 'Não foi possível identificar o código do contrato no Omie', contrato: contratoEscolhido }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Validar que o código do contrato é diferente do código do cliente
+    const cliDigits2 = Number(String(codigoClienteOmie).replace(/\D/g, ''));
+    const ctrDigits2 = Number(String(nCodCtr).replace(/\D/g, ''));
+    if (cliDigits2 && ctrDigits2 && cliDigits2 === ctrDigits2) {
+      return new Response(
+        JSON.stringify({ sucesso: false, erro: 'Código de contrato retornado é igual ao código do cliente', contrato: contratoEscolhido }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Atualizar contratos locais sem código
