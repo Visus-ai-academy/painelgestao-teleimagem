@@ -397,12 +397,18 @@ serve(async (req) => {
             app_key: omieAppKey,
             app_secret: omieAppSecret,
             param: [{
-              nCodCtr: codigoContratoOmie,
-              nValorContrato: Math.max(0, valorParaNF || 0)
+              contratoCadastro: {
+                cabecalho: {
+                  nCodCtr: codigoContratoOmie,
+                  cNumCtr: (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim(),
+                  nCodCli: codigoClienteNumerico,
+                  nValTotMes: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100)
+                }
+              }
             }]
           };
 
-          console.log(`Atualizando valor do contrato ${codigoContratoOmie} para R$ ${valorParaNF} (${demo.cliente_nome})`);
+          console.log(`Atualizando valor do contrato ${codigoContratoOmie} para R$ ${valorParaNF} (${demo.cliente_nome}) [nValTotMes]`);
           
           const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
             method: "POST", 
@@ -412,13 +418,15 @@ serve(async (req) => {
           
           const resultAtualizacao = await respAtualizacao.json();
           
-          if (resultAtualizacao?.nCodCtr) {
-            console.log(`✅ Contrato atualizado com sucesso: ${resultAtualizacao.nCodCtr}`);
+          if (resultAtualizacao?.cCodStatus || resultAtualizacao?.cDescStatus || resultAtualizacao?.nCodCtr) {
+            console.log(`✅ Contrato atualizado (AlterarContrato): ${JSON.stringify(resultAtualizacao)}`);
+          } else if (resultAtualizacao?.faultstring) {
+            console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
           } else {
             console.warn(`⚠️ Resultado inesperado na atualização do contrato: ${JSON.stringify(resultAtualizacao)}`);
           }
-        } catch (atualizacaoError) {
-          console.warn(`⚠️ Erro ao atualizar valor do contrato (continuando com faturamento): ${atualizacaoError.message}`);
+        } catch (atualizacaoError: any) {
+          console.warn(`⚠️ Erro ao atualizar valor do contrato (continuando com faturamento): ${atualizacaoError?.message || atualizarContratoReq}`);
         }
 
         // ETAPA 2: Faturar Contrato de Serviço no Omie
