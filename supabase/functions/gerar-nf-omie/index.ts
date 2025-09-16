@@ -398,16 +398,21 @@ serve(async (req) => {
             cTribServ: (cfgInt.trib_serv || '01').toString(),
             impostos: {}
           };
-          if (cfgInt.nCodServico) servico.nCodServico = Number(String(cfgInt.nCodServico).replace(/\D/g, ''));
-          if (cfgInt.cod_serv_lc116) servico.cCodServLC116 = cfgInt.cod_serv_lc116;
-          if (cfgInt.cod_serv_municipal) servico.cCodServMun = cfgInt.cod_serv_municipal;
-          if (contratoAtivo?.percentual_iss) servico.impostos.nAliqISS = Number(contratoAtivo.percentual_iss) || undefined;
 
-          // Validar campos mínimos para inclusão
-          const temServicoMinimo = !!servico.nCodServico || (!!servico.cCodServLC116 && !!servico.cCodServMun);
-          if (!temServicoMinimo) {
-            throw new Error('Configurações de integração insuficientes para IncluirOS: informe nCodServico ou (cCodServLC116 e cCodServMun) em contratos_clientes.configuracoes_integracao.');
+          // Usar configurações específicas do contrato se disponíveis, senão usar padrão global
+          if (cfgInt.nCodServico) {
+            servico.nCodServico = Number(String(cfgInt.nCodServico).replace(/\D/g, ''));
+          } else if (cfgInt.cod_serv_lc116 && cfgInt.cod_serv_municipal) {
+            servico.cCodServLC116 = cfgInt.cod_serv_lc116;
+            servico.cCodServMun = cfgInt.cod_serv_municipal;
+          } else {
+            // FALLBACK GLOBAL: usar códigos padrão fornecidos
+            console.log(`Usando códigos de serviço padrão para ${demo.cliente_nome}: nCodServico=402, cCodServLC116=4.02`);
+            servico.nCodServico = 402;
+            servico.cCodServLC116 = '4.02';
           }
+
+          if (contratoAtivo?.percentual_iss) servico.impostos.nAliqISS = Number(contratoAtivo.percentual_iss) || undefined;
 
           const osPayload: any = {
             Cabecalho: {
@@ -456,16 +461,74 @@ serve(async (req) => {
         }
 
         if (usarFallbackOS) {
-          const osResult = await criarOSDireta();
-          if (osResult?.nCodOS) {
-            console.log(`✅ OS criada no Omie (fallback) para ${demo.cliente_nome}: ${osResult.nCodOS} | Status: ${osResult.cDescStatus}`);
+          try {
+            const osResult = await criarOSDireta();
+            if (osResult?.nCodOS) {
+              console.log(`✅ OS criada no Omie (fallback) para ${demo.cliente_nome}: ${osResult.nCodOS} | Status: ${osResult.cDescStatus}`);
+              await supabase
+                .from('relatorios_faturamento_status')
+                .update({
+                  omie_nf_gerada: true,
+                  omie_codigo_pedido: osResult.nCodOS,
+                  data_geracao_nf_omie: new Date().toISOString(),
+                  omie_detalhes: osResult
+                })
+                .eq('cliente_id', demo.cliente_id)
+                .eq('periodo', periodo);
+
+              resultados.push({
+                cliente: demo.cliente_nome,
+                sucesso: true,
+                codigo_ordem_servico: osResult.nCodOS,
+                status: osResult.cDescStatus,
+                valor_total: valorTotal
+              });
+              sucessos++;
+              continue; // passa p/ próximo cliente
+            } else {
+              const detalhe = JSON.stringify(osResult);
+              console.error(`❌ Falha ao incluir OS via fallback: ${detalhe}`);
+              throw new Error(`Falha ao incluir OS via fallback: ${detalhe}`);
+            }
+          } catch (osError) {
+            console.error(`❌ Erro na criação da OS direta: ${osError.message}`);
+            throw osError;
+          }
+        }
+
+        const codigoContratoOmie = Number(codContratoDigits);
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
+
+        // Faturar Contrato de Serviço no Omie (método preferencial)
+        try {
+          const reqBody: OmieApiRequest = {
+            call: 'FaturarContrato',
+            app_key: omieAppKey,
+            app_secret: omieAppSecret,
+            param: [{ nCodCtr: Number(codigoContratoOmie) }]
+          };
+          console.log(
+            `Faturando Contrato no Omie (FaturarContrato) [https://app.omie.com.br/api/v1/servicos/contratofat/] para ${demo.cliente_nome}:`,
+            JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
+          );
+          const resp = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(reqBody)
+          });
+          const nfResult = await resp.json();
+
+          if (nfResult?.nCodOS) {
+            console.log(`✅ Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
+            // Salvar referência da OS no banco
             await supabase
               .from('relatorios_faturamento_status')
               .update({
                 omie_nf_gerada: true,
-                omie_codigo_pedido: osResult.nCodOS,
+                omie_codigo_pedido: nfResult.nCodOS,
+                omie_numero_pedido: nfResult.nCodCtr || null,
                 data_geracao_nf_omie: new Date().toISOString(),
-                omie_detalhes: osResult
+                omie_detalhes: nfResult
               })
               .eq('cliente_id', demo.cliente_id)
               .eq('periodo', periodo);
@@ -473,65 +536,48 @@ serve(async (req) => {
             resultados.push({
               cliente: demo.cliente_nome,
               sucesso: true,
-              codigo_ordem_servico: osResult.nCodOS,
-              status: osResult.cDescStatus,
+              codigo_ordem_servico: nfResult.nCodOS,
+              codigo_contrato: nfResult.nCodCtr,
+              status: nfResult.cDescStatus,
               valor_total: valorTotal
             });
             sucessos++;
-            continue; // passa p/ próximo cliente
           } else {
-            const detalhe = JSON.stringify(osResult);
-            throw new Error(`Falha ao incluir OS via fallback: ${detalhe}`);
+            throw new Error(`FaturarContrato retornou erro: ${JSON.stringify(nfResult)}`);
           }
-        }
+        } catch (contratoError) {
+          console.warn(`❌ Erro no FaturarContrato para ${demo.cliente_nome}: ${contratoError.message}. Tentando criar OS direta...`);
+          
+          // FALLBACK: tentar criar OS direta
+          try {
+            const osResult = await criarOSDireta();
+            if (osResult?.nCodOS) {
+              console.log(`✅ OS criada no Omie (fallback após erro contrato) para ${demo.cliente_nome}: ${osResult.nCodOS}`);
+              await supabase
+                .from('relatorios_faturamento_status')
+                .update({
+                  omie_nf_gerada: true,
+                  omie_codigo_pedido: osResult.nCodOS,
+                  data_geracao_nf_omie: new Date().toISOString(),
+                  omie_detalhes: osResult
+                })
+                .eq('cliente_id', demo.cliente_id)
+                .eq('periodo', periodo);
 
-        const codigoContratoOmie = Number(codContratoDigits);
-        console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
-
-        // Faturar Contrato de Serviço no Omie (método correto)
-        const reqBody: OmieApiRequest = {
-          call: 'FaturarContrato',
-          app_key: omieAppKey,
-          app_secret: omieAppSecret,
-          param: [{ nCodCtr: Number(codigoContratoOmie) }]
-        };
-        console.log(
-          `Faturando Contrato no Omie (FaturarContrato) [https://app.omie.com.br/api/v1/servicos/contratofat/] para ${demo.cliente_nome}:`,
-          JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
-        );
-        const resp = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(reqBody)
-        });
-        const nfResult = await resp.json();
-
-        if (nfResult?.nCodOS) {
-          console.log(`Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
-          // Salvar referência da OS no banco
-          await supabase
-            .from('relatorios_faturamento_status')
-            .update({
-              omie_nf_gerada: true,
-              omie_codigo_pedido: nfResult.nCodOS,
-              omie_numero_pedido: nfResult.nCodCtr || null,
-              data_geracao_nf_omie: new Date().toISOString(),
-              omie_detalhes: nfResult
-            })
-            .eq('cliente_id', demo.cliente_id)
-            .eq('periodo', periodo);
-
-          resultados.push({
-            cliente: demo.cliente_nome,
-            sucesso: true,
-            codigo_ordem_servico: nfResult.nCodOS,
-            codigo_contrato: nfResult.nCodCtr,
-            status: nfResult.cDescStatus,
-            valor_total: valorTotal
-          });
-          sucessos++;
-        } else {
-          throw new Error(`Erro no faturamento do contrato Omie: ${JSON.stringify(nfResult)}`);
+              resultados.push({
+                cliente: demo.cliente_nome,
+                sucesso: true,
+                codigo_ordem_servico: osResult.nCodOS,
+                status: osResult.cDescStatus,
+                valor_total: valorTotal
+              });
+              sucessos++;
+            } else {
+              throw new Error(`Fallback também falhou: ${JSON.stringify(osResult)}`);
+            }
+          } catch (fallbackError) {
+            throw new Error(`FaturarContrato e fallback falharam: Contrato: ${contratoError.message} | Fallback: ${fallbackError.message}`);
+          }
         }
 
       } catch (error) {
