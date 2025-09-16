@@ -194,10 +194,12 @@ serve(async (req) => {
           throw new Error(`Cliente não possui contrato ativo: ${demo.cliente_nome}`);
         }
 
-        // Obter contrato ativo (cliente já cadastrado no OMIE)
-        const contratoAtivo = clienteData.contratos_clientes[0];
+        // Obter contrato ativo priorizando o número dos parâmetros de faturamento
         const parametroCliente = parametrosData?.find(p => p.cliente_id === demo.cliente_id);
-        
+        const numeroContratoAlvo = (parametroCliente?.numero_contrato || '').toString().trim();
+        const contratoAtivo = (numeroContratoAlvo
+          ? clienteData.contratos_clientes.find((c: any) => (c.numero_contrato || '').toString().trim() === numeroContratoAlvo)
+          : null) || clienteData.contratos_clientes[0];
         // Buscar código OMIE real do cliente - IGNORAR códigos fictícios do Supabase
         let codigoClienteOmie = clienteData.omie_codigo_cliente || 
                                contratoAtivo.omie_codigo_cliente;
@@ -253,7 +255,7 @@ serve(async (req) => {
               if (updateContratoError) {
                 console.error(`Erro ao salvar código Omie no contrato:`, updateContratoError);
               } else {
-                console.log(`💾 Código real Omie ${codigoClienteOmie} salvo no contrato ${contratoAtivo.numero_contrato}`);
+                console.log(`💾 Código real Omie ${codigoClienteOmie} salvo no contrato ${contratoAtivo.numero_contrato} (campo omie_codigo_cliente)`);
               }
             } else {
               console.log(`❌ Cliente ${demo.cliente_nome} não encontrado no Omie via CNPJ`);
@@ -296,17 +298,35 @@ serve(async (req) => {
             body: {
               cliente_id: demo.cliente_id,
               cliente_nome: demo.cliente_nome,
-              numero_contrato: parametroCliente?.numero_contrato // Ex.: 2023/00170
+              numero_contrato: numeroContratoAlvo || contratoAtivo.numero_contrato // Ex.: 2023/00170
             }
           });
           if (sync.data?.sucesso && sync.data?.codigo_contrato) {
             const novoCod = String(sync.data.codigo_contrato);
-            // Persistir no contrato ativo, mesmo que já houvesse um código incorreto
-            await supabase
-              .from('contratos_clientes')
-              .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: new Date().toISOString() })
-              .eq('id', contratoAtivo.id);
-            contratoAtivo.omie_codigo_contrato = novoCod;
+            const novoCodDigits = novoCod.replace(/\D/g, '');
+            if (novoCodDigits && novoCodDigits !== codClienteDigits) {
+              const agoraISO = new Date().toISOString();
+              let updateQuery = supabase
+                .from('contratos_clientes')
+                .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
+                .eq('cliente_id', demo.cliente_id)
+                .eq('status', 'ativo');
+              const numeroFiltro = numeroContratoAlvo || contratoAtivo.numero_contrato;
+              if (numeroFiltro) {
+                updateQuery = updateQuery.eq('numero_contrato', numeroFiltro);
+              }
+              const { error: updErr } = await updateQuery;
+              if (updErr) {
+                // Fallback por ID do contrato em memória
+                await supabase
+                  .from('contratos_clientes')
+                  .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: agoraISO })
+                  .eq('id', contratoAtivo.id);
+              }
+              contratoAtivo.omie_codigo_contrato = novoCod;
+            } else {
+              console.warn('Código de contrato retornado é igual ao código do cliente ou inválido. Ignorando atualização.');
+            }
           } else {
             console.warn(`Sincronização de contrato Omie não retornou código para ${demo.cliente_nome}. Detalhes: ${JSON.stringify(sync.error || sync.data)}`);
           }
