@@ -388,9 +388,41 @@ serve(async (req) => {
         }
 
         const codigoContratoOmie = Number(codContratoDigits);
-        console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
+        console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie} | Valor: ${valorParaNF}`);
 
-        // Faturar Contrato de Serviço no Omie (método preferencial)
+        // ETAPA 1: Atualizar valor do contrato com valor bruto do demonstrativo
+        try {
+          const atualizarContratoReq = {
+            call: 'AlterarContrato',
+            app_key: omieAppKey,
+            app_secret: omieAppSecret,
+            param: [{
+              nCodCtr: codigoContratoOmie,
+              cNumCtr: contratoAtivo.numero_contrato || numeroContratoAlvo,
+              nValorContrato: Math.max(0, valorParaNF || 0)
+            }]
+          };
+
+          console.log(`Atualizando valor do contrato ${codigoContratoOmie} para R$ ${valorParaNF} (${demo.cliente_nome})`);
+          
+          const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(atualizarContratoReq)
+          });
+          
+          const resultAtualizacao = await respAtualizacao.json();
+          
+          if (resultAtualizacao?.nCodCtr) {
+            console.log(`✅ Contrato atualizado com sucesso: ${resultAtualizacao.nCodCtr}`);
+          } else {
+            console.warn(`⚠️ Resultado inesperado na atualização do contrato: ${JSON.stringify(resultAtualizacao)}`);
+          }
+        } catch (atualizacaoError) {
+          console.warn(`⚠️ Erro ao atualizar valor do contrato (continuando com faturamento): ${atualizacaoError.message}`);
+        }
+
+        // ETAPA 2: Faturar Contrato de Serviço no Omie
         try {
           const reqBody: OmieApiRequest = {
             call: 'FaturarContrato',
