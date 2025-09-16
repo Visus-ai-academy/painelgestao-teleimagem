@@ -70,16 +70,8 @@ serve(async (req) => {
 
     // Número do contrato desejado: prioridade body.numero_contrato -> contratos_clientes -> parametros_faturamento
     let numeroContratoDesejado: string | null = numero_contrato || null;
-    if (!numeroContratoDesejado) {
-      const { data: contratoAtivo } = await supabase
-        .from('contratos_clientes')
-        .select('numero_contrato')
-        .eq('cliente_id', clienteRow.id)
-        .eq('status', 'ativo')
-        .limit(1)
-        .maybeSingle();
-      numeroContratoDesejado = contratoAtivo?.numero_contrato || null;
-    }
+    
+    // Se não veio no body, buscar nos parâmetros de faturamento PRIMEIRO
     if (!numeroContratoDesejado) {
       const { data: paramAtivo } = await supabase
         .from('parametros_faturamento')
@@ -90,6 +82,20 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
       numeroContratoDesejado = paramAtivo?.numero_contrato || null;
+      console.log(`Número do contrato dos parâmetros: ${numeroContratoDesejado}`);
+    }
+    
+    // Fallback: buscar no contratos_clientes
+    if (!numeroContratoDesejado) {
+      const { data: contratoAtivo } = await supabase
+        .from('contratos_clientes')
+        .select('numero_contrato')
+        .eq('cliente_id', clienteRow.id)
+        .eq('status', 'ativo')
+        .limit(1)
+        .maybeSingle();
+      numeroContratoDesejado = contratoAtivo?.numero_contrato || null;
+      console.log(`Número do contrato da tabela contratos_clientes: ${numeroContratoDesejado}`);
     }
 
     let codigoClienteOmie = clienteRow.omie_codigo_cliente;
