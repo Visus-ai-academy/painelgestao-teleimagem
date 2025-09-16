@@ -398,7 +398,6 @@ serve(async (req) => {
             app_secret: omieAppSecret,
             param: [{
               nCodCtr: codigoContratoOmie,
-              cNumCtr: contratoAtivo.numero_contrato || numeroContratoAlvo,
               nValorContrato: Math.max(0, valorParaNF || 0)
             }]
           };

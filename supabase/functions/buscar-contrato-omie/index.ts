@@ -239,6 +239,17 @@ serve(async (req) => {
         .eq('cliente_id', clienteRow.id)
         .eq('status', 'ativo');
     }
+
+    // Retornar sucesso com detalhes do contrato identificado
+    const payload = {
+      sucesso: true,
+      codigo_contrato: nCodCtr,
+      numero_contrato: numeroContratoDesejado || (contratoEscolhido?.cNumCtr || contratoEscolhido?.cNumero || contratoEscolhido?.cNumContrato || contratoEscolhido?.numero) || null,
+      contrato: contratoEscolhido,
+      filtros: { cliente_id: clienteRow.id, cnpj: clienteRow.cnpj, codigo_cliente_omie: codigoClienteOmie }
+    };
+
+    return new Response(JSON.stringify(payload), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e: any) {
     console.error('Erro em buscar-contrato-omie:', e);
     return new Response(JSON.stringify({ sucesso: false, erro: e?.message || 'Erro desconhecido' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
