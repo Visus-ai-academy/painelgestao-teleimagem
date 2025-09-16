@@ -146,7 +146,7 @@ serve(async (req) => {
       call: 'ListarContratos',
       app_key: appKey,
       app_secret: appSecret,
-      param: [{ pagina: 1, registros_por_pagina: 200, nCodCli: Number(String(codigoClienteOmie).replace(/\D/g, '')) }]
+      param: [{ nPagina: 1, nRegsPorPagina: 200, nCodCli: Number(String(codigoClienteOmie).replace(/\D/g, '')) }]
     };
 
     console.log('Consultando contratos no Omie:', JSON.stringify({ call: listReq.call, param: listReq.param, numeroContratoDesejado }, null, 2));
