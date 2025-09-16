@@ -287,7 +287,7 @@ serve(async (req) => {
         const venc = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
         // Garantir que temos o código do contrato do Omie; se ausente ou inválido (igual ao código do cliente), sincronizar agora
-        const codContratoDigits = String(contratoAtivo.omie_codigo_contrato || '').replace(/\D/g, '');
+        let codContratoDigits = String(contratoAtivo.omie_codigo_contrato || '').replace(/\D/g, '');
         const codClienteDigits = String(codigoClienteOmie || '').replace(/\D/g, '');
         const contratoInvalido = !codContratoDigits || (codContratoDigits && codClienteDigits && codContratoDigits === codClienteDigits);
         if (contratoInvalido) {
@@ -307,12 +307,20 @@ serve(async (req) => {
               .update({ omie_codigo_contrato: novoCod, omie_data_sincronizacao: new Date().toISOString() })
               .eq('id', contratoAtivo.id);
             contratoAtivo.omie_codigo_contrato = novoCod;
+          } else {
+            console.warn(`Sincronização de contrato Omie não retornou código para ${demo.cliente_nome}. Detalhes: ${JSON.stringify(sync.error || sync.data)}`);
           }
         }
-        if (!contratoAtivo.omie_codigo_contrato) {
-          throw new Error(`Contrato Omie não sincronizado para ${demo.cliente_nome} (omie_codigo_contrato ausente no contrato ${contratoAtivo.numero_contrato})`);
+        // Revalidar após tentativa de sincronização
+        codContratoDigits = String(contratoAtivo.omie_codigo_contrato || '').replace(/\D/g, '');
+        if (!codContratoDigits) {
+          throw new Error(`Contrato Omie não sincronizado para ${demo.cliente_nome} (omie_codigo_contrato ausente no contrato ${contratoAtivo.numero_contrato || 'N/A'})`);
         }
-        const codigoContratoOmie = Number(String(contratoAtivo.omie_codigo_contrato).replace(/\D/g, ''));
+        if (codContratoDigits === codClienteDigits) {
+          throw new Error(`Contrato Omie inválido para ${demo.cliente_nome}: código do contrato (${codContratoDigits}) igual ao código do cliente. Crie/sincronize o contrato no Omie (ex.: 2023/00170) ou informe o código correto em contratos_clientes.omie_codigo_contrato.`);
+        }
+
+        const codigoContratoOmie = Number(codContratoDigits);
         
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie}`);
 
