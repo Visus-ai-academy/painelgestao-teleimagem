@@ -399,7 +399,6 @@ serve(async (req) => {
             param: [{
               contratoCadastro: {
                 cabecalho: {
-                  nCodCtr: codigoContratoOmie,
                   cNumCtr: (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim(),
                   nCodCli: codigoClienteNumerico,
                   nValTotMes: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100)
@@ -431,11 +430,54 @@ serve(async (req) => {
 
         // ETAPA 2: Faturar Contrato de Serviço no Omie
         try {
+          // Reconsultar o código do contrato (nCodCtr) pelo número do contrato para evitar códigos inválidos
+          const numeroConsulta = (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim();
+          let codigoContratoParaFaturar = codigoContratoOmie;
+          if (numeroConsulta) {
+            try {
+              const consultaReq: OmieApiRequest = {
+                call: 'ConsultarContrato',
+                app_key: omieAppKey,
+                app_secret: omieAppSecret,
+                param: [{ cNumCtr: numeroConsulta }]
+              };
+              const consultaResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(consultaReq)
+              });
+              const consultaJson = await consultaResp.json();
+              const findNCodCtr2 = (o: any): any => {
+                if (!o || typeof o !== 'object') return null;
+                if ('nCodCtr' in o) return o.nCodCtr;
+                if ('nCodContrato' in o) return (o as any).nCodContrato;
+                for (const v of Object.values(o)) {
+                  const r = findNCodCtr2(v);
+                  if (r != null) return r;
+                }
+                return null;
+              };
+              const codDireto = findNCodCtr2(consultaJson);
+              const codDiretoDigits = String(codDireto || '').replace(/\D/g, '');
+              if (codDiretoDigits && codDiretoDigits !== String(codigoClienteNumerico)) {
+                codigoContratoParaFaturar = Number(codDiretoDigits);
+                // Persistir para futuras execuções
+                const agoraISO = new Date().toISOString();
+                await supabase
+                  .from('contratos_clientes')
+                  .update({ omie_codigo_contrato: String(codDiretoDigits), omie_data_sincronizacao: agoraISO })
+                  .eq('id', contratoAtivo.id);
+              }
+            } catch (_) {
+              // noop - vamos tentar faturar com o que temos
+            }
+          }
+
           const reqBody: OmieApiRequest = {
             call: 'FaturarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{ nCodCtr: Number(codigoContratoOmie) }]
+            param: [{ nCodCtr: Number(codigoContratoParaFaturar) }]
           };
           console.log(
             `Faturando Contrato no Omie (FaturarContrato) [https://app.omie.com.br/api/v1/servicos/contratofat/] para ${demo.cliente_nome}:`,
