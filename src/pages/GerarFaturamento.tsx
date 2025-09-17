@@ -87,6 +87,7 @@ export default function GerarFaturamento() {
   const [gerandoRelatorios, setGerandoRelatorios] = useState(false);
   const [enviandoEmails, setEnviandoEmails] = useState(false);
   const [gerandoNFOmie, setGerandoNFOmie] = useState(false);
+  const [resetandoNFOmie, setResetandoNFOmie] = useState(false);
   const [refreshUploadStatus, setRefreshUploadStatus] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
   const [sistemaProntoParagerar, setSistemaProntoParagerar] = useState(true);
@@ -1106,6 +1107,56 @@ export default function GerarFaturamento() {
     setClientesSelecionadosNF(new Set());
   };
 
+  // Resetar status das NFs emitidas no período (para reprocessar)
+  const resetarStatusNFOmie = async () => {
+    if (resetandoNFOmie) return;
+
+    const clientesEmitidas = resultados
+      .filter(r => r.omieNFGerada)
+      .map(r => r.clienteNome);
+
+    if (clientesEmitidas.length === 0) {
+      toast({
+        title: "Nenhuma NF emitida",
+        description: "Não há NFs emitidas para resetar neste período",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetandoNFOmie(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('resetar-status-nf-omie', {
+        body: {
+          periodo: periodoSelecionado,
+          clientes: clientesEmitidas,
+        },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || 'Falha ao resetar status das NFs');
+      }
+
+      toast({
+        title: "Status resetado",
+        description: `${data.registros_atualizados || clientesEmitidas.length} registro(s) liberados para reemissão`,
+      });
+
+      // Recarregar status do DB e limpar seleção
+      await carregarResultadosDB();
+      setClientesSelecionadosNF(new Set());
+    } catch (e) {
+      console.error('Erro ao resetar status NF:', e);
+      toast({
+        title: "Erro ao resetar",
+        description: e instanceof Error ? e.message : 'Não foi possível resetar as NFs',
+        variant: "destructive",
+      });
+    } finally {
+      setResetandoNFOmie(false);
+    }
+  };
+
   // Estado para controlar o período anterior (para detectar mudanças reais)
   const [periodoAnterior, setPeriodoAnterior] = useState<string | null>(null);
 
@@ -1916,7 +1967,7 @@ export default function GerarFaturamento() {
                     )}
                   </Button>
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     <Button
                       onClick={selecionarTodosClientesNF}
                       variant="outline"
@@ -1932,6 +1983,22 @@ export default function GerarFaturamento() {
                       disabled={clientesSelecionadosNF.size === 0}
                     >
                       Limpar Seleção
+                    </Button>
+                    <Button
+                      onClick={resetarStatusNFOmie}
+                      variant="destructive"
+                      size="sm"
+                      disabled={resetandoNFOmie || resultados.filter(r => r.omieNFGerada).length === 0}
+                      className="sm:ml-2"
+                    >
+                      {resetandoNFOmie ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                          Resetando...
+                        </>
+                      ) : (
+                        '↩︎ Resetar NFs emitidas'
+                      )}
                     </Button>
                   </div>
                 </div>
