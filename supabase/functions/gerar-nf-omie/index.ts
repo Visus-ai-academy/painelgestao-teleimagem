@@ -393,6 +393,7 @@ serve(async (req) => {
         // ETAPA 1: Verificação e Busca Mais Robusta do Código do Contrato
         // Para resolver o problema do COT (Contrato não encontrado)
         let codigoContratoValidado = codigoContratoOmie;
+        let contratoDados: any = null;
         const numeroConsultaCompleta = (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim();
         
         try {
@@ -440,6 +441,7 @@ serve(async (req) => {
             
             if (contratoEncontrado?.cabecalho?.nCodCtr) {
               codigoContratoValidado = Number(contratoEncontrado.cabecalho.nCodCtr);
+              contratoDados = contratoEncontrado;
               console.log(`✅ Código do contrato validado para ${demo.cliente_nome}: ${codigoContratoValidado} (Número: ${contratoEncontrado.cabecalho.cNumCtr})`);
               
               // Salvar o código correto no banco
@@ -461,19 +463,41 @@ serve(async (req) => {
         console.log(`💰 Atualizando contrato ${codigoContratoValidado} com valor do demonstrativo: R$ ${valorParaNF} (${demo.cliente_nome})`);
         
         try {
+          const valorDemonstrativo = Math.round(Number(valorParaNF || 0) * 100) / 100;
+
+          // Montar payload com base no contrato retornado pela listagem (estrutura correta do OMIE)
+          let contratoParaAlterar: any;
+          if (contratoDados && typeof contratoDados === 'object') {
+            contratoParaAlterar = JSON.parse(JSON.stringify(contratoDados));
+            contratoParaAlterar.cabecalho = contratoParaAlterar.cabecalho || {};
+            contratoParaAlterar.cabecalho.nValTotMes = valorDemonstrativo;
+            contratoParaAlterar.cabecalho.nCodCtr = contratoParaAlterar.cabecalho.nCodCtr || Number(codigoContratoValidado);
+            contratoParaAlterar.cabecalho.nCodCli = contratoParaAlterar.cabecalho.nCodCli || Number(codigoClienteNumerico);
+            // Ajustar primeiro item do contrato (quando existir) para refletir o valor do demonstrativo
+            if (Array.isArray(contratoParaAlterar.itensContrato) && contratoParaAlterar.itensContrato.length > 0) {
+              const item0 = contratoParaAlterar.itensContrato[0];
+              item0.itemCabecalho = item0.itemCabecalho || {};
+              item0.itemCabecalho.quant = 1;
+              item0.itemCabecalho.valorUnit = valorDemonstrativo;
+              item0.itemCabecalho.valorTotal = valorDemonstrativo;
+            }
+          } else {
+            // Fallback mínimo quando não conseguimos obter a estrutura via listagem
+            contratoParaAlterar = {
+              cabecalho: {
+                nCodCtr: Number(codigoContratoValidado),
+                nCodCli: Number(codigoClienteNumerico),
+                cNumCtr: numeroConsultaCompleta || undefined,
+                nValTotMes: valorDemonstrativo
+              }
+            };
+          }
+
           const atualizarContratoReq = {
             call: 'AlterarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{
-              contratoCadastro: {
-                cabecalho: {
-                  cNumCtr: numeroConsultaCompleta,
-                  nCodCli: codigoClienteNumerico,
-                  nValTotMes: Math.round(Number(valorParaNF || 0) * 100) / 100 // Valor OBRIGATÓRIO do demonstrativo
-                }
-              }
-            }]
+            param: [{ contratoCadastro: contratoParaAlterar }]
           };
 
           const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
@@ -485,7 +509,7 @@ serve(async (req) => {
           const resultAtualizacao = await respAtualizacao.json();
           
           if (resultAtualizacao?.cCodStatus || resultAtualizacao?.cDescStatus || resultAtualizacao?.nCodCtr) {
-            console.log(`✅ Contrato atualizado com valor do demonstrativo: R$ ${valorParaNF} | Status: ${resultAtualizacao?.cDescStatus || 'OK'}`);
+            console.log(`✅ Contrato atualizado com valor do demonstrativo: R$ ${valorDemonstrativo} | Status: ${resultAtualizacao?.cDescStatus || 'OK'}`);
           } else if (resultAtualizacao?.faultstring) {
             console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
             // Não interromper - tentar faturar mesmo assim
