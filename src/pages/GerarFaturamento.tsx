@@ -412,19 +412,30 @@ export default function GerarFaturamento() {
     // Fallback para sessionStorage
     try {
       const saved = sessionStorage.getItem('resultadosFaturamento');
-      if (saved) {
-        const resultadosCarregados = JSON.parse(saved);
+      const ultimoEstado = localStorage.getItem('ultimoEstadoResultados');
+      
+      // Priorizar último estado salvo (preserva status)
+      const dadosParaCarregar = ultimoEstado || saved;
+      
+      if (dadosParaCarregar) {
+        const resultadosCarregados = JSON.parse(dadosParaCarregar);
         setResultados(resultadosCarregados);
         
         const resultadosUnicos = Array.from(new Map(resultadosCarregados.map((r: any) => [(r.clienteId || r.clienteNome), r])).values());
         const relatoriosGerados = resultadosUnicos.filter((r: any) => r.relatorioGerado).length;
         const emailsEnviados = resultadosUnicos.filter((r: any) => r.emailEnviado).length;
+        const nfsGeradas = resultadosUnicos.filter((r: any) => r.omieNFGerada).length;
+        
         setRelatoriosGerados(relatoriosGerados);
         setEmailsEnviados(emailsEnviados);
+        setNfsGeradas(nfsGeradas);
         
         // Persistir contadores no localStorage
         localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
         localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+        localStorage.setItem('nfsGeradas', nfsGeradas.toString());
+        
+        console.log(`✅ Status preservado: ${ultimoEstado ? 'último estado' : 'sessionStorage'} - ${resultadosCarregados.length} registros`);
         
         return true;
       }
@@ -667,6 +678,28 @@ export default function GerarFaturamento() {
       carregarClientes();
     }
   }, [periodoSelecionado, carregarClientes]);
+
+  // Carregar dados salvos na inicialização
+  useEffect(() => {
+    carregarResultadosDB();
+  }, [carregarResultadosDB]);
+
+  // Preservar status ao sair da página
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (resultados.length > 0) {
+        const dadosLeves = resultados.map(({ relatorioData, ...resto }) => resto);
+        sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
+        localStorage.setItem('ultimoEstadoResultados', JSON.stringify(dadosLeves));
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [resultados]);
 
   // Função para gerar demonstrativo de faturamento
   const gerarDemonstrativoFaturamento = async () => {
@@ -1682,24 +1715,28 @@ export default function GerarFaturamento() {
                            {resultado.arquivos && resultado.arquivos.length > 0 ? (
                              <div className="flex flex-col space-y-1">
                                {resultado.arquivos.map((arquivo, index) => (
-                                 <a
-                                   key={index}
-                                   href={arquivo.url}
-                                   className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                                 >
-                                   <ExternalLink className="h-3 w-3" />
-                                   {arquivo.tipo.toUpperCase()}
-                                 </a>
+                                  <a
+                                    key={index}
+                                    href={arquivo.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    {arquivo.tipo.toUpperCase()}
+                                  </a>
                                ))}
                              </div>
                            ) : resultado.linkRelatorio ? (
-                             <a 
-                               href={resultado.linkRelatorio} 
-                               className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                             >
-                               <ExternalLink className="h-3 w-3" />
-                               Ver Relatório
-                             </a>
+                              <a 
+                                href={resultado.linkRelatorio} 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Ver Relatório
+                              </a>
                            ) : (
                              <span className="text-sm text-muted-foreground">-</span>
                            )}
@@ -2179,24 +2216,28 @@ export default function GerarFaturamento() {
                             {resultado.arquivos && resultado.arquivos.length > 0 ? (
                               <div className="flex flex-col space-y-1">
                                 {resultado.arquivos.map((arquivo, index) => (
-                                  <a
-                                    key={index}
-                                    href={arquivo.url}
-                                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                                  >
-                                    <ExternalLink className="h-3 w-3" />
-                                    {arquivo.tipo.toUpperCase()}
-                                  </a>
+                                   <a
+                                     key={index}
+                                     href={arquivo.url}
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                                   >
+                                     <ExternalLink className="h-3 w-3" />
+                                     {arquivo.tipo.toUpperCase()}
+                                   </a>
                                 ))}
                               </div>
                             ) : resultado.linkRelatorio ? (
-                              <a 
-                                href={resultado.linkRelatorio} 
-                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Ver PDF
-                              </a>
+                               <a 
+                                 href={resultado.linkRelatorio} 
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                               >
+                                 <ExternalLink className="h-3 w-3" />
+                                 Ver PDF
+                               </a>
                             ) : (
                               <span className="text-sm text-muted-foreground">-</span>
                             )}

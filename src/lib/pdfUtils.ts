@@ -294,11 +294,20 @@ export const generatePDF = async (data: FaturamentoData): Promise<Blob> => {
 export const downloadPDF = async (data: FaturamentoData, filename: string) => {
   const blob = await generatePDF(data);
   const url = URL.createObjectURL(blob);
+  
+  // Abrir PDF em nova aba em vez de forçar download
+  window.open(url, '_blank');
+  
+  // Opcional: também criar link de download caso usuário prefira
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  
+  // Limpar URL após um tempo para evitar vazamento de memória
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
 };

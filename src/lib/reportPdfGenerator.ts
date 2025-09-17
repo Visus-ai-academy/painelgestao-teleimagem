@@ -181,11 +181,20 @@ export const generateImplementationReportPDF = (): string => {
 
 export const downloadImplementationReport = () => {
   const url = generateImplementationReportPDF();
+  
+  // Abrir PDF em nova aba em vez de forçar download
+  window.open(url, '_blank');
+  
+  // Opcional: também criar link de download caso usuário prefira
   const link = document.createElement('a');
   link.href = url;
   link.download = `relatorio-implementacoes-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+  link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  
+  // Limpar URL após um tempo
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
 };
