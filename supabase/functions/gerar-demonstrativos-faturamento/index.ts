@@ -311,30 +311,59 @@ serve(async (req) => {
       try {
         console.log('Processando cliente:', cliente.nome_fantasia);
         
-        // ✅ Resolver cliente_id válido (UUID) antes de cálculos
+        // ✅ Resolver cliente_id válido (UUID) prioritizando o que tem preços ativos
         const isUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
         let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
-        if (!clienteIdValido) {
-          // Tentar resolver por nome exato nas 3 colunas
-          const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
-          let resolved: { id: string } | null = null;
-          // Buscar por nome
-          if (!resolved) {
-            const resp = await supabase.from('clientes').select('id').in('nome', nomesBusca).limit(1);
-            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
+        
+        // NOVO: Sempre buscar o cliente com preços ativos para evitar duplicatas
+        const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
+        let resolved: { id: string } | null = null;
+        
+        // Buscar cliente que TEM preços ativos (prioridade máxima)
+        const { data: clientesComPrecos } = await supabase
+          .from('clientes')
+          .select('id')
+          .in('nome', nomesBusca)
+          .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+          .limit(1);
+        
+        if (clientesComPrecos && clientesComPrecos.length > 0) {
+          resolved = clientesComPrecos[0] as any;
+        } else {
+          // Fallback: buscar por nome_fantasia com preços
+          const { data: clientesFantasiaComPrecos } = await supabase
+            .from('clientes')
+            .select('id')
+            .in('nome_fantasia', nomesBusca)
+            .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+            .limit(1);
+          
+          if (clientesFantasiaComPrecos && clientesFantasiaComPrecos.length > 0) {
+            resolved = clientesFantasiaComPrecos[0] as any;
+          } else {
+            // Fallback: buscar por nome_mobilemed com preços
+            const { data: clientesMobilemedComPrecos } = await supabase
+              .from('clientes')
+              .select('id')
+              .in('nome_mobilemed', nomesBusca)
+              .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+              .limit(1);
+            
+            if (clientesMobilemedComPrecos && clientesMobilemedComPrecos.length > 0) {
+              resolved = clientesMobilemedComPrecos[0] as any;
+            } else {
+              // Último fallback: qualquer cliente com esse nome (sem preços)
+              if (!resolved && clienteIdValido) {
+                resolved = { id: clienteIdValido };
+              } else {
+                const resp = await supabase.from('clientes').select('id').in('nome', nomesBusca).limit(1);
+                if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
+              }
+            }
           }
-          // Buscar por nome_fantasia
-          if (!resolved) {
-            const resp = await supabase.from('clientes').select('id').in('nome_fantasia', nomesBusca).limit(1);
-            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
-          }
-          // Buscar por nome_mobilemed
-          if (!resolved) {
-            const resp = await supabase.from('clientes').select('id').in('nome_mobilemed', nomesBusca).limit(1);
-            if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
-          }
-          clienteIdValido = resolved?.id || null;
         }
+        
+        clienteIdValido = resolved?.id || null;
         
         if (!clienteIdValido) {
           console.warn(`⚠️ Cliente sem ID válido no cadastro: ${cliente.nome_fantasia}. Preços/Parâmetros não serão aplicados.`);

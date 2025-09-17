@@ -58,12 +58,36 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar dados do cliente
-    const { data: cliente, error: clienteError } = await supabase
+    // Buscar dados do cliente (prioritizar o que tem preços se houver duplicatas)
+    let { data: cliente, error: clienteError } = await supabase
       .from('clientes')
       .select('nome, nome_fantasia, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
+
+    // Se não encontrou ou se não tem preços, tentar buscar versão com preços
+    if (!cliente || clienteError) {
+      console.log('❗ Cliente não encontrado pelo ID, buscando versão com preços...');
+      
+      // Buscar cliente com mesmo nome que tenha preços ativos
+      const { data: clienteComPrecos } = await supabase
+        .from('clientes')
+        .select('id, nome, nome_fantasia, cnpj')
+        .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+        .limit(10);
+      
+      if (clienteComPrecos && clienteComPrecos.length > 0) {
+        // Se há apenas um, usar esse
+        if (clienteComPrecos.length === 1) {
+          cliente = clienteComPrecos[0];
+          console.log(`✅ Substituído para cliente com preços: ${cliente.nome} (ID: ${clienteComPrecos[0].id})`);
+        } else {
+          // Se há vários, usar o primeiro (pode melhorar a lógica aqui se necessário)
+          cliente = clienteComPrecos[0];
+          console.log(`⚠️ Múltiplos clientes com preços encontrados, usando: ${cliente.nome}`);
+        }
+      }
+    }
 
     if (clienteError) {
       console.error('Erro ao buscar cliente:', clienteError);
