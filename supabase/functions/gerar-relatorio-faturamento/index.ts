@@ -170,7 +170,7 @@ serve(async (req: Request) => {
             const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
             try {
               const { data: preco } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente.id,
+                p_cliente_id: cliente_id,
                 p_modalidade: g.modalidade,
                 p_especialidade: g.especialidade,
                 p_prioridade: g.prioridade,
@@ -178,8 +178,9 @@ serve(async (req: Request) => {
                 p_volume_total: g.quantidade,
                 p_is_plantao: isPlantao,
               });
-              if (preco && typeof preco === 'number' && preco > 0) {
-                precoPorCombo[key] = preco;
+              const precoNum = Number(preco);
+              if (Number.isFinite(precoNum) && precoNum > 0) {
+                precoPorCombo[key] = precoNum;
               } else {
                 precoPorCombo[key] = 0;
               }
