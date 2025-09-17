@@ -497,9 +497,8 @@ serve(async (req) => {
             call: 'AlterarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{ contratoCadastro: contratoParaAlterar }]
+            param: [{ csCadastro: contratoParaAlterar }]
           };
-
           const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
             method: "POST", 
             headers: { "Content-Type": "application/json" },
