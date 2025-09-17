@@ -497,7 +497,7 @@ serve(async (req) => {
             call: 'AlterarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{ csCadastro: contratoParaAlterar }]
+            param: [{ contratoCadastro: contratoParaAlterar }]
           };
           const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
             method: "POST", 
@@ -507,17 +507,21 @@ serve(async (req) => {
           
           const resultAtualizacao = await respAtualizacao.json();
           
+          if (resultAtualizacao?.faultstring) {
+            console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
+            throw new Error(`Falha ao atualizar contrato no Omie: ${resultAtualizacao.faultstring}`);
+          }
+
           if (resultAtualizacao?.cCodStatus || resultAtualizacao?.cDescStatus || resultAtualizacao?.nCodCtr) {
             console.log(`✅ Contrato atualizado com valor do demonstrativo: R$ ${valorDemonstrativo} | Status: ${resultAtualizacao?.cDescStatus || 'OK'}`);
-          } else if (resultAtualizacao?.faultstring) {
-            console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
-            // Não interromper - tentar faturar mesmo assim
           } else {
             console.warn(`⚠️ Resultado inesperado na atualização do contrato: ${JSON.stringify(resultAtualizacao)}`);
+            throw new Error('Falha ao atualizar o contrato no Omie (payload ou resposta inesperada).');
           }
         } catch (atualizacaoError: any) {
           console.warn(`⚠️ Erro ao atualizar valor do contrato: ${atualizacaoError?.message}`);
-          // Não interromper - tentar faturar mesmo assim
+          // Interromper para evitar faturamento com valor incorreto
+          throw atualizacaoError;
         }
 
         // ETAPA 3: Faturar Contrato (ÚNICO MÉTODO - obrigatoriamente com valor do demonstrativo)
