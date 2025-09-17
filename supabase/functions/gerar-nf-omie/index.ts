@@ -495,56 +495,51 @@ serve(async (req) => {
             };
           }
 
-          const atualizarContratoReqPrimary = {
+          // Tentar primeiro com o objeto direto (muitos exemplos reais aceitam o tipo csCadastro diretamente no param)
+          const reqDireto = {
             call: 'AlterarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{ contratoCadastro: contratoParaAlterar }]
+            param: [ contratoParaAlterar ]
           };
-
-          // Log enxuto do payload (sem chaves)
-          console.log('🛰️ Enviando AlterarContrato (contratoCadastro)...', JSON.stringify({
-            call: atualizarContratoReqPrimary.call,
-            param: [{ contratoCadastro: Object.keys(contratoParaAlterar || {}) }]
-          }));
-
+          console.log('🛰️ Enviando AlterarContrato (csCadastro direto no param)...');
           let respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
-            method: "POST", 
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(atualizarContratoReqPrimary)
+            body: JSON.stringify(reqDireto)
           });
           let resultAtualizacao = await respAtualizacao.json();
 
-          // Fallback 1: alguns ambientes esperam o objeto direto em param (sem wrapper)
+          // Fallback 1: usar wrapper contratoCadastro
           if (resultAtualizacao?.faultstring) {
-            console.warn(`⚠️ AlterarContrato falhou (contratoCadastro): ${resultAtualizacao.faultstring}. Tentando fallback direto em param...`);
-            const atualizarContratoReqSemWrapper = {
+            console.warn(`⚠️ AlterarContrato falhou (direto): ${resultAtualizacao.faultstring}. Tentando wrapper contratoCadastro...`);
+            const reqWrapper = {
               call: 'AlterarContrato',
               app_key: omieAppKey,
               app_secret: omieAppSecret,
-              param: [ contratoParaAlterar ]
+              param: [{ contratoCadastro: contratoParaAlterar }]
             };
             respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
-              method: "POST", 
+              method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(atualizarContratoReqSemWrapper)
+              body: JSON.stringify(reqWrapper)
             });
             resultAtualizacao = await respAtualizacao.json();
           }
 
-          // Fallback 2: tentar chave 'csCadastro' (nome do tipo complexo nos erros do Omie)
+          // Fallback 2: tentar chave 'csCadastro'
           if (resultAtualizacao?.faultstring) {
-            console.warn(`⚠️ AlterarContrato falhou (sem wrapper): ${resultAtualizacao.faultstring}. Tentando fallback com csCadastro...`);
-            const atualizarContratoReqCs = {
+            console.warn(`⚠️ AlterarContrato falhou (wrapper contratoCadastro): ${resultAtualizacao.faultstring}. Tentando csCadastro...`);
+            const reqCs = {
               call: 'AlterarContrato',
               app_key: omieAppKey,
               app_secret: omieAppSecret,
               param: [{ csCadastro: contratoParaAlterar }]
             };
             respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
-              method: "POST", 
+              method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(atualizarContratoReqCs)
+              body: JSON.stringify(reqCs)
             });
             resultAtualizacao = await respAtualizacao.json();
           }
