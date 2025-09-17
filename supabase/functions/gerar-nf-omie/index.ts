@@ -477,6 +477,8 @@ serve(async (req) => {
             if (Array.isArray(contratoParaAlterar.itensContrato) && contratoParaAlterar.itensContrato.length > 0) {
               const item0 = contratoParaAlterar.itensContrato[0];
               item0.itemCabecalho = item0.itemCabecalho || {};
+              // garantir sequência e manter campos obrigatórios existentes
+              item0.itemCabecalho.seq = item0.itemCabecalho.seq || 1;
               item0.itemCabecalho.quant = 1;
               item0.itemCabecalho.valorUnit = valorDemonstrativo;
               item0.itemCabecalho.valorTotal = valorDemonstrativo;
