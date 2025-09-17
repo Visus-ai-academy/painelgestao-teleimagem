@@ -169,7 +169,9 @@ serve(async (req: Request) => {
           combos.map(async ([key, g]) => {
             const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
             try {
-              const { data: preco } = await supabase.rpc('calcular_preco_exame', {
+              console.log(`🔍 Calculando preço para: Cliente=${cliente_id}, Mod=${g.modalidade}, Esp=${g.especialidade}, Pri=${g.prioridade}, Cat=${g.categoria || 'SC'}, Vol=${g.quantidade}`);
+              
+              const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente_id,
                 p_modalidade: g.modalidade,
                 p_especialidade: g.especialidade,
@@ -178,14 +180,23 @@ serve(async (req: Request) => {
                 p_volume_total: g.quantidade,
                 p_is_plantao: isPlantao,
               });
-              const precoNum = Number(preco);
-              if (Number.isFinite(precoNum) && precoNum > 0) {
-                precoPorCombo[key] = precoNum;
-              } else {
+              
+              if (error) {
+                console.error('❌ Erro na RPC calcular_preco_exame:', error);
                 precoPorCombo[key] = 0;
+              } else {
+                const precoNum = Number(preco);
+                console.log(`💰 Preço calculado para ${key}: R$ ${precoNum}`);
+                
+                if (Number.isFinite(precoNum) && precoNum > 0) {
+                  precoPorCombo[key] = precoNum;
+                } else {
+                  console.warn(`⚠️ Preço inválido retornado: ${preco} (${typeof preco})`);
+                  precoPorCombo[key] = 0;
+                }
               }
             } catch (e) {
-              console.warn('⚠️ Falha ao calcular preço para combo', key, e?.message || e);
+              console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
               precoPorCombo[key] = 0;
             }
           })
