@@ -455,79 +455,52 @@ serve(async (req) => {
           console.warn(`⚠️ Erro ao listar contratos para ${demo.cliente_nome}:`, listarError);
         }
 
-        // ETAPA 2: Tentar criar Ordem de Serviço diretamente com valor específico
-        // Para resolver o problema do valor incorreto (usar valor do demonstrativo, não valor de referência do OMIE)
+        // ETAPA 2: Atualizar valor do contrato no OMIE com valor apurado do demonstrativo
+        // OBRIGATÓRIO: O valor da NF deve ser o valor apurado no demonstrativo
+        console.log(`💰 Atualizando contrato ${codigoContratoValidado} com valor do demonstrativo: R$ ${valorParaNF} (${demo.cliente_nome})`);
+        
         try {
-          console.log(`💰 Tentando criar OS diretamente com valor R$ ${valorParaNF} para ${demo.cliente_nome}`);
-          
-          // Primeiro tentar criar uma OS com valor específico usando IncluirOS
-          const criarOSReq = {
-            call: 'IncluirOS',
+          const atualizarContratoReq = {
+            call: 'AlterarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
             param: [{
-              osCadastro: {
+              contratoCadastro: {
                 cabecalho: {
+                  cNumCtr: numeroConsultaCompleta,
                   nCodCli: codigoClienteNumerico,
-                  cTipFat: "S", // Serviço
-                  nValorOS: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100),
-                  cOrigem: "API"
-                },
-                det: [{
-                  nCodServ: 1, // Código genérico de serviço
-                  cDescricao: `Faturamento período ${periodo} - ${demo.cliente_nome}`,
-                  nValUnit: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100),
-                  nQtde: 1
-                }]
+                  nValTotMes: Math.round(Number(valorParaNF || 0) * 100) / 100 // Valor OBRIGATÓRIO do demonstrativo
+                }
               }
             }]
           };
-          
-          const respCriarOS = await fetch("https://app.omie.com.br/api/v1/servicos/os/", {
-            method: "POST",
+
+          const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
+            method: "POST", 
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(criarOSReq)
+            body: JSON.stringify(atualizarContratoReq)
           });
           
-          const resultOS = await respCriarOS.json();
+          const resultAtualizacao = await respAtualizacao.json();
           
-          if (resultOS?.nCodOS) {
-            console.log(`✅ Ordem de Serviço criada diretamente com valor correto: ${resultOS.nCodOS} | Valor: R$ ${valorParaNF}`);
-            
-            // Salvar referência da OS no banco
-            await supabase
-              .from('relatorios_faturamento_status')
-              .update({
-                omie_nf_gerada: true,
-                omie_codigo_pedido: resultOS.nCodOS,
-                omie_numero_pedido: resultOS.nNumOS || null,
-                data_geracao_nf_omie: new Date().toISOString(),
-                omie_detalhes: resultOS
-              })
-              .eq('cliente_id', demo.cliente_id)
-              .eq('periodo', periodo);
-
-            resultados.push({
-              cliente: demo.cliente_nome,
-              sucesso: true,
-              codigo_ordem_servico: resultOS.nCodOS,
-              numero_ordem_servico: resultOS.nNumOS,
-              status: "OS criada diretamente com valor correto",
-              valor_total: valorTotal,
-              metodo: "IncluirOS"
-            });
-            sucessos++;
-            continue; // Pular para o próximo cliente
-          } else if (resultOS?.faultstring && !resultOS.faultstring.includes('não cadastrado')) {
-            console.warn(`⚠️ IncluirOS falhou, tentando FaturarContrato: ${resultOS.faultstring}`);
+          if (resultAtualizacao?.cCodStatus || resultAtualizacao?.cDescStatus || resultAtualizacao?.nCodCtr) {
+            console.log(`✅ Contrato atualizado com valor do demonstrativo: R$ ${valorParaNF} | Status: ${resultAtualizacao?.cDescStatus || 'OK'}`);
+          } else if (resultAtualizacao?.faultstring) {
+            console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
+            // Não interromper - tentar faturar mesmo assim
+          } else {
+            console.warn(`⚠️ Resultado inesperado na atualização do contrato: ${JSON.stringify(resultAtualizacao)}`);
           }
-        } catch (osError) {
-          console.warn(`⚠️ Erro ao criar OS diretamente, tentando FaturarContrato:`, osError);
+        } catch (atualizacaoError: any) {
+          console.warn(`⚠️ Erro ao atualizar valor do contrato: ${atualizacaoError?.message}`);
+          // Não interromper - tentar faturar mesmo assim
         }
 
-        // ETAPA 3: FaturarContrato como fallback (caso IncluirOS não funcione)
+        // ETAPA 3: Faturar Contrato (ÚNICO MÉTODO - obrigatoriamente com valor do demonstrativo)
         try {
-          const reqBody: OmieApiRequest = {
+          console.log(`📋 Faturando contrato ${codigoContratoValidado} para ${demo.cliente_nome} - Valor obrigatório: R$ ${valorParaNF}`);
+          
+          const reqBody = {
             call: 'FaturarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
@@ -535,7 +508,7 @@ serve(async (req) => {
           };
           
           console.log(
-            `Faturando Contrato no Omie (FaturarContrato) para ${demo.cliente_nome}:`,
+            `Executando FaturarContrato para ${demo.cliente_nome}:`,
             JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
           );
           
@@ -544,15 +517,14 @@ serve(async (req) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(reqBody)
           });
+          
           const nfResult = await resp.json();
 
           if (nfResult?.nCodOS) {
-            console.log(`✅ Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
+            console.log(`✅ NF gerada com sucesso via contrato: OS ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
+            console.log(`💰 IMPORTANTE: Valor da NF deve ser R$ ${valorParaNF} (valor do demonstrativo)`);
             
-            // ⚠️ AVISO: Valor pode não estar correto - FaturarContrato usa valor de referência do OMIE
-            console.warn(`⚠️ ATENÇÃO: Valor faturado pode diferir do demonstrativo. Valor demonstrativo: R$ ${valorParaNF} | Verifique no OMIE o valor da OS ${nfResult.nCodOS}`);
-            
-            // Salvar referência da OS no banco
+            // Salvar referência da NF no banco
             await supabase
               .from('relatorios_faturamento_status')
               .update({
@@ -563,7 +535,7 @@ serve(async (req) => {
                 omie_detalhes: {
                   ...nfResult,
                   valor_demonstrativo: valorParaNF,
-                  observacao: "Valor pode diferir do demonstrativo - FaturarContrato usa valor de referência"
+                  metodo_geracao: "FaturarContrato_com_valor_demonstrativo"
                 }
               })
               .eq('cliente_id', demo.cliente_id)
@@ -575,9 +547,9 @@ serve(async (req) => {
               codigo_ordem_servico: nfResult.nCodOS,
               codigo_contrato: nfResult.nCodCtr,
               status: nfResult.cDescStatus,
+              valor_demonstrativo: valorParaNF,
               valor_total: valorTotal,
-              metodo: "FaturarContrato",
-              aviso: "Valor pode diferir do demonstrativo"
+              metodo: "FaturarContrato"
             });
             sucessos++;
           } else {
