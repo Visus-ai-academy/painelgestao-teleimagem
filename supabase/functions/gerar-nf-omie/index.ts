@@ -419,22 +419,23 @@ serve(async (req) => {
           const resultListar = await respListar.json();
           console.log(`📋 Contratos encontrados para ${demo.cliente_nome}:`, JSON.stringify(resultListar));
           
-          if (resultListar?.contratos_cadastro && Array.isArray(resultListar.contratos_cadastro)) {
+          // Corrigir: a resposta tem contratoCadastro, não contratos_cadastro
+          if (resultListar?.contratoCadastro && Array.isArray(resultListar.contratoCadastro)) {
             // Procurar contrato por número exato primeiro
-            let contratoEncontrado = resultListar.contratos_cadastro.find((c: any) => 
+            let contratoEncontrado = resultListar.contratoCadastro.find((c: any) => 
               c.cabecalho?.cNumCtr === numeroConsultaCompleta
             );
             
             // Se não encontrar por número exato, pegar o primeiro ativo
             if (!contratoEncontrado) {
-              contratoEncontrado = resultListar.contratos_cadastro.find((c: any) => 
-                c.cabecalho?.cSituacao === 'ATIVO' || c.cabecalho?.cSituacao === 'A'
+              contratoEncontrado = resultListar.contratoCadastro.find((c: any) => 
+                c.cabecalho?.cCodSit === '10' // Status ativo no Omie
               );
             }
             
             // Se ainda não encontrar, pegar o primeiro da lista
-            if (!contratoEncontrado && resultListar.contratos_cadastro.length > 0) {
-              contratoEncontrado = resultListar.contratos_cadastro[0];
+            if (!contratoEncontrado && resultListar.contratoCadastro.length > 0) {
+              contratoEncontrado = resultListar.contratoCadastro[0];
             }
             
             if (contratoEncontrado?.cabecalho?.nCodCtr) {
