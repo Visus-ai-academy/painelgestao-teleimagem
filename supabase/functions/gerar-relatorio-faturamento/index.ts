@@ -486,7 +486,7 @@ serve(async (req: Request) => {
           doc.text('Accession', 200, yPosition + 5);
           doc.text('Origem', 220, yPosition + 5);
           doc.text('Qtd', 245, yPosition + 5);
-          doc.text('Val.Ref', 260, yPosition + 5);
+          doc.text('Valor Total', 260, yPosition + 5);
         }
         
         yPosition += 12;
@@ -529,7 +529,7 @@ serve(async (req: Request) => {
               doc.text('Categ.', 205, yPosition + 5);
               doc.text('Prior.', 230, yPosition + 5);
               doc.text('Qtd', 250, yPosition + 5);
-              doc.text('Val.Ref', 260, yPosition + 5);
+              doc.text('Valor Total', 260, yPosition + 5);
             }
             
             yPosition += 12;
@@ -575,7 +575,13 @@ serve(async (req: Request) => {
             doc.text((item.ACCESSION_NUMBER || '-').substring(0, 10), 200, yPosition + 2);
             doc.text((item.EMPRESA || '-').substring(0, 12), 220, yPosition + 2);
             doc.text((item.VALORES || '0').toString(), 245, yPosition + 2);
-            doc.text(`R$ ${parseFloat(item.VALORES || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
+            // Calcular valor para volumetria usando o preço obtido via RPC
+            const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
+            const precoUnitario = precoPorCombo[key] ?? 0;
+            const qtd = Number(item.VALORES || 0) || 0;
+            const valorTotal = precoUnitario * qtd;
+            
+            doc.text(`R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 260, yPosition + 2);
           }
           
           yPosition += 6;
