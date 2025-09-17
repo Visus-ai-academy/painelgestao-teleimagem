@@ -390,99 +390,155 @@ serve(async (req) => {
         const codigoContratoOmie = Number(codContratoDigits);
         console.log(`Cliente ${demo.cliente_nome} - Código OMIE Cliente: ${codigoClienteNumerico} | Código Contrato: ${codigoContratoOmie} | Valor: ${valorParaNF}`);
 
-        // ETAPA 1: Atualizar valor do contrato com valor bruto do demonstrativo
+        // ETAPA 1: Verificação e Busca Mais Robusta do Código do Contrato
+        // Para resolver o problema do COT (Contrato não encontrado)
+        let codigoContratoValidado = codigoContratoOmie;
+        const numeroConsultaCompleta = (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim();
+        
         try {
-          const atualizarContratoReq = {
-            call: 'AlterarContrato',
+          console.log(`🔍 Verificando código do contrato para ${demo.cliente_nome} - Número: ${numeroConsultaCompleta}`);
+          
+          // Fazer uma busca mais ampla por contratos do cliente no OMIE
+          const listarContratosReq = {
+            call: 'ListarContratos',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
             param: [{
-              contratoCadastro: {
+              pagina: 1,
+              registros_por_pagina: 50,
+              filtrar_cliente: codigoClienteNumerico
+            }]
+          };
+          
+          const respListar = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(listarContratosReq)
+          });
+          
+          const resultListar = await respListar.json();
+          console.log(`📋 Contratos encontrados para ${demo.cliente_nome}:`, JSON.stringify(resultListar));
+          
+          if (resultListar?.contratos_cadastro && Array.isArray(resultListar.contratos_cadastro)) {
+            // Procurar contrato por número exato primeiro
+            let contratoEncontrado = resultListar.contratos_cadastro.find((c: any) => 
+              c.cabecalho?.cNumCtr === numeroConsultaCompleta
+            );
+            
+            // Se não encontrar por número exato, pegar o primeiro ativo
+            if (!contratoEncontrado) {
+              contratoEncontrado = resultListar.contratos_cadastro.find((c: any) => 
+                c.cabecalho?.cSituacao === 'ATIVO' || c.cabecalho?.cSituacao === 'A'
+              );
+            }
+            
+            // Se ainda não encontrar, pegar o primeiro da lista
+            if (!contratoEncontrado && resultListar.contratos_cadastro.length > 0) {
+              contratoEncontrado = resultListar.contratos_cadastro[0];
+            }
+            
+            if (contratoEncontrado?.cabecalho?.nCodCtr) {
+              codigoContratoValidado = Number(contratoEncontrado.cabecalho.nCodCtr);
+              console.log(`✅ Código do contrato validado para ${demo.cliente_nome}: ${codigoContratoValidado} (Número: ${contratoEncontrado.cabecalho.cNumCtr})`);
+              
+              // Salvar o código correto no banco
+              await supabase
+                .from('contratos_clientes')
+                .update({ 
+                  omie_codigo_contrato: String(codigoContratoValidado),
+                  omie_data_sincronizacao: new Date().toISOString()
+                })
+                .eq('id', contratoAtivo.id);
+            }
+          }
+        } catch (listarError) {
+          console.warn(`⚠️ Erro ao listar contratos para ${demo.cliente_nome}:`, listarError);
+        }
+
+        // ETAPA 2: Tentar criar Ordem de Serviço diretamente com valor específico
+        // Para resolver o problema do valor incorreto (usar valor do demonstrativo, não valor de referência do OMIE)
+        try {
+          console.log(`💰 Tentando criar OS diretamente com valor R$ ${valorParaNF} para ${demo.cliente_nome}`);
+          
+          // Primeiro tentar criar uma OS com valor específico usando IncluirOS
+          const criarOSReq = {
+            call: 'IncluirOS',
+            app_key: omieAppKey,
+            app_secret: omieAppSecret,
+            param: [{
+              osCadastro: {
                 cabecalho: {
-                  cNumCtr: (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim(),
                   nCodCli: codigoClienteNumerico,
-                  nValTotMes: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100)
-                }
+                  cTipFat: "S", // Serviço
+                  nValorOS: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100),
+                  cOrigem: "API"
+                },
+                det: [{
+                  nCodServ: 1, // Código genérico de serviço
+                  cDescricao: `Faturamento período ${periodo} - ${demo.cliente_nome}`,
+                  nValUnit: Math.max(0, Math.round(Number(valorParaNF || 0) * 100) / 100),
+                  nQtde: 1
+                }]
               }
             }]
           };
-
-          console.log(`Atualizando valor do contrato ${codigoContratoOmie} para R$ ${valorParaNF} (${demo.cliente_nome}) [nValTotMes]`);
           
-          const respAtualizacao = await fetch("https://app.omie.com.br/api/v1/servicos/contrato/", {
-            method: "POST", 
+          const respCriarOS = await fetch("https://app.omie.com.br/api/v1/servicos/os/", {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(atualizarContratoReq)
+            body: JSON.stringify(criarOSReq)
           });
           
-          const resultAtualizacao = await respAtualizacao.json();
+          const resultOS = await respCriarOS.json();
           
-          if (resultAtualizacao?.cCodStatus || resultAtualizacao?.cDescStatus || resultAtualizacao?.nCodCtr) {
-            console.log(`✅ Contrato atualizado (AlterarContrato): ${JSON.stringify(resultAtualizacao)}`);
-          } else if (resultAtualizacao?.faultstring) {
-            console.warn(`⚠️ Erro do Omie ao atualizar contrato: ${resultAtualizacao.faultstring} (${resultAtualizacao.faultcode})`);
-          } else {
-            console.warn(`⚠️ Resultado inesperado na atualização do contrato: ${JSON.stringify(resultAtualizacao)}`);
+          if (resultOS?.nCodOS) {
+            console.log(`✅ Ordem de Serviço criada diretamente com valor correto: ${resultOS.nCodOS} | Valor: R$ ${valorParaNF}`);
+            
+            // Salvar referência da OS no banco
+            await supabase
+              .from('relatorios_faturamento_status')
+              .update({
+                omie_nf_gerada: true,
+                omie_codigo_pedido: resultOS.nCodOS,
+                omie_numero_pedido: resultOS.nNumOS || null,
+                data_geracao_nf_omie: new Date().toISOString(),
+                omie_detalhes: resultOS
+              })
+              .eq('cliente_id', demo.cliente_id)
+              .eq('periodo', periodo);
+
+            resultados.push({
+              cliente: demo.cliente_nome,
+              sucesso: true,
+              codigo_ordem_servico: resultOS.nCodOS,
+              numero_ordem_servico: resultOS.nNumOS,
+              status: "OS criada diretamente com valor correto",
+              valor_total: valorTotal,
+              metodo: "IncluirOS"
+            });
+            sucessos++;
+            continue; // Pular para o próximo cliente
+          } else if (resultOS?.faultstring && !resultOS.faultstring.includes('não cadastrado')) {
+            console.warn(`⚠️ IncluirOS falhou, tentando FaturarContrato: ${resultOS.faultstring}`);
           }
-        } catch (atualizacaoError: any) {
-          console.warn(`⚠️ Erro ao atualizar valor do contrato (continuando com faturamento): ${atualizacaoError?.message || atualizarContratoReq}`);
+        } catch (osError) {
+          console.warn(`⚠️ Erro ao criar OS diretamente, tentando FaturarContrato:`, osError);
         }
 
-        // ETAPA 2: Faturar Contrato de Serviço no Omie
+        // ETAPA 3: FaturarContrato como fallback (caso IncluirOS não funcione)
         try {
-          // Reconsultar o código do contrato (nCodCtr) pelo número do contrato para evitar códigos inválidos
-          const numeroConsulta = (numeroContratoAlvo || contratoAtivo.numero_contrato || '').toString().trim();
-          let codigoContratoParaFaturar = codigoContratoOmie;
-          if (numeroConsulta) {
-            try {
-              const consultaReq: OmieApiRequest = {
-                call: 'ConsultarContrato',
-                app_key: omieAppKey,
-                app_secret: omieAppSecret,
-                param: [{ cNumCtr: numeroConsulta }]
-              };
-              const consultaResp = await fetch('https://app.omie.com.br/api/v1/servicos/contrato/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(consultaReq)
-              });
-              const consultaJson = await consultaResp.json();
-              const findNCodCtr2 = (o: any): any => {
-                if (!o || typeof o !== 'object') return null;
-                if ('nCodCtr' in o) return o.nCodCtr;
-                if ('nCodContrato' in o) return (o as any).nCodContrato;
-                for (const v of Object.values(o)) {
-                  const r = findNCodCtr2(v);
-                  if (r != null) return r;
-                }
-                return null;
-              };
-              const codDireto = findNCodCtr2(consultaJson);
-              const codDiretoDigits = String(codDireto || '').replace(/\D/g, '');
-              if (codDiretoDigits && codDiretoDigits !== String(codigoClienteNumerico)) {
-                codigoContratoParaFaturar = Number(codDiretoDigits);
-                // Persistir para futuras execuções
-                const agoraISO = new Date().toISOString();
-                await supabase
-                  .from('contratos_clientes')
-                  .update({ omie_codigo_contrato: String(codDiretoDigits), omie_data_sincronizacao: agoraISO })
-                  .eq('id', contratoAtivo.id);
-              }
-            } catch (_) {
-              // noop - vamos tentar faturar com o que temos
-            }
-          }
-
           const reqBody: OmieApiRequest = {
             call: 'FaturarContrato',
             app_key: omieAppKey,
             app_secret: omieAppSecret,
-            param: [{ nCodCtr: Number(codigoContratoParaFaturar) }]
+            param: [{ nCodCtr: Number(codigoContratoValidado) }]
           };
+          
           console.log(
-            `Faturando Contrato no Omie (FaturarContrato) [https://app.omie.com.br/api/v1/servicos/contratofat/] para ${demo.cliente_nome}:`,
+            `Faturando Contrato no Omie (FaturarContrato) para ${demo.cliente_nome}:`,
             JSON.stringify({ call: reqBody.call, param: reqBody.param }, null, 2)
           );
+          
           const resp = await fetch("https://app.omie.com.br/api/v1/servicos/contratofat/", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -492,6 +548,10 @@ serve(async (req) => {
 
           if (nfResult?.nCodOS) {
             console.log(`✅ Ordem de Serviço criada com sucesso no Omie: ${nfResult.nCodOS} | Status: ${nfResult.cDescStatus}`);
+            
+            // ⚠️ AVISO: Valor pode não estar correto - FaturarContrato usa valor de referência do OMIE
+            console.warn(`⚠️ ATENÇÃO: Valor faturado pode diferir do demonstrativo. Valor demonstrativo: R$ ${valorParaNF} | Verifique no OMIE o valor da OS ${nfResult.nCodOS}`);
+            
             // Salvar referência da OS no banco
             await supabase
               .from('relatorios_faturamento_status')
@@ -500,7 +560,11 @@ serve(async (req) => {
                 omie_codigo_pedido: nfResult.nCodOS,
                 omie_numero_pedido: nfResult.nCodCtr || null,
                 data_geracao_nf_omie: new Date().toISOString(),
-                omie_detalhes: nfResult
+                omie_detalhes: {
+                  ...nfResult,
+                  valor_demonstrativo: valorParaNF,
+                  observacao: "Valor pode diferir do demonstrativo - FaturarContrato usa valor de referência"
+                }
               })
               .eq('cliente_id', demo.cliente_id)
               .eq('periodo', periodo);
@@ -511,7 +575,9 @@ serve(async (req) => {
               codigo_ordem_servico: nfResult.nCodOS,
               codigo_contrato: nfResult.nCodCtr,
               status: nfResult.cDescStatus,
-              valor_total: valorTotal
+              valor_total: valorTotal,
+              metodo: "FaturarContrato",
+              aviso: "Valor pode diferir do demonstrativo"
             });
             sucessos++;
           } else {
