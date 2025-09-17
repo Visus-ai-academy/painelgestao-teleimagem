@@ -141,6 +141,57 @@ serve(async (req: Request) => {
 
     let finalData = dataFaturamento || [];
     
+    // Preparar mapa de preços por combinação para volumetria (modalidade|especialidade|categoria|prioridade)
+    const isFaturamentoDataLocalPrimario = finalData.length > 0 && Object.prototype.hasOwnProperty.call(finalData[0], 'valor');
+    let precoPorCombo: Record<string, number> = {};
+
+    if (!isFaturamentoDataLocalPrimario) {
+      // Agrupar volumetria para obter volume por combinação (usado na faixa de preço)
+      const grupos: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }>
+        = {};
+      for (const item of finalData as any[]) {
+        const modalidade = (item.MODALIDADE || '').toString();
+        const especialidade = (item.ESPECIALIDADE || '').toString();
+        const categoria = (item.CATEGORIA || 'SC').toString();
+        const prioridade = (item.PRIORIDADE || '').toString();
+        const key = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
+        const qtd = Number(item.VALORES || 0) || 0;
+        if (!grupos[key]) {
+          grupos[key] = { modalidade, especialidade, categoria, prioridade, quantidade: 0 };
+        }
+        grupos[key].quantidade += qtd;
+      }
+
+      // Consultar preço unitário via RPC uma única vez por combinação
+      const combos = Object.entries(grupos);
+      if (combos.length > 0) {
+        await Promise.all(
+          combos.map(async ([key, g]) => {
+            const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
+            try {
+              const { data: preco } = await supabase.rpc('calcular_preco_exame', {
+                p_cliente_id: cliente.id,
+                p_modalidade: g.modalidade,
+                p_especialidade: g.especialidade,
+                p_prioridade: g.prioridade,
+                p_categoria: g.categoria || 'SC',
+                p_volume_total: g.quantidade,
+                p_is_plantao: isPlantao,
+              });
+              if (preco && typeof preco === 'number' && preco > 0) {
+                precoPorCombo[key] = preco;
+              } else {
+                precoPorCombo[key] = 0;
+              }
+            } catch (e) {
+              console.warn('⚠️ Falha ao calcular preço para combo', key, e?.message || e);
+              precoPorCombo[key] = 0;
+            }
+          })
+        );
+      }
+    }
+    
     // Se não há dados, não gerar PDF
     if (finalData.length === 0) {
       console.log('❌ DADOS NÃO ENCONTRADOS - Cliente precisa de verificação no cadastro');
@@ -222,7 +273,12 @@ serve(async (req: Request) => {
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.quantidade) || 0), 0);
       } else {
         // Dados de volumetria - usar VALORES como quantidade
-        valorBrutoTotal = finalData.reduce((sum, item) => sum + (parseFloat(item.VALORES) || 0), 0);
+        valorBrutoTotal = (finalData as any[]).reduce((sum, item) => {
+          const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
+          const unit = precoPorCombo[key] ?? 0;
+          const qtd = Number(item.VALORES || 0) || 0;
+          return sum + unit * qtd;
+        }, 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
       }
       // Impostos padrão (calculados para exibição)
