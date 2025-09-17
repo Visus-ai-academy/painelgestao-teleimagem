@@ -162,14 +162,110 @@ serve(async (req: Request) => {
         grupos[key].quantidade += qtd;
       }
 
+      // Buscar condição de volume do contrato
+      const { data: contrato } = await supabase
+        .from('contratos_clientes')
+        .select('cond_volume')
+        .eq('cliente_id', cliente_id)
+        .eq('status', 'ativo')
+        .single();
+      
+      const condVolume = contrato?.cond_volume || 'MOD/ESP/CAT';
+      console.log(`📊 Condição de Volume: ${condVolume}`);
+
       // Consultar preço unitário via RPC uma única vez por combinação
       const combos = Object.entries(grupos);
       if (combos.length > 0) {
+        // Calcular volumes agregados conforme cond_volume
+        const volumesAgregados = new Map<string, number>();
+        
+        for (const [key, g] of combos) {
+          const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
+          
+          // Definir chave de agregação conforme cond_volume
+          let chaveAgregacao = '';
+          switch (condVolume) {
+            case 'MOD/ESP/CAT':
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+              break;
+            case 'MOD/ESP':
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
+              break;
+            case 'MOD':
+              chaveAgregacao = g.modalidade;
+              break;
+            default:
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+          }
+
+          // Para exames de plantão, verificar se deve considerar no volume agregado
+          if (isPlantao) {
+            // Verificar se preço considera plantão no volume agregado
+            const { data: precoPlantao } = await supabase
+              .from('precos_servicos')
+              .select('considera_prioridade_plantao')
+              .eq('cliente_id', cliente_id)
+              .eq('modalidade', g.modalidade)
+              .eq('especialidade', g.especialidade)
+              .eq('categoria', g.categoria || 'SC')
+              .eq('prioridade', g.prioridade)
+              .eq('ativo', true)
+              .maybeSingle();
+
+            // Só adiciona ao volume agregado se considera plantão
+            if (precoPlantao?.considera_prioridade_plantao) {
+              volumesAgregados.set(
+                chaveAgregacao, 
+                (volumesAgregados.get(chaveAgregacao) || 0) + g.quantidade
+              );
+            }
+          } else {
+            // Exames não-plantão sempre entram no volume agregado
+            volumesAgregados.set(
+              chaveAgregacao, 
+              (volumesAgregados.get(chaveAgregacao) || 0) + g.quantidade
+            );
+          }
+        }
+
+        console.log('📈 Volumes agregados por condição:', Object.fromEntries(volumesAgregados));
+
+        // Calcular preços por combo usando volume agregado correto
         await Promise.all(
           combos.map(async ([key, g]) => {
             const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
+            
+            // Definir chave de agregação para buscar volume
+            let chaveAgregacao = '';
+            switch (condVolume) {
+              case 'MOD/ESP/CAT':
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+                break;
+              case 'MOD/ESP':
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
+                break;
+              case 'MOD':
+                chaveAgregacao = g.modalidade;
+                break;
+              default:
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+            }
+            
+            // Para exames de plantão, usar o volume próprio (não agregado)
+            const volumeParaCalculo = isPlantao 
+              ? g.quantidade 
+              : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
+            
             try {
-              console.log(`🔍 Calculando preço para: Cliente=${cliente_id}, Mod=${g.modalidade}, Esp=${g.especialidade}, Pri=${g.prioridade}, Cat=${g.categoria || 'SC'}, Vol=${g.quantidade}`);
+              console.log(`🔍 Calculando preço para: ${key}`);
+              console.log(`   Cliente: ${cliente_id}`);
+              console.log(`   Modalidade: ${g.modalidade}`);
+              console.log(`   Especialidade: ${g.especialidade}`);
+              console.log(`   Categoria: ${g.categoria || 'SC'}`);
+              console.log(`   Prioridade: ${g.prioridade}`);
+              console.log(`   Volume próprio: ${g.quantidade}`);
+              console.log(`   Volume agregado: ${volumeParaCalculo}`);
+              console.log(`   É plantão: ${isPlantao}`);
               
               const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente_id,
@@ -177,7 +273,7 @@ serve(async (req: Request) => {
                 p_especialidade: g.especialidade,
                 p_prioridade: g.prioridade,
                 p_categoria: g.categoria || 'SC',
-                p_volume_total: g.quantidade,
+                p_volume_total: volumeParaCalculo,
                 p_is_plantao: isPlantao,
               });
               
