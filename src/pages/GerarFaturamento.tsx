@@ -48,7 +48,6 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
-import { DiagnosticoClientePrecos } from "@/components/DiagnosticoClientePrecos";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -2255,69 +2254,10 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="analise" className="space-y-6">
-          {/* Verificação de Dados - Movido da aba Demonstrativo */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                Verificação de Dados
-              </CardTitle>
-              <CardDescription>
-                Análise de consistência entre volumetria e demonstrativos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="text-sm">
-                  <div className="text-yellow-700">
-                    <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
-                    <div>Total nos Demonstrativos: <span className="font-medium">
-                      {(() => {
-                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                        if (demonstrativosCompletos) {
-                          try {
-                            const dados = JSON.parse(demonstrativosCompletos);
-                            const total = dados.resumo?.total_exames_geral || 0;
-                            return total.toLocaleString('pt-BR');
-                          } catch {
-                            return '0';
-                          }
-                        }
-                        return '0';
-                      })()} exames
-                    </span></div>
-                    {(() => {
-                      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-                      if (demonstrativosCompletos) {
-                        try {
-                          const dados = JSON.parse(demonstrativosCompletos);
-                          const totalDemonstrativos = dados.resumo?.total_exames_geral || 0;
-                          if (totalDemonstrativos !== 38528) {
-                            return (
-                              <div className="text-red-600 font-medium mt-1">
-                                ⚠️ Discrepância encontrada: {Math.abs(38528 - totalDemonstrativos).toLocaleString('pt-BR')} exames de diferença
-                              </div>
-                            );
-                          }
-                        } catch {}
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
           <ExamesValoresZerados />
         </TabsContent>
 
           </Tabs>
-          
-          {/* Seção de Diagnóstico */}
-          <div className="mt-8">
-            <DiagnosticoClientePrecos />
-          </div>
         </div>
       );
 }
