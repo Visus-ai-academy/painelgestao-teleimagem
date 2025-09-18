@@ -106,8 +106,8 @@ serve(async (req) => {
       );
     }
 
-    // ✅ Buscar TODOS os clientes com contratos ativos CO-FT ou NC-FT
-    console.log(`🔍 Buscando todos os clientes com contratos CO-FT ou NC-FT...`);
+    // ✅ Buscar dados completos dos clientes ativos com contratos CO-FT/NC-FT
+    console.log(`🔍 Buscando clientes com contratos CO-FT/NC-FT...`);
     
     const { data: todosClientesAtivos, error: clientesError } = await supabase
       .from('clientes')
@@ -126,85 +126,37 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📋 Total de clientes ativos com CO-FT/NC-FT: ${todosClientesAtivos?.length || 0}`);
+    console.log(`📋 Total de clientes ativos: ${todosClientesAtivos?.length || 0}`);
 
-    // ✅ Normalização e mapeamento de nomes da volumetria → cadastro
-    const normalizaNome = (valor?: string): string => {
-      if (!valor) return '';
-      let nome = valor.toUpperCase().trim();
-
-      // Mapeamentos específicos (espelham a função DB public.limpar_nome_cliente)
-      switch (nome) {
-        case 'INTERCOR2': nome = 'INTERCOR'; break;
-        case 'P-HADVENTISTA': nome = 'HADVENTISTA'; break;
-        case 'P-UNIMED_CARUARU': nome = 'UNIMED_CARUARU'; break;
-        case 'PRN - MEDIMAGEM CAMBORIU': nome = 'MEDIMAGEM_CAMBORIU'; break;
-        case 'UNIMAGEM_CENTRO': nome = 'UNIMAGEM_ATIBAIA'; break;
-        case 'VIVERCLIN 2': nome = 'VIVERCLIN'; break;
-        case 'CEDI-RJ':
-        case 'CEDI-RO':
-        case 'CEDI-UNIMED':
-        case 'CEDI_RJ':
-        case 'CEDI_RO':
-        case 'CEDI_UNIMED':
-          nome = 'CEDIDIAG';
-          break;
-      }
-
-      // Remover sufixos comuns
-      nome = nome.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
-      nome = nome.replace(/_PLANTÃO$/i, '').trim();
-      nome = nome.replace(/_RMX$/i, '').trim();
-
-      // Unificar separadores e remover espaços extras
-      nome = nome.replace(/[\s\-]+/g, '_');
-      nome = nome.replace(/_{2,}/g, '_');
-      return nome;
-    };
-
-    // Construir índice de nomes da volumetria normalizados → originais
-    const normToOriginals = new Map<string, Set<string>>();
-    for (const nome of clientesFiltrados) {
-      const norm = normalizaNome(nome);
-      if (!normToOriginals.has(norm)) normToOriginals.set(norm, new Set());
-      normToOriginals.get(norm)!.add(nome);
-    }
-
-    // ✅ Filtrar clientes que TÊM volumetria no período (mapeamento robusto)
-    const clientesComVolumetriaCadastrados: any[] = [];
-    const clientesEncontrados = new Set<string>();
+    // ✅ Usar o sistema original de mapeamento por nomes
+    console.log(`🔍 Fazendo mapeamento simples entre clientes cadastrados e volumetria...`);
+    
+    const clientesComVolumetria: any[] = [];
     const mapeamentoVolumetria = new Map<string, string[]>();
 
     (todosClientesAtivos || []).forEach((cliente: any) => {
-      const variantesCadastro = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
-        .filter(Boolean) as string[];
-      const variantesNorm = new Set(variantesCadastro.map(normalizaNome).filter(Boolean));
+      // Usar os nomes originais do sistema para buscar na volumetria
+      const nomes = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
+        .filter(Boolean)
+        .map(n => n.trim());
 
-      // Encontrar todos os nomes de volumetria que batem com qualquer variante normalizada do cadastro
-      const nomesCompatOriginais = new Set<string>();
-      for (const vNorm of variantesNorm) {
-        const origs = normToOriginals.get(vNorm);
-        if (origs) {
-          origs.forEach((o) => nomesCompatOriginais.add(o));
-        }
-      }
+      // Verificar se algum nome bate com os da volumetria
+      const nomesEncontrados = nomes.filter(nome => 
+        clientesFiltrados.some(volNome => 
+          volNome.trim().toUpperCase() === nome.trim().toUpperCase() ||
+          volNome.trim().toUpperCase().includes(nome.trim().toUpperCase()) ||
+          nome.trim().toUpperCase().includes(volNome.trim().toUpperCase())
+        )
+      );
 
-      if (nomesCompatOriginais.size > 0) {
-        clientesComVolumetriaCadastrados.push(cliente);
-        const lista = Array.from(nomesCompatOriginais);
-        mapeamentoVolumetria.set(cliente.id, lista);
-        lista.forEach((n) => clientesEncontrados.add(n));
-        console.log(`✅ Cliente mapeado: ${(cliente.nome_fantasia || cliente.nome)} → ${lista.join(', ')}`);
+      if (nomesEncontrados.length > 0) {
+        clientesComVolumetria.push(cliente);
+        mapeamentoVolumetria.set(cliente.id, nomesEncontrados);
+        console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${nomesEncontrados.join(', ')}`);
       }
     });
 
-    // Identificar clientes da volumetria sem cadastro
-    const clientesNaoEncontrados = clientesFiltrados.filter(nome => !clientesEncontrados.has(nome));
-    if (clientesNaoEncontrados.length > 0) {
-      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria SEM cadastro ativo com CO-FT/NC-FT:`, clientesNaoEncontrados);
-    }
-
-    let todosClientesFinal = clientesComVolumetriaCadastrados;
+    let todosClientesFinal = clientesComVolumetria;
     
     console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
@@ -309,13 +261,13 @@ serve(async (req) => {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
-        const nomesVolumetriaCompat = mapeamentoVolumetria.get(cliente.id);
+        const nomesVolumetriaCompat = mapeamentoVolumetria.get(cliente.id) || [];
         
         clientesAgrupados.set(nomeFantasia, {
           id: cliente.id,
           nome: cliente.nome,
           nome_fantasia: nomeFantasia,
-          nomes_mobilemed: Array.isArray(nomesVolumetriaCompat) ? nomesVolumetriaCompat : (nomesVolumetriaCompat ? [nomesVolumetriaCompat] : []),
+          nomes_mobilemed: nomesVolumetriaCompat,
           cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: cliente.tipo_faturamento
