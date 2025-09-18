@@ -772,9 +772,22 @@ export default function GerarFaturamento() {
         throw new Error(`Nenhum cliente encontrado na volumetria para o período ${periodoSelecionado}`);
       }
 
+      // ✅ LIMITAÇÃO DE TESTE: Filtrar apenas clientes permitidos
+      const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'IMDBATATAIS'];
+      const clientesFiltrados = clientesUnicosVolumetria.filter(cliente => 
+        clientesPermitidosParaTeste.includes(cliente)
+      );
+      
+      console.log(`🧪 [TESTE] Clientes filtrados para teste: ${clientesFiltrados.length}/${clientesUnicosVolumetria.length}`);
+      console.log(`🧪 [TESTE] Clientes permitidos:`, clientesFiltrados);
+
+      if (clientesFiltrados.length === 0) {
+        throw new Error(`Nenhum dos clientes de teste (${clientesPermitidosParaTeste.join(', ')}) foi encontrado na volumetria para o período selecionado`);
+      }
+
       setStatusProcessamento({
         processando: true,
-        mensagem: `Processando ${clientesUnicosVolumetria.length} clientes da volumetria...`,
+        mensagem: `Processando ${clientesFiltrados.length} clientes de teste...`,
         progresso: 30
       });
 
@@ -783,7 +796,8 @@ export default function GerarFaturamento() {
       // Chamar edge function para gerar os demonstrativos completos
       const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
         body: {
-          periodo: periodoSelecionado
+          periodo: periodoSelecionado,
+          clientesPermitidos: clientesPermitidosParaTeste // ✅ Enviar limitação para o backend
         }
       });
 

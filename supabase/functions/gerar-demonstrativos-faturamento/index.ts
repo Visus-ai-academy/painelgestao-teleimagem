@@ -41,13 +41,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { periodo } = await req.json();
+    const { periodo, clientesPermitidos } = await req.json();
     
     if (!periodo) {
       throw new Error('Período é obrigatório');
     }
 
     console.log(`Gerando demonstrativos para o período: ${periodo}`);
+    
+    // ✅ LIMITAÇÃO DE TESTE: Se clientesPermitidos fornecido, aplicar filtro
+    if (clientesPermitidos && Array.isArray(clientesPermitidos)) {
+      console.log(`🧪 [TESTE] Limitação ativa para clientes: ${clientesPermitidos.join(', ')}`);
+    }
 
     // Primeiro, buscar TODOS os clientes para fazer filtragem adequada
     const { data: todosClientes, error: clientesError } = await supabase
@@ -216,6 +221,25 @@ serve(async (req) => {
     
     console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.length + ' inativos com volumetria)');
     
+    // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
+    if (clientesPermitidos && Array.isArray(clientesPermitidos)) {
+      const clientesAntesFiltro = clientes.length;
+      clientes = clientes.filter(cliente => {
+        const nomes = [
+          cliente.nome,
+          cliente.nome_fantasia,
+          cliente.nome_mobilemed
+        ].filter(Boolean).map(n => n.toUpperCase());
+        
+        return clientesPermitidos.some(permitido => 
+          nomes.some(nome => nome.includes(permitido.toUpperCase()))
+        );
+      });
+      
+      console.log(`🧪 [TESTE] Filtro aplicado: ${clientes.length}/${clientesAntesFiltro} clientes mantidos`);
+      console.log(`🧪 [TESTE] Clientes mantidos:`, clientes.map(c => c.nome_fantasia || c.nome));
+    }
+    
     if (clientes.length === 0) {
       console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
       const { data: clientesVolumetriaAll, error: volAllErr } = await supabase
@@ -242,7 +266,12 @@ serve(async (req) => {
           ];
           const isClienteNC = clientesNC.some(nc => nomeUpper.includes(nc));
           
-          if (!isClienteNC) { // Só incluir se NÃO for NC
+          // ✅ APLICAR LIMITAÇÃO DE TESTE no fallback também
+          const isClientePermitido = !clientesPermitidos || clientesPermitidos.some(permitido => 
+            nomeUpper.includes(permitido.toUpperCase())
+          );
+          
+          if (!isClienteNC && isClientePermitido) { // Só incluir se NÃO for NC e for permitido no teste
             clientesFallbackFiltrados.push({
               id: 'temp-' + (clientesFallbackFiltrados.length + 1),
               nome,
@@ -256,7 +285,7 @@ serve(async (req) => {
         }
         
         clientes = clientesFallbackFiltrados;
-        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria (excluindo NC).');
+        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria (excluindo NC' + (clientesPermitidos ? ' e aplicando filtro de teste' : '') + ').');
       }
     }
 
