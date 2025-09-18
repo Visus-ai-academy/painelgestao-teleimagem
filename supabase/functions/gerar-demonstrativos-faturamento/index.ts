@@ -108,27 +108,51 @@ serve(async (req) => {
     }
 
     // ✅ Buscar dados completos APENAS dos clientes que têm volumetria
-    const { data: clientesCompletos, error: clientesError } = await supabase
-      .from('clientes')
-      .select(`
-        id,
-        nome,
-        nome_fantasia,
-        nome_mobilemed,
-        ativo,
-        status,
-        contratos_clientes(
-          tipo_faturamento,
-          cond_volume,
-          status
-        ),
-        parametros_faturamento(
-          status,
-          tipo_faturamento,
-          updated_at
-        )
-      `)
-      .or(clientesFiltrados.map(nome => `nome.eq.${nome},nome_fantasia.eq.${nome},nome_mobilemed.eq.${nome}`).join(','));
+    // OTIMIZAÇÃO: Fazer consultas separadas para evitar queries muito complexas
+    console.log(`🔍 Buscando dados completos para ${clientesFiltrados.length} clientes...`);
+    
+    // Fazer 3 consultas separadas para cada tipo de nome
+    const consultasPromises = [
+      supabase.from('clientes').select(`
+        id, nome, nome_fantasia, nome_mobilemed, ativo, status,
+        contratos_clientes(tipo_faturamento, cond_volume, status),
+        parametros_faturamento(status, tipo_faturamento, updated_at)
+      `).in('nome', clientesFiltrados),
+      
+      supabase.from('clientes').select(`
+        id, nome, nome_fantasia, nome_mobilemed, ativo, status,
+        contratos_clientes(tipo_faturamento, cond_volume, status),
+        parametros_faturamento(status, tipo_faturamento, updated_at)
+      `).in('nome_fantasia', clientesFiltrados),
+      
+      supabase.from('clientes').select(`
+        id, nome, nome_fantasia, nome_mobilemed, ativo, status,
+        contratos_clientes(tipo_faturamento, cond_volume, status),
+        parametros_faturamento(status, tipo_faturamento, updated_at)
+      `).in('nome_mobilemed', clientesFiltrados)
+    ];
+    
+    const resultadosConsultas = await Promise.all(consultasPromises);
+    
+    // Combinar resultados e remover duplicatas por ID
+    const clientesCompletos = [];
+    const idsVistos = new Set();
+    
+    resultadosConsultas.forEach(({ data }) => {
+      if (data) {
+        data.forEach(cliente => {
+          if (!idsVistos.has(cliente.id)) {
+            idsVistos.add(cliente.id);
+            clientesCompletos.push(cliente);
+          }
+        });
+      }
+    });
+    
+    console.log(`📋 Clientes encontrados no cadastro: ${clientesCompletos.length}`);
+    
+    const clientesError = resultadosConsultas.some(r => r.error) ? 
+      resultadosConsultas.find(r => r.error)?.error : null;
 
     // ✅ Complementar com clientes não encontrados no cadastro (fallback)
     let todosClientesFinal = [...(clientesCompletos || [])];
