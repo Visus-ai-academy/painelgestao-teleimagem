@@ -200,66 +200,30 @@ serve(async (req) => {
       return tipoParam === 'NC-NF';
     };
 
-    // ✅ Considerar APENAS clientes com Parâmetros ATIVOS e NÃO NC-NF
-    const clientesAtivos = todosClientesFinal.filter(c => {
+    // ✅ MUDANÇA: Processar TODOS os clientes da volumetria, criando parâmetros padrão quando necessário
+    const clientesAtivos = todosClientesFinal.map(c => {
       const pfAtivo = getParametroAtivo(c.parametros_faturamento);
-      const paramStatusOk = !!pfAtivo && !isStatusInativoOuCancelado(pfAtivo.status);
-      return (
-        paramStatusOk && !isNCNF(c)
-      );
-    });
-    
-    // Clientes inativos/cancelados (para verificação de volumetria) – NÃO incluir no demonstrativo
-    const clientesInativos = todosClientesFinal.filter(c => 
-      !c.ativo || isStatusInativoOuCancelado(c.status) || isStatusInativoOuCancelado(getParametroAtivo(c.parametros_faturamento)?.status)
-    );
-    
-    console.log(`📊 Clientes ativos: ${clientesAtivos.length}, Inativos/Cancelados: ${clientesInativos.length}`);
-
-    // ✅ OTIMIZAÇÃO: Buscar clientes inativos com volumetria de forma mais eficiente
-    const clientesInativosComVolumetria = [];
+      
+      // Se não tem parâmetros ativos, criar temporário padrão
+      if (!pfAtivo || isStatusInativoOuCancelado(pfAtivo.status)) {
+        c.parametros_faturamento = [{ 
+          status: 'A', 
+          tipo_faturamento: 'CO-FT',
+          created_temp: true // Flag para identificar temporários
+        }];
+      }
+      
+      return c;
+    }).filter(c => !isNCNF(c)); // Apenas excluir NC-NF
+    // ✅ SIMPLIFICADO: Não precisamos mais da lógica complexa de clientes inativos
+    // Todos os clientes da volumetria já estão incluídos na lista clientesAtivos
+    const clientesInativosComVolumetria = []; // Lista vazia - não precisamos mais desta lógica
     const alertasClientes: string[] = [];
     
-    if (clientesInativos.length > 0) {
-      // Buscar volumetria em batch para todos os nomes de clientes inativos
-      const nomesInativosParaBuscar = clientesInativos
-        .filter(c => !isNCNF(c))
-        .map(c => [c.nome, c.nome_mobilemed, c.nome_fantasia])
-        .flat()
-        .filter(Boolean);
-      
-      if (nomesInativosParaBuscar.length > 0) {
-        const { data: volumetriaInativos } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"EMPRESA"')
-          .eq('periodo_referencia', periodo)
-          .in('"EMPRESA"', nomesInativosParaBuscar)
-          .not('"VALORES"', 'is', null);
-        
-        if (volumetriaInativos && volumetriaInativos.length > 0) {
-          const empresasComVolumetria = new Set(volumetriaInativos.map(v => v.EMPRESA));
-          
-          for (const clienteInativo of clientesInativos) {
-            if (isNCNF(clienteInativo)) continue;
-            
-            const nomeFantasia = clienteInativo.nome_fantasia || clienteInativo.nome;
-            const nomes = [clienteInativo.nome, clienteInativo.nome_mobilemed, nomeFantasia].filter(Boolean);
-            
-            if (nomes.some(nome => empresasComVolumetria.has(nome))) {
-              clientesInativosComVolumetria.push(clienteInativo);
-              const status = !clienteInativo.ativo ? 'INATIVO' : 
-                           clienteInativo.status === 'Cancelado' ? 'CANCELADO' : 'INATIVO';
-              alertasClientes.push(`⚠️ Cliente ${status}: ${nomeFantasia} possui volumetria no período ${periodo} mas está ${status.toLowerCase()}`);
-            }
-          }
-        }
-      }
-    }
+    console.log(`📊 Clientes para processamento: ${clientesAtivos.length} (todos os clientes da volumetria)`);
 
-    // ✅ LISTA FINAL: apenas clientes ativos (já sem NC-NF) + inativos com volumetria (já filtrado NC-NF)
-    let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
-    
-    console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.length + ' inativos com volumetria)');
+    // ✅ LISTA FINAL: apenas clientes ativos (já inclui todos da volumetria)
+    let clientes = [...clientesAtivos];
     
     // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
     if (clientesPermitidos && Array.isArray(clientesPermitidos)) {
