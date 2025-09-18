@@ -156,6 +156,10 @@ serve(async (req) => {
 
     let todosClientesFinal = clientesMapeados;
     
+    // Diagnóstico: nomes de volumetria que não existem no cadastro ativo
+    const nomesCadastroAtivos = (todosClientesAtivos || []).flatMap((c: any) => [c.nome_mobilemed, c.nome_fantasia, c.nome].filter(Boolean).map((n: string) => n.trim().toUpperCase()));
+    const naoEncontradosNoCadastro = (clientesFiltrados || []).filter((nome: string) => !nomesCadastroAtivos.some((n: string) => n === nome.trim().toUpperCase() || n.includes(nome.trim().toUpperCase()) || nome.trim().toUpperCase().includes(n)));
+    
     console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
     const isStatusInativoOuCancelado = (status?: string) => {
@@ -956,10 +960,13 @@ serve(async (req) => {
         alertas: alertasClientes, // ✅ INCLUIR ALERTAS de clientes inativos com volumetria
         debug: {
           nomesComVolumetria: nomesComVolumetria.length,
+          nomesVolumetriaAmostra: (nomesComVolumetria || []).slice(0, 50),
           clientesMapeados: (todosClientesFinal?.length || 0),
           clientesElegiveis: (clientesElegiveis?.length || 0),
           excluidosSemContratoValidoCount: (excluidosSemContratoValido?.length || 0),
           excluidosSemContratoValido: excluidosSemContratoValido,
+          naoEncontradosNoCadastroCount: (naoEncontradosNoCadastro?.length || 0),
+          naoEncontradosNoCadastroAmostra: (naoEncontradosNoCadastro || []).slice(0, 50)
         },
         salvar_localStorage: {
           chave: `demonstrativos_completos_${periodo}`,
