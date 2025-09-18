@@ -59,10 +59,8 @@ serve(async (req) => {
     
     const { data: clientesComVolumetria, error: volError } = await supabase
       .from('volumetria_mobilemed')
-      .select('"EMPRESA"')
+      .select('"Cliente_Nome_Fantasia","EMPRESA"')
       .eq('periodo_referencia', periodo)
-      .not('"EMPRESA"', 'is', null)
-      .not('"EMPRESA"', 'eq', '')
       .not('"VALORES"', 'is', null)
       .limit(50000);
 
@@ -81,7 +79,7 @@ serve(async (req) => {
     }
 
     // ✅ Obter lista única de clientes que realmente têm volumetria
-    const nomesComVolumetria = [...new Set(clientesComVolumetria.map(c => c.EMPRESA).filter(Boolean))];
+    const nomesComVolumetria = [...new Set((clientesComVolumetria as any[]).map(c => (c.Cliente_Nome_Fantasia || c.EMPRESA)).filter(Boolean))];
     console.log(`📊 Clientes únicos com volumetria: ${nomesComVolumetria.length}`, nomesComVolumetria);
     
     // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
@@ -214,7 +212,9 @@ serve(async (req) => {
       });
 
     const alertasClientes: string[] = [];
+    const excluidosSemContratoValido = todosClientesFinal.filter((c: any) => !contratoValido(c)).map((c: any) => c.nome_fantasia || c.nome);
     console.log(`📊 Clientes elegíveis (contrato ativo CO-FT/NC-FT) para processamento: ${clientesElegiveis.length}`);
+    console.log(`ℹ️ Clientes com volumetria mapeados: ${todosClientesFinal.length} | Sem contrato válido: ${excluidosSemContratoValido.length}`);
 
     // ✅ LISTA FINAL: apenas clientes elegíveis por contrato e com volumetria
     let clientes = [...clientesElegiveis];
@@ -409,7 +409,7 @@ serve(async (req) => {
           tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
-        .in('"EMPRESA"', cliente.nomes_mobilemed)
+        .in('"Cliente_Nome_Fantasia"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
         .neq('tipo_faturamento', 'NC-NF'); // Excluir exames não faturáveis
 
@@ -954,6 +954,13 @@ serve(async (req) => {
         resumo,
         demonstrativos,
         alertas: alertasClientes, // ✅ INCLUIR ALERTAS de clientes inativos com volumetria
+        debug: {
+          nomesComVolumetria: nomesComVolumetria.length,
+          clientesMapeados: (todosClientesFinal?.length || 0),
+          clientesElegiveis: (clientesElegiveis?.length || 0),
+          excluidosSemContratoValidoCount: (excluidosSemContratoValido?.length || 0),
+          excluidosSemContratoValido: excluidosSemContratoValido,
+        },
         salvar_localStorage: {
           chave: `demonstrativos_completos_${periodo}`,
           dados: dadosParaSalvar
