@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,15 +38,6 @@ import { processContratosFile, processEscalasFile, processFinanceiroFile, proces
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-
-// Debounce simples
-const debounce = <T extends (...args: any[]) => any>(func: T, wait: number) => {
-  let timeout: NodeJS.Timeout;
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  }) as T;
-};
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ControlePeriodoFaturamento } from "@/components/ControlePeriodoFaturamento";
@@ -57,6 +48,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { DiagnosticoClientePrecos } from "@/components/DiagnosticoClientePrecos";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -107,9 +99,6 @@ export default function GerarFaturamento() {
   // Controle de período para upload
   const [periodoSelecionado, setPeriodoSelecionado] = useState("2025-06"); // Período com dados
   const [mostrarApenasEditaveis, setMostrarApenasEditaveis] = useState(true);
-  
-  // Ref para controlar salvamento simultâneo
-  const salvandoResultados = useRef(false);
   
   const [clientesCarregados, setClientesCarregados] = useState<Array<{
     id: string;
@@ -255,111 +244,95 @@ export default function GerarFaturamento() {
     return filtrados;
   }, [resultados, filtroClienteStatus, ordemAlfabeticaStatus]);
 
-  // Função para salvar resultados no banco de dados com debounce
-  const salvarResultadosDB = useCallback(
-    debounce(async (novosResultados: typeof resultados) => {
-      // Evitar chamadas múltiplas simultâneas
-      if (salvandoResultados.current) return;
-      salvandoResultados.current = true;
-      
-      try {
-        // Função para validar e converter data
-        const converterDataSegura = (dataStr: any): string | null => {
-          if (!dataStr) return null;
-          
-          try {
-            // Se já é uma string de data ISO, usar direto
-            if (typeof dataStr === 'string' && dataStr.includes('T')) {
-              const date = new Date(dataStr);
-              return isNaN(date.getTime()) ? null : date.toISOString();
-            }
-            
-            // Se é uma string de data brasileira, converter
-            if (typeof dataStr === 'string' && dataStr.includes('/')) {
-              const [datePart, timePart] = dataStr.split(',').map(s => s.trim());
-              const [day, month, year] = datePart.split('/');
-              const dateISO = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              
-              if (timePart) {
-                const date = new Date(`${dateISO}T${timePart}`);
-                return isNaN(date.getTime()) ? null : date.toISOString();
-              } else {
-                const date = new Date(dateISO);
-                return isNaN(date.getTime()) ? null : date.toISOString();
-              }
-            }
-            
-            // Tentar converter diretamente
+  // Função para salvar resultados no banco de dados
+  const salvarResultadosDB = useCallback(async (novosResultados: typeof resultados) => {
+    try {
+      // Função para validar e converter data
+      const converterDataSegura = (dataStr: any): string | null => {
+        if (!dataStr) return null;
+        
+        try {
+          // Se já é uma string de data ISO, usar direto
+          if (typeof dataStr === 'string' && dataStr.includes('T')) {
             const date = new Date(dataStr);
             return isNaN(date.getTime()) ? null : date.toISOString();
-          } catch (error) {
-            console.warn('Erro ao converter data:', dataStr, error);
-            return null;
           }
-        };
+          
+          // Se é uma string de data brasileira, converter
+          if (typeof dataStr === 'string' && dataStr.includes('/')) {
+            const [datePart, timePart] = dataStr.split(',').map(s => s.trim());
+            const [day, month, year] = datePart.split('/');
+            const dateISO = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            
+            if (timePart) {
+              const date = new Date(`${dateISO}T${timePart}`);
+              return isNaN(date.getTime()) ? null : date.toISOString();
+            } else {
+              const date = new Date(dateISO);
+              return isNaN(date.getTime()) ? null : date.toISOString();
+            }
+          }
+          
+          // Tentar converter diretamente
+          const date = new Date(dataStr);
+          return isNaN(date.getTime()) ? null : date.toISOString();
+        } catch (error) {
+          console.warn('Erro ao converter data:', dataStr, error);
+          return null;
+        }
+      };
 
-        // Preparar dados para inserção/atualização no banco
-        const dadosParaDB = novosResultados.map(resultado => ({
-          cliente_id: resultado.clienteId,
-          cliente_nome: resultado.clienteNome,
-          periodo: periodoSelecionado,
-          relatorio_gerado: resultado.relatorioGerado,
-          email_enviado: resultado.emailEnviado,
-          email_destino: resultado.emailDestino,
-          link_relatorio: resultado.linkRelatorio || null,
-          erro: resultado.erro || null,
-          erro_email: resultado.erroEmail || null,
-          data_processamento: converterDataSegura(resultado.dataProcessamento),
-          data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
-          data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
-          detalhes_relatorio: resultado.relatorioData ? JSON.stringify(resultado.relatorioData) : null
-        }));
+      // Preparar dados para inserção/atualização no banco
+      const dadosParaDB = novosResultados.map(resultado => ({
+        cliente_id: resultado.clienteId,
+        cliente_nome: resultado.clienteNome,
+        periodo: periodoSelecionado,
+        relatorio_gerado: resultado.relatorioGerado,
+        email_enviado: resultado.emailEnviado,
+        email_destino: resultado.emailDestino,
+        link_relatorio: resultado.linkRelatorio || null,
+        erro: resultado.erro || null,
+        erro_email: resultado.erroEmail || null,
+        data_processamento: converterDataSegura(resultado.dataProcessamento),
+        data_geracao_relatorio: resultado.relatorioGerado ? new Date().toISOString() : null,
+        data_envio_email: resultado.emailEnviado ? new Date().toISOString() : null,
+        detalhes_relatorio: resultado.relatorioData ? JSON.stringify(resultado.relatorioData) : null
+      }));
 
-        // Usar upsert para inserir ou atualizar registros (com timeout)
-        const promises = dadosParaDB.map(dados => 
-          Promise.race([
-            supabase
-              .from('relatorios_faturamento_status')
-              .upsert(dados, { 
-                onConflict: 'cliente_id,periodo',
-                ignoreDuplicates: false 
-              }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout na operação do banco')), 10000)
-            )
-          ])
-        );
-        
-        await Promise.all(promises);
+      // Usar upsert para inserir ou atualizar registros
+      for (const dados of dadosParaDB) {
+        await supabase
+          .from('relatorios_faturamento_status')
+          .upsert(dados, { 
+            onConflict: 'cliente_id,periodo',
+            ignoreDuplicates: false 
+          });
+      }
 
-        // Também salvar no sessionStorage como backup
+      // Também salvar no sessionStorage como backup
+      const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
+      sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
+      
+      // Atualizar contadores (deduplicados por cliente) e persistir no localStorage
+      const resultadosUnicos = Array.from(new Map(novosResultados.map(r => [(r.clienteId || r.clienteNome), r])).values());
+      const relatoriosGerados = resultadosUnicos.filter(r => r.relatorioGerado).length;
+      const emailsEnviados = resultadosUnicos.filter(r => r.emailEnviado).length;
+      setRelatoriosGerados(relatoriosGerados);
+      setEmailsEnviados(emailsEnviados);
+      localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+      localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+    } catch (error) {
+      console.error('Erro ao salvar resultados no banco:', error);
+      // Fallback para sessionStorage apenas
+      try {
         const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
         sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
-        
-        // Atualizar contadores (deduplicados por cliente) e persistir no localStorage
-        const resultadosUnicos = Array.from(new Map(novosResultados.map(r => [(r.clienteId || r.clienteNome), r])).values());
-        const relatoriosGerados = resultadosUnicos.filter(r => r.relatorioGerado).length;
-        const emailsEnviados = resultadosUnicos.filter(r => r.emailEnviado).length;
-        setRelatoriosGerados(relatoriosGerados);
-        setEmailsEnviados(emailsEnviados);
-        localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
-        localStorage.setItem('emailsEnviados', emailsEnviados.toString());
-      } catch (error) {
-        console.error('Erro ao salvar resultados no banco:', error);
-        // Fallback para sessionStorage apenas
-        try {
-          const dadosLeves = novosResultados.map(({ relatorioData, ...resto }) => resto);
-          sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
-        } catch (sessionError) {
-          console.warn('Erro ao salvar no sessionStorage:', sessionError);
-          sessionStorage.removeItem('resultadosFaturamento');
-        }
-      } finally {
-        salvandoResultados.current = false;
+      } catch (sessionError) {
+        console.warn('Erro ao salvar no sessionStorage:', sessionError);
+        sessionStorage.removeItem('resultadosFaturamento');
       }
-    }, 500), // 500ms debounce
-    [periodoSelecionado]
-  );
+    }
+  }, [periodoSelecionado]);
 
   // Função para carregar resultados do banco de dados
   const carregarResultadosDB = useCallback(async () => {
@@ -753,28 +726,7 @@ export default function GerarFaturamento() {
     });
 
     try {
-        // ✅ PASSO 2: Verificar se existem dados de volumetria ANTES de processar
-        console.log('🔍 [VALIDACAO] Verificando existência de dados na volumetria...');
-        const { data: validacaoVolumetria, error: validacaoError } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"EMPRESA"')
-          .eq('periodo_referencia', periodoSelecionado)
-          .not('"EMPRESA"', 'is', null)
-          .not('"VALORES"', 'is', null)
-          .gt('"VALORES"', 0)
-          .limit(1);
-
-        if (validacaoError) {
-          throw new Error('Erro ao validar volumetria: ' + validacaoError.message);
-        }
-
-        if (!validacaoVolumetria || validacaoVolumetria.length === 0) {
-          throw new Error(`❌ ERRO CRÍTICO: Não existem dados de volumetria para o período ${periodoSelecionado}. Faça o upload dos dados antes de gerar demonstrativos.`);
-        }
-
-        console.log('✅ [VALIDACAO] Dados de volumetria encontrados para o período');
-        
-        // ✅ PASSO 3: Verificar quantos clientes únicos existem na volumetria
+      // Primeiro: Verificar quantos clientes únicos existem na volumetria
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
@@ -793,12 +745,9 @@ export default function GerarFaturamento() {
         throw new Error(`Nenhum cliente encontrado na volumetria para o período ${periodoSelecionado}`);
       }
 
-      // ✅ Processar TODOS os clientes da volumetria (sem limitação de teste)
-      console.log(`📊 [PRODUCAO] Processando todos os ${clientesUnicosVolumetria.length} clientes da volumetria`);
-
       setStatusProcessamento({
         processando: true,
-        mensagem: `Processando ${clientesUnicosVolumetria.length} clientes...`,
+        mensagem: `Processando ${clientesUnicosVolumetria.length} clientes da volumetria...`,
         progresso: 30
       });
 
@@ -808,7 +757,6 @@ export default function GerarFaturamento() {
       const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
         body: {
           periodo: periodoSelecionado
-          // Removido: clientesPermitidos - processar TODOS os clientes
         }
       });
 
@@ -941,20 +889,12 @@ export default function GerarFaturamento() {
       });
       return;
     }
-    
-    // ✅ CLIENTES PERMITIDOS PARA TESTE DE ENVIO DE E-MAIL
-    const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'IMDBATATAIS'];
-    
-    const relatóriosParaEnviar = resultados.filter(r => 
-      r.relatorioGerado && 
-      !r.emailEnviado &&
-      clientesPermitidosParaTeste.includes(r.clienteNome)
-    );
+    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado); 
     
     if (relatóriosParaEnviar.length === 0) {
       toast({
         title: "Nenhum relatório para enviar",
-        description: "Nenhum dos clientes de teste (COT, CORTREL, IMDBATATAIS) possui relatório gerado ou todos já foram enviados",
+        description: "Todos os relatórios já foram enviados ou ainda não foram gerados",
         variant: "destructive",
       });
       return;
@@ -967,42 +907,14 @@ export default function GerarFaturamento() {
     try {
       for (const resultado of relatóriosParaEnviar) {
         try {
-          // Processar anexo PDF de forma segura
-          let anexo_pdf = undefined;
-          try {
-            if (resultado.arquivos?.[0]?.url) {
-              console.log(`📎 Processando PDF para ${resultado.clienteNome}:`, resultado.arquivos[0].url);
-              const response = await fetch(resultado.arquivos[0].url);
-              if (!response.ok) {
-                throw new Error(`Erro HTTP: ${response.status}`);
-              }
-              const arrayBuffer = await response.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              
-              // Converter para base64 de forma mais segura
-              const chunks = [];
-              const chunkSize = 8192; // 8KB chunks para evitar stack overflow
-              for (let i = 0; i < uint8Array.length; i += chunkSize) {
-                const chunk = uint8Array.slice(i, i + chunkSize);
-                chunks.push(String.fromCharCode.apply(null, chunk));
-              }
-              anexo_pdf = btoa(chunks.join(''));
-              
-              console.log(`✅ PDF processado com sucesso. Tamanho: ${anexo_pdf.length} caracteres`);
-            } else {
-              console.log(`⚠️ Nenhum arquivo PDF encontrado para ${resultado.clienteNome}`);
-            }
-          } catch (pdfError) {
-            console.error(`❌ Erro ao processar PDF para ${resultado.clienteNome}:`, pdfError);
-            // Continuar sem anexo se houver erro no PDF
-          }
-
           // Enviar e-mail com o relatório
           const { error: emailError } = await supabase.functions.invoke('enviar-relatorio-email', {
             body: {
               cliente_id: resultado.clienteId,
               relatorio: resultado.relatorioData,
-              anexo_pdf: anexo_pdf
+              anexo_pdf: resultado.arquivos?.[0]?.url ? 
+                await fetch(resultado.arquivos[0].url).then(r => r.arrayBuffer()).then(ab => btoa(String.fromCharCode(...new Uint8Array(ab)))) :
+                undefined
             }
           });
 
@@ -2006,60 +1918,28 @@ export default function GerarFaturamento() {
                   <Mail className="h-4 w-4" />
                   Etapa 3: Enviar E-mails com Relatórios
                 </h4>
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col sm:flex-row gap-3 items-center">
-                    <Button 
-                      onClick={enviarTodosEmails}
-                      disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
-                      size="lg"
-                      className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
-                    >
-                      {enviandoEmails ? (
-                        <>
-                          <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                          Enviando E-mails...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="h-5 w-5 mr-2" />
-                          📧 Enviar E-mails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length})
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-sm text-orange-700">
-                      Envia os relatórios por e-mail para os clientes
-                    </p>
-                  </div>
-                  
-                  {/* Botão de Reenvio */}
-                  {resultados.filter(r => r.relatorioGerado && r.emailEnviado).length > 0 && (
-                    <div className="flex flex-col sm:flex-row gap-3 items-center">
-                      <Button 
-                        onClick={() => {
-                          // Reset status de email enviado para permitir reenvio
-                          const resultadosAtualizados = resultados.map(r => 
-                            r.relatorioGerado ? { ...r, emailEnviado: false, erroEmail: undefined } : r
-                          );
-                          setResultados(resultadosAtualizados);
-                          salvarResultadosDB(resultadosAtualizados);
-                          toast({
-                            title: "Status resetado",
-                            description: "Agora você pode reenviar os e-mails",
-                          });
-                        }}
-                        disabled={gerandoRelatorios || enviandoEmails}
-                        size="sm"
-                        variant="outline"
-                        className="min-w-[280px] border-orange-300 text-orange-700 hover:bg-orange-50"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        🔄 Permitir Reenvio de E-mails ({resultados.filter(r => r.relatorioGerado && r.emailEnviado).length})
-                      </Button>
-                      <p className="text-sm text-orange-600">
-                        Permite reenviar emails já enviados
-                      </p>
-                    </div>
-                  )}
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <Button 
+                    onClick={enviarTodosEmails}
+                    disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
+                    size="lg"
+                    className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {enviandoEmails ? (
+                      <>
+                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                        Enviando E-mails...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-5 w-5 mr-2" />
+                        📧 Enviar E-mails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length})
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-sm text-orange-700">
+                    Envia os relatórios por e-mail para os clientes
+                  </p>
                 </div>
               </div>
 
@@ -2375,10 +2255,69 @@ export default function GerarFaturamento() {
         </TabsContent>
 
         <TabsContent value="analise" className="space-y-6">
+          {/* Verificação de Dados - Movido da aba Demonstrativo */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                Verificação de Dados
+              </CardTitle>
+              <CardDescription>
+                Análise de consistência entre volumetria e demonstrativos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-sm">
+                  <div className="text-yellow-700">
+                    <div>Total na Volumetria (excluindo NC-NF): <span className="font-medium">38.528 exames</span></div>
+                    <div>Total nos Demonstrativos: <span className="font-medium">
+                      {(() => {
+                        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                        if (demonstrativosCompletos) {
+                          try {
+                            const dados = JSON.parse(demonstrativosCompletos);
+                            const total = dados.resumo?.total_exames_geral || 0;
+                            return total.toLocaleString('pt-BR');
+                          } catch {
+                            return '0';
+                          }
+                        }
+                        return '0';
+                      })()} exames
+                    </span></div>
+                    {(() => {
+                      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+                      if (demonstrativosCompletos) {
+                        try {
+                          const dados = JSON.parse(demonstrativosCompletos);
+                          const totalDemonstrativos = dados.resumo?.total_exames_geral || 0;
+                          if (totalDemonstrativos !== 38528) {
+                            return (
+                              <div className="text-red-600 font-medium mt-1">
+                                ⚠️ Discrepância encontrada: {Math.abs(38528 - totalDemonstrativos).toLocaleString('pt-BR')} exames de diferença
+                              </div>
+                            );
+                          }
+                        } catch {}
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <ExamesValoresZerados />
         </TabsContent>
 
           </Tabs>
+          
+          {/* Seção de Diagnóstico */}
+          <div className="mt-8">
+            <DiagnosticoClientePrecos />
+          </div>
         </div>
       );
 }
