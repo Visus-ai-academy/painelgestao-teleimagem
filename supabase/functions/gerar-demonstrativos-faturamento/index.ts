@@ -113,12 +113,10 @@ serve(async (req) => {
       .from('clientes')
       .select(`
         id, nome, nome_fantasia, nome_mobilemed, ativo, status,
-        contratos_clientes!inner(tipo_faturamento, cond_volume, status),
+        contratos_clientes(tipo_faturamento, cond_volume, status),
         parametros_faturamento(status, tipo_faturamento, updated_at)
       `)
-      .eq('ativo', true)
-      .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT'])
-      .eq('contratos_clientes.status', 'ativo');
+      .eq('ativo', true);
 
     if (clientesError) {
       console.error('❌ Erro ao buscar clientes:', clientesError);
