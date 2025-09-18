@@ -18,6 +18,7 @@ import { TesteRegras27 } from '@/components/TesteRegras27';
 import { SystemDateTime } from '@/components/SystemDateTime';
 import { LimparUploadTravado } from '@/components/LimparUploadTravado';
 import { FinalizarUploadsTravados } from '@/components/FinalizarUploadsTravados';
+import { CorrigirStatusUploads } from '@/components/CorrigirStatusUploads';
 import { VolumetriaProvider } from "@/contexts/VolumetriaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUploadStatus } from "@/hooks/useUploadStatus";
@@ -153,7 +154,10 @@ export default function DadosVolumetria() {
                 <VolumetriaStatusPanel />
                 
                 {/* Finalizar uploads travados */}
-                <FinalizarUploadsTravados />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FinalizarUploadsTravados />
+                  <CorrigirStatusUploads />
+                </div>
                 
                 {/* Detectar e resetar uploads travados */}
                 {uploadStatus.processingUploads > 0 && uploadStatus.progressPercentage < 50 && (

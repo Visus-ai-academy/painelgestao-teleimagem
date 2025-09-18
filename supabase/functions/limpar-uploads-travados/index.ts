@@ -61,26 +61,80 @@ serve(async (req) => {
     console.log(`📋 Encontrados ${uploadsAntigos?.length || 0} uploads travados`);
 
     if (uploadsAntigos && uploadsAntigos.length > 0) {
-      // Atualizar status para erro
-      const { error: updateError } = await supabaseClient
-        .from('processamento_uploads')
-        .update({
-          status: 'erro',
-          detalhes_erro: JSON.stringify({
-            erro: 'Timeout durante processamento - automaticamente marcado como erro',
-            timestamp_limpeza: new Date().toISOString(),
-            duracao_travado: '30+ minutos'
-          })
-        })
-        .eq('status', 'processando')
-        .lt('created_at', cutoffTime);
+      let uploadsFinalizados = 0;
+      let uploadsComErro = 0;
 
-      if (updateError) {
-        console.error('❌ Erro ao atualizar uploads:', updateError);
-        throw updateError;
+      for (const upload of uploadsAntigos) {
+        console.log(`🔍 Verificando upload: ${upload.arquivo_nome}`);
+
+        try {
+          // Verificar se existem dados reais na volumetria para este upload
+          const loteUpload = upload.detalhes_erro?.lote_upload || 
+                            `lote_${upload.created_at.split('T')[0]}` ||
+                            'unknown';
+
+          const { count: registrosReais, error: countError } = await supabaseClient
+            .from('volumetria_mobilemed')
+            .select('*', { count: 'exact', head: true })
+            .eq('lote_upload', loteUpload);
+
+          if (countError) {
+            console.error(`Erro ao contar registros para ${upload.arquivo_nome}:`, countError);
+          }
+
+          // Se há dados reais, marcar como concluído
+          if (registrosReais && registrosReais > 0) {
+            const { error: updateError } = await supabaseClient
+              .from('processamento_uploads')
+              .update({
+                status: 'concluido',
+                completed_at: new Date().toISOString(),
+                registros_inseridos: registrosReais,
+                detalhes_erro: {
+                  ...upload.detalhes_erro,
+                  status: 'Finalizado automaticamente - dados encontrados na base',
+                  registros_reais_inseridos: registrosReais,
+                  timestamp_finalizacao: new Date().toISOString()
+                }
+              })
+              .eq('id', upload.id);
+
+            if (updateError) {
+              console.error(`❌ Erro ao finalizar ${upload.arquivo_nome}:`, updateError);
+            } else {
+              console.log(`✅ Upload finalizado como concluído: ${upload.arquivo_nome} (${registrosReais} registros)`);
+              uploadsFinalizados++;
+            }
+          } else {
+            // Se não há dados reais, marcar como erro
+            const { error: updateError } = await supabaseClient
+              .from('processamento_uploads')
+              .update({
+                status: 'erro',
+                detalhes_erro: {
+                  erro: 'Timeout durante processamento - nenhum dado encontrado na base',
+                  timestamp_limpeza: new Date().toISOString(),
+                  duracao_travado: '30+ minutos',
+                  registros_esperados: upload.registros_processados || 0,
+                  registros_encontrados: 0
+                }
+              })
+              .eq('id', upload.id);
+
+            if (updateError) {
+              console.error(`❌ Erro ao marcar como erro ${upload.arquivo_nome}:`, updateError);
+            } else {
+              console.log(`❌ Upload marcado como erro: ${upload.arquivo_nome} (nenhum dado encontrado)`);
+              uploadsComErro++;
+            }
+          }
+        } catch (err) {
+          console.error(`💥 Erro ao processar ${upload.arquivo_nome}:`, err);
+          uploadsComErro++;
+        }
       }
 
-      console.log(`✅ ${uploadsAntigos.length} uploads marcados como erro`);
+      console.log(`✅ Finalização: ${uploadsFinalizados} concluídos, ${uploadsComErro} com erro`);
     }
 
     // Também limpar uploads muito antigos (mais de 24 horas) que falharam
