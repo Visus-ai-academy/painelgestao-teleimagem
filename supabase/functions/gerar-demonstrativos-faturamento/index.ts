@@ -54,8 +54,61 @@ serve(async (req) => {
       console.log(`🧪 [TESTE] Limitação ativa para clientes: ${clientesPermitidos.join(', ')}`);
     }
 
-    // Primeiro, buscar TODOS os clientes para fazer filtragem adequada
-    const { data: todosClientes, error: clientesError } = await supabase
+    // ✅ MUDANÇA FUNDAMENTAL: Buscar APENAS clientes com volumetria no período
+    console.log(`🔍 Buscando clientes que TÊM volumetria no período: ${periodo}`);
+    
+    const { data: clientesComVolumetria, error: volError } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"EMPRESA"')
+      .eq('periodo_referencia', periodo)
+      .not('"EMPRESA"', 'is', null)
+      .not('"EMPRESA"', 'eq', '')
+      .not('"VALORES"', 'is', null)
+      .gt('"VALORES"', 0)
+      .limit(50000);
+
+    if (volError) {
+      throw new Error(`Erro ao buscar volumetria: ${volError.message}`);
+    }
+
+    if (!clientesComVolumetria || clientesComVolumetria.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `Nenhum cliente com volumetria encontrado para o período ${periodo}`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Obter lista única de clientes que realmente têm volumetria
+    const nomesComVolumetria = [...new Set(clientesComVolumetria.map(c => c.EMPRESA).filter(Boolean))];
+    console.log(`📊 Clientes únicos com volumetria: ${nomesComVolumetria.length}`, nomesComVolumetria);
+    
+    // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
+    let clientesFiltrados = nomesComVolumetria;
+    if (clientesPermitidos && Array.isArray(clientesPermitidos)) {
+      clientesFiltrados = nomesComVolumetria.filter(nome => 
+        clientesPermitidos.some(permitido => nome.toUpperCase().includes(permitido.toUpperCase()))
+      );
+      console.log(`🧪 [TESTE] Filtro aplicado: ${clientesFiltrados.length}/${nomesComVolumetria.length} clientes mantidos`);
+      console.log(`🧪 [TESTE] Clientes filtrados:`, clientesFiltrados);
+    }
+
+    if (clientesFiltrados.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: clientesPermitidos 
+            ? `Nenhum dos clientes de teste (${clientesPermitidos.join(', ')}) possui volumetria no período ${periodo}`
+            : `Nenhum cliente elegível após filtros para o período ${periodo}`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Buscar dados completos APENAS dos clientes que têm volumetria
+    const { data: clientesCompletos, error: clientesError } = await supabase
       .from('clientes')
       .select(`
         id,
@@ -75,55 +128,42 @@ serve(async (req) => {
           updated_at
         )
       `)
-      .order('nome');
+      .or(clientesFiltrados.map(nome => `nome.eq.${nome},nome_fantasia.eq.${nome},nome_mobilemed.eq.${nome}`).join(','));
 
-    if (clientesError) {
-      throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
-    }
-
-    if (!todosClientes || todosClientes.length === 0) {
-      console.log('❌ Nenhum cliente encontrado na tabela clientes');
+    // ✅ Complementar com clientes não encontrados no cadastro (fallback)
+    let todosClientesFinal = [...(clientesCompletos || [])];
+    const clientesEncontrados = new Set();
+    
+    // Mapear nomes encontrados no cadastro
+    (clientesCompletos || []).forEach(c => {
+      [c.nome, c.nome_fantasia, c.nome_mobilemed].filter(Boolean).forEach(nome => {
+        if (clientesFiltrados.includes(nome)) {
+          clientesEncontrados.add(nome);
+        }
+      });
+    });
+    
+    // Adicionar clientes que têm volumetria mas não estão no cadastro
+    const clientesNaoEncontrados = clientesFiltrados.filter(nome => !clientesEncontrados.has(nome));
+    
+    if (clientesNaoEncontrados.length > 0) {
+      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria não encontrados no cadastro:`, clientesNaoEncontrados);
       
-      // ✅ FALLBACK: Se não há clientes cadastrados, buscar direto da volumetria
-      console.log('🔄 Tentando buscar clientes direto da volumetria...');
-      
-      const { data: clientesVolumetria, error: volError } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
-        .eq('periodo_referencia', periodo)
-        .not('"EMPRESA"', 'is', null)
-        .not('"EMPRESA"', 'eq', '')
-        .limit(50000);
-
-      if (volError || !clientesVolumetria || clientesVolumetria.length === 0) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Nenhum cliente encontrado nem no cadastro nem na volumetria'
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Criar lista fictícia de clientes da volumetria
-      const nomesUnicos = [...new Set(clientesVolumetria.map(c => c.EMPRESA).filter(Boolean))];
-      const clientesFallback = nomesUnicos.map((nome, index) => ({
-        id: 'temp-' + (index + 1), // UUID temporário mais simples
-        nome: nome,
-        nome_fantasia: nome,
-        nome_mobilemed: nome,
-        ativo: true,
-        status: 'Ativo',
-        contratos_clientes: [{ tipo_faturamento: 'CO-FT' }],
-        parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }]
-      }));
-
-      console.log(`📋 Fallback: ${clientesFallback.length} clientes criados da volumetria`);
-      var todosClientesFinal = clientesFallback;
-    } else {
-      console.log(`📊 Total de clientes encontrados no cadastro: ${todosClientes.length}`);
-      var todosClientesFinal = todosClientes;
+      // Criar registros temporários para clientes não cadastrados
+      clientesNaoEncontrados.forEach((nome, index) => {
+        todosClientesFinal.push({
+          id: `temp-volumetria-${index + 1}`,
+          nome,
+          nome_fantasia: nome,
+          nome_mobilemed: nome,
+          ativo: true,
+          status: 'Ativo',
+          parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }]
+        });
+      });
     }
+    
+    console.log(`📋 Total final de clientes para processamento: ${todosClientesFinal.length}`);
 
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
     const isStatusInativoOuCancelado = (status?: string) => {
@@ -241,52 +281,15 @@ serve(async (req) => {
     }
     
     if (clientes.length === 0) {
-      console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
-      const { data: clientesVolumetriaAll, error: volAllErr } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"EMPRESA"')
-        .eq('periodo_referencia', periodo)
-        .not('"EMPRESA"', 'is', null)
-        .not('"EMPRESA"', 'eq', '')
-        .limit(50000);
-
-      if (volAllErr) {
-        console.error('❌ Erro ao buscar volumetria para fallback:', volAllErr);
-      } else {
-        const nomesUnicos = [...new Set((clientesVolumetriaAll || []).map(c => c.EMPRESA).filter(Boolean))];
-        
-        // FILTRAR clientes NC-NF também no fallback
-        const clientesFallbackFiltrados = [];
-        for (const nome of nomesUnicos) {
-          // Verificar se é cliente NC conhecido
-          const nomeUpper = nome.toUpperCase();
-          const clientesNC = [
-            'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
-            'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
-          ];
-          const isClienteNC = clientesNC.some(nc => nomeUpper.includes(nc));
-          
-          // ✅ APLICAR LIMITAÇÃO DE TESTE no fallback também
-          const isClientePermitido = !clientesPermitidos || clientesPermitidos.some(permitido => 
-            nomeUpper.includes(permitido.toUpperCase())
-          );
-          
-          if (!isClienteNC && isClientePermitido) { // Só incluir se NÃO for NC e for permitido no teste
-            clientesFallbackFiltrados.push({
-              id: 'temp-' + (clientesFallbackFiltrados.length + 1),
-              nome,
-              nome_fantasia: nome,
-              nome_mobilemed: nome,
-              ativo: true,
-              status: 'Ativo',
-              parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }],
-            });
-          }
-        }
-        
-        clientes = clientesFallbackFiltrados;
-        console.log('Fallback aplicado: ' + clientes.length + ' clientes adicionados a partir da volumetria (excluindo NC' + (clientesPermitidos ? ' e aplicando filtro de teste' : '') + ').');
-      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: clientesPermitidos 
+            ? `Nenhum dos clientes de teste (${clientesPermitidos.join(', ')}) possui volumetria no período ${periodo}`
+            : `Nenhum cliente com volumetria encontrado para o período ${periodo}`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (alertasClientes.length > 0) {

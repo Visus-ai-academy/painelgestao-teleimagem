@@ -753,7 +753,28 @@ export default function GerarFaturamento() {
     });
 
     try {
-      // Primeiro: Verificar quantos clientes únicos existem na volumetria
+        // ✅ PASSO 2: Verificar se existem dados de volumetria ANTES de processar
+        console.log('🔍 [VALIDACAO] Verificando existência de dados na volumetria...');
+        const { data: validacaoVolumetria, error: validacaoError } = await supabase
+          .from('volumetria_mobilemed')
+          .select('"EMPRESA"')
+          .eq('periodo_referencia', periodoSelecionado)
+          .not('"EMPRESA"', 'is', null)
+          .not('"VALORES"', 'is', null)
+          .gt('"VALORES"', 0)
+          .limit(1);
+
+        if (validacaoError) {
+          throw new Error('Erro ao validar volumetria: ' + validacaoError.message);
+        }
+
+        if (!validacaoVolumetria || validacaoVolumetria.length === 0) {
+          throw new Error(`❌ ERRO CRÍTICO: Não existem dados de volumetria para o período ${periodoSelecionado}. Faça o upload dos dados antes de gerar demonstrativos.`);
+        }
+
+        console.log('✅ [VALIDACAO] Dados de volumetria encontrados para o período');
+        
+        // ✅ PASSO 3: Verificar quantos clientes únicos existem na volumetria
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
