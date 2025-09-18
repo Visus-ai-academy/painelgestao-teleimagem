@@ -154,12 +154,31 @@ serve(async (req) => {
 
     // Construir conjunto de nomes da volumetria (prioriza Cliente_Nome_Fantasia)
     const volumetriaNormToOriginal = new Map<string, string>();
+
+    // Índice de resolução -> nome fantasia desejado para logs (não altera filtro da volumetria)
+    const idxResolucao = new Map<string, string>();
+    for (const c of (todosClientesAtivos || [])) {
+      const display = (c.nome_fantasia || c.nome || '').trim();
+      if (!display) continue;
+      const cand = [c.nome_mobilemed, c.nome_fantasia, c.nome].filter(Boolean) as string[];
+      for (const v of cand) {
+        const k = normalizeName(v);
+        if (k && !idxResolucao.has(k)) idxResolucao.set(k, display);
+      }
+    }
+
+    const clientesVolumetriaResolvidos = new Set<string>();
     for (const c of (clientesComVolumetria as any[])) {
       const base = c.Cliente_Nome_Fantasia || c.EMPRESA;
       if (!base) continue;
       const k = normalizeName(base);
-      if (k) volumetriaNormToOriginal.set(k, base);
+      if (!k) continue;
+      volumetriaNormToOriginal.set(k, base); // mantém original para filtros .in
+      const resolved = idxResolucao.get(k) || base;
+      clientesVolumetriaResolvidos.add(resolved);
     }
+
+    console.log(`📊 Clientes únicos com volumetria (resolvidos p/ fantasia): ${clientesVolumetriaResolvidos.size}`, Array.from(clientesVolumetriaResolvidos));
 
     const clientesMapeados: any[] = [];
     const mapeamentoVolumetria = new Map<string, string[]>();
