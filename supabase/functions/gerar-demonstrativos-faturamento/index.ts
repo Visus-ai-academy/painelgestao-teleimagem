@@ -126,33 +126,58 @@ serve(async (req) => {
 
     console.log(`📋 Total de clientes ativos: ${todosClientesAtivos?.length || 0}`);
 
-    // ✅ Usar o sistema original de mapeamento por nomes
-    console.log(`🔍 Fazendo mapeamento simples entre clientes cadastrados e volumetria...`);
+    // ✅ Mapeamento DIRETO e SIMPLES entre cadastro e volumetria
+    console.log(`🔍 Fazendo mapeamento direto entre clientes cadastrados (${todosClientesAtivos?.length || 0}) e volumetria (${clientesFiltrados.length})...`);
     
     const clientesMapeados: any[] = [];
     const mapeamentoVolumetria = new Map<string, string[]>();
+    const naoMapeados: string[] = [];
 
     (todosClientesAtivos || []).forEach((cliente: any) => {
-      // Usar os nomes originais do sistema para buscar na volumetria
-      const nomes = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
-        .filter(Boolean)
-        .map(n => n.trim());
+      // Criar lista de nomes para busca (prioridade: nome_mobilemed > nome_fantasia > nome)
+      const nomesParaBusca = [
+        cliente.nome_mobilemed,
+        cliente.nome_fantasia, 
+        cliente.nome
+      ].filter(Boolean).map(n => n.trim());
 
-      // Verificar se algum nome bate com os da volumetria
-      const nomesEncontrados = nomes.filter(nome => 
-        clientesFiltrados.some(volNome => 
-          volNome.trim().toUpperCase() === nome.trim().toUpperCase() ||
-          volNome.trim().toUpperCase().includes(nome.trim().toUpperCase()) ||
-          nome.trim().toUpperCase().includes(volNome.trim().toUpperCase())
-        )
-      );
+      // Buscar correspondência EXATA ou CONTÉM na volumetria
+      let nomesEncontrados: string[] = [];
+      
+      for (const nomeCliente of nomesParaBusca) {
+        const matches = clientesFiltrados.filter(volNome => {
+          const nomeClienteUpper = nomeCliente.toUpperCase();
+          const volNomeUpper = volNome.toUpperCase();
+          
+          // Correspondência exata tem prioridade
+          if (nomeClienteUpper === volNomeUpper) return true;
+          
+          // Se o nome do cliente contém o nome da volumetria
+          if (nomeClienteUpper.includes(volNomeUpper)) return true;
+          
+          // Se o nome da volumetria contém o nome do cliente  
+          if (volNomeUpper.includes(nomeClienteUpper)) return true;
+          
+          return false;
+        });
+        
+        if (matches.length > 0) {
+          nomesEncontrados = [...new Set([...nomesEncontrados, ...matches])];
+        }
+      }
 
       if (nomesEncontrados.length > 0) {
         clientesMapeados.push(cliente);
         mapeamentoVolumetria.set(cliente.id, nomesEncontrados);
         console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${nomesEncontrados.join(', ')}`);
+      } else {
+        naoMapeados.push(cliente.nome_fantasia || cliente.nome);
       }
     });
+    
+    console.log(`📊 MAPEAMENTO: ${clientesMapeados.length} mapeados | ${naoMapeados.length} não mapeados`);
+    console.log(`🔍 Primeiros 20 não mapeados: ${naoMapeados.slice(0, 20).join(', ')}`);
+    console.log(`🔍 Primeiras 20 empresas volumetria: ${clientesFiltrados.slice(0, 20).join(', ')}`);
 
     let todosClientesFinal = clientesMapeados;
     
