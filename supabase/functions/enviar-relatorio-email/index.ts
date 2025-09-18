@@ -40,6 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { cliente_id, relatorio, anexo_pdf }: EmailRequest = await req.json();
 
     console.log(`Enviando email para cliente ${cliente_id}`);
+    console.log('Dados do relatório recebidos:', JSON.stringify(relatorio, null, 2));
 
     // Buscar dados do cliente
     const { data: cliente, error: clienteError } = await supabase
@@ -60,10 +61,10 @@ const handler = async (req: Request): Promise<Response> => {
     const html = await renderAsync(
       React.createElement(RelatorioFaturamentoEmail, {
         cliente_nome: cliente.nome,
-        periodo: relatorio.periodo,
-        total_laudos: relatorio.resumo.total_laudos,
-        valor_total: relatorio.resumo.valor_total,
-        valor_a_pagar: relatorio.resumo.valor_a_pagar
+        periodo: relatorio.periodo || 'N/A',
+        total_laudos: relatorio.resumo?.total_laudos || relatorio.total_laudos || 0,
+        valor_total: relatorio.resumo?.valor_total || relatorio.valor_total || 0,
+        valor_a_pagar: relatorio.resumo?.valor_a_pagar || relatorio.valor_a_pagar || 0
       })
     );
 

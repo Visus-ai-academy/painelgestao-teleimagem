@@ -57,14 +57,14 @@ export const RelatorioFaturamentoEmail = ({
           <Row>
             <Column>
               <Text style={summaryLabel}>Total de Laudos:</Text>
-              <Text style={summaryValue}>{total_laudos.toLocaleString()}</Text>
+              <Text style={summaryValue}>{(total_laudos || 0).toLocaleString()}</Text>
             </Column>
           </Row>
           <Row>
             <Column>
               <Text style={summaryLabel}>Valor Total Faturado:</Text>
               <Text style={summaryValue}>
-                {valor_total.toLocaleString('pt-BR', { 
+                {(valor_total || 0).toLocaleString('pt-BR', { 
                   style: 'currency', 
                   currency: 'BRL' 
                 })}
@@ -75,7 +75,7 @@ export const RelatorioFaturamentoEmail = ({
             <Column>
               <Text style={summaryLabel}>Valor a Pagar:</Text>
               <Text style={summaryValueHighlight}>
-                {valor_a_pagar.toLocaleString('pt-BR', { 
+                {(valor_a_pagar || 0).toLocaleString('pt-BR', { 
                   style: 'currency', 
                   currency: 'BRL' 
                 })}
