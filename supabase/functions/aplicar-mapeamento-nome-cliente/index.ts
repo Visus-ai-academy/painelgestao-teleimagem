@@ -6,6 +6,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalizador robusto para nomes (alinha com funções SQL limpar_nome_cliente/aplicar_mapeamento_nome_fantasia)
+function normalizeName(raw?: string): string {
+  if (!raw) return '';
+  let s = String(raw).trim();
+  // Remover diacríticos
+  s = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  // Mapeamentos específicos conhecidos
+  const mapEspecifico: Record<string, string> = {
+    'CEDI-RJ': 'CEDIDIAG',
+    'CEDI_RO': 'CEDIDIAG',
+    'CEDI-RO': 'CEDIDIAG',
+    'CEDI_UNIMED': 'CEDIDIAG',
+    'CEDI-UNIMED': 'CEDIDIAG',
+  };
+  if (mapEspecifico[s.toUpperCase()]) {
+    s = mapEspecifico[s.toUpperCase()];
+  }
+  // Remover sufixos comuns
+  const removeSuffix = (txt: string, suff: string) => txt.toUpperCase().endsWith(suff) ? txt.slice(0, -suff.length) : txt;
+  s = removeSuffix(s, ' - TELE');
+  s = removeSuffix(s, '- TELE');
+  s = removeSuffix(s, '-CT');
+  s = removeSuffix(s, '-MR');
+  s = removeSuffix(s, '_PLANTAO'); // sem acento
+  s = removeSuffix(s, '_PLANTÃO');
+  s = removeSuffix(s, '_RMX');
+  // Normalizar separadores e pontuação
+  s = s.replace(/[^A-Z0-9]/gi, '');
+  // Uppercase final
+  s = s.toUpperCase();
+  return s;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,20 +50,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { arquivo_fonte } = await req.json();
-    console.log(`[aplicar-mapeamento-nome-cliente] Iniciando para arquivo: ${arquivo_fonte || 'TODOS'}`);
+    const { arquivo_fonte, periodo } = await req.json().catch(() => ({ arquivo_fonte: undefined, periodo: undefined }));
+    console.log(`[aplicar-mapeamento-nome-cliente] Iniciando para arquivo: ${arquivo_fonte || 'TODOS'} | periodo: ${periodo || 'TODOS'}`);
 
-    // Construir filtro dinâmico baseado no arquivo_fonte
+    // Construir filtro dinâmico baseado em arquivo_fonte e periodo
     let query = supabase
       .from('volumetria_mobilemed')
-      .select('id, "EMPRESA"')
+      .select('id, "EMPRESA", "Cliente_Nome_Fantasia", periodo_referencia')
       .not('EMPRESA', 'is', null);
 
     if (arquivo_fonte && arquivo_fonte !== 'TODOS') {
       query = query.eq('arquivo_fonte', arquivo_fonte);
     }
+    if (periodo && periodo !== 'TODOS') {
+      query = query.eq('periodo_referencia', periodo);
+    }
 
-    // Buscar todos os registros de volumetria com EMPRESA
     const { data: registrosVolumetria, error: errorVolumetria } = await query;
 
     if (errorVolumetria) {
@@ -52,84 +87,86 @@ serve(async (req) => {
       );
     }
 
-    // Buscar mapeamento completo de clientes (nome_mobilemed -> nome_fantasia)
+    // Buscar clientes para mapeamento (nome_mobilemed -> nome_fantasia)
     const { data: clientes, error: errorClientes } = await supabase
       .from('clientes')
-      .select('nome_mobilemed, nome_fantasia')
-      .not('nome_mobilemed', 'is', null)
-      .not('nome_fantasia', 'is', null);
+      .select('id, nome, nome_fantasia, nome_mobilemed, ativo');
 
     if (errorClientes) {
       console.error('[aplicar-mapeamento-nome-cliente] Erro ao buscar clientes:', errorClientes);
       throw errorClientes;
     }
 
-    console.log(`[aplicar-mapeamento-nome-cliente] Carregados ${clientes?.length || 0} mapeamentos de clientes`);
+    console.log(`[aplicar-mapeamento-nome-cliente] Carregados ${clientes?.length || 0} clientes do cadastro`);
 
-    // Criar mapa para lookup rápido
-    const mapeamentoClientes: Record<string, string> = {};
-    clientes?.forEach(cliente => {
-      if (cliente.nome_mobilemed && cliente.nome_fantasia) {
-        mapeamentoClientes[cliente.nome_mobilemed] = cliente.nome_fantasia;
-      }
+    // Índices normalizados para lookup rápido
+    type Cli = { id: string; nome: string | null; nome_fantasia: string | null; nome_mobilemed: string | null; ativo: boolean | null };
+    const idxMobile: Record<string, Cli> = {};
+    const idxFantasia: Record<string, Cli> = {};
+    const idxNome: Record<string, Cli> = {};
+
+    (clientes || []).forEach((c: any) => {
+      const cli: Cli = { id: c.id, nome: c.nome, nome_fantasia: c.nome_fantasia, nome_mobilemed: c.nome_mobilemed, ativo: c.ativo };
+      if (c.nome_mobilemed) idxMobile[normalizeName(c.nome_mobilemed)] = cli;
+      if (c.nome_fantasia) idxFantasia[normalizeName(c.nome_fantasia)] = cli;
+      if (c.nome) idxNome[normalizeName(c.nome)] = cli;
     });
-
-    console.log(`[aplicar-mapeamento-nome-cliente] Mapeamentos únicos criados: ${Object.keys(mapeamentoClientes).length}`);
 
     let totalProcessados = 0;
     let totalAtualizados = 0;
-    const tamanhoLote = 100;
+    let totalJaMapeados = 0;
+    const naoEncontrados = new Set<string>();
 
-    // Processar em lotes
+    // Processar em lotes pequenos para evitar timeouts
+    const tamanhoLote = 200;
     for (let i = 0; i < registrosVolumetria.length; i += tamanhoLote) {
       const lote = registrosVolumetria.slice(i, i + tamanhoLote);
-      console.log(`[aplicar-mapeamento-nome-cliente] Processando lote ${Math.floor(i/tamanhoLote) + 1}/${Math.ceil(registrosVolumetria.length/tamanhoLote)}`);
-
-      const atualizacoes: Array<{id: string, novoNome: string, nomeOriginal: string}> = [];
+      console.log(`[aplicar-mapeamento-nome-cliente] Processando lote ${Math.floor(i / tamanhoLote) + 1}/${Math.ceil(registrosVolumetria.length / tamanhoLote)} (${lote.length} registros)`);
 
       for (const registro of lote) {
         totalProcessados++;
-        const nomeOriginal = registro.EMPRESA;
-        const nomeFantasia = mapeamentoClientes[nomeOriginal];
+        const nomeEmpresa = registro.EMPRESA as string;
+        const nomeFantasiaAtual = registro["Cliente_Nome_Fantasia"] as string | null;
+        const key = normalizeName(nomeEmpresa);
 
-        if (nomeFantasia && nomeFantasia !== nomeOriginal) {
-          atualizacoes.push({
-            id: registro.id,
-            novoNome: nomeFantasia,
-            nomeOriginal: nomeOriginal
-          });
-        }
-      }
+        // Lookup por nome_mobilemed > nome_fantasia > nome
+        const cli = idxMobile[key] || idxFantasia[key] || idxNome[key] || null;
 
-      // Aplicar atualizações do lote
-      for (const atualizacao of atualizacoes) {
-        const { error: updateError } = await supabase
-          .from('volumetria_mobilemed')
-          .update({ 
-            'EMPRESA': atualizacao.novoNome,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', atualizacao.id);
+        if (cli) {
+          const desejado = (cli.nome_fantasia || cli.nome || nomeEmpresa) as string;
+          if (nomeFantasiaAtual && normalizeName(nomeFantasiaAtual) === normalizeName(desejado)) {
+            totalJaMapeados++;
+            continue;
+          }
+          const { error: updateError } = await supabase
+            .from('volumetria_mobilemed')
+            .update({ 
+              'Cliente_Nome_Fantasia': desejado,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', registro.id);
 
-        if (updateError) {
-          console.error(`[aplicar-mapeamento-nome-cliente] Erro ao atualizar registro ${atualizacao.id}:`, updateError);
+          if (updateError) {
+            console.error(`[aplicar-mapeamento-nome-cliente] Erro ao atualizar registro ${registro.id}:`, updateError);
+          } else {
+            totalAtualizados++;
+            console.log(`[aplicar-mapeamento-nome-cliente] Mapeado: EMPRESA="${nomeEmpresa}" → Cliente_Nome_Fantasia="${desejado}"`);
+          }
         } else {
-          totalAtualizados++;
-          console.log(`[aplicar-mapeamento-nome-cliente] Atualizado: "${atualizacao.nomeOriginal}" → "${atualizacao.novoNome}"`);
+          naoEncontrados.add(nomeEmpresa);
         }
       }
-
-      console.log(`[aplicar-mapeamento-nome-cliente] Lote processado: ${atualizacoes.length} atualizações`);
     }
 
-    // Log da operação
     const resultadoFinal = {
       sucesso: true,
       total_processados: totalProcessados,
       total_atualizados: totalAtualizados,
+      total_ja_mapeados: totalJaMapeados,
+      nao_encontrados_amostra: Array.from(naoEncontrados).slice(0, 20),
       arquivo_fonte: arquivo_fonte || 'TODOS',
+      periodo: periodo || 'TODOS',
       data_processamento: new Date().toISOString(),
-      mapeamentos_disponiveis: Object.keys(mapeamentoClientes).length
     };
 
     console.log(`[aplicar-mapeamento-nome-cliente] Finalizado:`, resultadoFinal);
