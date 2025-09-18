@@ -30,15 +30,15 @@ export const RelatorioFaturamentoEmail = ({
 }: RelatorioFaturamentoEmailProps) => (
   <Html>
     <Head />
-    <Preview>Relatório de volumetria - Faturamento {periodo}</Preview>
+    <Preview>Relatório de volumetria - Teleimagem</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Relatório de Volumetria</Heading>
+        <Heading style={h1}>Relatório de Volumetria - Teleimagem</Heading>
         
-        <Text style={text}>Prezados,</Text>
+        <Text style={text}>Prezados!</Text>
         
         <Text style={text}>
-          Segue lista de exames referente à nota fiscal citada no e-mail.
+          Segue no anexo o relatórios de exames do período.
         </Text>
 
         <Section style={summarySection}>
@@ -94,9 +94,10 @@ export const RelatorioFaturamentoEmail = ({
         <Hr style={hr} />
 
         <Text style={footerText}>
-          Atenciosamente,<br />
-          <strong>Robson D'avila</strong><br />
-          Tel.: (41) 99255-1964
+          Atte.<br />
+          <strong>Teleimagem Serviços de Dados</strong><br />
+          Financeiro - Robson D'avila<br />
+          Tel.: 41 99255-1964
         </Text>
       </Container>
     </Body>

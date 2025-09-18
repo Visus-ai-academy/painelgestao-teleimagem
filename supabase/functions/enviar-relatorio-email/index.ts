@@ -67,7 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
       })
     );
 
-    const assunto = `Relatório de Volumetria - Faturamento ${relatorio.periodo}`;
+    const assunto = `Relatório de volumetria _ Teleimagem`;
     
     // Preparar anexos
     const attachments = [];

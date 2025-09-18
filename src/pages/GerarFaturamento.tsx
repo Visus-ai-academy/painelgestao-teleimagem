@@ -888,12 +888,20 @@ export default function GerarFaturamento() {
       });
       return;
     }
-    const relatóriosParaEnviar = resultados.filter(r => r.relatorioGerado && !r.emailEnviado); 
+    
+    // ✅ CLIENTES PERMITIDOS PARA TESTE DE ENVIO DE E-MAIL
+    const clientesPermitidosParaTeste = ['COT', 'CORTREL', 'IMDBATATAIS'];
+    
+    const relatóriosParaEnviar = resultados.filter(r => 
+      r.relatorioGerado && 
+      !r.emailEnviado &&
+      clientesPermitidosParaTeste.includes(r.clienteNome)
+    );
     
     if (relatóriosParaEnviar.length === 0) {
       toast({
         title: "Nenhum relatório para enviar",
-        description: "Todos os relatórios já foram enviados ou ainda não foram gerados",
+        description: "Nenhum dos clientes de teste (COT, CORTREL, IMDBATATAIS) possui relatório gerado ou todos já foram enviados",
         variant: "destructive",
       });
       return;
