@@ -59,8 +59,10 @@ serve(async (req) => {
     
     const { data: clientesComVolumetria, error: volError } = await supabase
       .from('volumetria_mobilemed')
-      .select('"Cliente_Nome_Fantasia","EMPRESA"')
+      .select('"EMPRESA"')
       .eq('periodo_referencia', periodo)
+      .not('"EMPRESA"', 'is', null)
+      .not('"EMPRESA"', 'eq', '')
       .not('"VALORES"', 'is', null)
       .limit(50000);
 
@@ -79,7 +81,7 @@ serve(async (req) => {
     }
 
     // ✅ Obter lista única de clientes que realmente têm volumetria
-    const nomesComVolumetria = [...new Set((clientesComVolumetria as any[]).map(c => (c.Cliente_Nome_Fantasia || c.EMPRESA)).filter(Boolean))];
+    const nomesComVolumetria = [...new Set(clientesComVolumetria.map(c => c.EMPRESA).filter(Boolean))];
     console.log(`📊 Clientes únicos com volumetria: ${nomesComVolumetria.length}`, nomesComVolumetria);
     
     // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
@@ -104,17 +106,19 @@ serve(async (req) => {
       );
     }
 
-    // ✅ Buscar dados completos dos clientes ativos com contratos CO-FT/NC-FT
-    console.log(`🔍 Buscando clientes com contratos CO-FT/NC-FT...`);
+    // ✅ Buscar TODOS os clientes com contratos ativos CO-FT ou NC-FT
+    console.log(`🔍 Buscando todos os clientes com contratos CO-FT ou NC-FT...`);
     
     const { data: todosClientesAtivos, error: clientesError } = await supabase
       .from('clientes')
       .select(`
         id, nome, nome_fantasia, nome_mobilemed, ativo, status,
-        contratos_clientes(tipo_faturamento, cond_volume, status),
+        contratos_clientes!inner(tipo_faturamento, cond_volume, status),
         parametros_faturamento(status, tipo_faturamento, updated_at)
       `)
-      .eq('ativo', true);
+      .eq('ativo', true)
+      .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT'])
+      .eq('contratos_clientes.status', 'ativo');
 
     if (clientesError) {
       console.error('❌ Erro ao buscar clientes:', clientesError);
@@ -124,94 +128,85 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📋 Total de clientes ativos: ${todosClientesAtivos?.length || 0}`);
+    console.log(`📋 Total de clientes ativos com CO-FT/NC-FT: ${todosClientesAtivos?.length || 0}`);
 
-    // ✅ Mapeamento ESTRITO usando normalização e Cliente_Nome_Fantasia
-    console.log(`🔍 Fazendo mapeamento estrito entre clientes cadastrados (${todosClientesAtivos?.length || 0}) e volumetria (${clientesFiltrados.length})...`);
+    // ✅ Normalização e mapeamento de nomes da volumetria → cadastro
+    const normalizaNome = (valor?: string): string => {
+      if (!valor) return '';
+      let nome = valor.toUpperCase().trim();
 
-    // Normalizador consistente (sem acentos, sem pontuação, uppercase)
-    const normalizeName = (raw?: string) => {
-      if (!raw) return '';
-      let s = String(raw).trim();
-      s = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-      // ajustes específicos recorrentes
-      const map: Record<string, string> = {
-        'CEDI-RJ': 'CEDIDIAG', 'CEDI_RO': 'CEDIDIAG', 'CEDI-RO': 'CEDIDIAG', 'CEDI_UNIMED': 'CEDIDIAG', 'CEDI-UNIMED': 'CEDIDIAG'
-      };
-      if (map[s.toUpperCase()]) s = map[s.toUpperCase()];
-      // remover sufixos comuns
-      const removeSuf = (txt: string, suf: string) => txt.toUpperCase().endsWith(suf) ? txt.slice(0, -suf.length) : txt;
-      s = removeSuf(s, ' - TELE');
-      s = removeSuf(s, '- TELE');
-      s = removeSuf(s, '-CT');
-      s = removeSuf(s, '-MR');
-      s = removeSuf(s, '_PLANTAO');
-      s = removeSuf(s, '_PLANTÃO');
-      s = removeSuf(s, '_RMX');
-      s = s.replace(/[^A-Z0-9]/gi, '');
-      return s.toUpperCase();
+      // Mapeamentos específicos (espelham a função DB public.limpar_nome_cliente)
+      switch (nome) {
+        case 'INTERCOR2': nome = 'INTERCOR'; break;
+        case 'P-HADVENTISTA': nome = 'HADVENTISTA'; break;
+        case 'P-UNIMED_CARUARU': nome = 'UNIMED_CARUARU'; break;
+        case 'PRN - MEDIMAGEM CAMBORIU': nome = 'MEDIMAGEM_CAMBORIU'; break;
+        case 'UNIMAGEM_CENTRO': nome = 'UNIMAGEM_ATIBAIA'; break;
+        case 'VIVERCLIN 2': nome = 'VIVERCLIN'; break;
+        case 'CEDI-RJ':
+        case 'CEDI-RO':
+        case 'CEDI-UNIMED':
+        case 'CEDI_RJ':
+        case 'CEDI_RO':
+        case 'CEDI_UNIMED':
+          nome = 'CEDIDIAG';
+          break;
+      }
+
+      // Remover sufixos comuns
+      nome = nome.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
+      nome = nome.replace(/_PLANTÃO$/i, '').trim();
+      nome = nome.replace(/_RMX$/i, '').trim();
+
+      // Unificar separadores e remover espaços extras
+      nome = nome.replace(/[\s\-]+/g, '_');
+      nome = nome.replace(/_{2,}/g, '_');
+      return nome;
     };
 
-    // Construir conjunto de nomes da volumetria (prioriza Cliente_Nome_Fantasia)
-    const volumetriaNormToOriginal = new Map<string, string>();
-
-    // Índice de resolução -> nome fantasia desejado para logs (não altera filtro da volumetria)
-    const idxResolucao = new Map<string, string>();
-    for (const c of (todosClientesAtivos || [])) {
-      const display = (c.nome_fantasia || c.nome || '').trim();
-      if (!display) continue;
-      const cand = [c.nome_mobilemed, c.nome_fantasia, c.nome].filter(Boolean) as string[];
-      for (const v of cand) {
-        const k = normalizeName(v);
-        if (k && !idxResolucao.has(k)) idxResolucao.set(k, display);
-      }
+    // Construir índice de nomes da volumetria normalizados → originais
+    const normToOriginals = new Map<string, Set<string>>();
+    for (const nome of clientesFiltrados) {
+      const norm = normalizaNome(nome);
+      if (!normToOriginals.has(norm)) normToOriginals.set(norm, new Set());
+      normToOriginals.get(norm)!.add(nome);
     }
 
-    const clientesVolumetriaResolvidos = new Set<string>();
-    for (const c of (clientesComVolumetria as any[])) {
-      const base = c.Cliente_Nome_Fantasia || c.EMPRESA;
-      if (!base) continue;
-      const k = normalizeName(base);
-      if (!k) continue;
-      volumetriaNormToOriginal.set(k, base); // mantém original para filtros .in
-      const resolved = idxResolucao.get(k) || base;
-      clientesVolumetriaResolvidos.add(resolved);
-    }
-
-    console.log(`📊 Clientes únicos com volumetria (resolvidos p/ fantasia): ${clientesVolumetriaResolvidos.size}`, Array.from(clientesVolumetriaResolvidos));
-
-    const clientesMapeados: any[] = [];
+    // ✅ Filtrar clientes que TÊM volumetria no período (mapeamento robusto)
+    const clientesComVolumetriaCadastrados: any[] = [];
+    const clientesEncontrados = new Set<string>();
     const mapeamentoVolumetria = new Map<string, string[]>();
-    const naoMapeados: string[] = [];
 
     (todosClientesAtivos || []).forEach((cliente: any) => {
-      const nomesParaBusca = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
-        .filter(Boolean).map((n: string) => n.trim());
-      const nomesNorm = Array.from(new Set(nomesParaBusca.map(normalizeName).filter(Boolean)));
+      const variantesCadastro = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
+        .filter(Boolean) as string[];
+      const variantesNorm = new Set(variantesCadastro.map(normalizaNome).filter(Boolean));
 
-      const encontrados: string[] = [];
-      for (const nn of nomesNorm) {
-        if (volumetriaNormToOriginal.has(nn)) {
-          encontrados.push(volumetriaNormToOriginal.get(nn)!);
+      // Encontrar todos os nomes de volumetria que batem com qualquer variante normalizada do cadastro
+      const nomesCompatOriginais = new Set<string>();
+      for (const vNorm of variantesNorm) {
+        const origs = normToOriginals.get(vNorm);
+        if (origs) {
+          origs.forEach((o) => nomesCompatOriginais.add(o));
         }
       }
 
-      if (encontrados.length > 0) {
-        clientesMapeados.push(cliente);
-        mapeamentoVolumetria.set(cliente.id, Array.from(new Set(encontrados)));
-        console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${Array.from(new Set(encontrados)).join(', ')}`);
-      } else {
-        naoMapeados.push(cliente.nome_fantasia || cliente.nome);
+      if (nomesCompatOriginais.size > 0) {
+        clientesComVolumetriaCadastrados.push(cliente);
+        const lista = Array.from(nomesCompatOriginais);
+        mapeamentoVolumetria.set(cliente.id, lista);
+        lista.forEach((n) => clientesEncontrados.add(n));
+        console.log(`✅ Cliente mapeado: ${(cliente.nome_fantasia || cliente.nome)} → ${lista.join(', ')}`);
       }
     });
 
-    console.log(`📊 MAPEAMENTO (estrito): ${clientesMapeados.length} mapeados | ${naoMapeados.length} não mapeados`);
-    console.log(`🔍 Nomes volumetria (norm=${volumetriaNormToOriginal.size}) amostra: ${Array.from(volumetriaNormToOriginal.values()).slice(0, 20).join(', ')}`);
+    // Identificar clientes da volumetria sem cadastro
+    const clientesNaoEncontrados = clientesFiltrados.filter(nome => !clientesEncontrados.has(nome));
+    if (clientesNaoEncontrados.length > 0) {
+      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria SEM cadastro ativo com CO-FT/NC-FT:`, clientesNaoEncontrados);
+    }
 
-    let todosClientesFinal = clientesMapeados;
-    // Diagnóstico: nomes de volumetria que não existem no cadastro ativo
-    const nomesCadastroAtivos = (todosClientesAtivos || []).flatMap((c: any) => [c.nome_mobilemed, c.nome_fantasia, c.nome].filter(Boolean).map((n: string) => n.trim().toUpperCase()));
-    const naoEncontradosNoCadastro = (clientesFiltrados || []).filter((nome: string) => !nomesCadastroAtivos.some((n: string) => n === nome.trim().toUpperCase() || n.includes(nome.trim().toUpperCase()) || nome.trim().toUpperCase().includes(n)));
+    let todosClientesFinal = clientesComVolumetriaCadastrados;
     
     console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
@@ -269,9 +264,7 @@ serve(async (req) => {
       });
 
     const alertasClientes: string[] = [];
-    const excluidosSemContratoValido = todosClientesFinal.filter((c: any) => !contratoValido(c)).map((c: any) => c.nome_fantasia || c.nome);
     console.log(`📊 Clientes elegíveis (contrato ativo CO-FT/NC-FT) para processamento: ${clientesElegiveis.length}`);
-    console.log(`ℹ️ Clientes com volumetria mapeados: ${todosClientesFinal.length} | Sem contrato válido: ${excluidosSemContratoValido.length}`);
 
     // ✅ LISTA FINAL: apenas clientes elegíveis por contrato e com volumetria
     let clientes = [...clientesElegiveis];
@@ -318,13 +311,13 @@ serve(async (req) => {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
-        const nomesVolumetriaCompat = mapeamentoVolumetria.get(cliente.id) || [];
+        const nomesVolumetriaCompat = mapeamentoVolumetria.get(cliente.id);
         
         clientesAgrupados.set(nomeFantasia, {
           id: cliente.id,
           nome: cliente.nome,
           nome_fantasia: nomeFantasia,
-          nomes_mobilemed: nomesVolumetriaCompat,
+          nomes_mobilemed: Array.isArray(nomesVolumetriaCompat) ? nomesVolumetriaCompat : (nomesVolumetriaCompat ? [nomesVolumetriaCompat] : []),
           cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: cliente.tipo_faturamento
@@ -466,7 +459,7 @@ serve(async (req) => {
           tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
-        .or(`"Cliente_Nome_Fantasia".in.("${cliente.nomes_mobilemed.join('","')}"),"EMPRESA".in.("${cliente.nomes_mobilemed.join('","')}")`)
+        .in('"EMPRESA"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
         .neq('tipo_faturamento', 'NC-NF'); // Excluir exames não faturáveis
 
@@ -1011,16 +1004,6 @@ serve(async (req) => {
         resumo,
         demonstrativos,
         alertas: alertasClientes, // ✅ INCLUIR ALERTAS de clientes inativos com volumetria
-        debug: {
-          nomesComVolumetria: nomesComVolumetria.length,
-          nomesVolumetriaAmostra: (nomesComVolumetria || []).slice(0, 50),
-          clientesMapeados: (todosClientesFinal?.length || 0),
-          clientesElegiveis: (clientesElegiveis?.length || 0),
-          excluidosSemContratoValidoCount: (excluidosSemContratoValido?.length || 0),
-          excluidosSemContratoValido: excluidosSemContratoValido,
-          naoEncontradosNoCadastroCount: (naoEncontradosNoCadastro?.length || 0),
-          naoEncontradosNoCadastroAmostra: (naoEncontradosNoCadastro || []).slice(0, 50)
-        },
         salvar_localStorage: {
           chave: `demonstrativos_completos_${periodo}`,
           dados: dadosParaSalvar
