@@ -64,7 +64,6 @@ serve(async (req) => {
       .not('"EMPRESA"', 'is', null)
       .not('"EMPRESA"', 'eq', '')
       .not('"VALORES"', 'is', null)
-      .gt('"VALORES"', 0)
       .limit(50000);
 
     if (volError) {
