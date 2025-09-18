@@ -1981,28 +1981,60 @@ export default function GerarFaturamento() {
                   <Mail className="h-4 w-4" />
                   Etapa 3: Enviar E-mails com Relatórios
                 </h4>
-                <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <Button 
-                    onClick={enviarTodosEmails}
-                    disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
-                    size="lg"
-                    className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
-                  >
-                    {enviandoEmails ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                        Enviando E-mails...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-5 w-5 mr-2" />
-                        📧 Enviar E-mails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length})
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-sm text-orange-700">
-                    Envia os relatórios por e-mail para os clientes
-                  </p>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 items-center">
+                    <Button 
+                      onClick={enviarTodosEmails}
+                      disabled={gerandoRelatorios || enviandoEmails || resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length === 0}
+                      size="lg"
+                      className="min-w-[280px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      {enviandoEmails ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                          Enviando E-mails...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-5 w-5 mr-2" />
+                          📧 Enviar E-mails ({resultados.filter(r => r.relatorioGerado && !r.emailEnviado).length})
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-orange-700">
+                      Envia os relatórios por e-mail para os clientes
+                    </p>
+                  </div>
+                  
+                  {/* Botão de Reenvio */}
+                  {resultados.filter(r => r.relatorioGerado && r.emailEnviado).length > 0 && (
+                    <div className="flex flex-col sm:flex-row gap-3 items-center">
+                      <Button 
+                        onClick={() => {
+                          // Reset status de email enviado para permitir reenvio
+                          const resultadosAtualizados = resultados.map(r => 
+                            r.relatorioGerado ? { ...r, emailEnviado: false, erroEmail: undefined } : r
+                          );
+                          setResultados(resultadosAtualizados);
+                          salvarResultadosDB(resultadosAtualizados);
+                          toast({
+                            title: "Status resetado",
+                            description: "Agora você pode reenviar os e-mails",
+                          });
+                        }}
+                        disabled={gerandoRelatorios || enviandoEmails}
+                        size="sm"
+                        variant="outline"
+                        className="min-w-[280px] border-orange-300 text-orange-700 hover:bg-orange-50"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        🔄 Permitir Reenvio de E-mails ({resultados.filter(r => r.relatorioGerado && r.emailEnviado).length})
+                      </Button>
+                      <p className="text-sm text-orange-600">
+                        Permite reenviar emails já enviados
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
