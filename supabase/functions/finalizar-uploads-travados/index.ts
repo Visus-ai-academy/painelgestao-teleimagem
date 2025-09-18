@@ -49,10 +49,14 @@ serve(async (req) => {
 
       try {
         // Contar registros reais inseridos na volumetria
+        const loteUpload = upload.detalhes_erro && typeof upload.detalhes_erro === 'object' 
+          ? upload.detalhes_erro.lote_upload 
+          : `lote_${upload.created_at.split('T')[0]}`;
+
         const { count: registrosReais, error: countError } = await supabaseClient
           .from('volumetria_mobilemed')
           .select('*', { count: 'exact', head: true })
-          .eq('lote_upload', upload.detalhes_erro?.lote_upload || 'unknown');
+          .eq('lote_upload', loteUpload);
 
         if (countError) {
           console.error(`Erro ao contar registros para ${upload.arquivo_nome}:`, countError);
@@ -66,7 +70,7 @@ serve(async (req) => {
             completed_at: new Date().toISOString(),
             registros_inseridos: registrosReais || upload.registros_inseridos,
             detalhes_erro: {
-              ...upload.detalhes_erro,
+              ...(upload.detalhes_erro || {}),
               status: 'Processamento Finalizado Automaticamente',
               registros_reais_inseridos: registrosReais,
               finalizado_em: new Date().toISOString(),

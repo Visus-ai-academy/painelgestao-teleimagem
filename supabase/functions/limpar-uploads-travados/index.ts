@@ -47,6 +47,7 @@ serve(async (req) => {
       }
     }
     
+    // Buscar uploads travados há mais de 10 minutos
     const { data: uploadsAntigos, error: selectError } = await supabaseClient
       .from('processamento_uploads')
       .select('*')
@@ -65,13 +66,13 @@ serve(async (req) => {
       let uploadsComErro = 0;
 
       for (const upload of uploadsAntigos) {
-        console.log(`🔍 Verificando upload: ${upload.arquivo_nome}`);
+        console.log(`🔍 Verificando upload: ${upload.arquivo_nome || 'sem nome'}`);
 
         try {
           // Verificar se existem dados reais na volumetria para este upload
-          const loteUpload = upload.detalhes_erro?.lote_upload || 
-                            `lote_${upload.created_at.split('T')[0]}` ||
-                            'unknown';
+          const loteUpload = upload.detalhes_erro && typeof upload.detalhes_erro === 'object' 
+            ? upload.detalhes_erro.lote_upload 
+            : `lote_${upload.created_at.split('T')[0]}`;
 
           const { count: registrosReais, error: countError } = await supabaseClient
             .from('volumetria_mobilemed')
@@ -91,7 +92,7 @@ serve(async (req) => {
                 completed_at: new Date().toISOString(),
                 registros_inseridos: registrosReais,
                 detalhes_erro: {
-                  ...upload.detalhes_erro,
+                  ...(upload.detalhes_erro || {}),
                   status: 'Finalizado automaticamente - dados encontrados na base',
                   registros_reais_inseridos: registrosReais,
                   timestamp_finalizacao: new Date().toISOString()
@@ -134,7 +135,7 @@ serve(async (req) => {
         }
       }
 
-      console.log(`✅ Finalização: ${uploadsFinalizados} concluídos, ${uploadsComErro} com erro`);
+      console.log(`✅ Finalização automática: ${uploadsFinalizados} concluídos, ${uploadsComErro} com erro`);
     }
 
     // Também limpar uploads muito antigos (mais de 24 horas) que falharam
