@@ -73,9 +73,14 @@ const handler = async (req: Request): Promise<Response> => {
     // Preparar anexos
     const attachments = [];
     if (anexo_pdf) {
+      // Limpar qualquer prefixo data: se existir
+      const cleanBase64 = anexo_pdf.replace(/^data:application\/pdf;base64,/, '');
+      
+      console.log(`Anexo PDF: tamanho do base64 = ${cleanBase64.length} caracteres`);
+      
       attachments.push({
         filename: `Demonstrativo_Fat_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-        content: anexo_pdf,
+        content: cleanBase64,
         type: 'application/pdf',
         disposition: 'attachment'
       });
