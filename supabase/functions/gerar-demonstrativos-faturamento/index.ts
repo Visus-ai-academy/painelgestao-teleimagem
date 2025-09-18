@@ -409,7 +409,7 @@ serve(async (req) => {
           tipo_faturamento
         `)
         .eq('periodo_referencia', periodo)
-        .in('"Cliente_Nome_Fantasia"', cliente.nomes_mobilemed)
+        .or(`"Cliente_Nome_Fantasia".in.("${cliente.nomes_mobilemed.join('","')}"),"EMPRESA".in.("${cliente.nomes_mobilemed.join('","')}")`)
         .not('"VALORES"', 'is', null)
         .neq('tipo_faturamento', 'NC-NF'); // Excluir exames não faturáveis
 
