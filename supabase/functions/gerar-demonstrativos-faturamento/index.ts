@@ -131,7 +131,7 @@ serve(async (req) => {
     // ✅ Usar o sistema original de mapeamento por nomes
     console.log(`🔍 Fazendo mapeamento simples entre clientes cadastrados e volumetria...`);
     
-    const clientesComVolumetria: any[] = [];
+    const clientesMapeados: any[] = [];
     const mapeamentoVolumetria = new Map<string, string[]>();
 
     (todosClientesAtivos || []).forEach((cliente: any) => {
@@ -150,13 +150,13 @@ serve(async (req) => {
       );
 
       if (nomesEncontrados.length > 0) {
-        clientesComVolumetria.push(cliente);
+        clientesMapeados.push(cliente);
         mapeamentoVolumetria.set(cliente.id, nomesEncontrados);
         console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${nomesEncontrados.join(', ')}`);
       }
     });
 
-    let todosClientesFinal = clientesComVolumetria;
+    let todosClientesFinal = clientesMapeados;
     
     console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
