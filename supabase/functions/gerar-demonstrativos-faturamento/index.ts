@@ -130,51 +130,73 @@ serve(async (req) => {
 
     console.log(`📋 Total de clientes ativos com CO-FT/NC-FT: ${todosClientesAtivos?.length || 0}`);
 
-    // ✅ Filtrar clientes que TÊM volumetria no período (mapeamento inteligente)
-    const clientesComVolumetriaCadastrados = [];
+    // ✅ Normalização e mapeamento de nomes da volumetria → cadastro
+    const normalizaNome = (valor?: string): string => {
+      if (!valor) return '';
+      let nome = valor.toUpperCase().trim();
+
+      // Mapeamentos específicos (espelham a função DB public.limpar_nome_cliente)
+      switch (nome) {
+        case 'INTERCOR2': nome = 'INTERCOR'; break;
+        case 'P-HADVENTISTA': nome = 'HADVENTISTA'; break;
+        case 'P-UNIMED_CARUARU': nome = 'UNIMED_CARUARU'; break;
+        case 'PRN - MEDIMAGEM CAMBORIU': nome = 'MEDIMAGEM_CAMBORIU'; break;
+        case 'UNIMAGEM_CENTRO': nome = 'UNIMAGEM_ATIBAIA'; break;
+        case 'VIVERCLIN 2': nome = 'VIVERCLIN'; break;
+        case 'CEDI-RJ':
+        case 'CEDI-RO':
+        case 'CEDI-UNIMED':
+        case 'CEDI_RJ':
+        case 'CEDI_RO':
+        case 'CEDI_UNIMED':
+          nome = 'CEDIDIAG';
+          break;
+      }
+
+      // Remover sufixos comuns
+      nome = nome.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
+      nome = nome.replace(/_PLANTÃO$/i, '').trim();
+      nome = nome.replace(/_RMX$/i, '').trim();
+
+      // Unificar separadores e remover espaços extras
+      nome = nome.replace(/[\s\-]+/g, '_');
+      nome = nome.replace(/_{2,}/g, '_');
+      return nome;
+    };
+
+    // Construir índice de nomes da volumetria normalizados → originais
+    const normToOriginals = new Map<string, Set<string>>();
+    for (const nome of clientesFiltrados) {
+      const norm = normalizaNome(nome);
+      if (!normToOriginals.has(norm)) normToOriginals.set(norm, new Set());
+      normToOriginals.get(norm)!.add(nome);
+    }
+
+    // ✅ Filtrar clientes que TÊM volumetria no período (mapeamento robusto)
+    const clientesComVolumetriaCadastrados: any[] = [];
     const clientesEncontrados = new Set<string>();
-    const mapeamentoVolumetria = new Map<string, any>();
+    const mapeamentoVolumetria = new Map<string, string[]>();
 
     (todosClientesAtivos || []).forEach((cliente: any) => {
-      // Normalizar nomes para comparação
-      const nomesMobilemed = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
-        .filter(Boolean)
-        .map(nome => nome.trim().toUpperCase());
+      const variantesCadastro = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
+        .filter(Boolean) as string[];
+      const variantesNorm = new Set(variantesCadastro.map(normalizaNome).filter(Boolean));
 
-      // Verificar se este cliente tem volumetria no período
-      let temVolumetria = false;
-      let nomeVolumetriaEncontrado = '';
-
-      for (const nomeVolumetria of clientesFiltrados) {
-        const nomeVolNormalizado = nomeVolumetria.trim().toUpperCase();
-        
-        // Verificar correspondência exata ou parcial
-        const temCorrespondencia = nomesMobilemed.some(nomeCadastro => {
-          // Correspondência exata
-          if (nomeCadastro === nomeVolNormalizado) return true;
-          
-          // Correspondência parcial (nome da volumetria contém o nome cadastrado)
-          if (nomeVolNormalizado.includes(nomeCadastro) || nomeCadastro.includes(nomeVolNormalizado)) return true;
-          
-          // Remover sufixos comuns para comparação
-          const nomeCadastroLimpo = nomeCadastro.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
-          const nomeVolLimpo = nomeVolNormalizado.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
-          
-          return nomeCadastroLimpo === nomeVolLimpo;
-        });
-
-        if (temCorrespondencia) {
-          temVolumetria = true;
-          nomeVolumetriaEncontrado = nomeVolumetria;
-          clientesEncontrados.add(nomeVolumetria);
-          mapeamentoVolumetria.set(cliente.id, nomeVolumetria);
-          break;
+      // Encontrar todos os nomes de volumetria que batem com qualquer variante normalizada do cadastro
+      const nomesCompatOriginais = new Set<string>();
+      for (const vNorm of variantesNorm) {
+        const origs = normToOriginals.get(vNorm);
+        if (origs) {
+          origs.forEach((o) => nomesCompatOriginais.add(o));
         }
       }
 
-      if (temVolumetria) {
+      if (nomesCompatOriginais.size > 0) {
         clientesComVolumetriaCadastrados.push(cliente);
-        console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${nomeVolumetriaEncontrado}`);
+        const lista = Array.from(nomesCompatOriginais);
+        mapeamentoVolumetria.set(cliente.id, lista);
+        lista.forEach((n) => clientesEncontrados.add(n));
+        console.log(`✅ Cliente mapeado: ${(cliente.nome_fantasia || cliente.nome)} → ${lista.join(', ')}`);
       }
     });
 
@@ -289,14 +311,13 @@ serve(async (req) => {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
-        // ✅ Usar o nome da volumetria mapeado corretamente
-        const nomeVolumetriaCorreto = mapeamentoVolumetria.get(cliente.id);
+        const nomesVolumetriaCompat = mapeamentoVolumetria.get(cliente.id);
         
         clientesAgrupados.set(nomeFantasia, {
           id: cliente.id,
           nome: cliente.nome,
           nome_fantasia: nomeFantasia,
-          nomes_mobilemed: nomeVolumetriaCorreto ? [nomeVolumetriaCorreto] : [],
+          nomes_mobilemed: Array.isArray(nomesVolumetriaCompat) ? nomesVolumetriaCompat : (nomesVolumetriaCompat ? [nomesVolumetriaCompat] : []),
           cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: cliente.tipo_faturamento
