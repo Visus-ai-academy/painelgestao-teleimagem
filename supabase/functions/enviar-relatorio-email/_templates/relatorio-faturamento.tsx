@@ -30,15 +30,15 @@ export const RelatorioFaturamentoEmail = ({
 }: RelatorioFaturamentoEmailProps) => (
   <Html>
     <Head />
-    <Preview>Relatório de volumetria - Teleimagem</Preview>
+    <Preview>Relatório de volumetria - Faturamento {periodo}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Relatório de Volumetria - Teleimagem</Heading>
+        <Heading style={h1}>Relatório de Volumetria</Heading>
         
-        <Text style={text}>Prezados!</Text>
+        <Text style={text}>Prezados,</Text>
         
         <Text style={text}>
-          Segue no anexo o relatórios de exames do período.
+          Segue lista de exames referente à nota fiscal citada no e-mail.
         </Text>
 
         <Section style={summarySection}>
@@ -57,14 +57,14 @@ export const RelatorioFaturamentoEmail = ({
           <Row>
             <Column>
               <Text style={summaryLabel}>Total de Laudos:</Text>
-              <Text style={summaryValue}>{(total_laudos || 0).toLocaleString()}</Text>
+              <Text style={summaryValue}>{total_laudos.toLocaleString()}</Text>
             </Column>
           </Row>
           <Row>
             <Column>
               <Text style={summaryLabel}>Valor Total Faturado:</Text>
               <Text style={summaryValue}>
-                {(valor_total || 0).toLocaleString('pt-BR', { 
+                {valor_total.toLocaleString('pt-BR', { 
                   style: 'currency', 
                   currency: 'BRL' 
                 })}
@@ -75,7 +75,7 @@ export const RelatorioFaturamentoEmail = ({
             <Column>
               <Text style={summaryLabel}>Valor a Pagar:</Text>
               <Text style={summaryValueHighlight}>
-                {(valor_a_pagar || 0).toLocaleString('pt-BR', { 
+                {valor_a_pagar.toLocaleString('pt-BR', { 
                   style: 'currency', 
                   currency: 'BRL' 
                 })}
@@ -94,10 +94,9 @@ export const RelatorioFaturamentoEmail = ({
         <Hr style={hr} />
 
         <Text style={footerText}>
-          Atte.<br />
-          <strong>Teleimagem Serviços de Dados</strong><br />
-          Financeiro - Robson D'avila<br />
-          Tel.: 41 99255-1964
+          Atenciosamente,<br />
+          <strong>Robson D'avila</strong><br />
+          Tel.: (41) 99255-1964
         </Text>
       </Container>
     </Body>
