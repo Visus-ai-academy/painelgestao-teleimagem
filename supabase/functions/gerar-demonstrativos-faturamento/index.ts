@@ -106,73 +106,85 @@ serve(async (req) => {
       );
     }
 
-    // ✅ Buscar dados completos APENAS dos clientes que têm volumetria
-    // OTIMIZAÇÃO: Fazer consultas separadas para evitar queries muito complexas
-    console.log(`🔍 Buscando dados completos para ${clientesFiltrados.length} clientes...`);
+    // ✅ Buscar TODOS os clientes com contratos ativos CO-FT ou NC-FT
+    console.log(`🔍 Buscando todos os clientes com contratos CO-FT ou NC-FT...`);
     
-    // Fazer 3 consultas separadas para cada tipo de nome
-    const consultasPromises = [
-      supabase.from('clientes').select(`
+    const { data: todosClientesAtivos, error: clientesError } = await supabase
+      .from('clientes')
+      .select(`
         id, nome, nome_fantasia, nome_mobilemed, ativo, status,
-        contratos_clientes(tipo_faturamento, cond_volume, status),
+        contratos_clientes!inner(tipo_faturamento, cond_volume, status),
         parametros_faturamento(status, tipo_faturamento, updated_at)
-      `).in('nome', clientesFiltrados),
-      
-      supabase.from('clientes').select(`
-        id, nome, nome_fantasia, nome_mobilemed, ativo, status,
-        contratos_clientes(tipo_faturamento, cond_volume, status),
-        parametros_faturamento(status, tipo_faturamento, updated_at)
-      `).in('nome_fantasia', clientesFiltrados),
-      
-      supabase.from('clientes').select(`
-        id, nome, nome_fantasia, nome_mobilemed, ativo, status,
-        contratos_clientes(tipo_faturamento, cond_volume, status),
-        parametros_faturamento(status, tipo_faturamento, updated_at)
-      `).in('nome_mobilemed', clientesFiltrados)
-    ];
-    
-    const resultadosConsultas = await Promise.all(consultasPromises);
-    
-    // Combinar resultados e remover duplicatas por ID
-    const clientesCompletos = [];
-    const idsVistos = new Set();
-    
-    resultadosConsultas.forEach(({ data }) => {
-      if (data) {
-        data.forEach(cliente => {
-          if (!idsVistos.has(cliente.id)) {
-            idsVistos.add(cliente.id);
-            clientesCompletos.push(cliente);
-          }
+      `)
+      .eq('ativo', true)
+      .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT'])
+      .eq('contratos_clientes.status', 'ativo');
+
+    if (clientesError) {
+      console.error('❌ Erro ao buscar clientes:', clientesError);
+      return new Response(
+        JSON.stringify({ success: false, error: clientesError.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`📋 Total de clientes ativos com CO-FT/NC-FT: ${todosClientesAtivos?.length || 0}`);
+
+    // ✅ Filtrar clientes que TÊM volumetria no período (mapeamento inteligente)
+    const clientesComVolumetriaCadastrados = [];
+    const clientesEncontrados = new Set<string>();
+    const mapeamentoVolumetria = new Map<string, any>();
+
+    (todosClientesAtivos || []).forEach((cliente: any) => {
+      // Normalizar nomes para comparação
+      const nomesMobilemed = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome]
+        .filter(Boolean)
+        .map(nome => nome.trim().toUpperCase());
+
+      // Verificar se este cliente tem volumetria no período
+      let temVolumetria = false;
+      let nomeVolumetriaEncontrado = '';
+
+      for (const nomeVolumetria of clientesFiltrados) {
+        const nomeVolNormalizado = nomeVolumetria.trim().toUpperCase();
+        
+        // Verificar correspondência exata ou parcial
+        const temCorrespondencia = nomesMobilemed.some(nomeCadastro => {
+          // Correspondência exata
+          if (nomeCadastro === nomeVolNormalizado) return true;
+          
+          // Correspondência parcial (nome da volumetria contém o nome cadastrado)
+          if (nomeVolNormalizado.includes(nomeCadastro) || nomeCadastro.includes(nomeVolNormalizado)) return true;
+          
+          // Remover sufixos comuns para comparação
+          const nomeCadastroLimpo = nomeCadastro.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
+          const nomeVolLimpo = nomeVolNormalizado.replace(/\s*-\s*(TELE|CT|MR|RX)$/i, '').trim();
+          
+          return nomeCadastroLimpo === nomeVolLimpo;
         });
+
+        if (temCorrespondencia) {
+          temVolumetria = true;
+          nomeVolumetriaEncontrado = nomeVolumetria;
+          clientesEncontrados.add(nomeVolumetria);
+          mapeamentoVolumetria.set(cliente.id, nomeVolumetria);
+          break;
+        }
+      }
+
+      if (temVolumetria) {
+        clientesComVolumetriaCadastrados.push(cliente);
+        console.log(`✅ Cliente mapeado: ${cliente.nome_fantasia || cliente.nome} → ${nomeVolumetriaEncontrado}`);
       }
     });
-    
-    console.log(`📋 Clientes encontrados no cadastro: ${clientesCompletos.length}`);
-    
-    const clientesError = resultadosConsultas.some(r => r.error) ? 
-      resultadosConsultas.find(r => r.error)?.error : null;
 
-    // ✅ Complementar sem criar clientes temporários: usar apenas clientes cadastrados
-    let todosClientesFinal = [...(clientesCompletos || [])];
-    const clientesEncontrados = new Set<string>();
-    
-    // Mapear nomes encontrados no cadastro
-    (clientesCompletos || []).forEach((c: any) => {
-      [c.nome, c.nome_fantasia, c.nome_mobilemed]
-        .filter(Boolean)
-        .forEach((nome: string) => {
-          if (clientesFiltrados.includes(nome)) {
-            clientesEncontrados.add(nome);
-          }
-        });
-    });
-    
-    // Identificar clientes que têm volumetria mas não estão no cadastro
+    // Identificar clientes da volumetria sem cadastro
     const clientesNaoEncontrados = clientesFiltrados.filter(nome => !clientesEncontrados.has(nome));
     if (clientesNaoEncontrados.length > 0) {
-      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria não encontrados no cadastro (IGNORADOS):`, clientesNaoEncontrados);
+      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria SEM cadastro ativo com CO-FT/NC-FT:`, clientesNaoEncontrados);
     }
+
+    let todosClientesFinal = clientesComVolumetriaCadastrados;
     
     console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
@@ -277,30 +289,20 @@ serve(async (req) => {
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
       if (!clientesAgrupados.has(nomeFantasia)) {
+        // ✅ Usar o nome da volumetria mapeado corretamente
+        const nomeVolumetriaCorreto = mapeamentoVolumetria.get(cliente.id);
+        
         clientesAgrupados.set(nomeFantasia, {
           id: cliente.id,
           nome: cliente.nome,
           nome_fantasia: nomeFantasia,
-          nomes_mobilemed: [
-            cliente.nome, // Nome principal
-            cliente.nome_mobilemed, // Nome MobileMed se existir
-            nomeFantasia // Nome fantasia
-          ].filter(Boolean), // Remove valores null/undefined
+          nomes_mobilemed: nomeVolumetriaCorreto ? [nomeVolumetriaCorreto] : [],
           cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
           tipo_faturamento: cliente.tipo_faturamento
             || cliente.contratos_clientes?.[0]?.tipo_faturamento
             || 'CO-FT'
         });
-      } else {
-        // Adicionar nomes adicionais para busca na volumetria
-        const clienteExistente = clientesAgrupados.get(nomeFantasia);
-        if (cliente.nome && !clienteExistente.nomes_mobilemed.includes(cliente.nome)) {
-          clienteExistente.nomes_mobilemed.push(cliente.nome);
-        }
-        if (cliente.nome_mobilemed && !clienteExistente.nomes_mobilemed.includes(cliente.nome_mobilemed)) {
-          clienteExistente.nomes_mobilemed.push(cliente.nome_mobilemed);
-        }
       }
     }
 
@@ -322,7 +324,9 @@ serve(async (req) => {
         let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
         
         // NOVO: Sempre buscar o cliente com preços ativos para evitar duplicatas
-        const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
+        const nomesBusca: string[] = cliente.nomes_mobilemed.length > 0 ? 
+          cliente.nomes_mobilemed :
+          [cliente.nome, cliente.nome_fantasia, cliente.nome_mobilemed].filter(Boolean);
         let resolved: { id: string } | null = null;
         
         // Buscar cliente que TEM preços ativos (prioridade máxima)
