@@ -153,41 +153,28 @@ serve(async (req) => {
     const clientesError = resultadosConsultas.some(r => r.error) ? 
       resultadosConsultas.find(r => r.error)?.error : null;
 
-    // ✅ Complementar com clientes não encontrados no cadastro (fallback)
+    // ✅ Complementar sem criar clientes temporários: usar apenas clientes cadastrados
     let todosClientesFinal = [...(clientesCompletos || [])];
-    const clientesEncontrados = new Set();
+    const clientesEncontrados = new Set<string>();
     
     // Mapear nomes encontrados no cadastro
-    (clientesCompletos || []).forEach(c => {
-      [c.nome, c.nome_fantasia, c.nome_mobilemed].filter(Boolean).forEach(nome => {
-        if (clientesFiltrados.includes(nome)) {
-          clientesEncontrados.add(nome);
-        }
-      });
+    (clientesCompletos || []).forEach((c: any) => {
+      [c.nome, c.nome_fantasia, c.nome_mobilemed]
+        .filter(Boolean)
+        .forEach((nome: string) => {
+          if (clientesFiltrados.includes(nome)) {
+            clientesEncontrados.add(nome);
+          }
+        });
     });
     
-    // Adicionar clientes que têm volumetria mas não estão no cadastro
+    // Identificar clientes que têm volumetria mas não estão no cadastro
     const clientesNaoEncontrados = clientesFiltrados.filter(nome => !clientesEncontrados.has(nome));
-    
     if (clientesNaoEncontrados.length > 0) {
-      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria não encontrados no cadastro:`, clientesNaoEncontrados);
-      
-      // Criar registros temporários para clientes não cadastrados
-      clientesNaoEncontrados.forEach((nome, index) => {
-        todosClientesFinal.push({
-          id: `temp-volumetria-${index + 1}`,
-          nome,
-          nome_fantasia: nome,
-          nome_mobilemed: nome,
-          ativo: true,
-          status: 'Ativo',
-          parametros_faturamento: [{ status: 'A', tipo_faturamento: 'CO-FT' }]
-        });
-      });
+      console.log(`⚠️ ${clientesNaoEncontrados.length} clientes com volumetria não encontrados no cadastro (IGNORADOS):`, clientesNaoEncontrados);
     }
     
-    console.log(`📋 Total final de clientes para processamento: ${todosClientesFinal.length}`);
-
+    console.log(`📋 Total de clientes encontrados no cadastro para processamento: ${todosClientesFinal.length}`);
     // ✅ SEPARAR clientes ativos dos inativos/cancelados (robusto para variações)
     const isStatusInativoOuCancelado = (status?: string) => {
       if (!status) return false;
@@ -223,30 +210,30 @@ serve(async (req) => {
       return tipoParam === 'NC-NF';
     };
 
-    // ✅ MUDANÇA: Processar TODOS os clientes da volumetria, criando parâmetros padrão quando necessário
-    const clientesAtivos = todosClientesFinal.map(c => {
-      const pfAtivo = getParametroAtivo(c.parametros_faturamento);
-      
-      // Se não tem parâmetros ativos, criar temporário padrão
-      if (!pfAtivo || isStatusInativoOuCancelado(pfAtivo.status)) {
-        c.parametros_faturamento = [{ 
-          status: 'A', 
-          tipo_faturamento: 'CO-FT',
-          created_temp: true // Flag para identificar temporários
-        }];
-      }
-      
-      return c;
-    }).filter(c => !isNCNF(c)); // Apenas excluir NC-NF
-    // ✅ SIMPLIFICADO: Não precisamos mais da lógica complexa de clientes inativos
-    // Todos os clientes da volumetria já estão incluídos na lista clientesAtivos
-    const clientesInativosComVolumetria = []; // Lista vazia - não precisamos mais desta lógica
-    const alertasClientes: string[] = [];
-    
-    console.log(`📊 Clientes para processamento: ${clientesAtivos.length} (todos os clientes da volumetria)`);
+    // ✅ NOVA REGRA: Processar SOMENTE clientes com contrato ATIVO e tipo de faturamento CO-FT ou NC-FT
+    const contratoValido = (c: any) => {
+      const contratos: any[] = Array.isArray(c.contratos_clientes) ? c.contratos_clientes : [];
+      return contratos.some(cc => (cc.status || '').toLowerCase() === 'ativo' && ['CO-FT','NC-FT'].includes((cc.tipo_faturamento || '').toUpperCase()));
+    };
 
-    // ✅ LISTA FINAL: apenas clientes ativos (já inclui todos da volumetria)
-    let clientes = [...clientesAtivos];
+    const clientesElegiveis = todosClientesFinal
+      .filter(contratoValido)
+      .map((c: any) => {
+        const contratos: any[] = Array.isArray(c.contratos_clientes) ? c.contratos_clientes : [];
+        const contratoAtivoTipo = contratos.find(cc => (cc.status || '').toLowerCase() === 'ativo' && ['CO-FT','NC-FT'].includes((cc.tipo_faturamento || '').toUpperCase()));
+        return {
+          ...c,
+          // Propagar tipo de faturamento e condição de volume do contrato elegível
+          tipo_faturamento: (contratoAtivoTipo?.tipo_faturamento || 'CO-FT').toUpperCase(),
+          cond_volume: contratoAtivoTipo?.cond_volume || 'MOD/ESP/CAT',
+        };
+      });
+
+    const alertasClientes: string[] = [];
+    console.log(`📊 Clientes elegíveis (contrato ativo CO-FT/NC-FT) para processamento: ${clientesElegiveis.length}`);
+
+    // ✅ LISTA FINAL: apenas clientes elegíveis por contrato e com volumetria
+    let clientes = [...clientesElegiveis];
     
     // ✅ APLICAR LIMITAÇÃO DE TESTE se fornecida
     if (clientesPermitidos && Array.isArray(clientesPermitidos)) {
@@ -301,7 +288,7 @@ serve(async (req) => {
           ].filter(Boolean), // Remove valores null/undefined
           cond_volume: cliente.cond_volume || cliente.contratos_clientes?.[0]?.cond_volume || 'MOD/ESP/CAT',
           parametros_faturamento: cliente.parametros_faturamento,
-          tipo_faturamento: (getParametroAtivo(cliente.parametros_faturamento)?.tipo_faturamento)
+          tipo_faturamento: cliente.tipo_faturamento
             || cliente.contratos_clientes?.[0]?.tipo_faturamento
             || 'CO-FT'
         });
