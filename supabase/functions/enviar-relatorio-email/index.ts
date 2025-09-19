@@ -40,7 +40,6 @@ const handler = async (req: Request): Promise<Response> => {
     const { cliente_id, relatorio, anexo_pdf }: EmailRequest = await req.json();
 
     console.log(`Enviando email para cliente ${cliente_id}`);
-    console.log('Dados do relatório recebidos:', JSON.stringify(relatorio, null, 2));
 
     // Buscar dados do cliente
     const { data: cliente, error: clienteError } = await supabase
@@ -61,26 +60,21 @@ const handler = async (req: Request): Promise<Response> => {
     const html = await renderAsync(
       React.createElement(RelatorioFaturamentoEmail, {
         cliente_nome: cliente.nome,
-        periodo: relatorio.periodo || 'N/A',
-        total_laudos: relatorio.resumo?.total_laudos || relatorio.total_laudos || 0,
-        valor_total: relatorio.resumo?.valor_total || relatorio.valor_total || 0,
-        valor_a_pagar: relatorio.resumo?.valor_a_pagar || relatorio.valor_a_pagar || 0
+        periodo: relatorio.periodo,
+        total_laudos: relatorio.resumo.total_laudos,
+        valor_total: relatorio.resumo.valor_total,
+        valor_a_pagar: relatorio.resumo.valor_a_pagar
       })
     );
 
-    const assunto = `Relatório de volumetria _ Teleimagem`;
+    const assunto = `Relatório de Volumetria - Faturamento ${relatorio.periodo}`;
     
     // Preparar anexos
     const attachments = [];
     if (anexo_pdf) {
-      // Limpar qualquer prefixo data: se existir
-      const cleanBase64 = anexo_pdf.replace(/^data:application\/pdf;base64,/, '');
-      
-      console.log(`Anexo PDF: tamanho do base64 = ${cleanBase64.length} caracteres`);
-      
       attachments.push({
         filename: `Demonstrativo_Fat_${cliente.nome.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-        content: cleanBase64,
+        content: anexo_pdf,
         type: 'application/pdf',
         disposition: 'attachment'
       });
