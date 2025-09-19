@@ -155,13 +155,19 @@ serve(async (req) => {
       return tipoParam === 'NC-NF';
     };
 
-    // ✅ Considerar APENAS clientes com Parâmetros ATIVOS e NÃO NC-NF
+    // ✅ Considerar APENAS clientes com tipo de faturamento CO-FT ou NC-FT
     const clientesAtivos = todosClientesFinal.filter(c => {
       const pfAtivo = getParametroAtivo(c.parametros_faturamento);
-      const paramStatusOk = !!pfAtivo && !isStatusInativoOuCancelado(pfAtivo.status);
-      return (
-        paramStatusOk && !isNCNF(c)
-      );
+      const contratoAtivo = Array.isArray(c.contratos_clientes)
+        ? c.contratos_clientes.find((cc: any) => (cc?.status || '').toString().toLowerCase() === 'ativo')
+        : null;
+      const tipo = (
+        pfAtivo?.tipo_faturamento || contratoAtivo?.tipo_faturamento || 'CO-FT'
+      ).toString().toUpperCase();
+      const elegivelPorTipo = tipo === 'CO-FT' || tipo === 'NC-FT';
+      // Excluir explicitamente NC-NF
+      const ehNCNF = (pfAtivo?.tipo_faturamento || contratoAtivo?.tipo_faturamento || '').toString().toUpperCase() === 'NC-NF';
+      return elegivelPorTipo && !ehNCNF;
     });
     
     // Clientes inativos/cancelados (para verificação de volumetria) – NÃO incluir no demonstrativo
