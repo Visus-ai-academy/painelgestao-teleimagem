@@ -751,30 +751,70 @@ export default function GerarFaturamento() {
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento com período:', periodoSelecionado);
-      
-      // Chamar edge function para gerar os demonstrativos completos
-      const { data: faturamentoData, error: faturamentoError } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-        body: {
-          periodo: periodoSelecionado
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
+
+      // Processar em lotes para evitar timeout da Edge Function
+      const chunkSize = 20;
+      const chunks: string[][] = [];
+      for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
+        chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
+      }
+
+      const todosDemonstrativos: any[] = [];
+      const todosAlertas: string[] = [];
+      let clientesProcessados = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const lote = chunks[i];
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
+          progresso: 30 + Math.round(((i) / chunks.length) * 35)
+        });
+
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: {
+            periodo: periodoSelecionado,
+            clientes: lote
+          }
+        });
+
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+        if (error || !data?.success) {
+          console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
         }
-      });
 
-      console.log('📡 [RESPOSTA] Resposta da edge function:');
-      console.log('📡 [RESPOSTA] Data:', faturamentoData);
-      console.log('📡 [RESPOSTA] Error:', faturamentoError);
-
-      if (faturamentoError || !faturamentoData?.success) {
-        console.log('❌ [ERRO] Erro na edge function:', faturamentoError?.message || faturamentoData?.error);
-        throw new Error(faturamentoError?.message || faturamentoData?.error || 'Erro ao gerar demonstrativos');
+        clientesProcessados += data?.resumo?.clientes_processados || 0;
+        todosDemonstrativos.push(...(data?.demonstrativos || []));
+        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
       }
 
-      // Salvar dados no localStorage se fornecidos pela edge function
-      if (faturamentoData.salvar_localStorage) {
-        const { chave, dados } = faturamentoData.salvar_localStorage;
-        localStorage.setItem(chave, JSON.stringify(dados));
-        console.log(`💾 Dados salvos no localStorage com chave: ${chave}`);
-      }
+      // Montar resumo combinado e salvar no localStorage para manter fluxo atual
+      const resumoCombinado = {
+        total_clientes: clientesUnicosVolumetria.length,
+        clientes_processados: clientesProcessados,
+        total_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.total_exames || 0), 0),
+        valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto || 0), 0),
+        valor_impostos_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_impostos || 0), 0),
+        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total || 0), 0),
+        valor_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_exames || 0), 0),
+        valor_franquias_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_franquia || 0), 0),
+        valor_portal_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_portal_laudos || 0), 0),
+        valor_integracao_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_integracao || 0), 0),
+      };
+
+      const dadosParaSalvar = {
+        demonstrativos: todosDemonstrativos,
+        resumo: resumoCombinado,
+        periodo: periodoSelecionado,
+        alertas: todosAlertas,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
+      console.log(`💾 Dados combinados salvos no localStorage. Lotes: ${chunks.length}, Processados: ${clientesProcessados}`);
 
       setStatusProcessamento({
         processando: true,
@@ -841,11 +881,11 @@ export default function GerarFaturamento() {
       });
 
       // ✅ Mostrar alertas se houver clientes inativos com volumetria
-      if (faturamentoData.alertas && faturamentoData.alertas.length > 0) {
+      if (todosAlertas && todosAlertas.length > 0) {
         setTimeout(() => {
           toast({
             title: "⚠️ Alertas de Segurança",
-            description: `${faturamentoData.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes no demonstrativo.`,
+            description: `${todosAlertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes no demonstrativo.`,
             variant: "destructive",
           });
         }, 1000);

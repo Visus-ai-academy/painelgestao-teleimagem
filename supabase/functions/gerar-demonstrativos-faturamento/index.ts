@@ -41,7 +41,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { periodo } = await req.json();
+    const { periodo, clientes: clientesFiltro } = await req.json();
     
     if (!periodo) {
       throw new Error('Período é obrigatório');
@@ -220,7 +220,22 @@ serve(async (req) => {
     // ✅ LISTA FINAL: apenas clientes ativos (já sem NC-NF) + inativos com volumetria (já filtrado NC-NF)
     let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
     
-    console.log('Clientes para demonstrativo: ' + clientes.length + ' (' + clientesAtivos.length + ' ativos + ' + clientesInativosComVolumetria.length + ' inativos com volumetria)');
+    // ✅ Se veio filtro de clientes pelo corpo da requisição, aplicar aqui (aceita nome/nome_fantasia/id)
+    if (Array.isArray(clientesFiltro) && clientesFiltro.length > 0) {
+      const filtroSet = new Set(
+        clientesFiltro
+          .map((v: any) => (v ?? '').toString().toUpperCase().trim())
+          .filter((v: string) => !!v)
+      );
+      clientes = clientes.filter((c: any) => {
+        const nome = (c.nome || '').toString().toUpperCase().trim();
+        const fantasia = (c.nome_fantasia || '').toString().toUpperCase().trim();
+        const id = (c.id || '').toString().toUpperCase().trim();
+        return filtroSet.has(nome) || filtroSet.has(fantasia) || filtroSet.has(id);
+      });
+    }
+    
+    console.log(`Clientes para demonstrativo: ${clientes.length} (${clientesAtivos.length} ativos + ${clientesInativosComVolumetria.length} inativos com volumetria${Array.isArray(clientesFiltro) && clientesFiltro.length > 0 ? ' | após filtro por input' : ''})`);
     
     if (clientes.length === 0) {
       console.warn('⚠️ Nenhum cliente elegível após filtros. Aplicando fallback baseado na volumetria...');
