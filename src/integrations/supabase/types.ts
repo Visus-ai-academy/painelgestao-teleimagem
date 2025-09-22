@@ -4151,13 +4151,13 @@ export type Database = {
               p_volume_total: number
             }
           | {
-              p_categoria?: string
+              p_categoria: string
               p_cliente_id: string
               p_especialidade: string
               p_modalidade: string
-              p_periodo?: string
-              p_prioridade?: string
-              p_volume_total?: number
+              p_periodo: string
+              p_prioridade: string
+              p_volume_total: number
             }
         Returns: number
       }
