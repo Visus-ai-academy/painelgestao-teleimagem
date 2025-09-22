@@ -250,36 +250,42 @@ export default function DemonstrativoFaturamento() {
   }, [periodo]);
 
   // Carregar dados de faturamento
-  // Função para buscar tipo de faturamento do cliente
   const buscarTipoFaturamento = async (clienteNome: string): Promise<string> => {
     try {
-      // Buscar no contrato do cliente
+      // 1. Primeiro buscar nos parâmetros ativos (mais confiável)
+      const { data: parametros } = await supabase
+        .from('clientes')
+        .select(`
+          nome, nome_fantasia, nome_mobilemed,
+          parametros_faturamento!inner(tipo_faturamento, status)
+        `)
+        .eq('parametros_faturamento.status', 'A')
+        .or(`nome.eq.${clienteNome},nome_fantasia.eq.${clienteNome},nome_mobilemed.eq.${clienteNome}`)
+        .limit(1);
+
+      if (parametros?.[0]?.parametros_faturamento?.[0]?.tipo_faturamento) {
+        return parametros[0].parametros_faturamento[0].tipo_faturamento;
+      }
+
+      // 2. Fallback: buscar nos contratos ativos
       const { data: clienteContrato } = await supabase
         .from('clientes')
         .select(`
-          contratos_clientes (
-            tipo_faturamento
-          )
+          nome, nome_fantasia, nome_mobilemed,
+          contratos_clientes!inner(tipo_faturamento, status)
         `)
+        .eq('contratos_clientes.status', 'ativo')
         .or(`nome.eq.${clienteNome},nome_fantasia.eq.${clienteNome},nome_mobilemed.eq.${clienteNome}`)
-        .limit(1)
-        .maybeSingle();
-      
-      if (clienteContrato?.contratos_clientes?.[0]?.tipo_faturamento) {
-        return clienteContrato.contratos_clientes[0].tipo_faturamento;
+        .limit(1);
+
+      if (clienteContrato?.[0]?.contratos_clientes?.[0]?.tipo_faturamento) {
+        return clienteContrato[0].contratos_clientes[0].tipo_faturamento;
       }
-      
-      // Fallback: determinar por lista conhecida
-      const nomeUpper = clienteNome.toUpperCase();
-      const clientesNC = [
-        'CDICARDIO', 'CDIGOIAS', 'CISP', 'CLIRAM', 'CRWANDERLEY', 'DIAGMAX-PR',
-        'GOLD', 'PRODIMAGEM', 'TRANSDUSON', 'ZANELLO', 'CEMVALENCA', 'RMPADUA', 'RADI-IMAGEM'
-      ];
-      
-      return clientesNC.some(nc => nomeUpper.includes(nc)) ? 'NC-FT' : 'CO-FT';
+
+      return 'Não definido';
     } catch (error) {
       console.error('Erro ao buscar tipo de faturamento:', error);
-      return 'CO-FT'; // Default fallback
+      return 'Não definido';
     }
   };
 
@@ -339,45 +345,68 @@ export default function DemonstrativoFaturamento() {
             console.log(`✅ Deduplicação: ${clientesRaw.length} registros → ${clientesConvertidos.length} clientes únicos`);
             
             if (clientesConvertidos.length > 0) {
-              // Enriquecer tipo_faturamento a partir da tabela faturamento (prioritário) e, se necessário, dos contratos ativos
-              try {
-                const nomes = [...new Set(clientesConvertidos.map((c) => c.nome))];
-                const { data: tiposFat } = await supabase
-                  .from('faturamento')
-                  .select('cliente_nome, tipo_faturamento')
-                  .eq('periodo_referencia', periodo)
-                  .in('cliente_nome', nomes)
-                  .not('tipo_faturamento', 'is', null)
-                  .limit(50000);
-                const mapTipos = new Map<string, string>();
-                (tiposFat || []).forEach((r: any) => {
-                  if (r.cliente_nome && r.tipo_faturamento) mapTipos.set(r.cliente_nome, r.tipo_faturamento);
-                });
-                let enriquecidos = clientesConvertidos.map((c) => ({
-                  ...c,
-                  tipo_faturamento: c.tipo_faturamento || mapTipos.get(c.nome)
-                }));
-                // Fallback: buscar contratos para preencher ausentes
-                const faltantes = enriquecidos.filter((c) => !c.tipo_faturamento).map((c) => c.nome);
-                if (faltantes.length > 0) {
-                  const { data: contratos } = await supabase
-                    .from('clientes')
-                    .select('nome, nome_fantasia, nome_mobilemed, status, contratos_clientes!inner(tipo_faturamento, status)')
-                    .not('contratos_clientes.tipo_faturamento', 'eq', 'NC-NF');
-                  const mapContratoTipos = new Map<string, string>();
-                  (contratos || []).forEach((cli: any) => {
-                    const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
-                    if (!tipo) return;
-                    [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
-                      if (nm) mapContratoTipos.set(nm, tipo);
-                    });
-                  });
-                  enriquecidos = enriquecidos.map((c) => ({
-                    ...c,
-                    tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
-                  }));
-                }
-                setClientes(enriquecidos);
+               // Enriquecer tipo_faturamento a partir dos PARÂMETROS PRIMEIRO (mais confiável), depois contratos
+               try {
+                 const nomes = [...new Set(clientesConvertidos.map((c) => c.nome))];
+                 
+                 // 1. Buscar tipo_faturamento dos PARÂMETROS (prioritário)
+                 const { data: tiposParam } = await supabase
+                   .from('clientes')
+                   .select(`
+                     nome, nome_fantasia, nome_mobilemed,
+                     parametros_faturamento!inner(tipo_faturamento, status)
+                   `)
+                   .eq('parametros_faturamento.status', 'A')
+                   .limit(50000);
+                 
+                 const mapTiposParam = new Map<string, string>();
+                 (tiposParam || []).forEach((cli: any) => {
+                   const tipo = cli.parametros_faturamento?.[0]?.tipo_faturamento;
+                   if (!tipo) return;
+                   [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
+                     if (nm) mapTiposParam.set(nm, tipo);
+                   });
+                 });
+                 
+                 // 2. Fallback: buscar da tabela faturamento apenas se não encontrou nos parâmetros
+                 const { data: tiposFat } = await supabase
+                   .from('faturamento')
+                   .select('cliente_nome, tipo_faturamento')
+                   .eq('periodo_referencia', periodo)
+                   .in('cliente_nome', nomes)
+                   .not('tipo_faturamento', 'is', null)
+                   .limit(50000);
+                 const mapTiposFat = new Map<string, string>();
+                 (tiposFat || []).forEach((r: any) => {
+                   if (r.cliente_nome && r.tipo_faturamento) mapTiposFat.set(r.cliente_nome, r.tipo_faturamento);
+                 });
+                 
+                 let enriquecidos = clientesConvertidos.map((c) => ({
+                   ...c,
+                   tipo_faturamento: c.tipo_faturamento || mapTiposParam.get(c.nome) || mapTiposFat.get(c.nome)
+                 }));
+                 
+                 // 3. Fallback final: buscar contratos ativos para clientes ainda sem tipo
+                 const faltantes = enriquecidos.filter((c) => !c.tipo_faturamento).map((c) => c.nome);
+                 if (faltantes.length > 0) {
+                   const { data: contratos } = await supabase
+                     .from('clientes')
+                     .select('nome, nome_fantasia, nome_mobilemed, status, contratos_clientes!inner(tipo_faturamento, status)')
+                     .eq('contratos_clientes.status', 'ativo');
+                   const mapContratoTipos = new Map<string, string>();
+                   (contratos || []).forEach((cli: any) => {
+                     const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
+                     if (!tipo) return;
+                     [cli.nome, cli.nome_fantasia, cli.nome_mobilemed].forEach((nm: string) => {
+                       if (nm) mapContratoTipos.set(nm, tipo);
+                     });
+                   });
+                   enriquecidos = enriquecidos.map((c) => ({
+                     ...c,
+                     tipo_faturamento: c.tipo_faturamento || mapContratoTipos.get(c.nome)
+                   }));
+                 }
+                 setClientes(enriquecidos);
                 setClientesFiltrados(enriquecidos);
               } catch (e) {
                 console.warn('Não foi possível enriquecer tipo_faturamento dos demonstrativos locais:', e);
@@ -547,7 +576,7 @@ export default function DemonstrativoFaturamento() {
                   status
                 )
               `)
-              .not('contratos_clientes.tipo_faturamento', 'eq', 'NC-NF'); // EXCLUIR NC-NF
+              .eq('contratos_clientes.status', 'ativo'); // INCLUIR TODOS OS TIPOS (CO-FT, NC-FT, NC-NF)
             
             console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
             
@@ -838,7 +867,7 @@ export default function DemonstrativoFaturamento() {
             periodo: item.periodo_referencia || periodo,
             status_pagamento: status,
             data_vencimento: item.data_vencimento,
-            tipo_faturamento: item.tipo_faturamento || 'CO-FT', // Default para CO-FT
+            tipo_faturamento: item.tipo_faturamento || 'Não definido', // Não assumir CO-FT
           });
         }
       });
@@ -852,7 +881,7 @@ export default function DemonstrativoFaturamento() {
             cliente.tipo_faturamento = await buscarTipoFaturamento(cliente.nome);
           } catch (error) {
             console.warn(`Erro ao buscar tipo faturamento para ${cliente.nome}:`, error);
-            cliente.tipo_faturamento = 'CO-FT'; // fallback
+            cliente.tipo_faturamento = 'Não definido'; // fallback
           }
         }
       }
