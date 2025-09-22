@@ -110,7 +110,10 @@ export default function GerarFaturamento() {
   });
 
   // Estado para controlar se o demonstrativo foi gerado 
-  const [demonstrativosGeradosPorCliente, setDemonstrativosGeradosPorCliente] = useState<Set<string>>(new Set());
+  const [demonstrativosGeradosPorCliente, setDemonstrativosGeradosPorCliente] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem(`demonstrativosGerados_${periodoSelecionado}`);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const [demonstrativoGerado, setDemonstrativoGerado] = useState(false);
   
   // Verificar se há dados de faturamento processados para este período
@@ -690,6 +693,19 @@ export default function GerarFaturamento() {
     carregarResultadosDB();
   }, [carregarResultadosDB]);
 
+  // Carregar demonstrativos do período atual no mount
+  useEffect(() => {
+    const carregarDemonstrativosDoLocalStorage = () => {
+      const saved = localStorage.getItem(`demonstrativosGerados_${periodoSelecionado}`);
+      if (saved) {
+        const clientesCarregados = JSON.parse(saved);
+        setDemonstrativosGeradosPorCliente(new Set(clientesCarregados));
+      }
+    };
+    
+    carregarDemonstrativosDoLocalStorage();
+  }, [periodoSelecionado]);
+
   // Preservar status ao sair da página
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -697,6 +713,18 @@ export default function GerarFaturamento() {
         const dadosLeves = resultados.map(({ relatorioData, ...resto }) => resto);
         sessionStorage.setItem('resultadosFaturamento', JSON.stringify(dadosLeves));
         localStorage.setItem('ultimoEstadoResultados', JSON.stringify(dadosLeves));
+        
+        // Também salvar status de demonstrativos, relatórios, emails e NFs
+        const clientesComDemonstrativo = Array.from(demonstrativosGeradosPorCliente);
+        localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesComDemonstrativo));
+        
+        const relatoriosGerados = resultados.filter(r => r.relatorioGerado).length;
+        const emailsEnviados = resultados.filter(r => r.emailEnviado).length;
+        const nfsGeradas = resultados.filter(r => r.omieNFGerada).length;
+        
+        localStorage.setItem('relatoriosGerados', relatoriosGerados.toString());
+        localStorage.setItem('emailsEnviados', emailsEnviados.toString());
+        localStorage.setItem('nfsGeradas', nfsGeradas.toString());
       }
     };
 
@@ -875,7 +903,10 @@ export default function GerarFaturamento() {
 
       // ✅ Atualizar demonstrativosGeradosPorCliente com os clientes que tiveram demonstrativos gerados
       const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
-      setDemonstrativosGeradosPorCliente(new Set(clientesComDemonstrativo));
+      const novosClientes = new Set(clientesComDemonstrativo);
+      setDemonstrativosGeradosPorCliente(novosClientes);
+      // Persistir no localStorage
+      localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientes)));
 
       setStatusProcessamento({
         processando: false,
@@ -1914,6 +1945,8 @@ export default function GerarFaturamento() {
                     const clientesProcessados = new Set(dados.demonstrativos.map(d => d.cliente_nome));
                     console.log('✅ Clientes processados:', Array.from(clientesProcessados));
                     setDemonstrativosGeradosPorCliente(clientesProcessados);
+                    // Persistir no localStorage
+                    localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(clientesProcessados)));
                     
                     setDemonstrativoGerado(true);
                     localStorage.setItem('demonstrativoGerado', 'true');
