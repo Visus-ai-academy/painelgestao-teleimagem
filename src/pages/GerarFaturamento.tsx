@@ -188,9 +188,6 @@ export default function GerarFaturamento() {
     omieCodigoPedido?: string;
     omieNumeroPedido?: string;
     dataGeracaoNFOmie?: string;
-    demonstrativoGerado?: boolean;
-    statusDemonstrativo?: 'pendente' | 'gerado';
-    dataGeracaoDemonstrativo?: string;
   }>>(() => {
     const saved = sessionStorage.getItem('resultadosFaturamento');
     return saved ? JSON.parse(saved) : [];
@@ -515,9 +512,7 @@ export default function GerarFaturamento() {
               relatorioGerado: false,
               emailEnviado: false,
               emailDestino: cliente.email,
-              tipo_faturamento: cliente.tipo_faturamento || 'Não definido',
-              demonstrativoGerado: false,
-              statusDemonstrativo: 'pendente' as const
+              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
             }));
             setResultados(resultadosBase);
             salvarResultadosDB(resultadosBase);
@@ -665,9 +660,7 @@ export default function GerarFaturamento() {
         relatorioGerado: false,
         emailEnviado: false,
         emailDestino: cliente.email,
-        tipo_faturamento: 'CO-FT', // Assumir CO-FT para clientes da volumetria que não foram filtrados
-        demonstrativoGerado: false,
-        statusDemonstrativo: 'pendente' as const
+        tipo_faturamento: 'CO-FT' // Assumir CO-FT para clientes da volumetria que não foram filtrados
         // Não definir erro aqui - apenas se houver erro real
       }));
       
@@ -880,23 +873,9 @@ export default function GerarFaturamento() {
       setDemonstrativoGerado(true);
       localStorage.setItem('demonstrativoGerado', 'true');
 
-      // ✅ Atualizar o status dos resultados para mostrar que os demonstrativos foram gerados
+      // ✅ Atualizar demonstrativosGeradosPorCliente com os clientes que tiveram demonstrativos gerados
       const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
-      setResultados(prev => {
-        const novosResultados = prev.map(resultado => {
-          const temDemonstrativo = clientesComDemonstrativo.includes(resultado.clienteNome);
-          return {
-            ...resultado,
-            demonstrativoGerado: temDemonstrativo,
-            statusDemonstrativo: temDemonstrativo ? ('gerado' as const) : ('pendente' as const),
-            dataGeracaoDemonstrativo: temDemonstrativo ? new Date().toLocaleString('pt-BR') : undefined
-          };
-        });
-        
-        // Salvar no banco de dados
-        salvarResultadosDB(novosResultados);
-        return novosResultados;
-      });
+      setDemonstrativosGeradosPorCliente(new Set(clientesComDemonstrativo));
 
       setStatusProcessamento({
         processando: false,
@@ -2209,7 +2188,7 @@ export default function GerarFaturamento() {
                         <tr key={`${resultado.clienteNome}-${index}`} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
           <td className="p-3 text-center">
-            {resultado.statusDemonstrativo === 'gerado' || resultado.demonstrativoGerado || demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
+            {demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
               <Badge variant="default" className="bg-green-600">
                 Concluído
               </Badge>
