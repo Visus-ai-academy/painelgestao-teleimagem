@@ -362,8 +362,8 @@ export default function DemonstrativoFaturamento() {
                 if (faltantes.length > 0) {
                   const { data: contratos } = await supabase
                     .from('clientes')
-                    .select('nome, nome_fantasia, nome_mobilemed, contratos_clientes!inner(tipo_faturamento)')
-                    .eq('ativo', true);
+                    .select('nome, nome_fantasia, nome_mobilemed, status, contratos_clientes!inner(tipo_faturamento, status)')
+                    .not('contratos_clientes.tipo_faturamento', 'eq', 'NC-NF');
                   const mapContratoTipos = new Map<string, string>();
                   (contratos || []).forEach((cli: any) => {
                     const tipo = cli.contratos_clientes?.[0]?.tipo_faturamento;
@@ -531,7 +531,7 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-            // Buscar clientes cadastrados ATIVOS com contratos que precisam de demonstrativo (excluir NC-NF)
+            // Buscar TODOS os clientes com contratos que precisam de demonstrativo (excluir NC-NF)
             const { data: clientesCadastrados } = await supabase
               .from('clientes')
               .select(`
@@ -543,10 +543,10 @@ export default function DemonstrativoFaturamento() {
                 ativo,
                 status,
                 contratos_clientes!inner (
-                  tipo_faturamento
+                  tipo_faturamento,
+                  status
                 )
               `)
-              .eq('ativo', true) // APENAS clientes ativos
               .not('contratos_clientes.tipo_faturamento', 'eq', 'NC-NF'); // EXCLUIR NC-NF
             
             console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
@@ -554,9 +554,14 @@ export default function DemonstrativoFaturamento() {
             // Criar mapa de clientes por nome fantasia
             const clientesMapPorNome = new Map();
             clientesCadastrados?.forEach(cliente => {
-              if (cliente.nome_fantasia) clientesMapPorNome.set(cliente.nome_fantasia, cliente);
-              if (cliente.nome) clientesMapPorNome.set(cliente.nome, cliente);
-              if (cliente.nome_mobilemed) clientesMapPorNome.set(cliente.nome_mobilemed, cliente);
+              // Adicionar tipo_faturamento do contrato ao cliente
+              const clienteComTipo = {
+                ...cliente,
+                tipo_faturamento: cliente.contratos_clientes?.[0]?.tipo_faturamento
+              };
+              if (cliente.nome_fantasia) clientesMapPorNome.set(cliente.nome_fantasia, clienteComTipo);
+              if (cliente.nome) clientesMapPorNome.set(cliente.nome, clienteComTipo);
+              if (cliente.nome_mobilemed) clientesMapPorNome.set(cliente.nome_mobilemed, clienteComTipo);
             });
             
             console.log('🔍 Processando volumetria com NOME FANTASIA e cálculo de preços...');
@@ -702,6 +707,7 @@ export default function DemonstrativoFaturamento() {
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
+                  tipo_faturamento: dadosCliente.cliente.tipo_faturamento || 'Não definido',
                   observacoes: `Dados baseados na volumetria com preços calculados`
                 });
               } else {

@@ -173,6 +173,7 @@ export default function GerarFaturamento() {
     relatorioGerado: boolean;
     emailEnviado: boolean;
     emailDestino: string;
+    tipo_faturamento?: string;
     linkRelatorio?: string;
     arquivos?: Array<{ tipo: string; url: string; nome: string }>;
     erro?: string;
@@ -228,7 +229,13 @@ export default function GerarFaturamento() {
       array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
     );
     
-    let filtrados = [...uniqueResults];
+    // Filtrar apenas clientes ATIVOS (não mostrar inativos/cancelados no Status por Cliente)
+    let filtrados = uniqueResults.filter(resultado => {
+      // Se o resultado tem tipo_faturamento definido e não é NC-NF, incluir
+      // (assumindo que clientes inativos não teriam demonstrativos gerados)
+      const tipo = (resultado as any).tipo_faturamento;
+      return tipo && tipo !== 'NC-NF';
+    });
     
     if (filtroClienteStatus) {
       filtrados = filtrados.filter(resultado => 
@@ -508,7 +515,8 @@ export default function GerarFaturamento() {
               clienteNome: cliente.nome,
               relatorioGerado: false,
               emailEnviado: false,
-              emailDestino: cliente.email
+              emailDestino: cliente.email,
+              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
             }));
             setResultados(resultadosBase);
             salvarResultadosDB(resultadosBase);
@@ -655,7 +663,8 @@ export default function GerarFaturamento() {
         clienteNome: cliente.nome,
         relatorioGerado: false,
         emailEnviado: false,
-        emailDestino: cliente.email
+        emailDestino: cliente.email,
+        tipo_faturamento: 'CO-FT' // Assumir CO-FT para clientes da volumetria que não foram filtrados
         // Não definir erro aqui - apenas se houver erro real
       }));
       
