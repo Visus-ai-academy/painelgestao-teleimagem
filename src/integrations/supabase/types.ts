@@ -4145,8 +4145,8 @@ export type Database = {
               p_categoria: string
               p_cliente_id: string
               p_especialidade: string
-              p_is_plantao?: boolean
               p_modalidade: string
+              p_periodo: string
               p_prioridade: string
               p_volume_total: number
             }
@@ -4154,11 +4154,43 @@ export type Database = {
               p_categoria?: string
               p_cliente_id: string
               p_especialidade: string
+              p_is_plantao?: boolean
               p_modalidade: string
               p_periodo?: string
               p_prioridade?: string
               p_volume_total?: number
             }
+          | {
+              p_categoria?: string
+              p_cliente_id: string
+              p_especialidade: string
+              p_is_plantao?: boolean
+              p_modalidade: string
+              p_prioridade?: string
+              p_volume_total?: number
+            }
+          | {
+              p_categoria?: string
+              p_cliente_id: string
+              p_especialidade: string
+              p_modalidade: string
+              p_prioridade?: string
+              p_volume_total?: number
+            }
+        Returns: {
+          detalhes_calculo: Json
+          faixa_volume: string
+          valor_unitario: number
+        }[]
+      }
+      calcular_volume_total: {
+        Args: {
+          p_categoria?: string
+          p_cliente_id: string
+          p_especialidade?: string
+          p_modalidade: string
+          p_periodo?: string
+        }
         Returns: number
       }
       calculate_custom_metric: {
