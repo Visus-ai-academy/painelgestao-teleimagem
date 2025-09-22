@@ -883,12 +883,13 @@ serve(async (req) => {
         let valorImpostos = 0;
         let valorISS = 0;
         
-        // ✅ CORREÇÃO TRIBUTAÇÃO: Calcular ISS se percentual > 0 OU buscar do contrato
+        // ✅ CORREÇÃO TRIBUTAÇÃO: Calcular impostos baseado no regime tributário
         if (percentualISS > 0) {
+          // Cliente tem ISS configurado
           valorISS = valorBruto * (percentualISS / 100);
           valorImpostos = valorISS;
         } else if (!simplesNacional) {
-          // Buscar ISS do contrato se não tem nos parâmetros
+          // Cliente regime normal: buscar ISS do contrato + aplicar impostos federais
           const { data: contratoISS } = await supabase
             .from('contratos_clientes')
             .select('percentual_iss')
@@ -899,8 +900,14 @@ serve(async (req) => {
           const issContrato = contratoISS?.[0]?.percentual_iss || 0;
           if (issContrato > 0) {
             valorISS = valorBruto * (issContrato / 100);
-            valorImpostos = valorISS;
           }
+          
+          // Para regime normal, sempre aplicar impostos federais (IRRF, CSLL, PIS, COFINS)
+          // Alíquota padrão de 4,65% para impostos federais quando regime normal
+          const impostosFedrais = valorBruto * 0.0465; // 4,65% (IRRF 1,5% + CSLL 1% + PIS 0,65% + COFINS 3%)
+          valorImpostos = valorISS + impostosFedrais;
+          
+          console.log(`🏛️ Impostos ${cliente.nome_fantasia}: ISS R$ ${valorISS.toFixed(2)} + Federais R$ ${impostosFedrais.toFixed(2)} = Total R$ ${valorImpostos.toFixed(2)}`);
         }
         
         const valorTotal = valorBruto - valorImpostos;
@@ -932,6 +939,8 @@ serve(async (req) => {
             simples_nacional: simplesNacional,
             percentual_iss: percentualISS,
             valor_iss: valorISS,
+            valor_impostos_federais: !simplesNacional ? (valorImpostos - valorISS) : 0,
+            percentual_impostos_federais: !simplesNacional ? 4.65 : 0,
             base_calculo: valorBruto
           }
         };
