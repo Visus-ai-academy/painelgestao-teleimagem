@@ -4154,6 +4154,15 @@ export type Database = {
               p_categoria?: string
               p_cliente_id: string
               p_especialidade: string
+              p_is_plantao?: boolean
+              p_modalidade: string
+              p_prioridade?: string
+              p_volume_total?: number
+            }
+          | {
+              p_categoria?: string
+              p_cliente_id: string
+              p_especialidade: string
               p_modalidade: string
               p_prioridade?: string
               p_volume_total?: number
@@ -4163,17 +4172,6 @@ export type Database = {
           faixa_volume: string
           valor_unitario: number
         }[]
-      }
-      calcular_preco_exame_final: {
-        Args: {
-          p_categoria?: string
-          p_cliente_id: string
-          p_especialidade: string
-          p_modalidade: string
-          p_prioridade?: string
-          p_volume_total?: number
-        }
-        Returns: number
       }
       calculate_custom_metric: {
         Args: { metric_name: string }
