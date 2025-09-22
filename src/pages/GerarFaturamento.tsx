@@ -1300,9 +1300,7 @@ export default function GerarFaturamento() {
         setEmailsEnviados(0);
         localStorage.setItem('relatoriosGerados', '0');
         localStorage.setItem('emailsEnviados', '0');
-        localStorage.removeItem('nfsGeradas');
         sessionStorage.removeItem('resultadosFaturamento');
-        sessionStorage.removeItem('progressoFaturamento');
         setResultados([]);
       }
       
