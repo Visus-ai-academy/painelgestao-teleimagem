@@ -229,13 +229,9 @@ export default function GerarFaturamento() {
       array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
     );
     
-    // Filtrar apenas clientes ATIVOS (não mostrar inativos/cancelados no Status por Cliente)
-    let filtrados = uniqueResults.filter(resultado => {
-      // Se o resultado tem tipo_faturamento definido e não é NC-NF, incluir
-      // (assumindo que clientes inativos não teriam demonstrativos gerados)
-      const tipo = (resultado as any).tipo_faturamento;
-      return tipo && tipo !== 'NC-NF';
-    });
+    // Não filtrar por tipo_faturamento aqui - a filtragem de clientes inativos/cancelados
+    // já acontece no carregamento dos dados do banco (carregarResultadosDB)
+    let filtrados = [...uniqueResults];
     
     if (filtroClienteStatus) {
       filtrados = filtrados.filter(resultado => 
