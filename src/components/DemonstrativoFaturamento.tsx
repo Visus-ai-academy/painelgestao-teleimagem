@@ -702,7 +702,7 @@ export default function DemonstrativoFaturamento() {
                       volumeRef = dadosCliente.total_exames;
                   }
 
-                  const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
+                  const { data: resultadoPreco } = await supabase.rpc('calcular_preco_exame', {
                     p_cliente_id: dadosCliente.cliente.id,
                     p_modalidade: combinacao.config.modalidade,
                     p_especialidade: combinacao.config.especialidade,
@@ -711,6 +711,8 @@ export default function DemonstrativoFaturamento() {
                     p_volume_total: volumeRef,
                     p_is_plantao: combinacao.config.is_plantao
                   });
+                  
+                  const precoCalculado = resultadoPreco?.[0]?.valor_unitario || 0;
                   
                   if (precoCalculado && precoCalculado > 0) {
                     const valorCombinacao = Number(precoCalculado) * combinacao.quantidade;
