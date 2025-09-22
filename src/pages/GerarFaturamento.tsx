@@ -188,6 +188,9 @@ export default function GerarFaturamento() {
     omieCodigoPedido?: string;
     omieNumeroPedido?: string;
     dataGeracaoNFOmie?: string;
+    demonstrativoGerado?: boolean;
+    statusDemonstrativo?: 'pendente' | 'gerado';
+    dataGeracaoDemonstrativo?: string;
   }>>(() => {
     const saved = sessionStorage.getItem('resultadosFaturamento');
     return saved ? JSON.parse(saved) : [];
@@ -512,7 +515,9 @@ export default function GerarFaturamento() {
               relatorioGerado: false,
               emailEnviado: false,
               emailDestino: cliente.email,
-              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
+              tipo_faturamento: cliente.tipo_faturamento || 'Não definido',
+              demonstrativoGerado: false,
+              statusDemonstrativo: 'pendente' as const
             }));
             setResultados(resultadosBase);
             salvarResultadosDB(resultadosBase);
@@ -654,13 +659,15 @@ export default function GerarFaturamento() {
       localStorage.setItem('clientesCarregados', JSON.stringify(clientesFinais));
       
       // Inicializar resultados para todos os clientes SEM erros padrão
-      const novosResultados = clientesFinais.map(cliente => ({
+            const novosResultados = clientesFinais.map(cliente => ({
         clienteId: cliente.id,
         clienteNome: cliente.nome,
         relatorioGerado: false,
         emailEnviado: false,
         emailDestino: cliente.email,
-        tipo_faturamento: 'CO-FT' // Assumir CO-FT para clientes da volumetria que não foram filtrados
+        tipo_faturamento: 'CO-FT', // Assumir CO-FT para clientes da volumetria que não foram filtrados
+        demonstrativoGerado: false,
+        statusDemonstrativo: 'pendente' as const
         // Não definir erro aqui - apenas se houver erro real
       }));
       
@@ -872,6 +879,24 @@ export default function GerarFaturamento() {
       // Marcar demonstrativo como gerado
       setDemonstrativoGerado(true);
       localStorage.setItem('demonstrativoGerado', 'true');
+
+      // ✅ Atualizar o status dos resultados para mostrar que os demonstrativos foram gerados
+      const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
+      setResultados(prev => {
+        const novosResultados = prev.map(resultado => {
+          const temDemonstrativo = clientesComDemonstrativo.includes(resultado.clienteNome);
+          return {
+            ...resultado,
+            demonstrativoGerado: temDemonstrativo,
+            statusDemonstrativo: temDemonstrativo ? ('gerado' as const) : ('pendente' as const),
+            dataGeracaoDemonstrativo: temDemonstrativo ? new Date().toLocaleString('pt-BR') : undefined
+          };
+        });
+        
+        // Salvar no banco de dados
+        salvarResultadosDB(novosResultados);
+        return novosResultados;
+      });
 
       setStatusProcessamento({
         processando: false,
@@ -2183,17 +2208,17 @@ export default function GerarFaturamento() {
                       {resultadosFiltradosStatus.map((resultado, index) => (
                         <tr key={`${resultado.clienteNome}-${index}`} className="border-b">
                           <td className="p-3 font-medium">{resultado.clienteNome}</td>
-                          <td className="p-3 text-center">
-                            {demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
-                              <Badge variant="default" className="bg-green-600">
-                                Concluído
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">
-                                Pendente
-                              </Badge>
-                            )}
-                          </td>
+          <td className="p-3 text-center">
+            {resultado.statusDemonstrativo === 'gerado' || resultado.demonstrativoGerado || demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
+              <Badge variant="default" className="bg-green-600">
+                Concluído
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                Pendente
+              </Badge>
+            )}
+          </td>
                           <td className="p-3 text-center">
                             {resultado.relatorioGerado ? (
                               <Badge variant="default" className="bg-green-600">
