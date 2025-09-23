@@ -59,16 +59,6 @@ const formatarPeriodoAbreviado = (periodo: string): string => {
   }
 };
 
-// Helpers de formatação seguros
-const formatNumber = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(Number(value))) return '0';
-  return Number(value).toLocaleString('pt-BR');
-};
-const formatCurrency = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(Number(value))) return 'R$ 0,00';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value));
-};
-
 export default function DemonstrativoFaturamento() {
   const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteFaturamento[]>([]);
@@ -813,25 +803,20 @@ export default function DemonstrativoFaturamento() {
         console.error('❌ Erro ao buscar contratos:', errorContratos);
       }
       
-      // Criar mapas de clientes que precisam de demonstrativo
-      const clientesIdsPermitidos = new Set<string>();
-      const clientesNomesPermitidos = new Set<string>();
-      const normalize = (s?: string | null) => (s || '').toString().trim().toUpperCase();
-      clientesComContratos?.forEach((cliente) => {
-        if (cliente.id) clientesIdsPermitidos.add(cliente.id);
-        if (cliente.nome_fantasia) clientesNomesPermitidos.add(normalize(cliente.nome_fantasia));
-        if (cliente.nome) clientesNomesPermitidos.add(normalize(cliente.nome));
-        if (cliente.nome_mobilemed) clientesNomesPermitidos.add(normalize(cliente.nome_mobilemed));
+      // Criar mapa de clientes que precisam de demonstrativo
+      const clientesQueNecessitamDemonstrativo = new Set();
+      clientesComContratos?.forEach(cliente => {
+        if (cliente.nome_fantasia) clientesQueNecessitamDemonstrativo.add(cliente.nome_fantasia);
+        if (cliente.nome) clientesQueNecessitamDemonstrativo.add(cliente.nome);
+        if (cliente.nome_mobilemed) clientesQueNecessitamDemonstrativo.add(cliente.nome_mobilemed);
       });
       
-      console.log('📋 IDs permitidos:', clientesIdsPermitidos.size, ' | Nomes permitidos amostra:', Array.from(clientesNomesPermitidos).slice(0,5));
+      console.log('📋 Clientes que precisam de demonstrativo:', Array.from(clientesQueNecessitamDemonstrativo));
       
-      // Filtrar dados de faturamento por cliente_id quando disponível; fallback por nome normalizado
-      const dadosFaturamentoFiltrados = dadosFaturamento.filter((item) => {
-        const byId = item.cliente_id && clientesIdsPermitidos.has(item.cliente_id);
-        const byName = clientesNomesPermitidos.has(normalize(item.cliente_nome));
-        return Boolean(byId || byName);
-      });
+      // Filtrar dados de faturamento apenas para clientes que precisam de demonstrativo
+      const dadosFaturamentoFiltrados = dadosFaturamento.filter(item => 
+        clientesQueNecessitamDemonstrativo.has(item.cliente_nome)
+      );
       
       console.log(`🔍 Dados filtrados: ${dadosFaturamentoFiltrados.length} registros (eram ${dadosFaturamento.length})`);
       console.log('👥 Clientes filtrados únicos:', [...new Set(dadosFaturamentoFiltrados.map(d => d.cliente_nome))]);
@@ -1205,7 +1190,7 @@ export default function DemonstrativoFaturamento() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-800">
-                    {formatNumber(resumoCalculado.total_exames_geral)}
+                    {resumoCalculado.total_exames_geral.toLocaleString()}
                   </div>
                   <div className="text-sm text-muted-foreground">Total Exames</div>
                 </div>
@@ -1284,7 +1269,7 @@ export default function DemonstrativoFaturamento() {
                               </td>
                               <td className="py-1 px-3 border-b">{detalhe.prioridade}</td>
                               <td className="py-1 px-3 text-right border-b">
-                                {formatNumber(detalhe.quantidade)}
+                                {detalhe.quantidade.toLocaleString('pt-BR')}
                               </td>
                               <td className="py-1 px-3 text-right font-medium border-b">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(detalhe.valor_total)}
@@ -1392,9 +1377,9 @@ export default function DemonstrativoFaturamento() {
                             {cliente.tipo_faturamento || 'Não definido'}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4 text-right">{formatNumber(cliente.total_exames)}</td>
-                        <td className="py-3 px-4 text-right">{formatCurrency(cliente.valor_bruto)}</td>
-                        <td className="py-3 px-4 text-right font-medium">{formatCurrency(cliente.valor_liquido)}</td>
+                        <td className="py-3 px-4 text-right">{cliente.total_exames.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-right">R$ {cliente.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right font-medium">R$ {cliente.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         <td className="py-3 px-4 text-center">
                           <Badge 
                             variant={
@@ -1444,9 +1429,9 @@ export default function DemonstrativoFaturamento() {
                                         <td className="py-1">{detalhe.especialidade}</td>
                                         <td className="py-1">{detalhe.categoria}</td>
                                         <td className="py-1">{detalhe.prioridade}</td>
-                                        <td className="py-1 text-right">{formatNumber(detalhe.quantidade)}</td>
-                                        <td className="py-1 text-right">{formatCurrency(detalhe.valor_unitario)}</td>
-                                        <td className="py-1 text-right font-medium">{formatCurrency(detalhe.valor_total)}</td>
+                                        <td className="py-1 text-right">{detalhe.quantidade}</td>
+                                        <td className="py-1 text-right">R$ {detalhe.valor_unitario.toFixed(2)}</td>
+                                        <td className="py-1 text-right font-medium">R$ {detalhe.valor_total.toFixed(2)}</td>
                                       </tr>
                                     ))}
                                   </tbody>
