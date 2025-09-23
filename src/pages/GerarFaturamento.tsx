@@ -492,55 +492,35 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // ✅ PRIORIZAR DADOS DOS DEMONSTRATIVOS SALVOS
-      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-      if (demonstrativosCompletos) {
-        try {
-          const dados = JSON.parse(demonstrativosCompletos);
-          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
-            const clientesDoDemonstrativo = dados.demonstrativos.map((demo: any) => ({
-              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
-              nome: demo.cliente_nome || demo.nome_cliente,
-              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
-            }));
-            
-            console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
-            setClientesCarregados(clientesDoDemonstrativo);
-            localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
+      // Não priorizar demonstrativos salvos para evitar subcontagem; sempre carregar da volumetria
+      // (mantido apenas para futura referência caso necessário)
 
-            // Inicializar resultados base para todos os clientes dos demonstrativos
-            const resultadosBase = clientesDoDemonstrativo.map((cliente: any) => ({
-              clienteId: cliente.id,
-              clienteNome: cliente.nome,
-              relatorioGerado: false,
-              emailEnviado: false,
-              emailDestino: cliente.email,
-              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
-            }));
-            setResultados(resultadosBase);
-            salvarResultadosDB(resultadosBase);
-            return;
-          }
-        } catch (error) {
-          console.error('Erro ao processar demonstrativos do localStorage:', error);
-        }
-      }
       
-      // Fallback: Buscar da volumetria se não há demonstrativos
-      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
-        .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
-        .eq('periodo_referencia', periodoSelecionado)
-        .not('"EMPRESA"', 'is', null)
-        .not('"EMPRESA"', 'eq', '')
-        .limit(50000); // Aumentar limite explicitamente
-
-      console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria?.length || 0} registros para período ${periodoSelecionado}`);
-
-      if (errorVolumetria) {
-        console.error('❌ Erro na consulta volumetria:', errorVolumetria);
-        throw errorVolumetria;
+      // Buscar todos os registros de clientes da volumetria com paginação (limite Supabase 1000)
+      const pageSize = 1000;
+      let offset = 0;
+      let clientesVolumetria: { Cliente_Nome_Fantasia: string | null; EMPRESA: string | null }[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from('volumetria_mobilemed')
+          .select('"Cliente_Nome_Fantasia", "EMPRESA"')
+          .eq('periodo_referencia', periodoSelecionado)
+          .not('"EMPRESA"', 'is', null)
+          .not('"EMPRESA"', 'eq', '')
+          .range(offset, offset + pageSize - 1);
+        if (error) {
+          console.error('❌ Erro na consulta volumetria (paginada):', error);
+          throw error;
+        }
+        const batch = data || [];
+        clientesVolumetria.push(...batch);
+        console.log(`📦 Carregada página com ${batch.length} registros (offset ${offset})`);
+        if (batch.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 200000) break; // guarda de segurança
       }
+
+      console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria.length} registros para período ${periodoSelecionado}`);
 
       let clientesFinais: any[] = [];
       
