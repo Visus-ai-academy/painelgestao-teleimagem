@@ -932,8 +932,8 @@ serve(async (req) => {
           }
           
           // Para regime normal, sempre aplicar impostos federais (IRRF, CSLL, PIS, COFINS)
-          // Alíquota padrão de 4,65% para impostos federais quando regime normal
-          const impostosFedrais = valorBruto * 0.0465; // 4,65% (IRRF 1,5% + CSLL 1% + PIS 0,65% + COFINS 3%)
+          // Alíquota padrão de 6,15% para impostos federais quando regime normal
+          const impostosFedrais = valorBruto * 0.0615; // 6,15% (IRRF 1,5% + CSLL 1% + PIS 0,65% + COFINS 3%)
           valorImpostos = valorISS + impostosFedrais;
           
           console.log(`🏛️ Impostos ${cliente.nome_fantasia}: ISS R$ ${valorISS.toFixed(2)} + Federais R$ ${impostosFedrais.toFixed(2)} = Total R$ ${valorImpostos.toFixed(2)}`);
@@ -969,7 +969,7 @@ serve(async (req) => {
             percentual_iss: percentualISS,
             valor_iss: valorISS,
             valor_impostos_federais: !simplesNacional ? (valorImpostos - valorISS) : 0,
-            percentual_impostos_federais: !simplesNacional ? 4.65 : 0,
+            percentual_impostos_federais: !simplesNacional ? 6.15 : 0,
             base_calculo: valorBruto,
             // Detalhes individuais dos impostos federais
             valor_pis: !simplesNacional ? parseFloat((valorBruto * 0.0065).toFixed(2)) : 0,
