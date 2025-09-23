@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { 
   FileSpreadsheet, 
   Download, 
@@ -17,10 +18,12 @@ import {
   Users,
   Calendar,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import DemonstrativoFaturamentoOtimizado from './DemonstrativoFaturamentoOtimizado';
 import * as XLSX from "xlsx";
 interface ClienteFaturamento {
   id: string;
@@ -69,6 +72,7 @@ export default function DemonstrativoFaturamento() {
   const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [modoOtimizado, setModoOtimizado] = useState(true); // Usar versão otimizada por padrão
   const hasShownInitialToast = useRef(false);
   // Evita correções em loop: registra tentativas por período e status de execução
   const tcCorrectionTried = useRef<Set<string>>(new Set());
