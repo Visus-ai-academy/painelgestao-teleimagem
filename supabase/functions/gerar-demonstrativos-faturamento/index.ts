@@ -27,7 +27,26 @@ serve(async (req) => {
     const listaClientesFiltro = Array.isArray(clientes)
       ? clientes.filter((c: any) => !!c).map((c: any) => String(c).trim().toUpperCase())
       : [];
-
+    // Helper to normalize names (mirrors DB limpar_nome_cliente)
+    const normalizeName = (s: string): string => {
+      if (!s) return '';
+      let n = String(s).toUpperCase().trim();
+      const map: Record<string,string> = {
+        'INTERCOR2':'INTERCOR',
+        'P-HADVENTISTA':'HADVENTISTA',
+        'P-UNIMED_CARUARU':'UNIMED_CARUARU',
+        'PRN - MEDIMAGEM CAMBORIU':'MEDIMAGEM_CAMBORIU',
+        'UNIMAGEM_CENTRO':'UNIMAGEM_ATIBAIA',
+        'VIVERCLIN 2':'VIVERCLIN',
+        'CEDI-RJ':'CEDIDIAG','CEDI-RO':'CEDIDIAG','CEDI-UNIMED':'CEDIDIAG',
+        'CEDI_RJ':'CEDIDIAG','CEDI_RO':'CEDIDIAG','CEDI_UNIMED':'CEDIDIAG',
+      };
+      if (map[n]) n = map[n];
+      const removeSuffix = (suffix: string) => { if (n.endsWith(suffix)) n = n.slice(0, -suffix.length); };
+      [' - TELE','- TELE','-CT','-MR','_PLANTÃO','_PLANTAO','_RMX'].forEach(removeSuffix);
+      n = n.replace(/\s+/g,' ').replace(/\s*-\s*/g,'-').trim();
+      return n;
+    };
 
     console.log(`🚀 Iniciando geração de demonstrativos para período: ${periodo}`);
     
@@ -50,13 +69,16 @@ serve(async (req) => {
 
     console.log(`📊 Total de clientes encontrados: ${clientesCompletos?.length || 0}`);
 
+    // Conjunto normalizado de nomes vindos da volumetria
+    const filtroSet = new Set(listaClientesFiltro.map(normalizeName));
+
     // Aplicar filtro de clientes quando fornecido (nomes vindos da volumetria)
     const listaClientes = (clientesCompletos || []).filter((c) => {
-      if (!listaClientesFiltro.length) return true;
+      if (!filtroSet.size) return true;
       const candidatos = [c.nome_fantasia, c.nome_mobilemed, c.nome]
         .filter(Boolean)
-        .map((s: string) => s.trim().toUpperCase());
-      return candidatos.some((n) => listaClientesFiltro.includes(n));
+        .map((s: any) => normalizeName(String(s)));
+      return candidatos.some((n) => filtroSet.has(n));
     });
 
     console.log(`📊 Total de clientes após filtro: ${listaClientes.length}`);
