@@ -1888,21 +1888,116 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                <div className="text-sm text-gray-600 mb-4">
-                  {demonstrativoGerado ? (
-                    <div className="text-green-600">
-                      Demonstrativo gerado com sucesso
+                
+                {/* Botão e informações diretamente na Etapa 1 */}
+                <div className="flex flex-col lg:flex-row gap-4 items-start mb-4">
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      onClick={async () => {
+                        if (!periodoSelecionado) {
+                          toast({
+                            title: "Período obrigatório",
+                            description: "Por favor, selecione um período",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+
+                        setProcessandoTodos(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+                            body: { periodo: periodoSelecionado }
+                          });
+
+                          if (error) {
+                            throw new Error(`Erro na edge function: ${error.message || JSON.stringify(error)}`);
+                          }
+
+                          if (data?.success) {
+                            // Persistir demonstrativos no localStorage
+                            const dadosParaSalvar = {
+                              demonstrativos: data.demonstrativos,
+                              resumo: data.resumo,
+                              periodo: periodoSelecionado,
+                              timestamp: new Date().toISOString()
+                            };
+                            localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
+                            
+                            setDemonstrativoGerado(true);
+                            
+                            toast({
+                              title: "Demonstrativos gerados com sucesso!",
+                              description: `${data.resumo?.clientes_processados || 0} clientes processados`
+                            });
+
+                            // Atualizar a lista de clientes para relatórios
+                            if (data.demonstrativos && Array.isArray(data.demonstrativos)) {
+                              const clientesParaRelatorio = data.demonstrativos.map(d => ({
+                                id: d.cliente_id,
+                                nome: d.cliente_nome,
+                                email: ''
+                              }));
+                              setClientesCarregados(clientesParaRelatorio);
+                              localStorage.setItem('clientesCarregados', JSON.stringify(clientesParaRelatorio));
+                            }
+
+                            // Mostrar alertas se houver clientes inativos
+                            if (data.alertas && data.alertas.length > 0) {
+                              setTimeout(() => {
+                                toast({
+                                  title: "⚠️ Alertas de Segurança",
+                                  description: `${data.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s)`,
+                                  variant: "destructive",
+                                });
+                              }, 1000);
+                            }
+                          } else {
+                            throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
+                          }
+                        } catch (error: any) {
+                          toast({
+                            title: "Erro ao gerar demonstrativos",
+                            description: error.message || 'Erro desconhecido',
+                            variant: "destructive"
+                          });
+                        } finally {
+                          setProcessandoTodos(false);
+                        }
+                      }}
+                      disabled={processandoTodos || !periodoSelecionado}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {processandoTodos ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Gerar Demonstrativos
+                        </>
+                      )}
+                    </Button>
+                    <div className="text-sm text-blue-700">
+                      Período selecionado: <strong>{periodoSelecionado}</strong>
                     </div>
-                  ) : (
-                    <div className="text-blue-700">
-                      <FileBarChart2 className="h-4 w-4 inline mr-2" />
-                      Generate o demonstrativo completo com franquias para todos os clientes do período selecionado.
-                    </div>
-                  )}
+                  </div>
+                  
+                  <div className="flex-1 text-sm text-blue-700">
+                    Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
+                  </div>
                 </div>
 
-                {/* Componente de geração de demonstrativos */}
-                <DemonstrativoFaturamentoCompleto 
+                {demonstrativoGerado && (
+                  <div className="text-sm text-green-600 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Demonstrativo gerado com sucesso
+                  </div>
+                )}
+
+                {/* Componente de geração de demonstrativos - apenas para exibir dados */}
+                <DemonstrativoFaturamentoCompleto
                   periodo={periodoSelecionado} 
                   onDemonstrativosGerados={(dados) => {
                     console.log('🔄 Callback onDemonstrativosGerados recebido:');

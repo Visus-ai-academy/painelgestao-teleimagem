@@ -234,40 +234,7 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
-            {/* Botão na esquerda */}
-            <div className="flex flex-col gap-4">
-              <Button 
-                onClick={handleGerarDemonstrativos}
-                disabled={loading || !periodo}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Gerar Demonstrativos
-                  </>
-                )}
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
-              </div>
-            </div>
-            
-            {/* Texto explicativo na direita */}
-            <div className="flex-1 text-sm text-muted-foreground">
-              Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Componente agora só exibe os dados, o botão foi movido para a Etapa 1 */}
 
       {/* ✅ MOVER PARA ABA DEMONSTRATIVOS: Remover daqui */}
       {false && resumo && (
