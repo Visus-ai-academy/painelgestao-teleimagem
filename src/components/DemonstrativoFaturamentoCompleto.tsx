@@ -238,18 +238,15 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Demonstrativos de Faturamento Completo
           </CardTitle>
           <CardDescription>
             Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="text-sm text-muted-foreground">
-                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
-              </div>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
             </div>
             <Button 
               onClick={handleGerarDemonstrativos}
