@@ -15,6 +15,7 @@ import {
   Brain
 } from "lucide-react";
 import { FilterBar } from "@/components/FilterBar";
+import { TesteCenarioCBittencourt } from "@/components/TesteCenarioCBittencourt";
 
 const melhoresPraticasRH = [
   {
@@ -307,6 +308,19 @@ export default function Desenvolvimento() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Teste de Cenário de Preços */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            Teste de Cenário - Sistema de Preços
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TesteCenarioCBittencourt />
         </CardContent>
       </Card>
     </div>
