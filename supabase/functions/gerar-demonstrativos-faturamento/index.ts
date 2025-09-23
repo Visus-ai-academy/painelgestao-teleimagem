@@ -633,32 +633,48 @@ serve(async (req) => {
               });
 
               try {
-                const rpc1 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: clienteIdValido,
-                  p_modalidade: grupo.modalidade,
-                  p_especialidade: grupo.especialidade,
-                  p_prioridade: grupo.prioridade,
-                  p_categoria: grupo.categoria || 'SC',
-                  p_volume_total: volumeEspecifico, // ✅ Usar quantidade do grupo para faixa (ex.: 113 -> 101-250)
-                  p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
-                });
-                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                  if (!rpc1.error && rpc1.data !== null && rpc1.data !== undefined) {
-                    if (Array.isArray(rpc1.data)) {
-                      const item = rpc1.data[0] as any;
-                      preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
-                    } else if (typeof rpc1.data === 'number') {
-                      preco = rpc1.data as unknown as number;
-                    } else if (typeof rpc1.data === 'object') {
-                      preco = (rpc1.data as any)?.valor_unitario ?? null;
-                    } else {
-                      preco = null;
-                    }
-                  } else {
-                    preco = null;
-                  }
+                // ✅ CÁLCULO DIRETO SEM RPC - para evitar problemas de compatibilidade
+                const { data: precosConfig, error: precosError } = await supabase
+                  .from('precos_servicos')
+                  .select('*')
+                  .eq('cliente_id', clienteIdValido)
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .eq('categoria', grupo.categoria || 'SC')
+                  .eq('prioridade', grupo.prioridade)
+                  .eq('ativo', true)
+                  .order('created_at', { ascending: false })
+                  .limit(1);
 
-                precoError = rpc1.error;
+                if (precosError) {
+                  console.error(`❌ Erro ao buscar preços:`, precosError);
+                  precoError = precosError;
+                } else if (precosConfig && precosConfig.length > 0) {
+                  const config = precosConfig[0];
+                  
+                  // Verificar se volume está na faixa
+                  const volMin = config.volume_inicial || 1;
+                  const volMax = config.volume_final || 999999;
+                  
+                  console.log(`📊 Verificando faixa de volume: ${volumeEspecifico} está entre ${volMin} e ${volMax}?`);
+                  
+                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
+                    // Usar valor de urgência se aplicável, senão valor base
+                    if (grupo.prioridade.includes('URGÊNCIA') && config.valor_urgencia) {
+                      preco = config.valor_urgencia;
+                    } else {
+                      preco = config.valor_base || 0;
+                    }
+                    
+                    console.log(`✅ Preço encontrado na faixa ${volMin}-${volMax}: R$ ${preco}`);
+                  } else {
+                    console.log(`⚠️ Volume ${volumeEspecifico} fora da faixa ${volMin}-${volMax}`);
+                    preco = 0;
+                  }
+                } else {
+                  console.log(`⚠️ Nenhuma configuração de preço encontrada para ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade}`);
+                  preco = 0;
+                }
               } catch (e) {
                 precoError = e;
               }
@@ -678,52 +694,62 @@ serve(async (req) => {
 
               // Fallback 1: se não encontrou, tentar com prioridade ROTINA
               if ((!preco || preco <= 0) && !precoError) {
-                const rpc2 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: clienteIdValido,
-                  p_modalidade: grupo.modalidade,
-                  p_especialidade: grupo.especialidade,
-                  p_prioridade: 'ROTINA',
-                  p_categoria: grupo.categoria || 'SC',
-                   p_volume_total: volumeEspecifico, // ✅ Usar volume condicional para faixa
-                  p_is_plantao: false
-                });
-                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                if (!rpc2.error && rpc2.data !== null && rpc2.data !== undefined) {
-                  if (Array.isArray(rpc2.data)) {
-                    const item = rpc2.data[0] as any;
-                    preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
-                  } else if (typeof rpc2.data === 'number') {
-                    preco = rpc2.data as unknown as number;
-                  } else if (typeof rpc2.data === 'object') {
-                    preco = (rpc2.data as any)?.valor_unitario ?? null;
+                console.log(`🔄 Fallback 1: Tentando com prioridade ROTINA para ${grupo.modalidade}/${grupo.especialidade}`);
+                
+                const { data: precosFallback1, error: errorFallback1 } = await supabase
+                  .from('precos_servicos')
+                  .select('*')
+                  .eq('cliente_id', clienteIdValido)
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .eq('categoria', grupo.categoria || 'SC')
+                  .eq('prioridade', 'ROTINA')
+                  .eq('ativo', true)
+                  .order('created_at', { ascending: false })
+                  .limit(1);
+
+                if (!errorFallback1 && precosFallback1 && precosFallback1.length > 0) {
+                  const config = precosFallback1[0];
+                  const volMin = config.volume_inicial || 1;
+                  const volMax = config.volume_final || 999999;
+                  
+                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
+                    preco = config.valor_base || 0;
+                    console.log(`✅ Fallback 1 - Preço ROTINA encontrado: R$ ${preco}`);
                   }
                 }
-
               }
 
               // Fallback 2: se ainda não encontrou e categoria != SC, tentar com SC
               if ((!preco || preco <= 0) && (grupo.categoria || 'SC') !== 'SC') {
-                const rpc3 = await supabase.rpc('calcular_preco_exame', {
-                  p_cliente_id: clienteIdValido,
-                  p_modalidade: grupo.modalidade,
-                  p_especialidade: grupo.especialidade,
-                  p_prioridade: grupo.prioridade,
-                  p_categoria: 'SC',
-                   p_volume_total: volumeEspecifico,
-                  p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
-                });
-                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                if (!rpc3.error && rpc3.data !== null && rpc3.data !== undefined) {
-                  if (Array.isArray(rpc3.data)) {
-                    const item = rpc3.data[0] as any;
-                    preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
-                  } else if (typeof rpc3.data === 'number') {
-                    preco = rpc3.data as unknown as number;
-                  } else if (typeof rpc3.data === 'object') {
-                    preco = (rpc3.data as any)?.valor_unitario ?? null;
+                console.log(`🔄 Fallback 2: Tentando com categoria SC para ${grupo.modalidade}/${grupo.especialidade}`);
+                
+                const { data: precosFallback2, error: errorFallback2 } = await supabase
+                  .from('precos_servicos')
+                  .select('*')
+                  .eq('cliente_id', clienteIdValido)
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .eq('categoria', 'SC')
+                  .eq('prioridade', grupo.prioridade)
+                  .eq('ativo', true)
+                  .order('created_at', { ascending: false })
+                  .limit(1);
+
+                if (!errorFallback2 && precosFallback2 && precosFallback2.length > 0) {
+                  const config = precosFallback2[0];
+                  const volMin = config.volume_inicial || 1;
+                  const volMax = config.volume_final || 999999;
+                  
+                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
+                    if (grupo.prioridade.includes('URGÊNCIA') && config.valor_urgencia) {
+                      preco = config.valor_urgencia;
+                    } else {
+                      preco = config.valor_base || 0;
+                    }
+                    console.log(`✅ Fallback 2 - Preço SC encontrado: R$ ${preco}`);
                   }
                 }
-
               }
 
               if (preco && preco > 0) {
