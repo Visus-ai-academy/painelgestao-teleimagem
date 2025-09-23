@@ -360,7 +360,6 @@ serve(async (req: Request) => {
                   precoPorCombo[key] = 0;
                 }
               }
-              }
             } catch (e) {
               console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
               precoPorCombo[key] = 0;
