@@ -970,7 +970,12 @@ serve(async (req) => {
             valor_iss: valorISS,
             valor_impostos_federais: !simplesNacional ? (valorImpostos - valorISS) : 0,
             percentual_impostos_federais: !simplesNacional ? 4.65 : 0,
-            base_calculo: valorBruto
+            base_calculo: valorBruto,
+            // Detalhes individuais dos impostos federais
+            valor_pis: !simplesNacional ? parseFloat((valorBruto * 0.0065).toFixed(2)) : 0,
+            valor_cofins: !simplesNacional ? parseFloat((valorBruto * 0.03).toFixed(2)) : 0,
+            valor_csll: !simplesNacional ? parseFloat((valorBruto * 0.01).toFixed(2)) : 0,
+            valor_irrf: !simplesNacional ? parseFloat((valorBruto * 0.015).toFixed(2)) : 0
           }
         };
 

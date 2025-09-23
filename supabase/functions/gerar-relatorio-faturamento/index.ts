@@ -438,7 +438,7 @@ serve(async (req: Request) => {
       valorPortal = Number(demonstrativoData.valor_portal_laudos || 0);
       valorIntegracao = Number(demonstrativoData.valor_integracao || 0);
       totalImpostos = Number(demonstrativoData.valor_impostos || 0);
-      valorAPagar = Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos));
+      valorAPagar = parseFloat((Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos))).toFixed(2));
     } else {
       // Calcular resumo usando dados de faturamento ou volumetria
       const isFaturamentoDataLocal = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
@@ -462,11 +462,24 @@ serve(async (req: Request) => {
       valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
       valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
       totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-      valorAPagar = valorBrutoTotal - totalImpostos;
+      valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
     }
 
-    // Mesmo quando vem do demonstrativo, calcular valores individuais para exibição
+    // Calcular valores individuais para exibição baseado no regime tributário
     if (demonstrativoData) {
+      const detalhesTribu = demonstrativoData.detalhes_tributacao || {};
+      if (!detalhesTribu.simples_nacional) {
+        // Usar valores calculados no demonstrativo se disponíveis, senão calcular
+        valorPIS = detalhesTribu.valor_pis || parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+        valorCOFINS = detalhesTribu.valor_cofins || parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+        valorCSLL = detalhesTribu.valor_csll || parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+        valorIRRF = detalhesTribu.valor_irrf || parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+      } else {
+        // Simples nacional: impostos federais zerados
+        valorPIS = valorCOFINS = valorCSLL = valorIRRF = 0;
+      }
+    } else {
+      // Fallback: calcular impostos padrão
       valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
       valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
       valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
