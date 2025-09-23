@@ -205,21 +205,11 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
     setExpandedClients(newExpanded);
   };
 
-  const formatCurrency = (value: number | undefined | null) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return 'R$ 0,00';
-    }
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
-  };
-
-  const formatNumber = (value: number | undefined | null) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return '0';
-    }
-    return value.toLocaleString('pt-BR');
   };
 
   const getStatusBadge = (detalhes: any) => {

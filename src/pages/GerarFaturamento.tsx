@@ -48,6 +48,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { DiagnosticoClientePrecos } from "@/components/DiagnosticoClientePrecos";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -783,30 +784,60 @@ export default function GerarFaturamento() {
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento para período:', periodoSelecionado);
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
 
-      setStatusProcessamento({
-        processando: true,
-        mensagem: `Processando todos os clientes com parâmetros de faturamento...`,
-        progresso: 50
-      });
-
-      // Chamar edge function uma única vez para processar todos os clientes
-      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-        body: { periodo: periodoSelecionado }
-      });
-
-      console.log('📋 [RESPOSTA] Data:', data);
-      console.log('📋 [RESPOSTA] Error:', error);
-
-      if (error || !data?.success) {
-        console.error('❌ [ERRO] Erro na edge function:', error?.message || data?.error);
-        throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+      // Processar em lotes para evitar timeout da Edge Function
+      const chunkSize = 20;
+      const chunks: string[][] = [];
+      for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
+        chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
       }
 
-      const todosDemonstrativos = data?.demonstrativos || [];
-      const todosAlertas = data?.alertas || [];
-      const resumoCombinado = data?.resumo || {};
+      const todosDemonstrativos: any[] = [];
+      const todosAlertas: string[] = [];
+      let clientesProcessados = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const lote = chunks[i];
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
+          progresso: 30 + Math.round(((i) / chunks.length) * 35)
+        });
+
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: {
+            periodo: periodoSelecionado,
+            clientes: lote
+          }
+        });
+
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+        if (error || !data?.success) {
+          console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+        }
+
+        clientesProcessados += data?.resumo?.clientes_processados || 0;
+        todosDemonstrativos.push(...(data?.demonstrativos || []));
+        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
+      }
+
+      // Montar resumo combinado e salvar no localStorage para manter fluxo atual
+      const resumoCombinado = {
+        total_clientes: clientesUnicosVolumetria.length,
+        clientes_processados: clientesProcessados,
+        total_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.total_exames || 0), 0),
+        valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto || 0), 0),
+        valor_impostos_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_impostos || 0), 0),
+        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total || 0), 0),
+        valor_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_exames || 0), 0),
+        valor_franquias_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_franquia || 0), 0),
+        valor_portal_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_portal_laudos || 0), 0),
+        valor_integracao_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_integracao || 0), 0),
+      };
 
       const dadosParaSalvar = {
         demonstrativos: todosDemonstrativos,
@@ -816,7 +847,7 @@ export default function GerarFaturamento() {
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
-      console.log(`💾 Dados salvos no localStorage. Processados: ${resumoCombinado.clientes_processados}`);
+      console.log(`💾 Dados combinados salvos no localStorage. Lotes: ${chunks.length}, Processados: ${clientesProcessados}`);
 
       setStatusProcessamento({
         processando: true,
@@ -872,7 +903,7 @@ export default function GerarFaturamento() {
 
       // ✅ Atualizar demonstrativosGeradosPorCliente com os clientes que tiveram demonstrativos gerados
       const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
-      const novosClientes = new Set<string>(clientesComDemonstrativo);
+      const novosClientes = new Set(clientesComDemonstrativo);
       setDemonstrativosGeradosPorCliente(novosClientes);
       // Persistir no localStorage
       localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientes)));
@@ -2370,6 +2401,11 @@ export default function GerarFaturamento() {
         </TabsContent>
 
           </Tabs>
+          
+          {/* Seção de Diagnóstico */}
+          <div className="mt-8">
+            <DiagnosticoClientePrecos />
+          </div>
         </div>
       );
 }
