@@ -61,7 +61,7 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
   const { toast } = useToast();
 
   // Chave para localStorage baseada no período
-  const storageKey = `demonstrativos_${periodo}`;
+  const storageKey = `demonstrativos_completos_${periodo}`;
 
   // Carregar dados do localStorage ao montar o componente
   useEffect(() => {
