@@ -168,11 +168,16 @@ Deno.serve(async (req) => {
           console.log(`🔍 Buscando volumetria para cliente: ${nomeCliente} no período ${periodo}`);
 
           // Buscar dados de volumetria
+          const filtrosEmpresas = [nomeCliente, cliente.nome_fantasia, cliente.nome]
+            .filter((v) => v && String(v).trim().length > 0)
+            .map((v) => `EMPRESA.eq.${v}`)
+            .join(',');
+
           const { data: volumetriaData, error: volumetriaError } = await supabase
             .from('volumetria_mobilemed')
             .select('*')
             .eq('periodo_referencia', periodo)
-            .or(`EMPRESA.eq.${nomeCliente},EMPRESA.eq.${cliente.nome_fantasia || ''},EMPRESA.eq.${cliente.nome}`)
+            .or(filtrosEmpresas)
             .not('arquivo_fonte', 'eq', 'volumetria_onco_padrao');
 
           if (volumetriaError || !volumetriaData || volumetriaData.length === 0) {
@@ -344,7 +349,27 @@ Deno.serve(async (req) => {
             }
           };
 
-          // Salvar na tabela de demonstrativos calculados
+          // Adicionar ao retorno antes de persistir (não bloquear UI)
+          demonstrativos.push(demonstrativo);
+
+          // Atualizar resumo imediatamente
+          resumo.clientes_processados++;
+          resumo.total_exames_geral += totalExames;
+          resumo.valor_bruto_geral += valorBrutoTotal;
+          resumo.valor_impostos_geral += valorTotalImpostos;
+          resumo.valor_total_geral += valorBrutoTotal;
+          resumo.valor_exames_geral += valorExamesTotal;
+          resumo.valor_franquias_geral += (franquia.valor_franquia || 0);
+          resumo.valor_portal_geral += (franquia.valor_portal_laudos || 0);
+          resumo.valor_integracao_geral += (franquia.valor_integracao || 0);
+
+          if (ehSimplesNacional) {
+            resumo.clientes_simples_nacional++;
+          } else {
+            resumo.clientes_regime_normal++;
+          }
+
+          // Persistir de forma tolerante a falhas
           const { error: insertError } = await supabase
             .from('demonstrativos_faturamento_calculados')
             .insert({
@@ -375,28 +400,9 @@ Deno.serve(async (req) => {
 
           if (insertError) {
             console.error(`❌ Erro ao salvar demonstrativo para ${nomeCliente}:`, insertError);
-            throw new Error(`Erro ao salvar demonstrativo: ${insertError.message}`);
-          }
-
-          console.log(`✅ Demonstrativo salvo com sucesso para ${nomeCliente}`);
-
-          demonstrativos.push(demonstrativo);
-
-          // Atualizar resumo
-          resumo.clientes_processados++;
-          resumo.total_exames_geral += totalExames;
-          resumo.valor_bruto_geral += valorBrutoTotal;
-          resumo.valor_impostos_geral += valorTotalImpostos;
-          resumo.valor_total_geral += valorBrutoTotal;
-          resumo.valor_exames_geral += valorExamesTotal;
-          resumo.valor_franquias_geral += (franquia.valor_franquia || 0);
-          resumo.valor_portal_geral += (franquia.valor_portal_laudos || 0);
-          resumo.valor_integracao_geral += (franquia.valor_integracao || 0);
-
-          if (ehSimplesNacional) {
-            resumo.clientes_simples_nacional++;
+            // segue o processamento sem interromper
           } else {
-            resumo.clientes_regime_normal++;
+            console.log(`✅ Demonstrativo salvo com sucesso para ${nomeCliente}`);
           }
 
         } catch (error) {
