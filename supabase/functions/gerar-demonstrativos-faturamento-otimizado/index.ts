@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
             const volRef = condicaoVolume === 'GERAL' ? totalExames : grupo.volumeRef;
             console.log(`🔍 Buscando preço para ${nomeCliente}: ${chave} (qtd=${grupo.quantidade}, volRef=${volRef})`);
 
-            const { data: precoData } = await supabase.rpc('calcular_preco_exame', {
+            const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
               p_cliente_nome: nomeCliente,
               p_modalidade: grupo.modalidade,
               p_especialidade: grupo.especialidade, 
@@ -256,6 +256,10 @@ Deno.serve(async (req) => {
               p_prioridade: grupo.prioridade,
               p_volume_referencia: volRef
             });
+
+            if (precoError) {
+              console.error(`❌ Erro no cálculo de preço para ${nomeCliente} - ${chave}:`, precoError);
+            }
 
             let valorUnitario = 0;
             if (precoData) {
@@ -287,13 +291,19 @@ Deno.serve(async (req) => {
           const parametrosFaturamento = cliente.parametros_faturamento?.find(p => p.status === 'A') || {};
 
           // Calcular franquia, portal e integração usando RPC existente
-          const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
+          console.log(`💰 Calculando faturamento completo para ${nomeCliente}...`);
+          const { data: calculoCompleto, error: calculoError } = await supabase.rpc('calcular_faturamento_completo', {
             p_cliente_id: cliente.id,
             p_periodo: periodo,
             p_volume_total: totalExames
           });
 
+          if (calculoError) {
+            console.error(`❌ Erro no cálculo de faturamento para ${nomeCliente}:`, calculoError);
+          }
+
           const franquia = calculoCompleto?.[0] || {};
+          console.log(`📊 Resultado cálculo faturamento ${nomeCliente}:`, franquia);
 
           // Calcular impostos
           const valorBrutoTotal = valorExamesTotal + (franquia.valor_franquia || 0) + (franquia.valor_portal_laudos || 0) + (franquia.valor_integracao || 0);
@@ -365,7 +375,10 @@ Deno.serve(async (req) => {
 
           if (insertError) {
             console.error(`❌ Erro ao salvar demonstrativo para ${nomeCliente}:`, insertError);
+            throw new Error(`Erro ao salvar demonstrativo: ${insertError.message}`);
           }
+
+          console.log(`✅ Demonstrativo salvo com sucesso para ${nomeCliente}`);
 
           demonstrativos.push(demonstrativo);
 
