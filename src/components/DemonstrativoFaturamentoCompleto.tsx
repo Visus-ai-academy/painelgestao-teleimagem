@@ -235,36 +235,36 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-          </CardTitle>
-          <CardDescription>
-            Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Botão na esquerda */}
+            <div className="flex flex-col gap-4">
+              <Button 
+                onClick={handleGerarDemonstrativos}
+                disabled={loading || !periodo}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Gerar Demonstrativos
+                  </>
+                )}
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
+              </div>
             </div>
-            <Button 
-              onClick={handleGerarDemonstrativos}
-              disabled={loading || !periodo}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processando...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Gerar Demonstrativos
-                </>
-              )}
-            </Button>
+            
+            {/* Texto explicativo na direita */}
+            <div className="flex-1 text-sm text-muted-foreground">
+              Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
+            </div>
           </div>
         </CardContent>
       </Card>

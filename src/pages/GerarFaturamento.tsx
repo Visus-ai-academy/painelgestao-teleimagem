@@ -1890,8 +1890,8 @@ export default function GerarFaturamento() {
                 </h4>
                 <div className="text-sm text-gray-600 mb-4">
                   {demonstrativoGerado ? (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="h-4 w-4" />
+                    <div className="text-green-600">
+                      Demonstrativo gerado com sucesso
                     </div>
                   ) : (
                     <div className="text-blue-700">
