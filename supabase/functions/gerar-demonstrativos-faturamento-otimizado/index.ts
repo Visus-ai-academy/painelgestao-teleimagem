@@ -167,10 +167,15 @@ Deno.serve(async (req) => {
           const nomeCliente = cliente.nome_mobilemed || cliente.nome_fantasia || cliente.nome;
           console.log(`🔍 Buscando volumetria para cliente: ${nomeCliente} no período ${periodo}`);
 
-          // Buscar dados de volumetria
+          // Buscar dados de volumetria (considerar EMPRESA e Cliente_Nome_Fantasia)
           const filtrosEmpresas = [nomeCliente, cliente.nome_fantasia, cliente.nome]
             .filter((v) => v && String(v).trim().length > 0)
-            .map((v) => `EMPRESA.eq.${v}`)
+            .map((v) => `"Cliente_Nome_Fantasia".eq.${v}`)
+            .concat(
+              [nomeCliente, cliente.nome_fantasia, cliente.nome]
+                .filter((v) => v && String(v).trim().length > 0)
+                .map((v) => `EMPRESA.eq.${v}`)
+            )
             .join(',');
 
           const { data: volumetriaData, error: volumetriaError } = await supabase
@@ -253,13 +258,19 @@ Deno.serve(async (req) => {
             const volRef = condicaoVolume === 'GERAL' ? totalExames : grupo.volumeRef;
             console.log(`🔍 Buscando preço para ${nomeCliente}: ${chave} (qtd=${grupo.quantidade}, volRef=${volRef})`);
 
+            // Verificar se o cliente tem plantão/urgência na prioridade
+            const prio = (grupo.prioridade || '').toString().toUpperCase();
+            const isPlantao = prio.includes('PLANTÃO') || prio.includes('PLANTAO') || prio.includes('URGENTE') || prio.includes('URGÊNCIA');
+
+            // Usar a função RPC para calcular preço com cliente_id (assinatura esperada)
             const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-              p_cliente_nome: nomeCliente,
+              p_cliente_id: cliente.id,
               p_modalidade: grupo.modalidade,
-              p_especialidade: grupo.especialidade, 
-              p_categoria: grupo.categoria,
-              p_prioridade: grupo.prioridade,
-              p_volume_referencia: volRef
+              p_especialidade: grupo.especialidade,
+              p_categoria: grupo.categoria || 'SC',
+              p_prioridade: grupo.prioridade || 'ROTINA',
+              p_volume_total: volRef,
+              p_is_plantao: isPlantao
             });
 
             if (precoError) {
@@ -267,14 +278,13 @@ Deno.serve(async (req) => {
             }
 
             let valorUnitario = 0;
-            if (precoData) {
-              if (typeof precoData === 'number') {
-                valorUnitario = precoData;
-              } else if (Array.isArray(precoData) && precoData.length > 0) {
-                valorUnitario = precoData[0].valor || 0;
-              } else if (typeof precoData === 'object' && precoData.valor) {
-                valorUnitario = precoData.valor;
-              }
+            if (Array.isArray(precoData)) {
+              const first = (precoData as any[])[0] || {};
+              valorUnitario = Number(first.valor_unitario ?? first.preco ?? first.valor ?? 0);
+            } else if (typeof precoData === 'number') {
+              valorUnitario = precoData as number;
+            } else if (precoData && typeof precoData === 'object') {
+              valorUnitario = Number((precoData as any).valor_unitario || (precoData as any).valor || 0);
             }
 
             const valorGrupo = grupo.quantidade * valorUnitario;
