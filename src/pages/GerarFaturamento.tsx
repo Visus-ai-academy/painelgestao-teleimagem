@@ -468,34 +468,19 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // ✅ PRIORIZAR DADOS DOS DEMONSTRATIVOS SALVOS
+      // Opcional: mapear e-mails dos demonstrativos salvos (sem limitar a lista)
+      const emailsDemonstrativos = new Map<string, string>();
       const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
       if (demonstrativosCompletos) {
         try {
           const dados = JSON.parse(demonstrativosCompletos);
-          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
-            const clientesDoDemonstrativo = dados.demonstrativos.map((demo: any) => ({
-              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
-              nome: demo.cliente_nome || demo.nome_cliente,
-              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
-            }));
-            
-            console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
-            setClientesCarregados(clientesDoDemonstrativo);
-            localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
-
-            // Inicializar resultados base para todos os clientes dos demonstrativos
-            const resultadosBase = clientesDoDemonstrativo.map((cliente: any) => ({
-              clienteId: cliente.id,
-              clienteNome: cliente.nome,
-              relatorioGerado: false,
-              emailEnviado: false,
-              emailDestino: cliente.email,
-              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
-            }));
-            setResultados(resultadosBase);
-            salvarResultadosDB(resultadosBase);
-            return;
+          if (dados.demonstrativos && Array.isArray(dados.demonstrativos)) {
+            dados.demonstrativos.forEach((demo: any) => {
+              const nome = (demo.cliente_nome || demo.nome_cliente || '').trim();
+              const email = demo.cliente_email || demo.email_cliente;
+              if (nome && email) emailsDemonstrativos.set(nome.toUpperCase(), email);
+            });
+            console.log(`ℹ️ Mapeados ${emailsDemonstrativos.size} e-mails de demonstrativos salvos`);
           }
         } catch (error) {
           console.error('Erro ao processar demonstrativos do localStorage:', error);
@@ -523,9 +508,24 @@ export default function GerarFaturamento() {
         let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria (antes de filtrar NC-NF): ${nomesUnicos.length}`);
 
-        // Mantendo todos os clientes (sem filtro NC-NF) para garantir visibilidade completa na etapa de geração
-        // Se necessário, aplicaremos filtros específicos nas etapas seguintes (relatórios/envio/NF)
-        console.log(`📊 Clientes únicos para processamento (sem filtro NC-NF): ${nomesUnicos.length}`);
+        // 🔎 Obter IDs de clientes com tipo de faturamento NC-NF (parâmetros/contratos ativos)
+        const { data: pfNC } = await supabase
+          .from('parametros_faturamento')
+          .select('cliente_id')
+          .eq('status', 'A')
+          .eq('tipo_faturamento', 'NC-NF');
+
+        const { data: ccNC } = await supabase
+          .from('contratos_clientes')
+          .select('cliente_id')
+          .eq('status', 'ativo')
+          .eq('tipo_faturamento', 'NC-NF');
+
+        const idsNCSet = new Set<string>([
+          ...((pfNC || []).map(p => p.cliente_id).filter(Boolean) as string[]),
+          ...((ccNC || []).map(c => c.cliente_id).filter(Boolean) as string[])
+        ]);
+        console.log(`🚫 Clientes NC-NF (ids únicos): ${idsNCSet.size}`);
 
         // Preparar arrays auxiliares
         const clientesTemp: any[] = [];
@@ -554,10 +554,19 @@ export default function GerarFaturamento() {
 
           const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
           
+          // Excluir clientes NC-NF mapeados por ID
+          if (emailCliente?.[0]?.id && idsNCSet.has(emailCliente[0].id)) {
+            continue;
+          }
+
+          const emailAux = emailsDemonstrativos.get(nomeCliente.trim().toUpperCase())
+            || emailCliente?.[0]?.email
+            || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
+
           clientesTemp.push({
             id: clienteId,
             nome: nomeCliente,
-            email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
+            email: emailAux
           });
         }
         
