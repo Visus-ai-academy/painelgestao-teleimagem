@@ -48,6 +48,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { DiagnosticoClientePrecos } from "@/components/DiagnosticoClientePrecos";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -342,17 +343,40 @@ export default function GerarFaturamento() {
   // Função para carregar resultados do banco de dados
   const carregarResultadosDB = useCallback(async () => {
     try {
-        // Consulta direta na tabela de relatórios (sem JOIN)
+        // Primeira consulta: buscar relatorios com JOIN para filtrar clientes ativos
         const { data, error } = await supabase
         .from('relatorios_faturamento_status')
-        .select('*')
+        .select(`
+          *,
+          clientes!inner(id, nome)
+        `)
         .eq('periodo', periodoSelecionado)
         .order('cliente_nome');
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const resultadosCarregados = data.map(item => ({
+        // Segunda consulta: buscar parâmetros para filtrar clientes inativos/cancelados
+        const clienteIds = data.map(item => item.cliente_id).filter(Boolean);
+        const { data: parametrosData } = await supabase
+          .from('parametros_faturamento')
+          .select('cliente_id, status')
+          .in('cliente_id', clienteIds);
+
+        // Filtrar clientes que NÃO têm status Inativo (I) ou Cancelado (C) nos parâmetros
+        const dataFiltrada = data.filter(item => {
+          const parametros = parametrosData?.filter(p => p.cliente_id === item.cliente_id);
+          if (!parametros || parametros.length === 0) return true; // Se não tem parâmetros, incluir
+          
+          // Se tem parâmetros, excluir apenas se TODOS são Inativos ou Cancelados
+          const todosInativos = parametros.every((p: any) => 
+            p.status === 'I' || p.status === 'C'
+          );
+          
+          return !todosInativos;
+        });
+
+        const resultadosCarregados = dataFiltrada.map(item => ({
           clienteId: item.cliente_id,
           clienteNome: item.cliente_nome,
           relatorioGerado: item.relatorio_gerado,
@@ -468,19 +492,34 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Opcional: mapear e-mails dos demonstrativos salvos (sem limitar a lista)
-      const emailsDemonstrativos = new Map<string, string>();
+      // ✅ PRIORIZAR DADOS DOS DEMONSTRATIVOS SALVOS
       const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
       if (demonstrativosCompletos) {
         try {
           const dados = JSON.parse(demonstrativosCompletos);
-          if (dados.demonstrativos && Array.isArray(dados.demonstrativos)) {
-            dados.demonstrativos.forEach((demo: any) => {
-              const nome = (demo.cliente_nome || demo.nome_cliente || '').trim();
-              const email = demo.cliente_email || demo.email_cliente;
-              if (nome && email) emailsDemonstrativos.set(nome.toUpperCase(), email);
-            });
-            console.log(`ℹ️ Mapeados ${emailsDemonstrativos.size} e-mails de demonstrativos salvos`);
+          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
+            const clientesDoDemonstrativo = dados.demonstrativos.map((demo: any) => ({
+              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
+              nome: demo.cliente_nome || demo.nome_cliente,
+              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
+            }));
+            
+            console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
+            setClientesCarregados(clientesDoDemonstrativo);
+            localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
+
+            // Inicializar resultados base para todos os clientes dos demonstrativos
+            const resultadosBase = clientesDoDemonstrativo.map((cliente: any) => ({
+              clienteId: cliente.id,
+              clienteNome: cliente.nome,
+              relatorioGerado: false,
+              emailEnviado: false,
+              emailDestino: cliente.email,
+              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
+            }));
+            setResultados(resultadosBase);
+            salvarResultadosDB(resultadosBase);
+            return;
           }
         } catch (error) {
           console.error('Erro ao processar demonstrativos do localStorage:', error);
@@ -490,8 +529,10 @@ export default function GerarFaturamento() {
       // Fallback: Buscar da volumetria se não há demonstrativos
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia", cliente_nome_fantasia, "EMPRESA"')
+        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
+        .not('"EMPRESA"', 'is', null)
+        .not('"EMPRESA"', 'eq', '')
         .limit(50000); // Aumentar limite explicitamente
 
       console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria?.length || 0} registros para período ${periodoSelecionado}`);
@@ -504,31 +545,50 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // ✅ Priorizar: Cliente_Nome_Fantasia (ou cliente_nome_fantasia); fallback para EMPRESA
-        let nomesUnicos = [...new Set(clientesVolumetria
-          .map(c => (c.Cliente_Nome_Fantasia || c.cliente_nome_fantasia || c.EMPRESA))
-          .filter((n: any) => !!n)
-        )];
+        // ✅ USAR Cliente_Nome_Fantasia quando disponível, senão EMPRESA
+        let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria (antes de filtrar NC-NF): ${nomesUnicos.length}`);
 
-        // 🔎 Obter IDs de clientes com tipo de faturamento NC-NF (parâmetros/contratos ativos)
-        const { data: pfNC } = await supabase
-          .from('parametros_faturamento')
-          .select('cliente_id')
-          .eq('status', 'A')
-          .eq('tipo_faturamento', 'NC-NF');
+        // 🔎 Remover clientes NC-NF (via parâmetros ou contrato) da lista
+        try {
+          // Buscar IDs com tipo NC-NF nos parâmetros ativos
+          const { data: pfNC } = await supabase
+            .from('parametros_faturamento')
+            .select('cliente_id')
+            .eq('status', 'A')
+            .eq('tipo_faturamento', 'NC-NF');
 
-        const { data: ccNC } = await supabase
-          .from('contratos_clientes')
-          .select('cliente_id')
-          .eq('status', 'ativo')
-          .eq('tipo_faturamento', 'NC-NF');
+          // Buscar IDs com tipo NC-NF em contratos ativos
+          const { data: ccNC } = await supabase
+            .from('contratos_clientes')
+            .select('cliente_id')
+            .eq('status', 'ativo')
+            .eq('tipo_faturamento', 'NC-NF');
 
-        const idsNCSet = new Set<string>([
-          ...((pfNC || []).map(p => p.cliente_id).filter(Boolean) as string[]),
-          ...((ccNC || []).map(c => c.cliente_id).filter(Boolean) as string[])
-        ]);
-        console.log(`🚫 Clientes NC-NF (ids únicos): ${idsNCSet.size}`);
+          const idsNC = Array.from(new Set([...(pfNC?.map(p => p.cliente_id) || []), ...(ccNC?.map(c => c.cliente_id) || [])].filter(Boolean)));
+
+          let nomesNC = new Set<string>();
+          if (idsNC.length > 0) {
+            const { data: clientesNC } = await supabase
+              .from('clientes')
+              .select('nome, nome_fantasia, nome_mobilemed')
+              .in('id', idsNC);
+            const normalize = (s?: string) => (s || '').trim().toUpperCase();
+            (clientesNC || []).forEach(c => {
+              [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
+                const k = normalize(n);
+                if (k) nomesNC.add(k);
+              });
+            });
+          }
+
+          const normalize = (s?: string) => (s || '').trim().toUpperCase();
+          nomesUnicos = nomesUnicos.filter(n => !nomesNC.has(normalize(n)));
+        } catch (e) {
+          console.warn('Falha ao filtrar NC-NF:', e);
+        }
+
+        console.log(`📊 Clientes únicos após filtrar NC-NF: ${nomesUnicos.length}`);
 
         // Preparar arrays auxiliares
         const clientesTemp: any[] = [];
@@ -557,19 +617,10 @@ export default function GerarFaturamento() {
 
           const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
           
-          // Excluir clientes NC-NF mapeados por ID
-          if (emailCliente?.[0]?.id && idsNCSet.has(emailCliente[0].id)) {
-            continue;
-          }
-
-          const emailAux = emailsDemonstrativos.get(nomeCliente.trim().toUpperCase())
-            || emailCliente?.[0]?.email
-            || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`;
-
           clientesTemp.push({
             id: clienteId,
             nome: nomeCliente,
-            email: emailAux
+            email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
           });
         }
         
@@ -713,18 +764,14 @@ export default function GerarFaturamento() {
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('"Cliente_Nome_Fantasia", "EMPRESA"')
-        .eq('periodo_referencia', periodoSelecionado);
+        .eq('periodo_referencia', periodoSelecionado)
+        .not('"EMPRESA"', 'is', null);
 
       if (errorVolumetria) {
         throw new Error('Erro ao consultar volumetria: ' + errorVolumetria.message);
       }
 
-      // Combinar todas as possíveis fontes de nome de cliente
-      const clientesUnicosVolumetria = [...new Set(
-        clientesVolumetria
-          ?.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA)
-          .filter(Boolean) || []
-      )];
+      const clientesUnicosVolumetria = [...new Set(clientesVolumetria?.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean) || [])];
       console.log('📊 [VOLUMETRIA] Clientes únicos encontrados:', clientesUnicosVolumetria.length, clientesUnicosVolumetria);
 
       if (clientesUnicosVolumetria.length === 0) {
@@ -737,26 +784,46 @@ export default function GerarFaturamento() {
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento para período:', periodoSelecionado);
-      
-      // Chamar a edge function uma única vez (ela processa todos os clientes automaticamente)
-      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-        body: {
-          periodo: periodoSelecionado
-        }
-      });
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
 
-      console.log('[RESPOSTA] Data:', data);
-      console.log('[RESPOSTA] Error:', error);
-
-      if (error || !data?.success) {
-        console.error('❌ [ERRO] Erro na edge function:', error?.message || data?.error);
-        throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+      // Processar em lotes para evitar timeout da Edge Function
+      const chunkSize = 20;
+      const chunks: string[][] = [];
+      for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
+        chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
       }
 
-      const todosDemonstrativos = data?.demonstrativos || [];
-      const todosAlertas = Array.isArray(data?.alertas) ? data.alertas : [];
-      const clientesProcessados = data?.resumo?.clientes_processados || todosDemonstrativos.length;
+      const todosDemonstrativos: any[] = [];
+      const todosAlertas: string[] = [];
+      let clientesProcessados = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const lote = chunks[i];
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
+          progresso: 30 + Math.round(((i) / chunks.length) * 35)
+        });
+
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: {
+            periodo: periodoSelecionado,
+            clientes: lote
+          }
+        });
+
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+        if (error || !data?.success) {
+          console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+        }
+
+        clientesProcessados += data?.resumo?.clientes_processados || 0;
+        todosDemonstrativos.push(...(data?.demonstrativos || []));
+        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
+      }
 
       // Montar resumo combinado e salvar no localStorage para manter fluxo atual
       const resumoCombinado = {
@@ -780,7 +847,7 @@ export default function GerarFaturamento() {
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
-      console.log(`💾 Dados salvos no localStorage. Processados: ${clientesProcessados}`);
+      console.log(`💾 Dados combinados salvos no localStorage. Lotes: ${chunks.length}, Processados: ${clientesProcessados}`);
 
       setStatusProcessamento({
         processando: true,
@@ -835,7 +902,7 @@ export default function GerarFaturamento() {
       localStorage.setItem('demonstrativoGerado', 'true');
 
       // ✅ Atualizar demonstrativosGeradosPorCliente com os clientes que tiveram demonstrativos gerados
-      const clientesComDemonstrativo = todosDemonstrativos.map((d: any) => d.cliente_nome).filter(Boolean) as string[];
+      const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
       const novosClientes = new Set(clientesComDemonstrativo);
       setDemonstrativosGeradosPorCliente(novosClientes);
       // Persistir no localStorage
@@ -2334,6 +2401,11 @@ export default function GerarFaturamento() {
         </TabsContent>
 
           </Tabs>
+          
+          {/* Seção de Diagnóstico */}
+          <div className="mt-8">
+            <DiagnosticoClientePrecos />
+          </div>
         </div>
       );
 }
