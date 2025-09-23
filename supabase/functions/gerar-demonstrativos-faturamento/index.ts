@@ -344,10 +344,13 @@ serve(async (req) => {
     // Retornar resposta imediata
     return new Response(
       JSON.stringify({
-        sucesso: true,
+        success: true,
         periodo,
         status: 'processando',
-        mensagem: 'Processamento de demonstrativos iniciado em background para evitar timeout de CPU'
+        mensagem: 'Processamento de demonstrativos iniciado em background para evitar timeout de CPU',
+        demonstrativos: [],
+        resumo: { clientes_processados: 0 },
+        alertas: []
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
