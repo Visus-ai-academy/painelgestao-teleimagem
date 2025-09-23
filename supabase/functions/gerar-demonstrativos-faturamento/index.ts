@@ -228,7 +228,7 @@ serve(async (req) => {
     } // Fim do loop de lotes
 
     const resumo = {
-      total_clientes: clientes?.length || 0,
+      total_clientes: clientesCompletos?.length || 0,
       clientes_processados: resultados.length,
       total_exames_geral: totalExamesGeral,
       valor_bruto_geral: valorBrutoGeral,
