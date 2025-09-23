@@ -498,48 +498,6 @@ serve(async (req) => {
         
         console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames total`);
 
-        // ✅ USAR CONDIÇÃO DE VOLUME CORRIGIDA DO CLIENTE
-        const condVolume = cliente.cond_volume || 'MOD/ESP/CAT';
-        console.log(`📋 Condição de Volume para ${cliente.nome_fantasia}: ${condVolume}`);
-
-        // Função para calcular volume baseado na condição
-        const calcularVolumeCondicional = (modalidade: string, especialidade: string, categoria: string): number => {
-          if (!volumetria || volumetria.length === 0) return 0;
-          
-          let volumeCalculado = 0;
-          
-          switch (condVolume) {
-            case 'MOD/ESP':
-              // Somar apenas exames da modalidade + especialidade específica
-              volumeCalculado = volumetria
-                .filter(v => 
-                  v.MODALIDADE?.toUpperCase().trim() === modalidade.toUpperCase().trim() &&
-                  v.ESPECIALIDADE?.toUpperCase().trim() === especialidade.toUpperCase().trim()
-                )
-                .reduce((sum, item) => sum + (item.VALORES || 0), 0);
-              break;
-              
-            case 'MOD/ESP/CAT':
-              // Somar apenas exames da modalidade + especialidade + categoria específica
-              volumeCalculado = volumetria
-                .filter(v => 
-                  v.MODALIDADE?.toUpperCase().trim() === modalidade.toUpperCase().trim() &&
-                  v.ESPECIALIDADE?.toUpperCase().trim() === especialidade.toUpperCase().trim() &&
-                  (v.CATEGORIA || 'SC').toUpperCase().trim() === categoria.toUpperCase().trim()
-                )
-                .reduce((sum, item) => sum + (item.VALORES || 0), 0);
-              break;
-              
-            default:
-              // Fallback para volume total
-              volumeCalculado = totalExames;
-              break;
-          }
-          
-          console.log(`📊 Volume calculado para ${modalidade}/${especialidade}/${categoria}: ${volumeCalculado} (condição: ${condVolume})`);
-          return volumeCalculado;
-        };
-
         // Calcular valores dos exames baseado na tabela de preços
         let valorExames = 0;
         const detalhesExames = [];
@@ -609,13 +567,6 @@ serve(async (req) => {
                 continue;
               }
 
-              // ✅ CALCULAR VOLUME BASEADO NA CONDIÇÃO DO CONTRATO
-              const volumeEspecifico = calcularVolumeCondicional(
-                grupo.modalidade, 
-                grupo.especialidade, 
-                grupo.categoria || 'SC'
-              );
-
               // Primeira tentativa: prioridade informada
               let preco: number | null = null;
               let precoError: any = null;
@@ -626,131 +577,31 @@ serve(async (req) => {
                 especialidade: grupo.especialidade, 
                 categoria: grupo.categoria || 'SC',
                 prioridade: grupo.prioridade,
-                quantidade: grupo.quantidade,
-                volume_especifico: volumeEspecifico, // ✅ Usar volume específico da condição
-                condicao_volume: condVolume,
-                is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
+                quantidade: grupo.quantidade
               });
 
-              try {
-                // ✅ CÁLCULO DIRETO SEM RPC - para evitar problemas de compatibilidade
-                const { data: precosConfig, error: precosError } = await supabase
-                  .from('precos_servicos')
-                  .select('*')
-                  .eq('cliente_id', clienteIdValido)
-                  .eq('modalidade', grupo.modalidade)
-                  .eq('especialidade', grupo.especialidade)
-                  .eq('categoria', grupo.categoria || 'SC')
-                  .eq('prioridade', grupo.prioridade)
-                  .eq('ativo', true)
-                  .order('created_at', { ascending: false })
-                  .limit(1);
+              // ✅ USAR FUNÇÃO RPC ORIGINAL (sem cálculos manuais)
+              const { data: precoRPC, error: precoError } = await supabase.rpc('calcular_preco_exame', {
+                p_cliente: cliente.nome_fantasia || cliente.nome,
+                p_modalidade: grupo.modalidade,
+                p_especialidade: grupo.especialidade,
+                p_categoria: grupo.categoria || 'SC',
+                p_prioridade: grupo.prioridade,
+                p_periodo: periodo
+              });
 
-                if (precosError) {
-                  console.error(`❌ Erro ao buscar preços:`, precosError);
-                  precoError = precosError;
-                } else if (precosConfig && precosConfig.length > 0) {
-                  const config = precosConfig[0];
-                  
-                  // Verificar se volume está na faixa
-                  const volMin = config.volume_inicial || 1;
-                  const volMax = config.volume_final || 999999;
-                  
-                  console.log(`📊 Verificando faixa de volume: ${volumeEspecifico} está entre ${volMin} e ${volMax}?`);
-                  
-                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
-                    // Usar valor de urgência se aplicável, senão valor base
-                    if (grupo.prioridade.includes('URGÊNCIA') && config.valor_urgencia) {
-                      preco = config.valor_urgencia;
-                    } else {
-                      preco = config.valor_base || 0;
-                    }
-                    
-                    console.log(`✅ Preço encontrado na faixa ${volMin}-${volMax}: R$ ${preco}`);
-                  } else {
-                    console.log(`⚠️ Volume ${volumeEspecifico} fora da faixa ${volMin}-${volMax}`);
-                    preco = 0;
-                  }
-                } else {
-                  console.log(`⚠️ Nenhuma configuração de preço encontrada para ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade}`);
-                  preco = 0;
-                }
-              } catch (e) {
-                precoError = e;
-              }
+              preco = precoRPC || 0;
 
-              console.log(`📊 Resultado da função calcular_preco_exame:`, {
+              console.log(`📊 Resultado da função RPC calcular_preco_exame:`, {
                 cliente: cliente.nome_fantasia,
                 modalidade: grupo.modalidade,
                 especialidade: grupo.especialidade,
                 prioridade: grupo.prioridade,
                 categoria: grupo.categoria,
                 quantidade: grupo.quantidade,
-                volume_usado: volumeEspecifico,
                 preco_retornado: preco,
-                erro: precoError?.message || precoError || 'nenhum',
-                rpc_error: precoError ? true : false
+                erro: precoError?.message || 'nenhum'
               });
-
-              // Fallback 1: se não encontrou, tentar com prioridade ROTINA
-              if ((!preco || preco <= 0) && !precoError) {
-                console.log(`🔄 Fallback 1: Tentando com prioridade ROTINA para ${grupo.modalidade}/${grupo.especialidade}`);
-                
-                const { data: precosFallback1, error: errorFallback1 } = await supabase
-                  .from('precos_servicos')
-                  .select('*')
-                  .eq('cliente_id', clienteIdValido)
-                  .eq('modalidade', grupo.modalidade)
-                  .eq('especialidade', grupo.especialidade)
-                  .eq('categoria', grupo.categoria || 'SC')
-                  .eq('prioridade', 'ROTINA')
-                  .eq('ativo', true)
-                  .order('created_at', { ascending: false })
-                  .limit(1);
-
-                if (!errorFallback1 && precosFallback1 && precosFallback1.length > 0) {
-                  const config = precosFallback1[0];
-                  const volMin = config.volume_inicial || 1;
-                  const volMax = config.volume_final || 999999;
-                  
-                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
-                    preco = config.valor_base || 0;
-                    console.log(`✅ Fallback 1 - Preço ROTINA encontrado: R$ ${preco}`);
-                  }
-                }
-              }
-
-              // Fallback 2: se ainda não encontrou e categoria != SC, tentar com SC
-              if ((!preco || preco <= 0) && (grupo.categoria || 'SC') !== 'SC') {
-                console.log(`🔄 Fallback 2: Tentando com categoria SC para ${grupo.modalidade}/${grupo.especialidade}`);
-                
-                const { data: precosFallback2, error: errorFallback2 } = await supabase
-                  .from('precos_servicos')
-                  .select('*')
-                  .eq('cliente_id', clienteIdValido)
-                  .eq('modalidade', grupo.modalidade)
-                  .eq('especialidade', grupo.especialidade)
-                  .eq('categoria', 'SC')
-                  .eq('prioridade', grupo.prioridade)
-                  .eq('ativo', true)
-                  .order('created_at', { ascending: false })
-                  .limit(1);
-
-                if (!errorFallback2 && precosFallback2 && precosFallback2.length > 0) {
-                  const config = precosFallback2[0];
-                  const volMin = config.volume_inicial || 1;
-                  const volMax = config.volume_final || 999999;
-                  
-                  if (volumeEspecifico >= volMin && volumeEspecifico <= volMax) {
-                    if (grupo.prioridade.includes('URGÊNCIA') && config.valor_urgencia) {
-                      preco = config.valor_urgencia;
-                    } else {
-                      preco = config.valor_base || 0;
-                    }
-                    console.log(`✅ Fallback 2 - Preço SC encontrado: R$ ${preco}`);
-                  }
-                }
-              }
 
               if (preco && preco > 0) {
                 grupo.valor_unitario = preco;
