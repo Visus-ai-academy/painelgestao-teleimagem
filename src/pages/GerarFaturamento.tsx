@@ -523,46 +523,9 @@ export default function GerarFaturamento() {
         let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
         console.log(`📊 Clientes únicos encontrados na volumetria (antes de filtrar NC-NF): ${nomesUnicos.length}`);
 
-        // 🔎 Remover clientes NC-NF (via parâmetros ou contrato) da lista
-        try {
-          // Buscar IDs com tipo NC-NF nos parâmetros ativos
-          const { data: pfNC } = await supabase
-            .from('parametros_faturamento')
-            .select('cliente_id')
-            .eq('status', 'A')
-            .eq('tipo_faturamento', 'NC-NF');
-
-          // Buscar IDs com tipo NC-NF em contratos ativos
-          const { data: ccNC } = await supabase
-            .from('contratos_clientes')
-            .select('cliente_id')
-            .eq('status', 'ativo')
-            .eq('tipo_faturamento', 'NC-NF');
-
-          const idsNC = Array.from(new Set([...(pfNC?.map(p => p.cliente_id) || []), ...(ccNC?.map(c => c.cliente_id) || [])].filter(Boolean)));
-
-          let nomesNC = new Set<string>();
-          if (idsNC.length > 0) {
-            const { data: clientesNC } = await supabase
-              .from('clientes')
-              .select('nome, nome_fantasia, nome_mobilemed')
-              .in('id', idsNC);
-            const normalize = (s?: string) => (s || '').trim().toUpperCase();
-            (clientesNC || []).forEach(c => {
-              [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
-                const k = normalize(n);
-                if (k) nomesNC.add(k);
-              });
-            });
-          }
-
-          const normalize = (s?: string) => (s || '').trim().toUpperCase();
-          nomesUnicos = nomesUnicos.filter(n => !nomesNC.has(normalize(n)));
-        } catch (e) {
-          console.warn('Falha ao filtrar NC-NF:', e);
-        }
-
-        console.log(`📊 Clientes únicos após filtrar NC-NF: ${nomesUnicos.length}`);
+        // Mantendo todos os clientes (sem filtro NC-NF) para garantir visibilidade completa na etapa de geração
+        // Se necessário, aplicaremos filtros específicos nas etapas seguintes (relatórios/envio/NF)
+        console.log(`📊 Clientes únicos para processamento (sem filtro NC-NF): ${nomesUnicos.length}`);
 
         // Preparar arrays auxiliares
         const clientesTemp: any[] = [];
