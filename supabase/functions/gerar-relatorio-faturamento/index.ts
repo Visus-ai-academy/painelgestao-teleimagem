@@ -291,81 +291,79 @@ serve(async (req: Request) => {
         console.log('📈 Volumes agregados por condição:', Object.fromEntries(volumesAgregados));
 
         // Calcular preços por combo usando volume agregado correto
-        await Promise.all(
-          combos.map(async ([key, g]) => {
-            const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
+        for (const [key, g] of combos) {
+          const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
+          
+          // Definir chave de agregação para buscar volume
+          let chaveAgregacao = '';
+          switch (condVolume) {
+            case 'MOD/ESP/CAT':
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+              break;
+            case 'MOD/ESP':
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
+              break;
+            case 'MOD':
+              chaveAgregacao = g.modalidade;
+              break;
+            default:
+              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+          }
+          
+          // Para exames de plantão, usar o volume próprio (não agregado)
+          const volumeParaCalculo = isPlantao 
+            ? g.quantidade 
+            : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
+          
+          try {
+            console.log(`🔍 Calculando preço para: ${key}`);
+            console.log(`   Cliente: ${cliente_id}`);
+            console.log(`   Modalidade: ${g.modalidade}`);
+            console.log(`   Especialidade: ${g.especialidade}`);
+            console.log(`   Categoria: ${g.categoria || 'SC'}`);
+            console.log(`   Prioridade: ${g.prioridade}`);
+            console.log(`   Volume próprio: ${g.quantidade}`);
+            console.log(`   Volume agregado: ${volumeParaCalculo}`);
+            console.log(`   É plantão: ${isPlantao}`);
             
-            // Definir chave de agregação para buscar volume
-            let chaveAgregacao = '';
-            switch (condVolume) {
-              case 'MOD/ESP/CAT':
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-                break;
-              case 'MOD/ESP':
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
-                break;
-              case 'MOD':
-                chaveAgregacao = g.modalidade;
-                break;
-              default:
-                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-            }
+            const { data: precoData, error } = await supabase.rpc('calcular_preco_exame', {
+              p_cliente_id: cliente_id,
+              p_modalidade: g.modalidade,
+              p_especialidade: g.especialidade,
+              p_prioridade: g.prioridade,
+              p_categoria: g.categoria || 'SC',
+              p_volume_total: volumeParaCalculo,
+              p_is_plantao: isPlantao,
+            });
             
-            // Para exames de plantão, usar o volume próprio (não agregado)
-            const volumeParaCalculo = isPlantao 
-              ? g.quantidade 
-              : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
-            
-            try {
-              console.log(`🔍 Calculando preço para: ${key}`);
-              console.log(`   Cliente: ${cliente_id}`);
-              console.log(`   Modalidade: ${g.modalidade}`);
-              console.log(`   Especialidade: ${g.especialidade}`);
-              console.log(`   Categoria: ${g.categoria || 'SC'}`);
-              console.log(`   Prioridade: ${g.prioridade}`);
-              console.log(`   Volume próprio: ${g.quantidade}`);
-              console.log(`   Volume agregado: ${volumeParaCalculo}`);
-              console.log(`   É plantão: ${isPlantao}`);
-              
-              const { data: precoData, error } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente_id,
-                p_modalidade: g.modalidade,
-                p_especialidade: g.especialidade,
-                p_prioridade: g.prioridade,
-                p_categoria: g.categoria || 'SC',
-                p_volume_total: volumeParaCalculo,
-                p_is_plantao: isPlantao,
-              });
-              
-              if (error) {
-                console.error('❌ Erro na RPC calcular_preco_exame:', error);
-                precoPorCombo[key] = 0;
-              } else {
-                let precoNum: number | null = null;
-                if (Array.isArray(precoData)) {
-                  const item = precoData[0] as any;
-                  precoNum = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
-                } else if (typeof precoData === 'number') {
-                  precoNum = precoData as number;
-                } else if (typeof precoData === 'object' && precoData !== null) {
-                  precoNum = (precoData as any)?.valor_unitario ?? null;
-                }
-
-                console.log(`💰 Preço calculado para ${key}:`, precoNum);
-                
-                if (Number.isFinite(precoNum) && (precoNum as number) > 0) {
-                  precoPorCombo[key] = precoNum as number;
-                } else {
-                  console.warn(`⚠️ Preço inválido retornado:`, precoData, typeof precoData);
-                  precoPorCombo[key] = 0;
-                }
-              }
-            } catch (e) {
-              console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
+            if (error) {
+              console.error('❌ Erro na RPC calcular_preco_exame:', error);
               precoPorCombo[key] = 0;
+            } else {
+              let precoNum: number | null = null;
+              if (Array.isArray(precoData)) {
+                const item = precoData[0] as any;
+                precoNum = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
+              } else if (typeof precoData === 'number') {
+                precoNum = precoData as number;
+              } else if (typeof precoData === 'object' && precoData !== null) {
+                precoNum = (precoData as any)?.valor_unitario ?? null;
+              }
+
+              console.log(`💰 Preço calculado para ${key}:`, precoNum);
+              
+              if (Number.isFinite(precoNum) && (precoNum as number) > 0) {
+                precoPorCombo[key] = precoNum as number;
+              } else {
+                console.warn(`⚠️ Preço inválido retornado:`, precoData, typeof precoData);
+                precoPorCombo[key] = 0;
+              }
             }
-          })
-        );
+          } catch (e) {
+            console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
+            precoPorCombo[key] = 0;
+          }
+        }
       }
     }
     
