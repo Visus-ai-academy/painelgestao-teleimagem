@@ -79,33 +79,48 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar dados do cliente (prioritizar o que tem preços se houver duplicatas)
+    // Buscar dados do cliente
+    console.log(`🔍 Buscando cliente com ID: ${cliente_id}`);
+    
     let { data: cliente, error: clienteError } = await supabase
       .from('clientes')
-      .select('nome, nome_fantasia, cnpj')
+      .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
 
-    // Se não encontrou ou se não tem preços, tentar buscar versão com preços
+    // Se não encontrou pelo ID, tentar buscar por nome nos demonstrativos gerados
     if (!cliente || clienteError) {
-      console.log('❗ Cliente não encontrado pelo ID, buscando versão com preços...');
+      console.log('❗ Cliente não encontrado pelo ID, tentando buscar por dados de demonstrativo...');
       
-      // Buscar cliente com mesmo nome que tenha preços ativos
-      const { data: clienteComPrecos } = await supabase
-        .from('clientes')
-        .select('id, nome, nome_fantasia, cnpj')
-        .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-        .limit(10);
+      // Se temos dados do demonstrativo, usar o cliente_nome de lá
+      if (demonstrativoData && demonstrativoData.cliente_nome) {
+        console.log(`🔍 Buscando cliente pelo nome do demonstrativo: ${demonstrativoData.cliente_nome}`);
+        
+        const { data: clientePorNome } = await supabase
+          .from('clientes')
+          .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
+          .or(`nome.ilike.%${demonstrativoData.cliente_nome}%,nome_fantasia.ilike.%${demonstrativoData.cliente_nome}%,nome_mobilemed.ilike.%${demonstrativoData.cliente_nome}%`)
+          .limit(1);
+        
+        if (clientePorNome && clientePorNome.length > 0) {
+          cliente = clientePorNome[0];
+          console.log(`✅ Cliente encontrado por nome do demonstrativo: ${cliente.nome}`);
+        }
+      }
       
-      if (clienteComPrecos && clienteComPrecos.length > 0) {
-        // Se há apenas um, usar esse
-        if (clienteComPrecos.length === 1) {
+      // Se ainda não encontrou, buscar qualquer cliente com preços ativos
+      if (!cliente) {
+        console.log('🔍 Tentando buscar clientes com preços ativos...');
+        
+        const { data: clienteComPrecos } = await supabase
+          .from('clientes')
+          .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
+          .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+          .limit(10);
+        
+        if (clienteComPrecos && clienteComPrecos.length > 0) {
           cliente = clienteComPrecos[0];
-          console.log(`✅ Substituído para cliente com preços: ${cliente.nome} (ID: ${clienteComPrecos[0].id})`);
-        } else {
-          // Se há vários, usar o primeiro (pode melhorar a lógica aqui se necessário)
-          cliente = clienteComPrecos[0];
-          console.log(`⚠️ Múltiplos clientes com preços encontrados, usando: ${cliente.nome}`);
+          console.log(`⚠️ Usando cliente com preços como fallback: ${cliente.nome}`);
         }
       }
     }
