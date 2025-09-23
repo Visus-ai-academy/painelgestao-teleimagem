@@ -490,7 +490,7 @@ export default function GerarFaturamento() {
       // Fallback: Buscar da volumetria se não há demonstrativos
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
+        .select('"Cliente_Nome_Fantasia", cliente_nome_fantasia, "EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
         .limit(50000); // Aumentar limite explicitamente
 
@@ -504,8 +504,11 @@ export default function GerarFaturamento() {
       let clientesFinais: any[] = [];
       
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // ✅ USAR Cliente_Nome_Fantasia quando disponível, senão EMPRESA
-        let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
+        // ✅ Priorizar: Cliente_Nome_Fantasia (ou cliente_nome_fantasia); fallback para EMPRESA
+        let nomesUnicos = [...new Set(clientesVolumetria
+          .map(c => (c.Cliente_Nome_Fantasia || c.cliente_nome_fantasia || c.EMPRESA))
+          .filter((n: any) => !!n)
+        )];
         console.log(`📊 Clientes únicos encontrados na volumetria (antes de filtrar NC-NF): ${nomesUnicos.length}`);
 
         // 🔎 Obter IDs de clientes com tipo de faturamento NC-NF (parâmetros/contratos ativos)
