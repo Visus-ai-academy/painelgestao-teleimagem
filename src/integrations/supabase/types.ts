@@ -4140,15 +4140,24 @@ export type Database = {
         }[]
       }
       calcular_preco_exame: {
-        Args: {
-          p_categoria?: string
-          p_cliente_id: string
-          p_especialidade: string
-          p_is_plantao?: boolean
-          p_modalidade: string
-          p_prioridade?: string
-          p_volume_total?: number
-        }
+        Args:
+          | {
+              p_categoria: string
+              p_cliente: string
+              p_especialidade: string
+              p_modalidade: string
+              p_periodo: string
+              p_prioridade: string
+            }
+          | {
+              p_categoria?: string
+              p_cliente_id: string
+              p_especialidade: string
+              p_is_plantao?: boolean
+              p_modalidade: string
+              p_prioridade?: string
+              p_volume_total?: number
+            }
         Returns: {
           cond_volume_usada: string
           detalhes_calculo: Json
