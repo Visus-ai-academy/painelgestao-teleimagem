@@ -4158,13 +4158,7 @@ export type Database = {
               p_prioridade?: string
               p_volume_total?: number
             }
-        Returns: {
-          cond_volume_usada: string
-          detalhes_calculo: Json
-          faixa_aplicada: string
-          valor_unitario: number
-          volume_calculado: number
-        }[]
+        Returns: number
       }
       calcular_volume_total: {
         Args: {
