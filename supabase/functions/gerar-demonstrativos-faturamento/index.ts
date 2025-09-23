@@ -167,15 +167,12 @@ serve(async (req) => {
 
               // Usar a função RPC para calcular preço
               const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_nome: nomeCliente,
+                p_cliente: nomeCliente,
                 p_modalidade: modalidade,
                 p_especialidade: especialidade,
                 p_categoria: categoria,
                 p_prioridade: prioridade,
-                p_quantidade: quantidade,
-                p_volume_especifico: volumeEspecifico,
-                p_condicao_volume: condicaoVolume,
-                p_is_plantao: false
+                p_periodo: periodo
               });
 
               console.log(`📊 Resultado da função calcular_preco_exame: {
