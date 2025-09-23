@@ -17,11 +17,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { periodo } = await req.json();
+    const { periodo, clientes } = await req.json();
     
     if (!periodo) {
       throw new Error('Período é obrigatório');
     }
+
+    // Normalizar filtro de clientes vindo do front (nomes em caixa alta e sem espaços extras)
+    const listaClientesFiltro = Array.isArray(clientes)
+      ? clientes.filter((c: any) => !!c).map((c: any) => String(c).trim().toUpperCase())
+      : [];
+
 
     console.log(`🚀 Iniciando geração de demonstrativos para período: ${periodo}`);
     
@@ -43,6 +49,17 @@ serve(async (req) => {
     }
 
     console.log(`📊 Total de clientes encontrados: ${clientesCompletos?.length || 0}`);
+
+    // Aplicar filtro de clientes quando fornecido (nomes vindos da volumetria)
+    const listaClientes = (clientesCompletos || []).filter((c) => {
+      if (!listaClientesFiltro.length) return true;
+      const candidatos = [c.nome_fantasia, c.nome_mobilemed, c.nome]
+        .filter(Boolean)
+        .map((s: string) => s.trim().toUpperCase());
+      return candidatos.some((n) => listaClientesFiltro.includes(n));
+    });
+
+    console.log(`📊 Total de clientes após filtro: ${listaClientes.length}`);
     console.log(`📊 Processando em lotes de 10 clientes`);
 
     let totalExamesGeral = 0;
@@ -59,10 +76,10 @@ serve(async (req) => {
 
     // Processar em lotes de 10 clientes
     const TAMANHO_LOTE = 10;
-    const totalClientes = clientesCompletos?.length || 0;
+    const totalClientes = listaClientes.length;
     
     for (let i = 0; i < totalClientes; i += TAMANHO_LOTE) {
-      const loteAtual = clientesCompletos!.slice(i, i + TAMANHO_LOTE);
+      const loteAtual = listaClientes.slice(i, i + TAMANHO_LOTE);
       console.log(`🔄 Processando lote ${Math.floor(i/TAMANHO_LOTE) + 1}/${Math.ceil(totalClientes/TAMANHO_LOTE)} (${loteAtual.length} clientes)`);
 
       for (const cliente of loteAtual) {
@@ -285,7 +302,7 @@ serve(async (req) => {
     } // Fim do loop de lotes
 
     const resumo = {
-      total_clientes: clientesCompletos?.length || 0,
+      total_clientes: listaClientes.length,
       clientes_processados: resultados.length,
       total_exames_geral: totalExamesGeral,
       valor_bruto_geral: valorBrutoGeral,

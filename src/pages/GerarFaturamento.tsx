@@ -830,51 +830,15 @@ export default function GerarFaturamento() {
 
       setStatusProcessamento({
         processando: true,
-        mensagem: 'Verificando se todos os clientes foram processados...',
-        progresso: 70
+        mensagem: 'Consolidando resultados...',
+        progresso: 90
       });
 
-      // Aguardar e verificar se demonstrativos foram salvos no localStorage
-      console.log('🔍 [VERIFICACAO] Aguardando geração dos demonstrativos...');
-      
-      let tentativas = 0;
-      const maxTentativas = 20; // 20 tentativas = até 1 minuto
-      let demonstrativosSalvos = false;
-      
-      while (tentativas < maxTentativas && !demonstrativosSalvos) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3 segundos
-        tentativas++;
-        
-        setStatusProcessamento({
-          processando: true,
-          mensagem: `Verificando demonstrativos gerados... (${tentativas}/${maxTentativas})`,
-          progresso: 70 + ((tentativas / maxTentativas) * 20)
-        });
-
-        console.log(`🔍 [VERIFICACAO] Tentativa ${tentativas}/${maxTentativas} - Verificando localStorage...`);
-        
-        // Verificar se demonstrativos foram salvos no localStorage corretamente
-        const demonstrativosLocalStorage = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
-        if (demonstrativosLocalStorage) {
-          try {
-            const dados = JSON.parse(demonstrativosLocalStorage);
-            if (dados.demonstrativos && dados.demonstrativos.length > 0) {
-              console.log(`✅ [SUCESSO] Demonstrativos encontrados no localStorage: ${dados.demonstrativos.length} clientes`);
-              demonstrativosSalvos = true;
-              break;
-            }
-          } catch (error) {
-            console.warn('⚠️ [AVISO] Erro ao verificar localStorage:', error);
-          }
-        }
-        
-        console.log(`⏳ [AGUARDANDO] Tentativa ${tentativas}: ainda sem demonstrativos salvos, aguardando...`);
+      // Se não houve nenhum demonstrativo, ainda assim seguir e informar
+      if (!todosDemonstrativos || todosDemonstrativos.length === 0) {
+        console.warn('⚠️ Nenhum demonstrativo retornado para os clientes selecionados');
       }
 
-      if (!demonstrativosSalvos) {
-        console.warn('⚠️ [TIMEOUT] Geração de demonstrativos não concluída dentro do tempo limite');
-        throw new Error('Timeout: A geração dos demonstrativos demorou mais que 1 minuto. Tente novamente.');
-      }
 
       // Marcar demonstrativo como gerado
       setDemonstrativoGerado(true);
