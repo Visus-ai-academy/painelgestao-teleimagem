@@ -1894,75 +1894,7 @@ export default function GerarFaturamento() {
                   <div className="flex flex-col gap-3">
                     <Button 
                       onClick={async () => {
-                        if (!periodoSelecionado) {
-                          toast({
-                            title: "Período obrigatório",
-                            description: "Por favor, selecione um período",
-                            variant: "destructive"
-                          });
-                          return;
-                        }
-
-                        setProcessandoTodos(true);
-                        try {
-                          const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
-                            body: { periodo: periodoSelecionado }
-                          });
-
-                          if (error) {
-                            throw new Error(`Erro na edge function: ${error.message || JSON.stringify(error)}`);
-                          }
-
-                          if (data?.success) {
-                            // Persistir demonstrativos no localStorage
-                            const dadosParaSalvar = {
-                              demonstrativos: data.demonstrativos,
-                              resumo: data.resumo,
-                              periodo: periodoSelecionado,
-                              timestamp: new Date().toISOString()
-                            };
-                            localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
-                            
-                            setDemonstrativoGerado(true);
-                            
-                            toast({
-                              title: "Demonstrativos gerados com sucesso!",
-                              description: `${data.resumo?.clientes_processados || 0} clientes processados`
-                            });
-
-                            // Atualizar a lista de clientes para relatórios
-                            if (data.demonstrativos && Array.isArray(data.demonstrativos)) {
-                              const clientesParaRelatorio = data.demonstrativos.map(d => ({
-                                id: d.cliente_id,
-                                nome: d.cliente_nome,
-                                email: ''
-                              }));
-                              setClientesCarregados(clientesParaRelatorio);
-                              localStorage.setItem('clientesCarregados', JSON.stringify(clientesParaRelatorio));
-                            }
-
-                            // Mostrar alertas se houver clientes inativos
-                            if (data.alertas && data.alertas.length > 0) {
-                              setTimeout(() => {
-                                toast({
-                                  title: "⚠️ Alertas de Segurança",
-                                  description: `${data.alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s)`,
-                                  variant: "destructive",
-                                });
-                              }, 1000);
-                            }
-                          } else {
-                            throw new Error(data?.message || data?.error || 'Erro desconhecido na geração dos demonstrativos');
-                          }
-                        } catch (error: any) {
-                          toast({
-                            title: "Erro ao gerar demonstrativos",
-                            description: error.message || 'Erro desconhecido',
-                            variant: "destructive"
-                          });
-                        } finally {
-                          setProcessandoTodos(false);
-                        }
+                        await gerarDemonstrativoFaturamento();
                       }}
                       disabled={processandoTodos || !periodoSelecionado}
                       className="bg-blue-600 hover:bg-blue-700"
