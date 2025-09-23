@@ -4140,39 +4140,21 @@ export type Database = {
         }[]
       }
       calcular_preco_exame: {
-        Args:
-          | {
-              p_categoria: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_modalidade: string
-              p_periodo: string
-              p_prioridade: string
-              p_volume_total: number
-            }
-          | {
-              p_categoria?: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_is_plantao?: boolean
-              p_modalidade: string
-              p_periodo?: string
-              p_prioridade?: string
-              p_volume_total?: number
-            }
-          | {
-              p_categoria?: string
-              p_cliente_id: string
-              p_especialidade: string
-              p_is_plantao?: boolean
-              p_modalidade: string
-              p_prioridade?: string
-              p_volume_total?: number
-            }
+        Args: {
+          p_categoria?: string
+          p_cliente_id: string
+          p_especialidade: string
+          p_is_plantao?: boolean
+          p_modalidade: string
+          p_prioridade?: string
+          p_volume_total?: number
+        }
         Returns: {
+          cond_volume_usada: string
           detalhes_calculo: Json
-          faixa_volume: string
+          faixa_aplicada: string
           valor_unitario: number
+          volume_calculado: number
         }[]
       }
       calcular_volume_total: {
