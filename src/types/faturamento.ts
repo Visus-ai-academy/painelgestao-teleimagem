@@ -22,6 +22,10 @@ export interface RegraContrato {
   categoria: "Angio" | "Contrastado" | "Mastoide" | "OIT" | "Pescoço" | "Prostata" | "Score";
   prioridade: "Plantão" | "Rotina" | "Urgente";
   valor: number;
+  valorUrgencia?: number;
+  condVolume: "Mod" | "Mod/Esp" | "Mod/Esp/Cat" | "Total";
+  volInicial: number;
+  volFinal: number;
   desconto?: number;
   acrescimo?: number;
   dataVigenciaInicio: string;

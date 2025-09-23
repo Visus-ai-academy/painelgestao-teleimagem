@@ -39,10 +39,11 @@ export const useFaturamento = () => {
     });
   }, [regras]);
 
-  // Calcular valor do exame baseado nas regras do contrato
+  // Calcular valor do exame baseado nas regras do contrato com condição de volume
   const calcularValorExame = useCallback((
     exame: ExameRealizado, 
-    regrasCliente: RegraContrato[]
+    regrasCliente: RegraContrato[],
+    examesCliente: ExameRealizado[]
   ): number => {
     const regraAplicavel = regrasCliente.find(regra => 
       regra.modalidade === exame.modalidade &&
@@ -56,7 +57,54 @@ export const useFaturamento = () => {
       return 0;
     }
 
-    let valor = regraAplicavel.valor;
+    if (!regraAplicavel.condVolume) {
+      console.warn(`Condição de volume não configurada para exame ${exame.id}`);
+      return 0;
+    }
+
+    // Calcular volume total baseado na condição de volume
+    let volumeTotal: number;
+    
+    if (regraAplicavel.condVolume === 'Mod') {
+      // Somar todos da mesma modalidade
+      volumeTotal = examesCliente.filter(e => e.modalidade === exame.modalidade).length;
+    } else if (regraAplicavel.condVolume === 'Mod/Esp') {
+      // Somar todos da mesma modalidade + especialidade
+      volumeTotal = examesCliente.filter(e => 
+        e.modalidade === exame.modalidade && 
+        e.especialidade === exame.especialidade
+      ).length;
+    } else if (regraAplicavel.condVolume === 'Mod/Esp/Cat') {
+      // Somar apenas da mesma modalidade + especialidade + categoria
+      volumeTotal = examesCliente.filter(e => 
+        e.modalidade === exame.modalidade && 
+        e.especialidade === exame.especialidade &&
+        e.categoria === exame.categoria
+      ).length;
+    } else if (regraAplicavel.condVolume === 'Total') {
+      // Somar todos os exames do cliente
+      volumeTotal = examesCliente.length;
+    } else {
+      console.warn(`Condição de volume ${regraAplicavel.condVolume} não reconhecida para exame ${exame.id}`);
+      return 0;
+    }
+
+    // Verificar se volume está na faixa configurada
+    const volInicial = regraAplicavel.volInicial || 1;
+    const volFinal = regraAplicavel.volFinal || 999999;
+    
+    if (volumeTotal < volInicial || volumeTotal > volFinal) {
+      console.warn(`Volume ${volumeTotal} fora da faixa ${volInicial}-${volFinal} para exame ${exame.id}`);
+      return 0;
+    }
+
+    // Determinar valor baseado na prioridade
+    let valor: number;
+    if (exame.prioridade === 'Urgente' && regraAplicavel.valorUrgencia) {
+      valor = regraAplicavel.valorUrgencia;
+    } else {
+      valor = regraAplicavel.valor;
+    }
     
     // Aplicar desconto se houver
     if (regraAplicavel.desconto) {
@@ -108,7 +156,7 @@ export const useFaturamento = () => {
       let totalAcrescimo = 0;
 
       for (const exame of examesCliente) {
-        const valor = calcularValorExame(exame, regrasCliente);
+        const valor = calcularValorExame(exame, regrasCliente, examesCliente);
         
         const item: FaturamentoItem = {
           id: `item_${exame.id}`,

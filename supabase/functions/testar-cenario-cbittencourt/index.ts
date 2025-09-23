@@ -132,29 +132,61 @@ serve(async (req) => {
         vol_final: precoEspecifico.vol_final
       });
 
-      // Calcular volume total baseado na condição de volume
-      let volumeTotal = 1;
-      const condVolume = precoEspecifico.cond_volume || '';
+      // Calcular volume total baseado na condição de volume ESPECÍFICA de cada preço
+      let volumeTotal;
+      const condVolume = precoEspecifico.cond_volume;
+
+      if (!condVolume) {
+        console.log(`Erro: Condição de volume não configurada para ${cenario.nome}`);
+        resultados.push({
+          cenario: cenario.nome,
+          quantidade: cenario.quantidade,
+          preco_encontrado: false,
+          preco_unitario: 0,
+          preco_total: 0,
+          detalhes: 'Condição de volume não configurada'
+        });
+        continue;
+      }
 
       if (condVolume === 'Mod') {
-        // Somar todos RX do cliente
+        // Somar todos da mesma modalidade (RX)
         volumeTotal = 75 + 150 + 25 + 125; // 375 total
       } else if (condVolume === 'Mod/Esp') {
-        // Somar todos RX + Medicina Interna do cliente  
+        // Somar todos da mesma modalidade + especialidade (RX + Medicina Interna)
         volumeTotal = 75 + 150 + 25 + 125; // 375 total
       } else if (condVolume === 'Mod/Esp/Cat') {
-        // Somar por categoria específica
+        // Somar apenas da mesma modalidade + especialidade + categoria
         if (cenario.categoria === 'SC') {
           volumeTotal = 75 + 150; // 225 total SC
         } else if (cenario.categoria === 'OIT') {
-          volumeTotal = 25 + 125; // 150 total OIT
+          volumeTotal = 25 + 125; // 150 total OIT  
+        } else {
+          console.log(`Erro: Categoria ${cenario.categoria} não prevista para Mod/Esp/Cat`);
+          resultados.push({
+            cenario: cenario.nome,
+            quantidade: cenario.quantidade,
+            preco_encontrado: false,
+            preco_unitario: 0,
+            preco_total: 0,
+            detalhes: `Categoria ${cenario.categoria} não suportada para Mod/Esp/Cat`
+          });
+          continue;
         }
       } else if (condVolume === 'Total') {
-        // Somar todos os exames do cliente (assumindo só RX neste exemplo)
+        // Somar todos os exames do cliente
         volumeTotal = 75 + 150 + 25 + 125; // 375 total
       } else {
-        // Sem condição de volume - usar quantidade específica
-        volumeTotal = cenario.quantidade;
+        console.log(`Erro: Condição de volume ${condVolume} não reconhecida para ${cenario.nome}`);
+        resultados.push({
+          cenario: cenario.nome,
+          quantidade: cenario.quantidade,
+          preco_encontrado: false,
+          preco_unitario: 0,
+          preco_total: 0,
+          detalhes: `Condição de volume ${condVolume} não reconhecida`
+        });
+        continue;
       }
 
       console.log('Volume calculado:', volumeTotal, 'Condição:', condVolume);
