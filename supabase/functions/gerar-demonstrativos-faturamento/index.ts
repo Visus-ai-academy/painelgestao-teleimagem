@@ -336,59 +336,55 @@ serve(async (req) => {
         const isUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
         let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
         
-        // NOVO: Sempre buscar o cliente com preços ativos para evitar duplicatas
+        // Resolver cliente_id de forma robusta sem subselects inválidos
         const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
-        let resolved: { id: string } | null = null;
-        
-        // Buscar cliente que TEM preços ativos (prioridade máxima)
-        const { data: clientesComPrecos } = await supabase
-          .from('clientes')
-          .select('id')
-          .in('nome', nomesBusca)
-          .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-          .limit(1);
-        
-        if (clientesComPrecos && clientesComPrecos.length > 0) {
-          resolved = clientesComPrecos[0] as any;
-        } else {
-          // Fallback: buscar por nome_fantasia com preços
-          const { data: clientesFantasiaComPrecos } = await supabase
-            .from('clientes')
-            .select('id')
-            .in('nome_fantasia', nomesBusca)
-            .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-            .limit(1);
-          
-          if (clientesFantasiaComPrecos && clientesFantasiaComPrecos.length > 0) {
-            resolved = clientesFantasiaComPrecos[0] as any;
-          } else {
-            // Fallback: buscar por nome_mobilemed com preços
-            const { data: clientesMobilemedComPrecos } = await supabase
+        let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
+
+        // 1) Buscar candidatos por nome/nome_fantasia/nome_mobilemed
+        let candidatosIds: string[] = [];
+        if (nomesBusca.length > 0) {
+          try {
+            // Montar string para operador IN do PostgREST
+            const lista = nomesBusca.map((n) => n.replace(/,/g, ' ')).join(',');
+            const { data: candidatos, error: candErr } = await supabase
+              .from('clientes')
+              .select('id, nome, nome_fantasia, nome_mobilemed')
+              .or(`nome.in.(${lista}),nome_fantasia.in.(${lista}),nome_mobilemed.in.(${lista})`)
+              .limit(50);
+            if (!candErr && candidatos) {
+              candidatosIds = candidatos.map((c: any) => c.id).filter(Boolean);
+            }
+          } catch (_e) {
+            // fallback leve: tentar por nome exato
+            const { data: candNome } = await supabase
               .from('clientes')
               .select('id')
-              .in('nome_mobilemed', nomesBusca)
-              .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-              .limit(1);
-            
-            if (clientesMobilemedComPrecos && clientesMobilemedComPrecos.length > 0) {
-              resolved = clientesMobilemedComPrecos[0] as any;
-            } else {
-              // Último fallback: qualquer cliente com esse nome (sem preços)
-              if (!resolved && clienteIdValido) {
-                resolved = { id: clienteIdValido };
-              } else {
-                const resp = await supabase.from('clientes').select('id').in('nome', nomesBusca).limit(1);
-                if (!resp.error && resp.data && resp.data.length > 0) resolved = resp.data[0] as any;
-              }
-            }
+              .in('nome', nomesBusca)
+              .limit(10);
+            if (candNome) candidatosIds = candNome.map((c: any) => c.id);
           }
         }
-        
-        clienteIdValido = resolved?.id || null;
-        
+
+        // 2) Se houver candidatos, priorizar quem tem preços ativos
+        if (candidatosIds.length > 0) {
+          const { data: comPrecos } = await supabase
+            .from('precos_servicos')
+            .select('cliente_id')
+            .in('cliente_id', candidatosIds)
+            .eq('ativo', true)
+            .limit(1);
+          if (comPrecos && comPrecos.length > 0) {
+            clienteIdValido = comPrecos[0].cliente_id as string;
+          } else {
+            // Caso nenhum candidato tenha preços, usar o primeiro candidato encontrado
+            clienteIdValido = candidatosIds[0] || clienteIdValido;
+          }
+        }
+
         if (!clienteIdValido) {
           console.warn(`⚠️ Cliente sem ID válido no cadastro: ${cliente.nome_fantasia}. Preços/Parâmetros não serão aplicados.`);
         }
+
         // Regras de exclusão: NC-NF não gera demonstrativo nem relatório
         if ((cliente.tipo_faturamento || '').toUpperCase() === 'NC-NF') {
           console.log(`⏭️ Ignorando cliente NC-NF: ${cliente.nome_fantasia}`);
@@ -636,11 +632,21 @@ serve(async (req) => {
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                if (!rpc1.error && rpc1.data && Array.isArray(rpc1.data) && rpc1.data.length > 0) {
-                  preco = rpc1.data[0].valor_unitario;
-                } else {
-                  preco = null;
-                }
+                  if (!rpc1.error && rpc1.data !== null && rpc1.data !== undefined) {
+                    if (Array.isArray(rpc1.data)) {
+                      const item = rpc1.data[0] as any;
+                      preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
+                    } else if (typeof rpc1.data === 'number') {
+                      preco = rpc1.data as unknown as number;
+                    } else if (typeof rpc1.data === 'object') {
+                      preco = (rpc1.data as any)?.valor_unitario ?? null;
+                    } else {
+                      preco = null;
+                    }
+                  } else {
+                    preco = null;
+                  }
+
                 precoError = rpc1.error;
               } catch (e) {
                 precoError = e;
@@ -671,9 +677,17 @@ serve(async (req) => {
                   p_is_plantao: false
                 });
                 // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                if (!rpc2.error && rpc2.data && Array.isArray(rpc2.data) && rpc2.data.length > 0) {
-                  preco = rpc2.data[0].valor_unitario;
+                if (!rpc2.error && rpc2.data !== null && rpc2.data !== undefined) {
+                  if (Array.isArray(rpc2.data)) {
+                    const item = rpc2.data[0] as any;
+                    preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
+                  } else if (typeof rpc2.data === 'number') {
+                    preco = rpc2.data as unknown as number;
+                  } else if (typeof rpc2.data === 'object') {
+                    preco = (rpc2.data as any)?.valor_unitario ?? null;
+                  }
                 }
+
               }
 
               // Fallback 2: se ainda não encontrou e categoria != SC, tentar com SC
@@ -688,9 +702,17 @@ serve(async (req) => {
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
                 // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
-                if (!rpc3.error && rpc3.data && Array.isArray(rpc3.data) && rpc3.data.length > 0) {
-                  preco = rpc3.data[0].valor_unitario;
+                if (!rpc3.error && rpc3.data !== null && rpc3.data !== undefined) {
+                  if (Array.isArray(rpc3.data)) {
+                    const item = rpc3.data[0] as any;
+                    preco = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
+                  } else if (typeof rpc3.data === 'number') {
+                    preco = rpc3.data as unknown as number;
+                  } else if (typeof rpc3.data === 'object') {
+                    preco = (rpc3.data as any)?.valor_unitario ?? null;
+                  }
                 }
+
               }
 
               if (preco && preco > 0) {
@@ -932,7 +954,7 @@ serve(async (req) => {
           cliente_id: cliente.id,
           cliente_nome: cliente.nome_fantasia || cliente.nome,
           periodo,
-          total_exames: totalExamesComPreco, // Somente exames com preço aplicado
+          total_exames: totalExames, // Usar total de exames do período
           valor_exames: valorExames,
           valor_franquia: valorFranquia,
           valor_portal_laudos: valorPortal,

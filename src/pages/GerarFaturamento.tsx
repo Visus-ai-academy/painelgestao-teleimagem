@@ -1330,7 +1330,13 @@ export default function GerarFaturamento() {
           clientesParaProcessar = dados.demonstrativos
             .filter((demo: any) => {
               const total = Number(demo.total_exames ?? demo.total_laudos ?? demo.volume_total ?? 0);
-              return total > 0; // ✅ Somente clientes com volumetria
+              const temValorMonetario = [
+                demo.valor_exames,
+                demo.valor_franquia,
+                demo.valor_portal_laudos,
+                demo.valor_integracao,
+              ].map((v: any) => Number(v || 0)).reduce((a, b) => a + b, 0) > 0;
+              return total > 0 || temValorMonetario;
             })
             .map((demo: any) => ({
               id: demo.cliente_id || `temp-${demo.cliente_nome}`,
