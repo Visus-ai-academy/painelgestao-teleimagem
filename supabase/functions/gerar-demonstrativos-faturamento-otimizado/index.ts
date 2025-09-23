@@ -187,6 +187,15 @@ Deno.serve(async (req) => {
 
           if (volumetriaError || !volumetriaData || volumetriaData.length === 0) {
             console.log(`📊 Cliente ${nomeCliente}: Sem registros na volumetria para período ${periodo}`);
+            // Persistir status para refletir no painel "Status por Cliente"
+            await supabase
+              .from('demonstrativos_faturamento_calculados')
+              .insert({
+                periodo_referencia: periodo,
+                cliente_id: cliente.id,
+                cliente_nome: nomeCliente,
+                status: 'sem_volumetria'
+              });
             continue;
           }
 
@@ -263,15 +272,14 @@ Deno.serve(async (req) => {
             const isPlantao = prio.includes('PLANTÃO') || prio.includes('PLANTAO') || prio.includes('URGENTE') || prio.includes('URGÊNCIA');
 
             // Usar a função RPC para calcular preço com cliente_id (assinatura esperada)
-            const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-              p_cliente_id: cliente.id,
-              p_modalidade: grupo.modalidade,
-              p_especialidade: grupo.especialidade,
-              p_categoria: grupo.categoria || 'SC',
-              p_prioridade: grupo.prioridade || 'ROTINA',
-              p_volume_total: volRef,
-              p_is_plantao: isPlantao
-            });
+          const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
+            p_categoria: grupo.categoria || 'SC',
+            p_cliente: nomeCliente,
+            p_especialidade: grupo.especialidade,
+            p_modalidade: grupo.modalidade,
+            p_periodo: periodo,
+            p_prioridade: grupo.prioridade || 'ROTINA'
+          });
 
             if (precoError) {
               console.error(`❌ Erro no cálculo de preço para ${nomeCliente} - ${chave}:`, precoError);
@@ -303,7 +311,10 @@ Deno.serve(async (req) => {
           }
 
           // Buscar parâmetros de faturamento
-          const parametrosFaturamento = cliente.parametros_faturamento?.find(p => p.status === 'A') || {};
+          const parametrosFaturamentoArr = Array.isArray(cliente.parametros_faturamento)
+            ? cliente.parametros_faturamento
+            : (cliente.parametros_faturamento ? [cliente.parametros_faturamento] : []);
+          const parametrosFaturamento = parametrosFaturamentoArr.find((p: any) => p.status === 'A') || {};
 
           // Calcular franquia, portal e integração usando RPC existente
           console.log(`💰 Calculando faturamento completo para ${nomeCliente}...`);
