@@ -98,32 +98,62 @@ serve(async (req) => {
       console.log(`📈 Cliente ${nomeCliente}: ${volumetriaCliente.length} registros, ${volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0)} exames total`);
 
       // Agrupar e processar por modalidade/especialidade/categoria/prioridade
-      const grupos = {};
-      volumetriaCliente.forEach(registro => {
+      const grupos: Record<string, any[]> = {};
+      volumetriaCliente.forEach((registro: any) => {
         const key = `${registro.MODALIDADE}/${registro.ESPECIALIDADE}/${registro.CATEGORIA}/${registro.PRIORIDADE}`;
-        if (!grupos[key]) {
-          grupos[key] = [];
-        }
+        if (!grupos[key]) grupos[key] = [];
         grupos[key].push(registro);
       });
 
       console.log(`💰 Calculando preços para ${Object.keys(grupos).length} grupos de exames do cliente ${nomeCliente}`);
 
-      const detalhesCliente = [];
+      // Pré-calcular volumes por nível conforme regra de contrato
+      const totalPorModalidade = new Map<string, number>();
+      const totalPorModEsp = new Map<string, number>();
+      const totalPorModEspCat = new Map<string, number>();
+      for (const [key, registros] of Object.entries(grupos)) {
+        const [mod, esp, cat] = key.split('/');
+        const qtd = (registros as any[]).reduce((sum, r) => sum + (r.VALORES || 0), 0);
+        totalPorModalidade.set(mod, (totalPorModalidade.get(mod) || 0) + qtd);
+        const kME = `${mod}|${esp}`;
+        totalPorModEsp.set(kME, (totalPorModEsp.get(kME) || 0) + qtd);
+        const kMEC = `${mod}|${esp}|${cat}`;
+        totalPorModEspCat.set(kMEC, (totalPorModEspCat.get(kMEC) || 0) + qtd);
+      }
+
+      const detalhesCliente: any[] = [];
       let valorTotalCliente = 0;
 
       for (const [key, registros] of Object.entries(grupos)) {
         const [modalidade, especialidade, categoria, prioridade] = key.split('/');
         const quantidade = (registros as any[]).reduce((sum, r) => sum + (r.VALORES || 0), 0);
-
         if (quantidade === 0) continue;
 
-        console.log(`🔍 Buscando preço para ${nomeCliente}: ${modalidade}/${especialidade}/${categoria}/${prioridade} (${quantidade} exames)`);
+        // Volume de referência conforme contrato
+        let volumeRef = quantidade;
+        const mod = modalidade || '';
+        const esp = especialidade || '';
+        const cat = categoria || 'SC';
+        switch ((condicaoVolume || '').toUpperCase()) {
+          case 'MOD':
+            volumeRef = totalPorModalidade.get(mod) || quantidade;
+            break;
+          case 'MOD/ESP':
+            volumeRef = totalPorModEsp.get(`${mod}|${esp}`) || quantidade;
+            break;
+          case 'MOD/ESP/CAT':
+            volumeRef = totalPorModEspCat.get(`${mod}|${esp}|${cat}`) || quantidade;
+            break;
+          case 'GERAL':
+          default:
+            volumeRef = volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0);
+        }
+
+        console.log(`🔍 Buscando preço para ${nomeCliente}: ${modalidade}/${especialidade}/${categoria}/${prioridade} (qtd=${quantidade}, volRef=${volumeRef})`);
 
         // Verificar se o cliente tem plantão na prioridade
-        const isPlantao = prioridade?.toUpperCase().includes('PLANTÃO') || 
-                         prioridade?.toUpperCase().includes('PLANTAO') || 
-                         prioridade?.toUpperCase().includes('URGENTE');
+        const prio = (prioridade || '').toUpperCase();
+        const isPlantao = prio.includes('PLANTÃO') || prio.includes('PLANTAO') || prio.includes('URGENTE');
 
         // Usar a função RPC para calcular preço com cliente_id
         const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
@@ -132,7 +162,7 @@ serve(async (req) => {
           p_especialidade: especialidade,
           p_categoria: categoria || 'SC',
           p_prioridade: prioridade || 'ROTINA',
-          p_volume_total: quantidade,
+          p_volume_total: volumeRef,
           p_is_plantao: isPlantao
         });
 
@@ -141,19 +171,28 @@ serve(async (req) => {
           continue;
         }
 
-        if (precoData && precoData > 0) {
-          const valorTotal = precoData * quantidade;
+        // A função RPC pode retornar número ou array de objetos
+        let valorUnitario = 0;
+        if (Array.isArray(precoData)) {
+          const first = (precoData as any[])[0] || {};
+          valorUnitario = Number(first.valor_unitario ?? first.preco ?? 0);
+        } else if (typeof precoData === 'number') {
+          valorUnitario = precoData as number;
+        } else if (precoData && typeof precoData === 'object') {
+          valorUnitario = Number((precoData as any).valor_unitario || 0);
+        }
+
+        if (valorUnitario > 0) {
+          const valorTotal = valorUnitario * quantidade;
           valorTotalCliente += valorTotal;
-          
-          console.log(`💰 Preço encontrado: ${modalidade}/${especialidade}/${categoria}/${prioridade} = R$ ${precoData.toFixed(2)} x ${quantidade} = R$ ${valorTotal.toFixed(2)}`);
-          
+          console.log(`💰 Preço: ${modalidade}/${especialidade}/${categoria}/${prioridade} = R$ ${valorUnitario.toFixed(2)} x ${quantidade} = R$ ${valorTotal.toFixed(2)}`);
           detalhesCliente.push({
             modalidade,
-            especialidade, 
+            especialidade,
             categoria,
             prioridade,
             quantidade,
-            valor_unitario: precoData,
+            valor_unitario: valorUnitario,
             valor_total: valorTotal
           });
         }

@@ -813,20 +813,25 @@ export default function DemonstrativoFaturamento() {
         console.error('❌ Erro ao buscar contratos:', errorContratos);
       }
       
-      // Criar mapa de clientes que precisam de demonstrativo
-      const clientesQueNecessitamDemonstrativo = new Set();
-      clientesComContratos?.forEach(cliente => {
-        if (cliente.nome_fantasia) clientesQueNecessitamDemonstrativo.add(cliente.nome_fantasia);
-        if (cliente.nome) clientesQueNecessitamDemonstrativo.add(cliente.nome);
-        if (cliente.nome_mobilemed) clientesQueNecessitamDemonstrativo.add(cliente.nome_mobilemed);
+      // Criar mapas de clientes que precisam de demonstrativo
+      const clientesIdsPermitidos = new Set<string>();
+      const clientesNomesPermitidos = new Set<string>();
+      const normalize = (s?: string | null) => (s || '').toString().trim().toUpperCase();
+      clientesComContratos?.forEach((cliente) => {
+        if (cliente.id) clientesIdsPermitidos.add(cliente.id);
+        if (cliente.nome_fantasia) clientesNomesPermitidos.add(normalize(cliente.nome_fantasia));
+        if (cliente.nome) clientesNomesPermitidos.add(normalize(cliente.nome));
+        if (cliente.nome_mobilemed) clientesNomesPermitidos.add(normalize(cliente.nome_mobilemed));
       });
       
-      console.log('📋 Clientes que precisam de demonstrativo:', Array.from(clientesQueNecessitamDemonstrativo));
+      console.log('📋 IDs permitidos:', clientesIdsPermitidos.size, ' | Nomes permitidos amostra:', Array.from(clientesNomesPermitidos).slice(0,5));
       
-      // Filtrar dados de faturamento apenas para clientes que precisam de demonstrativo
-      const dadosFaturamentoFiltrados = dadosFaturamento.filter(item => 
-        clientesQueNecessitamDemonstrativo.has(item.cliente_nome)
-      );
+      // Filtrar dados de faturamento por cliente_id quando disponível; fallback por nome normalizado
+      const dadosFaturamentoFiltrados = dadosFaturamento.filter((item) => {
+        const byId = item.cliente_id && clientesIdsPermitidos.has(item.cliente_id);
+        const byName = clientesNomesPermitidos.has(normalize(item.cliente_nome));
+        return Boolean(byId || byName);
+      });
       
       console.log(`🔍 Dados filtrados: ${dadosFaturamentoFiltrados.length} registros (eram ${dadosFaturamento.length})`);
       console.log('👥 Clientes filtrados únicos:', [...new Set(dadosFaturamentoFiltrados.map(d => d.cliente_nome))]);
