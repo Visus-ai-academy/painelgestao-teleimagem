@@ -327,7 +327,7 @@ serve(async (req: Request) => {
               console.log(`   Volume agregado: ${volumeParaCalculo}`);
               console.log(`   É plantão: ${isPlantao}`);
               
-              const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
+              const { data: precoData, error } = await supabase.rpc('calcular_preco_exame', {
                 p_cliente_id: cliente_id,
                 p_modalidade: g.modalidade,
                 p_especialidade: g.especialidade,
@@ -341,15 +341,25 @@ serve(async (req: Request) => {
                 console.error('❌ Erro na RPC calcular_preco_exame:', error);
                 precoPorCombo[key] = 0;
               } else {
-                const precoNum = Number(preco);
-                console.log(`💰 Preço calculado para ${key}: R$ ${precoNum}`);
+                let precoNum: number | null = null;
+                if (Array.isArray(precoData)) {
+                  const item = precoData[0] as any;
+                  precoNum = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
+                } else if (typeof precoData === 'number') {
+                  precoNum = precoData as number;
+                } else if (typeof precoData === 'object' && precoData !== null) {
+                  precoNum = (precoData as any)?.valor_unitario ?? null;
+                }
+
+                console.log(`💰 Preço calculado para ${key}:`, precoNum);
                 
-                if (Number.isFinite(precoNum) && precoNum > 0) {
-                  precoPorCombo[key] = precoNum;
+                if (Number.isFinite(precoNum) && (precoNum as number) > 0) {
+                  precoPorCombo[key] = precoNum as number;
                 } else {
-                  console.warn(`⚠️ Preço inválido retornado: ${preco} (${typeof preco})`);
+                  console.warn(`⚠️ Preço inválido retornado:`, precoData, typeof precoData);
                   precoPorCombo[key] = 0;
                 }
+              }
               }
             } catch (e) {
               console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);

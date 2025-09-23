@@ -333,12 +333,12 @@ serve(async (req) => {
         console.log('Processando cliente:', cliente.nome_fantasia);
         
         // ✅ Resolver cliente_id válido (UUID) prioritizando o que tem preços ativos
-        const isUuid = (v?: string) => !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
+        const isUuid = (v?: string) =>
+          !!v && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
         let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
         
         // Resolver cliente_id de forma robusta sem subselects inválidos
         const nomesBusca: string[] = Array.from(new Set((cliente.nomes_mobilemed || []).filter(Boolean)));
-        let clienteIdValido: string | null = isUuid(cliente.id) ? cliente.id : null;
 
         // 1) Buscar candidatos por nome/nome_fantasia/nome_mobilemed
         let candidatosIds: string[] = [];
