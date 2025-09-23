@@ -207,19 +207,31 @@ serve(async (req) => {
         valorIntegracaoGeral += valorIntegracaoFinal;
 
         resultados.push({
-          cliente: nomeCliente,
-          valor_exames: valorTotalCliente,
-          valor_franquia: valorFranquiaFinal,
-          valor_portal: valorPortalFinal,
-          valor_integracao: valorIntegracaoFinal,
-          valor_bruto: valorBruto,
-          impostos_federais: impostosFederais,
-          impostos_municipais: impostosMunicipais,
-          total_impostos: totalImpostos,
-          valor_liquido: valorLiquido,
-          quantidade_exames: volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0),
-          detalhes: detalhesCliente,
-          regime_tributario: simples ? 'Simples Nacional' : 'Regime Normal'
+          cliente_id: cliente.id,
+          cliente_nome: nomeCliente,
+          periodo: periodo,
+          total_exames: volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0),
+          valor_exames: valorTotalCliente || 0,
+          valor_franquia: valorFranquiaFinal || 0,
+          valor_portal_laudos: valorPortalFinal || 0,
+          valor_integracao: valorIntegracaoFinal || 0,
+          valor_bruto: valorBruto || 0,
+          valor_impostos: totalImpostos || 0,
+          valor_total: valorLiquido || 0,
+          detalhes_franquia: {
+            tipo: aplicarFranquia ? 'aplicada' : 'nao_aplica',
+            motivo: aplicarFranquia ? 'Franquia aplicada conforme parâmetros' : 'Cliente sem franquia',
+            volume_atual: volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0),
+            valor_aplicado: valorFranquiaFinal || 0
+          },
+          detalhes_exames: detalhesCliente || [],
+          detalhes_tributacao: {
+            simples_nacional: simples || false,
+            percentual_iss: percentualIss || 0,
+            valor_iss: impostosMunicipais || 0,
+            base_calculo: valorBruto || 0
+          },
+          alertas: []
         });
 
         console.log(`Cliente ${nomeCliente} processado com sucesso - Total: R$ ${valorLiquido.toFixed(2)} (${volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0)} exames)`);
