@@ -37,6 +37,27 @@ serve(async (req: Request) => {
       console.log('Função iniciada');
     
     const body = await req.json();
+    
+    // Se não veio nenhum parâmetro, buscar todos os clientes com demonstrativo
+    if (!body.cliente_id && !body.periodo) {
+      console.log('⚠️ Buscando todos os clientes com demonstrativo no localStorage...');
+      
+      // Retornar lista de clientes disponíveis para relatório
+      const { data: clientesDisponiveis } = await supabase
+        .from('clientes')
+        .select('id, nome, nome_fantasia')
+        .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+        .order('nome');
+      
+      return new Response(JSON.stringify({
+        success: true,
+        clientes_disponiveis: clientesDisponiveis || [],
+        message: "Lista de clientes disponíveis para relatório"
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const demonstrativoData = body?.demonstrativo_data || null;
     console.log('Body recebido:', JSON.stringify(body));
     

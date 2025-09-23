@@ -635,7 +635,12 @@ serve(async (req) => {
                   p_volume_total: volumeEspecifico, // ✅ Usar quantidade do grupo para faixa (ex.: 113 -> 101-250)
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
-                preco = rpc1.data as number | null;
+                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
+                if (!rpc1.error && rpc1.data && Array.isArray(rpc1.data) && rpc1.data.length > 0) {
+                  preco = rpc1.data[0].valor_unitario;
+                } else {
+                  preco = null;
+                }
                 precoError = rpc1.error;
               } catch (e) {
                 precoError = e;
@@ -665,8 +670,9 @@ serve(async (req) => {
                    p_volume_total: volumeEspecifico, // ✅ Usar volume condicional para faixa
                   p_is_plantao: false
                 });
-                if (!rpc2.error && rpc2.data) {
-                  preco = rpc2.data as number;
+                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
+                if (!rpc2.error && rpc2.data && Array.isArray(rpc2.data) && rpc2.data.length > 0) {
+                  preco = rpc2.data[0].valor_unitario;
                 }
               }
 
@@ -681,8 +687,9 @@ serve(async (req) => {
                    p_volume_total: volumeEspecifico,
                   p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO')
                 });
-                if (!rpc3.error && rpc3.data) {
-                  preco = rpc3.data as number;
+                // ✅ CORREÇÃO: RPC retorna array, pegar primeiro item e valor_unitario
+                if (!rpc3.error && rpc3.data && Array.isArray(rpc3.data) && rpc3.data.length > 0) {
+                  preco = rpc3.data[0].valor_unitario;
                 }
               }
 
