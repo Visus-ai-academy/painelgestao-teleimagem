@@ -25,24 +25,25 @@ serve(async (req) => {
 
     console.log(`🚀 Iniciando geração de demonstrativos para período: ${periodo}`);
     
-    // Buscar clientes ativos com parâmetros de faturamento (LIMITE: 10 clientes)
-    const { data: clientes, error: clientesError } = await supabase
+    // Buscar TODOS os clientes ativos com parâmetros de faturamento
+    const { data: clientesCompletos, error: clientesError } = await supabase
       .from('clientes')
       .select(`
+        id,
         nome,
         nome_fantasia, 
         nome_mobilemed,
         parametros_faturamento!inner(tipo_faturamento, status)
       `)
-      .eq('parametros_faturamento.status', 'A')
-      .limit(10);
+      .eq('parametros_faturamento.status', 'A');
 
     if (clientesError) {
       console.error('❌ Erro ao buscar clientes:', clientesError);
       throw clientesError;
     }
 
-    console.log(`📊 Processando ${clientes?.length || 0} clientes (máximo 10)`);
+    console.log(`📊 Total de clientes encontrados: ${clientesCompletos?.length || 0}`);
+    console.log(`📊 Processando em lotes de 10 clientes`);
 
     let totalExamesGeral = 0;
     let valorBrutoGeral = 0;
@@ -56,7 +57,15 @@ serve(async (req) => {
     let clientesRegimeNormal = 0;
     const resultados = [];
 
-    for (const cliente of clientes || []) {
+    // Processar em lotes de 10 clientes
+    const TAMANHO_LOTE = 10;
+    const totalClientes = clientesCompletos?.length || 0;
+    
+    for (let i = 0; i < totalClientes; i += TAMANHO_LOTE) {
+      const loteAtual = clientesCompletos!.slice(i, i + TAMANHO_LOTE);
+      console.log(`🔄 Processando lote ${Math.floor(i/TAMANHO_LOTE) + 1}/${Math.ceil(totalClientes/TAMANHO_LOTE)} (${loteAtual.length} clientes)`);
+
+      for (const cliente of loteAtual) {
       const nomeCliente = cliente.nome_fantasia || cliente.nome_mobilemed || cliente.nome;
       
       // Buscar volumetria para este cliente
@@ -216,6 +225,7 @@ serve(async (req) => {
         console.log(`Cliente ${nomeCliente} processado com sucesso - Total: R$ ${valorLiquido.toFixed(2)} (${volumetriaCliente.reduce((sum, r) => sum + (r.VALORES || 0), 0)} exames)`);
       }
     }
+    } // Fim do loop de lotes
 
     const resumo = {
       total_clientes: clientes?.length || 0,
@@ -241,7 +251,7 @@ serve(async (req) => {
         success: true,
         periodo,
         status: 'concluido',
-        mensagem: `Demonstrativos gerados com sucesso! ${resultados.length} clientes processados (limite: 10).`,
+        mensagem: `Demonstrativos gerados com sucesso! ${resultados.length} clientes processados em lotes de 10.`,
         demonstrativos: resultados,
         resumo: resumo,
         alertas: []
