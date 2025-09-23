@@ -120,14 +120,20 @@ serve(async (req) => {
 
         console.log(`🔍 Buscando preço para ${nomeCliente}: ${modalidade}/${especialidade}/${categoria}/${prioridade} (${quantidade} exames)`);
 
-        // Usar a função RPC para calcular preço
+        // Verificar se o cliente tem plantão na prioridade
+        const isPlantao = prioridade?.toUpperCase().includes('PLANTÃO') || 
+                         prioridade?.toUpperCase().includes('PLANTAO') || 
+                         prioridade?.toUpperCase().includes('URGENTE');
+
+        // Usar a função RPC para calcular preço com cliente_id
         const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-          p_cliente: nomeCliente,
+          p_cliente_id: cliente.id,
           p_modalidade: modalidade,
           p_especialidade: especialidade,
-          p_categoria: categoria,
-          p_prioridade: prioridade,
-          p_periodo: periodo
+          p_categoria: categoria || 'SC',
+          p_prioridade: prioridade || 'ROTINA',
+          p_volume_total: quantidade,
+          p_is_plantao: isPlantao
         });
 
         if (precoError) {

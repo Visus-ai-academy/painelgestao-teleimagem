@@ -55,10 +55,10 @@ serve(async (req) => {
       p_cliente_id: clienteId,
       p_modalidade: 'RX',
       p_especialidade: 'MUSCULO ESQUELETICO',
-      p_prioridade: 'URGÊNCIA',
       p_categoria: 'SC',
-      p_quantidade: totalExames,
-      is_plantao: false
+      p_prioridade: 'URGÊNCIA',
+      p_volume_total: totalExames,
+      p_is_plantao: false
     });
 
     console.log('🔧 Resultado RPC calcular_preco_exame:', rpcResult);

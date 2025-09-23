@@ -340,9 +340,10 @@ serve(async (req: Request) => {
               console.error('❌ Erro na RPC calcular_preco_exame:', error);
               precoPorCombo[key] = 0;
             } else {
-              let precoNum: number | null = null;
-              if (Array.isArray(precoData)) {
-                const item = precoData[0] as any;
+             // A função agora retorna um valor numérico diretamente
+             let precoNum: number | null = null;
+             if (typeof precoData === 'number') {
+               precoNum = precoData;
                 precoNum = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
               } else if (typeof precoData === 'number') {
                 precoNum = precoData as number;
