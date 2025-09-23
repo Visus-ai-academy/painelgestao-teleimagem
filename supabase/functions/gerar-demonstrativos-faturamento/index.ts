@@ -327,10 +327,29 @@ serve(async (req) => {
     const demonstrativos: DemonstrativoCliente[] = [];
     let processados = 0;
 
-    // Processar cada cliente agrupado
-    for (const cliente of clientesAgrupados.values()) {
+    // ✅ OTIMIZAÇÃO: Processar em lotes para evitar timeout
+    const MAX_CLIENTES_POR_BATCH = 20;
+    const TIMEOUT_LIMITE_MS = 50000; // 50 segundos para deixar margem
+    const inicioProcessamento = Date.now();
+    
+    const clientesArray = Array.from(clientesAgrupados.values());
+    const totalClientesParaProcessar = Math.min(clientesArray.length, MAX_CLIENTES_POR_BATCH);
+    
+    console.log(`🔄 Processando ${totalClientesParaProcessar} clientes de ${clientesArray.length} total (lote limitado para evitar timeout)`);
+    
+    // Processar apenas o primeiro lote de clientes
+    for (let i = 0; i < totalClientesParaProcessar; i++) {
+      const cliente = clientesArray[i];
+      
+      // Verificar timeout antes de cada cliente
+      const tempoDecorrido = Date.now() - inicioProcessamento;
+      if (tempoDecorrido > TIMEOUT_LIMITE_MS) {
+        console.warn(`⏰ Parando processamento por timeout. Processados: ${i}/${totalClientesParaProcessar}`);
+        break;
+      }
+      
       try {
-        console.log('Processando cliente:', cliente.nome_fantasia);
+        console.log(`Processando cliente ${i + 1}/${totalClientesParaProcessar}:`, cliente.nome_fantasia);
         
         // ✅ Resolver cliente_id válido (UUID) prioritizando o que tem preços ativos
         const isUuid = (v?: string) =>
@@ -423,11 +442,20 @@ serve(async (req) => {
       allowedEspecialidades = ['MEDICINA INTERNA'];
     }
 
-    // Paginação para evitar limite de 1000 registros
+    // Paginação otimizada para evitar timeout - processar menos dados por vez
     let volumetria: any[] = [];
-    const pageSize = 1000;
+    const pageSize = 500; // Reduzido de 1000 para 500
+    const maxPages = 4; // Máximo 4 páginas = 2000 registros por cliente
     let from = 0;
-    while (true) {
+    let paginaAtual = 0;
+    
+    while (paginaAtual < maxPages) {
+      // Verificar timeout durante paginação
+      const tempoDecorrido = Date.now() - inicioProcessamento;
+      if (tempoDecorrido > (TIMEOUT_LIMITE_MS * 0.8)) { // 80% do limite
+        console.warn(`⏰ Parando paginação volumetria por timeout para ${cliente.nome_fantasia}`);
+        break;
+      }
       // Montar query base com filtros principais
       let query = supabase
         .from('volumetria_mobilemed')
@@ -468,6 +496,7 @@ serve(async (req) => {
       if (!page || page.length === 0) break;
 
       volumetria.push(...page);
+      paginaAtual++;
 
       if (page.length < pageSize) break; // última página
       from += pageSize;
@@ -587,9 +616,23 @@ serve(async (req) => {
             grupos.get(chave).quantidade += (exame.VALORES || 1);
           }
 
-          // Calcular preço para cada grupo
-          for (const grupo of grupos.values()) {
+          // ✅ LIMITAÇÃO: Processar apenas os 15 grupos mais importantes (por quantidade) para evitar timeout
+          const gruposArray = Array.from(grupos.values())
+            .sort((a, b) => b.quantidade - a.quantidade)
+            .slice(0, 15); // Máximo 15 grupos por cliente
+          
+          console.log(`💰 Calculando preços para ${gruposArray.length} grupos de exames (dos ${grupos.size} totais) do cliente ${cliente.nome_fantasia}`);
+
+          // Calcular preço para cada grupo (limitado)
+          for (const grupo of gruposArray) {
             try {
+              // Verificar timeout durante cálculo de preços
+              const tempoDecorrido = Date.now() - inicioProcessamento;
+              if (tempoDecorrido > (TIMEOUT_LIMITE_MS * 0.9)) { // 90% do limite
+                console.warn(`⏰ Parando cálculo de preços por timeout para ${cliente.nome_fantasia}`);
+                break;
+              }
+
               console.log(`🔍 Buscando preço para ${cliente.nome_fantasia}: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade} (${grupo.quantidade} exames)`);
               
               // Verificar se temos todos os dados necessários
@@ -1000,6 +1043,12 @@ serve(async (req) => {
         console.error(`Erro ao processar cliente ${cliente.nome_fantasia}:`, error);
         continue;
       }
+    }
+    
+    // Informar se há mais clientes para processar
+    const clientesRestantes = clientesArray.length - totalClientesParaProcessar;
+    if (clientesRestantes > 0) {
+      alertasClientes.push(`⚠️ Processamento limitado: ${totalClientesParaProcessar} clientes processados. ${clientesRestantes} clientes restantes podem ser processados em nova execução.`);
     }
 
     // Ordenar por valor total (maior primeiro)
