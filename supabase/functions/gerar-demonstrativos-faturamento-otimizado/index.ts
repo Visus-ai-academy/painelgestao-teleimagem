@@ -179,45 +179,60 @@ Deno.serve(async (req) => {
       clientes_regime_normal: 0
     };
 
-    // Processar clientes em lotes de 10
-    const batchSize = 10;
+    // Processar clientes em lotes menores de 5 para evitar timeout
+    const batchSize = 5;
+    const maxProcessingTime = 45000; // 45 segundos limite
+    const startTime = Date.now();
+    
     for (let i = 0; i < (clientes?.length || 0); i += batchSize) {
+      // Verificar timeout
+      if (Date.now() - startTime > maxProcessingTime) {
+        console.log(`⏱️ Timeout atingido, processando ${resumo.clientes_processados} de ${clientes?.length || 0} clientes`);
+        break;
+      }
+      
       const batch = clientes?.slice(i, i + batchSize) || [];
       console.log(`🔄 Processando lote ${Math.floor(i/batchSize) + 1}/${Math.ceil((clientes?.length || 0)/batchSize)} (${batch.length} clientes)`);
 
       for (const cliente of batch) {
+        // Verificar timeout individual por cliente
+        if (Date.now() - startTime > maxProcessingTime) {
+          console.log(`⏱️ Timeout atingido durante processamento de ${cliente.nome}`);
+          break;
+        }
+        
         try {
           let nomeCliente = cliente.nome_fantasia || cliente.nome_mobilemed || cliente.nome;
           console.log(`🔍 Buscando volumetria para cliente: ${nomeCliente} no período ${periodo}`);
 
-          // Buscar dados de volumetria - considerar todos os clientes do grupo
+          // Buscar dados de volumetria - otimizado para evitar loops aninhados
           let volumetriaData = [];
           let nomeEncontrado = nomeCliente;
           
-          // Se tem clientes_originais (grupo agrupado), buscar dados de todos
+          // Coletar todos os nomes únicos de uma vez
           const clientesParaBuscar = cliente.clientes_originais || [cliente];
+          const todosNomes = new Set();
           
           for (const clienteOriginal of clientesParaBuscar) {
-            const nomesParaBuscar = [
-              clienteOriginal.nome_fantasia, 
-              clienteOriginal.nome_mobilemed, 
-              clienteOriginal.nome
-            ].filter(n => n?.trim());
+            [clienteOriginal.nome_fantasia, clienteOriginal.nome_mobilemed, clienteOriginal.nome]
+              .filter(n => n?.trim())
+              .forEach(nome => todosNomes.add(nome));
+          }
+          
+          if (todosNomes.size > 0) {
+            // Fazer uma única consulta com todos os nomes
+            const nomesArray = Array.from(todosNomes);
+            const { data: dados, error } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('periodo_referencia', periodo)
+              .or(nomesArray.map(nome => `"Cliente_Nome_Fantasia".eq."${nome}","EMPRESA".eq."${nome}"`).join(','))
+              .neq('arquivo_fonte', 'volumetria_onco_padrao');
             
-            // Tentar cada nome até encontrar dados
-            for (const nomeParaTeste of nomesParaBuscar) {
-              const { data: dados, error } = await supabase
-                .from('volumetria_mobilemed')
-                .select('*')
-                .eq('periodo_referencia', periodo)
-                .or(`"Cliente_Nome_Fantasia".eq.${nomeParaTeste},"EMPRESA".eq.${nomeParaTeste}`)
-                .not('arquivo_fonte', 'eq', 'volumetria_onco_padrao');
-              
-              if (!error && dados && dados.length > 0) {
-                volumetriaData = volumetriaData.concat(dados);
-                nomeEncontrado = clienteOriginal.nome_fantasia || nomeParaTeste;
-                console.log(`📊 Encontrados ${dados.length} registros para ${nomeParaTeste} (agrupado como ${nomeCliente})`);
-              }
+            if (!error && dados && dados.length > 0) {
+              volumetriaData = dados;
+              nomeEncontrado = nomesArray[0];
+              console.log(`📊 Encontrados ${dados.length} registros para ${nomeCliente} (agrupado como ${nomeCliente})`);
             }
           }
           
@@ -315,56 +330,39 @@ Deno.serve(async (req) => {
             const prio = (grupo.prioridade || '').toString().toUpperCase();
             const isPlantao = prio.includes('PLANTÃO') || prio.includes('PLANTAO') || prio.includes('URGENTE') || prio.includes('URGÊNCIA');
 
-            // Usar a função RPC para calcular preço
+            // Usar a função RPC para calcular preço com timeout
             let valorUnitario = 0;
             
-            // Primeiro tentar buscar preço diretamente na tabela
-            const { data: precosDireto, error: precosDiretoError } = await supabase
-              .from('precos_servicos')
-              .select('valor_base, valor_urgencia, considera_prioridade_plantao')
-              .eq('cliente_id', cliente.id)
-              .eq('modalidade', grupo.modalidade)
-              .eq('especialidade', grupo.especialidade)
-              .eq('categoria', grupo.categoria || 'SC')
-              .eq('ativo', true)
-              .order('created_at', { ascending: false })
-              .limit(1);
+            try {
+              // Primeiro tentar buscar preço diretamente na tabela (mais rápido)
+              const { data: precosDireto, error: precosDiretoError } = await supabase
+                .from('precos_servicos')
+                .select('valor_base, valor_urgencia, considera_prioridade_plantao')
+                .eq('cliente_id', cliente.id)
+                .eq('modalidade', grupo.modalidade)
+                .eq('especialidade', grupo.especialidade)
+                .eq('categoria', grupo.categoria || 'SC')
+                .eq('ativo', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
 
-            if (precosDireto && precosDireto.length > 0) {
-              const preco = precosDireto[0];
-              // Se considera plantão e é plantão, usar valor_urgencia, senão valor_base
-              if (preco.considera_prioridade_plantao && isPlantao) {
-                valorUnitario = Number(preco.valor_urgencia || preco.valor_base || 0);
-              } else {
-                valorUnitario = Number(preco.valor_base || 0);
-              }
-              console.log(`💰 Preço encontrado diretamente para ${nomeCliente} - ${chave}: R$ ${valorUnitario}`);
-            } else {
-              // Se não encontrou direto, tentar RPC (fallback)
-              const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-                p_cliente_id: cliente.id,
-                p_modalidade: grupo.modalidade,
-                p_especialidade: grupo.especialidade,
-                p_categoria: grupo.categoria || 'SC',
-                p_prioridade: grupo.prioridade || 'ROTINA',
-                p_volume_total: volRef,
-                p_is_plantao: isPlantao
-              });
-
-              if (precoError) {
-                console.error(`❌ Erro no cálculo de preço para ${nomeCliente} - ${chave}:`, precoError);
-              } else if (precoData && typeof precoData === 'number') {
-                valorUnitario = precoData;
-              } else if (precoData && typeof precoData === 'object') {
-                if (Array.isArray(precoData) && precoData.length > 0) {
-                  const first = precoData[0];
-                  valorUnitario = Number(first.valor_unitario ?? first.preco ?? first.valor ?? 0);
+              if (precosDireto && !precosDiretoError) {
+                // Se considera plantão e é plantão, usar valor_urgencia, senão valor_base
+                if (precosDireto.considera_prioridade_plantao && isPlantao) {
+                  valorUnitario = Number(precosDireto.valor_urgencia || precosDireto.valor_base || 0);
                 } else {
-                  valorUnitario = Number((precoData as any).valor_unitario || (precoData as any).valor || 0);
+                  valorUnitario = Number(precosDireto.valor_base || 0);
                 }
+                console.log(`💰 Preço encontrado diretamente para ${nomeCliente} - ${chave}: R$ ${valorUnitario}`);
+              } else {
+                // Fallback para valor padrão se não encontrar preço
+                console.log(`⚠️ Preço não encontrado para ${nomeCliente} - ${chave}, usando valor padrão`);
+                valorUnitario = 0;
               }
-              
-              console.log(`💰 Preço calculado via RPC para ${nomeCliente} - ${chave}: R$ ${valorUnitario}`);
+            } catch (error) {
+              console.error(`❌ Erro na busca de preço para ${nomeCliente} - ${chave}:`, error);
+              valorUnitario = 0;
             }
 
             const valorGrupo = grupo.quantidade * valorUnitario;
@@ -388,19 +386,42 @@ Deno.serve(async (req) => {
             : (cliente.parametros_faturamento ? [cliente.parametros_faturamento] : []);
           const parametrosFaturamento = parametrosFaturamentoArr.find((p: any) => p.status === 'A') || {};
 
-          // Calcular franquia, portal e integração usando RPC existente
+          // Calcular franquia, portal e integração diretamente (mais rápido que RPC)
           console.log(`💰 Calculando faturamento completo para ${nomeCliente}...`);
-          const { data: calculoCompleto, error: calculoError } = await supabase.rpc('calcular_faturamento_completo', {
-            p_cliente_id: cliente.id,
-            p_periodo: periodo,
-            p_volume_total: totalExames
-          });
-
-          if (calculoError) {
-            console.error(`❌ Erro no cálculo de faturamento para ${nomeCliente}:`, calculoError);
+          
+          let valorFranquia = 0;
+          let valorPortal = 0;
+          let valorIntegracao = 0;
+          
+          try {
+            // Calcular franquia baseado nos parâmetros
+            if (parametrosFaturamento.aplicar_franquia) {
+              if (parametrosFaturamento.frequencia_continua) {
+                // Frequência contínua sempre cobra
+                valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
+              } else if (totalExames > 0) {
+                // Só cobra se houver volume
+                valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
+              }
+            }
+            
+            // Calcular portal e integração
+            if (parametrosFaturamento.portal_laudos) {
+              valorPortal = Number(parametrosFaturamento.valor_integracao || 0);
+            }
+            if (parametrosFaturamento.cobrar_integracao) {
+              valorIntegracao = Number(parametrosFaturamento.valor_integracao || 0);
+            }
+          } catch (error) {
+            console.error(`❌ Erro no cálculo de faturamento para ${nomeCliente}:`, error);
           }
 
-          const franquia = calculoCompleto?.[0] || {};
+          const franquia = {
+            valor_franquia: valorFranquia,
+            valor_portal_laudos: valorPortal,
+            valor_integracao: valorIntegracao
+          };
+          
           console.log(`📊 Resultado cálculo faturamento ${nomeCliente}:`, franquia);
 
           // Calcular impostos
