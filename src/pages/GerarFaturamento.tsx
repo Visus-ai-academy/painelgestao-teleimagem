@@ -737,6 +737,26 @@ export default function GerarFaturamento() {
       progresso: 10
     });
 
+    // RESETAR todos os status para "pendente" no início do processamento
+    setResultados((prev) => {
+      const novosResultados = prev.map(resultado => ({
+        ...resultado,
+        relatorioGerado: false, // Status Demonstrativo para pendente
+        emailEnviado: false,    // Status E-mail para pendente  
+        nfOmieGerada: false,    // Status NF Omie para pendente
+        dataProcessamento: new Date().toISOString(),
+      }));
+      
+      // Persistir no DB também
+      salvarResultadosDB(novosResultados);
+      return novosResultados;
+    });
+
+    // Resetar sets de controle
+    setDemonstrativosGeradosPorCliente(new Set());
+    setDemonstrativoGerado(false);
+    localStorage.setItem('demonstrativoGerado', 'false');
+
     let progressoSimulado: NodeJS.Timeout | null = null;
 
     try {
@@ -986,6 +1006,21 @@ export default function GerarFaturamento() {
     }
 
     setEnviandoEmails(true);
+    
+    // RESETAR status de emails para "pendente" no início do processamento
+    setResultados((prev) => {
+      const novosResultados = prev.map(resultado => ({
+        ...resultado,
+        emailEnviado: false,
+        emailDestino: resultado.emailDestino || '',
+        dataProcessamento: new Date().toISOString(),
+      }));
+      
+      // Persistir no DB também
+      salvarResultadosDB(novosResultados);
+      return novosResultados;
+    });
+    
     let enviados = 0;
     let errors = 0;
 
@@ -1125,6 +1160,25 @@ export default function GerarFaturamento() {
     console.log(`🚀 Gerando NFs para ${clientesParaNF.length} clientes selecionados:`, clientesParaNF.map(c => c.clienteNome));
 
     setGerandoNFOmie(true);
+
+    // RESETAR status de NF Omie para "pendente" nos clientes selecionados
+    const clientesParaReset = Array.from(clientesSelecionadosNF);
+    setResultados((prev) => {
+      const novosResultados = prev.map(resultado => 
+        clientesParaReset.includes(resultado.clienteNome)
+          ? {
+              ...resultado,
+              omieNFGerada: false,
+              nfOmieData: undefined,
+              dataProcessamento: new Date().toISOString(),
+            }
+          : resultado
+      );
+      
+      // Persistir no DB também
+      salvarResultadosDB(novosResultados);
+      return novosResultados;
+    });
 
     try {
       console.log('Gerando NFs no Omie para período:', periodoSelecionado);
@@ -1370,6 +1424,20 @@ export default function GerarFaturamento() {
       processando: true,
       mensagem: 'Iniciando geração de relatórios...',
       progresso: 0
+    });
+
+    // RESETAR status de relatórios para "pendente" no início do processamento
+    setResultados((prev) => {
+      const novosResultados = prev.map(resultado => ({
+        ...resultado,
+        linkRelatorio: undefined,
+        arquivos: undefined,
+        dataProcessamento: new Date().toISOString(),
+      }));
+      
+      // Persistir no DB também
+      salvarResultadosDB(novosResultados);
+      return novosResultados;
     });
 
     try {
