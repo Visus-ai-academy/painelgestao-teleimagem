@@ -654,6 +654,7 @@ export default function DemonstrativoFaturamento() {
               
               let valorTotalCliente = 0;
               let temPrecoConfigurado = false;
+              const combinacoesSemPreco: string[] = [];
 
               // Obter como o volume deve ser considerado para este cliente
               let condVolume: string | null = null;
@@ -725,6 +726,10 @@ export default function DemonstrativoFaturamento() {
                     temPrecoConfigurado = true;
                     
                     console.log(`💰 ${clienteNome} - ${chave}: ${combinacao.quantidade} exames x R$ ${precoCalculado} = R$ ${valorCombinacao.toFixed(2)}`);
+                  } else {
+                    // Registrar combinação sem preço cadastrado
+                    combinacoesSemPreco.push(chave);
+                    console.warn(`⚠️ Exame sem preço cadastrado: ${clienteNome} - ${chave}`);
                   }
                 } catch (error) {
                   console.log(`Erro ao calcular preço para ${clienteNome} (${chave}):`, error);
@@ -738,13 +743,30 @@ export default function DemonstrativoFaturamento() {
                 continue;
               }
 
-              // Se o cliente tem volumetria mas valor 0, investigar o motivo
-              if (valorTotalCliente === 0) {
-                console.error(`🚨 Cliente ${clienteNome} com ${dadosCliente.total_exames} exames mas valor R$ 0 - verificar preços:`, {
+              // Identificar exames sem preço cadastrado
+              if (valorTotalCliente === 0 && combinacoesSemPreco.length > 0) {
+                console.warn(`⚠️ Cliente ${clienteNome} - ${combinacoesSemPreco.length} exames sem preço cadastrado:`, {
                   cliente_id: dadosCliente.cliente.id,
-                  tipo_faturamento: tipoFat,
-                  combinacoes: Array.from(dadosCliente.combinacoes.entries())
+                  total_exames: dadosCliente.total_exames,
+                  exames_sem_preco: combinacoesSemPreco,
+                  tipo_faturamento: tipoFat
                 });
+                
+                // Ainda incluir no resumo para visibilidade, mas com valor 0
+                clientesMap.set(clienteNome, {
+                  id: dadosCliente.cliente.id,
+                  nome: clienteNome,
+                  email: dadosCliente.cliente.email || '',
+                  total_exames: dadosCliente.total_exames,
+                  valor_bruto: 0,
+                  valor_liquido: 0,
+                  periodo: periodo,
+                  status_pagamento: 'pendente' as const,
+                  data_vencimento: new Date().toISOString().split('T')[0],
+                  tipo_faturamento: tipoFat,
+                  observacoes: `${combinacoesSemPreco.length} exames sem preço cadastrado: ${combinacoesSemPreco.slice(0, 3).join(', ')}${combinacoesSemPreco.length > 3 ? '...' : ''}`
+                });
+                continue;
               }
 
               // Incluir apenas clientes com valor > 0 (todos deveriam ter preço configurado)
