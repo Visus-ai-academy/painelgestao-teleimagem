@@ -114,6 +114,10 @@ export default function GerarFaturamento() {
     const saved = localStorage.getItem(`demonstrativosGerados_${periodoSelecionado}`);
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+  
+  // Estado para controlar clientes em processamento
+  const [clientesProcessandoDemonstrativo, setClientesProcessandoDemonstrativo] = useState<Set<string>>(new Set());
+  
   const [demonstrativoGerado, setDemonstrativoGerado] = useState(false);
   
   // Verificar se há dados de faturamento processados para este período
@@ -956,6 +960,14 @@ export default function GerarFaturamento() {
 
       for (let i = 0; i < chunks.length; i++) {
         const lote = chunks[i];
+        
+        // Marcar clientes do lote como processando
+        setClientesProcessandoDemonstrativo(prev => {
+          const newSet = new Set(prev);
+          lote.forEach(cliente => newSet.add(cliente));
+          return newSet;
+        });
+        
         setStatusProcessamento({
           processando: true,
           mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
@@ -974,11 +986,49 @@ export default function GerarFaturamento() {
 
         if (error || !data?.success) {
           console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          
+          // Remover clientes do lote de processamento em caso de erro
+          setClientesProcessandoDemonstrativo(prev => {
+            const newSet = new Set(prev);
+            lote.forEach(cliente => newSet.delete(cliente));
+            return newSet;
+          });
+          
           throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
         }
 
         clientesProcessados += data?.resumo?.clientes_processados || 0;
-        todosDemonstrativos.push(...(data?.demonstrativos || []));
+        const demonstrativosDoLote = data?.demonstrativos || [];
+        todosDemonstrativos.push(...demonstrativosDoLote);
+        
+        // ✅ Atualizar status individual dos clientes processados com sucesso
+        if (demonstrativosDoLote.length > 0) {
+          const clientesFinalizados = demonstrativosDoLote.map(d => d.cliente_nome).filter(Boolean);
+          
+          // Marcar como concluídos
+          setDemonstrativosGeradosPorCliente(prev => {
+            const newSet = new Set(prev);
+            clientesFinalizados.forEach(cliente => newSet.add(cliente));
+            return newSet;
+          });
+          
+          // Remover de processamento
+          setClientesProcessandoDemonstrativo(prev => {
+            const newSet = new Set(prev);
+            clientesFinalizados.forEach(cliente => newSet.delete(cliente));
+            return newSet;
+          });
+          
+          // Salvar progresso no localStorage
+          const clientesAtualizados = Array.from(new Set([
+            ...Array.from(demonstrativosGeradosPorCliente),
+            ...clientesFinalizados
+          ]));
+          localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(clientesAtualizados));
+          
+          console.log(`✅ Lote ${i + 1} finalizado: ${clientesFinalizados.length} demonstrativos gerados`);
+        }
+        
         if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
       }
 
@@ -1065,6 +1115,9 @@ export default function GerarFaturamento() {
       // Persistir no localStorage
       localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientes)));
 
+      // ✅ Limpar todos os estados de processamento ao finalizar
+      setClientesProcessandoDemonstrativo(new Set());
+      
       setStatusProcessamento({
         processando: false,
         mensagem: 'Demonstrativo gerado com sucesso!',
@@ -2380,11 +2433,15 @@ export default function GerarFaturamento() {
           <td className="p-3 text-center">
             {demonstrativosGeradosPorCliente.has(resultado.clienteNome) ? (
               <Badge variant="default" className="bg-green-600">
-                Concluído
+                ✅ Concluído
+              </Badge>
+            ) : clientesProcessandoDemonstrativo.has(resultado.clienteNome) ? (
+              <Badge variant="default" className="bg-blue-600 animate-pulse">
+                🔄 Processando...
               </Badge>
             ) : (
               <Badge variant="outline">
-                Pendente
+                ⏳ Pendente
               </Badge>
             )}
           </td>
