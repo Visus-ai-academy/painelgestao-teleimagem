@@ -467,32 +467,32 @@ serve(async (req: Request) => {
       valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
     }
 
-    // Calcular impostos detalhados usando dados do demonstrativo
-    if (demonstrativoData) {
-      const detalhesTribu = demonstrativoData.detalhes_tributacao || {};
-      if (!detalhesTribu.simples_nacional) {
-        // Usar valores calculados no demonstrativo se disponíveis, senão calcular
-        valorPIS = detalhesTribu.valor_pis || parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-        valorCOFINS = detalhesTribu.valor_cofins || parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-        valorCSLL = detalhesTribu.valor_csll || parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-        valorIRRF = detalhesTribu.valor_irrf || parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-        totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
+      // Calcular impostos detalhados usando dados do demonstrativo
+      if (demonstrativoData) {
+        const detalhesTribu = demonstrativoData.detalhes_tributacao || {};
+        if (!detalhesTribu.simples_nacional) {
+          // Usar valores calculados no demonstrativo se disponíveis, senão calcular
+          valorPIS = detalhesTribu.valor_pis || parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+          valorCOFINS = detalhesTribu.valor_cofins || parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+          valorCSLL = detalhesTribu.valor_csll || parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+          valorIRRF = detalhesTribu.valor_irrf || parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+          totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
+        } else {
+          // Simples nacional: impostos federais zerados
+          valorPIS = valorCOFINS = valorCSLL = valorIRRF = 0;
+          totalImpostos = 0;
+        }
+        // Valor a pagar NÃO deve descontar franquia/portal/integração aqui, pois já compõem o bruto
+        valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
       } else {
-        // Simples nacional: impostos federais zerados
-        valorPIS = valorCOFINS = valorCSLL = valorIRRF = 0;
-        totalImpostos = 0;
+        // Fallback: calcular impostos padrão
+        valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+        valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+        valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+        valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+        totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
+        valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
       }
-      // VALOR A PAGAR deve descontar franquia, portal, integração E impostos
-      valorAPagar = valorBrutoTotal - valorFranquia - valorPortal - valorIntegracao - totalImpostos;
-    } else {
-      // Fallback: calcular impostos padrão
-      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-      totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-      valorAPagar = valorBrutoTotal - valorFranquia - valorPortal - valorIntegracao - totalImpostos;
-    }
 
     // Gerar PDF apenas se houver dados
     let pdfUrl = null;
