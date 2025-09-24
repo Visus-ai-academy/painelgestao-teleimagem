@@ -813,7 +813,7 @@ export default function GerarFaturamento() {
         valor_integracao: d.valor_integracao,
         valor_bruto: d.valor_bruto_total,
         valor_impostos: d.valor_total_impostos,
-        valor_total: d.valor_liquido ?? d.valor_total_faturamento,
+        valor_total: d.valor_liquido || d.valor_bruto_total,
         detalhes_franquia: d.detalhes_franquia || {},
         detalhes_exames: d.detalhes_exames || [],
         detalhes_tributacao: {

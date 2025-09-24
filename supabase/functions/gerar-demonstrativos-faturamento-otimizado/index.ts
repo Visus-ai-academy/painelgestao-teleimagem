@@ -164,28 +164,40 @@ Deno.serve(async (req) => {
 
       for (const cliente of batch) {
         try {
-          const nomeCliente = cliente.nome_mobilemed || cliente.nome_fantasia || cliente.nome;
+          let nomeCliente = cliente.nome_mobilemed || cliente.nome_fantasia || cliente.nome;
           console.log(`🔍 Buscando volumetria para cliente: ${nomeCliente} no período ${periodo}`);
 
-          // Buscar dados de volumetria (considerar EMPRESA e Cliente_Nome_Fantasia)
-          const filtrosEmpresas = [nomeCliente, cliente.nome_fantasia, cliente.nome]
-            .filter((v) => v && String(v).trim().length > 0)
-            .map((v) => `"Cliente_Nome_Fantasia".eq.${v}`)
-            .concat(
-              [nomeCliente, cliente.nome_fantasia, cliente.nome]
-                .filter((v) => v && String(v).trim().length > 0)
-                .map((v) => `EMPRESA.eq.${v}`)
-            )
-            .join(',');
+          // Buscar dados de volumetria - priorizar nome fantasia que tem dados na volumetria
+          const nomesParaBuscar = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome].filter(n => n?.trim());
+          let volumetriaData = null;
+          let nomeEncontrado = nomeCliente;
+          
+          // Tentar cada nome até encontrar dados
+          for (const nomeParaTeste of nomesParaBuscar) {
+            const { data: dados, error } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('periodo_referencia', periodo)
+              .or(`"Cliente_Nome_Fantasia".eq.${nomeParaTeste},"EMPRESA".eq.${nomeParaTeste}`)
+              .not('arquivo_fonte', 'eq', 'volumetria_onco_padrao')
+              .limit(1);
+            
+            if (!error && dados && dados.length > 0) {
+              // Encontrou dados, buscar todos os registros para este nome
+              const { data: todosRegistros } = await supabase
+                .from('volumetria_mobilemed')
+                .select('*')
+                .eq('periodo_referencia', periodo)
+                .or(`"Cliente_Nome_Fantasia".eq.${nomeParaTeste},"EMPRESA".eq.${nomeParaTeste}`)
+                .not('arquivo_fonte', 'eq', 'volumetria_onco_padrao');
+              
+              volumetriaData = todosRegistros;
+              nomeEncontrado = nomeParaTeste;
+              break;
+            }
+          }
 
-          const { data: volumetriaData, error: volumetriaError } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('periodo_referencia', periodo)
-            .or(filtrosEmpresas)
-            .not('arquivo_fonte', 'eq', 'volumetria_onco_padrao');
-
-          if (volumetriaError || !volumetriaData || volumetriaData.length === 0) {
+          if (!volumetriaData || volumetriaData.length === 0) {
             console.log(`📊 Cliente ${nomeCliente}: Sem registros na volumetria para período ${periodo}`);
             // Persistir status para refletir no painel "Status por Cliente"
             await supabase
@@ -199,6 +211,8 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Usar o nome que realmente tem dados na volumetria
+          nomeCliente = nomeEncontrado;
           console.log(`📊 Cliente ${nomeCliente}: ${volumetriaData.length} registros encontrados na volumetria para período ${periodo}`);
 
           const totalExames = volumetriaData.reduce((sum, item) => sum + (item.VALORES || 0), 0);
@@ -271,29 +285,34 @@ Deno.serve(async (req) => {
             const prio = (grupo.prioridade || '').toString().toUpperCase();
             const isPlantao = prio.includes('PLANTÃO') || prio.includes('PLANTAO') || prio.includes('URGENTE') || prio.includes('URGÊNCIA');
 
-            // Usar a função RPC para calcular preço com cliente_id (assinatura esperada)
-          const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
-            p_categoria: grupo.categoria || 'SC',
-            p_cliente: nomeCliente,
-            p_especialidade: grupo.especialidade,
-            p_modalidade: grupo.modalidade,
-            p_periodo: periodo,
-            p_prioridade: grupo.prioridade || 'ROTINA'
-          });
+            // Usar a função RPC para calcular preço
+            const { data: precoData, error: precoError } = await supabase.rpc('calcular_preco_exame', {
+              p_cliente_id: cliente.id,
+              p_modalidade: grupo.modalidade,
+              p_especialidade: grupo.especialidade,
+              p_categoria: grupo.categoria || 'SC',
+              p_prioridade: grupo.prioridade || 'ROTINA',
+              p_volume_total: volRef,
+              p_is_plantao: isPlantao
+            });
 
             if (precoError) {
               console.error(`❌ Erro no cálculo de preço para ${nomeCliente} - ${chave}:`, precoError);
             }
 
             let valorUnitario = 0;
-            if (Array.isArray(precoData)) {
-              const first = (precoData as any[])[0] || {};
-              valorUnitario = Number(first.valor_unitario ?? first.preco ?? first.valor ?? 0);
-            } else if (typeof precoData === 'number') {
-              valorUnitario = precoData as number;
+            if (precoData && typeof precoData === 'number') {
+              valorUnitario = precoData;
             } else if (precoData && typeof precoData === 'object') {
-              valorUnitario = Number((precoData as any).valor_unitario || (precoData as any).valor || 0);
+              if (Array.isArray(precoData) && precoData.length > 0) {
+                const first = precoData[0];
+                valorUnitario = Number(first.valor_unitario ?? first.preco ?? first.valor ?? 0);
+              } else {
+                valorUnitario = Number((precoData as any).valor_unitario || (precoData as any).valor || 0);
+              }
             }
+            
+            console.log(`💰 Preço calculado para ${nomeCliente} - ${chave}: R$ ${valorUnitario}`);
 
             const valorGrupo = grupo.quantidade * valorUnitario;
             valorExamesTotal += valorGrupo;
@@ -429,16 +448,22 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error(`❌ Erro ao processar cliente ${cliente.nome}:`, error);
           
-          // Salvar erro na tabela
+          // Salvar erro na tabela com status específico
           await supabase
             .from('demonstrativos_faturamento_calculados')
             .insert({
               periodo_referencia: periodo,
               cliente_id: cliente.id,
-              cliente_nome: cliente.nome,
-              status: 'erro',
-              erro_detalhes: error instanceof Error ? error.message : String(error)
+              cliente_nome: cliente.nome_mobilemed || cliente.nome_fantasia || cliente.nome,
+              status: 'erro_processamento',
+              erro_detalhes: error instanceof Error ? error.message : String(error),
+              total_exames: 0,
+              valor_bruto_total: 0,
+              valor_total_faturamento: 0
             });
+          
+          // Continuar processamento dos outros clientes
+          console.log(`⚠️ Cliente ${cliente.nome} teve erro mas processamento continua...`);
         }
       }
     }
