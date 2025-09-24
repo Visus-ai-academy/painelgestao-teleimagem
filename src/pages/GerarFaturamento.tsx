@@ -824,7 +824,7 @@ export default function GerarFaturamento() {
       const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento-otimizado', {
         body: {
           periodo: periodoSelecionado,
-          forcar_recalculo: true,
+          forcar_recalculo: false,
         },
       });
 

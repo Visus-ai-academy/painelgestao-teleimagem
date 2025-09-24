@@ -66,43 +66,33 @@ Deno.serve(async (req) => {
 
     console.log(`🚀 Iniciando processamento de demonstrativos para período ${periodo} (forçar recálculo: ${forcar_recalculo})`);
 
-    // Verificar se já existem demonstrativos calculados
+    // Buscar demonstrativos já calculados para o período (para processamento incremental)
+    let demonstrativosExistentes: any[] = [];
+    let resumoExistente: Resumo | null = null;
     if (!forcar_recalculo) {
-      const { data: demonstrativosExistentes, error: errorExistentes } = await supabase
+      const { data: demosExist, error: errorExistentes } = await supabase
         .from('demonstrativos_faturamento_calculados')
         .select('*')
         .eq('periodo_referencia', periodo)
         .eq('status', 'calculado');
 
-      if (!errorExistentes && demonstrativosExistentes && demonstrativosExistentes.length > 0) {
-        console.log(`📋 Encontrados ${demonstrativosExistentes.length} demonstrativos já calculados para ${periodo}`);
-        
-        // Calcular resumo dos dados existentes
-        const resumo: Resumo = {
-          total_clientes: demonstrativosExistentes.length,
-          clientes_processados: demonstrativosExistentes.length,
-          total_exames_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.total_exames || 0), 0),
-          valor_bruto_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_bruto_total || 0), 0),
-          valor_impostos_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_total_impostos || 0), 0),
-          valor_total_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_total_faturamento || 0), 0),
-          valor_exames_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_exames || 0), 0),
-          valor_franquias_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_franquia || 0), 0),
-          valor_portal_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_portal_laudos || 0), 0),
-          valor_integracao_geral: demonstrativosExistentes.reduce((sum, d) => sum + (d.valor_integracao || 0), 0),
+      if (!errorExistentes && demosExist && demosExist.length > 0) {
+        console.log(`📋 Encontrados ${demosExist.length} demonstrativos existentes para ${periodo} (processamento incremental)`);
+        demonstrativosExistentes = demosExist;
+        resumoExistente = {
+          total_clientes: demosExist.length,
+          clientes_processados: demosExist.length,
+          total_exames_geral: demosExist.reduce((sum, d) => sum + (d.total_exames || 0), 0),
+          valor_bruto_geral: demosExist.reduce((sum, d) => sum + (d.valor_bruto_total || 0), 0),
+          valor_impostos_geral: demosExist.reduce((sum, d) => sum + (d.valor_total_impostos || 0), 0),
+          valor_total_geral: demosExist.reduce((sum, d) => sum + (d.valor_total_faturamento || d.valor_liquido || 0), 0),
+          valor_exames_geral: demosExist.reduce((sum, d) => sum + (d.valor_exames || 0), 0),
+          valor_franquias_geral: demosExist.reduce((sum, d) => sum + (d.valor_franquia || 0), 0),
+          valor_portal_geral: demosExist.reduce((sum, d) => sum + (d.valor_portal_laudos || 0), 0),
+          valor_integracao_geral: demosExist.reduce((sum, d) => sum + (d.valor_integracao || 0), 0),
           clientes_simples_nacional: 0,
-          clientes_regime_normal: demonstrativosExistentes.length
+          clientes_regime_normal: demosExist.length
         };
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            demonstrativos: demonstrativosExistentes,
-            resumo,
-            fonte_dados: 'cache_calculado',
-            calculado_em: demonstrativosExistentes[0]?.calculado_em
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
     }
 
@@ -167,10 +157,14 @@ Deno.serve(async (req) => {
     
     console.log(`📋 ${clientesRaw?.length || 0} clientes únicos carregados, ${clientes.length} grupos por nome fantasia + contrato`);
 
-    const demonstrativos: DemonstrativoCliente[] = [];
-    let resumo: Resumo = {
+    // Preparar processamento incremental: pular clientes já calculados
+    const idsJaCalculados = new Set((demonstrativosExistentes || []).map((d: any) => d.cliente_id));
+    const clientesParaProcessar = clientes.filter((c: any) => !idsJaCalculados.has(c.id));
+
+    const demonstrativos: DemonstrativoCliente[] = [...(demonstrativosExistentes as any[])];
+    let resumo: Resumo = resumoExistente || {
       total_clientes: clientes?.length || 0,
-      clientes_processados: 0,
+      clientes_processados: (demonstrativosExistentes || []).length,
       total_exames_geral: 0,
       valor_bruto_geral: 0,
       valor_impostos_geral: 0,
@@ -191,7 +185,7 @@ Deno.serve(async (req) => {
     // Log inicial
     console.log(`🚀 Iniciando processamento de ${clientes?.length || 0} clientes em lotes de ${batchSize}`);
     
-    for (let i = 0; i < (clientes?.length || 0); i += batchSize) {
+    for (let i = 0; i < (clientesParaProcessar?.length || 0); i += batchSize) {
       // Verificar timeout
       const tempoDecorrido = Date.now() - startTime;
       if (tempoDecorrido > maxProcessingTime) {
@@ -199,7 +193,7 @@ Deno.serve(async (req) => {
         break;
       }
       
-      const batch = clientes?.slice(i, i + batchSize) || [];
+      const batch = clientesParaProcessar?.slice(i, i + batchSize) || [];
       const loteAtual = Math.floor(i/batchSize) + 1;
       const totalLotes = Math.ceil((clientes?.length || 0)/batchSize);
       const tempoRestante = Math.round((maxProcessingTime - tempoDecorrido) / 1000);

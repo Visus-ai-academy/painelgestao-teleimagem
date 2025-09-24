@@ -204,7 +204,7 @@ serve(async (req: Request) => {
     // Preparar mapa de preços por combinação para volumetria (modalidade|especialidade|categoria|prioridade)
     const isFaturamentoDataLocalPrimario = finalData.length > 0 && Object.prototype.hasOwnProperty.call(finalData[0], 'valor');
     let precoPorCombo: Record<string, number> = {};
-
+    const combosNaoFaturadosIntencional = new Set<string>();
     if (!isFaturamentoDataLocalPrimario) {
       // Agrupar volumetria para obter volume por combinação (usado na faixa de preço)
       const grupos: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }>
@@ -365,7 +365,43 @@ serve(async (req: Request) => {
             precoPorCombo[key] = 0;
           }
         }
-      }
+
+        // Fallback para combos com preço 0: consultar precos_servicos ou aplicar valor padrão
+        for (const [key, g] of combos) {
+          if ((precoPorCombo[key] ?? 0) <= 0) {
+            try {
+              const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO') || g.prioridade.includes('URGENTE') || g.prioridade.includes('URGÊNCIA');
+              const { data: precoRegistro } = await supabase
+                .from('precos_servicos')
+                .select('valor_base, valor_urgencia, considera_prioridade_plantao, ativo')
+                .eq('cliente_id', cliente_id)
+                .eq('modalidade', g.modalidade)
+                .eq('especialidade', g.especialidade)
+                .eq('categoria', g.categoria || 'SC')
+                .eq('prioridade', g.prioridade)
+                .eq('ativo', true)
+                .maybeSingle();
+
+              if (precoRegistro) {
+                const base = Number(precoRegistro.valor_base || 0);
+                const urg = Number(precoRegistro.valor_urgencia || 0);
+                const considera = !!precoRegistro.considera_prioridade_plantao;
+                if (base === 0) {
+                  combosNaoFaturadosIntencional.add(key);
+                  precoPorCombo[key] = 0;
+                } else {
+                  precoPorCombo[key] = (considera && isPlantao) ? (urg || base) : base;
+                }
+              } else {
+                const valoresPadrao: Record<string, number> = { RX: 15, TC: 45, RM: 80, US: 25, MG: 20, CR: 15, DX: 15, ECG: 10, MAPA: 30 };
+                precoPorCombo[key] = valoresPadrao[g.modalidade] || 12;
+              }
+            } catch (_) {
+              const valoresPadrao: Record<string, number> = { RX: 15, TC: 45, RM: 80, US: 25, MG: 20, CR: 15, DX: 15, ECG: 10, MAPA: 30 };
+              precoPorCombo[key] = valoresPadrao[g.modalidade] || 12;
+            }
+          }
+        }
     }
     
     // Se não há dados, não gerar PDF
@@ -454,7 +490,7 @@ serve(async (req: Request) => {
           const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
           const unit = precoPorCombo[key] ?? 0;
           const qtd = Number(item.VALORES || 0) || 0;
-          return sum + unit * qtd;
+          return sum + unit * qtd; // itens intencionalmente zerados ficam com unit=0
         }, 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
       }

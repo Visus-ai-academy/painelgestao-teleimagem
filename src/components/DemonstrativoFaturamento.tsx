@@ -832,8 +832,27 @@ export default function DemonstrativoFaturamento() {
             console.log('📊 Clientes processados da volumetria:', clientesArray.length);
             console.log('📋 Primeiros 5 clientes:', clientesArray.slice(0, 5).map(c => ({ nome: c.nome, exames: c.total_exames, valor: c.valor_bruto })));
             
-            setClientes(clientesArray);
-            setClientesFiltrados(clientesArray);
+            // Ajustar Valor Líquido considerando impostos (ISS + federais quando aplicável)
+            const clientesAtualizados = await Promise.all(clientesArray.map(async (c) => {
+              try {
+                const { data: contrato } = await supabase
+                  .from('contratos_clientes')
+                  .select('percentual_iss, impostos_ab_min, simples')
+                  .eq('cliente_id', c.id)
+                  .eq('status', 'ativo')
+                  .maybeSingle();
+                const perc = Number(contrato?.percentual_iss || 0);
+                const iss = Number((c.valor_bruto * (perc / 100)).toFixed(2));
+                const federais = contrato?.simples ? 0 : Number(contrato?.impostos_ab_min || 0);
+                const valorLiquido = Number((c.valor_bruto - iss - federais).toFixed(2));
+                return { ...c, valor_liquido: valorLiquido };
+              } catch {
+                return c; // fallback mantém valor_liquido atual
+              }
+            }));
+            
+            setClientes(clientesAtualizados);
+            setClientesFiltrados(clientesAtualizados);
             
             // Mostrar toast apenas na primeira carga para evitar loop
             if (!hasShownInitialToast.current) {
