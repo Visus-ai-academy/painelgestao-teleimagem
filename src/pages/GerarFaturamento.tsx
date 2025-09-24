@@ -544,94 +544,129 @@ export default function GerarFaturamento() {
 
       let clientesFinais: any[] = [];
       
+      // 🔄 NOVA ESTRATÉGIA: Combinar volumetria + clientes ativos faturáveis, filtrar apenas NC-NF
+      
+      // 1️⃣ Buscar TODOS os nomes únicos da volumetria (sem normalização)
+      let nomesVolumetria = new Set<string>();
       if (clientesVolumetria && clientesVolumetria.length > 0) {
-        // ✅ USAR Cliente_Nome_Fantasia quando disponível, senão EMPRESA
-        let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
-        console.log(`📊 Clientes únicos encontrados na volumetria (inicial): ${nomesUnicos.length}`, nomesUnicos.slice(0, 10).concat(nomesUnicos.length > 10 ? ['...'] : []));
-
-        // 🔎 Remover clientes NC-NF (via parâmetros ou contrato) da lista
-        try {
-          // Buscar IDs com tipo NC-NF nos parâmetros ativos
-          const { data: pfNC } = await supabase
-            .from('parametros_faturamento')
-            .select('cliente_id')
-            .eq('status', 'A')
-            .eq('tipo_faturamento', 'NC-NF');
-
-          // Buscar IDs com tipo NC-NF em contratos ativos
-          const { data: ccNC } = await supabase
-            .from('contratos_clientes')
-            .select('cliente_id')
-            .eq('status', 'ativo')
-            .eq('tipo_faturamento', 'NC-NF');
-
-          const idsNC = Array.from(new Set([...(pfNC?.map(p => p.cliente_id) || []), ...(ccNC?.map(c => c.cliente_id) || [])].filter(Boolean)));
-          console.log(`🔍 IDs de clientes NC-NF encontrados: ${idsNC.length}`, idsNC);
-
-          let nomesNC = new Set<string>();
-          if (idsNC.length > 0) {
-            const { data: clientesNC } = await supabase
-              .from('clientes')
-              .select('nome, nome_fantasia, nome_mobilemed')
-              .in('id', idsNC);
-            
-            console.log(`🔍 Clientes NC-NF para filtrar:`, clientesNC);
-            
-            const normalize = (s?: string) => (s || '').trim().toUpperCase();
-            (clientesNC || []).forEach(c => {
-              [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
-                const k = normalize(n);
-                if (k) {
-                  nomesNC.add(k);
-                  console.log(`🚫 Adicionando cliente NC-NF para filtrar: ${k}`);
-                }
-              });
-            });
+        clientesVolumetria.forEach(c => {
+          const nome = c.Cliente_Nome_Fantasia || c.EMPRESA;
+          if (nome && nome.trim()) {
+            nomesVolumetria.add(nome.trim());
           }
+        });
+      }
+      console.log(`📊 Clientes únicos na volumetria: ${nomesVolumetria.size}`, Array.from(nomesVolumetria).slice(0, 10));
 
-          console.log(`🔍 Total de nomes NC-NF para filtrar: ${nomesNC.size}`, Array.from(nomesNC));
-          const nomesAntesDoFiltro = nomesUnicos.length;
-          
-          const normalize = (s?: string) => (s || '').trim().toUpperCase();
-          nomesUnicos = nomesUnicos.filter(n => {
-            const normalizado = normalize(n);
-            const deveFiltrar = nomesNC.has(normalizado);
-            if (deveFiltrar) {
-              console.log(`🚫 Filtrando cliente NC-NF: ${n} (${normalizado})`);
-            }
-            return !deveFiltrar;
+      // 2️⃣ Buscar clientes ativos CO-FT e NC-FT no cadastro
+      let nomesClientesAtivos = new Set<string>();
+      try {
+        const { data: clientesAtivos, error: errorAtivos } = await supabase
+          .from('clientes')
+          .select('id, nome, nome_fantasia, nome_mobilemed')
+          .eq('ativo', true);
+
+        if (errorAtivos) {
+          console.error('❌ Erro ao buscar clientes ativos:', errorAtivos);
+        } else if (clientesAtivos) {
+          // Buscar parâmetros para identificar tipos CO-FT e NC-FT
+          const { data: parametros } = await supabase
+            .from('parametros_faturamento')
+            .select('cliente_id, tipo_faturamento')
+            .eq('status', 'A')
+            .in('tipo_faturamento', ['CO-FT', 'NC-FT']);
+
+          // Buscar contratos para identificar tipos CO-FT e NC-FT
+          const { data: contratos } = await supabase
+            .from('contratos_clientes')
+            .select('cliente_id, tipo_faturamento')
+            .eq('status', 'ativo')
+            .in('tipo_faturamento', ['CO-FT', 'NC-FT']);
+
+          const idsPermitidos = new Set([
+            ...(parametros?.map(p => p.cliente_id) || []),
+            ...(contratos?.map(c => c.cliente_id) || [])
+          ]);
+
+          // Se não há configurações explícitas, assumir que todos são CO-FT (padrão)
+          const clientesFiltrados = idsPermitidos.size > 0 
+            ? clientesAtivos.filter(c => idsPermitidos.has(c.id))
+            : clientesAtivos; // Incluir todos se não há configuração específica
+
+          clientesFiltrados.forEach(c => {
+            [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
+              if (n && n.trim()) {
+                nomesClientesAtivos.add(n.trim());
+              }
+            });
           });
+        }
+      } catch (e) {
+        console.warn('⚠️ Falha ao buscar clientes ativos:', e);
+      }
+      console.log(`📊 Clientes ativos faturáveis: ${nomesClientesAtivos.size}`, Array.from(nomesClientesAtivos).slice(0, 10));
+
+      // 3️⃣ Combinar volumetria + clientes ativos
+      const todosNomes = new Set([...nomesVolumetria, ...nomesClientesAtivos]);
+      console.log(`📊 Total combinado (volumetria + ativos): ${todosNomes.size}`);
+
+      // 4️⃣ Remover apenas clientes NC-NF
+      try {
+        const { data: pfNC } = await supabase
+          .from('parametros_faturamento')
+          .select('cliente_id')
+          .eq('status', 'A')
+          .eq('tipo_faturamento', 'NC-NF');
+
+        const { data: ccNC } = await supabase
+          .from('contratos_clientes')
+          .select('cliente_id')
+          .eq('status', 'ativo')
+          .eq('tipo_faturamento', 'NC-NF');
+
+        const idsNC = Array.from(new Set([
+          ...(pfNC?.map(p => p.cliente_id) || []),
+          ...(ccNC?.map(c => c.cliente_id) || [])
+        ].filter(Boolean)));
+
+        let nomesNC = new Set<string>();
+        if (idsNC.length > 0) {
+          const { data: clientesNC } = await supabase
+            .from('clientes')
+            .select('nome, nome_fantasia, nome_mobilemed')
+            .in('id', idsNC);
           
-          console.log(`📊 Filtro NC-NF: ${nomesAntesDoFiltro} → ${nomesUnicos.length} clientes (removidos: ${nomesAntesDoFiltro - nomesUnicos.length})`);
-        } catch (e) {
-          console.warn('Falha ao filtrar NC-NF:', e);
+          (clientesNC || []).forEach(c => {
+            [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
+              if (n && n.trim()) {
+                nomesNC.add(n.trim());
+              }
+            });
+          });
         }
 
-        console.log(`📊 Clientes únicos após filtrar NC-NF: ${nomesUnicos.length}`);
+        // Filtrar NC-NF da lista final
+        const nomesFinais = Array.from(todosNomes).filter(nome => !nomesNC.has(nome));
+        console.log(`📊 Após filtrar NC-NF: ${todosNomes.size} → ${nomesFinais.length} clientes`);
 
-        // Preparar arrays auxiliares
+        // 5️⃣ Gerar lista final de clientes
+        const clientesProcessados = new Set<string>();
         const clientesTemp: any[] = [];
-        const clientesProcessadosSet = new Set<string>();
         
-        for (const nomeCliente of nomesUnicos) {
-          if (clientesProcessadosSet.has(nomeCliente.trim().toUpperCase())) {
-            continue;
-          }
-          clientesProcessadosSet.add(nomeCliente.trim().toUpperCase());
+        for (const nomeCliente of nomesFinais) {
+          const chaveUnica = nomeCliente.trim().toUpperCase();
+          if (clientesProcessados.has(chaveUnica)) continue;
+          clientesProcessados.add(chaveUnica);
           
+          // Buscar dados completos do cliente no cadastro
           const { data: emailCliente } = await supabase
             .from('clientes')
             .select('id, nome, email, nome_fantasia, nome_mobilemed')
             .or(`nome.eq.${nomeCliente},nome_fantasia.eq.${nomeCliente},nome_mobilemed.eq.${nomeCliente}`)
             .limit(1);
 
-          // Função para gerar UUID válido ou usar nome como string
-          const gerarIdValido = (nomeCliente: string): string => {
-            // Verificar se é um UUID válido
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            
-            // Primeiro, tentar buscar o cliente no cadastro
-            return `cliente-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30)}`;
+          const gerarIdValido = (nome: string): string => {
+            return `cliente-${nome.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30)}`;
           };
 
           const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
@@ -639,25 +674,41 @@ export default function GerarFaturamento() {
           clientesTemp.push({
             id: clienteId,
             nome: nomeCliente,
-            email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
+            email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+            temVolumetria: nomesVolumetria.has(nomeCliente),
+            tipo: nomesVolumetria.has(nomeCliente) ? 'volumetria' : 'cadastro'
           });
         }
+
+        clientesFinais = clientesTemp;
+        console.log(`✅ Clientes finais: ${clientesFinais.length}`, clientesFinais.slice(0, 5).map(c => `${c.nome} (${c.tipo})`));
+      } catch (e) {
+        console.warn('Falha ao filtrar NC-NF:', e);
+        // Em caso de erro, usar todos os nomes combinados
+        const clientesTemp: any[] = [];
+        const clientesProcessados = new Set<string>();
         
-        // ✅ Deduplificar clientes por nome (não por ID que pode ser temporário)
-        const clientesUnicos = new Map();
-        clientesTemp.forEach(cliente => {
-          const chaveUnica = cliente.nome.trim().toUpperCase();
-          if (!clientesUnicos.has(chaveUnica)) {
-            clientesUnicos.set(chaveUnica, cliente);
-          }
-        });
-        clientesFinais = Array.from(clientesUnicos.values());
-        console.log(`✅ Clientes finais após deduplicação: ${clientesFinais.length}`, clientesFinais.map(c => c.nome));
-      } else {
-        console.log('⚠️ Nenhum cliente encontrado na volumetria para o período:', periodoSelecionado);
+        for (const nomeCliente of Array.from(todosNomes)) {
+          const chaveUnica = nomeCliente.trim().toUpperCase();
+          if (clientesProcessados.has(chaveUnica)) continue;
+          clientesProcessados.add(chaveUnica);
+          
+          clientesTemp.push({
+            id: `cliente-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30)}`,
+            nome: nomeCliente,
+            email: `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
+            temVolumetria: nomesVolumetria.has(nomeCliente),
+            tipo: nomesVolumetria.has(nomeCliente) ? 'volumetria' : 'cadastro'
+          });
+        }
+        clientesFinais = clientesTemp;
+      }
+
+      if (clientesFinais.length === 0) {
+        console.log('⚠️ Nenhum cliente encontrado após todos os filtros');
         toast({
           title: "Nenhum cliente encontrado",
-          description: `Não há dados de volumetria para o período ${periodoSelecionado}`,
+          description: `Não há clientes faturáveis para o período ${periodoSelecionado}`,
           variant: "destructive",
         });
         setClientesCarregados([]);
@@ -665,11 +716,11 @@ export default function GerarFaturamento() {
         return;
       }
 
-      console.log(`✅ ${clientesFinais.length} clientes únicos da volumetria encontrados:`, clientesFinais.map(c => c.nome));
+      console.log(`✅ ${clientesFinais.length} clientes faturáveis encontrados (volumetria + cadastro):`, clientesFinais.map(c => `${c.nome} (${c.tipo})`));
       
       toast({
-        title: "Clientes carregados da volumetria",
-        description: `${clientesFinais.length} clientes únicos encontrados na volumetria do período ${periodoSelecionado}`,
+        title: "Clientes carregados",
+        description: `${clientesFinais.length} clientes faturáveis encontrados (${clientesFinais.filter(c => c.temVolumetria).length} com volumetria, ${clientesFinais.filter(c => !c.temVolumetria).length} só cadastro)`,
         variant: "default",
       });
       
