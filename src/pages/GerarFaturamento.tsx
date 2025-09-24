@@ -737,6 +737,8 @@ export default function GerarFaturamento() {
       progresso: 10
     });
 
+    let progressoSimulado: NodeJS.Timeout | null = null;
+
     try {
       // Primeiro: Verificar quantos clientes únicos existem na volumetria
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
@@ -772,6 +774,21 @@ export default function GerarFaturamento() {
         progresso: 45,
       });
 
+      // Simular progresso durante processamento da edge function
+      progressoSimulado = setInterval(() => {
+        setStatusProcessamento(prev => {
+          if (!prev.processando || prev.progresso >= 85) return prev;
+          const novoProgresso = Math.min(prev.progresso + 5, 85);
+          return {
+            ...prev,
+            progresso: novoProgresso,
+            mensagem: novoProgresso < 60 ? 'Calculando preços dos exames...' :
+                     novoProgresso < 75 ? 'Aplicando regras de faturamento...' :
+                     'Finalizando cálculos...'
+          };
+        });
+      }, 2000); // Atualiza a cada 2 segundos
+
       const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento-otimizado', {
         body: {
           periodo: periodoSelecionado,
@@ -779,8 +796,14 @@ export default function GerarFaturamento() {
         },
       });
 
+      // Parar simulação de progresso
+      clearInterval(progressoSimulado);
+
       console.log('[OTIMIZADO] Data:', data);
       console.log('[OTIMIZADO] Error:', error);
+
+      // Parar simulação de progresso
+      clearInterval(progressoSimulado);
 
       if (error || !data?.success) {
         console.error('❌ [ERRO] Erro na edge function (otimizado):', error?.message || data?.error);
@@ -932,6 +955,11 @@ export default function GerarFaturamento() {
       });
     } finally {
       console.log('🏁 [FINALLY] Finalizando processo...');
+      // Garantir que o intervalo de progresso seja limpo
+      if (progressoSimulado) {
+        clearInterval(progressoSimulado);
+        progressoSimulado = null;
+      }
       setProcessandoTodos(false);
     }
   };
