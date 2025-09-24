@@ -731,14 +731,24 @@ export default function DemonstrativoFaturamento() {
                 }
               }
               
-              // Incluir cliente elegível (exceto NC-NF). Se sem preço, entra com valores zerados para não sumir do resumo
+              // Incluir cliente elegível (exceto NC-NF). Todos devem ter preço configurado
               const tipoFat = (dadosCliente.cliente?.tipo_faturamento || 'Não definido') as string;
               if (tipoFat === 'NC-NF') {
                 console.warn(`Cliente ${clienteNome} é NC-NF - ignorado em demonstrativo`);
                 continue;
               }
 
-              if (temPrecoConfigurado && valorTotalCliente > 0) {
+              // Se o cliente tem volumetria mas valor 0, investigar o motivo
+              if (valorTotalCliente === 0) {
+                console.error(`🚨 Cliente ${clienteNome} com ${dadosCliente.total_exames} exames mas valor R$ 0 - verificar preços:`, {
+                  cliente_id: dadosCliente.cliente.id,
+                  tipo_faturamento: tipoFat,
+                  combinacoes: Array.from(dadosCliente.combinacoes.entries())
+                });
+              }
+
+              // Incluir apenas clientes com valor > 0 (todos deveriam ter preço configurado)
+              if (valorTotalCliente > 0) {
                 clientesMap.set(clienteNome, {
                   id: dadosCliente.cliente.id,
                   nome: clienteNome,
@@ -751,21 +761,6 @@ export default function DemonstrativoFaturamento() {
                   data_vencimento: new Date().toISOString().split('T')[0],
                   tipo_faturamento: tipoFat,
                   observacoes: `Dados baseados na volumetria com preços calculados`
-                });
-              } else {
-                console.warn(`Cliente ${clienteNome} sem preço configurado - incluindo no resumo com valor 0`);
-                clientesMap.set(clienteNome, {
-                  id: dadosCliente.cliente.id,
-                  nome: clienteNome,
-                  email: dadosCliente.cliente.email || '',
-                  total_exames: dadosCliente.total_exames,
-                  valor_bruto: 0,
-                  valor_liquido: 0,
-                  periodo: periodo,
-                  status_pagamento: 'pendente' as const,
-                  data_vencimento: new Date().toISOString().split('T')[0],
-                  tipo_faturamento: tipoFat,
-                  observacoes: `Sem preço configurado para as combinações encontradas - necessário configurar tabela de preços`
                 });
               }
             }
