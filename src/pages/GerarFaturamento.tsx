@@ -2444,12 +2444,12 @@ export default function GerarFaturamento() {
               <Badge variant="default" className="bg-blue-600 animate-pulse">
                 🔄 Processando...
               </Badge>
-            ) : (
-              <Badge variant="outline">
-                ⏳ Pendente
-              </Badge>
-            )}
-          </td>
+              ) : (
+                <Badge variant="outline">
+                  Pendente
+                </Badge>
+              )}
+            </td>
                           <td className="p-3 text-center">
                             {resultado.relatorioGerado ? (
                               <Badge variant="default" className="bg-green-600">
