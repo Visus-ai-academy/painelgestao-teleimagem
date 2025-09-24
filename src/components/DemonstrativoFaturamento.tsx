@@ -745,27 +745,68 @@ export default function DemonstrativoFaturamento() {
 
               // Identificar exames sem preço cadastrado
               if (valorTotalCliente === 0 && combinacoesSemPreco.length > 0) {
-                console.warn(`⚠️ Cliente ${clienteNome} - ${combinacoesSemPreco.length} exames sem preço cadastrado:`, {
-                  cliente_id: dadosCliente.cliente.id,
-                  total_exames: dadosCliente.total_exames,
-                  exames_sem_preco: combinacoesSemPreco,
-                  tipo_faturamento: tipoFat
-                });
+                // Verificar se cliente tem tipo NC-NF (não fatura)
+                if (tipoFat === 'NC-NF') {
+                  console.log(`ℹ️ Cliente ${clienteNome} é NC-NF - valor 0 esperado (não fatura)`);
+                  continue; // Não incluir no resumo
+                }
                 
-                // Ainda incluir no resumo para visibilidade, mas com valor 0
-                clientesMap.set(clienteNome, {
-                  id: dadosCliente.cliente.id,
-                  nome: clienteNome,
-                  email: dadosCliente.cliente.email || '',
-                  total_exames: dadosCliente.total_exames,
-                  valor_bruto: 0,
-                  valor_liquido: 0,
-                  periodo: periodo,
-                  status_pagamento: 'pendente' as const,
-                  data_vencimento: new Date().toISOString().split('T')[0],
-                  tipo_faturamento: tipoFat,
-                  observacoes: `${combinacoesSemPreco.length} exames sem preço cadastrado: ${combinacoesSemPreco.slice(0, 3).join(', ')}${combinacoesSemPreco.length > 3 ? '...' : ''}`
-                });
+                // Para outros tipos (CO-FT, NC-FT), verificar se são exames configurados para não faturar
+                let examesComPrecoZeroConfigurado = 0;
+                const examesSemConfiguracaoReal: string[] = [];
+                
+                // Verificar cada combinação que retornou preço 0
+                for (const combo of combinacoesSemPreco) {
+                  const [modalidade, especialidade, prioridade, categoria] = combo.split('|');
+                  
+                  // Verificar se existe configuração de preço = 0 (intencional)
+                  const { data: precoZeroConfig } = await supabase
+                    .from('precos_servicos')
+                    .select('valor_base')
+                    .eq('cliente_id', dadosCliente.cliente.id)
+                    .eq('modalidade', modalidade)
+                    .eq('especialidade', especialidade)
+                    .eq('prioridade', prioridade)
+                    .eq('categoria', categoria)
+                    .eq('valor_base', 0)
+                    .eq('ativo', true)
+                    .maybeSingle();
+                    
+                  if (precoZeroConfig) {
+                    examesComPrecoZeroConfigurado++;
+                  } else {
+                    examesSemConfiguracaoReal.push(combo);
+                  }
+                }
+                
+                // Só alertar se há exames realmente sem configuração de preço
+                if (examesSemConfiguracaoReal.length > 0) {
+                  console.warn(`⚠️ Cliente ${clienteNome} - ${examesSemConfiguracaoReal.length} exames sem preço cadastrado:`, {
+                    cliente_id: dadosCliente.cliente.id,
+                    total_exames: dadosCliente.total_exames,
+                    exames_sem_preco: examesSemConfiguracaoReal,
+                    exames_config_zero: examesComPrecoZeroConfigurado,
+                    tipo_faturamento: tipoFat
+                  });
+                  
+                  // Incluir no resumo para visibilidade
+                  clientesMap.set(clienteNome, {
+                    id: dadosCliente.cliente.id,
+                    nome: clienteNome,
+                    email: dadosCliente.cliente.email || '',
+                    total_exames: dadosCliente.total_exames,
+                    valor_bruto: 0,
+                    valor_liquido: 0,
+                    periodo: periodo,
+                    status_pagamento: 'pendente' as const,
+                    data_vencimento: new Date().toISOString().split('T')[0],
+                    tipo_faturamento: tipoFat,
+                    observacoes: `${examesSemConfiguracaoReal.length} exames sem preço cadastrado: ${examesSemConfiguracaoReal.slice(0, 3).join(', ')}${examesSemConfiguracaoReal.length > 3 ? '...' : ''}`
+                  });
+                } else if (examesComPrecoZeroConfigurado > 0) {
+                  console.log(`ℹ️ Cliente ${clienteNome} - todos os ${examesComPrecoZeroConfigurado} exames têm preço 0 configurado intencionalmente (não faturados)`);
+                }
+                
                 continue;
               }
 
