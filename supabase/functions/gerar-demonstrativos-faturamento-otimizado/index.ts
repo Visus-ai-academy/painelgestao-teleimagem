@@ -386,31 +386,55 @@ Deno.serve(async (req) => {
             : (cliente.parametros_faturamento ? [cliente.parametros_faturamento] : []);
           const parametrosFaturamento = parametrosFaturamentoArr.find((p: any) => p.status === 'A') || {};
 
-          // Calcular franquia, portal e integração diretamente (mais rápido que RPC)
+          // Calcular franquia, portal e integração usando RPC (com timeout)
           console.log(`💰 Calculando faturamento completo para ${nomeCliente}...`);
           
           let valorFranquia = 0;
           let valorPortal = 0;
           let valorIntegracao = 0;
+          let detalhesCalculo = {};
           
           try {
-            // Calcular franquia baseado nos parâmetros
-            if (parametrosFaturamento.aplicar_franquia) {
-              if (parametrosFaturamento.frequencia_continua) {
-                // Frequência contínua sempre cobra
-                valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
-              } else if (totalExames > 0) {
-                // Só cobra se houver volume
-                valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
-              }
-            }
+            // Usar RPC com timeout de 5 segundos
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout RPC')), 5000)
+            );
             
-            // Calcular portal e integração
-            if (parametrosFaturamento.portal_laudos) {
-              valorPortal = Number(parametrosFaturamento.valor_integracao || 0);
-            }
-            if (parametrosFaturamento.cobrar_integracao) {
-              valorIntegracao = Number(parametrosFaturamento.valor_integracao || 0);
+            const rpcPromise = supabase.rpc('calcular_faturamento_completo', {
+              p_cliente_id: cliente.id,
+              p_periodo: periodo,
+              p_volume_total: totalExames
+            });
+            
+            const { data: calculoCompleto, error: calculoError } = await Promise.race([
+              rpcPromise,
+              timeoutPromise
+            ]).catch(() => ({ data: null, error: 'timeout' }));
+
+            if (!calculoError && calculoCompleto?.[0]) {
+              const calculo = calculoCompleto[0];
+              valorFranquia = calculo.valor_franquia || 0;
+              valorPortal = calculo.valor_portal_laudos || 0;
+              valorIntegracao = calculo.valor_integracao || 0;
+              detalhesCalculo = calculo.detalhes_calculo || {};
+            } else {
+              // Fallback para cálculo simplificado se RPC falhar/timeout
+              console.log(`⚠️ RPC timeout/erro para ${nomeCliente}, usando cálculo simplificado`);
+              
+              if (parametrosFaturamento.aplicar_franquia) {
+                if (parametrosFaturamento.frequencia_continua) {
+                  valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
+                } else if (totalExames > 0) {
+                  valorFranquia = Number(parametrosFaturamento.valor_franquia || 0);
+                }
+              }
+              
+              if (parametrosFaturamento.portal_laudos) {
+                valorPortal = Number(parametrosFaturamento.valor_integracao || 0);
+              }
+              if (parametrosFaturamento.cobrar_integracao) {
+                valorIntegracao = Number(parametrosFaturamento.valor_integracao || 0);
+              }
             }
           } catch (error) {
             console.error(`❌ Erro no cálculo de faturamento para ${nomeCliente}:`, error);
@@ -419,7 +443,8 @@ Deno.serve(async (req) => {
           const franquia = {
             valor_franquia: valorFranquia,
             valor_portal_laudos: valorPortal,
-            valor_integracao: valorIntegracao
+            valor_integracao: valorIntegracao,
+            detalhes_calculo: detalhesCalculo
           };
           
           console.log(`📊 Resultado cálculo faturamento ${nomeCliente}:`, franquia);
