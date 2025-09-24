@@ -564,7 +564,7 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-             // Buscar TODOS os clientes com contratos ativos (incluindo TODOS os tipos)
+             // Buscar TODOS os clientes com contratos ativos, excluindo NC-NF (LEFT join para não perder clientes da volumetria)
              const { data: clientesCadastrados } = await supabase
                .from('clientes')
                .select(`
@@ -575,23 +575,24 @@ export default function DemonstrativoFaturamento() {
                  email,
                  ativo,
                  status,
-                 contratos_clientes!inner (
+                 contratos_clientes!left (
                    tipo_faturamento,
                    status
                  )
                `)
-               .eq('contratos_clientes.status', 'ativo'); // INCLUIR TODOS OS TIPOS
+               .eq('contratos_clientes.status', 'ativo')
+               .neq('contratos_clientes.tipo_faturamento', 'NC-NF');
             
-            console.log('🏢 Clientes encontrados com contratos ativos:', clientesCadastrados?.length || 0);
+            console.log('🏢 Clientes encontrados com contratos ativos (exceto NC-NF):', clientesCadastrados?.length || 0);
             
-            // Criar mapa de clientes por nome fantasia
+            // Criar mapa de clientes por nome fantasia (ignorando NC-NF)
             const clientesMapPorNome = new Map();
             clientesCadastrados?.forEach(cliente => {
-              // Adicionar tipo_faturamento do contrato ao cliente
               const clienteComTipo = {
                 ...cliente,
                 tipo_faturamento: cliente.contratos_clientes?.[0]?.tipo_faturamento
               };
+              if (clienteComTipo.tipo_faturamento === 'NC-NF') return; // excluir NC-NF
               if (cliente.nome_fantasia) clientesMapPorNome.set(cliente.nome_fantasia, clienteComTipo);
               if (cliente.nome) clientesMapPorNome.set(cliente.nome, clienteComTipo);
               if (cliente.nome_mobilemed) clientesMapPorNome.set(cliente.nome_mobilemed, clienteComTipo);
@@ -730,7 +731,13 @@ export default function DemonstrativoFaturamento() {
                 }
               }
               
-              // Só incluir cliente se tem preço configurado
+              // Incluir cliente elegível (exceto NC-NF). Se sem preço, entra com valores zerados para não sumir do resumo
+              const tipoFat = (dadosCliente.cliente?.tipo_faturamento || 'Não definido') as string;
+              if (tipoFat === 'NC-NF') {
+                console.warn(`Cliente ${clienteNome} é NC-NF - ignorado em demonstrativo`);
+                continue;
+              }
+
               if (temPrecoConfigurado && valorTotalCliente > 0) {
                 clientesMap.set(clienteNome, {
                   id: dadosCliente.cliente.id,
@@ -742,11 +749,24 @@ export default function DemonstrativoFaturamento() {
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  tipo_faturamento: dadosCliente.cliente.tipo_faturamento || 'Não definido',
+                  tipo_faturamento: tipoFat,
                   observacoes: `Dados baseados na volumetria com preços calculados`
                 });
               } else {
-                console.warn(`Cliente ${clienteNome} sem preço configurado - pulando`);
+                console.warn(`Cliente ${clienteNome} sem preço configurado - incluindo no resumo com valor 0`);
+                clientesMap.set(clienteNome, {
+                  id: dadosCliente.cliente.id,
+                  nome: clienteNome,
+                  email: dadosCliente.cliente.email || '',
+                  total_exames: dadosCliente.total_exames,
+                  valor_bruto: 0,
+                  valor_liquido: 0,
+                  periodo: periodo,
+                  status_pagamento: 'pendente' as const,
+                  data_vencimento: new Date().toISOString().split('T')[0],
+                  tipo_faturamento: tipoFat,
+                  observacoes: `Sem preço configurado para as combinações encontradas - necessário configurar tabela de preços`
+                });
               }
             }
 
