@@ -340,15 +340,15 @@ serve(async (req: Request) => {
               console.error('❌ Erro na RPC calcular_preco_exame:', error);
               precoPorCombo[key] = 0;
             } else {
-             // A função agora retorna um valor numérico diretamente
-             let precoNum: number | null = null;
-             if (typeof precoData === 'number') {
-               precoNum = precoData;
-                precoNum = typeof item === 'number' ? item : (item?.valor_unitario ?? null);
-              } else if (typeof precoData === 'number') {
-                precoNum = precoData as number;
-              } else if (typeof precoData === 'object' && precoData !== null) {
-                precoNum = (precoData as any)?.valor_unitario ?? null;
+              // A função retorna um valor numérico (ou objeto) - normalizar
+              let precoNum: number | null = null;
+              if (typeof precoData === 'number') {
+                precoNum = precoData;
+              } else if (Array.isArray(precoData) && precoData.length > 0 && typeof precoData[0] === 'number') {
+                precoNum = precoData[0] as number;
+              } else if (precoData && typeof precoData === 'object') {
+                const candidate = (precoData as any).valor_unitario ?? (precoData as any).valor ?? null;
+                precoNum = typeof candidate === 'number' ? candidate : null;
               }
 
               console.log(`💰 Preço calculado para ${key}:`, precoNum);
