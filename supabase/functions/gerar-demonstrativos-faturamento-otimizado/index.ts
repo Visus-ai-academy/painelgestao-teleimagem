@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     }
 
     // Buscar clientes ativos
-    const { data: clientes, error: clientesError } = await supabase
+    const { data: clientesRaw, error: clientesError } = await supabase
       .from('clientes')
       .select(`
         id, nome, nome_fantasia, nome_mobilemed, ativo, status,
@@ -139,6 +139,29 @@ Deno.serve(async (req) => {
     if (clientesError) {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
     }
+
+    // Agrupar clientes por nome_fantasia
+    const clientesAgrupados = new Map();
+    for (const cliente of clientesRaw || []) {
+      const nomeAgrupamento = cliente.nome_fantasia || cliente.nome;
+      
+      if (!clientesAgrupados.has(nomeAgrupamento)) {
+        // Usar o primeiro cliente do grupo como base, mas com nome agrupado
+        clientesAgrupados.set(nomeAgrupamento, {
+          ...cliente,
+          nome: nomeAgrupamento, // Use nome_fantasia como nome principal
+          clientes_originais: []
+        });
+      }
+      
+      // Adicionar cliente original ao grupo
+      clientesAgrupados.get(nomeAgrupamento).clientes_originais.push(cliente);
+    }
+    
+    // Converter Map para Array
+    const clientes = Array.from(clientesAgrupados.values());
+    
+    console.log(`📋 ${clientesRaw?.length || 0} clientes únicos carregados, ${clientes.length} grupos por nome fantasia`);
 
     const demonstrativos: DemonstrativoCliente[] = [];
     let resumo: Resumo = {
@@ -164,11 +187,11 @@ Deno.serve(async (req) => {
 
       for (const cliente of batch) {
         try {
-          let nomeCliente = cliente.nome_mobilemed || cliente.nome_fantasia || cliente.nome;
+          let nomeCliente = cliente.nome_fantasia || cliente.nome_mobilemed || cliente.nome;
           console.log(`🔍 Buscando volumetria para cliente: ${nomeCliente} no período ${periodo}`);
 
           // Buscar dados de volumetria - priorizar nome fantasia que tem dados na volumetria
-          const nomesParaBuscar = [cliente.nome_mobilemed, cliente.nome_fantasia, cliente.nome].filter(n => n?.trim());
+          const nomesParaBuscar = [cliente.nome_fantasia, cliente.nome_mobilemed, cliente.nome].filter(n => n?.trim());
           let volumetriaData = null;
           let nomeEncontrado = nomeCliente;
           
