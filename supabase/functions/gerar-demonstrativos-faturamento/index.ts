@@ -66,7 +66,7 @@ serve(async (req) => {
 
     console.log(`Total de clientes ativos: ${clientes?.length || 0}`);
 
-    // Aplicar filtro opcional de clientes (por nome/nome_fantasia/nome_mobilemed)
+    // Aplicar filtro opcional de clientes
     const clientesProcessar = (clientesFiltro && Array.isArray(clientesFiltro) && clientesFiltro.length > 0)
       ? (clientes || []).filter((c: any) => {
           const nomes = [c.nome, c.nome_fantasia, c.nome_mobilemed]
@@ -97,24 +97,12 @@ serve(async (req) => {
         .map(n => n?.trim())
         .filter(n => n && n.length > 0);
 
-      // Buscar volumetria por EMPRESA e por Cliente_Nome_Fantasia (deduplicando)
-      const { data: volEmp } = await supabase
+      // Buscar volumetria usando EMPRESA
+      const { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', nomesBusca);
-
-      const { data: volFant } = await supabase
-        .from('volumetria_mobilemed')
-        .select('*')
-        .eq('periodo_referencia', periodo)
-        .in('"Cliente_Nome_Fantasia"', nomesBusca);
-
-      const combinado = [...(volEmp || []), ...(volFant || [])];
-
-      const volumetria = Array.from(
-        new Map((combinado || []).map((r: any) => [r.id ?? `${r.DATA_REALIZACAO}|${r.MODALIDADE}|${r.ESPECIALIDADE}|${r.CATEGORIA}|${r.PRIORIDADE}|${r.VALORES}`, r])).values()
-      );
 
       if (!volumetria || volumetria.length === 0) {
         console.log(`Sem volumetria para ${cliente.nome}`);
