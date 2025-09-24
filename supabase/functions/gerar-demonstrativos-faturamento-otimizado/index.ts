@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         .eq('periodo_referencia', periodo);
     }
 
-    // Buscar clientes ativos
+    // Buscar clientes ativos (base) e complementar com clientes da volumetria no período
     const { data: clientesRaw, error: clientesError } = await supabase
       .from('clientes')
       .select(`
@@ -130,36 +130,66 @@ Deno.serve(async (req) => {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
     }
 
+    // Coletar clientes presentes na volumetria do período (usa Cliente_Nome_Fantasia mapeado)
+    const { data: vClientes, error: volErr } = await supabase
+      .from('volumetria_mobilemed')
+      .select('"Cliente_Nome_Fantasia", "EMPRESA"')
+      .eq('periodo_referencia', periodo)
+      .neq('arquivo_fonte', 'volumetria_onco_padrao')
+      .neq('tipo_faturamento', 'NC-NF');
+
+    if (volErr) {
+      console.warn('⚠️ Erro ao buscar clientes da volumetria:', volErr.message);
+    }
+
+    const nomesVolumetria = new Set<string>();
+    (vClientes || []).forEach((r: any) => {
+      const n = (r.Cliente_Nome_Fantasia || r.EMPRESA || '').toString().trim();
+      if (n) nomesVolumetria.add(n);
+    });
+
     // Agrupar clientes por nome_fantasia + número_contrato para evitar duplicatas como PRN TELE_*
     const clientesAgrupados = new Map();
     for (const cliente of clientesRaw || []) {
       const nomeAgrupamento = cliente.nome_fantasia || cliente.nome;
       const numeroContrato = cliente.contratos_clientes?.[0]?.numero_contrato;
-      
-      // Chave de agrupamento: nome_fantasia + numero_contrato (ou apenas nome se não há contrato)
       const chaveAgrupamento = numeroContrato ? `${nomeAgrupamento}_${numeroContrato}` : nomeAgrupamento;
-      
+
       if (!clientesAgrupados.has(chaveAgrupamento)) {
-        // Usar o primeiro cliente do grupo como base, mas com nome agrupado
         clientesAgrupados.set(chaveAgrupamento, {
           ...cliente,
-          nome: nomeAgrupamento, // Use nome_fantasia como nome principal
+          nome: nomeAgrupamento,
           clientes_originais: []
         });
       }
-      
-      // Adicionar cliente original ao grupo
       clientesAgrupados.get(chaveAgrupamento).clientes_originais.push(cliente);
     }
-    
-    // Converter Map para Array
-    const clientes = Array.from(clientesAgrupados.values());
-    
-    console.log(`📋 ${clientesRaw?.length || 0} clientes únicos carregados, ${clientes.length} grupos por nome fantasia + contrato`);
 
-    // Preparar processamento incremental: pular clientes já calculados
-    const idsJaCalculados = new Set((demonstrativosExistentes || []).map((d: any) => d.cliente_id));
-    const clientesParaProcessar = clientes.filter((c: any) => !idsJaCalculados.has(c.id));
+    // Incluir clientes que estão na volumetria mas não têm contrato ativo/cadastro
+    for (const nome of Array.from(nomesVolumetria)) {
+      const chave = nome; // sem contrato, agrupar somente por nome fantasia
+      if (!clientesAgrupados.has(chave)) {
+        clientesAgrupados.set(chave, {
+          id: null,
+          nome,
+          nome_fantasia: nome,
+          nome_mobilemed: nome,
+          contratos_clientes: [],
+          parametros_faturamento: [],
+          clientes_originais: [{ nome_fantasia: nome, nome, nome_mobilemed: nome }]
+        });
+      }
+    }
+
+    // Converter Map para Array (união clientes ativos + volumetria)
+    const clientes = Array.from(clientesAgrupados.values());
+
+    console.log(`📋 ${clientesRaw?.length || 0} clientes ativos e ${nomesVolumetria.size} clientes na volumetria → ${clientes.length} grupos finais`);
+
+    // Preparar processamento incremental: pular clientes já calculados (por id OU por nome)
+    const idsJaCalculados = new Set((demonstrativosExistentes || []).map((d: any) => d.cliente_id).filter(Boolean));
+    const nomesJaCalculados = new Set((demonstrativosExistentes || []).map((d: any) => (d.cliente_nome || '').toString().trim()).filter(Boolean));
+    const clientesParaProcessar = clientes.filter((c: any) => !idsJaCalculados.has(c.id) && !nomesJaCalculados.has(c.nome_fantasia || c.nome));
 
     const demonstrativos: DemonstrativoCliente[] = [...(demonstrativosExistentes as any[])];
     let resumo: Resumo = resumoExistente || {
