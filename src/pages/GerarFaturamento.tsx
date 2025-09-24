@@ -544,13 +544,23 @@ export default function GerarFaturamento() {
 
       let clientesFinais: any[] = [];
       
-      // 🔄 NOVA ESTRATÉGIA: Combinar volumetria + clientes ativos faturáveis, filtrar apenas NC-NF
+      // 🔄 ESTRATÉGIA CORRIGIDA: Usar Cliente_Nome_Fantasia + limpar_nome_cliente() + clientes ativos faturáveis
       
-      // 1️⃣ Buscar TODOS os nomes únicos da volumetria (sem normalização)
+      // 1️⃣ Buscar TODOS os nomes únicos da volumetria usando Cliente_Nome_Fantasia (já mapeado) ou EMPRESA com limpeza
       let nomesVolumetria = new Set<string>();
       if (clientesVolumetria && clientesVolumetria.length > 0) {
         clientesVolumetria.forEach(c => {
-          const nome = c.Cliente_Nome_Fantasia || c.EMPRESA;
+          // Usar Cliente_Nome_Fantasia quando disponível, senão EMPRESA com limpeza
+          let nome = c.Cliente_Nome_Fantasia;
+          if (!nome) {
+            // Aplicar limpar_nome_cliente no EMPRESA se não há Cliente_Nome_Fantasia
+            nome = c.EMPRESA;
+            if (nome) {
+              // Aplicar as mesmas regras da função limpar_nome_cliente
+              nome = limparNomeCliente(nome);
+            }
+          }
+          
           if (nome && nome.trim()) {
             nomesVolumetria.add(nome.trim());
           }
@@ -558,7 +568,7 @@ export default function GerarFaturamento() {
       }
       console.log(`📊 Clientes únicos na volumetria: ${nomesVolumetria.size}`, Array.from(nomesVolumetria).slice(0, 10));
 
-      // 2️⃣ Buscar clientes ativos CO-FT e NC-FT no cadastro
+      // 2️⃣ Buscar clientes ativos CO-FT e NC-FT no cadastro (usando nome_fantasia)
       let nomesClientesAtivos = new Set<string>();
       try {
         const { data: clientesAtivos, error: errorAtivos } = await supabase
@@ -591,14 +601,14 @@ export default function GerarFaturamento() {
           // Se não há configurações explícitas, assumir que todos são CO-FT (padrão)
           const clientesFiltrados = idsPermitidos.size > 0 
             ? clientesAtivos.filter(c => idsPermitidos.has(c.id))
-            : clientesAtivos; // Incluir todos se não há configuração específica
+            : clientesAtivos;
 
           clientesFiltrados.forEach(c => {
-            [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
-              if (n && n.trim()) {
-                nomesClientesAtivos.add(n.trim());
-              }
-            });
+            // Priorizar nome_fantasia, depois nome
+            const nomePreferido = c.nome_fantasia || c.nome;
+            if (nomePreferido && nomePreferido.trim()) {
+              nomesClientesAtivos.add(nomePreferido.trim());
+            }
           });
         }
       } catch (e) {
@@ -637,7 +647,8 @@ export default function GerarFaturamento() {
             .in('id', idsNC);
           
           (clientesNC || []).forEach(c => {
-            [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
+            // Usar nome_fantasia preferido, depois outros nomes
+            [c.nome_fantasia, c.nome, c.nome_mobilemed].forEach(n => {
               if (n && n.trim()) {
                 nomesNC.add(n.trim());
               }
@@ -714,6 +725,52 @@ export default function GerarFaturamento() {
         setClientesCarregados([]);
         localStorage.setItem('clientesCarregados', JSON.stringify([]));
         return;
+      }
+
+      // Função auxiliar para replicar limpar_nome_cliente() no frontend
+      function limparNomeCliente(nome: string): string {
+        if (!nome) return nome;
+        
+        let nomeLimpo = nome;
+        
+        // Mapeamentos específicos
+        const mapeamentos: Record<string, string> = {
+          'INTERCOR2': 'INTERCOR',
+          'P-HADVENTISTA': 'HADVENTISTA',
+          'P-UNIMED_CARUARU': 'UNIMED_CARUARU',
+          'PRN - MEDIMAGEM CAMBORIU': 'MEDIMAGEM_CAMBORIU',
+          'UNIMAGEM_CENTRO': 'UNIMAGEM_ATIBAIA',
+          'VIVERCLIN 2': 'VIVERCLIN',
+          'CEDI-RJ': 'CEDIDIAG',
+          'CEDI-RO': 'CEDIDIAG',
+          'CEDI-UNIMED': 'CEDIDIAG',
+          'CEDI_RJ': 'CEDIDIAG',
+          'CEDI_RO': 'CEDIDIAG',
+          'CEDI_UNIMED': 'CEDIDIAG'
+        };
+        
+        if (mapeamentos[nomeLimpo]) {
+          nomeLimpo = mapeamentos[nomeLimpo];
+        } else {
+          // Remover sufixos
+          if (nomeLimpo.endsWith('- TELE')) {
+            nomeLimpo = nomeLimpo.slice(0, -6);
+          }
+          if (nomeLimpo.endsWith('-CT')) {
+            nomeLimpo = nomeLimpo.slice(0, -3);
+          }
+          if (nomeLimpo.endsWith('-MR')) {
+            nomeLimpo = nomeLimpo.slice(0, -3);
+          }
+          if (nomeLimpo.endsWith('_PLANTÃO')) {
+            nomeLimpo = nomeLimpo.slice(0, -8);
+          }
+          if (nomeLimpo.endsWith('_RMX')) {
+            nomeLimpo = nomeLimpo.slice(0, -4);
+          }
+        }
+        
+        return nomeLimpo.trim();
       }
 
       console.log(`✅ ${clientesFinais.length} clientes faturáveis encontrados (volumetria + cadastro):`, clientesFinais.map(c => `${c.nome} (${c.tipo})`));
