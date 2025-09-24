@@ -226,14 +226,26 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Gerar (Status por Cliente)
   const resultadosFiltradosStatus = useMemo(() => {
-    // Primeiro, remover duplicatas por clienteNome (mais confiável que clienteId)
-    const uniqueResults = resultados.filter((resultado, index, array) => 
-      array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
-    );
+    // Agrupar clientes por nome_fantasia + número_contrato para evitar duplicatas de PRN TELE_*
+    const clientesAgrupados = new Map();
     
-    // Não filtrar por tipo_faturamento aqui - a filtragem de clientes inativos/cancelados
-    // já acontece no carregamento dos dados do banco (carregarResultadosDB)
-    let filtrados = [...uniqueResults];
+    for (const resultado of resultados) {
+      // Buscar dados de agrupamento no banco para cada cliente
+      const chaveAgrupamento = resultado.clienteNome; // Usar nome_fantasia como chave de agrupamento
+      
+      if (!clientesAgrupados.has(chaveAgrupamento)) {
+        clientesAgrupados.set(chaveAgrupamento, resultado);
+      } else {
+        // Se já existe, manter o status mais recente
+        const existente = clientesAgrupados.get(chaveAgrupamento);
+        if (resultado.dataProcessamento && resultado.dataProcessamento > (existente.dataProcessamento || '')) {
+          clientesAgrupados.set(chaveAgrupamento, resultado);
+        }
+      }
+    }
+    
+    // Converter Map para Array e aplicar filtros
+    let filtrados = Array.from(clientesAgrupados.values());
     
     if (filtroClienteStatus) {
       filtrados = filtrados.filter(resultado => 
@@ -898,10 +910,11 @@ export default function GerarFaturamento() {
       setDemonstrativosGeradosPorCliente(novosClientesSet);
       localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientesSet)));
 
-      // Mesclar com resultados atuais e setar relatorioGerado
+      // Mesclar com resultados atuais - ATUALIZAR status APENAS dos clientes que foram processados
       setResultados((prev) => {
         const mapa = new Map<string, any>();
         prev.forEach((r) => mapa.set(r.clienteNome, r));
+        
         todosDemonstrativos.forEach((d: any) => {
           const nome = d.cliente_nome;
           const existente = mapa.get(nome);
@@ -921,6 +934,7 @@ export default function GerarFaturamento() {
           };
           mapa.set(nome, atualizado);
         });
+        
         const arr = Array.from(mapa.values());
         // Persistir no DB
         salvarResultadosDB(arr);

@@ -140,14 +140,18 @@ Deno.serve(async (req) => {
       throw new Error(`Erro ao buscar clientes: ${clientesError.message}`);
     }
 
-    // Agrupar clientes por nome_fantasia
+    // Agrupar clientes por nome_fantasia + número_contrato para evitar duplicatas como PRN TELE_*
     const clientesAgrupados = new Map();
     for (const cliente of clientesRaw || []) {
       const nomeAgrupamento = cliente.nome_fantasia || cliente.nome;
+      const numeroContrato = cliente.contratos_clientes?.[0]?.numero_contrato;
       
-      if (!clientesAgrupados.has(nomeAgrupamento)) {
+      // Chave de agrupamento: nome_fantasia + numero_contrato (ou apenas nome se não há contrato)
+      const chaveAgrupamento = numeroContrato ? `${nomeAgrupamento}_${numeroContrato}` : nomeAgrupamento;
+      
+      if (!clientesAgrupados.has(chaveAgrupamento)) {
         // Usar o primeiro cliente do grupo como base, mas com nome agrupado
-        clientesAgrupados.set(nomeAgrupamento, {
+        clientesAgrupados.set(chaveAgrupamento, {
           ...cliente,
           nome: nomeAgrupamento, // Use nome_fantasia como nome principal
           clientes_originais: []
@@ -155,13 +159,13 @@ Deno.serve(async (req) => {
       }
       
       // Adicionar cliente original ao grupo
-      clientesAgrupados.get(nomeAgrupamento).clientes_originais.push(cliente);
+      clientesAgrupados.get(chaveAgrupamento).clientes_originais.push(cliente);
     }
     
     // Converter Map para Array
     const clientes = Array.from(clientesAgrupados.values());
     
-    console.log(`📋 ${clientesRaw?.length || 0} clientes únicos carregados, ${clientes.length} grupos por nome fantasia`);
+    console.log(`📋 ${clientesRaw?.length || 0} clientes únicos carregados, ${clientes.length} grupos por nome fantasia + contrato`);
 
     const demonstrativos: DemonstrativoCliente[] = [];
     let resumo: Resumo = {
