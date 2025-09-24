@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 interface DemonstrativoCliente {
   cliente_id: string;
@@ -25,8 +21,6 @@ interface DemonstrativoCliente {
 }
 
 serve(async (req) => {
-  console.log('=== FUNÇÃO DEMONSTRATIVOS INICIADA ===');
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -38,12 +32,11 @@ serve(async (req) => {
     );
 
     const { periodo, clientes: clientesFiltro } = await req.json();
+    console.log('Período recebido:', periodo);
     
     if (!periodo) {
       throw new Error('Período é obrigatório');
     }
-
-    console.log(`Gerando demonstrativos para o período: ${periodo}`);
 
     // Buscar clientes ativos
     const { data: clientes, error: clientesError } = await supabase
@@ -99,7 +92,6 @@ serve(async (req) => {
         .map(n => n?.trim())
         .filter(n => n && n.length > 0);
 
-      // Buscar volumetria usando EMPRESA
       const { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
@@ -113,161 +105,33 @@ serve(async (req) => {
 
       console.log(`Encontrada volumetria: ${volumetria.length} registros`);
 
-      // Agrupar volumetria por modalidade/especialidade/categoria/prioridade
-      const grupos = new Map();
+      // Contar exames totais
       let totalExames = 0;
-
       for (const vol of volumetria) {
-        const chave = `${vol.MODALIDADE}-${vol.ESPECIALIDADE}-${vol.CATEGORIA || 'SC'}-${vol.PRIORIDADE}`;
-        if (!grupos.has(chave)) {
-          grupos.set(chave, {
-            modalidade: vol.MODALIDADE,
-            especialidade: vol.ESPECIALIDADE,
-            categoria: vol.CATEGORIA || 'SC',
-            prioridade: vol.PRIORIDADE,
-            quantidade: 0,
-            valor_unitario: 0
-          });
-        }
-        const grupo = grupos.get(chave);
-        grupo.quantidade += vol.VALORES || 0;
         totalExames += vol.VALORES || 0;
       }
 
-      let valorExames = 0;
-      const detalhesExames = [];
-
-      // Calcular preços para cada grupo
-      for (const grupo of grupos.values()) {
-        // Buscar preço na tabela precos_servicos
-        const { data: precos } = await supabase
-          .from('precos_servicos')
-          .select('valor_base, valor_urgencia, volume_inicial, volume_final')
-          .eq('cliente_id', cliente.id)
-          .eq('ativo', true)
-          .ilike('modalidade', grupo.modalidade)
-          .ilike('especialidade', grupo.especialidade)
-          .ilike('categoria', grupo.categoria)
-          .ilike('prioridade', grupo.prioridade)
-          .gte('volume_final', grupo.quantidade)
-          .lte('volume_inicial', grupo.quantidade)
-          .order('volume_inicial')
-          .limit(1);
-
-        let preco = 0;
-
-        if (precos && precos.length > 0) {
-          const precoItem = precos[0];
-          const isUrgencia = grupo.prioridade.toUpperCase().includes('URGÊNCIA') || 
-                           grupo.prioridade.toUpperCase().includes('PLANTÃO');
-          preco = isUrgencia ? (precoItem.valor_urgencia || precoItem.valor_base) : precoItem.valor_base;
-        }
-
-        // Fallback: tentar com ROTINA se não encontrou
-        if (preco <= 0) {
-          const { data: precosRotina } = await supabase
-            .from('precos_servicos')
-            .select('valor_base')
-            .eq('cliente_id', cliente.id)
-            .eq('ativo', true)
-            .ilike('modalidade', grupo.modalidade)
-            .ilike('especialidade', grupo.especialidade)
-            .ilike('categoria', grupo.categoria)
-            .ilike('prioridade', 'ROTINA')
-            .gte('volume_final', grupo.quantidade)
-            .lte('volume_inicial', grupo.quantidade)
-            .limit(1);
-
-          if (precosRotina && precosRotina.length > 0) {
-            preco = precosRotina[0].valor_base;
-          }
-        }
-
-        // Fallback: tentar com categoria SC
-        if (preco <= 0 && grupo.categoria !== 'SC') {
-          const { data: precosSC } = await supabase
-            .from('precos_servicos')
-            .select('valor_base, valor_urgencia')
-            .eq('cliente_id', cliente.id)
-            .eq('ativo', true)
-            .ilike('modalidade', grupo.modalidade)
-            .ilike('especialidade', grupo.especialidade)
-            .ilike('categoria', 'SC')
-            .ilike('prioridade', grupo.prioridade)
-            .gte('volume_final', grupo.quantidade)
-            .lte('volume_inicial', grupo.quantidade)
-            .limit(1);
-
-          if (precosSC && precosSC.length > 0) {
-            const precoItem = precosSC[0];
-            const isUrgencia = grupo.prioridade.toUpperCase().includes('URGÊNCIA') || 
-                             grupo.prioridade.toUpperCase().includes('PLANTÃO');
-            preco = isUrgencia ? (precoItem.valor_urgencia || precoItem.valor_base) : precoItem.valor_base;
-          }
-        }
-
-        if (preco > 0) {
-          grupo.valor_unitario = preco;
-          const valorGrupo = grupo.quantidade * preco;
-          valorExames += valorGrupo;
-
-          detalhesExames.push({
-            modalidade: grupo.modalidade,
-            especialidade: grupo.especialidade,
-            categoria: grupo.categoria,
-            prioridade: grupo.prioridade,
-            quantidade: grupo.quantidade,
-            valor_unitario: preco,
-            valor_total: valorGrupo
-          });
-
-          console.log(`Preço encontrado: ${grupo.modalidade}/${grupo.especialidade} = R$ ${preco} x ${grupo.quantidade} = R$ ${valorGrupo}`);
-        } else {
-          console.warn(`Preço não encontrado para: ${grupo.modalidade}/${grupo.especialidade}/${grupo.categoria}/${grupo.prioridade}`);
-        }
-      }
-
-      // Calcular franquia, portal e integração usando função existente
-      const { data: calculoCompleto } = await supabase.rpc('calcular_faturamento_completo', {
-        p_cliente_id: cliente.id,
-        p_periodo: periodo,
-        p_volume_total: totalExames
-      });
-
-      const valorFranquia = calculoCompleto?.[0]?.valor_franquia || 0;
-      const valorPortal = calculoCompleto?.[0]?.valor_portal_laudos || 0;
-      const valorIntegracao = calculoCompleto?.[0]?.valor_integracao || 0;
-
-      const valorBruto = valorExames + valorFranquia + valorPortal + valorIntegracao;
-      const valorImpostos = valorBruto * 0.075; // 7.5% de impostos aproximado
-      const valorTotal = valorBruto + valorImpostos;
-
+      // Criar demonstrativo básico
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
         cliente_nome: cliente.nome_fantasia || cliente.nome,
         periodo,
         total_exames: totalExames,
-        valor_exames: valorExames,
-        valor_franquia: valorFranquia,
-        valor_portal_laudos: valorPortal,
-        valor_integracao: valorIntegracao,
-        valor_bruto: valorBruto,
-        valor_impostos: valorImpostos,
-        valor_total: valorTotal,
-        detalhes_franquia: calculoCompleto?.[0]?.detalhes_franquia || {},
-        detalhes_exames: detalhesExames,
-        detalhes_tributacao: {
-          simples_nacional: true,
-          percentual_iss: 7.5,
-          valor_iss: valorImpostos,
-          base_calculo: valorBruto
-        },
+        valor_exames: 0,
+        valor_franquia: 0,
+        valor_portal_laudos: 0,
+        valor_integracao: 0,
+        valor_bruto: 0,
+        valor_impostos: 0,
+        valor_total: 0,
+        detalhes_franquia: {},
+        detalhes_exames: [],
+        detalhes_tributacao: {},
         tipo_faturamento: tipoFaturamento
       };
 
       demonstrativos.push(demonstrativo);
-
-      console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
+      console.log(`Demonstrativo básico criado para ${cliente.nome}: ${totalExames} exames`);
     }
 
     console.log(`Total de demonstrativos gerados: ${demonstrativos.length}`);
