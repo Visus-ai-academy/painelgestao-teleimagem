@@ -25,6 +25,8 @@ interface DemonstrativoCliente {
 }
 
 serve(async (req) => {
+  console.log('=== FUNÇÃO DEMONSTRATIVOS INICIADA ===');
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
