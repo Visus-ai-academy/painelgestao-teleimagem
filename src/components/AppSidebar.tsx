@@ -240,6 +240,9 @@ export function AppSidebar() {
           <div className="flex items-center justify-center h-full">
             {!collapsed && (
               <div className="text-center">
+                <h2 className="font-bold text-lg bg-gradient-to-r from-slate-700 to-slate-900 bg-clip-text text-transparent font-orbitron tracking-wider drop-shadow-lg">
+                  Teleimagem
+                </h2>
                 <p className="text-sm bg-gradient-to-r from-slate-600 to-slate-800 bg-clip-text text-transparent font-orbitron font-light tracking-wide">
                   Sistema de Gestão
                 </p>

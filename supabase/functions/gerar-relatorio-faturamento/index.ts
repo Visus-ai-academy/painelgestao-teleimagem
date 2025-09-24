@@ -37,27 +37,6 @@ serve(async (req: Request) => {
       console.log('Função iniciada');
     
     const body = await req.json();
-    
-    // Se não veio nenhum parâmetro, buscar todos os clientes com demonstrativo
-    if (!body.cliente_id && !body.periodo) {
-      console.log('⚠️ Buscando todos os clientes com demonstrativo no localStorage...');
-      
-      // Retornar lista de clientes disponíveis para relatório
-      const { data: clientesDisponiveis } = await supabase
-        .from('clientes')
-        .select('id, nome, nome_fantasia')
-        .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-        .order('nome');
-      
-      return new Response(JSON.stringify({
-        success: true,
-        clientes_disponiveis: clientesDisponiveis || [],
-        message: "Lista de clientes disponíveis para relatório"
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     const demonstrativoData = body?.demonstrativo_data || null;
     console.log('Body recebido:', JSON.stringify(body));
     
@@ -79,48 +58,33 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Buscar dados do cliente
-    console.log(`🔍 Buscando cliente com ID: ${cliente_id}`);
-    
+    // Buscar dados do cliente (prioritizar o que tem preços se houver duplicatas)
     let { data: cliente, error: clienteError } = await supabase
       .from('clientes')
-      .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
+      .select('nome, nome_fantasia, cnpj')
       .eq('id', cliente_id)
       .maybeSingle();
 
-    // Se não encontrou pelo ID, tentar buscar por nome nos demonstrativos gerados
+    // Se não encontrou ou se não tem preços, tentar buscar versão com preços
     if (!cliente || clienteError) {
-      console.log('❗ Cliente não encontrado pelo ID, tentando buscar por dados de demonstrativo...');
+      console.log('❗ Cliente não encontrado pelo ID, buscando versão com preços...');
       
-      // Se temos dados do demonstrativo, usar o cliente_nome de lá
-      if (demonstrativoData && demonstrativoData.cliente_nome) {
-        console.log(`🔍 Buscando cliente pelo nome do demonstrativo: ${demonstrativoData.cliente_nome}`);
-        
-        const { data: clientePorNome } = await supabase
-          .from('clientes')
-          .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
-          .or(`nome.ilike.%${demonstrativoData.cliente_nome}%,nome_fantasia.ilike.%${demonstrativoData.cliente_nome}%,nome_mobilemed.ilike.%${demonstrativoData.cliente_nome}%`)
-          .limit(1);
-        
-        if (clientePorNome && clientePorNome.length > 0) {
-          cliente = clientePorNome[0];
-          console.log(`✅ Cliente encontrado por nome do demonstrativo: ${cliente.nome}`);
-        }
-      }
+      // Buscar cliente com mesmo nome que tenha preços ativos
+      const { data: clienteComPrecos } = await supabase
+        .from('clientes')
+        .select('id, nome, nome_fantasia, cnpj')
+        .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
+        .limit(10);
       
-      // Se ainda não encontrou, buscar qualquer cliente com preços ativos
-      if (!cliente) {
-        console.log('🔍 Tentando buscar clientes com preços ativos...');
-        
-        const { data: clienteComPrecos } = await supabase
-          .from('clientes')
-          .select('id, nome, nome_fantasia, nome_mobilemed, cnpj')
-          .filter('id', 'in', '(SELECT DISTINCT cliente_id FROM precos_servicos WHERE ativo = true)')
-          .limit(10);
-        
-        if (clienteComPrecos && clienteComPrecos.length > 0) {
+      if (clienteComPrecos && clienteComPrecos.length > 0) {
+        // Se há apenas um, usar esse
+        if (clienteComPrecos.length === 1) {
           cliente = clienteComPrecos[0];
-          console.log(`⚠️ Usando cliente com preços como fallback: ${cliente.nome}`);
+          console.log(`✅ Substituído para cliente com preços: ${cliente.nome} (ID: ${clienteComPrecos[0].id})`);
+        } else {
+          // Se há vários, usar o primeiro (pode melhorar a lógica aqui se necessário)
+          cliente = clienteComPrecos[0];
+          console.log(`⚠️ Múltiplos clientes com preços encontrados, usando: ${cliente.nome}`);
         }
       }
     }
@@ -204,7 +168,7 @@ serve(async (req: Request) => {
     // Preparar mapa de preços por combinação para volumetria (modalidade|especialidade|categoria|prioridade)
     const isFaturamentoDataLocalPrimario = finalData.length > 0 && Object.prototype.hasOwnProperty.call(finalData[0], 'valor');
     let precoPorCombo: Record<string, number> = {};
-    const combosNaoFaturadosIntencional = new Set<string>();
+
     if (!isFaturamentoDataLocalPrimario) {
       // Agrupar volumetria para obter volume por combinação (usado na faixa de preço)
       const grupos: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }>
@@ -291,117 +255,73 @@ serve(async (req: Request) => {
         console.log('📈 Volumes agregados por condição:', Object.fromEntries(volumesAgregados));
 
         // Calcular preços por combo usando volume agregado correto
-        for (const [key, g] of combos) {
-          const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
-          
-          // Definir chave de agregação para buscar volume
-          let chaveAgregacao = '';
-          switch (condVolume) {
-            case 'MOD/ESP/CAT':
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-              break;
-            case 'MOD/ESP':
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
-              break;
-            case 'MOD':
-              chaveAgregacao = g.modalidade;
-              break;
-            default:
-              chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
-          }
-          
-          // Para exames de plantão, usar o volume próprio (não agregado)
-          const volumeParaCalculo = isPlantao 
-            ? g.quantidade 
-            : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
-          
-          try {
-            console.log(`🔍 Calculando preço para: ${key}`);
-            console.log(`   Cliente: ${cliente_id}`);
-            console.log(`   Modalidade: ${g.modalidade}`);
-            console.log(`   Especialidade: ${g.especialidade}`);
-            console.log(`   Categoria: ${g.categoria || 'SC'}`);
-            console.log(`   Prioridade: ${g.prioridade}`);
-            console.log(`   Volume próprio: ${g.quantidade}`);
-            console.log(`   Volume agregado: ${volumeParaCalculo}`);
-            console.log(`   É plantão: ${isPlantao}`);
+        await Promise.all(
+          combos.map(async ([key, g]) => {
+            const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO');
             
-            const { data: precoData, error } = await supabase.rpc('calcular_preco_exame', {
-              p_cliente_id: cliente_id,
-              p_modalidade: g.modalidade,
-              p_especialidade: g.especialidade,
-              p_prioridade: g.prioridade,
-              p_categoria: g.categoria || 'SC',
-              p_volume_total: volumeParaCalculo,
-              p_is_plantao: isPlantao,
-            });
-            
-            if (error) {
-              console.error('❌ Erro na RPC calcular_preco_exame:', error);
-              precoPorCombo[key] = 0;
-            } else {
-              // A função retorna um valor numérico (ou objeto) - normalizar
-              let precoNum: number | null = null;
-              if (typeof precoData === 'number') {
-                precoNum = precoData;
-              } else if (Array.isArray(precoData) && precoData.length > 0 && typeof precoData[0] === 'number') {
-                precoNum = precoData[0] as number;
-              } else if (precoData && typeof precoData === 'object') {
-                const candidate = (precoData as any).valor_unitario ?? (precoData as any).valor ?? null;
-                precoNum = typeof candidate === 'number' ? candidate : null;
-              }
-
-              console.log(`💰 Preço calculado para ${key}:`, precoNum);
-              
-              if (Number.isFinite(precoNum) && (precoNum as number) > 0) {
-                precoPorCombo[key] = precoNum as number;
-              } else {
-                console.warn(`⚠️ Preço inválido retornado:`, precoData, typeof precoData);
-                precoPorCombo[key] = 0;
-              }
+            // Definir chave de agregação para buscar volume
+            let chaveAgregacao = '';
+            switch (condVolume) {
+              case 'MOD/ESP/CAT':
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
+                break;
+              case 'MOD/ESP':
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}`;
+                break;
+              case 'MOD':
+                chaveAgregacao = g.modalidade;
+                break;
+              default:
+                chaveAgregacao = `${g.modalidade}|${g.especialidade}|${g.categoria || 'SC'}`;
             }
-          } catch (e) {
-            console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
-            precoPorCombo[key] = 0;
-          }
-        }
-
-        // Fallback para combos com preço 0: consultar precos_servicos ou aplicar valor padrão
-        for (const [key, g] of combos) {
-          if ((precoPorCombo[key] ?? 0) <= 0) {
+            
+            // Para exames de plantão, usar o volume próprio (não agregado)
+            const volumeParaCalculo = isPlantao 
+              ? g.quantidade 
+              : (volumesAgregados.get(chaveAgregacao) || g.quantidade);
+            
             try {
-              const isPlantao = g.prioridade.includes('PLANTAO') || g.prioridade.includes('PLANTÃO') || g.prioridade.includes('URGENTE') || g.prioridade.includes('URGÊNCIA');
-              const { data: precoRegistro } = await supabase
-                .from('precos_servicos')
-                .select('valor_base, valor_urgencia, considera_prioridade_plantao, ativo')
-                .eq('cliente_id', cliente_id)
-                .eq('modalidade', g.modalidade)
-                .eq('especialidade', g.especialidade)
-                .eq('categoria', g.categoria || 'SC')
-                .eq('prioridade', g.prioridade)
-                .eq('ativo', true)
-                .maybeSingle();
-
-              if (precoRegistro) {
-                const base = Number(precoRegistro.valor_base || 0);
-                const urg = Number(precoRegistro.valor_urgencia || 0);
-                const considera = !!precoRegistro.considera_prioridade_plantao;
-                if (base === 0) {
-                  combosNaoFaturadosIntencional.add(key);
-                  precoPorCombo[key] = 0;
-                } else {
-                  precoPorCombo[key] = (considera && isPlantao) ? (urg || base) : base;
-                }
+              console.log(`🔍 Calculando preço para: ${key}`);
+              console.log(`   Cliente: ${cliente_id}`);
+              console.log(`   Modalidade: ${g.modalidade}`);
+              console.log(`   Especialidade: ${g.especialidade}`);
+              console.log(`   Categoria: ${g.categoria || 'SC'}`);
+              console.log(`   Prioridade: ${g.prioridade}`);
+              console.log(`   Volume próprio: ${g.quantidade}`);
+              console.log(`   Volume agregado: ${volumeParaCalculo}`);
+              console.log(`   É plantão: ${isPlantao}`);
+              
+              const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
+                p_cliente_id: cliente_id,
+                p_modalidade: g.modalidade,
+                p_especialidade: g.especialidade,
+                p_prioridade: g.prioridade,
+                p_categoria: g.categoria || 'SC',
+                p_volume_total: volumeParaCalculo,
+                p_is_plantao: isPlantao,
+              });
+              
+              if (error) {
+                console.error('❌ Erro na RPC calcular_preco_exame:', error);
+                precoPorCombo[key] = 0;
               } else {
-                const valoresPadrao: Record<string, number> = { RX: 15, TC: 45, RM: 80, US: 25, MG: 20, CR: 15, DX: 15, ECG: 10, MAPA: 30 };
-                precoPorCombo[key] = valoresPadrao[g.modalidade] || 12;
+                const precoNum = Number(preco);
+                console.log(`💰 Preço calculado para ${key}: R$ ${precoNum}`);
+                
+                if (Number.isFinite(precoNum) && precoNum > 0) {
+                  precoPorCombo[key] = precoNum;
+                } else {
+                  console.warn(`⚠️ Preço inválido retornado: ${preco} (${typeof preco})`);
+                  precoPorCombo[key] = 0;
+                }
               }
-            } catch (_) {
-              const valoresPadrao: Record<string, number> = { RX: 15, TC: 45, RM: 80, US: 25, MG: 20, CR: 15, DX: 15, ECG: 10, MAPA: 30 };
-              precoPorCombo[key] = valoresPadrao[g.modalidade] || 12;
+            } catch (e) {
+              console.error('❌ Falha ao calcular preço para combo', key, e?.message || e);
+              precoPorCombo[key] = 0;
             }
-          }
-        }
+          })
+        );
+      }
     }
     
     // Se não há dados, não gerar PDF
@@ -475,8 +395,7 @@ serve(async (req: Request) => {
       valorPortal = Number(demonstrativoData.valor_portal_laudos || 0);
       valorIntegracao = Number(demonstrativoData.valor_integracao || 0);
       totalImpostos = Number(demonstrativoData.valor_impostos || 0);
-      // VALOR A PAGAR deve descontar apenas os impostos (franquia/portal/integração já compõem o bruto)
-      valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
+      valorAPagar = Number(demonstrativoData.valor_total || (valorBrutoTotal - totalImpostos));
     } else {
       // Calcular resumo usando dados de faturamento ou volumetria
       const isFaturamentoDataLocal = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
@@ -490,7 +409,7 @@ serve(async (req: Request) => {
           const key = `${(item.MODALIDADE || '')}|${(item.ESPECIALIDADE || '')}|${(item.CATEGORIA || 'SC')}|${(item.PRIORIDADE || '')}`;
           const unit = precoPorCombo[key] ?? 0;
           const qtd = Number(item.VALORES || 0) || 0;
-          return sum + unit * qtd; // itens intencionalmente zerados ficam com unit=0
+          return sum + unit * qtd;
         }, 0);
         totalLaudos = finalData.reduce((sum, item) => sum + (parseInt(item.VALORES) || 0), 0);
       }
@@ -500,35 +419,16 @@ serve(async (req: Request) => {
       valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
       valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
       totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-      valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
+      valorAPagar = valorBrutoTotal - totalImpostos;
     }
 
-      // Calcular impostos detalhados usando dados do demonstrativo
-      if (demonstrativoData) {
-        const detalhesTribu = demonstrativoData.detalhes_tributacao || {};
-        if (!detalhesTribu.simples_nacional) {
-          // Usar valores calculados no demonstrativo se disponíveis, senão calcular
-          valorPIS = detalhesTribu.valor_pis || parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-          valorCOFINS = detalhesTribu.valor_cofins || parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-          valorCSLL = detalhesTribu.valor_csll || parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-          valorIRRF = detalhesTribu.valor_irrf || parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-          totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-        } else {
-          // Simples nacional: impostos federais zerados
-          valorPIS = valorCOFINS = valorCSLL = valorIRRF = 0;
-          totalImpostos = 0;
-        }
-        // Valor a pagar NÃO deve descontar franquia/portal/integração aqui, pois já compõem o bruto
-        valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
-      } else {
-        // Fallback: calcular impostos padrão
-        valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
-        valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
-        valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
-        valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
-        totalImpostos = valorPIS + valorCOFINS + valorCSLL + valorIRRF;
-        valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
-      }
+    // Mesmo quando vem do demonstrativo, calcular valores individuais para exibição
+    if (demonstrativoData) {
+      valorPIS = parseFloat((valorBrutoTotal * (percentualPIS / 100)).toFixed(2));
+      valorCOFINS = parseFloat((valorBrutoTotal * (percentualCOFINS / 100)).toFixed(2));
+      valorCSLL = parseFloat((valorBrutoTotal * (percentualCSLL / 100)).toFixed(2));
+      valorIRRF = parseFloat((valorBrutoTotal * (percentualIRRF / 100)).toFixed(2));
+    }
 
     // Gerar PDF apenas se houver dados
     let pdfUrl = null;
@@ -668,7 +568,7 @@ serve(async (req: Request) => {
       doc.setLineWidth(1);
       doc.line(25, yQuadro1 + 50, 270, yQuadro1 + 50);
       
-      // Valor a Pagar destacado - CORRIGIDO para descontar impostos
+      // Valor a Pagar destacado (movido para baixo para não sobrepor)
       doc.setFontSize(16);
       doc.setTextColor(0, 0, 0); // Cor preta em vez de verde
       doc.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 148, yQuadro1 + 62, { align: 'center' });

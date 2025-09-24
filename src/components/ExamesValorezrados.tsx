@@ -119,7 +119,7 @@ export function ExamesValoresZerados() {
             const clienteId = clienteData[0].id;
             
             // Calcular preço usando a função RPC
-            const { data: precoCalculado_data } = await supabase.rpc('calcular_preco_exame', {
+            const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
               p_cliente_id: clienteId,
               p_modalidade: combinacao.modalidade,
               p_especialidade: combinacao.especialidade,
@@ -129,8 +129,7 @@ export function ExamesValoresZerados() {
               p_is_plantao: (combinacao.prioridade || '').toUpperCase().includes('PLANT')
             });
 
-            const precoCalculado = precoCalculado_data?.[0]?.valor_unitario || 0;
-            combinacao.valor_unitario = precoCalculado;
+            combinacao.valor_unitario = precoCalculado || 0;
             combinacao.tem_preco_cadastrado = precoCalculado && precoCalculado > 0;
 
             // Só incluir se NÃO tem preço cadastrado (valor zerado)

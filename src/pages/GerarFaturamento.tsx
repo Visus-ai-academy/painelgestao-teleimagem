@@ -48,6 +48,7 @@ import { DemonstrativoFaturamentoCompleto } from "@/components/DemonstrativoFatu
 import { ControleFechamentoFaturamento } from '@/components/ControleFechamentoFaturamento';
 import ListaExamesPeriodo from "@/components/faturamento/ListaExamesPeriodo";
 import { ExamesValoresZerados } from "@/components/ExamesValorezrados";
+import { DiagnosticoClientePrecos } from "@/components/DiagnosticoClientePrecos";
 
 import { generatePDF, downloadPDF, type FaturamentoData } from "@/lib/pdfUtils";
 
@@ -226,26 +227,14 @@ export default function GerarFaturamento() {
 
   // Resultados filtrados e ordenados para aba Gerar (Status por Cliente)
   const resultadosFiltradosStatus = useMemo(() => {
-    // Agrupar clientes por nome_fantasia + número_contrato para evitar duplicatas de PRN TELE_*
-    const clientesAgrupados = new Map();
+    // Primeiro, remover duplicatas por clienteNome (mais confiável que clienteId)
+    const uniqueResults = resultados.filter((resultado, index, array) => 
+      array.findIndex(r => r.clienteNome === resultado.clienteNome) === index
+    );
     
-    for (const resultado of resultados) {
-      // Buscar dados de agrupamento considerando nome_fantasia (já vem unificado da função)
-      const chaveAgrupamento = resultado.clienteNome; // Use nome unificado como chave
-      
-      if (!clientesAgrupados.has(chaveAgrupamento)) {
-        clientesAgrupados.set(chaveAgrupamento, resultado);
-      } else {
-        // Se já existe, manter o status mais recente
-        const existente = clientesAgrupados.get(chaveAgrupamento);
-        if (resultado.dataProcessamento && resultado.dataProcessamento > (existente.dataProcessamento || '')) {
-          clientesAgrupados.set(chaveAgrupamento, resultado);
-        }
-      }
-    }
-    
-    // Converter Map para Array e aplicar filtros
-    let filtrados = Array.from(clientesAgrupados.values());
+    // Não filtrar por tipo_faturamento aqui - a filtragem de clientes inativos/cancelados
+    // já acontece no carregamento dos dados do banco (carregarResultadosDB)
+    let filtrados = [...uniqueResults];
     
     if (filtroClienteStatus) {
       filtrados = filtrados.filter(resultado => 
@@ -503,35 +492,55 @@ export default function GerarFaturamento() {
     try {
       console.log('🔍 Carregando clientes para período:', periodoSelecionado);
       
-      // Não priorizar demonstrativos salvos para evitar subcontagem; sempre carregar da volumetria
-      // (mantido apenas para futura referência caso necessário)
+      // ✅ PRIORIZAR DADOS DOS DEMONSTRATIVOS SALVOS
+      const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+      if (demonstrativosCompletos) {
+        try {
+          const dados = JSON.parse(demonstrativosCompletos);
+          if (dados.demonstrativos && Array.isArray(dados.demonstrativos) && dados.demonstrativos.length > 0) {
+            const clientesDoDemonstrativo = dados.demonstrativos.map((demo: any) => ({
+              id: demo.cliente_id || `temp-${demo.cliente_nome}`,
+              nome: demo.cliente_nome || demo.nome_cliente,
+              email: demo.cliente_email || demo.email_cliente || `${(demo.cliente_nome || '').toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`
+            }));
+            
+            console.log(`✅ Clientes carregados dos demonstrativos salvos: ${clientesDoDemonstrativo.length}`);
+            setClientesCarregados(clientesDoDemonstrativo);
+            localStorage.setItem('clientesCarregados', JSON.stringify(clientesDoDemonstrativo));
 
-      
-      // Buscar todos os registros de clientes da volumetria com paginação (limite Supabase 1000)
-      const pageSize = 1000;
-      let offset = 0;
-      let clientesVolumetria: { Cliente_Nome_Fantasia: string | null; EMPRESA: string | null }[] = [];
-      while (true) {
-        const { data, error } = await supabase
-          .from('volumetria_mobilemed')
-          .select('"Cliente_Nome_Fantasia", "EMPRESA"')
-          .eq('periodo_referencia', periodoSelecionado)
-          .not('"EMPRESA"', 'is', null)
-          .not('"EMPRESA"', 'eq', '')
-          .range(offset, offset + pageSize - 1);
-        if (error) {
-          console.error('❌ Erro na consulta volumetria (paginada):', error);
-          throw error;
+            // Inicializar resultados base para todos os clientes dos demonstrativos
+            const resultadosBase = clientesDoDemonstrativo.map((cliente: any) => ({
+              clienteId: cliente.id,
+              clienteNome: cliente.nome,
+              relatorioGerado: false,
+              emailEnviado: false,
+              emailDestino: cliente.email,
+              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
+            }));
+            setResultados(resultadosBase);
+            salvarResultadosDB(resultadosBase);
+            return;
+          }
+        } catch (error) {
+          console.error('Erro ao processar demonstrativos do localStorage:', error);
         }
-        const batch = data || [];
-        clientesVolumetria.push(...batch);
-        console.log(`📦 Carregada página com ${batch.length} registros (offset ${offset})`);
-        if (batch.length < pageSize) break;
-        offset += pageSize;
-        if (offset > 200000) break; // guarda de segurança
       }
+      
+      // Fallback: Buscar da volumetria se não há demonstrativos
+      const { data: clientesVolumetria, error: errorVolumetria } = await supabase
+        .from('volumetria_mobilemed')
+        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
+        .eq('periodo_referencia', periodoSelecionado)
+        .not('"EMPRESA"', 'is', null)
+        .not('"EMPRESA"', 'eq', '')
+        .limit(50000); // Aumentar limite explicitamente
 
-      console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria.length} registros para período ${periodoSelecionado}`);
+      console.log(`🔍 Consulta volumetria retornou ${clientesVolumetria?.length || 0} registros para período ${periodoSelecionado}`);
+
+      if (errorVolumetria) {
+        console.error('❌ Erro na consulta volumetria:', errorVolumetria);
+        throw errorVolumetria;
+      }
 
       let clientesFinais: any[] = [];
       
@@ -749,28 +758,6 @@ export default function GerarFaturamento() {
       progresso: 10
     });
 
-    // RESETAR todos os status para "pendente" no início do processamento
-    setResultados((prev) => {
-      const novosResultados = prev.map(resultado => ({
-        ...resultado,
-        relatorioGerado: false, // Status Demonstrativo para pendente
-        emailEnviado: false,    // Status E-mail para pendente  
-        nfOmieGerada: false,    // Status NF Omie para pendente
-        dataProcessamento: new Date().toISOString(),
-      }));
-      
-      // Persistir no DB também
-      salvarResultadosDB(novosResultados);
-      return novosResultados;
-    });
-
-    // Resetar sets de controle
-    setDemonstrativosGeradosPorCliente(new Set());
-    setDemonstrativoGerado(false);
-    localStorage.setItem('demonstrativoGerado', 'false');
-
-    let progressoSimulado: NodeJS.Timeout | null = null;
-
     try {
       // Primeiro: Verificar quantos clientes únicos existem na volumetria
       console.log('🔍 [VERIFICACAO] Contando clientes únicos na volumetria...');
@@ -797,170 +784,149 @@ export default function GerarFaturamento() {
         progresso: 30
       });
 
-      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento-otimizado para período:', periodoSelecionado);
+      console.log('📡 [EDGE_FUNCTION] Chamando gerar-demonstrativos-faturamento em lotes para período:', periodoSelecionado);
 
-      // Usar função otimizada (processa e persiste no banco, com resumo correto)
-      setStatusProcessamento({
-        processando: true,
-        mensagem: `Calculando demonstrativos otimizados...`,
-        progresso: 45,
-      });
-
-      // Simular progresso durante processamento da edge function
-      progressoSimulado = setInterval(() => {
-        setStatusProcessamento(prev => {
-          if (!prev.processando || prev.progresso >= 85) return prev;
-          const novoProgresso = Math.min(prev.progresso + 5, 85);
-          return {
-            ...prev,
-            progresso: novoProgresso,
-            mensagem: novoProgresso < 60 ? 'Calculando preços dos exames...' :
-                     novoProgresso < 75 ? 'Aplicando regras de faturamento...' :
-                     'Finalizando cálculos...'
-          };
-        });
-      }, 2000); // Atualiza a cada 2 segundos
-
-      const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento-otimizado', {
-        body: {
-          periodo: periodoSelecionado,
-          forcar_recalculo: false,
-        },
-      });
-
-      // Parar simulação de progresso
-      clearInterval(progressoSimulado);
-
-      console.log('[OTIMIZADO] Data:', data);
-      console.log('[OTIMIZADO] Error:', error);
-
-      // Parar simulação de progresso
-      clearInterval(progressoSimulado);
-
-      if (error || !data?.success) {
-        console.error('❌ [ERRO] Erro na edge function (otimizado):', error?.message || data?.error);
-        throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+      // Processar em lotes para evitar timeout da Edge Function
+      const chunkSize = 20;
+      const chunks: string[][] = [];
+      for (let i = 0; i < clientesUnicosVolumetria.length; i += chunkSize) {
+        chunks.push(clientesUnicosVolumetria.slice(i, i + chunkSize));
       }
 
-      // Dados retornados pela função otimizada
-      const todosDemonstrativos = Array.isArray(data.demonstrativos) ? data.demonstrativos : [];
-      const resumoCombinado = data.resumo || {
-        total_clientes: todosDemonstrativos.length,
-        clientes_processados: todosDemonstrativos.length,
+      const todosDemonstrativos: any[] = [];
+      const todosAlertas: string[] = [];
+      let clientesProcessados = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const lote = chunks[i];
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Processando lote ${i + 1}/${chunks.length} (${lote.length} clientes)...`,
+          progresso: 30 + Math.round(((i) / chunks.length) * 35)
+        });
+
+        const { data, error } = await supabase.functions.invoke('gerar-demonstrativos-faturamento', {
+          body: {
+            periodo: periodoSelecionado,
+            clientes: lote
+          }
+        });
+
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Data:`, data);
+        console.log(`[LOTE ${i + 1}/${chunks.length}] Error:`, error);
+
+        if (error || !data?.success) {
+          console.error('❌ [ERRO] Erro na edge function (lote):', error?.message || data?.error);
+          throw new Error(error?.message || data?.error || 'Erro ao gerar demonstrativos');
+        }
+
+        clientesProcessados += data?.resumo?.clientes_processados || 0;
+        todosDemonstrativos.push(...(data?.demonstrativos || []));
+        if (Array.isArray(data?.alertas)) todosAlertas.push(...data.alertas);
+      }
+
+      // Montar resumo combinado e salvar no localStorage para manter fluxo atual
+      const resumoCombinado = {
+        total_clientes: clientesUnicosVolumetria.length,
+        clientes_processados: clientesProcessados,
         total_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.total_exames || 0), 0),
-        valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto_total || d.valor_bruto || 0), 0),
-        valor_impostos_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total_impostos || d.valor_impostos || 0), 0),
-        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_liquido || d.valor_total_faturamento || (d.valor_bruto_total - (d.valor_total_impostos || 0)) || 0), 0), // CORRIGIDO: sempre valor líquido
+        valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto || 0), 0),
+        valor_impostos_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_impostos || 0), 0),
+        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total || 0), 0),
         valor_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_exames || 0), 0),
         valor_franquias_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_franquia || 0), 0),
         valor_portal_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_portal_laudos || 0), 0),
         valor_integracao_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_integracao || 0), 0),
       };
 
-      const demonstrativosMapeados = todosDemonstrativos.map((d: any) => ({
-        cliente_id: d.cliente_id,
-        cliente_nome: d.cliente_nome,
-        periodo: periodoSelecionado,
-        total_exames: d.total_exames,
-        valor_exames: d.valor_exames,
-        valor_franquia: d.valor_franquia,
-        valor_portal_laudos: d.valor_portal_laudos,
-        valor_integracao: d.valor_integracao,
-        valor_bruto: d.valor_bruto_total,
-        valor_impostos: d.valor_total_impostos,
-        valor_total: d.valor_liquido || d.valor_total_faturamento || (d.valor_bruto_total - (d.valor_total_impostos || 0)), // CORRIGIDO: sempre usar valor líquido
-        detalhes_franquia: d.detalhes_franquia || {},
-        detalhes_exames: d.detalhes_exames || [],
-        detalhes_tributacao: {
-          simples_nacional: Boolean(d.parametros_utilizados?.eh_simples_nacional),
-          percentual_iss: d.percentual_iss,
-          valor_iss: d.valor_iss,
-          base_calculo: d.valor_bruto_total,
-        },
-        alertas: d.alertas || [],
-      }));
-
       const dadosParaSalvar = {
-        demonstrativos: demonstrativosMapeados,
+        demonstrativos: todosDemonstrativos,
         resumo: resumoCombinado,
         periodo: periodoSelecionado,
-        alertas: data.alertas || [],
-        timestamp: new Date().toISOString(),
+        alertas: todosAlertas,
+        timestamp: new Date().toISOString()
       };
       localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
-      console.log(`💾 Dados (otimizado) salvos no localStorage. Processados: ${resumoCombinado.clientes_processados}`);
+      console.log(`💾 Dados combinados salvos no localStorage. Lotes: ${chunks.length}, Processados: ${clientesProcessados}`);
 
       setStatusProcessamento({
         processando: true,
-        mensagem: 'Consolidando resultados...',
-        progresso: 90,
+        mensagem: 'Verificando se todos os clientes foram processados...',
+        progresso: 70
       });
 
-      if (!todosDemonstrativos || todosDemonstrativos.length === 0) {
-        console.warn('⚠️ Nenhum demonstrativo retornado na execução otimizada');
+      // Aguardar e verificar se demonstrativos foram salvos no localStorage
+      console.log('🔍 [VERIFICACAO] Aguardando geração dos demonstrativos...');
+      
+      let tentativas = 0;
+      const maxTentativas = 20; // 20 tentativas = até 1 minuto
+      let demonstrativosSalvos = false;
+      
+      while (tentativas < maxTentativas && !demonstrativosSalvos) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3 segundos
+        tentativas++;
+        
+        setStatusProcessamento({
+          processando: true,
+          mensagem: `Verificando demonstrativos gerados... (${tentativas}/${maxTentativas})`,
+          progresso: 70 + ((tentativas / maxTentativas) * 20)
+        });
+
+        console.log(`🔍 [VERIFICACAO] Tentativa ${tentativas}/${maxTentativas} - Verificando localStorage...`);
+        
+        // Verificar se demonstrativos foram salvos no localStorage corretamente
+        const demonstrativosLocalStorage = localStorage.getItem(`demonstrativos_completos_${periodoSelecionado}`);
+        if (demonstrativosLocalStorage) {
+          try {
+            const dados = JSON.parse(demonstrativosLocalStorage);
+            if (dados.demonstrativos && dados.demonstrativos.length > 0) {
+              console.log(`✅ [SUCESSO] Demonstrativos encontrados no localStorage: ${dados.demonstrativos.length} clientes`);
+              demonstrativosSalvos = true;
+              break;
+            }
+          } catch (error) {
+            console.warn('⚠️ [AVISO] Erro ao verificar localStorage:', error);
+          }
+        }
+        
+        console.log(`⏳ [AGUARDANDO] Tentativa ${tentativas}: ainda sem demonstrativos salvos, aguardando...`);
+      }
+
+      if (!demonstrativosSalvos) {
+        console.warn('⚠️ [TIMEOUT] Geração de demonstrativos não concluída dentro do tempo limite');
+        throw new Error('Timeout: A geração dos demonstrativos demorou mais que 1 minuto. Tente novamente.');
       }
 
       // Marcar demonstrativo como gerado
       setDemonstrativoGerado(true);
       localStorage.setItem('demonstrativoGerado', 'true');
 
-      // Atualizar "Status por Cliente" imediatamente e persistir no DB (relatorios_faturamento_status)
-      const clientesComDemonstrativo: string[] = todosDemonstrativos.map((d: any) => String(d.cliente_nome)).filter(Boolean);
-      const novosClientesSet = new Set<string>(clientesComDemonstrativo);
-      setDemonstrativosGeradosPorCliente(novosClientesSet);
-      localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientesSet)));
-
-      // Mesclar com resultados atuais - ATUALIZAR status APENAS dos clientes que foram processados
-      setResultados((prev) => {
-        const mapa = new Map<string, any>();
-        prev.forEach((r) => mapa.set(r.clienteNome, r));
-        
-        todosDemonstrativos.forEach((d: any) => {
-          const nome = d.cliente_nome;
-          const existente = mapa.get(nome);
-          const atualizado = {
-            clienteId: d.cliente_id || existente?.clienteId || '',
-            clienteNome: nome,
-            relatorioGerado: true,
-            emailEnviado: existente?.emailEnviado || false,
-            emailDestino: existente?.emailDestino || '',
-            linkRelatorio: existente?.linkRelatorio,
-            arquivos: existente?.arquivos,
-            dataProcessamento: new Date().toISOString(),
-            detalhesRelatorio: {
-              total_laudos: d.total_exames || 0,
-              valor_total: Number(d.valor_liquido || d.valor_total_faturamento || 0),
-            },
-          };
-          mapa.set(nome, atualizado);
-        });
-        
-        const arr = Array.from(mapa.values());
-        // Persistir no DB
-        salvarResultadosDB(arr);
-        return arr;
-      });
+      // ✅ Atualizar demonstrativosGeradosPorCliente com os clientes que tiveram demonstrativos gerados
+      const clientesComDemonstrativo = todosDemonstrativos.map(d => d.cliente_nome).filter(Boolean);
+      const novosClientes = new Set(clientesComDemonstrativo);
+      setDemonstrativosGeradosPorCliente(novosClientes);
+      // Persistir no localStorage
+      localStorage.setItem(`demonstrativosGerados_${periodoSelecionado}`, JSON.stringify(Array.from(novosClientes)));
 
       setStatusProcessamento({
         processando: false,
         mensagem: 'Demonstrativo gerado com sucesso!',
-        progresso: 100,
+        progresso: 100
       });
 
       toast({
-        title: 'Demonstrativo gerado!',
+        title: "Demonstrativo gerado!",
         description: `Demonstrativos completos gerados com sucesso para o período ${periodoSelecionado}`,
-        variant: 'default',
+        variant: "default",
       });
 
-      // Alertas da execução otimizada (se houver)
-      const alertas = Array.isArray(data?.alertas) ? data.alertas : [];
-      if (alertas.length > 0) {
+      // ✅ Mostrar alertas se houver clientes inativos com volumetria
+      if (todosAlertas && todosAlertas.length > 0) {
         setTimeout(() => {
           toast({
-            title: '⚠️ Alertas de Segurança',
-            description: `${alertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes no demonstrativo.`,
-            variant: 'destructive',
+            title: "⚠️ Alertas de Segurança",
+            description: `${todosAlertas.length} cliente(s) inativo(s)/cancelado(s) com volumetria detectado(s). Verifique os detalhes no demonstrativo.`,
+            variant: "destructive",
           });
         }, 1000);
       }
@@ -989,11 +955,6 @@ export default function GerarFaturamento() {
       });
     } finally {
       console.log('🏁 [FINALLY] Finalizando processo...');
-      // Garantir que o intervalo de progresso seja limpo
-      if (progressoSimulado) {
-        clearInterval(progressoSimulado);
-        progressoSimulado = null;
-      }
       setProcessandoTodos(false);
     }
   };
@@ -1020,21 +981,6 @@ export default function GerarFaturamento() {
     }
 
     setEnviandoEmails(true);
-    
-    // RESETAR status de emails para "pendente" no início do processamento
-    setResultados((prev) => {
-      const novosResultados = prev.map(resultado => ({
-        ...resultado,
-        emailEnviado: false,
-        emailDestino: resultado.emailDestino || '',
-        dataProcessamento: new Date().toISOString(),
-      }));
-      
-      // Persistir no DB também
-      salvarResultadosDB(novosResultados);
-      return novosResultados;
-    });
-    
     let enviados = 0;
     let errors = 0;
 
@@ -1174,25 +1120,6 @@ export default function GerarFaturamento() {
     console.log(`🚀 Gerando NFs para ${clientesParaNF.length} clientes selecionados:`, clientesParaNF.map(c => c.clienteNome));
 
     setGerandoNFOmie(true);
-
-    // RESETAR status de NF Omie para "pendente" nos clientes selecionados
-    const clientesParaReset = Array.from(clientesSelecionadosNF);
-    setResultados((prev) => {
-      const novosResultados = prev.map(resultado => 
-        clientesParaReset.includes(resultado.clienteNome)
-          ? {
-              ...resultado,
-              omieNFGerada: false,
-              nfOmieData: undefined,
-              dataProcessamento: new Date().toISOString(),
-            }
-          : resultado
-      );
-      
-      // Persistir no DB também
-      salvarResultadosDB(novosResultados);
-      return novosResultados;
-    });
 
     try {
       console.log('Gerando NFs no Omie para período:', periodoSelecionado);
@@ -1403,13 +1330,7 @@ export default function GerarFaturamento() {
           clientesParaProcessar = dados.demonstrativos
             .filter((demo: any) => {
               const total = Number(demo.total_exames ?? demo.total_laudos ?? demo.volume_total ?? 0);
-              const temValorMonetario = [
-                demo.valor_exames,
-                demo.valor_franquia,
-                demo.valor_portal_laudos,
-                demo.valor_integracao,
-              ].map((v: any) => Number(v || 0)).reduce((a, b) => a + b, 0) > 0;
-              return total > 0 || temValorMonetario;
+              return total > 0; // ✅ Somente clientes com volumetria
             })
             .map((demo: any) => ({
               id: demo.cliente_id || `temp-${demo.cliente_nome}`,
@@ -1438,20 +1359,6 @@ export default function GerarFaturamento() {
       processando: true,
       mensagem: 'Iniciando geração de relatórios...',
       progresso: 0
-    });
-
-    // RESETAR status de relatórios para "pendente" no início do processamento
-    setResultados((prev) => {
-      const novosResultados = prev.map(resultado => ({
-        ...resultado,
-        linkRelatorio: undefined,
-        arquivos: undefined,
-        dataProcessamento: new Date().toISOString(),
-      }));
-      
-      // Persistir no DB também
-      salvarResultadosDB(novosResultados);
-      return novosResultados;
     });
 
     try {
@@ -1996,48 +1903,22 @@ export default function GerarFaturamento() {
                   <FileBarChart2 className="h-4 w-4" />
                   Etapa 1: Gerar Demonstrativo de Faturamento Completo
                 </h4>
-                
-                {/* Botão e informações diretamente na Etapa 1 */}
-                <div className="flex flex-col lg:flex-row gap-4 items-start mb-4">
-                  <div className="flex flex-col gap-3">
-                    <Button 
-                      onClick={async () => {
-                        await gerarDemonstrativoFaturamento();
-                      }}
-                      disabled={processandoTodos || !periodoSelecionado}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {processandoTodos ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          Processando...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Gerar Demonstrativos
-                        </>
-                      )}
-                    </Button>
-                    <div className="text-sm text-blue-700">
-                      Período selecionado: <strong>{periodoSelecionado}</strong>
+                <div className="text-sm text-gray-600 mb-4">
+                  {demonstrativoGerado ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      ✅ Demonstrativo gerado com sucesso! Você pode prosseguir para a Etapa 2.
                     </div>
-                  </div>
-                  
-                  <div className="flex-1 text-sm text-blue-700">
-                    Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
-                  </div>
+                  ) : (
+                    <div className="text-blue-700">
+                      <FileBarChart2 className="h-4 w-4 inline mr-2" />
+                      Generate o demonstrativo completo com franquias para todos os clientes do período selecionado.
+                    </div>
+                  )}
                 </div>
 
-                {demonstrativoGerado && (
-                  <div className="text-sm text-green-600 flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4" />
-                    Demonstrativo gerado com sucesso
-                  </div>
-                )}
-
-                {/* Componente de geração de demonstrativos - apenas para exibir dados */}
-                <DemonstrativoFaturamentoCompleto
+                {/* Componente de geração de demonstrativos */}
+                <DemonstrativoFaturamentoCompleto 
                   periodo={periodoSelecionado} 
                   onDemonstrativosGerados={(dados) => {
                     console.log('🔄 Callback onDemonstrativosGerados recebido:');
@@ -2242,6 +2123,18 @@ export default function GerarFaturamento() {
                   </div>
                 </div>
                 
+                <div className="bg-white p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 text-purple-800 mb-2">
+                    <Zap className="h-4 w-4" />
+                    <span className="font-semibold text-sm">📋 Como usar:</span>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p>1. <strong>Selecione</strong> os clientes usando os checkboxes na coluna "Status NF Omie"</p>
+                    <p>2. <strong>Clique</strong> no botão "Gerar NFs Selecionadas" acima</p>
+                    <p>3. Apenas clientes com relatório gerado podem ser selecionados</p>
+                    <p>4. 🧪 <strong>MODO TESTE:</strong> Limitado aos clientes: COT, CORTREL, IMDBATATAIS, BROOKLIN</p>
+                  </div>
+                </div>
               </div>
 
             </CardContent>
@@ -2502,6 +2395,11 @@ export default function GerarFaturamento() {
         </TabsContent>
 
           </Tabs>
+          
+          {/* Seção de Diagnóstico */}
+          <div className="mt-8">
+            <DiagnosticoClientePrecos />
+          </div>
         </div>
       );
 }

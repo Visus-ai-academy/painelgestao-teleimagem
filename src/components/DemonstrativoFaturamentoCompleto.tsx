@@ -61,7 +61,7 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
   const { toast } = useToast();
 
   // Chave para localStorage baseada no período
-  const storageKey = `demonstrativos_completos_${periodo}`;
+  const storageKey = `demonstrativos_${periodo}`;
 
   // Carregar dados do localStorage ao montar o componente
   useEffect(() => {
@@ -205,21 +205,11 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
     setExpandedClients(newExpanded);
   };
 
-  const formatCurrency = (value: number | undefined | null) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return 'R$ 0,00';
-    }
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
-  };
-
-  const formatNumber = (value: number | undefined | null) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return '0';
-    }
-    return value.toLocaleString('pt-BR');
   };
 
   const getStatusBadge = (detalhes: any) => {
@@ -234,7 +224,43 @@ export function DemonstrativoFaturamentoCompleto({ periodo, onDemonstrativosGera
 
   return (
     <div className="space-y-6">
-      {/* Componente agora só exibe os dados, o botão foi movido para a Etapa 1 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Demonstrativos de Faturamento Completo
+          </CardTitle>
+          <CardDescription>
+            Gere demonstrativos incluindo valores de exames, franquias, portal de laudos e integração
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="text-sm text-muted-foreground">
+                Período selecionado: <strong>{periodo || 'Nenhum período selecionado'}</strong>
+              </div>
+            </div>
+            <Button 
+              onClick={handleGerarDemonstrativos}
+              disabled={loading || !periodo}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Gerar Demonstrativos
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ✅ MOVER PARA ABA DEMONSTRATIVOS: Remover daqui */}
       {false && resumo && (

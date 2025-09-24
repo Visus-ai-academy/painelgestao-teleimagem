@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { 
   FileSpreadsheet, 
   Download, 
@@ -18,12 +17,10 @@ import {
   Users,
   Calendar,
   FileText,
-  AlertTriangle,
-  Zap
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import DemonstrativoFaturamentoOtimizado from './DemonstrativoFaturamentoOtimizado';
 import * as XLSX from "xlsx";
 interface ClienteFaturamento {
   id: string;
@@ -72,7 +69,6 @@ export default function DemonstrativoFaturamento() {
   const [periodo, setPeriodo] = useState("2025-06"); // Período com dados carregados
   const [ordemAlfabetica, setOrdemAlfabetica] = useState(true);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
-  const [modoOtimizado, setModoOtimizado] = useState(true); // Usar versão otimizada por padrão
   const hasShownInitialToast = useRef(false);
   // Evita correções em loop: registra tentativas por período e status de execução
   const tcCorrectionTried = useRef<Set<string>>(new Set());
@@ -322,15 +318,15 @@ export default function DemonstrativoFaturamento() {
                    nome: nomeCliente,
                    email: emailCliente,
                    total_exames: demo.total_exames || 0,
-                   valor_bruto: Number(demo.valor_bruto_total ?? demo.valor_bruto ?? demo.valor_exames ?? 0),
-                    valor_liquido: Number(demo.valor_total_faturamento ?? demo.valor_liquido ?? (demo.valor_bruto_total ?? demo.valor_bruto ?? 0) - (demo.valor_total_impostos ?? demo.valor_impostos ?? 0)),
+                   valor_bruto: Number(demo.valor_bruto ?? demo.valor_exames ?? 0),
+                   valor_liquido: Number(demo.valor_total ?? demo.valor_liquido ?? 0),
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
                    // Não assumir CO-FT por padrão; vamos enriquecer com dados do banco abaixo
                    tipo_faturamento: demo.tipo_faturamento || undefined,
                    alertas: demo.alertas || [],
-                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_total_impostos || demo.valor_impostos || 0).toFixed(2)}`,
+                   observacoes: `Exames: ${demo.total_exames || 0} | Franquia: R$ ${(demo.valor_franquia || 0).toFixed(2)} | Portal: R$ ${(demo.valor_portal_laudos || 0).toFixed(2)} | Integração: R$ ${(demo.valor_integracao || 0).toFixed(2)} | Impostos: R$ ${(demo.valor_impostos || 0).toFixed(2)}`,
                    detalhes_exames: demo.detalhes_exames || []
                  };
                });
@@ -564,35 +560,34 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-             // Buscar TODOS os clientes com contratos ativos, excluindo NC-NF (LEFT join para não perder clientes da volumetria)
-             const { data: clientesCadastrados } = await supabase
-               .from('clientes')
-               .select(`
-                 id, 
-                 nome, 
-                 nome_fantasia, 
-                 nome_mobilemed, 
-                 email,
-                 ativo,
-                 status,
-                 contratos_clientes!left (
-                   tipo_faturamento,
-                   status
-                 )
-               `)
-               .eq('contratos_clientes.status', 'ativo')
-               .neq('contratos_clientes.tipo_faturamento', 'NC-NF');
+            // Buscar TODOS os clientes com contratos que precisam de demonstrativo (excluir NC-NF)
+            const { data: clientesCadastrados } = await supabase
+              .from('clientes')
+              .select(`
+                id, 
+                nome, 
+                nome_fantasia, 
+                nome_mobilemed, 
+                email,
+                ativo,
+                status,
+                contratos_clientes!inner (
+                  tipo_faturamento,
+                  status
+                )
+              `)
+              .eq('contratos_clientes.status', 'ativo'); // INCLUIR TODOS OS TIPOS (CO-FT, NC-FT, NC-NF)
             
-            console.log('🏢 Clientes encontrados com contratos ativos (exceto NC-NF):', clientesCadastrados?.length || 0);
+            console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
             
-            // Criar mapa de clientes por nome fantasia (ignorando NC-NF)
+            // Criar mapa de clientes por nome fantasia
             const clientesMapPorNome = new Map();
             clientesCadastrados?.forEach(cliente => {
+              // Adicionar tipo_faturamento do contrato ao cliente
               const clienteComTipo = {
                 ...cliente,
                 tipo_faturamento: cliente.contratos_clientes?.[0]?.tipo_faturamento
               };
-              if (clienteComTipo.tipo_faturamento === 'NC-NF') return; // excluir NC-NF
               if (cliente.nome_fantasia) clientesMapPorNome.set(cliente.nome_fantasia, clienteComTipo);
               if (cliente.nome) clientesMapPorNome.set(cliente.nome, clienteComTipo);
               if (cliente.nome_mobilemed) clientesMapPorNome.set(cliente.nome_mobilemed, clienteComTipo);
@@ -654,7 +649,6 @@ export default function DemonstrativoFaturamento() {
               
               let valorTotalCliente = 0;
               let temPrecoConfigurado = false;
-              const combinacoesSemPreco: string[] = [];
 
               // Obter como o volume deve ser considerado para este cliente
               let condVolume: string | null = null;
@@ -708,7 +702,7 @@ export default function DemonstrativoFaturamento() {
                       volumeRef = dadosCliente.total_exames;
                   }
 
-                  const { data: resultadoPreco } = await supabase.rpc('calcular_preco_exame', {
+                  const { data: precoCalculado } = await supabase.rpc('calcular_preco_exame', {
                     p_cliente_id: dadosCliente.cliente.id,
                     p_modalidade: combinacao.config.modalidade,
                     p_especialidade: combinacao.config.especialidade,
@@ -718,100 +712,20 @@ export default function DemonstrativoFaturamento() {
                     p_is_plantao: combinacao.config.is_plantao
                   });
                   
-                  const precoCalculado = resultadoPreco?.[0]?.valor_unitario || 0;
-                  
                   if (precoCalculado && precoCalculado > 0) {
                     const valorCombinacao = Number(precoCalculado) * combinacao.quantidade;
                     valorTotalCliente += valorCombinacao;
                     temPrecoConfigurado = true;
                     
                     console.log(`💰 ${clienteNome} - ${chave}: ${combinacao.quantidade} exames x R$ ${precoCalculado} = R$ ${valorCombinacao.toFixed(2)}`);
-                  } else {
-                    // Registrar combinação sem preço cadastrado
-                    combinacoesSemPreco.push(chave);
-                    console.warn(`⚠️ Exame sem preço cadastrado: ${clienteNome} - ${chave}`);
                   }
                 } catch (error) {
                   console.log(`Erro ao calcular preço para ${clienteNome} (${chave}):`, error);
                 }
               }
               
-              // Incluir cliente elegível (exceto NC-NF). Todos devem ter preço configurado
-              const tipoFat = (dadosCliente.cliente?.tipo_faturamento || 'Não definido') as string;
-              if (tipoFat === 'NC-NF') {
-                console.warn(`Cliente ${clienteNome} é NC-NF - ignorado em demonstrativo`);
-                continue;
-              }
-
-              // Identificar exames sem preço cadastrado
-              if (valorTotalCliente === 0 && combinacoesSemPreco.length > 0) {
-                // Verificar se cliente tem tipo NC-NF (não fatura)
-                if (tipoFat === 'NC-NF') {
-                  console.log(`ℹ️ Cliente ${clienteNome} é NC-NF - valor 0 esperado (não fatura)`);
-                  continue; // Não incluir no resumo
-                }
-                
-                // Para outros tipos (CO-FT, NC-FT), verificar se são exames configurados para não faturar
-                let examesComPrecoZeroConfigurado = 0;
-                const examesSemConfiguracaoReal: string[] = [];
-                
-                // Verificar cada combinação que retornou preço 0
-                for (const combo of combinacoesSemPreco) {
-                  const [modalidade, especialidade, prioridade, categoria] = combo.split('|');
-                  
-                  // Verificar se existe configuração de preço = 0 (intencional)
-                  const { data: precoZeroConfig } = await supabase
-                    .from('precos_servicos')
-                    .select('valor_base')
-                    .eq('cliente_id', dadosCliente.cliente.id)
-                    .eq('modalidade', modalidade)
-                    .eq('especialidade', especialidade)
-                    .eq('prioridade', prioridade)
-                    .eq('categoria', categoria)
-                    .eq('valor_base', 0)
-                    .eq('ativo', true)
-                    .maybeSingle();
-                    
-                  if (precoZeroConfig) {
-                    examesComPrecoZeroConfigurado++;
-                  } else {
-                    examesSemConfiguracaoReal.push(combo);
-                  }
-                }
-                
-                // Só alertar se há exames realmente sem configuração de preço
-                if (examesSemConfiguracaoReal.length > 0) {
-                  console.warn(`⚠️ Cliente ${clienteNome} - ${examesSemConfiguracaoReal.length} exames sem preço cadastrado:`, {
-                    cliente_id: dadosCliente.cliente.id,
-                    total_exames: dadosCliente.total_exames,
-                    exames_sem_preco: examesSemConfiguracaoReal,
-                    exames_config_zero: examesComPrecoZeroConfigurado,
-                    tipo_faturamento: tipoFat
-                  });
-                  
-                  // Incluir no resumo para visibilidade
-                  clientesMap.set(clienteNome, {
-                    id: dadosCliente.cliente.id,
-                    nome: clienteNome,
-                    email: dadosCliente.cliente.email || '',
-                    total_exames: dadosCliente.total_exames,
-                    valor_bruto: 0,
-                    valor_liquido: 0,
-                    periodo: periodo,
-                    status_pagamento: 'pendente' as const,
-                    data_vencimento: new Date().toISOString().split('T')[0],
-                    tipo_faturamento: tipoFat,
-                    observacoes: `${examesSemConfiguracaoReal.length} exames sem preço cadastrado: ${examesSemConfiguracaoReal.slice(0, 3).join(', ')}${examesSemConfiguracaoReal.length > 3 ? '...' : ''}`
-                  });
-                } else if (examesComPrecoZeroConfigurado > 0) {
-                  console.log(`ℹ️ Cliente ${clienteNome} - todos os ${examesComPrecoZeroConfigurado} exames têm preço 0 configurado intencionalmente (não faturados)`);
-                }
-                
-                continue;
-              }
-
-              // Incluir apenas clientes com valor > 0 (todos deveriam ter preço configurado)
-              if (valorTotalCliente > 0) {
+              // Só incluir cliente se tem preço configurado
+              if (temPrecoConfigurado && valorTotalCliente > 0) {
                 clientesMap.set(clienteNome, {
                   id: dadosCliente.cliente.id,
                   nome: clienteNome,
@@ -822,9 +736,11 @@ export default function DemonstrativoFaturamento() {
                   periodo: periodo,
                   status_pagamento: 'pendente' as const,
                   data_vencimento: new Date().toISOString().split('T')[0],
-                  tipo_faturamento: tipoFat,
+                  tipo_faturamento: dadosCliente.cliente.tipo_faturamento || 'Não definido',
                   observacoes: `Dados baseados na volumetria com preços calculados`
                 });
+              } else {
+                console.warn(`Cliente ${clienteNome} sem preço configurado - pulando`);
               }
             }
 
@@ -832,27 +748,8 @@ export default function DemonstrativoFaturamento() {
             console.log('📊 Clientes processados da volumetria:', clientesArray.length);
             console.log('📋 Primeiros 5 clientes:', clientesArray.slice(0, 5).map(c => ({ nome: c.nome, exames: c.total_exames, valor: c.valor_bruto })));
             
-            // Ajustar Valor Líquido considerando impostos (ISS + federais quando aplicável)
-            const clientesAtualizados = await Promise.all(clientesArray.map(async (c) => {
-              try {
-                const { data: contrato } = await supabase
-                  .from('contratos_clientes')
-                  .select('percentual_iss, impostos_ab_min, simples')
-                  .eq('cliente_id', c.id)
-                  .eq('status', 'ativo')
-                  .maybeSingle();
-                const perc = Number(contrato?.percentual_iss || 0);
-                const iss = Number((c.valor_bruto * (perc / 100)).toFixed(2));
-                const federais = contrato?.simples ? 0 : Number(contrato?.impostos_ab_min || 0);
-                const valorLiquido = Number((c.valor_bruto - iss - federais).toFixed(2));
-                return { ...c, valor_liquido: valorLiquido };
-              } catch {
-                return c; // fallback mantém valor_liquido atual
-              }
-            }));
-            
-            setClientes(clientesAtualizados);
-            setClientesFiltrados(clientesAtualizados);
+            setClientes(clientesArray);
+            setClientesFiltrados(clientesArray);
             
             // Mostrar toast apenas na primeira carga para evitar loop
             if (!hasShownInitialToast.current) {
@@ -897,7 +794,8 @@ export default function DemonstrativoFaturamento() {
             tipo_faturamento
           )
         `)
-         .eq('ativo', true);
+        .eq('ativo', true)
+        .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT']);
       
       if (errorContratos) {
         console.error('❌ Erro ao buscar contratos:', errorContratos);
