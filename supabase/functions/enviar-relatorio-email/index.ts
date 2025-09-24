@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// Remove Resend dependency to fix build errors
 const resendApiKey = Deno.env.get("RESEND_API_KEY");
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     // Verificar se o Resend está configurado
-    if (!resend || !resendApiKey) {
+    if (!resendApiKey) {
       console.error('RESEND_API_KEY não configurado ou inválido');
       console.log('RESEND_API_KEY está definido:', !!resendApiKey);
       throw new Error('Serviço de email não configurado. Configure a chave RESEND_API_KEY.');
@@ -132,22 +131,33 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Enviar email
-    const emailResponse = await resend.emails.send({
+    // Enviar email via fetch para Resend API
+    const emailPayload = {
       from: 'Teleimagem <financeiro@teleimagem.com.br>',
       reply_to: 'financeiro@teleimagem.com.br',
       to: [cliente.email],
       subject: assunto,
       html: html,
-      attachments: attachments.length > 0 ? attachments : undefined
+      ...(attachments.length > 0 && { attachments })
+    };
+
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
     });
 
-    console.log('Resposta do Resend:', emailResponse);
+    const emailResult = await emailResponse.json();
+
+    console.log('Resposta do Resend:', emailResult);
 
     // Verificar se houve erro na resposta
-    if (emailResponse.error) {
-      console.error('Erro detalhado do Resend:', emailResponse.error);
-      throw new Error(`Erro do Resend: ${emailResponse.error.message || JSON.stringify(emailResponse.error)}`);
+    if (!emailResponse.ok || emailResult.error) {
+      console.error('Erro detalhado do Resend:', emailResult);
+      throw new Error(`Erro do Resend: ${emailResult.error?.message || emailResult.message || 'Erro desconhecido'}`);
     }
 
     // Log do envio
@@ -166,7 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        email_id: emailResponse.data?.id,
+        email_id: emailResult.id,
         message: `Email enviado com sucesso para ${cliente.email}` 
       }),
       {

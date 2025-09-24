@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { Resend } from 'https://esm.sh/resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +11,7 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -119,17 +118,27 @@ Equipe de Cobrança
 Teleimagem A.I.
         `;
 
-        // Enviar email via Resend
-        if (resend) {
-          const emailResponse = await resend.emails.send({
+        // Enviar email via Resend API
+        if (resendApiKey) {
+          const emailPayload = {
             from: 'Teleimagem <onboarding@resend.dev>',
             reply_to: 'i.a.academybrasil@gmail.com',
             to: [fatura.cliente_email],
             subject: assunto,
             text: corpoEmail
+          };
+
+          const emailResponse = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailPayload),
           });
 
-          console.log(`Email enviado para ${fatura.cliente_email}:`, emailResponse);
+          const emailResult = await emailResponse.json();
+          console.log(`Email enviado para ${fatura.cliente_email}:`, emailResult);
         }
 
         // Registrar o envio do email
