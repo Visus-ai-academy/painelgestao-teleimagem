@@ -185,10 +185,7 @@ export default function TechWelcome() {
         {/* Logo/Title Area - Responsive positioning and sizing */}
         <div className="absolute left-1/2 top-[18%] md:left-[36%] md:top-[35%] transform -translate-x-1/2 -translate-y-1/2 text-center px-4 max-w-xs md:max-w-none z-20">
           <div className={`transform transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl leading-tight">
-              TeleImagem
-            </h1>
-            <p className="text-base sm:text-xl md:text-2xl text-cyan-100 mb-1 md:mb-4 font-orbitron font-light tracking-wide drop-shadow-lg">
+            <p className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 md:mb-6 font-orbitron tracking-wider drop-shadow-2xl leading-tight">
               Sistema de Gestão
             </p>
             <p className="text-xs sm:text-base md:text-lg text-blue-100 font-orbitron font-light drop-shadow-lg">
