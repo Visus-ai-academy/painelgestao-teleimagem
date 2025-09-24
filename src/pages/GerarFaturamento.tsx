@@ -873,7 +873,7 @@ export default function GerarFaturamento() {
             dataProcessamento: new Date().toISOString(),
             detalhesRelatorio: {
               total_laudos: d.total_exames || 0,
-              valor_total: Number(d.valor_total_faturamento || d.valor_liquido || 0),
+              valor_total: Number(d.valor_liquido || d.valor_total_faturamento || 0),
             },
           };
           mapa.set(nome, atualizado);
