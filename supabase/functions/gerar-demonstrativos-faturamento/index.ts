@@ -220,18 +220,27 @@ serve(async (req) => {
     // ✅ LISTA FINAL: apenas clientes ativos (já sem NC-NF) + inativos com volumetria (já filtrado NC-NF)
     let clientes = [...clientesAtivos, ...clientesInativosComVolumetria];
     
-    // ✅ Se veio filtro de clientes pelo corpo da requisição, aplicar aqui (aceita nome/nome_fantasia/id)
+    // ✅ Se veio filtro de clientes pelo corpo da requisição, aplicar aqui (aceita nome/nome_fantasia/id/nome_mobilemed com normalização)
     if (Array.isArray(clientesFiltro) && clientesFiltro.length > 0) {
+      const normalize = (s: any) => (s ?? '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .trim();
+
       const filtroSet = new Set(
         clientesFiltro
-          .map((v: any) => (v ?? '').toString().toUpperCase().trim())
+          .map((v: any) => normalize(v))
           .filter((v: string) => !!v)
       );
+
       clientes = clientes.filter((c: any) => {
-        const nome = (c.nome || '').toString().toUpperCase().trim();
-        const fantasia = (c.nome_fantasia || '').toString().toUpperCase().trim();
+        const nome = normalize(c.nome);
+        const fantasia = normalize(c.nome_fantasia);
+        const mobilemed = normalize(c.nome_mobilemed);
         const id = (c.id || '').toString().toUpperCase().trim();
-        return filtroSet.has(nome) || filtroSet.has(fantasia) || filtroSet.has(id);
+        return filtroSet.has(nome) || filtroSet.has(fantasia) || filtroSet.has(mobilemed) || filtroSet.has(id);
       });
     }
     

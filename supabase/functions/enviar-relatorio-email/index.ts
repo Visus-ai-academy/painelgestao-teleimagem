@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
-import React from 'npm:react@18.3.1';
-import { renderAsync } from 'npm:@react-email/components@0.0.22';
+import React from 'https://esm.sh/react@18.3.1';
+import { renderAsync } from 'https://esm.sh/@react-email/render@0.0.14';
 import { RelatorioFaturamentoEmail } from './_templates/relatorio-faturamento.tsx';
 
 const resendApiKey = Deno.env.get("RESEND_API_KEY");
