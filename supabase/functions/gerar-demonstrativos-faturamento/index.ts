@@ -398,14 +398,18 @@ serve(async (req) => {
         if (!clienteIdValido) {
           console.warn(`⚠️ Cliente sem ID válido no cadastro: ${cliente.nome_fantasia}. Preços/Parâmetros não serão aplicados.`);
         }
+        
+        // ✅ LOGS DETALHADOS PARA DEBUG
+        console.log(`📋 Cliente ${cliente.nome_fantasia}: ID = ${clienteIdValido}, Nomes = ${JSON.stringify(cliente.nomes_mobilemed)}`);
+        
         // Regras de exclusão: NC-NF não gera demonstrativo nem relatório
         if ((cliente.tipo_faturamento || '').toUpperCase() === 'NC-NF') {
           console.log(`⏭️ Ignorando cliente NC-NF: ${cliente.nome_fantasia}`);
           continue;
         }
 
-    // Buscar volumetria do período DIRETAMENTE no banco - mais eficiente
     console.log(`🔍 Buscando volumetria para cliente: ${cliente.nome_fantasia} no período ${periodo}`);
+    console.log(`🎯 Nomes de busca:`, cliente.nomes_mobilemed);
     
     // Buscar contrato ativo para aplicar filtros de faturamento (especialidades/modalidades) e condição de volume
     let contratoAtivo: any = null;
@@ -460,7 +464,17 @@ serve(async (req) => {
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', cliente.nomes_mobilemed)
         .not('"VALORES"', 'is', null)
+        .gt('"VALORES"', 0)
         .neq('tipo_faturamento', 'NC-NF'); // Excluir exames não faturáveis
+
+      console.log(`🔍 QUERY VOLUMETRIA para ${cliente.nome_fantasia}:`, {
+        periodo,
+        empresas_busca: cliente.nomes_mobilemed,
+        filtros_aplicados: {
+          especialidades: allowedEspecialidades,
+          modalidades: allowedModalidades
+        }
+      });
 
       // Aplicar filtros contratuais quando existirem
       if (allowedEspecialidades && allowedEspecialidades.length > 0) {
@@ -489,25 +503,39 @@ serve(async (req) => {
     console.log(`📊 Cliente ${cliente.nome_fantasia} (${cliente.nomes_mobilemed.join(', ')}): ${volumetria?.length || 0} registros encontrados na volumetria para período ${periodo}`);
     
     if (volumetria && volumetria.length > 0) {
-      // Log uma amostra dos dados encontrados
-      console.log(`📋 Amostra volumetria ${cliente.nome_fantasia}:`, volumetria.slice(0, 3).map(v => ({
+      // Log uma amostra dos dados encontrados para debug
+      console.log(`📋 Amostra volumetria ${cliente.nome_fantasia}:`, volumetria.slice(0, 2).map(v => ({
         modalidade: v.MODALIDADE,
         especialidade: v.ESPECIALIDADE,
         categoria: v.CATEGORIA,
         prioridade: v.PRIORIDADE,
         valores: v.VALORES,
         empresa: v.EMPRESA,
-        periodo: v.periodo_referencia
+        periodo: v.periodo_referencia,
+        tipo_faturamento: v.tipo_faturamento
       })));
+      
+      // ✅ LOG IMPORTANTE: Total de exames vs registros
+      const totalExamesCalculado = volumetria.reduce((sum, item) => sum + (item.VALORES || 0), 0);
+      console.log(`📊 RESUMO VOLUMETRIA ${cliente.nome_fantasia}: ${volumetria.length} registros → ${totalExamesCalculado} exames`);
     } else {
       console.warn(`⚠️ PROBLEMA: Nenhum dado de volumetria encontrado para ${cliente.nome_fantasia} no período ${periodo}`);
-      console.log(`🔍 Nomes MobileMed para busca:`, cliente.nomes_mobilemed);
+      console.log(`🔍 Detalhes da busca:`, {
+        periodo,
+        nomes_mobilemed: cliente.nomes_mobilemed,
+        filtros_especialidade: allowedEspecialidades,
+        filtros_modalidade: allowedModalidades
+      });
+      
+      // ✅ IMPORTANTE: Continuar processamento mesmo sem volumetria para evitar demonstrativos vazios
+      console.log(`➡️ Continuando processamento para ${cliente.nome_fantasia} mesmo sem volumetria...`);
     }
 
-        // ✅ CORREÇÃO: Contar por VALORES (exames reais), não por registros
+        // ✅ CORREÇÃO: Mesmo sem volumetria, criar demonstrativo com valores zerados
         const totalExames = volumetria?.reduce((sum, item) => sum + (item.VALORES || 0), 0) || 0;
+        const totalRegistros = volumetria?.length || 0;
         
-        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${volumetria?.length || 0} registros, ${totalExames} exames total`);
+        console.log(`📈 Cliente ${cliente.nome_fantasia}: ${totalRegistros} registros, ${totalExames} exames total`);
 
         // ✅ USAR CONDIÇÃO DE VOLUME CORRIGIDA DO CLIENTE
         const condVolume = cliente.cond_volume || 'MOD/ESP/CAT';

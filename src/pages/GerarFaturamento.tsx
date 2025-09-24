@@ -518,12 +518,15 @@ export default function GerarFaturamento() {
               clienteNome: cliente.nome,
               relatorioGerado: false,
               emailEnviado: false,
+              omieNFGerada: false,
               emailDestino: cliente.email,
-              tipo_faturamento: cliente.tipo_faturamento || 'Não definido'
+              tipo_faturamento: cliente.tipo_faturamento || 'CO-FT'
             }));
             setResultados(resultadosBase);
             salvarResultadosDB(resultadosBase);
-            return;
+            
+            console.log(`✅ ${resultadosBase.length} resultados base criados dos demonstrativos`);
+            return; // ✅ RETORNO VÁLIDO - Dados carregados com sucesso
           }
         } catch (error) {
           console.error('Erro ao processar demonstrativos do localStorage:', error);
