@@ -533,7 +533,7 @@ export default function GerarFaturamento() {
       // Fallback: Buscar da volumetria se não há demonstrativos
       const { data: clientesVolumetria, error: errorVolumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('"Cliente_Nome_Fantasia", "EMPRESA"')
+        .select('"EMPRESA"')
         .eq('periodo_referencia', periodoSelecionado)
         .not('"EMPRESA"', 'is', null)
         .not('"EMPRESA"', 'eq', '')
@@ -550,25 +550,18 @@ export default function GerarFaturamento() {
       
       // 🔄 ESTRATÉGIA CORRIGIDA: Usar Cliente_Nome_Fantasia + limpar_nome_cliente() + clientes ativos faturáveis
       
-      // 1️⃣ Buscar TODOS os nomes únicos da volumetria usando Cliente_Nome_Fantasia (já mapeado) ou EMPRESA com limpeza
+      // 1️⃣ Buscar TODOS os nomes únicos da volumetria usando EMPRESA (com limpeza aplicada)
       let nomesVolumetria = new Set<string>();
       if (clientesVolumetria && clientesVolumetria.length > 0) {
         console.log(`🔍 DEBUG: Primeiros 10 registros da volumetria:`, clientesVolumetria.slice(0, 10));
         
         clientesVolumetria.forEach(c => {
-          // Usar Cliente_Nome_Fantasia quando disponível, senão EMPRESA com limpeza
-          let nome = c.Cliente_Nome_Fantasia;
-          if (!nome) {
-            // Aplicar limpar_nome_cliente no EMPRESA se não há Cliente_Nome_Fantasia
-            nome = c.EMPRESA;
-            if (nome) {
-              // Aplicar as mesmas regras da função limpar_nome_cliente
-              nome = limparNomeCliente(nome);
-            }
-          }
-          
+          // Cliente_Nome_Fantasia está sempre vazio, usar apenas EMPRESA com limpeza
+          let nome = c.EMPRESA;
           if (nome && nome.trim()) {
-            nomesVolumetria.add(nome.trim());
+            // Aplicar as mesmas regras da função limpar_nome_cliente do banco
+            nome = limparNomeCliente(nome.trim());
+            nomesVolumetria.add(nome);
           }
         });
       }
