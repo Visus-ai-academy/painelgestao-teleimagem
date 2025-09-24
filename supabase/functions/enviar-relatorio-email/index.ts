@@ -1,9 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
-import React from 'https://esm.sh/react@18.3.1';
-import { renderAsync } from 'https://esm.sh/@react-email/render@0.0.14';
-import { RelatorioFaturamentoEmail } from './_templates/relatorio-faturamento.tsx';
 
 const resendApiKey = Deno.env.get("RESEND_API_KEY");
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
@@ -56,16 +53,71 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Cliente não possui email cadastrado');
     }
 
-    // Gerar HTML do email usando React Email
-    const html = await renderAsync(
-      React.createElement(RelatorioFaturamentoEmail, {
-        cliente_nome: cliente.nome,
-        periodo: relatorio.periodo,
-        total_laudos: relatorio.resumo.total_laudos,
-        valor_total: relatorio.resumo.valor_total,
-        valor_a_pagar: relatorio.resumo.valor_a_pagar
-      })
-    );
+    // Gerar HTML do email usando template
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Relatório de Volumetria - Faturamento ${relatorio.periodo}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background-color: #ffffff; }
+            .container { max-width: 580px; margin: 0 auto; }
+            .header { color: #333; font-size: 24px; font-weight: bold; text-align: center; margin: 30px 0; }
+            .text { color: #333; font-size: 16px; line-height: 26px; margin: 16px 0; }
+            .summary { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 20px; margin: 20px 0; }
+            .summary-label { color: #666; font-size: 14px; font-weight: bold; margin: 8px 0 4px 0; }
+            .summary-value { color: #333; font-size: 16px; margin: 0 0 12px 0; }
+            .summary-highlight { color: #28a745; font-size: 18px; font-weight: bold; margin: 0 0 12px 0; }
+            .warning { color: #856404; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; font-size: 14px; margin: 20px 0; }
+            .footer { color: #666; font-size: 14px; text-align: center; margin: 20px 0; }
+            .hr { border: none; border-top: 1px solid #e9ecef; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1 class="header">Relatório de Volumetria</h1>
+            
+            <p class="text">Prezados,</p>
+            
+            <p class="text">Segue lista de exames referente à nota fiscal citada no e-mail.</p>
+
+            <div class="summary">
+              <div class="summary-label">Cliente:</div>
+              <div class="summary-value">${cliente.nome}</div>
+              
+              <div class="summary-label">Período:</div>
+              <div class="summary-value">${relatorio.periodo}</div>
+              
+              <div class="summary-label">Total de Laudos:</div>
+              <div class="summary-value">${relatorio.resumo.total_laudos.toLocaleString()}</div>
+              
+              <div class="summary-label">Valor Total Faturado:</div>
+              <div class="summary-value">${relatorio.resumo.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+              
+              <div class="summary-label">Valor a Pagar:</div>
+              <div class="summary-highlight">${relatorio.resumo.valor_a_pagar.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+            </div>
+
+            <hr class="hr">
+
+            <div class="warning">
+              <strong>⚠️ Importante:</strong> Evite pagamento de juros e multa ou a suspensão 
+              dos serviços, quitando o pagamento no vencimento.
+            </div>
+
+            <hr class="hr">
+
+            <div class="footer">
+              Atenciosamente,<br>
+              <strong>Robson D'avila</strong><br>
+              Tel.: (41) 99255-1964
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
 
     const assunto = `Relatório de Volumetria - Faturamento ${relatorio.periodo}`;
     
