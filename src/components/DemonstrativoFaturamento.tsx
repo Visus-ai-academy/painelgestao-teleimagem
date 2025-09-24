@@ -323,7 +323,7 @@ export default function DemonstrativoFaturamento() {
                    email: emailCliente,
                    total_exames: demo.total_exames || 0,
                    valor_bruto: Number(demo.valor_bruto_total ?? demo.valor_bruto ?? demo.valor_exames ?? 0),
-                   valor_liquido: Number(demo.valor_total_faturamento ?? demo.valor_liquido ?? (demo.valor_bruto_total ?? demo.valor_bruto ?? 0) - (demo.valor_total_impostos ?? demo.valor_impostos ?? 0)),
+                    valor_liquido: Number(demo.valor_total_faturamento ?? demo.valor_liquido ?? (demo.valor_bruto_total ?? demo.valor_bruto ?? 0) - (demo.valor_total_impostos ?? demo.valor_impostos ?? 0)),
                    periodo: periodo,
                    status_pagamento: 'pendente' as const,
                    data_vencimento: new Date().toISOString().split('T')[0],
@@ -564,25 +564,25 @@ export default function DemonstrativoFaturamento() {
             // Processar dados da volumetria para criar demonstrativo usando NOME FANTASIA e cálculo correto
             const clientesMap = new Map<string, ClienteFaturamento>();
             
-            // Buscar TODOS os clientes com contratos que precisam de demonstrativo (excluir NC-NF)
-            const { data: clientesCadastrados } = await supabase
-              .from('clientes')
-              .select(`
-                id, 
-                nome, 
-                nome_fantasia, 
-                nome_mobilemed, 
-                email,
-                ativo,
-                status,
-                contratos_clientes!inner (
-                  tipo_faturamento,
-                  status
-                )
-              `)
-              .eq('contratos_clientes.status', 'ativo'); // INCLUIR TODOS OS TIPOS (CO-FT, NC-FT, NC-NF)
+             // Buscar TODOS os clientes com contratos ativos (incluindo TODOS os tipos)
+             const { data: clientesCadastrados } = await supabase
+               .from('clientes')
+               .select(`
+                 id, 
+                 nome, 
+                 nome_fantasia, 
+                 nome_mobilemed, 
+                 email,
+                 ativo,
+                 status,
+                 contratos_clientes!inner (
+                   tipo_faturamento,
+                   status
+                 )
+               `)
+               .eq('contratos_clientes.status', 'ativo'); // INCLUIR TODOS OS TIPOS
             
-            console.log('🏢 Clientes encontrados com tipo de faturamento CO-FT/NC-FT:', clientesCadastrados?.length || 0);
+            console.log('🏢 Clientes encontrados com contratos ativos:', clientesCadastrados?.length || 0);
             
             // Criar mapa de clientes por nome fantasia
             const clientesMapPorNome = new Map();
@@ -800,8 +800,7 @@ export default function DemonstrativoFaturamento() {
             tipo_faturamento
           )
         `)
-        .eq('ativo', true)
-        .in('contratos_clientes.tipo_faturamento', ['CO-FT', 'NC-FT']);
+         .eq('ativo', true);
       
       if (errorContratos) {
         console.error('❌ Erro ao buscar contratos:', errorContratos);
