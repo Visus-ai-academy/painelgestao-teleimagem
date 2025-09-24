@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
       .select(`
         id, nome, nome_fantasia, nome_mobilemed, ativo, status,
         contratos_clientes!inner (
-          id, status, tipo_faturamento, cond_volume, 
+          id, numero_contrato, status, tipo_faturamento, cond_volume, 
           percentual_iss, impostos_ab_min, simples
         ),
         parametros_faturamento (
@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
               .from('volumetria_mobilemed')
               .select('*')
               .eq('periodo_referencia', periodo)
-              .or(nomesArray.map(nome => `"Cliente_Nome_Fantasia".eq."${nome}","EMPRESA".eq."${nome}"`).join(','))
+              .or(nomesArray.map(nome => `"Cliente_Nome_Fantasia".eq.${nome},"EMPRESA".eq.${nome}`).join(','))
               .neq('arquivo_fonte', 'volumetria_onco_padrao');
             
             if (!error && dados && dados.length > 0) {
@@ -597,7 +597,48 @@ Deno.serve(async (req) => {
             resumo.clientes_regime_normal++;
           }
 
-          // Persistir de forma tolerante a falhas
+          // Persistir status 'calculado' imediatamente para manter consistência
+          try {
+            await supabase
+              .from('demonstrativos_faturamento_calculados')
+              .upsert({
+                periodo_referencia: periodo,
+                cliente_id: cliente.id,
+                cliente_nome: nomeCliente,
+                total_exames: totalExames,
+                total_registros: totalRegistros,
+                volume_referencia: totalExames,
+                condicao_volume: condicaoVolume,
+                valor_exames: valorExamesTotal,
+                valor_franquia: franquia.valor_franquia || 0,
+                valor_portal_laudos: franquia.valor_portal_laudos || 0,
+                valor_integracao: franquia.valor_integracao || 0,
+                valor_bruto_total: valorBrutoTotal,
+                percentual_iss: percentualISS,
+                valor_iss: valorISS,
+                impostos_ab_min: impostosAbMin,
+                valor_impostos_federais: valorImpostosFederais,
+                valor_total_impostos: valorTotalImpostos,
+                valor_liquido: valorLiquido,
+                valor_total_faturamento: valorLiquido, // CORRIGIDO: valor líquido (após impostos)
+                detalhes_franquia: franquia.detalhes_franquia || {},
+                detalhes_exames: detalhesExames,
+                parametros_utilizados: {
+                  contrato: contrato,
+                  parametros_faturamento: parametrosFaturamento,
+                  eh_simples_nacional: ehSimplesNacional
+                },
+                status: 'calculado',
+                calculado_em: new Date().toISOString(),
+                calculado_por: 'system'
+              }, { 
+                onConflict: 'periodo_referencia,cliente_id',
+                ignoreDuplicates: false 
+              });
+          } catch (persistError) {
+            console.warn(`⚠️ Erro ao persistir demonstrativo para ${nomeCliente}:`, persistError);
+            // Não bloquear processamento por erro de persistência
+          }
           const { error: insertError } = await supabase
             .from('demonstrativos_faturamento_calculados')
             .insert({

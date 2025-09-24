@@ -230,8 +230,8 @@ export default function GerarFaturamento() {
     const clientesAgrupados = new Map();
     
     for (const resultado of resultados) {
-      // Buscar dados de agrupamento no banco para cada cliente
-      const chaveAgrupamento = resultado.clienteNome; // Usar nome_fantasia como chave de agrupamento
+      // Buscar dados de agrupamento considerando nome_fantasia (já vem unificado da função)
+      const chaveAgrupamento = resultado.clienteNome; // Use nome unificado como chave
       
       if (!clientesAgrupados.has(chaveAgrupamento)) {
         clientesAgrupados.set(chaveAgrupamento, resultado);
