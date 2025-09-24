@@ -439,8 +439,8 @@ serve(async (req: Request) => {
       valorPortal = Number(demonstrativoData.valor_portal_laudos || 0);
       valorIntegracao = Number(demonstrativoData.valor_integracao || 0);
       totalImpostos = Number(demonstrativoData.valor_impostos || 0);
-      // VALOR A PAGAR deve descontar todos os impostos, franquias e taxas
-      valorAPagar = valorBrutoTotal - valorFranquia - valorPortal - valorIntegracao - totalImpostos;
+      // VALOR A PAGAR deve descontar apenas os impostos (franquia/portal/integração já compõem o bruto)
+      valorAPagar = parseFloat((valorBrutoTotal - totalImpostos).toFixed(2));
     } else {
       // Calcular resumo usando dados de faturamento ou volumetria
       const isFaturamentoDataLocal = finalData.length > 0 && finalData[0].hasOwnProperty('valor');
