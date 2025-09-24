@@ -547,7 +547,7 @@ export default function GerarFaturamento() {
       if (clientesVolumetria && clientesVolumetria.length > 0) {
         // ✅ USAR Cliente_Nome_Fantasia quando disponível, senão EMPRESA
         let nomesUnicos = [...new Set(clientesVolumetria.map(c => c.Cliente_Nome_Fantasia || c.EMPRESA).filter(Boolean))];
-        console.log(`📊 Clientes únicos encontrados na volumetria (antes de filtrar NC-NF): ${nomesUnicos.length}`);
+        console.log(`📊 Clientes únicos encontrados na volumetria (inicial): ${nomesUnicos.length}`, nomesUnicos.slice(0, 10).concat(nomesUnicos.length > 10 ? ['...'] : []));
 
         // 🔎 Remover clientes NC-NF (via parâmetros ou contrato) da lista
         try {
@@ -566,6 +566,7 @@ export default function GerarFaturamento() {
             .eq('tipo_faturamento', 'NC-NF');
 
           const idsNC = Array.from(new Set([...(pfNC?.map(p => p.cliente_id) || []), ...(ccNC?.map(c => c.cliente_id) || [])].filter(Boolean)));
+          console.log(`🔍 IDs de clientes NC-NF encontrados: ${idsNC.length}`, idsNC);
 
           let nomesNC = new Set<string>();
           if (idsNC.length > 0) {
@@ -573,17 +574,35 @@ export default function GerarFaturamento() {
               .from('clientes')
               .select('nome, nome_fantasia, nome_mobilemed')
               .in('id', idsNC);
+            
+            console.log(`🔍 Clientes NC-NF para filtrar:`, clientesNC);
+            
             const normalize = (s?: string) => (s || '').trim().toUpperCase();
             (clientesNC || []).forEach(c => {
               [c.nome, c.nome_fantasia, c.nome_mobilemed].forEach(n => {
                 const k = normalize(n);
-                if (k) nomesNC.add(k);
+                if (k) {
+                  nomesNC.add(k);
+                  console.log(`🚫 Adicionando cliente NC-NF para filtrar: ${k}`);
+                }
               });
             });
           }
 
+          console.log(`🔍 Total de nomes NC-NF para filtrar: ${nomesNC.size}`, Array.from(nomesNC));
+          const nomesAntesDoFiltro = nomesUnicos.length;
+          
           const normalize = (s?: string) => (s || '').trim().toUpperCase();
-          nomesUnicos = nomesUnicos.filter(n => !nomesNC.has(normalize(n)));
+          nomesUnicos = nomesUnicos.filter(n => {
+            const normalizado = normalize(n);
+            const deveFiltrar = nomesNC.has(normalizado);
+            if (deveFiltrar) {
+              console.log(`🚫 Filtrando cliente NC-NF: ${n} (${normalizado})`);
+            }
+            return !deveFiltrar;
+          });
+          
+          console.log(`📊 Filtro NC-NF: ${nomesAntesDoFiltro} → ${nomesUnicos.length} clientes (removidos: ${nomesAntesDoFiltro - nomesUnicos.length})`);
         } catch (e) {
           console.warn('Falha ao filtrar NC-NF:', e);
         }
@@ -633,6 +652,7 @@ export default function GerarFaturamento() {
           }
         });
         clientesFinais = Array.from(clientesUnicos.values());
+        console.log(`✅ Clientes finais após deduplicação: ${clientesFinais.length}`, clientesFinais.map(c => c.nome));
       } else {
         console.log('⚠️ Nenhum cliente encontrado na volumetria para o período:', periodoSelecionado);
         toast({
