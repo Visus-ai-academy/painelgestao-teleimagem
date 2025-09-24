@@ -552,6 +552,7 @@ export default function GerarFaturamento() {
       
       // 1️⃣ Buscar TODOS os nomes únicos da volumetria usando EMPRESA (com limpeza aplicada)
       let nomesVolumetria = new Set<string>();
+      let nomesVolumetriaKeys = new Set<string>();
       if (clientesVolumetria && clientesVolumetria.length > 0) {
         console.log(`🔍 DEBUG: Primeiros 10 registros da volumetria:`, clientesVolumetria.slice(0, 10));
         
@@ -562,6 +563,7 @@ export default function GerarFaturamento() {
             // Aplicar as mesmas regras da função limpar_nome_cliente do banco
             nome = limparNomeCliente(nome.trim());
             nomesVolumetria.add(nome);
+            nomesVolumetriaKeys.add(normalizarChaveNome(nome));
           }
         });
       }
@@ -628,7 +630,7 @@ export default function GerarFaturamento() {
       console.log(`📊 Total combinado (volumetria + ativos): ${todosNomes.size}`);
 
       // 🔍 DEBUG: Verificar intersecção entre volumetria e clientes ativos
-      const intersecao = Array.from(nomesClientesAtivos).filter(nome => nomesVolumetria.has(nome));
+      const intersecao = Array.from(nomesClientesAtivos).filter(nome => nomesVolumetriaKeys.has(normalizarChaveNome(nome)));
       console.log(`🔍 DEBUG: Clientes que aparecem tanto na volumetria quanto no cadastro ativo: ${intersecao.length}`, intersecao.slice(0, 10));
 
       // 4️⃣ Remover apenas clientes NC-NF
@@ -698,7 +700,7 @@ export default function GerarFaturamento() {
           const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
           
           // 🔍 DEBUG: Verificar se cliente realmente tem volumetria
-          const temVolumetriaReal = nomesVolumetria.has(nomeCliente);
+          const temVolumetriaReal = nomesVolumetriaKeys.has(normalizarChaveNome(nomeCliente));
           console.log(`🔍 DEBUG: Cliente "${nomeCliente}" tem volumetria? ${temVolumetriaReal}`);
           
           clientesTemp.push({
@@ -734,8 +736,8 @@ export default function GerarFaturamento() {
             id: `cliente-${nomeCliente.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30)}`,
             nome: nomeCliente,
             email: `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
-            temVolumetria: nomesVolumetria.has(nomeCliente),
-            tipo: nomesVolumetria.has(nomeCliente) ? 'volumetria' : 'cadastro'
+            temVolumetria: nomesVolumetriaKeys.has(normalizarChaveNome(nomeCliente)),
+            tipo: nomesVolumetriaKeys.has(normalizarChaveNome(nomeCliente)) ? 'volumetria' : 'cadastro'
           });
         }
         clientesFinais = clientesTemp;
@@ -797,6 +799,13 @@ export default function GerarFaturamento() {
         }
         
         return nomeLimpo.trim();
+      }
+
+      // Normaliza nome para comparação (remove acentos, espaços e símbolos, upper)
+      function normalizarChaveNome(nome: string): string {
+        if (!nome) return '';
+        const semAcento = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return semAcento.toUpperCase().replace(/[^A-Z0-9]/g, '');
       }
 
       console.log(`✅ ${clientesFinais.length} clientes faturáveis encontrados (volumetria + cadastro):`, clientesFinais.map(c => `${c.nome} (${c.tipo})`));
