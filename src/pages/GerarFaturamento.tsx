@@ -549,6 +549,8 @@ export default function GerarFaturamento() {
       // 1️⃣ Buscar TODOS os nomes únicos da volumetria usando Cliente_Nome_Fantasia (já mapeado) ou EMPRESA com limpeza
       let nomesVolumetria = new Set<string>();
       if (clientesVolumetria && clientesVolumetria.length > 0) {
+        console.log(`🔍 DEBUG: Primeiros 10 registros da volumetria:`, clientesVolumetria.slice(0, 10));
+        
         clientesVolumetria.forEach(c => {
           // Usar Cliente_Nome_Fantasia quando disponível, senão EMPRESA com limpeza
           let nome = c.Cliente_Nome_Fantasia;
@@ -566,7 +568,8 @@ export default function GerarFaturamento() {
           }
         });
       }
-      console.log(`📊 Clientes únicos na volumetria: ${nomesVolumetria.size}`, Array.from(nomesVolumetria).slice(0, 10));
+      console.log(`📊 Clientes únicos na volumetria para período ${periodoSelecionado}: ${nomesVolumetria.size}`);
+      console.log(`📊 Primeiros 10 nomes da volumetria:`, Array.from(nomesVolumetria).slice(0, 10));
 
       // 2️⃣ Buscar clientes ativos CO-FT e NC-FT no cadastro (usando nome_fantasia)
       let nomesClientesAtivos = new Set<string>();
@@ -579,6 +582,8 @@ export default function GerarFaturamento() {
         if (errorAtivos) {
           console.error('❌ Erro ao buscar clientes ativos:', errorAtivos);
         } else if (clientesAtivos) {
+          console.log(`🔍 DEBUG: Total de clientes ativos no cadastro: ${clientesAtivos.length}`);
+          
           // Buscar parâmetros para identificar tipos CO-FT e NC-FT
           const { data: parametros } = await supabase
             .from('parametros_faturamento')
@@ -598,10 +603,14 @@ export default function GerarFaturamento() {
             ...(contratos?.map(c => c.cliente_id) || [])
           ]);
 
+          console.log(`🔍 DEBUG: IDs com parâmetros/contratos CO-FT ou NC-FT: ${idsPermitidos.size}`);
+
           // Se não há configurações explícitas, assumir que todos são CO-FT (padrão)
           const clientesFiltrados = idsPermitidos.size > 0 
             ? clientesAtivos.filter(c => idsPermitidos.has(c.id))
             : clientesAtivos;
+
+          console.log(`🔍 DEBUG: Clientes filtrados após aplicar tipos faturamento: ${clientesFiltrados.length}`);
 
           clientesFiltrados.forEach(c => {
             // Priorizar nome_fantasia, depois nome
@@ -614,11 +623,16 @@ export default function GerarFaturamento() {
       } catch (e) {
         console.warn('⚠️ Falha ao buscar clientes ativos:', e);
       }
-      console.log(`📊 Clientes ativos faturáveis: ${nomesClientesAtivos.size}`, Array.from(nomesClientesAtivos).slice(0, 10));
+      console.log(`📊 Clientes ativos faturáveis: ${nomesClientesAtivos.size}`);
+      console.log(`📊 Primeiros 10 nomes clientes ativos:`, Array.from(nomesClientesAtivos).slice(0, 10));
 
       // 3️⃣ Combinar volumetria + clientes ativos
       const todosNomes = new Set([...nomesVolumetria, ...nomesClientesAtivos]);
       console.log(`📊 Total combinado (volumetria + ativos): ${todosNomes.size}`);
+
+      // 🔍 DEBUG: Verificar intersecção entre volumetria e clientes ativos
+      const intersecao = Array.from(nomesClientesAtivos).filter(nome => nomesVolumetria.has(nome));
+      console.log(`🔍 DEBUG: Clientes que aparecem tanto na volumetria quanto no cadastro ativo: ${intersecao.length}`, intersecao.slice(0, 10));
 
       // 4️⃣ Remover apenas clientes NC-NF
       try {
@@ -639,6 +653,8 @@ export default function GerarFaturamento() {
           ...(ccNC?.map(c => c.cliente_id) || [])
         ].filter(Boolean)));
 
+        console.log(`🔍 DEBUG: IDs de clientes NC-NF: ${idsNC.length}`);
+
         let nomesNC = new Set<string>();
         if (idsNC.length > 0) {
           const { data: clientesNC } = await supabase
@@ -655,6 +671,8 @@ export default function GerarFaturamento() {
             });
           });
         }
+
+        console.log(`🔍 DEBUG: Nomes NC-NF para filtrar: ${nomesNC.size}`, Array.from(nomesNC));
 
         // Filtrar NC-NF da lista final
         const nomesFinais = Array.from(todosNomes).filter(nome => !nomesNC.has(nome));
@@ -682,17 +700,28 @@ export default function GerarFaturamento() {
 
           const clienteId = emailCliente?.[0]?.id || gerarIdValido(nomeCliente);
           
+          // 🔍 DEBUG: Verificar se cliente realmente tem volumetria
+          const temVolumetriaReal = nomesVolumetria.has(nomeCliente);
+          console.log(`🔍 DEBUG: Cliente "${nomeCliente}" tem volumetria? ${temVolumetriaReal}`);
+          
           clientesTemp.push({
             id: clienteId,
             nome: nomeCliente,
             email: emailCliente?.[0]?.email || `${nomeCliente.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.com`,
-            temVolumetria: nomesVolumetria.has(nomeCliente),
-            tipo: nomesVolumetria.has(nomeCliente) ? 'volumetria' : 'cadastro'
+            temVolumetria: temVolumetriaReal,
+            tipo: temVolumetriaReal ? 'volumetria' : 'cadastro'
           });
         }
 
         clientesFinais = clientesTemp;
-        console.log(`✅ Clientes finais: ${clientesFinais.length}`, clientesFinais.slice(0, 5).map(c => `${c.nome} (${c.tipo})`));
+        
+        // 🔍 DEBUG: Contagem final
+        const comVolumetria = clientesFinais.filter(c => c.temVolumetria).length;
+        const semVolumetria = clientesFinais.filter(c => !c.temVolumetria).length;
+        console.log(`✅ Clientes finais: ${clientesFinais.length} (${comVolumetria} com volumetria, ${semVolumetria} só cadastro)`);
+        console.log(`✅ Primeiros 5 clientes com volumetria:`, clientesFinais.filter(c => c.temVolumetria).slice(0, 5).map(c => c.nome));
+        console.log(`✅ Primeiros 5 clientes sem volumetria:`, clientesFinais.filter(c => !c.temVolumetria).slice(0, 5).map(c => c.nome));
+        
       } catch (e) {
         console.warn('Falha ao filtrar NC-NF:', e);
         // Em caso de erro, usar todos os nomes combinados
