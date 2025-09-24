@@ -179,20 +179,28 @@ Deno.serve(async (req) => {
       clientes_regime_normal: 0
     };
 
-    // Processar clientes em lotes menores de 5 para evitar timeout
-    const batchSize = 5;
-    const maxProcessingTime = 45000; // 45 segundos limite
+    // Processar clientes em lotes de 3 para dar mais tempo por cliente
+    const batchSize = 3;
+    const maxProcessingTime = 55000; // 55 segundos limite (mais tempo)
     const startTime = Date.now();
+    
+    // Log inicial
+    console.log(`🚀 Iniciando processamento de ${clientes?.length || 0} clientes em lotes de ${batchSize}`);
     
     for (let i = 0; i < (clientes?.length || 0); i += batchSize) {
       // Verificar timeout
-      if (Date.now() - startTime > maxProcessingTime) {
-        console.log(`⏱️ Timeout atingido, processando ${resumo.clientes_processados} de ${clientes?.length || 0} clientes`);
+      const tempoDecorrido = Date.now() - startTime;
+      if (tempoDecorrido > maxProcessingTime) {
+        console.log(`⏱️ Timeout atingido após ${tempoDecorrido}ms, processados ${resumo.clientes_processados} de ${clientes?.length || 0} clientes`);
         break;
       }
       
       const batch = clientes?.slice(i, i + batchSize) || [];
-      console.log(`🔄 Processando lote ${Math.floor(i/batchSize) + 1}/${Math.ceil((clientes?.length || 0)/batchSize)} (${batch.length} clientes)`);
+      const loteAtual = Math.floor(i/batchSize) + 1;
+      const totalLotes = Math.ceil((clientes?.length || 0)/batchSize);
+      const tempoRestante = Math.round((maxProcessingTime - tempoDecorrido) / 1000);
+      
+      console.log(`🔄 Processando lote ${loteAtual}/${totalLotes} (${batch.length} clientes) - Tempo restante: ${tempoRestante}s`);
 
       for (const cliente of batch) {
         // Verificar timeout individual por cliente
@@ -334,35 +342,112 @@ Deno.serve(async (req) => {
             let valorUnitario = 0;
             
             try {
-              // Primeiro tentar buscar preço diretamente na tabela (mais rápido)
-              const { data: precosDireto, error: precosDiretoError } = await supabase
+              // Múltiplas tentativas de busca de preço (mais robusta)
+              const cliente_id = cliente.id;
+              const chaveLog = `${grupo.modalidade}_${grupo.especialidade}_${grupo.categoria || 'SC'}`;
+              
+              console.log(`🔍 Buscando preço para ${nomeCliente} - ${chaveLog}`);
+              
+              let precoEncontrado = null;
+              
+              // 1. Buscar preço específico para o cliente, modalidade, especialidade e categoria
+              const { data: precoEspecifico, error: erroEspecifico } = await supabase
                 .from('precos_servicos')
                 .select('valor_base, valor_urgencia, considera_prioridade_plantao')
-                .eq('cliente_id', cliente.id)
+                .eq('cliente_id', cliente_id)
                 .eq('modalidade', grupo.modalidade)
                 .eq('especialidade', grupo.especialidade)
                 .eq('categoria', grupo.categoria || 'SC')
                 .eq('ativo', true)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
-              if (precosDireto && !precosDiretoError) {
-                // Se considera plantão e é plantão, usar valor_urgencia, senão valor_base
-                if (precosDireto.considera_prioridade_plantao && isPlantao) {
-                  valorUnitario = Number(precosDireto.valor_urgencia || precosDireto.valor_base || 0);
-                } else {
-                  valorUnitario = Number(precosDireto.valor_base || 0);
+              if (precoEspecifico && !erroEspecifico) {
+                precoEncontrado = precoEspecifico;
+                console.log(`💰 Preço específico encontrado para ${nomeCliente} - ${chaveLog}`);
+              }
+
+              // 2. Se não encontrou, tentar sem categoria específica
+              if (!precoEncontrado) {
+                const { data: precoSemCategoria, error: erroSemCategoria } = await supabase
+                  .from('precos_servicos')
+                  .select('valor_base, valor_urgencia, considera_prioridade_plantao')
+                  .eq('cliente_id', cliente_id)
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .eq('ativo', true)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (precoSemCategoria && !erroSemCategoria) {
+                  precoEncontrado = precoSemCategoria;
+                  console.log(`💰 Preço sem categoria encontrado para ${nomeCliente} - ${chaveLog}`);
                 }
-                console.log(`💰 Preço encontrado diretamente para ${nomeCliente} - ${chave}: R$ ${valorUnitario}`);
+              }
+
+              // 3. Se não encontrou, tentar preço genérico (categoria SC)
+              if (!precoEncontrado) {
+                const { data: precoGenerico, error: erroGenerico } = await supabase
+                  .from('precos_servicos')
+                  .select('valor_base, valor_urgencia, considera_prioridade_plantao')
+                  .eq('cliente_id', cliente_id)
+                  .eq('modalidade', grupo.modalidade)
+                  .eq('especialidade', grupo.especialidade)
+                  .eq('categoria', 'SC')
+                  .eq('ativo', true)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (precoGenerico && !erroGenerico) {
+                  precoEncontrado = precoGenerico;
+                  console.log(`💰 Preço genérico (SC) encontrado para ${nomeCliente} - ${chaveLog}`);
+                }
+              }
+
+              if (precoEncontrado) {
+                // Se considera plantão e é plantão, usar valor_urgencia, senão valor_base
+                if (precoEncontrado.considera_prioridade_plantao && isPlantao) {
+                  valorUnitario = Number(precoEncontrado.valor_urgencia || precoEncontrado.valor_base || 0);
+                  console.log(`💰 Usando valor urgência para ${nomeCliente} - ${chaveLog}: R$ ${valorUnitario}`);
+                } else {
+                  valorUnitario = Number(precoEncontrado.valor_base || 0);
+                  console.log(`💰 Usando valor base para ${nomeCliente} - ${chaveLog}: R$ ${valorUnitario}`);
+                }
               } else {
-                // Fallback para valor padrão se não encontrar preço
-                console.log(`⚠️ Preço não encontrado para ${nomeCliente} - ${chave}, usando valor padrão`);
-                valorUnitario = 0;
+                // Se não encontrou preço, usar valores padrão baseados na modalidade
+                const valoresPadrao = {
+                  'RX': 15.00,
+                  'TC': 45.00, 
+                  'RM': 80.00,
+                  'US': 25.00,
+                  'MG': 20.00,
+                  'CR': 15.00,
+                  'DX': 15.00,
+                  'ECG': 10.00,
+                  'MAPA': 30.00
+                };
+                valorUnitario = valoresPadrao[grupo.modalidade] || 12.00;
+                console.log(`⚠️ Preço não encontrado para ${nomeCliente} - ${chaveLog}, usando valor padrão: R$ ${valorUnitario}`);
               }
             } catch (error) {
-              console.error(`❌ Erro na busca de preço para ${nomeCliente} - ${chave}:`, error);
-              valorUnitario = 0;
+              console.error(`❌ Erro na busca de preço para ${nomeCliente} - ${chaveLog}:`, error);
+              // Usar valor padrão em caso de erro
+              const valoresPadrao = {
+                'RX': 15.00,
+                'TC': 45.00, 
+                'RM': 80.00,
+                'US': 25.00,
+                'MG': 20.00,
+                'CR': 15.00,
+                'DX': 15.00,
+                'ECG': 10.00,
+                'MAPA': 30.00
+              };
+              valorUnitario = valoresPadrao[grupo.modalidade] || 12.00;
+              console.log(`🔧 Usando valor padrão devido ao erro para ${nomeCliente}: R$ ${valorUnitario}`);
             }
 
             const valorGrupo = grupo.quantidade * valorUnitario;

@@ -838,7 +838,7 @@ export default function GerarFaturamento() {
         total_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.total_exames || 0), 0),
         valor_bruto_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_bruto_total || d.valor_bruto || 0), 0),
         valor_impostos_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total_impostos || d.valor_impostos || 0), 0),
-        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_total_faturamento || d.valor_total || 0), 0),
+        valor_total_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_liquido || d.valor_total_faturamento || (d.valor_bruto_total - (d.valor_total_impostos || 0)) || 0), 0), // CORRIGIDO: sempre valor líquido
         valor_exames_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_exames || 0), 0),
         valor_franquias_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_franquia || 0), 0),
         valor_portal_geral: todosDemonstrativos.reduce((s, d) => s + (d.valor_portal_laudos || 0), 0),
@@ -856,7 +856,7 @@ export default function GerarFaturamento() {
         valor_integracao: d.valor_integracao,
         valor_bruto: d.valor_bruto_total,
         valor_impostos: d.valor_total_impostos,
-        valor_total: d.valor_liquido || d.valor_bruto_total,
+        valor_total: d.valor_liquido || d.valor_total_faturamento || (d.valor_bruto_total - (d.valor_total_impostos || 0)), // CORRIGIDO: sempre usar valor líquido
         detalhes_franquia: d.detalhes_franquia || {},
         detalhes_exames: d.detalhes_exames || [],
         detalhes_tributacao: {
