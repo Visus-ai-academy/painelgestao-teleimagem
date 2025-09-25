@@ -118,22 +118,49 @@ serve(async (req) => {
       }
 
       // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
-      const clientesComAgrupamento = ['PRN', 'CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'];
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
       
-      if (clientesComAgrupamento.includes(nomeFantasia) && (!volumetria || volumetria.length === 0)) {
-        console.log(`Aplicando agrupamento para ${nomeFantasia}`);
+      if ((!volumetria || volumetria.length === 0)) {
+        console.log(`Verificando se ${nomeFantasia} precisa de agrupamento...`);
         
         let padroesBusca: string[] = [];
         
+        // Agrupamento específico por padrão
         if (nomeFantasia === 'PRN') {
           padroesBusca = ['PRN%'];
         } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
           padroesBusca = ['CEDI%'];
         }
+        // Agrupamentos por sufixos comuns  
+        else if (nomeFantasia === 'CDI_HCMINEIROS') {
+          padroesBusca = ['CDI_HCMINEIROS%'];
+        } else if (nomeFantasia === 'CDMINEIROS') {
+          padroesBusca = ['CDMINEIROS%'];
+        } else if (nomeFantasia === 'GDI') {
+          padroesBusca = ['GDI%'];
+        } else if (nomeFantasia === 'RADIOCOR') {
+          padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
+        } else if (nomeFantasia === 'NL_RADIOCOR') {
+          padroesBusca = ['NL_RADIOCOR%'];
+        } else if (nomeFantasia === 'INTERCOR') {
+          padroesBusca = ['INTERCOR%'];
+        } else if (nomeFantasia === 'RMPADUA') {
+          padroesBusca = ['PADUA%'];
+        } else if (nomeFantasia === 'VIVERCLIN') {
+          padroesBusca = ['VIVERCLIN%'];
+        }
+        // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
+        else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
+          // Tentar buscar variações do nome fantasia
+          padroesBusca = [
+            `${nomeFantasia}%`, 
+            `${nomeFantasia}_%`, 
+            `${nomeFantasia}-%`
+          ];
+        }
         
         if (padroesBusca.length > 0) {
-          console.log(`Buscando por padrões:`, padroesBusca);
+          console.log(`Aplicando agrupamento para ${nomeFantasia} com padrões:`, padroesBusca);
           
           for (const padrao of padroesBusca) {
             const { data: volumetriaAgrupada } = await supabase
@@ -144,14 +171,29 @@ serve(async (req) => {
             
             if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
               volumetria = (volumetria || []).concat(volumetriaAgrupada);
+              console.log(`Encontrados ${volumetriaAgrupada.length} registros com padrão ${padrao}`);
             }
           }
         }
       }
 
-      if (!volumetria || volumetria.length === 0) {
-        console.log(`Sem volumetria para ${cliente.nome} (${nomeFantasia}) nas chaves:`, nomesBusca);
-        continue;
+      // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
+      if (nomeFantasia === 'CEDIDIAG' && volumetria && volumetria.length > 0) {
+        console.log(`Aplicando filtro específico CEDIDIAG: apenas Medicina Interna`);
+        volumetria = volumetria.filter(vol => {
+          const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString();
+          
+          // Apenas Medicina Interna
+          const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA') || especialidade.includes('MEDICINA_INTERNA');
+          
+          // Excluir Dr. Rodrigo Vaz Lima (verificar variações do nome)
+          const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima') || 
+                                  medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO LIMA');
+          
+          return isMedicinaInterna && !isExcludedDoctor;
+        });
+        console.log(`CEDIDIAG: Após filtro específico: ${volumetria.length} registros`);
       }
 
       console.log(`Encontrada volumetria: ${volumetria.length} registros`);

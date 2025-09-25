@@ -165,31 +165,59 @@ serve(async (req: Request) => {
           dataVolumetria = dataVolumetriaEmpresa;
         } else {
           // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
-          const clientesComAgrupamento = ['PRN', 'CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'];
           const nomeFantasia = cliente.nome_fantasia || cliente.nome;
           
-          if (clientesComAgrupamento.includes(nomeFantasia)) {
-            console.log(`📊 Aplicando agrupamento para ${nomeFantasia}`);
+          console.log(`📊 Verificando agrupamento para ${nomeFantasia}...`);
+          
+          let padroesBusca: string[] = [];
+          
+          // Agrupamento específico por padrão
+          if (nomeFantasia === 'PRN') {
+            padroesBusca = ['PRN%'];
+          } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
+            padroesBusca = ['CEDI%'];
+          }
+          // Agrupamentos por sufixos comuns  
+          else if (nomeFantasia === 'CDI_HCMINEIROS') {
+            padroesBusca = ['CDI_HCMINEIROS%'];
+          } else if (nomeFantasia === 'CDMINEIROS') {
+            padroesBusca = ['CDMINEIROS%'];
+          } else if (nomeFantasia === 'GDI') {
+            padroesBusca = ['GDI%'];
+          } else if (nomeFantasia === 'RADIOCOR') {
+            padroesBusca = ['RADIOCOR%', 'NL_RADIOCOR%'];
+          } else if (nomeFantasia === 'NL_RADIOCOR') {
+            padroesBusca = ['NL_RADIOCOR%'];
+          } else if (nomeFantasia === 'INTERCOR') {
+            padroesBusca = ['INTERCOR%'];
+          } else if (nomeFantasia === 'RMPADUA') {
+            padroesBusca = ['PADUA%'];
+          } else if (nomeFantasia === 'VIVERCLIN') {
+            padroesBusca = ['VIVERCLIN%'];
+          }
+          // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
+          else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
+            padroesBusca = [
+              `${nomeFantasia}%`, 
+              `${nomeFantasia}_%`, 
+              `${nomeFantasia}-%`
+            ];
+          }
+          
+          if (padroesBusca.length > 0) {
+            console.log(`📊 Aplicando agrupamento para ${nomeFantasia} com padrões:`, padroesBusca);
             
-            let padraoBusca = '';
-            if (nomeFantasia === 'PRN') {
-              padraoBusca = 'PRN%';
-            } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
-              padraoBusca = 'CEDI%';
-            }
-            
-            if (padraoBusca) {
-              console.log(`📊 Buscando por padrão: ${padraoBusca}`);
+            for (const padrao of padroesBusca) {
               const { data: dataVolumetriaAgrupada } = await supabase
                 .from('volumetria_mobilemed')
                 .select('*')
                 .eq('periodo_referencia', periodo)
-                .like('"EMPRESA"', padraoBusca)
+                .like('"EMPRESA"', padrao)
                 .neq('tipo_faturamento', 'NC-NF');
               
-              console.log(`📊 Volumetria (Agrupada) encontrada: ${dataVolumetriaAgrupada?.length || 0} registros`);
               if (dataVolumetriaAgrupada && dataVolumetriaAgrupada.length > 0) {
-                dataVolumetria = dataVolumetriaAgrupada;
+                dataVolumetria = (dataVolumetria || []).concat(dataVolumetriaAgrupada);
+                console.log(`📊 Encontrados ${dataVolumetriaAgrupada.length} registros com padrão ${padrao}`);
               }
             }
           }
@@ -198,6 +226,26 @@ serve(async (req: Request) => {
       
       if (dataVolumetria && dataVolumetria.length > 0) {
         dataFaturamento = dataVolumetria;
+        
+        // REGRA ESPECÍFICA CEDIDIAG: apenas Medicina Interna, excluindo médico específico
+        const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+        if (nomeFantasia === 'CEDIDIAG') {
+          console.log(`📊 Aplicando filtro específico CEDIDIAG: apenas Medicina Interna`);
+          dataFaturamento = dataFaturamento.filter((vol: any) => {
+            const especialidade = (vol.ESPECIALIDADE || '').toString().toUpperCase();
+            const medico = (vol.MEDICO || '').toString();
+            
+            // Apenas Medicina Interna
+            const isMedicinaInterna = especialidade.includes('MEDICINA INTERNA') || especialidade.includes('MEDICINA_INTERNA');
+            
+            // Excluir Dr. Rodrigo Vaz Lima (verificar variações do nome)
+            const isExcludedDoctor = medico.includes('Rodrigo Vaz') || medico.includes('Rodrigo Lima') || 
+                                    medico.includes('RODRIGO VAZ') || medico.includes('RODRIGO LIMA');
+            
+            return isMedicinaInterna && !isExcludedDoctor;
+          });
+          console.log(`📊 CEDIDIAG: Após filtro específico: ${dataFaturamento.length} registros`);
+        }
       }
     }
 
