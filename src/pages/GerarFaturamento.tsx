@@ -2396,18 +2396,6 @@ export default function GerarFaturamento() {
                   </div>
                 </div>
                 
-                <div className="bg-white p-4 rounded-lg border border-purple-200">
-                  <div className="flex items-center gap-2 text-purple-800 mb-2">
-                    <Zap className="h-4 w-4" />
-                    <span className="font-semibold text-sm">📋 Como usar:</span>
-                  </div>
-                  <div className="space-y-1 text-sm text-gray-700">
-                    <p>1. <strong>Selecione</strong> os clientes usando os checkboxes na coluna "Status NF Omie"</p>
-                    <p>2. <strong>Clique</strong> no botão "Gerar NFs Selecionadas" acima</p>
-                    <p>3. Apenas clientes com relatório gerado podem ser selecionados</p>
-                    <p>4. 🧪 <strong>MODO TESTE:</strong> Limitado aos clientes: COT, CORTREL, IMDBATATAIS, BROOKLIN</p>
-                  </div>
-                </div>
               </div>
 
             </CardContent>
