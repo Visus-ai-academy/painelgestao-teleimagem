@@ -274,131 +274,220 @@ serve(async (req: Request) => {
       }
     }
 
-    // Configurar PDF
-    const pdf = new jsPDF();
+    // Configurar PDF com modelo profissional
+    const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 20;
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+    let yPos = margin;
 
+    // === CABEÇALHO PRINCIPAL ===
     // Adicionar logomarca se disponível
     if (logoDataUrl) {
       try {
-        pdf.addImage(logoDataUrl, 'JPEG', margin, 10, 40, 20);
+        pdf.addImage(logoDataUrl, 'JPEG', margin, yPos, 50, 20);
       } catch (e) {
         console.log('Erro ao adicionar logo ao PDF:', e);
       }
     }
+    
+    // Título principal (lado direito)
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(18);
+    pdf.setTextColor(44, 62, 80); // Azul escuro
+    pdf.text('DEMONSTRATIVO DE FATURAMENTO', pageWidth - margin, yPos + 10, { align: 'right' });
+    
+    yPos += 35;
+    
+    // Linha separadora
+    pdf.setDrawColor(52, 152, 219); // Azul
+    pdf.setLineWidth(1);
+    pdf.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
 
-    // Cabeçalho
-    pdf.setFontSize(16);
-    pdf.text('RELATÓRIO DE FATURAMENTO', pageWidth - margin, 20, { align: 'right' });
-
-    // Informações do cliente
-    pdf.setFontSize(12);
-    pdf.text(`Cliente: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin, 40);
-    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || '')}`, margin, 50);
-    pdf.text(`Período: ${periodo}`, margin, 60);
-
-    // Resumo financeiro
+    // === INFORMAÇÕES DO CLIENTE ===
+    pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(14);
-    pdf.text('RESUMO FINANCEIRO', margin, 80);
+    pdf.setTextColor(52, 73, 94); 
+    pdf.text('DADOS DO CLIENTE', margin, yPos);
+    yPos += 8;
     
-    pdf.setFontSize(10);
-    let yPos = 90;
+    // Caixa de informações do cliente
+    pdf.setFillColor(245, 245, 245);
+    pdf.rect(margin, yPos - 3, contentWidth, 25, 'F');
+    pdf.setDrawColor(189, 195, 199);
+    pdf.rect(margin, yPos - 3, contentWidth, 25);
     
-    // Usar dados do demonstrativo se disponível
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(44, 62, 80);
+    
+    pdf.text(`CLIENTE: ${dadosRelatorio.cliente_nome || cliente.nome}`, margin + 5, yPos + 5);
+    pdf.text(`CNPJ: ${formatarCNPJ(dadosRelatorio.cliente_cnpj || cliente.cnpj || 'Não informado')}`, margin + 5, yPos + 12);
+    pdf.text(`PERÍODO DE REFERÊNCIA: ${periodo}`, margin + 5, yPos + 19);
+    
+    yPos += 35;
+
+    // === RESUMO EXECUTIVO ===
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(52, 73, 94);
+    pdf.text('RESUMO EXECUTIVO', margin, yPos);
+    yPos += 8;
+    
+    // Caixa do resumo executivo
+    pdf.setFillColor(236, 240, 241);
+    const resumoHeight = 40;
+    pdf.rect(margin, yPos - 3, contentWidth, resumoHeight, 'F');
+    pdf.setDrawColor(189, 195, 199);
+    pdf.rect(margin, yPos - 3, contentWidth, resumoHeight);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(44, 62, 80);
+    
+    let resumoY = yPos + 5;
+    
     if (demonstrativoData) {
-      pdf.text(`Total de Exames: ${demonstrativoData.total_exames}`, margin, yPos);
-      yPos += 10;
-      pdf.text(`Valor dos Exames: R$ ${demonstrativoData.valor_exames?.toFixed(2) || '0,00'}`, margin, yPos);
-      yPos += 10;
+      // Linha 1: Exames e Valor dos Exames
+      pdf.text(`Total de Exames Realizados: ${demonstrativoData.total_exames || 0}`, margin + 5, resumoY);
+      pdf.text(`Valor dos Exames: R$ ${(demonstrativoData.valor_exames || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
+      resumoY += 7;
       
-      if (demonstrativoData.valor_franquia > 0) {
-        pdf.text(`Valor da Franquia: R$ ${demonstrativoData.valor_franquia.toFixed(2)}`, margin, yPos);
-        yPos += 10;
+      // Linha 2: Franquia e Portal (se aplicável)
+      if (demonstrativoData.valor_franquia > 0 || demonstrativoData.valor_portal_laudos > 0) {
+        if (demonstrativoData.valor_franquia > 0) {
+          pdf.text(`Franquia: R$ ${demonstrativoData.valor_franquia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+        }
+        if (demonstrativoData.valor_portal_laudos > 0) {
+          pdf.text(`Portal de Laudos: R$ ${demonstrativoData.valor_portal_laudos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
+        }
+        resumoY += 7;
       }
       
-      if (demonstrativoData.valor_portal_laudos > 0) {
-        pdf.text(`Portal de Laudos: R$ ${demonstrativoData.valor_portal_laudos.toFixed(2)}`, margin, yPos);
-        yPos += 10;
-      }
-      
+      // Linha 3: Integração (se aplicável)
       if (demonstrativoData.valor_integracao > 0) {
-        pdf.text(`Integração: R$ ${demonstrativoData.valor_integracao.toFixed(2)}`, margin, yPos);
-        yPos += 10;
+        pdf.text(`Integração: R$ ${demonstrativoData.valor_integracao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+        resumoY += 7;
       }
       
-      pdf.text(`Valor Bruto: R$ ${demonstrativoData.valor_bruto?.toFixed(2) || '0,00'}`, margin, yPos);
-      yPos += 10;
+      // Linha separadora
+      pdf.setDrawColor(127, 140, 141);
+      pdf.line(margin + 5, resumoY, pageWidth - margin - 5, resumoY);
+      resumoY += 5;
       
-      if (demonstrativoData.valor_impostos > 0) {
-        pdf.text(`Impostos: R$ ${demonstrativoData.valor_impostos.toFixed(2)}`, margin, yPos);
-        yPos += 10;
-      }
+      // Valores finais
+      pdf.text(`Valor Bruto Total: R$ ${(demonstrativoData.valor_bruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+      pdf.text(`Total de Impostos: R$ ${(demonstrativoData.valor_impostos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + contentWidth/2, resumoY);
+      resumoY += 7;
       
+      // Valor líquido destacado
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
-      pdf.text(`VALOR LÍQUIDO: R$ ${demonstrativoData.valor_total?.toFixed(2) || '0,00'}`, margin, yPos);
-      yPos += 15;
+      pdf.setTextColor(231, 76, 60); // Vermelho para destaque
+      pdf.text(`VALOR LÍQUIDO A FATURAR: R$ ${(demonstrativoData.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
       
-      // Detalhes de tributação se disponível
-      if (demonstrativoData.detalhes_tributacao) {
-        pdf.setFontSize(10);
-        const trib = demonstrativoData.detalhes_tributacao;
-        pdf.text(`Regime: ${trib.simples_nacional ? 'Simples Nacional' : 'Regime Normal'}`, margin, yPos);
-        yPos += 10;
-        
-        if (trib.percentual_iss) {
-          pdf.text(`ISS: ${trib.percentual_iss}% - R$ ${trib.valor_iss?.toFixed(2) || '0,00'}`, margin, yPos);
-          yPos += 10;
-        }
-        
-        if (trib.valor_irrf) {
-          pdf.text(`IRRF: 1,5% - R$ ${trib.valor_irrf.toFixed(2)}`, margin, yPos);
-          yPos += 10;
-        }
-        
-        yPos += 10;
-      }
     } else {
       // Fallback para dados básicos
-      pdf.text(`Total de Exames: ${totalLaudos}`, margin, yPos);
-      yPos += 10;
-      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toFixed(2)}`, margin, yPos);
-      yPos += 10;
-      pdf.text(`Impostos: R$ ${totalImpostos.toFixed(2)}`, margin, yPos);
-      yPos += 10;
+      pdf.text(`Total de Exames: ${totalLaudos}`, margin + 5, resumoY);
+      resumoY += 7;
+      pdf.text(`Valor Bruto: R$ ${valorBrutoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+      resumoY += 7;
+      pdf.text(`Impostos: R$ ${totalImpostos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+      resumoY += 7;
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`VALOR A PAGAR: R$ ${valorAPagar.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, resumoY);
+    }
+    
+    yPos += resumoHeight + 15;
+
+    // === INFORMAÇÕES TRIBUTÁRIAS ===
+    if (demonstrativoData?.detalhes_tributacao) {
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
-      pdf.text(`VALOR A PAGAR: R$ ${valorAPagar.toFixed(2)}`, margin, yPos);
-      yPos += 15;
+      pdf.setTextColor(52, 73, 94);
+      pdf.text('INFORMAÇÕES TRIBUTÁRIAS', margin, yPos);
+      yPos += 8;
+      
+      const trib = demonstrativoData.detalhes_tributacao;
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(44, 62, 80);
+      
+      pdf.text(`• Regime Tributário: ${trib.simples_nacional ? 'Simples Nacional' : 'Regime Normal'}`, margin + 5, yPos);
+      yPos += 6;
+      
+      if (trib.percentual_iss) {
+        pdf.text(`• ISS (${trib.percentual_iss}%): R$ ${(trib.valor_iss || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
+        yPos += 6;
+      }
+      
+      if (trib.valor_irrf && trib.valor_irrf > 0) {
+        pdf.text(`• IRRF (1,5%): R$ ${trib.valor_irrf.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
+        yPos += 6;
+      }
+      
+      if (trib.impostos_ab_min && trib.impostos_ab_min > 0) {
+        pdf.text(`• Imposto Mínimo Aplicado: R$ ${trib.impostos_ab_min.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, margin + 5, yPos);
+        yPos += 6;
+      }
+      
+      yPos += 10;
     }
 
-    // Tabela de detalhes (se há dados)
+    // === DETALHAMENTO DOS SERVIÇOS ===
     if (finalData.length > 0) {
-      pdf.setFontSize(10);
-      pdf.text('DETALHES POR ESPECIALIDADE/MODALIDADE:', margin, yPos);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.setTextColor(52, 73, 94);
+      pdf.text('DETALHAMENTO DOS SERVIÇOS', margin, yPos);
       yPos += 10;
       
       // Cabeçalho da tabela
+      const headerHeight = 8;
+      const rowHeight = 7;
+      const colWidths = [25, 45, 25, 15, 25, 25]; // Modalidade, Especialidade, Categoria, Qtd, V.Unit, V.Total
       const headers = ['Modalidade', 'Especialidade', 'Categoria', 'Qtd', 'Valor Unit.', 'Valor Total'];
-      const colWidths = [30, 40, 25, 20, 25, 30];
-      let xPos = margin;
       
+      // Fundo do cabeçalho
+      pdf.setFillColor(52, 152, 219); // Azul
+      pdf.rect(margin, yPos - 2, contentWidth, headerHeight, 'F');
+      
+      // Texto do cabeçalho
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(255, 255, 255); // Branco
+      
+      let xPos = margin + 2;
       headers.forEach((header, i) => {
-        pdf.text(header, xPos, yPos);
+        pdf.text(header, xPos, yPos + 4);
         xPos += colWidths[i];
       });
       
-      yPos += 5;
-      pdf.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 5;
+      yPos += headerHeight + 2;
       
-      // Dados da tabela (primeiros 20 para não estourar página)
-      const dadosTabela = finalData.slice(0, 20);
+      // Dados da tabela
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(44, 62, 80);
       
-      dadosTabela.forEach((item) => {
-        if (yPos > pageHeight - 30) return; // Evitar sair da página
+      let alternateRow = false;
+      finalData.forEach((item, index) => {
+        if (yPos > pageHeight - 20) {
+          // Nova página se necessário
+          pdf.addPage();
+          yPos = margin;
+        }
         
-        xPos = margin;
+        // Fundo alternado para linhas
+        if (alternateRow) {
+          pdf.setFillColor(248, 249, 250);
+          pdf.rect(margin, yPos - 1, contentWidth, rowHeight, 'F');
+        }
+        
+        xPos = margin + 2;
         const modalidade = demonstrativoData ? item.modalidade : (item.MODALIDADE || item.modalidade || '');
         const especialidade = demonstrativoData ? item.especialidade : (item.ESPECIALIDADE || item.especialidade || '');
         const categoria = demonstrativoData ? item.categoria : (item.CATEGORIA || item.categoria || 'SC');
@@ -406,20 +495,53 @@ serve(async (req: Request) => {
         const valorUnit = demonstrativoData ? item.valor_unitario : (item.valor_unitario || 0);
         const valorTotal = demonstrativoData ? item.valor_total : (item.valor_total || item.valor || 0);
         
-        pdf.text(modalidade.substring(0, 15), xPos, yPos);
+        // Truncar textos longos
+        pdf.text(modalidade.toString().substring(0, 10), xPos, yPos + 3);
         xPos += colWidths[0];
-        pdf.text(especialidade.substring(0, 20), xPos, yPos);
+        pdf.text(especialidade.toString().substring(0, 18), xPos, yPos + 3);
         xPos += colWidths[1];
-        pdf.text(categoria.substring(0, 12), xPos, yPos);
+        pdf.text(categoria.toString().substring(0, 10), xPos, yPos + 3);
         xPos += colWidths[2];
-        pdf.text(quantidade.toString(), xPos, yPos);
+        pdf.text(quantidade.toString(), xPos, yPos + 3);
         xPos += colWidths[3];
-        pdf.text(`R$ ${Number(valorUnit).toFixed(2)}`, xPos, yPos);
+        pdf.text(`R$ ${Number(valorUnit).toFixed(2)}`, xPos, yPos + 3);
         xPos += colWidths[4];
-        pdf.text(`R$ ${Number(valorTotal).toFixed(2)}`, xPos, yPos);
+        pdf.text(`R$ ${Number(valorTotal).toFixed(2)}`, xPos, yPos + 3);
         
-        yPos += 8;
+        yPos += rowHeight;
+        alternateRow = !alternateRow;
       });
+      
+      yPos += 10;
+    }
+
+    // === RODAPÉ ===
+    yPos = pageHeight - 40;
+    
+    // Linha separadora
+    pdf.setDrawColor(52, 152, 219);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(127, 140, 141);
+    pdf.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, yPos);
+    pdf.text('Sistema de Gestão Teleimagem', pageWidth - margin, yPos, { align: 'right' });
+    yPos += 6;
+    pdf.text('Este documento é válido apenas para o período especificado', margin, yPos);
+    
+    // Numeração de páginas
+    const totalPages = pdf.internal.pages.length - 1;
+    if (totalPages > 1) {
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(127, 140, 141);
+        pdf.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      }
     }
 
     // Salvar PDF no storage
