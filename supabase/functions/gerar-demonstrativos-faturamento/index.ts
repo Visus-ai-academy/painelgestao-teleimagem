@@ -341,7 +341,13 @@ serve(async (req) => {
         tipo_faturamento: tipoFaturamento
       };
 
-      demonstrativos.push(demonstrativo);
+      // Só incluir no demonstrativo se houver valor total > 0
+      if (valorTotal > 0) {
+        demonstrativos.push(demonstrativo);
+        console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
+      } else {
+        console.log(`Cliente ${cliente.nome} excluído do demonstrativo - valor total zero`);
+      }
       console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
     }
 

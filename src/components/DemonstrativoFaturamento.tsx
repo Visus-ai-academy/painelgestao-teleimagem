@@ -307,7 +307,7 @@ export default function DemonstrativoFaturamento() {
             
             // ✅ Converter formato dos demonstrativos completos para o formato esperado
             const clientesRaw: ClienteFaturamento[] = dados.demonstrativos
-              .filter((demo: any) => demo && (demo.cliente_nome || demo.nome_cliente)) // aceitar ambos
+              .filter((demo: any) => demo && (demo.cliente_nome || demo.nome_cliente) && demo.valor_total > 0) // Filtrar valor_total > 0
               .map((demo: any) => {
                 const nomeCliente = demo.cliente_nome || demo.nome_cliente || 'Cliente sem nome';
                 const emailCliente = demo.cliente_email || demo.email_cliente || 

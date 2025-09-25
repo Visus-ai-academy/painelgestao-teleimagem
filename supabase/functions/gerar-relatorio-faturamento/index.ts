@@ -128,7 +128,8 @@ serve(async (req: Request) => {
       .from('faturamento')
       .select('*, accession_number, cliente_nome_original')
       .eq('cliente_nome', cliente.nome_fantasia || cliente.nome) // Usar nome_fantasia prioritariamente
-      .eq('periodo_referencia', periodo);
+      .eq('periodo_referencia', periodo)
+      .gt('valor', 0); // Filtrar apenas registros com valor > 0
 
     console.log(`📊 Faturamento encontrado: ${dataFaturamento?.length || 0} registros`);
     
