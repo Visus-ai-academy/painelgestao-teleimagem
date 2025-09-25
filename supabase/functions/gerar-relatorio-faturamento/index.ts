@@ -877,7 +877,7 @@ serve(async (req: Request) => {
       }
 
     // Sempre retornar sucesso, mesmo sem dados
-      response = {
+      const response = {
         success: true,
         message: "Relatório gerado com sucesso",
         cliente: cliente.nome_fantasia || cliente.nome,
@@ -894,7 +894,6 @@ serve(async (req: Request) => {
       },
       timestamp: new Date().toISOString()
     };
-
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
