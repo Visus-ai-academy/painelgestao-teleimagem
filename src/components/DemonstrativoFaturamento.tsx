@@ -471,9 +471,24 @@ export default function DemonstrativoFaturamento() {
         console.log('👥 Clientes únicos na volumetria:', clientesUnicos.length, clientesUnicos.slice(0, 5));
       }
       
-      // Buscar dados de faturamento do período - TODOS OS DADOS PRIMEIRO
-      console.log('🔍 Iniciando busca na tabela faturamento...');
+      // Buscar dados de faturamento do período - AGRUPADOS POR NOME FANTASIA
+      console.log('🔍 Iniciando busca na tabela faturamento com agrupamento por nome fantasia...');
       console.log('🔍 Período de busca:', periodo);
+      
+      // Primeiro buscar clientes ativos para mapear nome -> nome_fantasia
+      const { data: clientesAtivos } = await supabase
+        .from('clientes')
+        .select('nome, nome_fantasia, nome_mobilemed')
+        .eq('ativo', true);
+        
+      const mapeamentoNomes = new Map();
+      clientesAtivos?.forEach(c => {
+        const fantasia = c.nome_fantasia || c.nome;
+        // Mapear todos os nomes possíveis para o nome fantasia
+        if (c.nome) mapeamentoNomes.set(c.nome, fantasia);
+        if (c.nome_fantasia) mapeamentoNomes.set(c.nome_fantasia, fantasia);
+        if (c.nome_mobilemed) mapeamentoNomes.set(c.nome_mobilemed, fantasia);
+      });
       
       const { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
@@ -504,17 +519,41 @@ export default function DemonstrativoFaturamento() {
       })));
       
       if (dadosFaturamento && dadosFaturamento.length > 0) {
-        const clientesUnicos = [...new Set(dadosFaturamento.map(d => d.cliente_nome))];
-        console.log('👥 Clientes únicos encontrados:', clientesUnicos.length, clientesUnicos);
+        // Agrupar por nome fantasia primeiro
+        const dadosFaturamentoAgrupados = new Map();
+        
+        dadosFaturamento.forEach(item => {
+          const nomeFantasia = mapeamentoNomes.get(item.cliente_nome) || item.cliente_nome;
+          
+          if (!dadosFaturamentoAgrupados.has(nomeFantasia)) {
+            dadosFaturamentoAgrupados.set(nomeFantasia, []);
+          }
+          dadosFaturamentoAgrupados.get(nomeFantasia).push({
+            ...item,
+            cliente_nome: nomeFantasia // Usar nome fantasia
+          });
+        });
+        
+        // Converter map de volta para array
+        const dadosAgrupados = [];
+        for (const [nomeFantasia, itens] of dadosFaturamentoAgrupados) {
+          dadosAgrupados.push(...itens);
+        }
+        
+        const clientesUnicos = [...new Set(dadosAgrupados.map(d => d.cliente_nome))];
+        console.log('👥 Clientes únicos encontrados (agrupados por nome fantasia):', clientesUnicos.length, clientesUnicos);
         console.log('📋 Lista completa de clientes únicos:', clientesUnicos);
         
-        // Log detalhado de cada cliente
+        // Log detalhado de cada cliente agrupado
         clientesUnicos.forEach(clienteNome => {
-          const registrosCliente = dadosFaturamento.filter(d => d.cliente_nome === clienteNome);
+          const registrosCliente = dadosAgrupados.filter(d => d.cliente_nome === clienteNome);
           const totalExames = registrosCliente.reduce((sum, r) => sum + (r.quantidade || 1), 0);
           const totalValor = registrosCliente.reduce((sum, r) => sum + (Number(r.valor_bruto) || 0), 0);
           console.log(`📊 ${clienteNome}: ${registrosCliente.length} registros, ${totalExames} exames, R$ ${totalValor.toFixed(2)}`);
         });
+        
+        // Usar dados agrupados
+        dadosFaturamento = dadosAgrupados;
       } else {
         console.warn('⚠️ Nenhum dado de faturamento retornado pela consulta');
         console.log('🔍 Detalhes do erro:', error);

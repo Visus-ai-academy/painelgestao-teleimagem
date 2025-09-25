@@ -385,7 +385,7 @@ serve(async (req: Request) => {
                 p_categoria: g.categoria || 'SC',
                 p_prioridade: g.prioridade,
                 p_volume_total: volumeParaCalculo,
-                p_periodo: periodo
+                p_is_plantao: isPlantao
               });
               
               if (precoError) {
@@ -863,10 +863,10 @@ serve(async (req: Request) => {
       }
 
     // Sempre retornar sucesso, mesmo sem dados
-    const response = {
-      success: true,
-      message: "Relatório gerado com sucesso",
-      cliente: cliente.nome,
+      response = {
+        success: true,
+        message: "Relatório gerado com sucesso",
+        cliente: cliente.nome_fantasia || cliente.nome,
       periodo: periodo,
       totalRegistros: finalData.length,
       dadosEncontrados: finalData.length > 0,

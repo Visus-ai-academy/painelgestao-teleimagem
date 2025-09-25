@@ -233,6 +233,7 @@ serve(async (req) => {
           let detalhesCalculo: any = {};
           
           // Usar função calcular_preco_exame que implementa corretamente Vol. Inicial/Final
+          const isPlantao = grupo.prioridade === 'PLANTÃO';
           const { data: precoCalculado, error: precoError } = await supabase.rpc('calcular_preco_exame', {
             p_cliente_id: cliente.id,
             p_modalidade: grupo.modalidade,
@@ -240,7 +241,7 @@ serve(async (req) => {
             p_categoria: grupo.categoria,
             p_prioridade: grupo.prioridade,
             p_volume_total: grupo.quantidade,
-            p_periodo: periodo
+            p_is_plantao: isPlantao
           });
           
           if (precoError) {
@@ -317,7 +318,7 @@ serve(async (req) => {
 
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
-        cliente_nome: cliente.nome,
+        cliente_nome: cliente.nome_fantasia || cliente.nome,
         periodo,
         total_exames: totalExames,
         valor_exames: valorExamesCalculado,
