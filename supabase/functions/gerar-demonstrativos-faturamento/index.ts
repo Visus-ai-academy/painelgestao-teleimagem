@@ -143,34 +143,52 @@ serve(async (req) => {
         gruposExames[key].quantidade += qtd;
       }
 
-      // Calcular preços para cada grupo
+      // Calcular preços para cada grupo usando tabela precos_servicos
       for (const [key, grupo] of Object.entries(gruposExames)) {
         try {
-          const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
-            p_cliente_id: cliente.id,
-            p_modalidade: grupo.modalidade,
-            p_especialidade: grupo.especialidade,
-            p_prioridade: grupo.prioridade,
-            p_categoria: grupo.categoria,
-            p_volume_total: grupo.quantidade,
-            p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO'),
-          });
+          // Buscar preço na tabela precos_servicos
+          const { data: precoData, error } = await supabase
+            .from('precos_servicos')
+            .select('valor_base, valor_urgencia')
+            .eq('cliente_id', cliente.id)
+            .eq('modalidade', grupo.modalidade)
+            .eq('especialidade', grupo.especialidade)
+            .eq('categoria', grupo.categoria)
+            .eq('prioridade', grupo.prioridade)
+            .eq('ativo', true)
+            .maybeSingle();
           
-          const precoUnitario = Number(preco || 0);
+          if (error) {
+            console.error(`Erro ao buscar preço para ${key}:`, error);
+            continue;
+          }
+          
+          let precoUnitario = 0;
+          if (precoData) {
+            // Verificar se é urgência/plantão para usar valor_urgencia
+            const isUrgencia = grupo.prioridade.toUpperCase().includes('URGÊNCIA') || 
+                             grupo.prioridade.toUpperCase().includes('PLANTAO') ||
+                             grupo.prioridade.toUpperCase().includes('PLANTÃO');
+            
+            precoUnitario = isUrgencia && precoData.valor_urgencia ? 
+                           Number(precoData.valor_urgencia) : 
+                           Number(precoData.valor_base || 0);
+          }
+          
           const valorTotal = precoUnitario * grupo.quantidade;
           valorExamesCalculado += valorTotal;
           
-          if (valorTotal > 0) {
-            detalhesExames.push({
-              modalidade: grupo.modalidade,
-              especialidade: grupo.especialidade,
-              categoria: grupo.categoria,
-              prioridade: grupo.prioridade,
-              quantidade: grupo.quantidade,
-              valor_unitario: precoUnitario,
-              valor_total: valorTotal
-            });
-          }
+          console.log(`Calculado para ${key}: ${grupo.quantidade} x R$ ${precoUnitario} = R$ ${valorTotal}`);
+          
+          detalhesExames.push({
+            modalidade: grupo.modalidade,
+            especialidade: grupo.especialidade,
+            categoria: grupo.categoria,
+            prioridade: grupo.prioridade,
+            quantidade: grupo.quantidade,
+            valor_unitario: precoUnitario,
+            valor_total: valorTotal
+          });
         } catch (error) {
           console.error(`Erro ao calcular preço para ${key}:`, error);
         }
