@@ -913,7 +913,7 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  };
+  } // End processRequest function
 
   // Executar com timeout
   try {
@@ -929,4 +929,4 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-}); // End serve function
+});
