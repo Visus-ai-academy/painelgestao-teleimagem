@@ -102,14 +102,30 @@ serve(async (req) => {
         cliente.nome_mobilemed || cliente.nome
       ].filter(Boolean);
 
-      // Busca única por nomes (EMPRESA ou Cliente_Nome_Fantasia) com colunas necessárias
-      const inList = nomesBusca.map((n: string) => `"${n}"`).join(',');
-      const orFilter = `"EMPRESA".in.(${inList}),"Cliente_Nome_Fantasia".in.(${inList})`;
-      let { data: volumetria } = await supabase
+      // Busca única por nomes com múltiplas estratégias
+      let { data: volumetria } = null;
+      
+      // Estratégia 1: Busca por EMPRESA
+      const { data: volumetriaEmpresa } = await supabase
         .from('volumetria_mobilemed')
         .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
         .eq('periodo_referencia', periodo)
-        .or(orFilter);
+        .in('EMPRESA', nomesBusca);
+      
+      // Estratégia 2: Busca por Cliente_Nome_Fantasia
+      const { data: volumetriaFantasia } = await supabase
+        .from('volumetria_mobilemed')
+        .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
+        .eq('periodo_referencia', periodo)
+        .in('"Cliente_Nome_Fantasia"', nomesBusca);
+      
+      // Combinar resultados únicos
+      const volumetriaMap = new Map();
+      [...(volumetriaEmpresa || []), ...(volumetriaFantasia || [])].forEach(item => {
+        const key = `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
+        volumetriaMap.set(key, item);
+      });
+      volumetria = Array.from(volumetriaMap.values());
 
       // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
