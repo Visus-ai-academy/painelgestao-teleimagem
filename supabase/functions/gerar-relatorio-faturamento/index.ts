@@ -913,7 +913,7 @@ const handler = async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  }; // End processRequest function
+  } // End processRequest function
 
   // Executar com timeout
   try {
