@@ -122,27 +122,132 @@ serve(async (req) => {
         totalExames += vol.VALORES || 0;
       }
 
-      // Criar demonstrativo básico
+      // Calcular valores dos exames usando preços do banco
+      let valorExamesCalculado = 0;
+      const detalhesExames = [];
+
+      // Agrupar volumetria por modalidade/especialidade/categoria/prioridade
+      const gruposExames: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }> = {};
+      
+      for (const vol of volumetria) {
+        const modalidade = (vol.MODALIDADE || '').toString();
+        const especialidade = (vol.ESPECIALIDADE || '').toString();
+        const categoria = (vol.CATEGORIA || 'SC').toString();
+        const prioridade = (vol.PRIORIDADE || '').toString();
+        const key = `${modalidade}|${especialidade}|${categoria}|${prioridade}`;
+        const qtd = Number(vol.VALORES || 0) || 0;
+        
+        if (!gruposExames[key]) {
+          gruposExames[key] = { modalidade, especialidade, categoria, prioridade, quantidade: 0 };
+        }
+        gruposExames[key].quantidade += qtd;
+      }
+
+      // Calcular preços para cada grupo
+      for (const [key, grupo] of Object.entries(gruposExames)) {
+        try {
+          const { data: preco, error } = await supabase.rpc('calcular_preco_exame', {
+            p_cliente_id: cliente.id,
+            p_modalidade: grupo.modalidade,
+            p_especialidade: grupo.especialidade,
+            p_prioridade: grupo.prioridade,
+            p_categoria: grupo.categoria,
+            p_volume_total: grupo.quantidade,
+            p_is_plantao: grupo.prioridade.includes('PLANTAO') || grupo.prioridade.includes('PLANTÃO'),
+          });
+          
+          const precoUnitario = Number(preco || 0);
+          const valorTotal = precoUnitario * grupo.quantidade;
+          valorExamesCalculado += valorTotal;
+          
+          if (valorTotal > 0) {
+            detalhesExames.push({
+              modalidade: grupo.modalidade,
+              especialidade: grupo.especialidade,
+              categoria: grupo.categoria,
+              prioridade: grupo.prioridade,
+              quantidade: grupo.quantidade,
+              valor_unitario: precoUnitario,
+              valor_total: valorTotal
+            });
+          }
+        } catch (error) {
+          console.error(`Erro ao calcular preço para ${key}:`, error);
+        }
+      }
+
+      // Buscar parâmetros de faturamento para calcular franquia, portal e integração
+      const { data: parametros } = await supabase
+        .from('parametros_faturamento')
+        .select('*')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'A')
+        .maybeSingle();
+
+      let valorFranquia = 0;
+      let valorPortal = 0;
+      let valorIntegracao = 0;
+
+      if (parametros) {
+        // Calcular franquia
+        if (parametros.aplicar_franquia) {
+          if (parametros.frequencia_continua) {
+            valorFranquia = parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)
+              ? (parametros.valor_acima_franquia || parametros.valor_franquia || 0)
+              : (parametros.valor_franquia || 0);
+          } else if (totalExames > 0) {
+            valorFranquia = parametros.frequencia_por_volume && totalExames > (parametros.volume_franquia || 0)
+              ? (parametros.valor_acima_franquia || parametros.valor_franquia || 0)
+              : (parametros.valor_franquia || 0);
+          }
+        }
+
+        // Calcular portal de laudos
+        if (parametros.portal_laudos) {
+          valorPortal = parametros.valor_integracao || 0;
+        }
+
+        // Calcular integração
+        if (parametros.cobrar_integracao) {
+          valorIntegracao = parametros.valor_integracao || 0;
+        }
+      }
+
+      const valorBruto = valorExamesCalculado + valorFranquia + valorPortal + valorIntegracao;
+      const valorImpostos = valorBruto * 0.0615; // 6.15% de impostos
+      const valorTotal = valorBruto - valorImpostos;
+
+      // Criar demonstrativo com valores calculados
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
         cliente_nome: cliente.nome_fantasia || cliente.nome,
         periodo,
         total_exames: totalExames,
-        valor_exames: 0,
-        valor_franquia: 0,
-        valor_portal_laudos: 0,
-        valor_integracao: 0,
-        valor_bruto: 0,
-        valor_impostos: 0,
-        valor_total: 0,
-        detalhes_franquia: {},
-        detalhes_exames: [],
-        detalhes_tributacao: {},
+        valor_exames: valorExamesCalculado,
+        valor_franquia: valorFranquia,
+        valor_portal_laudos: valorPortal,
+        valor_integracao: valorIntegracao,
+        valor_bruto: valorBruto,
+        valor_impostos: valorImpostos,
+        valor_total: valorTotal,
+        detalhes_franquia: {
+          aplicar: parametros?.aplicar_franquia || false,
+          valor_base: parametros?.valor_franquia || 0,
+          frequencia_continua: parametros?.frequencia_continua || false
+        },
+        detalhes_exames: detalhesExames,
+        detalhes_tributacao: {
+          percentual_total: 6.15,
+          pis: valorBruto * 0.0065,
+          cofins: valorBruto * 0.03,
+          csll: valorBruto * 0.01,
+          irrf: valorBruto * 0.015
+        },
         tipo_faturamento: tipoFaturamento
       };
 
       demonstrativos.push(demonstrativo);
-      console.log(`Demonstrativo básico criado para ${cliente.nome}: ${totalExames} exames`);
+      console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
     }
 
     console.log(`Total de demonstrativos gerados: ${demonstrativos.length}`);
