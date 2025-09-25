@@ -189,13 +189,32 @@ serve(async (req) => {
         });
       }
 
-      // Contar exames totais (apenas registros faturáveis) - MANTENDO FILTRO NC-NF
+      // Contar exames totais (apenas registros faturáveis) - APLICANDO TODOS OS FILTROS DE EXCLUSÃO
       let totalExames = 0;
       for (const vol of volumetria) {
-        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-        if (vol.tipo_faturamento === 'NC-NF') {
+        // APLICAR FILTROS DE EXCLUSÃO: Excluir registros que não devem ser faturados
+        if (vol.tipo_faturamento === 'NC-NF' || vol.tipo_faturamento === 'EXCLUSAO') {
           continue; // Pular este registro do total
         }
+        
+        // FILTRO ESPECÍFICO CBU: Excluir exames com ESTUDO_DESCRICAO que indica exclusão
+        if (nomeFantasia === 'CBU') {
+          const estudoDesc = (vol.ESTUDO_DESCRICAO || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Excluir exames que não devem ser faturados para CBU
+          if (estudoDesc.includes('EXCLUSAO') || estudoDesc.includes('NAO FATURAR') || 
+              estudoDesc.includes('SEM COBRANCA') || estudoDesc.includes('CORTESIA') ||
+              estudoDesc.includes('CANCELADO') || estudoDesc.includes('TESTE')) {
+            continue;
+          }
+          
+          // Outros filtros específicos para CBU se necessário
+          if (medico.includes('TESTE') || medico.includes('DEMO')) {
+            continue;
+          }
+        }
+        
         totalExames += vol.VALORES || 0;
       }
 
@@ -207,9 +226,27 @@ serve(async (req) => {
       const gruposExames: Record<string, { modalidade: string; especialidade: string; categoria: string; prioridade: string; quantidade: number }> = {};
       
       for (const vol of volumetria) {
-        // APLICAR FILTRO NC-NF: Excluir registros que não devem ser faturados
-        if (vol.tipo_faturamento === 'NC-NF') {
+        // APLICAR FILTROS DE EXCLUSÃO: Excluir registros que não devem ser faturados
+        if (vol.tipo_faturamento === 'NC-NF' || vol.tipo_faturamento === 'EXCLUSAO') {
           continue; // Pular este registro
+        }
+        
+        // FILTRO ESPECÍFICO CBU: Excluir exames com ESTUDO_DESCRICAO que indica exclusão
+        if (nomeFantasia === 'CBU') {
+          const estudoDesc = (vol.ESTUDO_DESCRICAO || '').toString().toUpperCase();
+          const medico = (vol.MEDICO || '').toString().toUpperCase();
+          
+          // Excluir exames que não devem ser faturados para CBU
+          if (estudoDesc.includes('EXCLUSAO') || estudoDesc.includes('NAO FATURAR') || 
+              estudoDesc.includes('SEM COBRANCA') || estudoDesc.includes('CORTESIA') ||
+              estudoDesc.includes('CANCELADO') || estudoDesc.includes('TESTE')) {
+            continue;
+          }
+          
+          // Outros filtros específicos para CBU se necessário
+          if (medico.includes('TESTE') || medico.includes('DEMO')) {
+            continue;
+          }
         }
         
         const modalidade = (vol.MODALIDADE || '').toString();
@@ -355,7 +392,8 @@ serve(async (req) => {
         valorIRRF = valorBruto * 0.015; // 1,5% padrão
       }
 
-      const valorTotal = valorBruto + valorISS + valorIRRF;
+      const totalImpostos = valorISS + valorIRRF;
+      const valorLiquido = valorBruto - totalImpostos; // VALOR LÍQUIDO = BRUTO - IMPOSTOS
 
       const demonstrativo: DemonstrativoCliente = {
         cliente_id: cliente.id,
@@ -367,23 +405,25 @@ serve(async (req) => {
         valor_portal_laudos: valorPortalLaudos,
         valor_integracao: valorIntegracao,
         valor_bruto: valorBruto,
-        valor_impostos: valorISS + valorIRRF,
-        valor_total: valorTotal,
+        valor_impostos: totalImpostos,
+        valor_total: valorLiquido, // VALOR LÍQUIDO (bruto - impostos)
         detalhes_franquia: detalhesFranquia,
         detalhes_exames: detalhesExames,
         detalhes_tributacao: {
           simples_nacional: parametros?.simples || false,
           percentual_iss: parametros?.percentual_iss,
           valor_iss: valorISS,
+          valor_irrf: valorIRRF,
           base_calculo: valorBruto,
           impostos_ab_min: parametros?.impostos_ab_min || 0,
-          irrf: valorBruto * 0.015
+          total_impostos: totalImpostos,
+          valor_liquido: valorLiquido
         },
         tipo_faturamento: tipoFaturamento
       };
 
-      // Incluir no demonstrativo se houver volumetria (exames) OU valor total > 0
-      if (totalExames > 0 || valorTotal > 0) {
+      // Incluir no demonstrativo se houver volumetria (exames) OU valor líquido > 0
+      if (totalExames > 0 || valorLiquido > 0) {
         demonstrativos.push(demonstrativo);
       }
     }
@@ -400,16 +440,47 @@ serve(async (req) => {
       valor_integracao_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_integracao || 0), 0),
       valor_bruto_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_bruto || 0), 0),
       valor_impostos_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_impostos || 0), 0),
-      valor_total_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0),
+      valor_liquido_geral: demonstrativos.reduce((acc, dem) => acc + (dem.valor_total || 0), 0), // valor_total agora é líquido
       clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
       clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
     };
+
+    // Gerar relatórios PDF automaticamente para cada cliente
+    let relatoriosGerados = 0;
+    let relatoriosComErro = 0;
+
+    for (const demonstrativo of demonstrativos) {
+      try {
+        // Chamar a função que gera o PDF do relatório
+        const { error: pdfError } = await supabase.functions.invoke('gerar-relatorio-faturamento', {
+          body: {
+            cliente_id: demonstrativo.cliente_id,
+            periodo: demonstrativo.periodo,
+            demonstrativo_data: demonstrativo
+          }
+        });
+
+        if (pdfError) {
+          console.error(`Erro ao gerar PDF para cliente ${demonstrativo.cliente_nome}:`, pdfError);
+          relatoriosComErro++;
+        } else {
+          relatoriosGerados++;
+        }
+      } catch (error) {
+        console.error(`Erro ao gerar relatório para ${demonstrativo.cliente_nome}:`, error);
+        relatoriosComErro++;
+      }
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         demonstrativos,
-        resumo
+        resumo: {
+          ...resumo,
+          relatorios_gerados: relatoriosGerados,
+          relatorios_com_erro: relatoriosComErro
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
