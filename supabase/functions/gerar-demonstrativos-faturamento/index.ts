@@ -193,7 +193,7 @@ serve(async (req) => {
       } else if (nomeFantasia === 'CDATUCURUI' || nomeFantasia === 'CDA TUCURUI') {
         padroesBusca = ['CDATUCURUI%', 'CDA_TUCURUI%', 'CDA-TUCURUI%', 'CDA TUCURUI%'];
       } else if (nomeFantasia.includes('AKCPALMAS') || nomeFantasia.includes('AKC')) {
-        padroesBusca = ['AKC%', 'AKCPALMAS%'];
+        padroesBusca = ['AKC%', 'AKCPALMAS%', 'AKC_PALMAS%', 'AKC-PALMAS%', 'AKC PALMAS%'];
       }
       // Agrupamento genérico: se nome_fantasia é diferente do nome, buscar variações
       else if (cliente.nome_fantasia && cliente.nome_fantasia !== cliente.nome) {
@@ -208,19 +208,28 @@ serve(async (req) => {
       // SEMPRE executar busca por padrão se houver padrões definidos
       if (padroesBusca.length > 0) {
         for (const padrao of padroesBusca) {
-          const { data: volumetriaAgrupada } = await supabase
-            .from('volumetria_mobilemed')
-            .select('*')
-            .eq('periodo_referencia', periodo)
-            .like('"EMPRESA"', padrao);
+          const [volEmp, volFant] = await Promise.all([
+            supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('periodo_referencia', periodo)
+              .like('"EMPRESA"', padrao),
+            supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('periodo_referencia', periodo)
+              .like('"Cliente_Nome_Fantasia"', padrao)
+          ]);
           
-          if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
-            // Adicionar ao conjunto usando Map para evitar duplicatas
-            volumetriaAgrupada.forEach(item => {
+          const combinar = (arr?: any[] | null) => {
+            (arr || []).forEach(item => {
               const key = `${item.EMPRESA}_${item.ESTUDO_DESCRICAO || ''}_${item.VALORES}_${item.MEDICO || ''}`;
               volumetriaMap.set(key, item);
             });
-          }
+          };
+
+          combinar(volEmp.data as any[]);
+          combinar(volFant.data as any[]);
         }
         
         // Recriar array a partir do Map atualizado
