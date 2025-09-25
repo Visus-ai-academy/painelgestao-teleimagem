@@ -39,8 +39,8 @@ serve(async (req) => {
       throw new Error('Período é obrigatório');
     }
 
-    // Buscar clientes ativos
-    const { data: clientes, error: clientesError } = await supabase
+    // Buscar clientes ativos (com optional filtro)
+    let clientesQuery = supabase
       .from('clientes')
       .select(`
         id,
@@ -68,8 +68,22 @@ serve(async (req) => {
           numero_contrato
         )
       `)
-      .eq('ativo', true)
-      .order('nome');
+      .eq('ativo', true);
+
+    if (Array.isArray(clientesFiltro) && clientesFiltro.length > 0) {
+      const looksUuid = typeof clientesFiltro[0] === 'string' && /[0-9a-fA-F-]{36}/.test(clientesFiltro[0]);
+      if (looksUuid) {
+        // Filtrar por ids
+        // @ts-ignore
+        clientesQuery = clientesQuery.in('id', clientesFiltro);
+      } else {
+        // Filtrar por nomes
+        // @ts-ignore
+        clientesQuery = clientesQuery.in('nome', clientesFiltro);
+      }
+    }
+
+    const { data: clientes, error: clientesError } = await clientesQuery.order('nome');
 
     if (clientesError) {
       console.error('Erro ao buscar clientes:', clientesError);
@@ -100,22 +114,14 @@ serve(async (req) => {
 
       console.log(`Buscando volumetria para ${cliente.nome} com nomes:`, nomesBusca);
 
-      // Estratégia 1: Busca exata pelos nomes cadastrados
+      // Busca única por nomes (EMPRESA ou Cliente_Nome_Fantasia) com colunas necessárias
+      const inList = nomesBusca.map((n: string) => `"${n}"`).join(',');
+      const orFilter = `"EMPRESA".in.(${inList}),"Cliente_Nome_Fantasia".in.(${inList})`;
       let { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
-        .select('*')
+        .select('EMPRESA, "Cliente_Nome_Fantasia", MODALIDADE, ESPECIALIDADE, CATEGORIA, PRIORIDADE, VALORES, ESTUDO_DESCRICAO, MEDICO, tipo_faturamento')
         .eq('periodo_referencia', periodo)
-        .in('"EMPRESA"', nomesBusca);
-
-      // Estratégia 2: Busca por Cliente_Nome_Fantasia
-      if (!volumetria || volumetria.length === 0) {
-        const { data: volumetriaAlt } = await supabase
-          .from('volumetria_mobilemed')
-          .select('*')
-          .eq('periodo_referencia', periodo)
-          .in('"Cliente_Nome_Fantasia"', nomesBusca);
-        volumetria = volumetriaAlt || [];
-      }
+        .or(orFilter);
 
       // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
       const nomeFantasia = cliente.nome_fantasia || cliente.nome;
@@ -330,9 +336,6 @@ serve(async (req) => {
             status: unit > 0 ? 'com_preco' : 'sem_preco'
           });
 
-          if (unit === 0) {
-            console.log(`Nenhum preço encontrado para ${key} - verificar tabela de preços`);
-          }
         } catch (error) {
           console.error(`Erro no cálculo de preço de ${key}:`, error);
         }
