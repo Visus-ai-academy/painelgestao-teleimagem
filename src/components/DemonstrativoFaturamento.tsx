@@ -490,7 +490,7 @@ export default function DemonstrativoFaturamento() {
         if (c.nome_mobilemed) mapeamentoNomes.set(c.nome_mobilemed, fantasia);
       });
       
-      const { data: dadosFaturamento, error } = await supabase
+      let { data: dadosFaturamento, error } = await supabase
         .from('faturamento')
         .select(`
           cliente_id,
@@ -1064,20 +1064,35 @@ export default function DemonstrativoFaturamento() {
       {/* ✅ RESUMO GERAL - Agora na aba correta */}
       {clientes.length > 0 && (() => {
         // ✅ EXTRAIR VALORES REAIS DOS DEMONSTRATIVOS SALVOS
-        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_completos_${periodo}`);
+        const demonstrativosCompletos = localStorage.getItem(`demonstrativos_${periodo}`);
         let resumoReal = null;
         
         if (demonstrativosCompletos) {
           try {
-            const dados = JSON.parse(demonstrativosCompletos);
-            resumoReal = dados.resumo;
-            console.log('✅ Resumo carregado do localStorage:', resumoReal);
-            console.log('✅ Dados completos do localStorage:', dados);
+            const demonstrativos = JSON.parse(demonstrativosCompletos);
+            console.log('✅ Demonstrativos carregados:', demonstrativos);
+            
+            // Calcular resumo dos demonstrativos salvos
+            resumoReal = {
+              clientes_processados: demonstrativos.length,
+              total_exames_geral: demonstrativos.reduce((sum, dem) => sum + (dem.total_exames || 0), 0),
+              valor_exames_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_exames || 0), 0),
+              valor_franquias_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_franquia || 0), 0),
+              valor_portal_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_portal_laudos || 0), 0),
+              valor_integracao_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_integracao || 0), 0),
+              valor_bruto_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_bruto || 0), 0),
+              valor_impostos_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_impostos || 0), 0),
+              valor_total_geral: demonstrativos.reduce((sum, dem) => sum + (dem.valor_total || 0), 0),
+              clientes_simples_nacional: demonstrativos.filter(dem => dem.detalhes_tributacao?.simples_nacional).length,
+              clientes_regime_normal: demonstrativos.filter(dem => !dem.detalhes_tributacao?.simples_nacional).length
+            };
+            
+            console.log('✅ Resumo calculado dos demonstrativos:', resumoReal);
           } catch (error) {
-            console.error('❌ Erro ao processar resumo do localStorage:', error);
+            console.error('❌ Erro ao processar demonstrativos do localStorage:', error);
           }
         } else {
-          console.warn('⚠️ Não há demonstrativos_completos no localStorage para período:', periodo);
+          console.warn('⚠️ Não há demonstrativos no localStorage para período:', periodo);
         }
         
         const resumoCalculado = resumoReal || (() => {
