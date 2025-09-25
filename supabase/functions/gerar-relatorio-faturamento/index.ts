@@ -133,9 +133,12 @@ serve(async (req: Request) => {
     console.log(`📊 Faturamento encontrado: ${dataFaturamento?.length || 0} registros`);
     
     if (!dataFaturamento || dataFaturamento.length === 0) {
+      // Buscar dados de volumetria como fallback (cliente_nome_fantasia) COM AGRUPAMENTO
       console.log('⚠️ Nenhum dado de faturamento encontrado, tentando volumetria...');
       
-      // Buscar dados de volumetria como fallback (cliente_nome_fantasia)
+      let dataVolumetria = null;
+      
+      // Estratégia 1: Busca por Cliente_Nome_Fantasia
       const { data: dataVolumetriaFantasia } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
@@ -146,9 +149,9 @@ serve(async (req: Request) => {
       console.log(`📊 Volumetria (Cliente_Nome_Fantasia) encontrada: ${dataVolumetriaFantasia?.length || 0} registros`);
       
       if (dataVolumetriaFantasia && dataVolumetriaFantasia.length > 0) {
-        dataFaturamento = dataVolumetriaFantasia;
+        dataVolumetria = dataVolumetriaFantasia;
       } else {
-        // Fallback adicional: buscar por EMPRESA com múltiplos candidatos
+        // Estratégia 2: Busca por EMPRESA com múltiplos candidatos
         const candidatos = [cliente.nome_fantasia, cliente.nome].filter(Boolean);
         const { data: dataVolumetriaEmpresa } = await supabase
           .from('volumetria_mobilemed')
@@ -157,9 +160,44 @@ serve(async (req: Request) => {
           .in('"EMPRESA"', candidatos as string[])
           .neq('tipo_faturamento', 'NC-NF');
         console.log(`📊 Volumetria (EMPRESA) encontrada: ${dataVolumetriaEmpresa?.length || 0} registros`);
+        
         if (dataVolumetriaEmpresa && dataVolumetriaEmpresa.length > 0) {
-          dataFaturamento = dataVolumetriaEmpresa;
+          dataVolumetria = dataVolumetriaEmpresa;
+        } else {
+          // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
+          const clientesComAgrupamento = ['PRN', 'CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'];
+          const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+          
+          if (clientesComAgrupamento.includes(nomeFantasia)) {
+            console.log(`📊 Aplicando agrupamento para ${nomeFantasia}`);
+            
+            let padraoBusca = '';
+            if (nomeFantasia === 'PRN') {
+              padraoBusca = 'PRN%';
+            } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
+              padraoBusca = 'CEDI%';
+            }
+            
+            if (padraoBusca) {
+              console.log(`📊 Buscando por padrão: ${padraoBusca}`);
+              const { data: dataVolumetriaAgrupada } = await supabase
+                .from('volumetria_mobilemed')
+                .select('*')
+                .eq('periodo_referencia', periodo)
+                .like('"EMPRESA"', padraoBusca)
+                .neq('tipo_faturamento', 'NC-NF');
+              
+              console.log(`📊 Volumetria (Agrupada) encontrada: ${dataVolumetriaAgrupada?.length || 0} registros`);
+              if (dataVolumetriaAgrupada && dataVolumetriaAgrupada.length > 0) {
+                dataVolumetria = dataVolumetriaAgrupada;
+              }
+            }
+          }
         }
+      }
+      
+      if (dataVolumetria && dataVolumetria.length > 0) {
+        dataFaturamento = dataVolumetria;
       }
     }
 

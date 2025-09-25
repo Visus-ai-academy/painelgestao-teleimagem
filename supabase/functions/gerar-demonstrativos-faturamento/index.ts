@@ -91,30 +91,67 @@ serve(async (req) => {
 
       console.log(`Processando cliente: ${cliente.nome}`);
 
-      // Buscar volumetria para este cliente no período
+      // Buscar volumetria para este cliente no período com agrupamento
       const nomesBusca = [
         cliente.nome,
         cliente.nome_fantasia || cliente.nome,
         cliente.nome_mobilemed || cliente.nome
       ].filter(Boolean);
 
+      console.log(`Buscando volumetria para ${cliente.nome} com nomes:`, nomesBusca);
+
+      // Estratégia 1: Busca exata pelos nomes cadastrados
       let { data: volumetria } = await supabase
         .from('volumetria_mobilemed')
         .select('*')
         .eq('periodo_referencia', periodo)
         .in('"EMPRESA"', nomesBusca);
 
+      // Estratégia 2: Busca por Cliente_Nome_Fantasia
       if (!volumetria || volumetria.length === 0) {
         const { data: volumetriaAlt } = await supabase
           .from('volumetria_mobilemed')
           .select('*')
           .eq('periodo_referencia', periodo)
           .in('"Cliente_Nome_Fantasia"', nomesBusca);
-        if (!volumetriaAlt || volumetriaAlt.length === 0) {
-          console.log(`Sem volumetria para ${cliente.nome} nas chaves:`, nomesBusca);
-          continue;
+        volumetria = volumetriaAlt || [];
+      }
+
+      // Estratégia 3: Para clientes específicos, fazer busca por padrão (agrupamento)
+      const clientesComAgrupamento = ['PRN', 'CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'];
+      const nomeFantasia = cliente.nome_fantasia || cliente.nome;
+      
+      if (clientesComAgrupamento.includes(nomeFantasia) && (!volumetria || volumetria.length === 0)) {
+        console.log(`Aplicando agrupamento para ${nomeFantasia}`);
+        
+        let padroesBusca: string[] = [];
+        
+        if (nomeFantasia === 'PRN') {
+          padroesBusca = ['PRN%'];
+        } else if (['CEDIDIAG', 'CEDI-RJ', 'CEDI-RO', 'CEDI_RJ', 'CEDI_RO'].includes(nomeFantasia)) {
+          padroesBusca = ['CEDI%'];
         }
-        volumetria = volumetriaAlt;
+        
+        if (padroesBusca.length > 0) {
+          console.log(`Buscando por padrões:`, padroesBusca);
+          
+          for (const padrao of padroesBusca) {
+            const { data: volumetriaAgrupada } = await supabase
+              .from('volumetria_mobilemed')
+              .select('*')
+              .eq('periodo_referencia', periodo)
+              .like('"EMPRESA"', padrao);
+            
+            if (volumetriaAgrupada && volumetriaAgrupada.length > 0) {
+              volumetria = (volumetria || []).concat(volumetriaAgrupada);
+            }
+          }
+        }
+      }
+
+      if (!volumetria || volumetria.length === 0) {
+        console.log(`Sem volumetria para ${cliente.nome} (${nomeFantasia}) nas chaves:`, nomesBusca);
+        continue;
       }
 
       console.log(`Encontrada volumetria: ${volumetria.length} registros`);
