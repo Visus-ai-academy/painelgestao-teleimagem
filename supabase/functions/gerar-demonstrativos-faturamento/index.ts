@@ -422,7 +422,6 @@ serve(async (req) => {
       } else {
         console.log(`Cliente ${cliente.nome} excluído - sem volumetria e sem valores: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
       }
-      console.log(`Demonstrativo criado para ${cliente.nome}: ${totalExames} exames, R$ ${valorTotal.toFixed(2)}`);
     }
 
     console.log(`Total de demonstrativos gerados: ${demonstrativos.length}`);
