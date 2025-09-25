@@ -1123,6 +1123,7 @@ export default function GerarFaturamento() {
       };
       localStorage.setItem(`demonstrativos_completos_${periodoSelecionado}`, JSON.stringify(dadosParaSalvar));
       console.log(`💾 Dados combinados salvos no localStorage. Lotes: ${chunks.length}, Processados: ${clientesProcessados}`);
+      console.log('💾 ATENÇÃO: Resumo sendo salvo em GerarFaturamento:', resumoCombinado);
 
       setStatusProcessamento({
         processando: true,

@@ -1033,6 +1033,7 @@ export default function DemonstrativoFaturamento() {
             const dados = JSON.parse(demonstrativosCompletos);
             resumoReal = dados.resumo;
             console.log('✅ Resumo carregado do localStorage:', resumoReal);
+            console.log('✅ Dados completos do localStorage:', dados);
           } catch (error) {
             console.error('❌ Erro ao processar resumo do localStorage:', error);
           }

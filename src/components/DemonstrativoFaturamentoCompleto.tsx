@@ -168,6 +168,8 @@ export function DemonstrativoFaturamentoCompleto({
           };
           localStorage.setItem(`demonstrativos_completos_${periodo}`, JSON.stringify(dadosParaSalvar));
           console.log('💾 demonstrativos_completos salvos no localStorage');
+          console.log('💾 Dados salvos:', dadosParaSalvar);
+          console.log('💾 Resumo salvo:', dadosParaSalvar.resumo);
         } catch (e) {
           console.warn('Não foi possível salvar demonstrativos completos no localStorage:', e);
         }
